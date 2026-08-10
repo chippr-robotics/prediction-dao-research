@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useAccount, useChainId } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { useDex } from '../../hooks/useDex'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
@@ -20,6 +20,9 @@ import BuyCryptoModal from './BuyCryptoModal'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { onrampAvailable, fetchOnrampOptions } from '../../lib/onramp/onrampClient'
 import { RoleDetailsSection } from './RoleDetailsCard'
+import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
+import { useAccountSwitcher, ACCOUNT_KIND_TAG, shortAccountAddr } from '../../hooks/useAccountSwitcher'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
 import './RoleDetailsCard.css'
@@ -39,19 +42,33 @@ function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showAddressQR, setShowAddressQR] = useState(false)
   const [showBuyCrypto, setShowBuyCrypto] = useState(false)
-  // Buy crypto (spec 060) two-layer gate: static capability + gateway (onrampAvailable), then the
+  // Buy crypto (spec 081) two-layer gate: static capability + gateway (onrampAvailable), then the
   // live catalog must CONFIRM the chain before the button renders — never a dead button (FR-006).
   // Stored as {chainId, ok} so a stale confirmation for another chain never leaks through the
   // derived flag below. Config-off leaves the sheet exactly as it is today.
   const [onrampCatalog, setOnrampCatalog] = useState(null)
   const { address, isConnected } = useAccount()
+  // Spec 063 (US1): the whole wallet identity — biticon, address, copy, balance, QR — reflects the
+  // account the member is ACTING AS (personal / multisig / recovered), not always the connected
+  // passkey, so it's obvious at a glance which account they're using. Falls back to the connected
+  // wallet when no acting account is selected.
+  const { address: actingAddress, label: actingLabel, type: actingType, isActingAccount } = useEffectiveAccount()
+  const displayAddress = actingAddress || address
+  const acctTypeLabel = actingType === 'vault' ? 'Multisig' : actingType === 'legacy' ? 'Recovered' : actingType === 'derived' ? 'Recovered' : null
+  // Acting-account switcher, surfaced as a caret dropdown ON the wallet biticon (spec 063 follow-up):
+  // picking an account switches the active identity so the biticon, address, balance, copy, and QR all
+  // follow it — no separate "Acting as" row.
+  const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hasChoices } = useAccountSwitcher()
+  const [acctMenuOpen, setAcctMenuOpen] = useState(false)
   const { openConnectModal, disconnectWallet } = useWallet()
-  const chainId = useChainId()
   const navigate = useNavigate()
   const { showModal } = useModal()
   const { copied: addressCopied, copy: copyAddress } = useClipboard()
   const { balances, loading: balanceLoading } = useDex()
-  const { network } = useNetworkMode()
+  // Both from the same source (issue #1030) — the chip used to pair `useChainId()`'s
+  // config-resolved id with `useNetworkMode()`'s network, so on an unconfigured chain the
+  // `Chain ${chainId}` fallback would have named the wrong chain too.
+  const { network, chainId } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
     roleDetails,
@@ -61,7 +78,7 @@ function WalletButton({ className = '' }) {
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
   // Purchases are delivered to the ACTIVE acting identity: the vault when operating as one,
-  // else the connected wallet — funds land where the member is currently acting (spec 060).
+  // else the connected wallet — funds land where the member is currently acting (spec 081).
   const { identity, isVault } = useActiveAccount()
   const buyDestination = isVault ? identity.vaultAddress : address
 
@@ -122,6 +139,12 @@ function WalletButton({ className = '' }) {
   const toggleDropdown = () => {
     setIsOpen(!isOpen)
   }
+
+  // Collapse the acting-account menu whenever the wallet dropdown itself closes.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when the dropdown closes
+    if (!isOpen) setAcctMenuOpen(false)
+  }, [isOpen])
 
   const handleDisconnect = () => {
     // Context disconnect: clears wagmi/WalletConnect persistence AND the
@@ -206,7 +229,7 @@ function WalletButton({ className = '' }) {
             aria-expanded={isOpen}
             aria-haspopup="true"
           >
-            <BlockiesAvatar address={address} size={24} />
+            <BlockiesAvatar address={displayAddress} size={24} />
           </button>
 
           {isOpen && (
@@ -217,17 +240,36 @@ function WalletButton({ className = '' }) {
             >
               <div className="dropdown-header">
                 <div className="account-info">
-                  <BlockiesAvatar address={address} size={40} />
+                  {/* The biticon IS the acting-account switcher: a caret expands the
+                      "act as" options (personal / multisig / recovered). Picking one
+                      switches the active identity so the biticon, address, balance,
+                      copy, and QR below all follow it. With only the personal wallet
+                      there's nothing to switch, so it's a plain avatar (no caret). */}
+                  {hasChoices ? (
+                    <button
+                      type="button"
+                      className="account-identity-trigger"
+                      onClick={() => setAcctMenuOpen((o) => !o)}
+                      aria-haspopup="listbox"
+                      aria-expanded={acctMenuOpen}
+                      aria-label="Change acting account"
+                    >
+                      <BlockiesAvatar address={displayAddress} size={40} />
+                      <span className="account-caret" aria-hidden="true">▾</span>
+                    </button>
+                  ) : (
+                    <BlockiesAvatar address={displayAddress} size={40} />
+                  )}
                   <div className="account-details">
                     <button
                       type="button"
                       className="account-address-full account-address-copy"
-                      onClick={() => copyAddress(address)}
-                      title={address}
-                      aria-label={addressCopied ? 'Address copied' : 'Copy wallet address'}
+                      onClick={() => copyAddress(displayAddress)}
+                      title={displayAddress}
+                      aria-label={addressCopied ? 'Address copied' : 'Copy account address'}
                     >
                       <span className="account-address-value">
-                        {addressCopied ? 'Copied!' : shortenAddress(address)}
+                        {addressCopied ? 'Copied!' : shortenAddress(displayAddress)}
                       </span>
                       <NavIcon
                         name={addressCopied ? 'check' : 'copy'}
@@ -235,6 +277,9 @@ function WalletButton({ className = '' }) {
                         className="account-address-copy-icon"
                       />
                     </button>
+                    {isActingAccount && (
+                      <span className="account-acting-tag">{actingLabel || acctTypeLabel}</span>
+                    )}
                     <span className="usdc-balance">
                       {balanceLoading
                         ? 'Loading...'
@@ -242,7 +287,7 @@ function WalletButton({ className = '' }) {
                     </span>
                     <span className="network-info">{network?.name || `Chain ${chainId}`}</span>
                   </div>
-                  {/* Buy crypto (spec 060): renders ONLY once the live catalog confirms the
+                  {/* Buy crypto (spec 081): renders ONLY once the live catalog confirms the
                       active network — config-off / testnet / unsupported leaves the sheet
                       byte-identical to today. Beside the balance it tops up. */}
                   {onrampConfirmed && (
@@ -265,7 +310,37 @@ function WalletButton({ className = '' }) {
                   >
                     <NavIcon name="qrcode" size={18} />
                   </button>
+
+                  {acctMenuOpen && hasChoices && (
+                    <ul className="account-switch-menu" role="listbox" aria-label="Act as account">
+                      {accounts.map((acc) => (
+                        <li key={acc.id} role="option" aria-selected={acc.id === currentId}>
+                          <button
+                            type="button"
+                            className="account-switch-opt"
+                            onClick={() => { choose(acc); setAcctMenuOpen(false) }}
+                          >
+                            <BlockiesAvatar address={acc.address} size={20} />
+                            <span className="account-switch-label">
+                              {acc.label || shortAccountAddr(acc.address)}
+                              {ACCOUNT_KIND_TAG[acc.kind] && (
+                                <span className="account-switch-tag">{ACCOUNT_KIND_TAG[acc.kind]}</span>
+                              )}
+                            </span>
+                            <span className="account-switch-addr">{shortAccountAddr(acc.address)}</span>
+                            {acc.id === currentId && <span className="account-switch-check" aria-hidden="true">✓</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
+                <LegacyUnlockDialog
+                  open={Boolean(unlockEntry)}
+                  entry={unlockEntry}
+                  onClose={() => setUnlockEntry(null)}
+                  onUnlocked={onUnlocked}
+                />
               </div>
 
               {/* Roles Section - Enhanced with details */}
@@ -308,8 +383,8 @@ function WalletButton({ className = '' }) {
               )}
 
               {/* Account Actions \u2014 personal account entries live here (moved off
-                  the section menu): Account, Membership, Preferences, plus the
-                  membership purchase flow and Disconnect. */}
+                  the section menu): Account, Membership, Network, Preferences, plus
+                  the membership purchase flow and Disconnect. */}
               <div className="dropdown-actions">
                 <button
                   onClick={() => { setIsOpen(false); navigate('/wallet?tab=account') }}
@@ -341,6 +416,16 @@ function WalletButton({ className = '' }) {
                     <span>Purchase Membership</span>
                   </button>
                 )}
+                {/* Network settings sit beside Preferences (spec 069) — RPC endpoints,
+                    failover and API keys are member configuration, not a Tools section. */}
+                <button
+                  onClick={() => { setIsOpen(false); navigate('/wallet?tab=network') }}
+                  className="action-button"
+                  role="menuitem"
+                >
+                  <span className="action-icon" aria-hidden="true"><NavIcon name="globe" size={16} /></span>
+                  <span>Network</span>
+                </button>
                 <button
                   onClick={() => { setIsOpen(false); navigate('/wallet?tab=preferences') }}
                   className="action-button"
@@ -381,12 +466,12 @@ function WalletButton({ className = '' }) {
         <AddressQRModal
           isOpen
           onClose={() => setShowAddressQR(false)}
-          address={address}
+          address={displayAddress}
           variant="quick"
         />
       )}
 
-      {/* Buy crypto pre-handoff disclosure (spec 060). chainId/destination stay live props so a
+      {/* Buy crypto pre-handoff disclosure (spec 081). chainId/destination stay live props so a
           network switched after opening is re-validated before any handoff to Coinbase. */}
       {showBuyCrypto && (
         <BuyCryptoModal

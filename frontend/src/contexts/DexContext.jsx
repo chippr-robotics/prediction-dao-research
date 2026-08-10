@@ -4,14 +4,19 @@ import { useChainId } from 'wagmi'
 import { useWallet } from '../hooks/useWalletManagement'
 import { useActiveAccount } from '../hooks/useActiveAccount'
 import { FEE_TIERS, DEFAULT_SLIPPAGE } from '../constants/dex'
-import { getNetwork, getCurrentChainId } from '../config/networks'
-import { getPortfolioRegistry } from '../config/assetTaxonomy'
+import { NETWORKS, getNetwork, getCurrentChainId } from '../config/networks'
 import { ERC20_ABI } from '../abis/ERC20'
 import { WNATIVE_ABI } from '../abis/WNative'
 import { SWAP_ROUTER_02_ABI } from '../abis/SwapRouter02'
 import { QUOTER_V2_ABI } from '../abis/QuoterV2'
 import { DexContext } from './DexContext'
-import { toSdkToken, buildTradeMetrics, ROUTED_FEE_TIERS } from '../lib/uniswap/trade'
+import { quoteBestRoute } from '../lib/uniswap/quote'
+import {
+  getSwapAddresses,
+  getSwapTokenMeta,
+  getSwapTokens,
+  isSwapChain,
+} from '../lib/uniswap/swapUniverse'
 import { makeReadProvider } from '../utils/rpcProvider'
 import logger from '../utils/logger'
 
@@ -27,7 +32,11 @@ const ZERO = '0x0000000000000000000000000000000000000000'
 export function DexProvider({ children }) {
   const { provider, address, isConnected, sendCalls } = useWallet()
   // Spec 043 (US3): swapping while operating as a vault becomes a threshold-gated vault proposal.
-  const { isVault: operatingAsVault, canActAsVault, identity: activeIdentity, submit: submitAsActive } = useActiveAccount()
+  const {
+    isVault: operatingAsVault, canActAsVault,
+    isLegacy: operatingAsLegacy, canActAsLegacy,
+    identity: activeIdentity, submit: submitAsActive,
+  } = useActiveAccount()
   const wagmiChainId = useChainId()
   const chainId = wagmiChainId || getCurrentChainId()
   const network = getNetwork(chainId)
@@ -46,7 +55,11 @@ export function DexProvider({ children }) {
   // member operates as one (on the vault's own network), else the connected
   // wallet. Balances and swap recipients follow this address so "available to
   // trade" is accurate for the selected account (Spec 043).
-  const tradingAddress = operatingAsVault && canActAsVault ? activeIdentity.vaultAddress : address
+  const tradingAddress = operatingAsVault && canActAsVault
+    ? activeIdentity.vaultAddress
+    : operatingAsLegacy && activeIdentity?.address
+      ? activeIdentity.address
+      : address
 
   const dexConfig = network?.dex || null
   const stableConfig = network?.stablecoin || null
@@ -105,20 +118,12 @@ export function DexProvider({ children }) {
   // portfolio registry knows about on this network (wrapped native + stablecoin
   // from app-config, plus curated commodities/tools/stables) — i.e. the
   // portfolio assets that have a routeable pair on a chain we support. Native
-  // coins (must be wrapped first) and NFT credentials are excluded. Swaps
-  // execute on the active chain, so the list is per-chain (honest-state: we only
-  // offer what can actually route here). Falls back to []/no-DEX cleanly.
-  const tradeTokens = useMemo(() => {
-    if (!isDexAvailable) return []
-    return getPortfolioRegistry(chainId)
-      .filter((entry) => entry.kind === 'erc20' && entry.address)
-      .map((entry) => ({
-        address: entry.address,
-        symbol: entry.symbol,
-        name: entry.name,
-        decimals: entry.decimals,
-      }))
-  }, [chainId, isDexAvailable])
+  // coins (must be wrapped first) and NFT credentials are excluded.
+  //
+  // This is `getSwapTokens(chainId)` — the SAME derivation the multi-network
+  // ticket applies to every other chain, deliberately not a second copy of it:
+  // the connected chain's list must not be able to drift from the rest.
+  const tradeTokens = useMemo(() => getSwapTokens(chainId), [chainId])
 
   // Address → metadata lookup so quote/swap math uses the right decimals and
   // ticker for any tradeable token, not just wrapped-native and the stablecoin.
@@ -268,6 +273,15 @@ export function DexProvider({ children }) {
         return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
+      // Spec 062: as a recovered legacy account, sign with its unlocked key (via
+      // the active-account seam), executing immediately — never the connected wallet.
+      if (operatingAsLegacy) {
+        if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to act as it.')
+        const res = await submitAsActive({ batch: [call] })
+        await fetchBalances()
+        return { sent: true, txHash: res.txHash }
+      }
+
       if (typeof sendCalls !== 'function') throw new Error('Wallet not connected')
       const res = await sendCalls([call])
       if (res?.state === 'failed') throw new Error(res.reason || 'Transaction failed')
@@ -280,7 +294,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [contracts, addresses, operatingAsVault, canActAsVault, submitAsActive, sendCalls, fetchBalances])
+  }, [contracts, addresses, operatingAsVault, canActAsVault, operatingAsLegacy, canActAsLegacy, submitAsActive, sendCalls, fetchBalances])
 
   const unwrapNative = useCallback(async (amount) => {
     if (!contracts) {
@@ -299,6 +313,13 @@ export function DexProvider({ children }) {
         return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
+      if (operatingAsLegacy) {
+        if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to act as it.')
+        const res = await submitAsActive({ batch: [call] })
+        await fetchBalances()
+        return { sent: true, txHash: res.txHash }
+      }
+
       if (typeof sendCalls !== 'function') throw new Error('Wallet not connected')
       const res = await sendCalls([call])
       if (res?.state === 'failed') throw new Error(res.reason || 'Transaction failed')
@@ -311,7 +332,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [contracts, addresses, operatingAsVault, canActAsVault, submitAsActive, sendCalls, fetchBalances])
+  }, [contracts, addresses, operatingAsVault, canActAsVault, operatingAsLegacy, canActAsLegacy, submitAsActive, sendCalls, fetchBalances])
 
   // Decimals lookup for a token by address used in quote/swap calls below.
   // Defaults to 18 (native/wrapped) when the token isn't in our known set.
@@ -360,102 +381,70 @@ export function DexProvider({ children }) {
     }
   }, [contracts, decimalsOf])
 
-  // Route a quote across the common V3 fee tiers and return the best-execution
-  // result decorated with Uniswap SDK figures (execution price, minimum
-  // received after slippage, price impact) — the numbers a trading UI shows.
-  const getBestQuote = useCallback(async (tokenIn, tokenOut, amountIn) => {
-    if (!contracts) {
+  /**
+   * Quote a pair on ANY swap-capable network — the read half of multi-network
+   * trading. The connected chain goes through the wallet/read provider already
+   * wired above; every other chain gets its own read provider and its own
+   * QuoterV2 (strictly per-chain addresses — a router or quoter borrowed from
+   * another network would quote a pool that does not exist, or worse, price
+   * against the wrong one). Leg decimals/symbols come from that chain's registry.
+   *
+   * Routing + SDK math live in lib/uniswap/quote.js, so a cross-chain quote and a
+   * local one are the same computation, not two that can drift apart.
+   */
+  const getBestQuoteOn = useCallback(async (targetChainId, tokenIn, tokenOut, amountIn) => {
+    const target = Number(targetChainId)
+    const isActive = target === Number(chainId)
+
+    if (isActive && !contracts) {
       throw new Error('DEX is not available on the current network')
+    }
+    if (!isActive && !isSwapChain(target)) {
+      throw new Error(`Swapping is not available on ${NETWORKS[target]?.name || 'that network'}`)
+    }
+
+    let quoter = contracts?.quoter
+    let decIn = decimalsOf(tokenIn)
+    let decOut = decimalsOf(tokenOut)
+    let symIn = symbolOf(tokenIn)
+    let symOut = symbolOf(tokenOut)
+
+    if (!isActive) {
+      const targetAddresses = getSwapAddresses(target)
+      const provider = makeReadProvider(NETWORKS[target].rpcUrl, target)
+      quoter = new ethers.Contract(targetAddresses.quoter, QUOTER_V2_ABI, provider)
+      const metaIn = getSwapTokenMeta(target, tokenIn)
+      const metaOut = getSwapTokenMeta(target, tokenOut)
+      decIn = metaIn?.decimals ?? 18
+      decOut = metaOut?.decimals ?? 18
+      symIn = metaIn?.symbol ?? 'TOKEN'
+      symOut = metaOut?.symbol ?? 'TOKEN'
     }
 
     setQuotingPrice(true)
     try {
-      const decIn = decimalsOf(tokenIn)
-      const decOut = decimalsOf(tokenOut)
-      const amountInWei = ethers.parseUnits(amountIn, decIn)
-      if (amountInWei <= 0n) {
-        throw new Error('Enter an amount greater than zero')
-      }
-
-      // Probe each fee tier; QuoterV2 reverts where no pool exists, so we keep
-      // the deepest output across the tiers that do quote — a lightweight route.
-      let best = null
-      for (const fee of ROUTED_FEE_TIERS) {
-        try {
-          const res = await contracts.quoter.quoteExactInputSingle.staticCall({
-            tokenIn,
-            tokenOut,
-            amountIn: amountInWei,
-            fee,
-            sqrtPriceLimitX96: 0,
-          })
-          const out = res[0]
-          if (out > 0n && (!best || out > best.amountOutWei)) {
-            best = { fee, amountOutWei: out, gasEstimate: res[3] }
-          }
-        } catch {
-          // No pool for this fee tier — skip it.
-        }
-      }
-
-      if (!best) {
-        throw new Error('No liquidity route available for this pair')
-      }
-
-      // Near-spot reference quote (a fraction of the size) on the winning tier,
-      // used to derive price impact via the SDK. Optional — impact is hidden if
-      // the reference quote is unavailable.
-      let refInWei = amountInWei / 1000n
-      if (refInWei <= 0n) refInWei = 1n
-      let refAmountInRaw = null
-      let refAmountOutRaw = null
-      try {
-        const refRes = await contracts.quoter.quoteExactInputSingle.staticCall({
-          tokenIn,
-          tokenOut,
-          amountIn: refInWei,
-          fee: best.fee,
-          sqrtPriceLimitX96: 0,
-        })
-        if (refRes[0] > 0n) {
-          refAmountInRaw = refInWei
-          refAmountOutRaw = refRes[0]
-        }
-      } catch {
-        // Impact figure is best-effort.
-      }
-
-      const sdkIn = toSdkToken(chainId, tokenIn, decIn, symbolOf(tokenIn))
-      const sdkOut = toSdkToken(chainId, tokenOut, decOut, symbolOf(tokenOut))
-      const metrics = buildTradeMetrics({
-        tokenIn: sdkIn,
-        tokenOut: sdkOut,
-        amountInRaw: amountInWei,
-        amountOutRaw: best.amountOutWei,
-        refAmountInRaw,
-        refAmountOutRaw,
+      return await quoteBestRoute({
+        quoter,
+        chainId: target,
+        tokenIn,
+        tokenOut,
+        amountIn,
+        decimalsIn: decIn,
+        decimalsOut: decOut,
+        symbolIn: symIn,
+        symbolOut: symOut,
         slippageBps: slippage,
       })
-
-      return {
-        amountOut: ethers.formatUnits(best.amountOutWei, decOut),
-        amountOutWei: best.amountOutWei,
-        feeTier: best.fee,
-        gasEstimate: best.gasEstimate,
-        executionPrice: metrics.executionPrice.toSignificant(6),
-        executionPriceInverted: metrics.executionPrice.invert().toSignificant(6),
-        minimumReceived: ethers.formatUnits(metrics.minimumReceivedRaw, decOut),
-        minimumReceivedWei: metrics.minimumReceivedRaw,
-        priceImpactPercent: metrics.priceImpact
-          ? parseFloat(metrics.priceImpact.toSignificant(4))
-          : null,
-        tokenInSymbol: symbolOf(tokenIn),
-        tokenOutSymbol: symbolOf(tokenOut),
-      }
     } finally {
       setQuotingPrice(false)
     }
   }, [contracts, decimalsOf, symbolOf, chainId, slippage])
+
+  // Route a quote across the common V3 fee tiers on the CONNECTED chain.
+  const getBestQuote = useCallback(
+    (tokenIn, tokenOut, amountIn) => getBestQuoteOn(chainId, tokenIn, tokenOut, amountIn),
+    [getBestQuoteOn, chainId],
+  )
 
   /**
    * Execute (or, as a vault, propose) a swap.
@@ -465,10 +454,21 @@ export function DexProvider({ children }) {
    * via `amountOutMinimum`, making the order immediate-or-cancel — it fills at
    * the limit or better, or not at all. We pre-check against the fresh quote
    * so an unfillable limit fails with a plain reason before any wallet prompt.
+   *
+   * `opts.chainId` — the network the CALLER believes the pair lives on. Quotes
+   * are cross-chain (getBestQuoteOn) but a swap is not: it uses THIS chain's
+   * router and approves THIS chain's addresses. Passing the pair's chain makes a
+   * mismatch fail here, before any signature, instead of approving a foreign
+   * address that happens to be a contract on the connected chain.
    */
   const swap = useCallback(async (tokenIn, tokenOut, amountIn, opts = {}) => {
     if (!contracts || !tradingAddress) {
       throw new Error('Wallet not connected')
+    }
+    if (opts.chainId != null && Number(opts.chainId) !== Number(chainId)) {
+      throw new Error(
+        `This pair trades on ${NETWORKS[Number(opts.chainId)]?.name || 'another network'} — switch your wallet to that network to place the order.`,
+      )
     }
 
     try {
@@ -517,6 +517,28 @@ export function DexProvider({ children }) {
         return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
+      // Spec 062: swap AS a recovered legacy account. Same [approve?, swap] batch,
+      // recipient = the legacy account, signed by its unlocked key via the
+      // active-account seam (sequential txs for an EOA), executed immediately.
+      // Approve is included only when the current allowance is short.
+      if (operatingAsLegacy) {
+        if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to swap as it.')
+        const legacyAllowance = await new ethers.Contract(tokenIn, ERC20_ABI, readProvider)
+          .allowance(tradingAddress, addresses.SWAP_ROUTER_02)
+        const batch = []
+        if (legacyAllowance < amountInWei) {
+          batch.push({ to: tokenIn, value: 0n, data: erc20.encodeFunctionData('approve', [addresses.SWAP_ROUTER_02, amountInWei]) })
+        }
+        batch.push({
+          to: addresses.SWAP_ROUTER_02,
+          value: 0n,
+          data: contracts.swapRouter.interface.encodeFunctionData('exactInputSingle', [swapParams(tradingAddress)]),
+        })
+        const res = await submitAsActive({ batch })
+        await fetchBalances()
+        return { sent: true, txHash: res.txHash }
+      }
+
       // Personal mode rides the unified spec-041 write rail: one batch through
       // sendCalls covers approval (only when needed, for the exact amount) and
       // the swap — a single WebAuthn ceremony for passkey sessions, sequential
@@ -553,7 +575,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [contracts, tradingAddress, readProvider, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, activeIdentity, submitAsActive, sendCalls])
+  }, [contracts, chainId, tradingAddress, readProvider, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, operatingAsLegacy, canActAsLegacy, activeIdentity, submitAsActive, sendCalls])
 
   const value = {
     balances,
@@ -567,6 +589,7 @@ export function DexProvider({ children }) {
     unwrapNative,
     getQuote,
     getBestQuote,
+    getBestQuoteOn,
     swap,
     setSlippage,
 

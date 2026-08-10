@@ -17,7 +17,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  /* Modal tier — must sit above the mobile bottom nav (.section-icon-nav, 1200)
+     and the nav drawer (1401) so the sheet is never occluded by the Pay/Request/
+     Wager bar on mobile. Matches the shared full-screen modal tier used by the
+     asset/collectible detail sheets. The nested sub-modal backdrop (1100) is
+     scoped to this stacking context, so it still layers above the sheet. */
+  z-index: 2000;
   padding: 1rem;
   animation: mmFadeIn 0.2s ease-out;
 }
@@ -1993,12 +1998,16 @@
   }
 }
 
-/* Narrow screens: the 4-column wager table can't fit the Actions column, so it
+/* Narrow screens: the 5-column wager table can't fit the Actions column, so it
    used to push the buttons off-screen behind a horizontal scroll (you couldn't
    see what action a row needed). Below 640px we drop the table layout and render
-   each row as a self-contained card: title, then time + status on one line, then
-   the action buttons wrapping onto their own full-width line — everything visible
-   without any sideways scrolling. */
+   each row as a self-contained card: title, then amount + time + status on one
+   wrapping line, then the action buttons on their own full-width line —
+   everything visible without any sideways scrolling.
+
+   This IS the phone experience for My Wagers: the table is the only list view at
+   every viewport, so every row action (resolve, accept, claim, refund, decrypt)
+   has to be reachable here without rotating the device. */
 @media (max-width: 640px) {
   .mm-table-container {
     overflow-x: visible;
@@ -2043,7 +2052,7 @@
   }
 
   /* Title gets the full width and can wrap (no ellipsis truncation in a card). */
-  .mm-table-market {
+  .mm-table td.mm-table-market {
     max-width: none;
     min-width: 0;
     margin-bottom: 0.5rem;
@@ -2055,27 +2064,40 @@
     text-overflow: clip;
   }
 
-  /* Time + status sit together above the actions. */
-  .mm-table-time {
+  /* Amount, time and status share one wrapping line above the actions.
+     These need `.mm-table td.<class>` — a bare class loses to the `.mm-table td`
+     rule above that turns every cell into a full-width block. */
+  .mm-table td.wc-table-amount,
+  .mm-table td.mm-table-time,
+  .mm-table td.mm-table-state {
     display: inline-block;
-    margin: 0 0 0.5rem 0;
-    margin-right: 0.75rem;
+    width: auto;
+    margin: 0 0.75rem 0.5rem 0;
+    vertical-align: middle;
+  }
+
+  .mm-table td.mm-table-state {
+    margin-right: 0;
   }
 
   /* Actions get their own full-width line and wrap instead of overflowing. */
-  .mm-table-actions {
+  .mm-table td.mm-table-actions {
     white-space: normal;
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.5rem;
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
   }
 
-  .mm-table-actions .mm-action-btn {
+  /* Touch-sized targets: the row's buttons are the only way to act on a wager
+     from a phone, so they get a full tap target instead of the compact desktop
+     size, and share the width rather than overflowing. */
+  .mm-table-actions .wc-action-sm {
     margin-right: 0;
     flex: 1 1 auto;
-    justify-content: center;
     min-height: 40px;
+    font-size: 0.8125rem;
   }
 
   /* Keep the unread accent bar aligned to the card's rounded corner. */

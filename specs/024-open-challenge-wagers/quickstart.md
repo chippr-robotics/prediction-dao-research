@@ -76,7 +76,8 @@ Assert:
 ## 4. Subgraph
 
 ```bash
-cd subgraph && npm test  # handleOpenWagerCreated: opponent null, status "open"; accept backfills opponent
+cd subgraph && npm run test:matchstick  # renamed from `test` (#1036); Docker-only on Linux x64 24 — see matchstick.Dockerfile
+# handleOpenWagerCreated: opponent null, status "open"; accept backfills opponent
 ```
 
 ## 5. Manual end-to-end (two browsers / two accounts)

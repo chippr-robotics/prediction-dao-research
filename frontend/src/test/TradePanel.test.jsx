@@ -2,19 +2,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 // TradePanel is the brokerage-style order ticket for on-chain swaps. It must:
-//  - name/link the DEX provider for the active network (ETCswap on the ETC
+//  - list pairs from EVERY swap-capable network, not just the connected one, and
+//    keep a pair on ONE network: choosing the pay leg pins the receive leg's
+//    chain (lib/assets/networkPin.js#samePair — never the bridge's bridgeDest);
+//  - quote a pair on its own network (getBestQuoteOn) even while the wallet sits
+//    elsewhere, then require the network switch BEFORE the order can be placed;
+//  - offer a search filter in both pair selectors — ~35 legs across six networks
+//    is not a scrollable list;
+//  - carry each leg's balance on its own pay/receive card and NO balance rows on
+//    the account card;
+//  - name/link the DEX provider for the PAIR's network (ETCswap on the ETC
 //    family, Uniswap elsewhere) while subtly attributing the Uniswap V3 protocol
 //    that powers routing (Spec 033 provider-awareness, preserved);
 //  - present a professional trade read-out (rate, price impact, minimum
-//    received, route) fed by getBestQuote();
+//    received, route);
 //  - let the member trade as their personal wallet or as a saved multisig
-//    vault (Spec 043), with balances that follow the selected account;
+//    vault (Spec 043);
 //  - offer the price types Uniswap V3 actually supports (Market, and Limit as
 //    immediate-or-cancel via amountOutMinimum) and gate perpetuals order types
 //    (Sell Short / Buy to Cover) on a per-network perps venue — hidden where
 //    none exists (honest-state).
-// We mock the DEX/wallet/token/account hooks so the component is exercised in
-// isolation.
+// The DEX/wallet/account hooks are mocked so the component is exercised in
+// isolation; the pair UNIVERSE deliberately comes from the real network config,
+// because "which pairs exist" is exactly what this feature is about.
 
 const {
   mockUseDex,
@@ -22,12 +32,16 @@ const {
   mockUseChainTokens,
   mockUseActiveAccount,
   mockUseCustodyVaults,
+  mockUseSwapBalances,
+  switchChainAsync,
 } = vi.hoisted(() => ({
   mockUseDex: vi.fn(),
   mockUseWallet: vi.fn(),
   mockUseChainTokens: vi.fn(),
   mockUseActiveAccount: vi.fn(),
   mockUseCustodyVaults: vi.fn(),
+  mockUseSwapBalances: vi.fn(),
+  switchChainAsync: vi.fn().mockResolvedValue({}),
 }))
 
 vi.mock('../hooks/useDex', () => ({ useDex: mockUseDex }))
@@ -35,21 +49,33 @@ vi.mock('../hooks', () => ({ useWallet: mockUseWallet }))
 vi.mock('../hooks/useChainTokens', () => ({ useChainTokens: mockUseChainTokens }))
 vi.mock('../hooks/useActiveAccount', () => ({ useActiveAccount: mockUseActiveAccount }))
 vi.mock('../hooks/useCustodyVaults', () => ({ useCustodyVaults: mockUseCustodyVaults }))
+vi.mock('../hooks/useLegacyAccounts', () => ({ useLegacyAccounts: () => [] }))
+vi.mock('../hooks/useSwapBalances', () => ({ useSwapBalances: mockUseSwapBalances }))
+vi.mock('../components/account/LegacyUnlockDialog', () => ({ default: () => null }))
+vi.mock('wagmi', () => ({
+  useSwitchChain: () => ({ switchChainAsync, isPending: false }),
+}))
 
 import TradePanel from '../components/fairwins/TradePanel'
 
-const ETC_ADDRESSES = {
-  WNATIVE: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a',
-  STABLECOIN: '0xDE093684c796204224BC081f937aa059D903c52a',
-  SWAP_ROUTER_02: '0xEd88EDD995b00956097bF90d39C9341BBde324d1',
-}
-const POLYGON_ADDRESSES = {
-  WNATIVE: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
-  STABLECOIN: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+// Real config addresses — the pair universe is built from networks.js itself.
+const POLYGON = {
+  WMATIC: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+  USDC: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+  WBTC: '0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6',
   SWAP_ROUTER_02: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
+}
+const BASE = {
+  WETH: '0x4200000000000000000000000000000000000006',
+  USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+}
+const ETC = {
+  WETC: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a',
+  USC: '0xDE093684c796204224BC081f937aa059D903c52a',
 }
 
 const SAMPLE_QUOTE = {
+  chainId: 137,
   amountOut: '1.23',
   amountOutWei: 1230000n,
   feeTier: 3000,
@@ -59,62 +85,30 @@ const SAMPLE_QUOTE = {
   minimumReceived: '1.22385',
   minimumReceivedWei: 1223850n,
   priceImpactPercent: 0.42,
-  tokenInSymbol: 'WPOL',
+  tokenInSymbol: 'WMATIC',
   tokenOutSymbol: 'USDC',
 }
 
-// Tradeable-token universe (spec: the selectors list every portfolio asset with
-// a routeable pair on the active chain). Keyed by address; wrapped-native and
-// the stablecoin lead, followed by curated commodities/tools.
-const ETC_TOKENS = [
-  { address: ETC_ADDRESSES.WNATIVE, symbol: 'WETC', name: 'Wrapped Ethereum Classic', decimals: 18 },
-  { address: ETC_ADDRESSES.STABLECOIN, symbol: 'USC', name: 'Classic USD', decimals: 6 },
-]
-const POLYGON_TOKENS = [
-  { address: POLYGON_ADDRESSES.WNATIVE, symbol: 'WPOL', name: 'Wrapped POL', decimals: 18 },
-  { address: POLYGON_ADDRESSES.STABLECOIN, symbol: 'USDC', name: 'USD Coin', decimals: 6 },
-  { address: '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619', symbol: 'WETH', name: 'Wrapped Ether', decimals: 18 },
-  { address: '0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6', symbol: 'WBTC', name: 'Wrapped BTC', decimals: 8 },
-  { address: '0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39', symbol: 'LINK', name: 'ChainLink Token', decimals: 18 },
-  { address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', symbol: 'USDT', name: 'Tether USD', decimals: 6 },
-]
-
-const balancesFor = (tokenList) => ({
-  native: '10',
-  wnative: '5',
-  stable: '100',
-  tokens: Object.fromEntries(
-    tokenList.map((t) => [t.address.toLowerCase(), t.symbol === 'USC' || t.symbol === 'USDC' ? '100' : '5']),
-  ),
-})
-
 function dexValue(overrides = {}) {
   return {
-    balances: balancesFor(ETC_TOKENS),
     loading: false,
     quotingPrice: false,
     wrapNative: vi.fn(),
     unwrapNative: vi.fn(),
     swap: vi.fn().mockResolvedValue({}),
-    getBestQuote: vi.fn().mockResolvedValue(SAMPLE_QUOTE),
+    getBestQuoteOn: vi.fn().mockResolvedValue(SAMPLE_QUOTE),
     slippage: 50,
     setSlippage: vi.fn(),
-    addresses: ETC_ADDRESSES,
-    tokens: { STABLE: { decimals: 6, symbol: 'USC' }, WNATIVE: { decimals: 18, symbol: 'WETC' } },
-    tradeTokens: ETC_TOKENS,
     isDexAvailable: true,
     dexProvider: { name: 'ETCswap', url: 'https://v3.etcswap.org' },
     network: { name: 'Ethereum Classic', chainId: 61 },
+    tradingAddress: '0x1111222233334444555566667777888899990000',
     ...overrides,
   }
 }
 
 const polygonDex = (overrides = {}) =>
   dexValue({
-    balances: balancesFor(POLYGON_TOKENS),
-    addresses: POLYGON_ADDRESSES,
-    tokens: { STABLE: { decimals: 6, symbol: 'USDC' }, WNATIVE: { decimals: 18, symbol: 'WPOL' } },
-    tradeTokens: POLYGON_TOKENS,
     dexProvider: { name: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=polygon' },
     network: { name: 'Polygon', chainId: 137 },
     ...overrides,
@@ -132,11 +126,34 @@ function personalAccount(overrides = {}) {
   }
 }
 
+/** Balances keyed by lower-cased address, the shape useSwapBalances returns. */
+const balancesFor = (entries) =>
+  Object.fromEntries(Object.entries(entries).map(([addr, v]) => [addr.toLowerCase(), v]))
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockUseActiveAccount.mockReturnValue(personalAccount())
   mockUseCustodyVaults.mockReturnValue({ vaults: [], supported: false })
+  mockUseSwapBalances.mockReturnValue({
+    balances: balancesFor({
+      [POLYGON.WMATIC]: '5',
+      [POLYGON.USDC]: '100',
+      [POLYGON.WBTC]: '0.25',
+      [BASE.WETH]: '2',
+      [BASE.USDC]: '40',
+      [ETC.WETC]: '5',
+      [ETC.USC]: '100',
+    }),
+    loading: false,
+    refresh: vi.fn(),
+  })
 })
+
+/** Open a pair selector and return its listbox. */
+function openSelector(name) {
+  fireEvent.click(screen.getByRole('button', { name }))
+  return screen.getByRole('listbox')
+}
 
 describe('TradePanel — provider identity & attribution', () => {
   beforeEach(() => {
@@ -144,11 +161,11 @@ describe('TradePanel — provider identity & attribution', () => {
     mockUseChainTokens.mockReturnValue({ native: 'ETC', stable: 'USC' })
   })
 
-  it('names ETCswap and links to it on an ETC-family chain', () => {
+  it('names ETCswap and links to it for an ETC-family pair', () => {
     mockUseDex.mockReturnValue(dexValue())
     render(<TradePanel />)
 
-    // Venue badge + subtitle name the chain's DEX.
+    // Venue badge + subtitle name the DEX of the pair's network.
     expect(screen.getAllByText('ETCswap').length).toBeGreaterThan(0)
     expect(screen.getByText('ETCswap Router ↗')).toBeInTheDocument()
     const link = screen.getByRole('link', { name: /Open ETCswap/ })
@@ -157,7 +174,7 @@ describe('TradePanel — provider identity & attribution', () => {
     expect(screen.getByText(/Uniswap v3 protocol/i)).toBeInTheDocument()
   })
 
-  it('names Uniswap and links to it on a non-ETC chain', () => {
+  it('names Uniswap and links to it for a Polygon pair', () => {
     mockUseWallet.mockReturnValue({ isConnected: true, chainId: 137 })
     mockUseChainTokens.mockReturnValue({ native: 'POL', stable: 'USDC' })
     mockUseDex.mockReturnValue(polygonDex())
@@ -167,26 +184,8 @@ describe('TradePanel — provider identity & attribution', () => {
     const link = screen.getByRole('link', { name: /Open Uniswap/ })
     expect(link).toHaveAttribute('href', expect.stringContaining('app.uniswap.org'))
     expect(screen.getByText(/Powered by Uniswap v3/i)).toBeInTheDocument()
-    // No ETCswap on a non-ETC chain.
+    // No ETCswap for a Polygon pair.
     expect(screen.queryByText(/ETCswap/)).toBeNull()
-  })
-
-  it('disabled-state names the chain provider, never the wrong one', () => {
-    mockUseWallet.mockReturnValue({ isConnected: true, chainId: 63 })
-    mockUseChainTokens.mockReturnValue({ native: 'ETC', stable: 'USC' })
-    mockUseDex.mockReturnValue(
-      dexValue({
-        isDexAvailable: false,
-        dexProvider: { name: 'ETCswap', url: 'https://etcswap.org' },
-        network: { name: 'Ethereum Classic Mordor', chainId: 63 },
-      }),
-    )
-    render(<TradePanel />)
-
-    expect(
-      screen.getByText(/ETCswap is not configured on Ethereum Classic Mordor/),
-    ).toBeInTheDocument()
-    expect(screen.queryByText(/Uniswap/)).toBeNull()
   })
 
   it('prompts to connect when the wallet is disconnected', () => {
@@ -198,30 +197,235 @@ describe('TradePanel — provider identity & attribution', () => {
   })
 })
 
+describe('TradePanel — multi-network pair selection', () => {
+  beforeEach(() => {
+    mockUseWallet.mockReturnValue({ isConnected: true, chainId: 137 })
+    mockUseChainTokens.mockReturnValue({ native: 'POL', stable: 'USDC' })
+    mockUseDex.mockReturnValue(polygonDex())
+  })
+
+  it('lists pay-leg tokens from every supported network, named with their network', () => {
+    render(<TradePanel />)
+
+    const sellList = openSelector('Token to sell')
+    // The connected network's own legs…
+    expect(within(sellList).getByRole('option', { name: 'WMATIC on Polygon' })).toBeInTheDocument()
+    expect(within(sellList).getByRole('option', { name: 'WBTC on Polygon' })).toBeInTheDocument()
+    // …plus other networks', which the single-chain ticket could never show.
+    expect(within(sellList).getByRole('option', { name: 'WETH on Base' })).toBeInTheDocument()
+    expect(within(sellList).getByRole('option', { name: 'USDC on Optimism' })).toBeInTheDocument()
+    expect(within(sellList).getByRole('option', { name: 'WETH on Arbitrum One' })).toBeInTheDocument()
+    expect(within(sellList).getByRole('option', { name: 'WETC on Ethereum Classic' })).toBeInTheDocument()
+    // Each option carries the shared asset artwork (glyph + network sub-badge).
+    expect(
+      within(sellList).getByRole('option', { name: 'WETH on Base' }).querySelector('.asset-logo'),
+    ).toBeInTheDocument()
+  })
+
+  it('groups the list by network, connected network first', () => {
+    render(<TradePanel />)
+
+    const sellList = openSelector('Token to sell')
+    const headings = Array.from(sellList.querySelectorAll('.trade-token-group')).map((el) =>
+      el.textContent.trim(),
+    )
+    expect(headings[0]).toBe('Polygon')
+    expect(headings).toContain('Base')
+    expect(headings).toContain('Ethereum Classic')
+  })
+
+  it('filters the list by token symbol, token name, or network name', () => {
+    render(<TradePanel />)
+
+    openSelector('Token to sell')
+    const search = screen.getByLabelText('Search tokens')
+
+    fireEvent.change(search, { target: { value: 'base' } })
+    let list = screen.getByRole('listbox')
+    expect(within(list).getByRole('option', { name: 'WETH on Base' })).toBeInTheDocument()
+    expect(within(list).queryByRole('option', { name: 'WMATIC on Polygon' })).toBeNull()
+
+    fireEvent.change(search, { target: { value: 'wrapped btc' } })
+    list = screen.getByRole('listbox')
+    expect(within(list).getByRole('option', { name: 'WBTC on Polygon' })).toBeInTheDocument()
+    expect(within(list).queryByRole('option', { name: 'WETH on Base' })).toBeNull()
+
+    // A query that matches nothing says so, and names what can be searched.
+    fireEvent.change(search, { target: { value: 'zzz' } })
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.getByText(/No token matches/)).toBeInTheDocument()
+  })
+
+  it('pins the receive leg to the pay leg’s network (one pool, one chain)', () => {
+    render(<TradePanel />)
+
+    const sellList = openSelector('Token to sell')
+    fireEvent.click(within(sellList).getByRole('option', { name: 'WETH on Base' }))
+
+    // Picking Base moved the pair: the counterpart is Base's stablecoin.
+    expect(screen.getByRole('button', { name: 'Token to sell' })).toHaveTextContent('WETH')
+    expect(screen.getByRole('button', { name: 'Token to buy' })).toHaveTextContent('USDC')
+
+    const buyList = openSelector('Token to buy')
+    expect(within(buyList).getByRole('option', { name: 'USDC on Base' })).toBeInTheDocument()
+    // Nothing off-network, and never the leg already being sold.
+    expect(within(buyList).queryByRole('option', { name: 'USDC on Polygon' })).toBeNull()
+    expect(within(buyList).queryByRole('option', { name: 'WETH on Base' })).toBeNull()
+    expect(screen.getByText(/a pair lives on one network/i)).toBeInTheDocument()
+  })
+
+  it('quotes the pair on its own network, not the wallet’s', async () => {
+    const getBestQuoteOn = vi.fn().mockResolvedValue({ ...SAMPLE_QUOTE, chainId: 8453 })
+    mockUseDex.mockReturnValue(polygonDex({ getBestQuoteOn }))
+    render(<TradePanel />)
+
+    const sellList = openSelector('Token to sell')
+    fireEvent.click(within(sellList).getByRole('option', { name: 'WETH on Base' }))
+    fireEvent.change(screen.getByLabelText('You pay'), { target: { value: '1' } })
+
+    await waitFor(() =>
+      expect(getBestQuoteOn).toHaveBeenCalledWith(8453, BASE.WETH, BASE.USDC, '1'),
+    )
+  })
+
+  it('asks for the network switch before an off-network order, and never offers to place it', async () => {
+    mockUseDex.mockReturnValue(polygonDex())
+    render(<TradePanel />)
+
+    const sellList = openSelector('Token to sell')
+    fireEvent.click(within(sellList).getByRole('option', { name: 'WETH on Base' }))
+    fireEvent.change(screen.getByLabelText('You pay'), { target: { value: '1' } })
+
+    // Disclosed before any signature, with the switch as the only primary action.
+    expect(screen.getByText(/This pair trades on Base and your wallet is on Polygon/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Swap / })).toBeNull()
+
+    const switchBtn = screen.getByRole('button', { name: 'Switch to Base' })
+    fireEvent.click(switchBtn)
+    await waitFor(() => expect(switchChainAsync).toHaveBeenCalledWith({ chainId: 8453 }))
+  })
+
+  it('keeps a cross-network pick when the wallet follows it to that network', async () => {
+    const { rerender } = render(<TradePanel />)
+
+    const sellList = openSelector('Token to sell')
+    fireEvent.click(within(sellList).getByRole('option', { name: 'WETH on Base' }))
+
+    // The member switched networks; the pair they chose must survive it.
+    mockUseWallet.mockReturnValue({ isConnected: true, chainId: 8453 })
+    mockUseDex.mockReturnValue(polygonDex({ network: { name: 'Base', chainId: 8453 } }))
+    rerender(<TradePanel />)
+
+    expect(screen.getByRole('button', { name: 'Token to sell' })).toHaveTextContent('WETH')
+    expect(screen.queryByText(/Switch to Base/)).toBeNull()
+    fireEvent.change(screen.getByLabelText('You pay'), { target: { value: '1' } })
+    expect(await screen.findByRole('button', { name: /Swap WETH for USDC/ })).toBeInTheDocument()
+  })
+
+  it('offers pairs from other networks when the connected chain has no DEX', () => {
+    mockUseWallet.mockReturnValue({ isConnected: true, chainId: 63 })
+    mockUseChainTokens.mockReturnValue({ native: 'ETC', stable: 'USC' })
+    mockUseDex.mockReturnValue(
+      dexValue({
+        isDexAvailable: false,
+        dexProvider: { name: 'ETCswap', url: 'https://etcswap.org' },
+        network: { name: 'Ethereum Classic Mordor', chainId: 63 },
+      }),
+    )
+    render(<TradePanel />)
+
+    // Honest about the connected network without becoming a dead end.
+    expect(
+      screen.getByText(/Ethereum Classic Mordor has no DEX deployment/),
+    ).toBeInTheDocument()
+    const sellList = openSelector('Token to sell')
+    expect(within(sellList).getByRole('option', { name: 'WMATIC on Polygon' })).toBeInTheDocument()
+    expect(within(sellList).queryByRole('option', { name: /on Ethereum Classic Mordor/ })).toBeNull()
+  })
+})
+
+describe('TradePanel — balances live on the pair cards', () => {
+  beforeEach(() => {
+    mockUseWallet.mockReturnValue({
+      isConnected: true,
+      chainId: 137,
+      address: '0x1111222233334444555566667777888899990000',
+    })
+    mockUseChainTokens.mockReturnValue({ native: 'POL', stable: 'USDC' })
+    mockUseDex.mockReturnValue(polygonDex())
+  })
+
+  it('shows each leg’s balance on its own card and none on the account card', () => {
+    render(<TradePanel />)
+
+    const balances = screen.getAllByText(/^Balance:/)
+    expect(balances).toHaveLength(2)
+    expect(balances[0].closest('.trade-leg')).toBeInTheDocument()
+    // The old account-card read-outs are gone.
+    expect(screen.queryByText(/Available to trade/)).toBeNull()
+    expect(screen.queryByText(/Cash available/)).toBeNull()
+  })
+
+  it('reads balances for the PAIR’s network and account', () => {
+    render(<TradePanel />)
+
+    expect(mockUseSwapBalances).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 137,
+        address: '0x1111222233334444555566667777888899990000',
+        tokens: [
+          { address: POLYGON.WMATIC, decimals: 18 },
+          { address: POLYGON.USDC, decimals: 6 },
+        ],
+      }),
+    )
+  })
+
+  it('MAX fills the pay leg from its balance', () => {
+    render(<TradePanel />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'MAX' }))
+    expect(screen.getByLabelText('You pay')).toHaveValue(5)
+  })
+
+  it('never renders an unread balance as zero', () => {
+    mockUseSwapBalances.mockReturnValue({ balances: {}, loading: true, refresh: vi.fn() })
+    render(<TradePanel />)
+
+    expect(screen.getAllByLabelText('balance loading').length).toBe(2)
+    expect(screen.getByRole('button', { name: 'MAX' })).toBeDisabled()
+  })
+})
+
 describe('TradePanel — SDK-driven trade read-out', () => {
   beforeEach(() => {
     mockUseWallet.mockReturnValue({ isConnected: true, chainId: 137 })
     mockUseChainTokens.mockReturnValue({ native: 'POL', stable: 'USDC' })
   })
 
-  it('quotes via getBestQuote and surfaces rate, impact, minimum received and route', async () => {
-    const getBestQuote = vi.fn().mockResolvedValue(SAMPLE_QUOTE)
-    mockUseDex.mockReturnValue(polygonDex({ getBestQuote }))
+  it('quotes via getBestQuoteOn and surfaces rate, impact, minimum received and route', async () => {
+    const getBestQuoteOn = vi.fn().mockResolvedValue(SAMPLE_QUOTE)
+    mockUseDex.mockReturnValue(polygonDex({ getBestQuoteOn }))
     render(<TradePanel />)
 
     fireEvent.change(screen.getByLabelText('You pay'), { target: { value: '1' } })
 
-    await waitFor(() => expect(getBestQuote).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(getBestQuoteOn).toHaveBeenCalledWith(137, POLYGON.WMATIC, POLYGON.USDC, '1'),
+    )
 
     // Best-execution output is shown on the receive leg.
     expect(await screen.findByText('1.23')).toBeInTheDocument()
     // Rate, price impact, minimum received, and the routed fee-tier pool.
-    expect(screen.getByText(/1 WPOL = 1.23 USDC/)).toBeInTheDocument()
+    expect(screen.getByText(/1 WMATIC = 1.23 USDC/)).toBeInTheDocument()
     expect(screen.getByText('0.42%')).toBeInTheDocument()
     // The minimum-received amount is wrapped in <SensitiveValue> for tilt-to-hide
     // (spec 047), so assert against the row that holds both amount and symbol.
     expect(screen.getByText('1.22385').closest('.trade-summary-val')).toHaveTextContent(/1.22385\s*USDC/)
     expect(screen.getByText('0.3% pool')).toBeInTheDocument()
+    // The route names the network it runs on — with six networks listed, the
+    // fee tier alone no longer identifies the pool.
+    expect(screen.getByText('on Polygon')).toBeInTheDocument()
   })
 
   it('inverts the rate line when tapped', async () => {
@@ -229,26 +433,22 @@ describe('TradePanel — SDK-driven trade read-out', () => {
     render(<TradePanel />)
 
     fireEvent.change(screen.getByLabelText('You pay'), { target: { value: '1' } })
-    const rate = await screen.findByText(/1 WPOL = 1.23 USDC/)
+    const rate = await screen.findByText(/1 WMATIC = 1.23 USDC/)
     fireEvent.click(rate)
-    expect(screen.getByText(/1 USDC = 0.813008 WPOL/)).toBeInTheDocument()
+    expect(screen.getByText(/1 USDC = 0.813008 WMATIC/)).toBeInTheDocument()
   })
 
-  it('executes the swap through the DEX swap()', async () => {
+  it('executes the swap through the DEX swap(), pinned to the pair’s network', async () => {
     const swap = vi.fn().mockResolvedValue({})
     mockUseDex.mockReturnValue(polygonDex({ swap }))
     render(<TradePanel />)
 
     fireEvent.change(screen.getByLabelText('You pay'), { target: { value: '1' } })
-    const execBtn = await screen.findByRole('button', { name: /Swap WPOL for USDC/ })
+    const execBtn = await screen.findByRole('button', { name: /Swap WMATIC for USDC/ })
     fireEvent.click(execBtn)
 
     await waitFor(() =>
-      expect(swap).toHaveBeenCalledWith(
-        POLYGON_ADDRESSES.WNATIVE,
-        POLYGON_ADDRESSES.STABLECOIN,
-        '1',
-      ),
+      expect(swap).toHaveBeenCalledWith(POLYGON.WMATIC, POLYGON.USDC, '1', { chainId: 137 }),
     )
   })
 
@@ -259,18 +459,6 @@ describe('TradePanel — SDK-driven trade read-out', () => {
     expect(screen.queryByRole('tablist', { name: 'Trade mode' })).toBeNull()
     expect(screen.queryByRole('tab', { name: 'Wrap' })).toBeNull()
     expect(screen.queryByRole('tab', { name: 'Unwrap' })).toBeNull()
-  })
-
-  it('lists every tradeable portfolio asset in both selectors', () => {
-    mockUseDex.mockReturnValue(polygonDex())
-    render(<TradePanel />)
-
-    const sell = screen.getByLabelText('Token to sell')
-    const buy = screen.getByLabelText('Token to buy')
-    for (const symbol of ['WPOL', 'USDC', 'WETH', 'WBTC', 'LINK', 'USDT']) {
-      expect(within(sell).getByRole('option', { name: symbol })).toBeInTheDocument()
-      expect(within(buy).getByRole('option', { name: symbol })).toBeInTheDocument()
-    }
   })
 })
 
@@ -285,7 +473,7 @@ describe('TradePanel — account selection (spec 043)', () => {
     mockUseDex.mockReturnValue(polygonDex())
   })
 
-  it('lists the personal wallet and every saved multisig, and shows account balances', () => {
+  it('lists the personal wallet and every saved multisig', () => {
     mockUseCustodyVaults.mockReturnValue({
       supported: true,
       vaults: [
@@ -299,10 +487,6 @@ describe('TradePanel — account selection (spec 043)', () => {
     expect(picker).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Personal wallet · 0x1111…0000/ })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Ops Treasury · Multisig/ })).toBeInTheDocument()
-
-    // Available-to-trade figures for the selected account (pay leg = WPOL).
-    expect(screen.getByText(/Available to trade \(WPOL\)/)).toBeInTheDocument()
-    expect(screen.getByText(/Cash available \(USDC\)/)).toBeInTheDocument()
   })
 
   it('switches the active identity when a multisig is selected', () => {
@@ -333,6 +517,26 @@ describe('TradePanel — account selection (spec 043)', () => {
     expect(screen.getByText('Multisig proposal')).toBeInTheDocument()
     expect(screen.getByText(/proposed to the multisig/)).toBeInTheDocument()
   })
+
+  it('says plainly that a multisig cannot trade a pair on another network', async () => {
+    mockUseActiveAccount.mockReturnValue(
+      personalAccount({
+        identity: { mode: 'vault', vaultAddress: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' },
+        isVault: true,
+        canActAsVault: true,
+      }),
+    )
+    mockUseCustodyVaults.mockReturnValue({
+      supported: true,
+      vaults: [{ address: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' }],
+    })
+    render(<TradePanel />)
+
+    const sellList = openSelector('Token to sell')
+    fireEvent.click(within(sellList).getByRole('option', { name: 'WETH on Base' }))
+
+    expect(screen.getByText(/This multisig lives on Polygon/)).toBeInTheDocument()
+  })
 })
 
 describe('TradePanel — order & price types', () => {
@@ -345,18 +549,31 @@ describe('TradePanel — order & price types', () => {
     mockUseDex.mockReturnValue(polygonDex())
     render(<TradePanel />)
 
-    // Default direction WPOL → USDC reads as Sell.
+    // Default direction WMATIC → USDC reads as Sell.
     expect(screen.getByLabelText(/Order Type/).value).toBe('sell')
 
     fireEvent.change(screen.getByLabelText(/Order Type/), { target: { value: 'buy' } })
     // Buy pays the stablecoin to receive the wrapped-native asset.
-    expect(screen.getByLabelText('Token to sell').value).toBe(POLYGON_ADDRESSES.STABLECOIN)
-    expect(screen.getByLabelText('Token to buy').value).toBe(POLYGON_ADDRESSES.WNATIVE)
+    expect(screen.getByRole('button', { name: 'Token to sell' })).toHaveTextContent('USDC')
+    expect(screen.getByRole('button', { name: 'Token to buy' })).toHaveTextContent('WMATIC')
 
     // Flipping the pair back flips the order type too.
-    fireEvent.change(screen.getByLabelText('Token to sell'), { target: { value: POLYGON_ADDRESSES.WNATIVE } })
-    fireEvent.change(screen.getByLabelText('Token to buy'), { target: { value: POLYGON_ADDRESSES.STABLECOIN } })
+    fireEvent.click(screen.getByRole('button', { name: 'Switch direction' }))
     expect(screen.getByLabelText(/Order Type/).value).toBe('sell')
+  })
+
+  it('re-seeds Buy/Sell on the pair’s own network, never the wallet’s', () => {
+    mockUseDex.mockReturnValue(polygonDex())
+    render(<TradePanel />)
+
+    const sellList = openSelector('Token to sell')
+    fireEvent.click(within(sellList).getByRole('option', { name: 'WETH on Base' }))
+    fireEvent.change(screen.getByLabelText(/Order Type/), { target: { value: 'buy' } })
+
+    // Base's own USDC → WETH, and the pair is still a Base pair.
+    expect(screen.getByRole('button', { name: 'Token to sell' })).toHaveTextContent('USDC')
+    expect(screen.getByRole('button', { name: 'Token to buy' })).toHaveTextContent('WETH')
+    expect(screen.getByRole('button', { name: 'Switch to Base' })).toBeInTheDocument()
   })
 
   it('offers Market and Limit price types and passes the limit floor to swap()', async () => {
@@ -376,12 +593,10 @@ describe('TradePanel — order & price types', () => {
 
     // 1 × 1.3 at 6 stable decimals → 1300000n enforced as amountOutMinimum.
     await waitFor(() =>
-      expect(swap).toHaveBeenCalledWith(
-        POLYGON_ADDRESSES.WNATIVE,
-        POLYGON_ADDRESSES.STABLECOIN,
-        '1',
-        { limitMinOutWei: 1300000n },
-      ),
+      expect(swap).toHaveBeenCalledWith(POLYGON.WMATIC, POLYGON.USDC, '1', {
+        chainId: 137,
+        limitMinOutWei: 1300000n,
+      }),
     )
   })
 
@@ -393,7 +608,7 @@ describe('TradePanel — order & price types', () => {
     expect(screen.queryByRole('option', { name: 'Buy to Cover' })).toBeNull()
   })
 
-  it('offers Sell Short / Buy to Cover only where the network has a perps venue', () => {
+  it('offers Sell Short / Buy to Cover only where the pair’s network has a perps venue', () => {
     mockUseDex.mockReturnValue(
       polygonDex({ network: { name: 'Polygon', chainId: 137, perps: { name: 'TestPerps' } } }),
     )
@@ -426,7 +641,7 @@ describe('TradePanel — session rails (passkey & gasless)', () => {
     expect(screen.getByText(/One passkey confirmation covers the whole order/)).toBeInTheDocument()
   })
 
-  it('is honest when a passkey session cannot transact on this network', () => {
+  it('is honest when a passkey session cannot transact on the pair’s network', () => {
     mockUseWallet.mockReturnValue({ isConnected: true, chainId: 61, loginMethod: 'passkey' })
     mockUseDex.mockReturnValue(dexValue()) // network has no passkey rail
     render(<TradePanel />)

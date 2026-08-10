@@ -1,5 +1,5 @@
 /**
- * /v1/onramp/* buy-crypto proxy tests (spec 060 — contracts/gateway-api.md).
+ * /v1/onramp/* buy-crypto proxy tests (spec 081 — contracts/gateway-api.md).
  * The Coinbase upstream is mocked via the injectable onrampFetch (JWT generation stubbed through
  * the injectable onrampClient where full control is needed); everything else uses the same
  * build-the-app-with-injected-deps pattern as polymarket.test.js.

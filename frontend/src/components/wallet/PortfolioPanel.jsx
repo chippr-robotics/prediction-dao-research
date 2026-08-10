@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import usePortfolio from '../../hooks/usePortfolio'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import InfoTip from '../ui/InfoTip'
 import AssetLogo from './AssetLogo'
 import AssetDetailSheet from './AssetDetailSheet'
@@ -23,6 +24,33 @@ function formatAggregateBalance(aggregate) {
   return formatAssetAmount(aggregate.balance, aggregate.underlying, aggregate.kind)
 }
 
+/*
+ * A word break for assistive tech only.
+ *
+ * These row buttons build their accessible name by concatenating adjacent <span>s that are
+ * separated visually (flex gaps, line breaks) but not textually. Nothing in the DOM says where one
+ * field ends and the next begins, so a name computed straight from the text runs them together:
+ * "EthereumETH3 instances · 2 networks1.75 ETH$3,500.00" — which a screen reader reads as
+ * "EthereumETH3", not "Ethereum, ETH, 3 instances".
+ *
+ * It surfaced as six failing tests when @testing-library/jest-dom went 6 -> 7 (jsdom 25 -> 30):
+ * the newer accessible-name implementation stopped inserting a space at element boundaries that
+ * the older one added for us. The DOM never changed — only whether the gap was implied or real.
+ * Making it real is what keeps the name correct regardless of which library, browser, or version
+ * computes it.
+ *
+ * Clip-based hiding on purpose (Portfolio.css): `display: none` would remove the text from the
+ * accessibility tree entirely and put the words straight back together.
+ *
+ * A comma, not a space. A whitespace-only separator does not survive: the name algorithm trims and
+ * normalises each node's contribution, so a <span> holding only " " contributes nothing and the
+ * fields run together exactly as before (measured). The comma also reads better — assistive tech
+ * pauses on it, so the name is announced as distinct fields rather than one run-on phrase.
+ */
+function Sep() {
+  return <span className="portfolio-visually-hidden">, </span>
+}
+
 function AggregateRow({ aggregate, onOpen }) {
   const networks = new Set(aggregate.instances.map((h) => h.asset.chainId))
   const singleInstance = aggregate.instances.length === 1 ? aggregate.instances[0] : null
@@ -37,8 +65,10 @@ function AggregateRow({ aggregate, onOpen }) {
         <AssetLogo symbol={aggregate.underlying} size={32} />
         <span className="portfolio-row-asset">
           <span className="portfolio-row-name">{aggregate.name}</span>
+          <Sep />
           <span className="portfolio-row-meta">
             {aggregate.underlying}
+            <Sep />
             <span className="portfolio-row-network">
               {singleInstance
                 ? singleInstance.network
@@ -46,8 +76,10 @@ function AggregateRow({ aggregate, onOpen }) {
             </span>
           </span>
         </span>
+        <Sep />
         <span className="portfolio-row-values">
           <SensitiveValue className="portfolio-row-balance">{formatAggregateBalance(aggregate)}</SensitiveValue>
+          <Sep />
           {aggregate.usd == null ? (
             <span className="portfolio-row-usd portfolio-row-usd-unavailable">
               <span aria-hidden="true">—</span>
@@ -81,6 +113,7 @@ function CategorySection({ group, collapsed, onToggle, onOpen, extra }) {
               {expanded ? '▾' : '▸'}
             </span>
             <span className="portfolio-category-label">{category.label}</span>
+            <Sep />
             <SensitiveValue className="portfolio-category-subtotal">{formatUsdFull(subtotalUsd)}</SensitiveValue>
           </button>
         </h3>
@@ -179,9 +212,55 @@ function CollectiblesEstimateRow({ valuationState, priceMap }) {
  * the asset detail sheet (instances + actions). Category explainers live in
  * InfoTip bubbles; testnet and zero-balance visibility follow the
  * Preferences → Portfolio settings.
+ *
+ * Spec 074 follow-up: the panel can be handed an externally-owned `portfolio`
+ * (MyAccountView mounts ONE usePortfolio so the account card's quick-access
+ * total and this panel read the same snapshot — no duplicate scans). Without
+ * the prop it self-loads exactly as before. Split into a self-loading wrapper
+ * and a body so the hook is never called conditionally.
  */
-export default function PortfolioPanel() {
-  const portfolio = usePortfolio()
+export default function PortfolioPanel({ portfolio = null }) {
+  if (portfolio) return <PortfolioBody portfolio={portfolio} />
+  return <SelfLoadingPortfolioPanel />
+}
+
+/** Loading bones: real section/row geometry, shimmer placeholders. */
+function PortfolioSkeleton() {
+  return (
+    <div className="portfolio-skeleton" aria-hidden="true">
+      {[0, 1, 2].map((section) => (
+        <section className="portfolio-category" key={section}>
+          <span className="portfolio-skeleton-bar portfolio-skeleton-heading" />
+          <ul className="portfolio-rows">
+            {[0, 1, 2].map((row) => (
+              <li className="portfolio-row portfolio-skeleton-row" key={row}>
+                <span className="portfolio-skeleton-avatar" />
+                <span className="portfolio-skeleton-lines">
+                  <span className="portfolio-skeleton-bar portfolio-skeleton-line-wide" />
+                  <span className="portfolio-skeleton-bar portfolio-skeleton-line-narrow" />
+                </span>
+                <span className="portfolio-skeleton-lines portfolio-skeleton-lines-end">
+                  <span className="portfolio-skeleton-bar portfolio-skeleton-line-narrow" />
+                  <span className="portfolio-skeleton-bar portfolio-skeleton-line-narrow" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+function SelfLoadingPortfolioPanel() {
+  // Spec 063 (US1): the portfolio shows the account the member is acting as (a vault or recovered
+  // account), not always the connected wallet. Personal mode passes its own address → unchanged.
+  const { address: actingAddress, isActingAccount } = useEffectiveAccount()
+  const portfolio = usePortfolio(isActingAccount ? { accountAddress: actingAddress } : undefined)
+  return <PortfolioBody portfolio={portfolio} />
+}
+
+function PortfolioBody({ portfolio }) {
   // Decided HERE (not inside the row) so the Digital Collectibles section keeps
   // its honest "No assets in this category." message when the row is absent.
   const collectiblesValuation = useCollectiblesValuation()
@@ -225,34 +304,22 @@ export default function PortfolioPanel() {
   }
 
   if (portfolio.status === 'loading') {
+    // Cold load (no session snapshot yet): show the BONES of the portfolio —
+    // category sections with shimmering placeholder rows — so the member sees
+    // the page shape immediately instead of a bare loading line.
+    // Placeholders are aria-hidden; the status text carries the semantics.
     return (
-      <div className="portfolio-root">
-        <p className="portfolio-state" role="status">
+      <div className="portfolio-root" aria-busy="true">
+        <p className="portfolio-visually-hidden" role="status">
           Loading portfolio…
         </p>
+        <PortfolioSkeleton />
       </div>
     )
   }
 
   return (
     <div className="portfolio-root">
-      <header className="portfolio-header">
-        <p className="portfolio-total-label" id="portfolio-total-label">
-          Total portfolio balance
-        </p>
-        <p className="portfolio-total" aria-labelledby="portfolio-total-label">
-          <SensitiveValue>{formatUsdFull(portfolio.totalUsd)}</SensitiveValue>
-        </p>
-        <button
-          type="button"
-          className="portfolio-refresh"
-          onClick={() => portfolio.refresh()}
-          disabled={portfolio.isLoading}
-        >
-          {portfolio.isLoading ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </header>
-
       {portfolio.categories.map((group) => (
         <CategorySection
           key={group.category.id}

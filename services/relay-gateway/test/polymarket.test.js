@@ -136,8 +136,11 @@ const PM_ENV = {
   POLYMARKET_BUILDER_CODE: BUILDER_CODE,
 }
 
-function build({ env = {}, polymarketFetch = mockPolymarketFetch(), killSwitch = createKillSwitch(false) } = {}) {
+function build({ env = {}, polymarketFetch = mockPolymarketFetch(), killSwitch = createKillSwitch(false), noRouter = false } = {}) {
   const config = testConfig({ ...PM_ENV, ...env })
+  // The FeeRouter is deployed on every network now (issue #966); tests about the ENV builder
+  // fees must construct the record-less state explicitly instead of inheriting it.
+  if (noRouter) config.feeRouter = { ...config.feeRouter, address: null }
   const clock = { t: TEST_NOW }
   const { app } = createApp(config, {
     providers: mockProviders(config),
@@ -326,13 +329,13 @@ describe('predict reads', () => {
   })
 
   it('returns the configured builder fee + code with the live platform rate', async () => {
-    const { app } = build()
+    const { app } = build({ noRouter: true }) // env-fallback builder bps (50/0 defaults)
     const res = await get(app, FEE_PATH).expect(200)
     expect(res.body).toMatchObject({ feeRateBps: 1000, builderTakerFeeBps: 50, builderMakerFeeBps: 0, builderCode: BUILDER_CODE })
   })
 
   it('still returns builder info (no block) when the CLOB fee rate is unavailable — trading not stranded', async () => {
-    const { app } = build({ polymarketFetch: mockPolymarketFetch({ '/fee-rate': {} }) })
+    const { app } = build({ noRouter: true, polymarketFetch: mockPolymarketFetch({ '/fee-rate': {} }) })
     const res = await get(app, FEE_PATH).expect(200)
     expect(res.body).toMatchObject({ feeRateBps: null, builderTakerFeeBps: 50, builderCode: BUILDER_CODE })
   })

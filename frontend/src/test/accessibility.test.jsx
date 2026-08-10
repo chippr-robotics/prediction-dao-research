@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+
+// Spec 064: stub the asset-selector data hook so provider-light home panels render
+// (the real UniversalAssetSelect component still renders, so a11y stays covered).
+vi.mock('../hooks/useSelectableAssets', async () => await import('./helpers/selectableAssetsMock'))
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import Button from '../components/ui/Button'

@@ -14,7 +14,7 @@ import { formatUnits } from 'ethers'
 import { getNetwork } from '../../config/networks'
 import { resolveTokenMeta } from '../reports/tokenMeta'
 import { valueTransfer } from '../reports/valuation'
-import { normalizeEntry } from './normalize'
+import { normalizeEntry, collapseBridgeEntries } from './normalize'
 import { mergeEntries } from './identity'
 import { VALUATION_STATUS } from './constants'
 
@@ -117,6 +117,12 @@ export function createLedgerRepository({ sources = [], enrich = defaultEnrich, g
         const items = await src.list({ ...ctx, provider: q.provider, signal: q.signal })
         // Normalize inside the per-source boundary so one bad source degrades
         // to stale instead of poisoning the whole ledger.
+        //
+        // This stays deliberately COARSE. An entry that violates an invariant here (a leaked
+        // chainId, an unknown class) is a SOURCE bug, and a source that emits one should be
+        // flagged untrustworthy rather than quietly filtered. Damaged STORED records — the
+        // self-contradictory bridge a restored backup can carry — are dropped by the source
+        // adapter that reads them, so they never reach this boundary.
         return items.map((item) => normalizeEntry(item, ctx))
       }),
     )
@@ -127,7 +133,10 @@ export function createLedgerRepository({ sources = [], enrich = defaultEnrich, g
       else staleClasses.push(sources[i].class)
     })
 
-    const merged = mergeEntries(collected)
+    // Dedup across sources, then collapse every observation of one bridge into
+    // the single movement it is — a bridge spans two networks and two
+    // transactions but is never two ledger entries (spec 067 FR-035).
+    const merged = collapseBridgeEntries(mergeEntries(collected))
     const enriched = await enrich(merged, { chainId: ctx.chainId, provider: q.provider })
     const filtered = enriched.filter((e) => matchesFilter(e, q.filter) && inPeriod(e, q.period))
     filtered.sort(compareEntries)
@@ -135,8 +144,7 @@ export function createLedgerRepository({ sources = [], enrich = defaultEnrich, g
     return {
       entries: filtered,
       staleClasses,
-      prunedBefore: typeof getPrunedBefore === 'function' ? getPrunedBefore(ctx) ?? null : null,
-    }
+      prunedBefore: typeof getPrunedBefore === 'function' ? getPrunedBefore(ctx) ?? null : null }
   }
 
   return { listEntries }

@@ -9,7 +9,11 @@
   background: var(--color-surface);
   border-radius: 12px;
   padding: 0;
-  overflow: hidden;
+  /* `clip`, not `hidden`: identical corner clipping, but hidden makes this a
+     scroll container, which silently kills `position: sticky` for every
+     descendant — the My Account frozen header (spec 074) sticks to the window
+     scroll and must not be captured here. */
+  overflow: clip;
   position: relative;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
@@ -749,11 +753,39 @@
   gap: 6px;
 }
 
-/* Security Section */
+/* Security Section (Recovery tab).
+   Every panel here is a collapsible AccordionSection, so the tab opens as a
+   scannable list of headings; the styles below apply to what each section shows
+   once it is expanded. */
+.security-section__intro {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary, #5a6772);
+}
+
+/* Section headings come from the accordion trigger — in-body headings (nested
+   sub-panels) stay smaller so they never compete with it. */
 .security-section h3 {
   margin: 0 0 8px;
   font-size: 18px;
   color: var(--color-text);
+}
+
+.security-section .acc h3 {
+  margin: 0;
+  font-size: inherit;
+}
+
+.security-section .acc__body h3,
+.security-section .acc__body h4 {
+  font-size: 15px;
+  margin: 16px 0 8px;
+}
+
+.security-section .acc__body > .section-description:first-child,
+.security-section .acc__body > p:first-child {
+  margin-top: 0;
 }
 
 .security-section .section-description {
@@ -855,17 +887,12 @@
   flex-shrink: 0;
 }
 
-.controllers-panel__link {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
+/* Address entry inside the link-wallet sheet (input + address book + QR scan). */
 .controllers-panel__link-row {
   display: flex;
   gap: 8px;
   align-items: flex-start;
+  margin-bottom: 12px;
 }
 
 .controllers-panel__address-wrap {
@@ -882,15 +909,15 @@
   min-width: 42px;
   height: 42px;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-secondary);
-  color: var(--color-text);
+  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
   cursor: pointer;
 }
 
 .controllers-panel__scan-btn:hover:not(:disabled) {
-  border-color: var(--color-primary, #36B37E);
-  color: var(--color-primary, #36B37E);
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
 }
 
 .controllers-panel__scan-btn:disabled {
@@ -1347,4 +1374,52 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
+}
+
+/* Legal & Policies section (Preferences tab → App group, issue #1025) */
+.app-legal-links {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.app-legal-link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.app-legal-link-row + .app-legal-link-row {
+  border-top: 1px solid var(--border-color);
+}
+
+.app-legal-link-row:hover,
+.app-legal-link-row:focus-visible {
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+}
+
+.app-legal-link-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.app-legal-link-label {
+  flex: 1;
+  font-size: 0.92rem;
+}
+
+.app-legal-link-chevron {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
 }

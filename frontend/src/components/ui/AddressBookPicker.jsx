@@ -6,6 +6,7 @@
  */
 
 import RestrictionTag from '../account/RestrictionTag'
+import NetworkPill from './NetworkPill'
 import './AddressBookField.css'
 
 function shorten(addr) {
@@ -27,7 +28,7 @@ export default function AddressBookPicker({
           <button type="button" className="ab-picker-option" onClick={() => onSelect?.(e)}>
             <span className="ab-picker-nick">{e.nickname}</span>
             <code className="ab-picker-addr">{shorten(e.address)}</code>
-            <span className="ab-address-network">{networkName(e.chainId)}</span>
+            <NetworkPill chainId={e.chainId} name={networkName(e.chainId)} />
             <RestrictionTag status={getStatus(e.address, e.chainId)} />
           </button>
         </li>

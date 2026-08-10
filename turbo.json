@@ -1,0 +1,210 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "//": "Task graph for spec 075 (US6). Targets wrap npm scripts that already exist. Turborepo does NOT sandbox: an undeclared input yields a WRONG CACHE HIT, not an error \u2014 every `inputs` list is a safety claim. DOTENV: turbo never loads .env files, and `globalEnv` only hashes what is already exported into TURBO'S OWN process \u2014 a var that dotenv (hardhat.config.js) or vite `loadEnv` reads INSIDE the task lands after the key is computed, so through that channel it moves nothing. The dotenv FILES are therefore hashed as globalDependencies below; that is what makes an edited AMOY_RPC_URL invalidate `//#test` instead of silently switching the test chain behind a cache hit. Cypress, Slither, Medusa, Manticore, Matchstick (renamed from `test` to `test:matchstick` so it stops being a turbo task \u2014 turbo has no way to exclude one; note the script itself runs bare `graph test`, which REJECTS this platform, so the only working invocation is the vendored image, `docker build -f subgraph/matchstick.Dockerfile` then `docker run`, exactly as subgraph-build.yml does), mkdocs, cloudbuild and every deploy path are OUTSIDE this graph. MINI-APPS: the packages under frontend/miniapps/* deliberately have no `test` script \u2014 vitest run in a package dir picks up that package's PUBLISH preset, whose hostScopePlugin rewrites react/jsx-runtime into the host shim and kills every suite at import. Their 22 spec files run under the host config as part of `frontend#test`, which is why `miniapps/*/src/**` is one of its inputs \u2014 remove that input and a mini-app source edit stops moving the key of the only task that tests it. See docs/developer-guide/monorepo.md.",
+  "globalDependencies": [
+    "package-lock.json",
+    "hardhat.config.js",
+    ".solcover.js",
+    "coverage-threshold-policy.json",
+    ".env*",
+    "frontend/.env*"
+  ],
+  "globalEnv": [
+    "AMOY_RPC_URL",
+    "AMOY_FORK_BLOCK",
+    "MAINNET_RPC_URL",
+    "OPTIMISM_RPC_URL",
+    "BASE_RPC_URL",
+    "ARBITRUM_RPC_URL",
+    "POLYGON_RPC_URL",
+    "FORCE_SOLCJS",
+    "REPORT_GAS",
+    "COVERAGE",
+    "TZ",
+    "NODE_OPTIONS",
+    "VITE_TENANT_ID",
+    "VITE_NETWORK_ID"
+  ],
+  "tasks": {
+    "//#compile": {
+      "inputs": [
+        "contracts/**/*.sol",
+        "hardhat.config.js"
+      ],
+      "outputs": [
+        "artifacts/**",
+        "cache/**"
+      ]
+    },
+    "//#test": {
+      "dependsOn": [
+        "//#compile"
+      ],
+      "inputs": [
+        "test/**",
+        "contracts/**/*.sol",
+        "scripts/deploy/lib/**",
+        "scripts/coverage/lib/**",
+        "scripts/operations/seed-local.js",
+        "packages/intent-types/src/**",
+        "services/relay-gateway/src/paymaster/build.js"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "eslint.config.js"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vite.config.js",
+        "vite-plugins/**"
+      ]
+    },
+    "frontend#test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "miniapps/*/src/**",
+        "vite.config.js",
+        "vite-plugins/**",
+        "$TURBO_ROOT$/tenants/**",
+        "$TURBO_ROOT$/packages/*/src/**"
+      ]
+    },
+    "fairwins-relay-gateway#test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "$TURBO_ROOT$/tenants/**",
+        "$TURBO_ROOT$/packages/*/src/**"
+      ]
+    },
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "public/**",
+        "index.html",
+        "vite.config.js",
+        "vite-plugins/**",
+        "$TURBO_ROOT$/tenants/**"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
+    },
+    "@fairwins/miniapp-build#build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "*.js",
+        "package.json",
+        "$TURBO_ROOT$/tenants/**"
+      ],
+      "outputs": []
+    },
+    "prediction-dao-research-subgraph#build": {
+      "dependsOn": [
+        "codegen"
+      ],
+      "inputs": [
+        "src/**",
+        "subgraph.yaml",
+        "schema.graphql",
+        "$TURBO_ROOT$/packages/abi/json/**"
+      ],
+      "outputs": [
+        "build/**"
+      ]
+    },
+    "codegen": {
+      "dependsOn": [
+        "//#check:abis"
+      ],
+      "inputs": [
+        "subgraph.yaml",
+        "schema.graphql",
+        "../packages/abi/json/**"
+      ],
+      "outputs": [
+        "generated/**"
+      ]
+    },
+    "//#check:storage-layout": {
+      "dependsOn": [
+        "//#compile"
+      ],
+      "inputs": [
+        "artifacts/build-info/**",
+        ".openzeppelin/**",
+        "deployments/**",
+        "cache/validations.json"
+      ],
+      "cache": false
+    },
+    "//#check:abis": {
+      "dependsOn": [
+        "//#compile"
+      ],
+      "inputs": [
+        "artifacts/build-info/**",
+        "scripts/codegen/**",
+        "packages/abi/**"
+      ]
+    },
+    "//#check:deps": {
+      "inputs": [
+        "package.json",
+        "package-lock.json",
+        "*/package.json",
+        "*/*/package.json",
+        "frontend/src/**",
+        "services/*/src/**"
+      ]
+    },
+    "//#tenants:validate": {
+      "inputs": [
+        "tenants/**",
+        "scripts/tenants/**"
+      ]
+    },
+    "//#test:coverage": {
+      "inputs": [
+        "contracts/**/*.sol",
+        "test/**",
+        ".solcover.js"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "check": {
+      "dependsOn": [
+        "//#check:abis",
+        "//#check:deps",
+        "//#tenants:validate",
+        "//#check:storage-layout"
+      ],
+      "cache": false
+    }
+  }
+}

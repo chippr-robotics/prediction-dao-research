@@ -1,0 +1,32 @@
+{
+  "schema": "fairwins-miniapp-manifest/1",
+  "id": "fixture-app",
+  "name": "Fixture Mini-App",
+  "version": "1.0.0",
+  "entry": "entry.js",
+  "styles": [
+    "style.css"
+  ],
+  "hostApi": 2,
+  "sharedDeps": [
+    "@fairwins/miniapp-sdk",
+    "react",
+    "react/jsx-runtime"
+  ],
+  "permissions": [
+    "store",
+    "toast"
+  ],
+  "storeKeys": [
+    "notes"
+  ],
+  "contracts": [],
+  "files": {
+    "entry.js": {
+      "sha256": "15ef1504497c3c1ea59952de7a1b4c6e01ba75eb5fb987e2718e60cc46977c7c"
+    },
+    "style.css": {
+      "sha256": "fdd4da8992a4ef401b5a9cae5deea5697cf6167312cceb29770d302040f5822f"
+    }
+  }
+}

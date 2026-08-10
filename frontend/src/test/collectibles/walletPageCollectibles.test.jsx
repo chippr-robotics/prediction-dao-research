@@ -21,6 +21,56 @@ vi.mock('../../components/collectibles/CollectiblesPanel', () => ({
 vi.mock('../../components/wallet/PortfolioPanel', () => ({
   default: () => <div data-testid="portfolio-panel" />,
 }))
+vi.mock('../../components/ui/BlockiesAvatar', () => ({
+  default: () => <div data-testid="blockies-avatar" />,
+}))
+// Spec 074 — the Account tab body is the unified view (card carousel +
+// Portfolio/Activity/Stats). Mock the portfolio hook (the default view's data
+// seam, also mounted for the card total) and the switcher seam so the
+// fallback-to-Account cases stay free of multi-chain scans and custody/legacy
+// async loads.
+vi.mock('../../hooks/usePortfolio', () => {
+  const usePortfolio = () => ({
+    status: 'ready',
+    isLoading: false,
+    error: null,
+    holdings: [],
+    aggregates: [],
+    categories: [],
+    totalUsd: 0,
+    failedAssets: [],
+    priceMap: new Map(),
+    showTestnetAssets: false,
+    showZeroBalances: false,
+    lastUpdated: null,
+    refresh: vi.fn(),
+  })
+  return { default: usePortfolio, usePortfolio }
+})
+vi.mock('../../hooks/useAccountSwitcher', () => {
+  const useAccountSwitcher = () => ({
+    accounts: [
+      {
+        id: 'personal',
+        kind: 'personal',
+        address: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+        label: 'Personal wallet',
+      },
+    ],
+    currentId: 'personal',
+    choose: vi.fn(),
+    unlockEntry: null,
+    setUnlockEntry: vi.fn(),
+    onUnlocked: vi.fn(),
+    hasChoices: false,
+  })
+  return {
+    useAccountSwitcher,
+    default: useAccountSwitcher,
+    ACCOUNT_KIND_TAG: { vault: 'Multisig', legacy: 'Recovered' },
+    shortAccountAddr: (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : ''),
+  }
+})
 vi.mock('../../hooks/useEncryption', () => ({
   useEncryption: () => ({ isInitialized: false, isInitializing: false, ensureInitialized: vi.fn() }),
 }))
@@ -126,11 +176,12 @@ describe('WalletPage — ?tab=collectibles deep link', () => {
     expect(container.querySelector('.profile-section')).toBeTruthy()
   })
 
-  it('filters Collectibles out of the Finance section bottom bar on unsupported networks', () => {
+  it('redirects the legacy ?tab=portfolio deep link into the unified My Account view (spec 074)', () => {
     useChainTokens.mockReturnValue({ capabilities: { collectibles: false } })
-    const { container } = renderPage('/wallet?tab=portfolio')
+    const { container, getByTestId } = renderPage('/wallet?tab=portfolio')
     expect(container.querySelector('.collectibles-section')).toBeNull()
-    // The rest of the Finance panels still render normally.
-    expect(container.querySelector('.portfolio-section')).toBeTruthy()
+    // The saved link lands on My Account with the Portfolio view active.
+    expect(container.querySelector('.profile-section')).toBeTruthy()
+    expect(getByTestId('portfolio-panel')).toBeTruthy()
   })
 })

@@ -12,13 +12,15 @@
  *   POST /v1/engine/webhook   engine status callback           (shared-secret)
  *   GET  /healthz             liveness/readiness               (origin-lock EXEMPT)
  *   GET  /v1/opensea/*        read-only collectibles proxy     (origin-locked; spec 055)
- *   GET+POST /v1/onramp/...   buy-crypto session mint proxy    (origin-locked; spec 060)
+ *   GET  /v1/bridge/*         read-only Across quote/status    (origin-locked; spec 067)
+ *   GET+POST /v1/onramp/...   buy-crypto session mint proxy    (origin-locked; spec 081)
  */
 import crypto from 'node:crypto'
 import express from 'express'
 import helmet from 'helmet'
 import { loadConfig } from './config/index.js'
 import { buildProviders } from './config/providers.js'
+import { createFeeRouterReader } from './fees/onchain.js'
 import { parseIntent, verifyIntent } from './intent/verify.js'
 import { createIntentStore } from './intent/store.js'
 import { createSanctionsScreen } from './policy/sanctions.js'
@@ -33,6 +35,10 @@ import { createTtlCache } from './opensea/cache.js'
 import { createOpenSeaRouter } from './opensea/routes.js'
 import { createPolymarketClient } from './polymarket/client.js'
 import { createPolymarketRouter } from './polymarket/routes.js'
+import { createEsploraClient, createStampsClient } from './bitcoin/client.js'
+import { createBitcoinRouter } from './bitcoin/routes.js'
+import { createAcrossClient } from './bridge/quotes.js'
+import { createBridgeRouter } from './bridge/routes.js'
 import { createOnrampClient } from './onramp/client.js'
 import { createOnrampRouter } from './onramp/routes.js'
 import { createAuditLogger } from './audit/log.js'
@@ -113,6 +119,8 @@ export function createApp(config, deps = {}) {
   const now = deps.now ?? (() => Math.floor(Date.now() / 1000))
   const killSwitch = deps.killSwitch ?? createKillSwitch(config.killSwitch)
   const audit = createAuditLogger(deps.auditSink ? { sink: deps.auditSink } : {})
+  // Live platform-fee rates from the FeeRouter contract (spec 060); env bps are the fallback.
+  const feeRates = deps.feeRates ?? createFeeRouterReader(config, providers)
 
   const nowMs = () => now() * 1000
   const store = createIntentStore({ now: nowMs })
@@ -162,7 +170,13 @@ export function createApp(config, deps = {}) {
   })
   // Capture the raw body so the engine-webhook route can verify the HMAC over the exact bytes
   // the engine signed (re-serializing could reorder keys and break the signature).
-  app.use(express.json({ limit: '32kb', verify: (req, _res, buf) => { req.rawBody = buf } })) // intents are small fixed-shape JSON; nothing large is legitimate
+  const jsonSmall = express.json({ limit: '32kb', verify: (req, _res, buf) => { req.rawBody = buf } }) // intents are small fixed-shape JSON; nothing large is legitimate
+  // Exception: the Bitcoin broadcast route (spec 061) carries a raw signed transaction as hex —
+  // the contract caps it at 100 kB of tx bytes (200k hex chars), so it gets a larger parse limit;
+  // the route itself enforces the exact cap and hex validity.
+  const jsonBtcTx = express.json({ limit: '256kb' })
+  const BTC_TX_PATH_RE = /^\/v1\/bitcoin\/[^/]+\/tx$/
+  app.use((req, res, next) => (req.method === 'POST' && BTC_TX_PATH_RE.test(req.path) ? jsonBtcTx : jsonSmall)(req, res, next))
 
   // ---- Origin-lock middleware (FR-029, SC-016): client-facing routes require X-Origin-Auth.
   // The Cloudflare Transform Rule injects the header zone-wide; a direct *.run.app hit lacks it.
@@ -257,6 +271,28 @@ export function createApp(config, deps = {}) {
     const header = req.get('x-origin-auth')
     return !!header && timingSafeEqual(header, config.originAuthSecret)
   }
+  /**
+   * Build identity (spec 076, FR-030/FR-031).
+   *
+   * Deliberately OUTSIDE the `disclose` gate below: an operator matching a member's bug report to a
+   * running build needs this exactly when they cannot reach the trusted edge, and a version string
+   * is not a secret (gasWalletRunwayHrs is, which is why THAT stays gated).
+   *
+   * When the deploy did not supply a version, this reports `unreleased+<sha>` — never the nearest
+   * tag. Reporting a release the process is not running would make the release record untrustworthy
+   * (constitution III).
+   */
+  const buildIdentity = () => {
+    const { version, gitSha } = config.build || {}
+    const short = gitSha ? String(gitSha).slice(0, 7) : null
+    const released = typeof version === 'string' && /^v\d+\.\d+\.\d+(-rc\.\d+)?$/.test(version)
+    return {
+      version: released ? version : short ? `unreleased+${short}` : 'unreleased',
+      gitSha: short,
+      released,
+    }
+  }
+
   const healthHandler = async (req, res) => {
     if (!healthCache.chains || Date.now() - healthCache.at >= config.healthCacheMs) {
       try {
@@ -270,7 +306,25 @@ export function createApp(config, deps = {}) {
     for (const [id, c] of Object.entries(healthCache.chains || {})) {
       chains[id] = disclose ? c : { rpc: c.rpc }
     }
-    res.json({ status: 'ok', chains, killSwitch: killSwitch.isActive() })
+    // Platform-fee summary (spec 060): where each fee system's live rate comes from. Public,
+    // read-only telemetry — rates are already public on-chain and in every confirm UI; the
+    // Fees admin tab renders this for the gateway-enforced rows.
+    const liveBps = await feeRates.getPolymarketBps()
+    const fees = {
+      feeRouter: feeRates.address,
+      polymarket: {
+        takerBps: liveBps?.takerBps ?? config.polymarket.takerFeeBps,
+        makerBps: liveBps?.makerBps ?? config.polymarket.makerFeeBps,
+        source: liveBps ? 'chain' : 'env-fallback',
+      },
+      opensea: {
+        referralConfigured: Boolean(
+          config.opensea.referralAddress || Object.keys(config.opensea.referralAddressByChain || {}).length
+        ),
+        beneficiary: config.opensea.referralAddress ?? null,
+      },
+    }
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees })
   }
   app.get('/healthz', healthHandler)
   app.get('/status', healthHandler)
@@ -593,10 +647,81 @@ export function createApp(config, deps = {}) {
       quotas: pmReadQuotas,
       writeQuotas: pmWriteQuotas,
       killSwitch,
+      feeRates,
     })
   )
 
-  // ---- GET/POST /v1/onramp/* (spec 060 buy-crypto; origin-locked via middleware) ---------------
+  // ---- GET/POST /v1/bitcoin/* (spec 061 Bitcoin proxy; origin-locked via middleware) ----------
+  // Esplora-compatible reads (balances/UTXOs/fees/tx status) + raw-tx broadcast + Stamps
+  // recognition. Quotas are keyed per caller IP (no signature to recover on these routes); the
+  // broadcast write gets its own tighter quota. The routes 503 fail-closed (bitcoin_disabled)
+  // until BTC_ENABLED=true — mounting is unconditional so the answer is always honest.
+  const btcReadQuotas = createQuotas({
+    signerPerWindow: config.bitcoin.quotaPerIp,
+    globalPerWindow: config.bitcoin.quotaGlobal,
+    windowMs: config.bitcoin.quotaWindowMs,
+    now: nowMs,
+  })
+  const btcWriteQuotas = createQuotas({
+    signerPerWindow: config.bitcoin.writeQuotaPerIp,
+    globalPerWindow: config.bitcoin.writeQuotaGlobal,
+    windowMs: config.bitcoin.quotaWindowMs,
+    now: nowMs,
+  })
+  const btcFetch = deps.bitcoinFetch ? { fetchImpl: deps.bitcoinFetch } : {}
+  const btcClientOpts = { timeoutMs: config.bitcoin.timeoutMs, retries: config.bitcoin.retries, ...btcFetch }
+  const esploraClients = deps.esploraClients ?? {
+    mainnet: createEsploraClient({ baseUrl: config.bitcoin.esploraUrl, ...btcClientOpts }),
+    testnet: createEsploraClient({ baseUrl: config.bitcoin.esploraTestnetUrl, ...btcClientOpts }),
+  }
+  const stampsClient =
+    deps.stampsClient !== undefined
+      ? deps.stampsClient
+      : config.bitcoin.stampsUrl
+        ? createStampsClient({ baseUrl: config.bitcoin.stampsUrl, ...btcClientOpts })
+        : null
+  app.use(
+    createBitcoinRouter(config, {
+      esploraClients,
+      stampsClient,
+      cache: deps.bitcoinCache ?? createTtlCache({ now: nowMs }),
+      quotas: btcReadQuotas,
+      writeQuotas: btcWriteQuotas,
+      killSwitch,
+      now: nowMs,
+    })
+  )
+
+  // ---- GET /v1/bridge/* (spec 067 cross-chain bridge; origin-locked via middleware) ------------
+  // Across suggested-fees + deposit-status reads. Quotas are keyed per caller IP (nothing to sign on
+  // a GET); there is no write route — the member's wallet submits the deposit itself (FR-013), so
+  // the gateway is a quoting and status convenience only. Mounting is unconditional so a disabled
+  // module answers 503 bridge_disabled with a machine-readable code the SPA can hide on, rather
+  // than a bare 404 (FR-053).
+  const bridgeQuotas = createQuotas({
+    signerPerWindow: config.bridge.quotaPerIp,
+    globalPerWindow: config.bridge.quotaGlobal,
+    windowMs: config.bridge.quotaWindowMs,
+    now: nowMs,
+  })
+  const acrossClient =
+    deps.acrossClient ??
+    createAcrossClient({
+      baseUrl: config.bridge.apiUrl,
+      timeoutMs: config.bridge.timeoutMs,
+      retries: config.bridge.retries,
+      ...(deps.bridgeFetch ? { fetchImpl: deps.bridgeFetch } : {}),
+    })
+  app.use(
+    createBridgeRouter(config, {
+      client: acrossClient,
+      cache: deps.bridgeCache ?? createTtlCache({ now: nowMs }),
+      quotas: bridgeQuotas,
+      killSwitch,
+    })
+  )
+
+  // ---- GET/POST /v1/onramp/* (spec 081 buy-crypto; origin-locked via middleware) ---------------
   // One quota instance for the module: options reads hit `options:<chainId>`, session mints hit
   // the destination address — the tighter per-address mint budget is the real backstop for the
   // shared CDP key. Destinations are screened through the shared sanctions screen before any

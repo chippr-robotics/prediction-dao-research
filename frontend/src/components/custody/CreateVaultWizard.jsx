@@ -4,13 +4,22 @@
 // Spec 049 (US1) — an optional Policy step sits between configuration and review: when rules are configured
 // they become a `policySetup` ({setupTo, setupData}) threaded into vault creation; when skipped the payload
 // carries no policySetup, keeping the initializer byte-identical to spec 043 (FR-010).
+// Spec 068 (US1/US5) — the flow states the deployment chain up front (FR-001) and owner rows use the
+// platform's shared address entry with QR + address book (FR-006).
 
 import { useState, useMemo, useEffect } from 'react'
 import { validateVaultConfig } from '../../lib/custody/safeVault'
 import { buildEnablePolicySetup } from '../../lib/custody/policy'
+import { buildEnablePolicyV2Setup } from '../../lib/custody/policyV2'
+import { NETWORKS } from '../../config/networks'
 import PolicyStep from './PolicyStep'
+import CustodyAddressField from './CustodyAddressField'
 
 export default function CreateVaultWizard({ connectedAddress, chainId, onCreate, onPreview, onDone }) {
+  // Strict lookup: never let an unknown chain silently borrow the default network's name.
+  const network = NETWORKS[Number(chainId)]
+  const chainName = network?.name || `chain ${chainId}`
+  const isTestnet = Boolean(network?.isTestnet)
   const [owners, setOwners] = useState([connectedAddress || ''])
   const [threshold, setThreshold] = useState(1)
   const [label, setLabel] = useState('')
@@ -41,7 +50,16 @@ export default function CreateVaultWizard({ connectedAddress, chainId, onCreate,
 
   // Spec 049: a policy still being edited (invalid) blocks create; a skipped policy is null.
   const policyBlocked = Boolean(policy?.invalid)
-  const buildPolicySetup = () => (policy && !policy.invalid ? buildEnablePolicySetup(chainId, policy) : undefined)
+  // Spec 068 (T026) — new vaults attach the ORDERED engine wherever it is deployed; the v1 setup
+  // path remains only for chains that still have v1 alone, and v1 policies are never created fresh
+  // (existing v1 vaults keep working and upgrade through PolicyPanelV2 — FR-020).
+  const buildPolicySetup = () => {
+    if (!policy || policy.invalid) return undefined
+    if (policy.orderedRules) {
+      return buildEnablePolicyV2Setup(chainId, policy.orderedRules, policy.cooldown || 0)
+    }
+    return buildEnablePolicySetup(chainId, policy)
+  }
 
   const updateOwner = (i, val) => setOwners((prev) => prev.map((o, idx) => (idx === i ? val : o)))
   const addOwner = () => setOwners((prev) => [...prev, ''])
@@ -89,18 +107,25 @@ export default function CreateVaultWizard({ connectedAddress, chainId, onCreate,
 
   return (
     <form className="custody-create" onSubmit={(e) => e.preventDefault()} aria-label="Create a vault">
+      {/* FR-001 — the member must know which chain their funds will live on BEFORE they deploy. */}
+      <p className="custody-hint" role="status">
+        This vault will be deployed on <strong>{chainName}</strong>
+        {isTestnet ? ' (a test network — funds here are not real)' : ''}. To create it somewhere
+        else, switch networks first.
+      </p>
+
       <fieldset>
         <legend>Owners</legend>
         {owners.map((owner, i) => (
           <div className="custody-owner-row" key={i}>
-            <label className="sr-only" htmlFor={`owner-${i}`}>{`Owner ${i + 1} address`}</label>
-            <input
+            <CustodyAddressField
               id={`owner-${i}`}
-              type="text"
-              inputMode="text"
-              placeholder="0x…"
+              label={`Owner ${i + 1} address`}
+              srOnlyLabel
               value={owner}
-              onChange={(e) => updateOwner(i, e.target.value)}
+              onChange={(next) => updateOwner(i, next)}
+              chainId={chainId}
+              selfAddress={i === 0 ? connectedAddress : null}
             />
             {owners.length > 1 && (
               <button type="button" onClick={() => removeOwner(i)} aria-label={`Remove owner ${i + 1}`}>

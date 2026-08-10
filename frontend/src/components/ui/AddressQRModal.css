@@ -310,3 +310,64 @@
     height: 200px;
   }
 }
+
+/* ---- Bitcoin mode (spec 061, FR-007) --------------------------------------
+   The Bitcoin receive view must be visually AND textually distinct from the
+   EVM address view so the two can never be confused: an explicit labeled
+   network badge (Bitcoin orange, but never color-only — the text carries the
+   meaning) and a matching accent on the address text. */
+
+.address-qr-network-badge {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.address-qr-network-badge--bitcoin {
+  border-color: #f7931a;
+  color: #b36400;
+  background: rgba(247, 147, 26, 0.12);
+}
+
+.address-qr-address--bitcoin {
+  border-left: 3px solid #f7931a;
+}
+
+.address-qr-type-toggle {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin: 4px 0 0;
+  width: 100%;
+  text-align: left;
+}
+
+.address-qr-type-toggle legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 6px;
+  color: var(--text-secondary, var(--text-primary));
+}
+
+.address-qr-type-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.address-qr-type-option input:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}

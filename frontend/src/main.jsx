@@ -20,9 +20,16 @@ import ErrorBoundary from './components/ui/ErrorBoundary'
 import TxProgressOverlay from './components/wallet/TxProgressOverlay'
 import { validateTheme } from './utils/validateTheme'
 import { registerServiceWorker } from './lib/pwa/serviceWorkerUpdate'
+import { installHostScope } from './lib/miniapps/hostScope'
 
 // Create query client for wagmi
 const queryClient = new QueryClient()
+
+// Publish the host's singleton React/ethers/SDK on the mini-app shared-module
+// scope before the first render (spec 073, research R2). A mini-app package
+// ships no copy of these and reads them from the scope as it evaluates, so the
+// scope has to exist before any workspace can import one.
+installHostScope()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

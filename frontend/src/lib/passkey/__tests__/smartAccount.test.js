@@ -4,6 +4,19 @@
  * batch composition, guard refusals, capability gating per network.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { decodeAbiParameters } from 'viem'
+
+const SIGNATURE_WRAPPER_ABI = [
+  {
+    type: 'tuple',
+    components: [
+      { name: 'ownerIndex', type: 'uint8' },
+      { name: 'signatureData', type: 'bytes' },
+    ],
+  },
+]
+const stubOwnerIndex = (sig) => Number(decodeAbiParameters(SIGNATURE_WRAPPER_ABI, sig)[0].ownerIndex)
+const stubSignatureData = (sig) => decodeAbiParameters(SIGNATURE_WRAPPER_ABI, sig)[0].signatureData
 
 vi.mock('../../../config/networks', () => ({
   getNetwork: vi.fn((chainId) => {
@@ -40,6 +53,13 @@ vi.mock('../../../config/contracts', () => ({
   }),
 }))
 
+// viem 2.53's `toCoinbaseSmartAccount.getStubSignature()` for a WebAuthn owner:
+// a SignatureWrapper with a HARDCODED ownerIndex 0 (word[1] == 0) wrapping a
+// dummy WebAuthnAuth. Estimation validates this against slot 0 (see the
+// stub-index override under test).
+const VIEM_WEBAUTHN_STUB =
+  '0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000000170000000000000000000000000000000000000000000000000000000000000001949fc7c88032b9fcb5f6efc7a7b8c63668eae9871b765e23123bb473ff57aa831a7c0d9276168ebcc29f2875a0239cffdf2a9cd1c2007c5c77c071db9264df1d000000000000000000000000000000000000000000000000000000000000002549960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008a7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2273496a396e6164474850596759334b7156384f7a4a666c726275504b474f716d59576f4d57516869467773222c226f726967696e223a2268747470733a2f2f7369676e2e636f696e626173652e636f6d222c2263726f73734f726967696e223a66616c73657d00000000000000000000000000000000000000000000'
+
 vi.mock('viem/account-abstraction', async () => {
   const actual = await vi.importActual('viem/account-abstraction')
   return {
@@ -47,9 +67,12 @@ vi.mock('viem/account-abstraction', async () => {
     toWebAuthnAccount: vi.fn(() => ({ type: 'webAuthnAccount' })),
     // Echo the pinned `address` param (the factory-mismatch fix pins the sender) and expose an
     // isDeployed the getFactoryArgs override consults; default counterfactual.
+    // getStubSignature mirrors viem's WebAuthn stub (hardcoded ownerIndex 0) so the
+    // stub-index override in buildAccount can be exercised.
     toCoinbaseSmartAccount: vi.fn(async (params) => ({
       address: params?.address ?? '0xACC0000000000000000000000000000000000001',
       isDeployed: vi.fn().mockResolvedValue(false),
+      getStubSignature: vi.fn().mockResolvedValue(VIEM_WEBAUTHN_STUB),
     })),
     createBundlerClient: vi.fn((opts) => opts),
     createPaymasterClient: vi.fn((opts) => ({ __isPaymasterClient: true, ...opts })),
@@ -62,11 +85,13 @@ import {
   addressToOwnerBytes,
   buildAction,
   buildAccount,
+  rewrapStubOwnerIndex,
   resolveOwnerIndex,
   encodeRemoveOwner,
   encodeAddWalletOwner,
   requirePasskeySupport,
   deriveAddress,
+  computeAccountAddress,
   defaultPublicClient,
   ChainNotSupportedError,
   LastControllerError,
@@ -122,15 +147,25 @@ describe('defaultPublicClient (issue #854 — client.chain.id crash)', () => {
 })
 
 describe('deriveAddress', () => {
-  it('reads the factory getAddress with the exact (owners, nonce) inputs', async () => {
-    const publicClient = { readContract: vi.fn().mockResolvedValue('0xACC0000000000000000000000000000000000001') }
+  it('computes the address LOCALLY — no RPC, so sign-in works on any chain', async () => {
+    // Was an eth_call to the factory's getAddress behind requirePasskeySupport, which made
+    // sign-in fail on chains with no passkey config. A rejecting client proves nothing is read.
+    const publicClient = { readContract: vi.fn().mockRejectedValue(new Error('RPC must not be used')) }
     const ownersBytes = [publicKeyToOwnerBytes({ x: X, y: Y })]
     const addr = await deriveAddress({ chainId: 80002, ownersBytes, nonce: 7n, deps: { publicClient } })
-    expect(addr).toMatch(/^0xACC/)
-    const call = publicClient.readContract.mock.calls[0][0]
-    expect(call.functionName).toBe('getAddress')
-    expect(call.args).toEqual([ownersBytes, 7n])
-    expect(call.address).toMatch(/^0xFAC7/i)
+    expect(addr).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    expect(publicClient.readContract).not.toHaveBeenCalled()
+  })
+
+  it('binds owners and nonce into the salt (different inputs ⇒ different accounts)', async () => {
+    const owners = [publicKeyToOwnerBytes({ x: X, y: Y })]
+    const other = [publicKeyToOwnerBytes({ x: Y, y: X })]
+    const [a, b, c] = await Promise.all([
+      deriveAddress({ chainId: 80002, ownersBytes: owners, nonce: 0n }),
+      deriveAddress({ chainId: 80002, ownersBytes: owners, nonce: 7n }),
+      deriveAddress({ chainId: 80002, ownersBytes: other, nonce: 0n }),
+    ])
+    expect(new Set([a, b, c]).size).toBe(3)
   })
 })
 
@@ -249,16 +284,16 @@ describe('buildAccount FairWins-factory address pinning (factory-mismatch fix)',
     expect(out.account.address).toBe(FUNDED)
   })
 
-  it('derives the sender from the FairWins factory (getAddress) when the caller omits it', async () => {
-    const publicClient = { readContract: vi.fn().mockResolvedValue(FUNDED), getCode: vi.fn() }
+  it('derives the sender from the FairWins factory params when the caller omits it', async () => {
+    // Derivation is LOCAL now (CREATE2 over the configured factory + pinned initCodeHash), so no
+    // RPC is consulted — but the result must still be exactly what the factory would have
+    // returned, and it must be what viem is pinned to. Pinning viem to anything else is the
+    // factory-mismatch bug this describe block exists to prevent.
+    const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
     await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient } })
-    // deriveAddress → getAddress on the FairWins-deployed factory (0xFAC7…), with the credential’s owner bytes.
-    const call = publicClient.readContract.mock.calls[0][0]
-    expect(call.functionName).toBe('getAddress')
-    expect(call.address).toMatch(/^0xFAC7/i)
-    expect(call.args).toEqual([[ownerBytes], 0n])
-    // …and that derived address is what viem is pinned to.
-    expect(toCoinbaseSmartAccount.mock.calls[0][0].address).toBe(FUNDED)
+    const expected = computeAccountAddress({ ownersBytes: [ownerBytes], nonce: 0n })
+    expect(publicClient.readContract).not.toHaveBeenCalled()
+    expect(toCoinbaseSmartAccount.mock.calls[0][0].address).toBe(expected)
   })
 
   it('overrides getFactoryArgs to deploy via the FairWins factory while counterfactual', async () => {
@@ -336,5 +371,47 @@ describe('resolveOwnerIndex (spec 045 FR-009)', () => {
     await expect(
       resolveOwnerIndex({ chainId: 80002, accountAddress: '0xACC', credential, deps: { readControllers } })
     ).rejects.toBeInstanceOf(CredentialNotControllerError)
+  })
+})
+
+describe('rewrapStubOwnerIndex (estimation stub validates the signing owner slot)', () => {
+  it('viem’s WebAuthn stub really does hardcode ownerIndex 0 (the bug it fixes)', () => {
+    expect(stubOwnerIndex(VIEM_WEBAUTHN_STUB)).toBe(0)
+  })
+
+  it('re-points the stub at a non-zero index, preserving the dummy signatureData', () => {
+    const rewrapped = rewrapStubOwnerIndex(VIEM_WEBAUTHN_STUB, 2)
+    expect(stubOwnerIndex(rewrapped)).toBe(2)
+    // Only the index changes — the dummy WebAuthnAuth payload is untouched.
+    expect(stubSignatureData(rewrapped)).toBe(stubSignatureData(VIEM_WEBAUTHN_STUB))
+  })
+
+  it('is a byte-for-byte no-op for slot 0 (pristine single-passkey accounts unchanged)', () => {
+    expect(rewrapStubOwnerIndex(VIEM_WEBAUTHN_STUB, 0)).toBe(VIEM_WEBAUTHN_STUB)
+  })
+
+  it('returns an undecodable stub untouched (never blocks a send)', () => {
+    expect(rewrapStubOwnerIndex('0xdeadbeef', 3)).toBe('0xdeadbeef')
+  })
+})
+
+describe('buildAccount stub-index override (validateUserOp-reverts-on-Prepare fix)', () => {
+  const credential = { credentialId: 'c1', publicKey: { x: X, y: Y } }
+  const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
+
+  it('re-points the estimation stub at the credential’s real owner index (slot 1)', async () => {
+    const out = await buildAccount({ chainId: 137, credential, accountAddress: '0xACC', ownerIndex: 1, deps: { publicClient } })
+    const stub = await out.account.getStubSignature()
+    // Without the override this is 0 → validateUserOp reverts (InvalidOwnerBytesLength)
+    // during estimation on an account whose slot 0 was removed. With it, estimation
+    // validates the SAME live slot signUserOperation signs with.
+    expect(stubOwnerIndex(stub)).toBe(1)
+  })
+
+  it('leaves the stub untouched for slot 0 (no override installed)', async () => {
+    const out = await buildAccount({ chainId: 137, credential, accountAddress: '0xACC', ownerIndex: 0, deps: { publicClient } })
+    const stub = await out.account.getStubSignature()
+    expect(stub).toBe(VIEM_WEBAUTHN_STUB)
+    expect(stubOwnerIndex(stub)).toBe(0)
   })
 })

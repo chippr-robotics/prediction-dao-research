@@ -35,7 +35,7 @@ import {
  *   killSwitch: {isActive: () => boolean},
  * }} deps
  */
-export function createPolymarketRouter(config, { client, gammaClient, dataClient, cache, quotas, writeQuotas, killSwitch }) {
+export function createPolymarketRouter(config, { client, gammaClient, dataClient, cache, quotas, writeQuotas, killSwitch, feeRates }) {
   const pm = config.polymarket
   const gamma = gammaClient ?? client // browse/search host (public)
   const data = dataClient ?? client // positions host (public)
@@ -178,7 +178,13 @@ export function createPolymarketRouter(config, { client, gammaClient, dataClient
         // The builder code + fee are OUR config and are ALWAYS known — trading must never be blocked
         // by a CLOB fee-rate quirk (FR-015). Polymarket's own taker fee (base_fee → the order's
         // feeRateBps) is best-effort: fetched for the signed order, null if the CLOB has none.
-        const builder = attachBuilderCode(config, { chainId: 137 })
+        // Since spec 060 the bps come LIVE from the FeeRouter contract (admin-editable on-chain);
+        // the env values remain the honest fallback when the router is unset/unreachable.
+        const live = feeRates ? await feeRates.getPolymarketBps() : null
+        const effectiveConfig = live
+          ? { ...config, polymarket: { ...pm, takerFeeBps: live.takerBps, makerFeeBps: live.makerBps } }
+          : config
+        const builder = attachBuilderCode(effectiveConfig, { chainId: 137 })
         let platform = null
         try {
           platform = normalizeFeeRate(await client.get('/fee-rate', { query: { token_id: tokenId } }), tokenId)
@@ -192,6 +198,8 @@ export function createPolymarketRouter(config, { client, gammaClient, dataClient
           builderCode: builder.builderCode,
           builderTakerFeeBps: builder.takerFeeBps,
           builderMakerFeeBps: builder.makerFeeBps,
+          // Where the bps came from: the on-chain FeeRouter, or the env fallback.
+          source: live ? 'chain' : 'env-fallback',
         }
       })
       respond(res, result)

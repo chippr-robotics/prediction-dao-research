@@ -44,10 +44,13 @@ import {
   buildWithdrawCalls,
 } from '../../lib/earn/vaultActions'
 import { ERC4626_VAULT_ABI } from '../../abis/ERC4626Vault'
+import { FEE_ROUTER_ABI } from '../../abis/FeeRouter'
+import { FEE_SERVICES } from '../../lib/fees/feeQuote'
 import { formatApy, formatTvl } from '../../lib/earn/format'
 
 const VAULT_IFACE = new Interface(ERC4626_VAULT_ABI)
 const ERC20_IFACE = new Interface(['function approve(address spender, uint256 value) returns (bool)'])
+const FEE_ROUTER_TEST_IFACE = new Interface(FEE_ROUTER_ABI)
 
 const ACCOUNT = '0x00000000000000000000000000000000000000ac'
 const VAULT = {
@@ -149,6 +152,76 @@ describe('buildDepositCalls (sendCalls batch)', () => {
     await expect(
       buildDepositCalls({ vault: VAULT, account: ACCOUNT, amount: 5_000_000n, provider: {} }),
     ).rejects.toThrow(/vault paused/)
+  })
+})
+
+describe('buildDepositCalls with a platform fee (spec 060)', () => {
+  const ROUTER = '0x00000000000000000000000000000000000000f1'
+  const FEE_QUOTE = { available: true, bps: 50, capBps: 250, routerAddress: ROUTER }
+
+  beforeEach(() => {
+    m.fns = {}
+  })
+
+  it('routes through the FeeRouter with the quoted rate as the consent ceiling', async () => {
+    m.fns.allowance = async () => 0n
+    const { calls, requiresApproval } = await buildDepositCalls({
+      vault: VAULT,
+      account: ACCOUNT,
+      amount: 5_000_000n,
+      provider: {},
+      feeQuote: FEE_QUOTE,
+    })
+    expect(requiresApproval).toBe(true)
+    expect(calls).toHaveLength(2)
+    // The ROUTER (not the vault) is approved for the exact gross amount.
+    expect(calls[0].target).toBe(VAULT.asset.address)
+    const approve = ERC20_IFACE.decodeFunctionData('approve', calls[0].data)
+    expect(approve[0].toLowerCase()).toBe(ROUTER)
+    expect(approve[1]).toBe(5_000_000n)
+    // The deposit is depositToVaultWithFee(earn.lend, vault, gross, member, quotedBps).
+    expect(calls[1].target).toBe(ROUTER)
+    const args = FEE_ROUTER_TEST_IFACE.decodeFunctionData('depositToVaultWithFee', calls[1].data)
+    expect(args[0]).toBe(FEE_SERVICES.EARN_LEND)
+    expect(args[1].toLowerCase()).toBe(VAULT.address)
+    expect(args[2]).toBe(5_000_000n)
+    expect(args[3].toLowerCase()).toBe(ACCOUNT)
+    expect(args[4]).toBe(50n)
+  })
+
+  it('dry-runs the router call when the allowance already covers the deposit', async () => {
+    m.fns.allowance = async () => 10_000_000n
+    const dryRun = vi.fn(async () => 5_000_000n)
+    m.fns['depositToVaultWithFee.staticCall'] = dryRun
+    const { calls, requiresApproval } = await buildDepositCalls({
+      vault: VAULT,
+      account: ACCOUNT,
+      amount: 5_000_000n,
+      provider: {},
+      feeQuote: FEE_QUOTE,
+    })
+    expect(requiresApproval).toBe(false)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].target).toBe(ROUTER)
+    expect(dryRun).toHaveBeenCalled()
+  })
+
+  it('keeps the pre-fee direct path byte-identical when the fee is zero or unavailable', async () => {
+    m.fns.allowance = async () => 0n
+    for (const feeQuote of [null, { available: false, bps: 0, routerAddress: null }, { ...FEE_QUOTE, bps: 0 }]) {
+      const { calls } = await buildDepositCalls({
+        vault: VAULT,
+        account: ACCOUNT,
+        amount: 5_000_000n,
+        provider: {},
+        feeQuote,
+      })
+      expect(calls[0].target).toBe(VAULT.asset.address)
+      const approve = ERC20_IFACE.decodeFunctionData('approve', calls[0].data)
+      expect(approve[0].toLowerCase()).toBe(VAULT.address) // vault, not router
+      expect(calls[1].target).toBe(VAULT.address)
+      VAULT_IFACE.decodeFunctionData('deposit', calls[1].data) // still a plain deposit
+    }
   })
 })
 

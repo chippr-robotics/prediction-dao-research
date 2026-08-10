@@ -4,7 +4,6 @@
 import { useState } from 'react'
 import { useWallet } from '../../hooks'
 import { useVaultProposals } from '../../hooks/useVaultProposals'
-import ProposeTransactionForm from './ProposeTransactionForm'
 import ProposalQueue from './ProposalQueue'
 import OwnersThresholdPanel from './OwnersThresholdPanel'
 
@@ -14,22 +13,22 @@ export default function VaultProposalsPanel({ vault, proposals }) {
   // hook is only live when no instance is passed, so nothing is fetched twice.
   const internal = useVaultProposals(proposals ? null : vault)
   const { queue, history, loading, error, propose, approve, execute, cancel } = proposals || internal
-  const [showPropose, setShowPropose] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null)
 
   if (!vault?.isSafe) return null
 
   // Acting on a vault requires being on its network (approvals/execution are chain-scoped).
+  const vaultChainLabel = vault.chainName ? `${vault.chainName} (${vault.chainId})` : `network ${vault.chainId}`
   if (Number(chainId) !== Number(vault.chainId)) {
     return (
       <div className="custody-proposals" role="region" aria-label="Vault proposals">
         <p className="custody-error" role="alert">
-          This vault is on network {vault.chainId}. Switch networks to view and act on its transactions.
+          This vault is on {vaultChainLabel}. Switch networks to view and act on its transactions.
         </p>
         {switchNetwork && (
           <button type="button" onClick={() => switchNetwork(vault.chainId)}>
-            Switch to network {vault.chainId}
+            Switch to {vault.chainName || `network ${vault.chainId}`}
           </button>
         )}
       </div>
@@ -40,6 +39,14 @@ export default function VaultProposalsPanel({ vault, proposals }) {
     setActionError(null)
     setBusy(true)
     try {
+      // Spec 068 (FR-004) — re-check at SUBMIT time, not just at render: the wallet may have
+      // switched networks while this panel was open, and a custody action must never be submitted
+      // to a chain other than the vault's own.
+      if (Number(chainId) !== Number(vault.chainId)) {
+        throw new Error(
+          `This vault is on ${vaultChainLabel} but your wallet is on network ${chainId}. Switch networks and try again.`,
+        )
+      }
       await fn(...args)
     } catch (e) {
       setActionError(e?.message || 'Action failed')
@@ -50,15 +57,16 @@ export default function VaultProposalsPanel({ vault, proposals }) {
 
   return (
     <div className="custody-vault-proposals">
+      {/* No vault-only "New transfer" form. Spending from a vault is a normal transfer made while
+          the vault is your acting account — pick it in the account menu and use Home or Transfer.
+          A second, custody-shaped send form here would be a parallel path to maintain, and would
+          quietly diverge from the one members actually use (asset picker, address book, screening,
+          fee disclosure). Governance below stays: changing owners has no equivalent elsewhere. */}
       {vault.owner && (
-        <div className="custody-actions">
-          <button type="button" onClick={() => setShowPropose((s) => !s)}>
-            {showPropose ? 'Close' : 'New transfer'}
-          </button>
-        </div>
-      )}
-      {vault.owner && showPropose && (
-        <ProposeTransactionForm vault={vault} onPropose={run(propose)} onDone={() => setShowPropose(false)} />
+        <p className="custody-hint" role="note">
+          To move funds, pick this vault in the account menu next to your avatar and use Transfer as
+          usual. Anything you submit lands here for the other owners to approve.
+        </p>
       )}
 
       <OwnersThresholdPanel vault={vault} onPropose={run(propose)} busy={busy} />

@@ -1,14 +1,10 @@
 name: Test Pipeline
 
 on:
-  pull_request:
-    branches:
-      - main
-      - develop
-  push:
-    branches:
-      - main
-      - develop
+  # pull_request/push triggers deliberately REMOVED (spec 075, FR-009).
+  # ci-manager.yml invokes this workflow via workflow_call; declaring event triggers here
+  # as well made it run TWICE per commit, which is why ci-manager's change detection only
+  # ever ADDED work instead of reducing it.
   workflow_dispatch:
   workflow_call:
 
@@ -16,6 +12,46 @@ permissions:
   contents: read
 
 jobs:
+  # Gate (spec 072, FR-008): every tenants/<id>/manifest.json must be valid —
+  # structure, domain uniqueness, fee caps, cohort separation, dedicated-mode
+  # record presence. Must fail the pipeline loudly (Constitution IV). The
+  # validator is dependency-free, so no npm ci is needed.
+  tenant-manifests:
+    name: Tenant Manifest Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Validate tenant manifests
+        run: node scripts/tenants/validate-tenant-manifest.js
+
+  # Gate (spec 075, FR-003/FR-015): version skew across manifests and undeclared (phantom)
+  # imports. Both invariants were fixed by hand once and had nothing preventing recurrence, which
+  # is precisely the failure mode spec 075 exists to remove. Dependency-free, so no npm ci.
+  dependency-hygiene:
+    name: Dependency Hygiene
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Check dependency hygiene
+        run: npm run check:deps
+
+
   smart-contract-tests:
     name: Smart Contract Tests
     runs-on: ubuntu-latest
@@ -25,7 +61,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -44,8 +80,39 @@ jobs:
       - name: Check upgradeable storage layout
         run: npm run check:storage-layout
 
+      # Gate (spec 075, FR-032): the committed ABIs must match the compiled contracts. The proxies
+      # are upgraded IN PLACE at stable addresses, so a stale ABI desynchronises the app and the
+      # subgraph from the chain with no address change to notice. Must fail loudly (constitution IV).
+      - name: Check generated ABIs are current
+        run: npm run check:abis
+
+      # Gate (spec 075, FR-005). plan.md describes this feature as "gated on a byte-for-byte
+      # bytecode diff that BLOCKS the change on any difference" — but the script was referenced
+      # nowhere except a comment in dependabot.yml, so it blocked nothing and was a tool someone
+      # had to remember to run. This is the step that makes the sentence true.
+      #
+      # It is the only automated defence against the incident that motivated the pin: a floating
+      # @chainlink/contracts (1.3.0 -> 1.5.0) silently changed ChainlinkFunctionsOracleAdapter's
+      # deployed bytecode with every other gate green, because CompilerTargets only checks the
+      # SHAPE of a version range, not the bytes that come out. Runs directly after Compile so the
+      # artifacts it hashes are this run's.
+      - name: Bytecode is byte-identical to the recorded baseline
+        run: node scripts/codegen/bytecode-digest.js --compare specs/075-monorepo-workspaces/baseline-bytecode.json
+
+      # spec 075 FR-041: exercise the task graph with caching DISABLED. Turborepo does not sandbox,
+      # so an undeclared input yields a wrong cache hit rather than an error; the cache is not
+      # trusted in CI until the graph has been observed to reproduce this pipeline's outcomes.
+      # Lives in THIS job because //#check:abis depends on //#compile — the dependency-hygiene job
+      # deliberately installs nothing.
+      - name: Root gates via the task graph (cache disabled)
+        run: npx turbo run check:abis tenants:validate --force
+
       - name: Run tests
-        run: npm test 2>&1 | tee test-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.txt
 
       - name: Summarize test results
         if: always()
@@ -102,12 +169,63 @@ jobs:
         run: node scripts/coverage/check-thresholds.js --summary coverage/coverage-summary.json --policy coverage-threshold-policy.json --scope gated
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: contracts-coverage-report
           path: coverage/
-          retention-days: 30
+          # 7, not 30. The repo is private, so artifacts draw on the account storage
+          # quota (public repos get it free) — 30-day retention at this push rate is
+          # what exhausted it and failed every job on upload. Coverage numbers land in
+          # the step summary above; the HTML is only read same-day, if ever.
+          retention-days: 7
+
+  # Gate (spec 075, FR-019/FR-020/B2). Mini-app output bytes are keccak-committed on-chain in
+  # MiniAppRegistry, and the chain of custody is:
+  #   npm hoisting -> module resolution -> host shim text -> entry.js -> manifest hash -> on-chain
+  # A change to installation layout can therefore invalidate an immutable, curated, on-chain record
+  # with no error raised anywhere. This gate existed as a script but appeared in NO workflow — it
+  # was a manual checklist item, for the one guarantee in this repo that cannot be re-checked after
+  # the fact.
+  miniapp-bytes:
+    name: Mini-app Output Bytes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `--since` stamped BEFORE the build, and `&&` so a failed build can never reach the
+      # compare. Both matter: the compare used to accept any dist/ younger than 10 minutes, so a
+      # build that FAILED left the previous successful output in place and the gate printed
+      # "output bytes unchanged" — the exact false pass its own source comment describes, which
+      # happened once already when rollup's native binary went missing during this conversion.
+      - name: Build mini-apps and compare output bytes
+        run: |
+          set -euo pipefail
+          STAMP=$(($(date +%s) * 1000))
+          # Explicit `&&`, and explicit `-e`. The comment above claims the compare cannot be
+          # reached by a failed build, so the code must say that rather than lean on the runner's
+          # default `bash -e {0}` — a `shell:` override, or someone copying this block elsewhere,
+          # would silently turn the claim false. Relying on implicit shell behaviour for a gate's
+          # blocking property is how the tee'd steps in this repo lost their exit codes.
+          #
+          # KEEP THIS COMPOUND LAST. `set -e` deliberately does NOT fire on a failing left-hand
+          # side of `&&`, so the build's failure reaches the step only as the compound's own exit
+          # status. Verified: with a trailing command after it, a failed build yields step exit 0.
+          npm run build:miniapps && node scripts/miniapps/record-build-digests.js \
+            --compare specs/075-monorepo-workspaces/baseline-miniapp-builds.json \
+            --since "$STAMP"
 
   frontend-lint:
     name: Frontend Lint
@@ -122,19 +240,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       # IMPORTANT: Linting errors must fail the build to prevent code quality regressions.
       # Do not add 'continue-on-error: true' to this step as it would hide ESLint failures.
       - name: Run linter
-        run: npm run lint 2>&1 | tee lint-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint-output.txt
 
       - name: Summarize lint results
         if: always()
@@ -168,14 +291,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'services/relay-gateway/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install gateway dependencies
-        run: npm ci
+        run: npm ci --workspace fairwins-relay-gateway --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Run tests
         run: npm test
@@ -193,17 +317,28 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Run tests
-        run: npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
+        env:
+          # Parity with frontend-testing.yml, which runs the IDENTICAL suite (spec 075, T027).
+          # Without the heap bump the full suite OOMs; TZ is pinned because several suites
+          # hard-code UTC datetime strings and would pass or fail on the runner's locale.
+          NODE_OPTIONS: --max-old-space-size=4096
+          TZ: UTC
 
       - name: Summarize test results
         if: always()
@@ -228,7 +363,11 @@ jobs:
       # actual test failures. We allow this to fail gracefully while still uploading
       # whatever coverage data was generated.
       - name: Generate coverage report
-        run: npm run test:coverage -- --run 2>&1 | tee coverage-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm run test:coverage -- --run 2>&1 | tee coverage-output.txt
         continue-on-error: true
 
       - name: Summarize coverage
@@ -255,12 +394,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: frontend-test-coverage
           path: frontend/coverage/
-          retention-days: 30
+          retention-days: 7
 
   frontend-build:
     name: Frontend Build
@@ -275,14 +414,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Build frontend
         run: npm run build
@@ -308,12 +448,9 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build-test
-          path: frontend/dist/
-          retention-days: 7
+      # No dist/ upload. Nothing downloads it — the gate is `npm run build` exiting 0,
+      # and the step summary above already reports bundle sizes and file count. Uploading
+      # 2.5 MB of unread bytes on every push is pure quota burn on a private repo.
 
   cypress-fast-e2e:
     name: Cypress Fast E2E
@@ -328,18 +465,26 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
+      # Constitution IV: this step MUST fail the pipeline on error. Do NOT reintroduce
+      # `continue-on-error` here (spec 075, FR-007/FR-008).
+      #
+      # `set -o pipefail` is load-bearing: the command is piped into `tee`, so without it the
+      # step's exit status is tee's (always 0) and cypress's failure is discarded exactly as
+      # `continue-on-error` used to discard it.
       - name: Run fast E2E tests
-        run: npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/fast/**/*.cy.js,cypress/e2e/passkey/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
-        continue-on-error: true
+        run: |
+          set -o pipefail
+          npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/fast/**/*.cy.js,cypress/e2e/passkey/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
 
       - name: Summarize E2E results
         if: always()
@@ -347,59 +492,100 @@ jobs:
           echo "### Cypress Fast E2E" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -f "cypress-results.json" ]; then
-            node -e "
-              const r = require('./cypress-results.json');
-              const stats = r.stats || {};
-              console.log('| Metric | Value |');
-              console.log('|--------|-------|');
-              console.log('| Passing | ' + (stats.passes || 0) + ' |');
-              console.log('| Failing | ' + (stats.failures || 0) + ' |');
-              console.log('| Pending | ' + (stats.pending || 0) + ' |');
-              console.log('| Duration | ' + ((stats.duration || 0) / 1000).toFixed(1) + 's |');
-              console.log('| Specs | ' + (stats.suites || 0) + ' |');
-            " >> $GITHUB_STEP_SUMMARY 2>/dev/null
+          # Parse the RUN-TOTAL row of Cypress's own summary table. The previous version preferred
+          # cypress-results.json, which Cypress never writes (see `Check E2E results`), and its
+          # fallback grepped the first `N passing` line — i.e. spec #1's tally reported as if it
+          # were the whole run.
+          #
+          # The totals row is the last line matching "All specs passed!" or "N of M failed", with
+          # columns: <label> <duration> <tests> <passing> <failing> <pending> <skipped>.
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-output.txt > cypress-plain.txt
+          TOTALS=$(grep -E "(All specs passed!|[0-9]+ of [0-9]+ failed)" cypress-plain.txt | tail -1)
+          if [ -n "$TOTALS" ]; then
+            # Strip box-drawing characters, then take the trailing numeric columns.
+            NUMS=$(echo "$TOTALS" | tr -d '│┌┐└┘─' | sed 's/[✔✖]//g' | grep -oE '[0-9]+|-' | tail -5 | tr '\n' ' ')
+            set -- $NUMS
+            # Cypress prints "-" for a zero column, so normalise it rather than rendering "-".
+            z () { [ "${1:-}" = "-" ] || [ -z "${1:-}" ] && echo 0 || echo "$1"; }
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Tests | ${1:-?} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passing | $(z "${2:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failing | $(z "${3:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Pending | $(z "${4:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`$(echo "$TOTALS" | tr -d '│' | xargs)\`" >> $GITHUB_STEP_SUMMARY
           else
-            # Fall back to parsing text output
-            PASSING=$(grep -oP 'passing \(\d+' cypress-output.txt | head -1 || echo "")
-            FAILING=$(grep -oP '\d+ failing' cypress-output.txt | head -1 || echo "")
-            if [ -n "$PASSING" ] || [ -n "$FAILING" ]; then
-              echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-              echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-              [ -n "$PASSING" ] && echo "| Result | $PASSING |" >> $GITHUB_STEP_SUMMARY
-              [ -n "$FAILING" ] && echo "| Failing | $FAILING |" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "⚠️ Could not parse Cypress results" >> $GITHUB_STEP_SUMMARY
-            fi
+            echo "⚠️ Cypress produced no run-total row — see the job log." >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Check E2E exit code
+      # Belt-and-braces assertion on the machine-readable results (spec 075, FR-008).
+      #
+      # This replaces `grep -q "failing" cypress-output.txt`, which could never match: the run uses
+      # `--reporter json`, so that file holds JSON, and mocha's JSON reporter emits `"failures": N`
+      # — never the word "failing". Combined with the `continue-on-error` above, the gate reported
+      # success on every run regardless of how many tests failed.
+      #
+      # A missing results file is also a failure: a crashed or never-started run must not pass.
+      - name: Check E2E results
+        if: always()
         run: |
-          if grep -q "failing" cypress-output.txt 2>/dev/null; then
+          # This gate used to require cypress-results.json. Cypress NEVER WRITES THAT FILE:
+          # `--reporter json --reporter-options "output=..."` emits the JSON to stdout and the
+          # option is ignored (verified directly — a passing single-spec run exits 0 and leaves no
+          # file). So spec 075 swapped an always-green gate for an always-RED one: this step could
+          # not pass even with every test green, which is the same defect wearing the other face.
+          # There is also no aggregate to write — the json reporter emits one object PER SPEC.
+          #
+          # The authoritative pass/fail is cypress's EXIT CODE, which is non-zero iff tests failed
+          # and which `set -o pipefail` on the run step now preserves. What that exit code cannot
+          # tell us is whether the run died before executing anything, so that is what this checks.
+          #
+          # EVERY MATCH BELOW RUNS ON THE DE-COLOURED COPY. Cypress writes
+          # `(<esc>[4m<esc>[1mRun Finished<esc>[22m<esc>[24m)`, so the literal "(Run Finished)"
+          # does not occur in the raw file, and the totals row's ✖ is wrapped in codes too.
+          # Grepping the raw output for either is the same mistake as the original gate grepping
+          # "failing" against a reporter that only ever emits "failures" — a check that cannot fire.
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-output.txt > cypress-plain.txt
+
+          if ! grep -qE "Run Finished" cypress-plain.txt; then
+            echo "::error::Cypress never reached 'Run Finished' — the run died before completing. Failing rather than assuming success."
+            exit 1
+          fi
+
+          # Cross-check the reported totals. Belt and braces: the run step already failed the job
+          # on a non-zero exit, but a summary row claiming failures must never coexist with a
+          # green step.
+          if grep -qE "[0-9]+ of [0-9]+ failed" cypress-plain.txt; then
+            echo "::error::Cypress reported failing specs."
+            grep -E "[0-9]+ of [0-9]+ failed" cypress-plain.txt
             exit 1
           fi
 
       - name: Upload Cypress screenshots
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: cypress-fast-screenshots
           path: frontend/cypress/screenshots
-          retention-days: 30
+          retention-days: 7
 
       - name: Upload Cypress videos
-        uses: actions/upload-artifact@v4
-        if: always()
+        uses: actions/upload-artifact@v7
+        # failure() not always(): a video of a PASSING run is never watched, and these are the
+        # largest artifacts in the pipeline. Uploading them on every push is what pushed the
+        # artifact API into rate-limiting.
+        if: failure()
         with:
           name: cypress-fast-videos
           path: frontend/cypress/videos
           retention-days: 7
 
       - name: Upload Cypress JSON results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: cypress-fast-results
-          path: frontend/cypress-results.json
-          retention-days: 30
+          path: frontend/cypress-output.txt
+          retention-days: 7

@@ -75,15 +75,27 @@ async function loadAllWagers(repository, account) {
   return all
 }
 
-export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
+export function useAccountStats({ range: initialRange = DEFAULT_RANGE, accountAddress = null } = {}) {
   const wallet = useWallet() || {}
-  const { address, chainId, isConnected, balances, refreshBalances, provider } = wallet
+  const { address: connectedAddress, chainId, isConnected, balances, refreshBalances, provider } = wallet
+  // Spec 063 pattern (mirrors usePortfolio): the stats follow the account the
+  // member is ACTING AS when the caller passes one — a multisig vault or a
+  // recovered legacy account — and default to the connected wallet otherwise.
+  const address = accountAddress || connectedAddress
+  const isActingOverride = Boolean(
+    accountAddress &&
+    connectedAddress &&
+    String(accountAddress).toLowerCase() !== String(connectedAddress).toLowerCase(),
+  )
   const { convertToUsd } = usePriceConversion()
   const tokens = useChainTokens()
 
   const [range, setRange] = useState(initialRange)
   const [wagers, setWagers] = useState([])
   const [stableBalance, setStableBalance] = useState(null)
+  // Native balance of the ACTING account. The wallet context only tracks the
+  // connected wallet's native balance, so an acting override reads its own.
+  const [actingNativeBalance, setActingNativeBalance] = useState(null)
   const [ledgerEntries, setLedgerEntries] = useState([])
   const [staleClasses, setStaleClasses] = useState([])
   const [prunedBefore, setPrunedBefore] = useState(null)
@@ -107,6 +119,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
       setLedgerEntries([])
       setStaleClasses([])
       setStableBalance(null)
+      setActingNativeBalance(null)
       setIsLoading(false)
       return
     }
@@ -140,7 +153,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     }))
     try {
       const repository = getDefaultWagerRepository(chainId)
-      const [loadedWagers, stable, ledger] = await Promise.all([
+      const [loadedWagers, stable, ledger, actingNative] = await Promise.all([
         loadAllWagers(repository, address),
         fetchStableBalance({
           provider,
@@ -151,11 +164,18 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
         // The unified activity ledger (spec 051): all classes, one read path
         // shared with the tax report so the two can never disagree.
         ledgerRepository.listEntries({ account: address, chainId, provider }),
+        // Acting override only: the wallet context tracks the CONNECTED wallet's
+        // native balance, so the acting account's is read directly. Best-effort —
+        // null leaves the tile on the last-known value rather than faking a zero.
+        isActingOverride && provider
+          ? provider.getBalance(address).then((raw) => Number(formatUnits(raw, 18))).catch(() => null)
+          : Promise.resolve(null),
       ])
       if (reqId !== reqIdRef.current) return
 
       setWagers(loadedWagers)
       if (stable != null) setStableBalance(stable)
+      if (actingNative != null) setActingNativeBalance(actingNative)
       setLedgerEntries(ledger.entries)
       setStaleClasses(ledger.staleClasses)
       setPrunedBefore(ledger.prunedBefore)
@@ -180,9 +200,16 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     } finally {
       if (reqId === reqIdRef.current) setIsLoading(false)
     }
-  }, [isConnected, address, chainId, provider, tokens.stableAddress, tokens.stableDecimals, ledgerRepository])
+  }, [isConnected, address, isActingOverride, chainId, provider, tokens.stableAddress, tokens.stableDecimals, ledgerRepository])
 
-  // Reload on connect / account / network change.
+  // Reload on connect / account / network change. Switching accounts (including
+  // switching the ACTING account) must never show the previous account's
+  // balances while the new ones load — clear them first.
+  useEffect(() => {
+    setStableBalance(null)
+    setActingNativeBalance(null)
+  }, [address])
+
   useEffect(() => {
     load()
   }, [load])
@@ -207,7 +234,11 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
   const { walletBalanceUsd, walletBalances } = useMemo(() => {
     const rows = []
     let usd = 0
-    const nativeAmt = Number(balances?.native) || 0
+    // Acting override: the context's native balance belongs to the CONNECTED
+    // wallet, so the acting account's directly-read balance replaces it.
+    const nativeAmt = isActingOverride
+      ? Number(actingNativeBalance) || 0
+      : Number(balances?.native) || 0
     if (nativeAmt > 0 || tokens.native) {
       const nUsd = Number(convertToUsd(nativeAmt)) || 0
       usd += nUsd
@@ -221,7 +252,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
       rows.push({ symbol: tokens.stable || 'STABLE', amount: stableAmt, usdValue: stableAmt })
     }
     return { walletBalanceUsd: usd, walletBalances: rows }
-  }, [balances, convertToUsd, stableBalance, tokens.native, tokens.stable])
+  }, [balances, convertToUsd, stableBalance, actingNativeBalance, isActingOverride, tokens.native, tokens.stable])
 
   // ---- Derived view models ----
   const wagerStatusById = useMemo(() => {

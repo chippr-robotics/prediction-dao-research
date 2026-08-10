@@ -33,7 +33,7 @@ vi.mock('../../utils/rpcProvider', () => ({ makeReadProvider: () => ({}) }))
 vi.mock('../../config/contracts', () => ({
   getContractAddressForChain: () => '0x000000000000000000000000000000000000d0a0',
 }))
-vi.mock('../../components/clearpath/connectors', () => ({
+vi.mock('../../lib/clearpath/connectors', () => ({
   getConnector: () => ({
     framework: 0,
     fetchProposals: () => m.proposals,
@@ -42,7 +42,10 @@ vi.mock('../../components/clearpath/connectors', () => ({
   }),
   detectFramework: () => Promise.resolve(0),
 }))
-vi.mock('../../components/clearpath/trackedDaoStore', () => ({ list: () => m.local }))
+// ClearPath is a package now, so its device-tracked list lives in the app's namespaced host store.
+// `lib/clearpath/trackedDaos` is the HOST-side reader of that namespace — legitimate, because the
+// host implements the namespaces; the isolation rule binds packages, not the host.
+vi.mock('../../lib/clearpath/trackedDaos', () => ({ list: () => m.local }))
 vi.mock('ethers', async (orig) => {
   const actual = await orig()
   function FakeContract() {

@@ -12,9 +12,9 @@ import { getContractAddressForChain } from '../../../config/contracts'
 import { getNetwork } from '../../../config/networks'
 import { makeReadProvider } from '../../../utils/rpcProvider'
 import { EXTERNAL_DAO_REGISTRY_ABI } from '../../../abis/externalDAORegistry'
-import { getConnector, detectFramework } from '../../../components/clearpath/connectors'
-import * as trackedDaoStore from '../../../components/clearpath/trackedDaoStore'
-import { knownDaosForChain } from '../../../config/clearpath/knownDaos'
+import { getConnector, detectFramework } from '../../../lib/clearpath/connectors'
+import * as trackedDaoStore from '../../../lib/clearpath/trackedDaos'
+import { knownDaosForChain } from '../../../lib/clearpath/knownDaos'
 import { pruneSnapshotMap } from '../activityStore'
 
 const STATE = { Pending: 0, Active: 1, Canceled: 2, Defeated: 3, Succeeded: 4, Queued: 5, Expired: 6, Executed: 7 }

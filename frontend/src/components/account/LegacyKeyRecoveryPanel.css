@@ -1,0 +1,421 @@
+/* Legacy key & word-list recovery. The bottom-sheet shell (ActionSheet.css) and
+   the per-step layout (.recover-step*, RecoverAccountPanel.css) are shared; this
+   file styles only the entry card, the stored-key list, and the secret/quote
+   inputs unique to this panel. Theme tokens (src/theme.css) with light-mode
+   fallbacks so text stays readable in both themes. */
+
+.legacy-recovery__start {
+  margin-top: 8px;
+}
+
+/* --- Stored keys --- */
+.lkr-stored {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Card identity borrowed from the My Account carousel's account-card (AccountCardsCarousel.css):
+   the same per-kind left accent used for a "legacy" account there, plus a card-level shadow — so a
+   recovered account reads as the same "account" here as it does in the carousel/account switcher. */
+.lkr-stored__item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border-left: 4px solid var(--semantic-warning, #f5a623);
+  border-radius: 10px;
+  background: var(--bg-primary, #f7f9fa);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.lkr-stored__kind {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e3e7eb);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #5a6772);
+}
+
+.lkr-stored__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lkr-stored__avatar {
+  flex: none;
+  border-radius: 50%;
+}
+
+.lkr-stored__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lkr-stored__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--brand-primary, #36b37e);
+  overflow-wrap: anywhere;
+}
+
+.lkr-stored__addr {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--text-primary, #1f2933);
+  font-size: 0.85rem;
+}
+
+.lkr-stored__sub {
+  font-size: 0.76rem;
+  color: var(--text-muted, #8a959e);
+}
+
+.lkr-stored__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lkr-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  background: transparent;
+  color: var(--text-secondary, #5a6772);
+  border-radius: 999px;
+  padding: 0.32rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: color 0.1s, background 0.1s, border-color 0.1s;
+}
+
+.lkr-action-btn:hover,
+.lkr-action-btn:focus-visible {
+  color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary, #36b37e);
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 10%, transparent);
+  outline: none;
+}
+
+.lkr-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+/* Icon-only on narrow screens; label appears alongside once there's room. */
+.lkr-action-btn__label {
+  display: none;
+}
+
+@media (min-width: 420px) {
+  .lkr-action-btn__label {
+    display: inline;
+  }
+
+  .lkr-action-btn {
+    padding: 0.32rem 0.6rem;
+  }
+}
+
+.lkr-action-btn--danger {
+  color: var(--danger-color, #dc2626);
+}
+
+.lkr-action-btn--danger:hover,
+.lkr-action-btn--danger:focus-visible {
+  color: var(--danger-color, #dc2626);
+  border-color: var(--danger-color, #dc2626);
+  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
+}
+
+/* --- Secret entry --- */
+.lkr-secret-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border-radius: 8px;
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.lkr-secret-input:focus {
+  outline: none;
+  border-color: var(--brand-primary, #36b37e);
+}
+
+/* --- BIP-39 word suggestions --- */
+.lkr-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.lkr-suggest__chip {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  cursor: pointer;
+}
+
+.lkr-suggest__chip:hover {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
+}
+
+/* --- Protection fallback link --- */
+.lkr-alt {
+  text-align: center;
+  margin: 10px 0 0 !important;
+}
+
+.lkr-linkbtn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--brand-primary, #36b37e);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lkr-linkbtn:hover {
+  text-decoration: underline;
+}
+
+/* --- Passphrase fields --- */
+.lkr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.lkr-field span {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #5a6772);
+}
+
+.lkr-field input {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border-radius: 8px;
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  font-size: 0.95rem;
+}
+
+.lkr-field input:focus {
+  outline: none;
+  border-color: var(--brand-primary, #36b37e);
+}
+
+/* --- Notices --- */
+.lkr-notice {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  margin: 0 0 12px;
+}
+
+.lkr-notice--error {
+  border: 1px solid var(--danger-color, #dc2626);
+  color: var(--danger-color, #dc2626);
+  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
+}
+
+.lkr-notice--warn {
+  border: 1px solid var(--warning-color, #f59e0b);
+  color: var(--text-primary, #1f2933);
+  background: color-mix(in srgb, var(--warning-color, #f59e0b) 12%, transparent);
+}
+
+/* --- Balance quote --- */
+.lkr-quote {
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lkr-quote > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+}
+
+.lkr-quote span {
+  color: var(--text-secondary, #5a6772);
+}
+
+.lkr-quote strong {
+  color: var(--text-primary, #1f2933);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.lkr-quote__empty {
+  color: var(--warning-color, #b7791f) !important;
+  font-size: 0.82rem !important;
+  margin: 4px 0 0 !important;
+}
+
+.lkr-quote__fee {
+  border-top: 1px solid var(--border-color, #e3e7eb);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.lkr-quote__fee span {
+  color: var(--text-muted, #8a959e);
+}
+
+/* --- SAVED screen optional actions --- */
+/* On the --surface-color sheet the plain --border-color is nearly invisible, so
+   these optional-action cards vanished. Lift them with a faint fill + a
+   text-derived border that stays visible in both themes. */
+.lkr-saved-action {
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 16%, transparent);
+  background: color-mix(in srgb, var(--text-primary, #1f2933) 4%, transparent);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 10px 0;
+}
+
+.lkr-saved-action__title {
+  margin: 0 0 2px !important;
+  font-weight: 600;
+  color: var(--text-primary, #1f2933) !important;
+  font-size: 0.9rem !important;
+}
+
+.lkr-saved-action__hint {
+  margin: 0 !important;
+  color: var(--text-secondary, #5a6772) !important;
+  font-size: 0.82rem !important;
+}
+
+.lkr-book-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lkr-book-name {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border-radius: 8px;
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  font-size: 0.9rem;
+}
+
+.lkr-book-name:focus {
+  outline: none;
+  border-color: var(--brand-primary, #36b37e);
+}
+
+/* --- Per-asset transfer outcomes --- */
+.lkr-outcomes {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lkr-outcome {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.86rem;
+  padding: 4px 0;
+}
+
+.lkr-outcome__sym {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--text-primary, #1f2933);
+}
+
+.lkr-outcome--sent .lkr-outcome__status {
+  color: var(--brand-primary, #36b37e);
+}
+
+.lkr-outcome--skipped .lkr-outcome__status {
+  color: var(--text-muted, #8a959e);
+}
+
+.lkr-outcome--failed .lkr-outcome__status {
+  color: var(--danger-color, #dc2626);
+}
+
+/* Spec 063 — cross-chain recovery ("Other chains") panel. */
+.lkr-crosschain {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 14%, transparent);
+  background: color-mix(in srgb, var(--text-primary, #1f2933) 4%, transparent);
+}
+.lkr-crosschain h4 {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  color: var(--text-primary, #1f2933);
+}
+.lkr-crosschain__results { display: flex; flex-direction: column; gap: 10px; }
+.lkr-asset-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 10%, transparent);
+}
+.lkr-asset-row__chain { font-weight: 600; color: var(--text-primary, #1f2933); }
+.lkr-asset-row__amount { color: var(--text-primary, #1f2933); font-variant-numeric: tabular-nums; }
+.lkr-asset-row__muted { color: var(--text-muted, #8a959e); font-size: 0.85rem; }
+.lkr-asset-row__addr {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  color: var(--text-muted, #8a959e);
+  margin: 0 8px;
+}
+.lkr-asset-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lkr-asset-list li { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.lkr-send-form { margin-top: 10px; }

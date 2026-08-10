@@ -13,6 +13,17 @@ import {
   listClientRecordsAllChains,
   mergeClientRecordsAllChains,
 } from '../../data/ledger/ledgerClientStore'
+import { readVaultEnvelope, writeVaultEnvelope, hasVault } from '../openChallenge/codeVault'
+import {
+  loadLegacyRecoveredKeys,
+  saveLegacyRecoveredKeys,
+  mergeLegacyRecoveredKeys,
+} from '../recovery/legacyRecoveredKeysStore'
+import {
+  loadMiniAppState,
+  applyMiniAppState,
+  mergeMiniAppState,
+} from '../miniapps/store'
 
 const PREF_KEYS = {
   recentSearches: 'recent_searches',
@@ -99,6 +110,69 @@ export const syncedObjects = [
       const fresh = (incoming || []).filter((r) => r?.entryId && !have.has(r.entryId))
       return { value: [...(current || []), ...fresh], conflicts: [] }
     },
+  },
+  {
+    // Spec 024/037 follow-up — the open-challenge recovery-code vault. Passkeys sync across
+    // devices but the vault is device-local localStorage, so a new device / reinstall lost every
+    // saved four-word code (the exact "passkey users can't recover their codes" gap). Riding this
+    // channel restores them, because the vault's at-rest envelope is encrypted under the account's
+    // key material and the SAME account re-derives that key on any device (passkey master seed or
+    // wallet signature). The value put in the bundle is the OPAQUE ciphertext envelope — the codes
+    // never enter the backup channel in cleartext, and this stays consistent whether or not the
+    // member has ever run a manual backup (auto-backup carries it too).
+    key: 'openChallengeCodes',
+    label: 'Recovery codes',
+    networkScoped: false, // the envelope is opaque ciphertext; code entries are not identity-keyed by chain
+    load: (account) => readVaultEnvelope(account),
+    // Ciphertext envelopes from the same account share a key but use per-write nonces over
+    // different entry sets, so they can't be unioned without the (async, ceremony-gated) vault
+    // key that this synchronous path deliberately never holds. Both modes therefore RESTORE the
+    // backed-up envelope only when this device has no local vault, and NEVER clobber existing
+    // local codes — recovery is purely additive from the member's perspective.
+    apply: (account, value, _mode) => {
+      if (value && !hasVault(account)) writeVaultEnvelope(account, value)
+      return { conflicts: [] }
+    },
+    merge: (current, incoming) => ({ value: current || incoming || null, conflicts: [] }),
+  },
+  {
+    // Spec 062 — recovered legacy accounts. The value is a map of
+    // passphrase-ENCRYPTED vault entries (ciphertext blobs only; no plaintext
+    // key material), so it is safe to place in the backup. Not network-scoped:
+    // a legacy EOA address is the same across every EVM chain, so entries are
+    // keyed by address alone.
+    key: 'legacyRecoveredKeys',
+    label: 'Recovered accounts',
+    networkScoped: false,
+    load: (account) => loadLegacyRecoveredKeys(account),
+    apply: (account, value, mode) => {
+      if (mode === 'replace') {
+        saveLegacyRecoveredKeys(account, value)
+        return { conflicts: [] }
+      }
+      const { value: merged, conflicts } = mergeLegacyRecoveredKeys(loadLegacyRecoveredKeys(account), value)
+      saveLegacyRecoveredKeys(account, merged)
+      return { conflicts }
+    },
+    merge: (current, incoming) => mergeLegacyRecoveredKeys(current, incoming),
+  },
+  {
+    // Spec 073 — per-app mini-app state, one entry for ALL apps rather than one
+    // per app: the installed set is open-ended, so a listing added next week has
+    // to ride this backup without editing this file.
+    //
+    // Not network-scoped. App data is chain-agnostic unless an app namespaces
+    // its own keys by chain, and declaring it scoped would make the restore UI
+    // offer a per-network choice the data cannot honor.
+    //
+    // Contains app state only — never a package, never key material, never
+    // anything privileged (see the module header of lib/miniapps/store.js).
+    key: 'miniAppState',
+    label: 'Mini-app data',
+    networkScoped: false,
+    load: (account) => loadMiniAppState(account),
+    apply: (account, value, mode) => applyMiniAppState(account, value, mode),
+    merge: (current, incoming) => mergeMiniAppState(current, incoming),
   },
 ]
 

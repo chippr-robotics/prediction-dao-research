@@ -5,6 +5,9 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import crypto from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import request from 'supertest'
 import { ethers } from 'ethers'
 import { createApp } from '../src/server.js'
@@ -61,10 +64,27 @@ describe('config / startup consistency check (FR-025)', () => {
     expect(config.chains[137].targetsByKey.wagerRegistry).toBe('0xE878b62887fC8A5F739B8Ce61bC19546A280Ef89')
     expect(config.chains[63].gasType).toBe('legacy')
     expect(config.chains[63].paymentSupported).toBe(false)
-    // ETC mainnet (61) has no deployments record yet -> enabling it must throw.
+    // A chain with no deployment record at all must refuse to start (FR-025).
+    // Use an empty deployments dir: every supported chain now has SOME record
+    // in the real deployments/ (61 gained one with the spec-068 custody deploy).
+    const emptyDeployments = fs.mkdtempSync(path.join(os.tmpdir(), 'rg-no-deployments-'))
+    expect(() =>
+      loadConfig({ ENABLED_CHAIN_IDS: '61' }, { deploymentsDir: emptyDeployments })
+    ).toThrow(/no deployment record/)
+    // ETC mainnet (61) has a record (custody contracts) but no wagerRegistry yet —
+    // enabling it must still fail loudly until the full target set is pinned.
+    // (If this starts passing, 61 became fully pinned: update the test, not the guard.)
+    // Assert the REASON, not just that chain 61 appears in some error: a loose match would keep
+    // passing if 61 later failed for an unrelated cause, quietly retiring this guarantee.
     expect(() =>
       loadConfig({ ENABLED_CHAIN_IDS: '61' }, { deploymentsDir: DEPLOYMENTS_DIR })
-    ).toThrow(/no deployment record/)
+    ).toThrow(/missing a valid "wagerRegistry" address/)
+
+    // A chain id the gateway does not support at all is refused earlier, by network id — a
+    // different branch from "supported but unpinned", and worth pinning separately.
+    expect(() =>
+      loadConfig({ ENABLED_CHAIN_IDS: '424242' }, { deploymentsDir: DEPLOYMENTS_DIR })
+    ).toThrow(/not a supported network/)
   })
 })
 
@@ -569,6 +589,59 @@ describe('GET /healthz + /status (cached, gated telemetry)', () => {
     await request(app).get('/status')
     await request(app).get('/status')
     expect(blockCalls).toBe(1) // three hits, one fan-out within the cache window
+  })
+
+  // Build identity (spec 076, FR-030/FR-031).
+  it('reports the build version to PUBLIC callers while runway telemetry stays gated', async () => {
+    const config = testConfig({
+      APP_VERSION: 'v1.4.0',
+      GIT_SHA: 'b7c48f1a958f8fbfb5d0bb54ed762db7ea6a2011',
+      GAS_WALLET_137: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+    })
+    const { app } = build({ config, providers: mockProviders(config) })
+
+    // The version must be readable with NO X-Origin-Auth: an operator diagnosing a bug report
+    // often cannot reach the trusted edge, and that is exactly when they need it.
+    const pub = await request(app).get('/status')
+    expect(pub.body.build).toEqual({
+      version: 'v1.4.0',
+      gitSha: 'b7c48f1',
+      released: true,
+    })
+
+    // The other half of this test is the part that matters on review: adding a public field must
+    // not have widened the disclosure that was deliberately gated.
+    expect(pub.body.chains['137'].gasWalletRunwayHrs).toBeUndefined()
+    const auth = await request(app).get('/status').set('X-Origin-Auth', ORIGIN_SECRET)
+    expect(auth.body.chains['137'].gasWalletRunwayHrs).toBeGreaterThan(0)
+  })
+
+  it('reports an unreleased build honestly rather than naming a release (FR-031)', async () => {
+    const config = testConfig({ GIT_SHA: 'b7c48f1a958f8fbfb5d0bb54ed762db7ea6a2011' })
+    const { app } = build({ config, providers: mockProviders(config) })
+    const res = await request(app).get('/healthz')
+    expect(res.body.build).toEqual({
+      version: 'unreleased+b7c48f1',
+      gitSha: 'b7c48f1',
+      released: false,
+    })
+  })
+
+  it('never presents a malformed version as a release', async () => {
+    for (const bad of ['main', '1.4.0', 'v1.4', 'latest']) {
+      const config = testConfig({ APP_VERSION: bad, GIT_SHA: 'b7c48f1aaaa' })
+      const { app } = build({ config, providers: mockProviders(config) })
+      const res = await request(app).get('/status')
+      expect(res.body.build.released, `"${bad}" must not read as released`).toBe(false)
+      expect(res.body.build.version).toBe('unreleased+b7c48f1')
+    }
+  })
+
+  it('says unreleased with no sha at all rather than inventing one', async () => {
+    const config = testConfig()
+    const { app } = build({ config, providers: mockProviders(config) })
+    const res = await request(app).get('/status')
+    expect(res.body.build).toEqual({ version: 'unreleased', gitSha: null, released: false })
   })
 })
 

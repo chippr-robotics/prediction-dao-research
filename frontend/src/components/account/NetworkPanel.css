@@ -1,0 +1,410 @@
+/* NetworkSettings — My Account → Network tab */
+
+.network-settings .section h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.network-card-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.network-card {
+  padding: 16px;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.network-card.active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.network-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.network-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.network-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.network-kind {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.network-kind.mainnet {
+  color: var(--color-success, #15803d);
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.network-kind.testnet {
+  color: var(--color-warning, #b45309);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.network-active-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  padding: 6px 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.network-switch-btn {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  background: var(--brand-primary, var(--color-primary));
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  white-space: nowrap;
+}
+
+.network-switch-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.network-switch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.network-feature-tags {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.network-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: default;
+}
+
+.network-tag.available {
+  color: var(--color-success, #15803d);
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.network-tag.unavailable {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  opacity: 0.75;
+}
+
+.network-tag-icon {
+  font-weight: 700;
+}
+
+/* Per-network operational documentation (native currency, explorer, faucet, swap) */
+.network-docs {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: 6px;
+}
+
+.network-doc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.network-doc-row dt {
+  flex: 0 0 110px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.network-doc-row dd {
+  margin: 0;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.network-doc-row a {
+  color: var(--brand-primary, var(--color-primary));
+  text-decoration: none;
+}
+
+.network-doc-row a:hover {
+  text-decoration: underline;
+}
+
+/* Non-EVM display-only cards (spec 061): no switch affordance, neutral badge. */
+.network-display-only-badge {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border, var(--color-text-secondary));
+}
+
+.network-display-only-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Member endpoint settings (spec 069)
+   --------------------------------------------------------------------------- */
+
+.network-reload-note {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--color-surface-alt, rgba(127, 127, 127, 0.08));
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.network-endpoint-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border, rgba(127, 127, 127, 0.25));
+}
+
+.network-endpoint-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.network-endpoint-source {
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 10px;
+}
+
+.network-endpoint-source.default {
+  color: var(--color-text-secondary);
+}
+
+.network-endpoint-source.member {
+  color: var(--brand-primary, var(--color-primary));
+}
+
+.network-endpoint-url,
+.network-endpoint-failover {
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.network-endpoint-auth-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-alt, rgba(127, 127, 127, 0.12));
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.network-endpoint-edit-btn,
+.network-endpoint-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.network-endpoint-edit-btn:hover,
+.network-endpoint-btn:hover {
+  border-color: var(--brand-primary, var(--color-primary));
+}
+
+.network-endpoint-btn.primary {
+  background: var(--brand-primary, var(--color-primary));
+  border-color: var(--brand-primary, var(--color-primary));
+  color: var(--color-on-primary, #fff);
+  font-weight: 600;
+}
+
+.network-endpoint-btn.subtle {
+  border-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.network-endpoint-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.network-endpoint-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border, rgba(127, 127, 127, 0.25));
+  border-radius: 10px;
+  background: var(--color-surface-alt, rgba(127, 127, 127, 0.05));
+}
+
+.network-endpoint-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.network-endpoint-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.network-endpoint-field input,
+.network-endpoint-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  background: var(--color-surface, transparent);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.network-endpoint-field input:disabled {
+  color: var(--color-text-secondary);
+}
+
+.network-endpoint-field input[aria-invalid='true'] {
+  border-color: var(--color-error, #d33);
+}
+
+.network-endpoint-secret {
+  display: flex;
+  gap: 8px;
+}
+
+.network-endpoint-reveal {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border: 1px solid var(--color-border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.network-endpoint-auth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border, rgba(127, 127, 127, 0.25));
+  border-radius: 8px;
+}
+
+.network-endpoint-auth legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.network-endpoint-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.network-endpoint-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-error, #d33);
+}
+
+.network-endpoint-warning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-warning, #b26b00);
+}
+
+.network-endpoint-probe {
+  margin: 0;
+  font-size: 12px;
+}
+
+.network-endpoint-probe.ok {
+  color: var(--color-success, #1b7f4b);
+}
+
+.network-endpoint-probe.failed {
+  color: var(--color-error, #d33);
+}
+
+.network-endpoint-saved {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-success, #1b7f4b);
+}
+
+.network-endpoint-facts {
+  margin: 0;
+}
+
+.network-endpoint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

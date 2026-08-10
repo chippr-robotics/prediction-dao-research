@@ -1,0 +1,360 @@
+name: Release
+
+# Publishes a release from `main` (spec 076, FR-004/FR-021/FR-033/FR-037).
+#
+# The version is NOT computed here. `scripts/release/version.js` is the single authority for that
+# (FR-015) — this workflow asks it, and hands the answer to Release Drafter as an explicit `version:`
+# input. `.github/release-drafter.yml` deliberately has no `version-resolver:` block: two systems
+# that must agree about what a classification means will eventually disagree, and one cannot.
+#
+# Three behaviours are deliberate and each is asserted below rather than assumed:
+#   · An EMPTY commit range publishes NOTHING (FR-021). It does not re-tag the current version.
+#   · A tag that already exists is a hard failure (FR-004). Tags are immutable; a workflow that
+#     force-updates one destroys the only durable record of what shipped.
+#   · The whole job is skipped for the CHANGELOG commit it makes itself, or it would loop.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  # Never two releases at once — they would race for the same tag.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  # `write`, not `read`: the final step OPENS a pull request for the generated release record
+  # (github.rest.pulls.create). With `read` the token 403s at runtime and the release job fails at
+  # its last step — the precise failure this PR exists to remove. Reported by review on #1088.
+  pull-requests: write
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    # The CHANGELOG commit this job pushes must not trigger it again.
+    if: "!contains(github.event.head_commit.message, '[skip release]')"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history AND tags: the version is computed from the commit range since the last
+          # tag, so a shallow clone would silently produce a wrong answer rather than an error.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # A squashed promotion collapses every PR title in the release into one subject, so the
+      # version would be computed from a single classification instead of all of them (research R6).
+      # This does not block — the merge has already happened — but it says loudly that the release
+      # about to be cut may understate what shipped.
+      - name: Warn if a promotion arrived squashed
+        run: |
+          set -euo pipefail
+          PARENTS=$(git rev-list --parents -n 1 HEAD | wc -w)
+          SUBJECT=$(git log -1 --format=%s)
+          if [ "$PARENTS" -lt 3 ] && printf '%s' "$SUBJECT" | grep -qiE '^(merge )?(pull request )?.*staging'; then
+            echo "::warning::This looks like a SQUASHED promotion from staging."
+            echo "::warning::Promotions must use a merge commit (spec 076, research R6) or the release"
+            echo "::warning::version is computed from one collapsed subject instead of every PR in it."
+          fi
+
+      - name: Compute the next version
+        id: version
+        run: |
+          set -euo pipefail
+          node scripts/release/version.js --explain | tee version-explain.txt
+          node scripts/release/version.js --json > version.json
+          VERSION=$(node -p "require('./version.json').version || ''")
+          REASON=$(node -p "require('./version.json').reason")
+          PREVIOUS=$(node -p "require('./version.json').previous || ''")
+          {
+            echo "version=$VERSION"
+            echo "reason=$REASON"
+            echo "previous=$PREVIOUS"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release version"
+            echo ""
+            echo '```'
+            cat version-explain.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # FR-021. A promotion that introduces no new commits must not mint a version — a release
+      # record describing nothing is worse than no record.
+      - name: Stop when there is nothing to release
+        id: gate
+        run: |
+          if [ -z "${{ steps.version.outputs.version }}" ]; then
+            echo "::notice::No release: ${{ steps.version.outputs.reason }}"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # FR-004. Published tags are immutable. If this fires, something already released this
+      # version and the right response is to investigate, never to force the tag.
+      - name: Refuse to move or reuse an existing tag
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::tag $TAG already exists. Published tags are immutable (spec 076 FR-004)."
+            echo "::error::This means a release already claimed this version. Do not force-update it."
+            exit 1
+          fi
+
+      - name: Create and push the tag
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Build the artifact table
+        if: steps.gate.outputs.proceed == 'true'
+        id: artifacts
+        run: |
+          set -euo pipefail
+          # Every artifact category is listed, INCLUDING the ones that did not move (FR-035):
+          # a missing row is indistinguishable from an unexamined one.
+          node scripts/release/artifacts.js \
+            --previous "${{ steps.version.outputs.previous }}" \
+            --version "${{ steps.version.outputs.version }}" \
+            --out artifacts.md
+          cat artifacts.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Release Drafter writes the NOTES. The version is supplied, never resolved here (FR-015).
+      - name: Publish the release
+        if: steps.gate.outputs.proceed == 'true'
+        id: drafter
+        uses: release-drafter/release-drafter@v7
+        with:
+          version: ${{ steps.version.outputs.version }}
+          tag: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          publish: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Append the artifact table to the release body
+        if: steps.gate.outputs.proceed == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            // Read the table from disk rather than threading it through a step output: the table is
+            // multi-line markdown and round-tripping it through shell quoting is where this kind of
+            // step usually breaks.
+            const fs = require('fs')
+            const table = fs.readFileSync('artifacts.md', 'utf8')
+            const release_id = Number('${{ steps.drafter.outputs.id }}')
+            const { data } = await github.rest.repos.getRelease({ ...context.repo, release_id })
+            await github.rest.repos.updateRelease({
+              ...context.repo,
+              release_id,
+              body: `${data.body || ''}\n\n${table}`,
+            })
+
+      # FR-037: the changelog is produced by the release process, never hand-written.
+      # FR-037 + FR-007a. This commit lands via a PULL REQUEST, not a push to main.
+      #
+      # It used to `git push origin HEAD:main`, and that failed on every one of the first seven
+      # releases once branch protection arrived:
+      #
+      #   remote: error: GH013: Repository rule violations found for refs/heads/main.
+      #   - Changes must be made through a pull request.
+      #   - 2 of 2 required status checks are expected.
+      #
+      # The alternative was a ruleset bypass for the bot. Opening a PR was chosen instead: the
+      # protection on the branch that deploys to members stays intact with no exception, and the
+      # generated commit gets the same checks as anything else. The cost is a small PR per release.
+      - name: Prepare the changelog and manifest commit
+        if: steps.gate.outputs.proceed == 'true'
+        id: changelog
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="release/${VERSION}-changelog"
+
+          # RANGE START COMES FROM THE CHANGELOG, NOT THE LAST TAG.
+          #
+          # The tag is published immediately and immutably; the in-repo record only lands when its
+          # pull request is merged. Those are not the same event, and deriving the range from the
+          # tag assumes they are. When a record is not merged before the next push, a tag-derived
+          # range starts AFTER commits that were never written down, and they are lost silently.
+          #
+          # That is not hypothetical: v1.2.4's entry is gone, and by 2026-08-10 the CHANGELOG sat at
+          # v1.2.5 while v1.5.1 was tagged — ten versions of drift, because ten records were open at
+          # once and conflicting.
+          #
+          # Starting from what the CHANGELOG actually contains makes the record self-healing: a
+          # missed merge widens the next range instead of dropping its contents. It is also what
+          # makes closing superseded records safe.
+          TAG_PREV="${{ steps.version.outputs.previous }}"
+          DOC_PREV="$(grep -oE '^## \[?v?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | head -1 | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' || true)"
+          [ -n "$DOC_PREV" ] && case "$DOC_PREV" in v*) : ;; *) DOC_PREV="v$DOC_PREV" ;; esac
+          PREV="$TAG_PREV"
+          if [ -n "$DOC_PREV" ] && git rev-parse -q --verify "refs/tags/$DOC_PREV" >/dev/null; then
+            # Widen to whichever is the ANCESTOR — never narrow the range.
+            if [ -n "$TAG_PREV" ] && git merge-base --is-ancestor "$DOC_PREV" "$TAG_PREV" 2>/dev/null; then
+              PREV="$DOC_PREV"
+              echo "::notice::CHANGELOG is behind the tags ($DOC_PREV < $TAG_PREV) — widening the range to $PREV so unmerged records are recovered rather than lost."
+            fi
+          fi
+
+          node scripts/release/changelog.js \
+            --version "$VERSION" \
+            --previous "$PREV" \
+            --artifacts artifacts.md
+
+          # Sync the repository version into every non-mini-app manifest (FR-007a). The tracked list
+          # is DERIVED from the workspace globs, so it cannot fall behind the workspace. Mini-apps
+          # version independently and are deliberately untouched (FR-007).
+          node scripts/release/sync-manifest-versions.js --version "$VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "chore(release): ${VERSION} [skip release]"
+
+          # `--force-with-lease` compares against refs/remotes/origin/$BRANCH, so that ref has to
+          # exist for the lease to mean anything. `fetch-depth: 0` above does fetch every branch
+          # today — but relying on that couples this push to a checkout implementation detail, and
+          # anyone shrinking fetch-depth for speed would silently turn the lease into a no-op
+          # ("stale info" rejection) exactly on the re-run path it exists to protect.
+          #
+          # So fetch it explicitly when it exists. `ls-remote` is a question, not a swallowed
+          # failure: a genuine transport error still fails the step under `set -e`.
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+          fi
+          git push origin "$BRANCH" --force-with-lease
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Open the release-record pull request
+        if: steps.gate.outputs.proceed == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const version = '${{ steps.version.outputs.version }}'
+            const head = '${{ steps.changelog.outputs.branch }}'
+            const body = [
+              `Generated release record for **${version}**.`,
+              '',
+              'Produced by `.github/workflows/release.yml` — the changelog and the manifest versions',
+              'are generated, never hand-written (spec 076, FR-037/FR-007a). Review and merge; there',
+              'is nothing to edit here.',
+              '',
+              `The tag \`${version}\` and its GitHub Release are already published and immutable —`,
+              'this pull request only brings the in-repo record into line with them.',
+              '',
+              '---',
+              '_Generated by [Claude Code](https://claude.ai/code)_',
+            ].join('\n')
+
+            // A re-run of the same release reuses its branch, so reuse the open PR too rather than
+            // failing on "a pull request already exists".
+            const existing = await github.rest.pulls.list({
+              ...context.repo, state: 'open', head: `${context.repo.owner}:${head}`,
+            })
+            if (existing.data.length > 0) {
+              core.notice(`Release-record PR already open: #${existing.data[0].number}`)
+              return
+            }
+
+            /*
+             * CLOSE SUPERSEDED RECORDS BEFORE OPENING A NEW ONE.
+             *
+             * This job runs on every push to main, and each run computes a new version, branches
+             * `release/<version>-changelog` from main, and opens a PR. Nothing closed the previous
+             * one. Measured 2026-08-10: TEN open release PRs (v1.2.6 through v1.5.1), most of them
+             * CONFLICTING with each other because every one edits CHANGELOG.md and the same
+             * manifests — and because each was branched from a main that never received the
+             * earlier entries, none of them was cumulative.
+             *
+             * The damage was not cosmetic. The tags were published and immutable while the in-repo
+             * record sat ten versions behind, and v1.2.4's entry was lost outright: its PR was
+             * closed or superseded before merge and nothing preserved what it said.
+             *
+             * A superseded record is genuinely redundant ONLY because the new one is generated for
+             * a range starting at the last version in CHANGELOG.md rather than the last tag (see
+             * the `--previous` argument above). If that ever reverts to tag-derived, closing these
+             * would start destroying entries again.
+             */
+            const stale = await github.rest.pulls.list({ ...context.repo, state: 'open', base: 'main' })
+            for (const pr of stale.data) {
+              if (!/^chore\(release\): /.test(pr.title)) continue
+              if (!/^release\/.*-changelog$/.test(pr.head.ref)) continue
+              if (pr.head.ref === head) continue
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: pr.number,
+                body:
+                  `Superseded by the release record for **${version}**, which covers this range too.\n\n` +
+                  'Closing so release records cannot accumulate and conflict with one another — see the ' +
+                  'note in `.github/workflows/release.yml`.',
+              })
+              await github.rest.pulls.update({ ...context.repo, pull_number: pr.number, state: 'closed' })
+              core.notice(`Closed superseded release-record PR #${pr.number} (${pr.title})`)
+            }
+            const pr = await github.rest.pulls.create({
+              ...context.repo,
+              title: `chore(release): ${version}`,
+              head,
+              base: 'main',
+              body,
+            })
+            core.notice(`Opened release-record PR #${pr.data.number} for ${version}`)
+
+            /*
+             * A PR OPENED BY GITHUB_TOKEN GETS NO CHECKS, SO IT CAN NEVER MERGE.
+             *
+             * GitHub deliberately does not fire workflow events for actions taken with the default
+             * GITHUB_TOKEN — it is how recursive workflow loops are prevented. The consequence here
+             * is that this pull request is created with ZERO check runs, and every required status
+             * check sits at "Expected — waiting for status to be reported" forever.
+             *
+             * Measured on #1120: 0 checks reported, mergeable=MERGEABLE but mergeStateStatus=BLOCKED,
+             * and `gh pr merge` refused with "the base branch policy prohibits the merge". A
+             * close/reopen (a real user token) took it from 0 to 23 checks immediately.
+             *
+             * So the record is born unmergeable, which is how the changelog fell ten versions behind
+             * the tags and lost v1.2.4 (#1119). #1121 taught the promotion rule to ADMIT this branch;
+             * that fix is necessary but not sufficient, because the checks never ran at all.
+             *
+             * Closing and reopening from the same token does NOT help — the exemption is per-token,
+             * not per-action. The durable fix is to create the PR with an App or PAT token; until one
+             * is provisioned this says so loudly rather than leaving a silently stuck PR, because a
+             * blocked release record looks identical to one nobody has got round to merging.
+             */
+            const checks = await github.rest.checks.listForRef({
+              ...context.repo, ref: pr.data.head.sha, per_page: 1,
+            })
+            if (checks.data.total_count === 0) {
+              core.warning(
+                `Release-record PR #${pr.data.number} has NO check runs, because GITHUB_TOKEN does not ` +
+                'trigger workflow events. Required checks will never report and the PR cannot merge. ' +
+                'Close and REOPEN it by hand to fire the events, or provision an App/PAT token for ' +
+                'this step. See the note in .github/workflows/release.yml.'
+              )
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: pr.data.number,
+                body:
+                  '> **This PR has no checks and cannot merge as-is.**\n>\n' +
+                  '> It was opened by `GITHUB_TOKEN`, and GitHub does not fire workflow events for that ' +
+                  'token, so no required status check will ever report. **Close and reopen this PR** to ' +
+                  'trigger them.\n>\n' +
+                  '> The durable fix is an App or PAT token for the PR-creation step in ' +
+                  '`.github/workflows/release.yml`.',
+              })
+            }

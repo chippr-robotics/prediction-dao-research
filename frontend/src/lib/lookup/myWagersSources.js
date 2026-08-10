@@ -120,14 +120,44 @@ export async function fetchDeviceChallenges(recoverCodes) {
 
 /**
  * Load the hybrid sources this module owns (pools + device-vault challenges), scoped to the active
- * network/account. Errors from any one source degrade to an empty array for that source (FR-024/019).
+ * network/account. Errors from any one source degrade to an empty array for that source
+ * (FR-024/019) — but the CALLER IS TOLD, via `poolsAvailable`.
+ *
+ * That flag is not decoration. Degrading a failed read to `[]` is right for a list that can render
+ * partially, and catastrophic for the notification source: `poolsSource` used to receive the same
+ * empty array whether the member had no pools or the read had collapsed, report `ok: true`, and
+ * the activity engine would then REPLACE the action-needed map with `{}` on every poll. A Polygon
+ * member whose pool was cancelled got no "refund your buy-in" notification and no badge, while the
+ * app affirmatively signalled that nothing needed attention — and the engine's own
+ * "couldn't refresh some activity" disclosure never fired, because nothing had reported a failure.
+ *
+ * `poolsAvailable` is false when the pool set could not be established at all: no subgraph on this
+ * chain, a subgraph that does not index Pool, or one that could not be reached. All three mean the
+ * SAME thing to a caller that must not fabricate an empty set — the distinction between them
+ * belongs in a UI that explains itself, not here.
  */
 export async function loadMyWagersSources({ chainId, account, recoverCodes, postGraphQL, resolveUrl } = {}) {
   const opts = { chainId, account, postGraphQL, resolveUrl }
-  const [createdPools, joinedPools, deviceChallenges] = await Promise.all([
-    fetchCreatedPools(opts).catch(() => []),
-    fetchJoinedPools(opts).catch(() => []),
+  const resolve = resolveUrl || getSubgraphUrl
+  // No endpoint means nothing was ASKED, so an empty result is not an answer.
+  const indexed = Boolean(resolve(chainId))
+
+  const [created, joined, deviceChallenges] = await Promise.all([
+    fetchCreatedPools(opts).then(
+      (pools) => ({ ok: true, pools }),
+      () => ({ ok: false, pools: [] }),
+    ),
+    fetchJoinedPools(opts).then(
+      (pools) => ({ ok: true, pools }),
+      () => ({ ok: false, pools: [] }),
+    ),
     fetchDeviceChallenges(recoverCodes),
   ])
-  return { createdPools, joinedPools, deviceChallenges }
+
+  return {
+    createdPools: created.pools,
+    joinedPools: joined.pools,
+    deviceChallenges,
+    poolsAvailable: indexed && created.ok && joined.ok,
+  }
 }

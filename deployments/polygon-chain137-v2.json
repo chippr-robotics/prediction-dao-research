@@ -39,7 +39,16 @@
     "policyGuardSetup": "0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b",
     "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7",
     "callsignRegistry": "0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2",
-    "callsignRegistryImpl": "0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49"
+    "callsignRegistryImpl": "0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49",
+    "safePolicyGuardV2": "0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c",
+    "feeRouter": "0xf8161fC26172621E9fbcc6c39500Bb14b0902B35",
+    "feeRouterImpl": "0x40ee755246E60f66E7bA425F99C6d704859d38db",
+    "bridgeRouter": "0x8064F3Cd9F8f113691B981d2B15EF85D95Abd551",
+    "bridgeRouterImpl": "0x8F7A7e7437733326BD2F8045BFceD9B821aF1De1",
+    "liquidityRouter": "0x13762c059c2A22E3bCd8A44F36EA44e8e3B22B31",
+    "liquidityRouterImpl": "0x33818052Ca8B5b8Bb9777Bf6eBbaFCD8Faae6e65",
+    "miniAppRegistry": "0x5a168Cc9FeFaf40e7BC536C8C61669e6d547A0A2",
+    "miniAppRegistryImpl": "0x41858006aD6dd0788b84F9fb17A28d8167C7b331"
   },
   "mocks": null,
   "constructorArgs": {
@@ -83,7 +92,12 @@
     "safePolicyGuard": [],
     "policyGuardSetup": [],
     "safeProposalHub": [],
-    "callsignRegistryImpl": []
+    "callsignRegistryImpl": [],
+    "safePolicyGuardV2": [],
+    "feeRouterImpl": [],
+    "bridgeRouterImpl": [],
+    "liquidityRouterImpl": [],
+    "miniAppRegistryImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-07-05T20:05:10.649Z",
@@ -101,7 +115,18 @@
     "backupPointerRegistry": 90120712,
     "safePolicyGuard": 90120723,
     "policyGuardSetup": 90120725,
-    "safeProposalHub": 90120743
+    "safeProposalHub": 90120743,
+    "safePolicyGuardV2": 90932886,
+    "feeRouter": 90939919,
+    "miniAppRegistry": 91265680
   },
-  "callsignRegistryDeployedAt": "2026-07-13T13:12:13.493Z"
+  "callsignRegistryDeployedAt": "2026-07-13T13:12:13.493Z",
+  "feeRouterDeployedAt": "2026-07-27T01:14:35.084Z",
+  "bridgeRouterDeployedAt": "2026-07-27T01:26:38.247Z",
+  "liquidityRouterDeployedAt": "2026-07-27T01:26:46.131Z",
+  "acrossSpokePool": "0x9295ee1d8C5b022Be115A2AD3c30C72E34e7F096",
+  "acrossHubPool": null,
+  "uniswapFactory": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+  "uniswapPositionManager": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+  "miniAppRegistryDeployedAt": "2026-08-01T16:59:00.666Z"
 }

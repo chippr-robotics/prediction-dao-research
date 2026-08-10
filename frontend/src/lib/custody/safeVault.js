@@ -9,6 +9,7 @@ import {
   ZeroAddress,
   getAddress,
   getCreate2Address,
+  isAddress,
   keccak256,
   solidityPackedKeccak256,
 } from 'ethers'
@@ -185,6 +186,69 @@ export async function loadVault(address, chainId, provider) {
     }
   } catch {
     return { address: addr, chainId: Number(chainId), isSafe: false, reason: 'not-a-safe' }
+  }
+}
+
+/**
+ * Spec 068 — EIP-3770 shortNames (lowercased) → chainId, for the custody chains plus the aliases
+ * members actually meet in Safe UIs: the ETC Cooperative's Safe fork displays vault and owner
+ * addresses as "ETC:0x…" (Classic) and "ETCM:0x…" (Mordor), and members paste them verbatim —
+ * the raw string would fail address validation before any chain was ever searched.
+ */
+export const CHAIN_SHORTNAMES = {
+  etc: 61,
+  etcm: 63,
+  mordor: 63,
+  matic: 137, // Polygon's registered EIP-3770 shortName
+  pol: 137,
+  oeth: 10, // Optimism
+  base: 8453,
+  arb1: 42161, // Arbitrum One
+}
+
+/**
+ * Split an optionally chain-prefixed address input ("ETCM:0xabc…" → address + chain hint).
+ * A recognized prefix becomes a chain hint; an unrecognized one is stripped without a hint
+ * (better to search everywhere than to reject a paste over its label). Validation of the
+ * address itself stays with the caller so error copy is consistent.
+ */
+export function parseVaultAddressInput(raw) {
+  const trimmed = String(raw || '').trim()
+  const m = /^([A-Za-z0-9-]+):(.+)$/.exec(trimmed)
+  if (!m || !isAddress(m[2].trim())) return { address: trimmed, chainHint: null }
+  return { address: m[2].trim(), chainHint: CHAIN_SHORTNAMES[m[1].toLowerCase()] ?? null }
+}
+
+/**
+ * Spec 068 — find a vault by address across EVERY custody chain, in parallel.
+ *
+ * A member holding a vault address does not necessarily know which chain it lives on, and asking
+ * them to guess (by switching networks until one sticks) is a bad way to find out. Loading by
+ * address therefore searches all custody chains rather than only the connected one.
+ *
+ * Crucially this distinguishes "not there" from "could not look": a chain whose RPC fails is
+ * reported as `unreachable`, never as absent — otherwise a single dead endpoint would tell a member
+ * their vault does not exist.
+ *
+ * @returns {{matches: Array, unreachable: Array<{chainId:number, error:string}>, searched: number[]}}
+ */
+export async function findVaultAcrossChains(address, chainIds, { providerFor, load = loadVault } = {}) {
+  const addr = getAddress(address)
+  const results = await Promise.all(
+    chainIds.map(async (chainId) => {
+      try {
+        const reader = providerFor ? providerFor(chainId) : undefined
+        const state = await load(addr, chainId, reader)
+        return { chainId: Number(chainId), state }
+      } catch (e) {
+        return { chainId: Number(chainId), error: e?.message || 'read failed' }
+      }
+    }),
+  )
+  return {
+    matches: results.filter((r) => r.state?.isSafe).map((r) => r.state),
+    unreachable: results.filter((r) => r.error).map((r) => ({ chainId: r.chainId, error: r.error })),
+    searched: chainIds.map(Number),
   }
 }
 

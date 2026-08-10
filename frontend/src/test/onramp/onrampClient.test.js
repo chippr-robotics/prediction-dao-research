@@ -1,5 +1,5 @@
 /**
- * onrampClient (spec 060) — the SPA side of the /v1/onramp/* buy-crypto proxy. Verifies the
+ * onrampClient (spec 081) — the SPA side of the /v1/onramp/* buy-crypto proxy. Verifies the
  * two-layer availability gate (capability + gateway), gateway-unset soft-fail, success mapping,
  * and error-code propagation into OnrampUnavailable (the hide/degrade signal).
  */

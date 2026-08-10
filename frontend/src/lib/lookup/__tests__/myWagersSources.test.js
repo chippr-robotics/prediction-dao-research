@@ -89,5 +89,42 @@ describe('loadMyWagersSources', () => {
     expect(out.createdPools).toHaveLength(1)
     expect(out.joinedPools).toEqual([])
     expect(out.deviceChallenges).toHaveLength(1)
+    // Degrading to [] is right for a list that renders partially — but the caller is TOLD, so a
+    // consumer that must not fabricate an empty set (the notification source) can refuse to.
+    expect(out.poolsAvailable).toBe(false)
+  })
+
+  /*
+   * `poolsAvailable` exists because the notification source cannot tell "no pools" from "no read"
+   * by looking at an empty array, and getting that wrong drops a refund notification for money the
+   * member could withdraw. See `src/test/sources/poolsSource.test.js`.
+   */
+  it('reports pools as available when every pool read succeeded', async () => {
+    recordJoinedPool(ACCOUNT, '0xpool1')
+    const postGraphQL = vi.fn()
+      .mockResolvedValueOnce({ pools: [rawPool()] })
+      .mockResolvedValueOnce({ pools: [rawPool()] })
+    const out = await loadMyWagersSources({ chainId: 137, account: ACCOUNT, postGraphQL, resolveUrl: url })
+    expect(out.poolsAvailable).toBe(true)
+  })
+
+  it('reports an empty-but-successful read as available — "you have no pools" is an answer', async () => {
+    recordJoinedPool(ACCOUNT, '0xpool1')
+    const postGraphQL = vi.fn().mockResolvedValue({ pools: [] })
+    const out = await loadMyWagersSources({ chainId: 137, account: ACCOUNT, postGraphQL, resolveUrl: url })
+    expect(out.createdPools).toEqual([])
+    expect(out.poolsAvailable).toBe(true)
+  })
+
+  it('reports pools as UNavailable on a chain with no subgraph — nothing was asked', async () => {
+    // Mordor and ETC. An empty result here is not an answer, because no query was issued.
+    recordJoinedPool(ACCOUNT, '0xpool1')
+    const postGraphQL = vi.fn()
+    const out = await loadMyWagersSources({
+      chainId: 63, account: ACCOUNT, postGraphQL, resolveUrl: () => null,
+    })
+    expect(postGraphQL).not.toHaveBeenCalled()
+    expect(out.createdPools).toEqual([])
+    expect(out.poolsAvailable).toBe(false)
   })
 })

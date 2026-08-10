@@ -121,10 +121,16 @@ describe('PortfolioPanel states', () => {
     expect(screen.queryByText(/total portfolio balance/i)).not.toBeInTheDocument()
   })
 
-  it('shows a loading state', () => {
+  it('shows a skeleton of the portfolio bones while loading (spec 074 follow-up)', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ status: 'loading' }))
-    renderPanel()
+    const { container } = renderPanel()
     expect(screen.getByRole('status')).toHaveTextContent(/loading portfolio/i)
+    // The bones: shimmering section/row placeholders (the balance total lives
+    // only on the account card — issue #1078).
+    const skeleton = container.querySelector('.portfolio-skeleton')
+    expect(skeleton).toBeTruthy()
+    expect(skeleton.getAttribute('aria-hidden')).toBe('true')
+    expect(skeleton.querySelectorAll('.portfolio-skeleton-row').length).toBeGreaterThanOrEqual(6)
   })
 
   it('shows the error state with a working retry', () => {
@@ -138,15 +144,16 @@ describe('PortfolioPanel states', () => {
 })
 
 describe('PortfolioPanel aggregate rows', () => {
-  it('renders one combined row per underlying with total, subtotal, and instance summary (FR-025)', () => {
+  it('renders one combined row per underlying with subtotal and instance summary (FR-025)', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
 
-    expect(screen.getByText('Total portfolio balance')).toBeInTheDocument()
-    expect(screen.getByText('$3,600.00')).toBeInTheDocument()
+    // The portfolio total lives only on the account card, not in the panel
+    // body (issue #1078 — duplicate balance removed).
+    expect(screen.queryByText('Total portfolio balance')).not.toBeInTheDocument()
 
     const commodities = screen.getByRole('region', { name: 'Digital Commodities' })
-    const ethRow = within(commodities).getByRole('button', { name: /ethereum eth 3 instances/i })
+    const ethRow = within(commodities).getByRole('button', { name: /ethereum\W+eth\W+3 instances/i })
     expect(ethRow).toHaveTextContent('3 instances · 2 networks')
     expect(ethRow).toHaveTextContent('$3,500.00')
     // Single-instance aggregates name their network directly.
@@ -157,7 +164,7 @@ describe('PortfolioPanel aggregate rows', () => {
   it('renders unpriced aggregates with an em dash, never $0.00', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
-    const etcRow = screen.getByRole('button', { name: /ethereum classic 2 etc/i })
+    const etcRow = screen.getByRole('button', { name: /ethereum classic\W+2 etc/i })
     expect(within(etcRow).getByText('price unavailable')).toBeInTheDocument()
     expect(within(etcRow).queryByText('$0.00')).not.toBeInTheDocument()
   })
@@ -165,7 +172,7 @@ describe('PortfolioPanel aggregate rows', () => {
   it('opens the asset detail sheet when a row is tapped (FR-024)', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /ethereum eth 3 instances/i }))
+    fireEvent.click(screen.getByRole('button', { name: /ethereum\W+eth\W+3 instances/i }))
 
     const sheet = screen.getByRole('dialog', { name: /ethereum details/i })
     expect(sheet).toBeInTheDocument()
@@ -181,7 +188,7 @@ describe('PortfolioPanel aggregate rows', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
 
-    const toggle = screen.getByRole('button', { name: /payment stablecoins \$/i })
+    const toggle = screen.getByRole('button', { name: /payment stablecoins\W+\$/i })
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
 
     fireEvent.click(toggle)
@@ -212,12 +219,10 @@ describe('PortfolioPanel aggregate rows', () => {
     expect(screen.getByText(/< 0\.000001 ETH/)).toBeInTheDocument()
   })
 
-  it('refresh button triggers a reload', () => {
-    const snapshot = makeSnapshot({ aggregates: POPULATED })
-    mockUsePortfolio.mockReturnValue(snapshot)
+  it('does not render a mid-page refresh control (issue #1078 — lives on the account card only)', () => {
+    mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /^refresh$/i }))
-    expect(snapshot.refresh).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /^refresh$/i })).not.toBeInTheDocument()
   })
 })
 

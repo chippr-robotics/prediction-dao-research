@@ -14,10 +14,9 @@ const OPPONENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1
 
 function connectAsAdmin() {
   cy.mockWeb3Provider({ account: ADMIN })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.visitWagers()
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
 }
 
@@ -28,16 +27,18 @@ function attemptCreate() {
   cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type('Pause test wager')
   cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(OPPONENT)
   cy.wait(300)
-  cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type('2')
-  cy.get('[role="dialog"]').then(($m) => {
-    const enc = $m.find('input[type="checkbox"]')
-    if (enc.length && enc.is(':checked')) cy.wrap(enc.first()).uncheck({ force: true })
-  })
-  cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+  cy.enterAmountViaKeypad('fm-stake', '2')
+  // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
+  // from FriendMarketsModal several sprints ago (grep `checkbox` there returns nothing). The
+  // block that used to uncheck it was a no-op guarded by `if (length > 0)`, so it silently did
+  // nothing while the spec read as though it controlled encryption. (#1028)
+  cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 }
 
 describe('Paused Protocol', () => {
   before(() => {
+    cy.ensureWagerCapacity([0, 1])
+    cy.ensureEncryptionKeys([0, 1])
     // Ensure the creator can create when unpaused: funded + approved + member.
     cy.fundAccount(ADMIN)
     cy.task('chainTx', { action: 'approve', args: { index: 0 } })

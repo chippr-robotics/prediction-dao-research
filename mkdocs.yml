@@ -1,5 +1,5 @@
 site_name: FairWins
-site_description: Peer-to-peer wagers with friends — smart-contract escrow, oracle resolution, end-to-end encrypted terms
+site_description: Self-custody digital asset infrastructure — embedded wallets, policy-governed custody, payments, markets connectivity, and compliance across major networks, available white-label
 site_author: Chippr Robotics
 site_url: https://docs.FairWins.app
 
@@ -92,6 +92,8 @@ nav:
     - Open Challenges: user-guide/open-challenges.md
     - Membership Vouchers: user-guide/membership-vouchers.md
     - Earn (Lending & Rewards): user-guide/earn.md
+    - Staking (Liquid & Delegated): user-guide/staking.md
+    - Platform Fees: user-guide/platform-fees.md
     - Resolving a Wager: user-guide/resolve-wager.md
     - Private Wager Encryption: user-guide/private-market-encryption.md
     - Address Book & Screening: user-guide/address-book.md
@@ -104,6 +106,9 @@ nav:
     - Frontend Development: developer-guide/frontend.md
     - ClearPath Multi-Network DAOs: developer-guide/clearpath-multi-network.md
     - Earn Integration: developer-guide/earn-integration.md
+    - Staking Integration: developer-guide/staking-integration.md
+    - Platform Fees (FeeRouter): developer-guide/platform-fees.md
+    - Mini-Apps (spec 073): developer-guide/miniapps.md
     - Encryption Architecture: developer-guide/encryption-architecture.md
     - Envelope Encryption Spec: developer-guide/envelope-encryption-spec.md
     - Ethereum Security Agent: developer-guide/ethereum-security-agent.md
@@ -137,6 +142,9 @@ nav:
     - Relayer Operations: runbooks/relayer-operations.md
     - Paymaster Operations: runbooks/paymaster-operations.md
     - Callsign Operations: runbooks/callsigns-operations.md
+    - Fee Operations: runbooks/fee-operations.md
+    - Mini-App Registry Operations: runbooks/miniapp-registry-operations.md
+    - Staking Operations: runbooks/staking-operations.md
     - Contract Upgrades: runbooks/contract-upgrades.md
     - Relayer Mordor Deploy: runbooks/relayer-mordor-deploy.md
     - Wager Pools Deploy: runbooks/zk-wager-pools-deploy.md
@@ -157,6 +165,114 @@ nav:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md
     - Configuration: reference/configuration.md
+  - Knowledge Base:
+    - Overview: blog/knowledge/README.md
+    - Inventory & Schedule: blog/knowledge-base-inventory.md
+    - Wallets & Keys:
+      - Self-Custody Explained: blog/knowledge/01-self-custody-explained/blog.md
+      - Passkeys & Smart Accounts: blog/knowledge/02-passkeys-and-smart-accounts/blog.md
+      - Gas Fees & Going Gasless: blog/knowledge/03-gas-fees-and-gasless/blog.md
+    - Payments & Markets:
+      - Stablecoins Explained: blog/knowledge/04-stablecoins-explained/blog.md
+      - Escrow & Trustless Settlement: blog/knowledge/05-escrow-and-trustless-settlement/blog.md
+      - Prediction Markets 101: blog/knowledge/06-prediction-markets-101/blog.md
+    - Earning & Yield:
+      - DeFi Lending & Yield: blog/knowledge/07-defi-lending-and-yield/blog.md
+      - Morpho & Vaults Explained: blog/knowledge/08-morpho-and-vaults/blog.md
+      - Reading APY & Risk: blog/knowledge/09-apy-and-risk/blog.md
+      - Fees & Basis Points: blog/knowledge/10-fees-and-basis-points/blog.md
+    - Security & Custody:
+      - Multisig Wallets: blog/knowledge/11-multisig-wallets/blog.md
+      - Spending Guardrails: blog/knowledge/12-spending-guardrails/blog.md
+      - Sanctions & Compliance: blog/knowledge/13-sanctions-and-compliance/blog.md
+    - Oracles & Trading:
+      - Oracles Explained: blog/knowledge/14-oracles-explained/blog.md
+      - Polymarket & Builder Fees: blog/knowledge/15-polymarket-and-builder-fees/blog.md
+    - Identity, Privacy & Networks:
+      - NFTs, Soulbound Tokens & Memberships: blog/knowledge/16-nfts-soulbound-and-memberships/blog.md
+      - On-Chain Names: blog/knowledge/17-onchain-names/blog.md
+      - Private & Encrypted: blog/knowledge/18-private-and-encrypted/blog.md
+      - Blockchain Networks & Layer-2s: blog/knowledge/19-blockchain-networks-and-l2s/blog.md
+      - What Is a DAO?: blog/knowledge/20-what-is-a-dao/blog.md
+  - Engineering Blog:
+    - Overview: blog/posts/README.md
+    - Topic Inventory: blog/blog-topics-inventory.md
+    - Identity & Access:
+      - Role-Based Access Control: blog/posts/01-rbac-operations-control-plane/blog.md
+      - Soulbound Memberships & Vouchers: blog/posts/02-soulbound-memberships-vouchers/blog.md
+      - Sanctions & Compliance Gating: blog/posts/03-sanctions-compliance-gating/blog.md
+    - Accounts & Keys:
+      - Passkey Smart Accounts: blog/posts/04-passkey-smart-accounts/blog.md
+      - Account Recovery & Unified Connect: blog/posts/05-account-recovery-unified-connect/blog.md
+      - Sponsored Gas & Verifying Paymaster: blog/posts/06-sponsored-gas-verifying-paymaster/blog.md
+    - Custody & Multisig:
+      - Safe Multisig Custody: blog/posts/07-safe-multisig-custody/blog.md
+      - Multisig Policy Engine: blog/posts/08-multisig-policy-engine/blog.md
+    - Gasless Rails:
+      - Intent-Based Gasless Payments: blog/posts/09-intent-based-gasless-payments/blog.md
+      - Relayer Gateway Architecture: blog/posts/10-relayer-gateway-architecture/blog.md
+    - Contract Architecture:
+      - UUPS Upgrades & Storage Safety: blog/posts/11-uups-upgrades-storage-safety/blog.md
+      - The Two-Facet Proxy (24 KB Limit): blog/posts/12-two-facet-proxy-24kb/blog.md
+      - Deterministic Singleton Deployment: blog/posts/13-deterministic-singleton-deployment/blog.md
+    - Prediction Markets:
+      - The Wager Lifecycle Contract: blog/posts/14-wager-lifecycle-contract/blog.md
+      - Oracle Adapter Abstraction: blog/posts/15-oracle-adapter-abstraction/blog.md
+      - Draw Resolution & Open Challenges: blog/posts/16-draw-resolution-open-challenges/blog.md
+      - Wager Pools (ERC-1167 Clones): blog/posts/17-wager-pools-erc1167/blog.md
+    - Privacy Architecture:
+      - Envelope Encryption (Published): blog/posts/18-envelope-encryption/blog.md
+      - Multi-Recipient Encryption: blog/posts/19-multi-recipient-encryption/blog.md
+      - Encrypted Data Sync: blog/posts/20-encrypted-data-sync/blog.md
+      - The Nullifier System (Design History): blog/posts/21-nullifier-system/blog.md
+    - Finance Surfaces:
+      - The FeeRouter: blog/posts/22-fee-router/blog.md
+      - Earn (ERC-4626 Vaults): blog/posts/23-earn-erc4626-vaults/blog.md
+      - Predict (Polymarket Builder Codes): blog/posts/24-predict-polymarket-builder-codes/blog.md
+      - Bitcoin (Non-EVM): blog/posts/25-bitcoin-non-evm/blog.md
+    - Multi-Chain Infrastructure:
+      - ClearPath DAO Registry: blog/posts/26-clearpath-dao-registry/blog.md
+      - Indexing Without a Subgraph: blog/posts/27-indexing-without-subgraph/blog.md
+      - The Unified Activity Ledger: blog/posts/28-unified-activity-ledger/blog.md
+    - Security & DevOps:
+      - AI-Driven Security Review in CI: blog/posts/29-ai-security-review-ci/blog.md
+      - Coverage & Audit Gates: blog/posts/30-coverage-audit-gates/blog.md
+      - Symbolic Execution & Fuzzing: blog/posts/31-symbolic-execution-fuzzing/blog.md
+      - Spec-Driven Development: blog/posts/32-spec-driven-development/blog.md
+    - Standalone:
+      - CallsignRegistry (ENS-Style Naming): blog/posts/33-callsign-registry/blog.md
+      - TokenFactory (Templated Minting): blog/posts/34-token-factory/blog.md
+  - Finance Professional Series:
+    - Overview: blog/finance/README.md
+    - Series Inventory: blog/finance-professional-inventory.md
+    - Custody & Settlement:
+      - Self-Custody vs. Qualified Custodians: blog/finance/01-self-custody-vs-qualified-custodians/blog.md
+      - Trustless Escrow & Counterparty Risk: blog/finance/02-trustless-escrow-counterparty-risk/blog.md
+      - Atomic Settlement (DvP at T+0): blog/finance/03-atomic-settlement-dvp/blog.md
+      - Institutional Controls & Multisig: blog/finance/04-institutional-controls-multisig/blog.md
+      - Programmable Spending Policy: blog/finance/05-programmable-spending-policy/blog.md
+    - Money, Yield & Markets:
+      - Stablecoins as a Settlement Asset: blog/finance/06-stablecoins-settlement-asset/blog.md
+      - On-Chain Lending vs. Money Markets: blog/finance/07-onchain-lending-vs-money-markets/blog.md
+      - Tokenized Vaults as Fund Structures: blog/finance/08-tokenized-vaults-fund-structures/blog.md
+      - A Risk Framework for DeFi Yield: blog/finance/09-defi-yield-risk-framework/blog.md
+      - Oracles & Reference-Data Integrity: blog/finance/10-oracles-reference-data-integrity/blog.md
+      - Prediction Markets as Event Contracts: blog/finance/11-prediction-markets-event-derivatives/blog.md
+      - Builder Codes & Best Execution: blog/finance/12-builder-codes-best-execution/blog.md
+    - Compliance, Disclosure & Governance:
+      - Programmatic Compliance & the Travel Rule: blog/finance/13-programmatic-compliance-travel-rule/blog.md
+      - Fee Transparency & Cost Disclosure: blog/finance/14-fee-transparency-cost-disclosure/blog.md
+      - Confidentiality on a Public Ledger: blog/finance/15-confidentiality-public-ledger-mnpi/blog.md
+      - Operational Risk in Upgradeable Systems: blog/finance/16-operational-risk-upgradeable-systems/blog.md
+      - "Assurance: Audits & Formal Verification": blog/finance/17-assurance-audits-formal-verification/blog.md
+      - DAOs & Member-Owned Governance: blog/finance/18-daos-member-owned-governance/blog.md
+
+# Companion social/image-prompt assets live beside each post but are not nav pages.
+not_in_nav: |
+  /blog/posts/*/social.md
+  /blog/knowledge/*/social.md
+  /blog/finance/*/social.md
+  /blog/private-prediction-markets-envelope-encryption.md
 
 extra:
   social:

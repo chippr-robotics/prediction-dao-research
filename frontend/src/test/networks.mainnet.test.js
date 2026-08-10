@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { getNetwork, getSelectableNetworks, isSupportedChainId } from '../config/networks'
 import { getContractAddressForChain } from '../config/contracts'
 import { getNetworkFeatures } from '../config/networkCapabilities'
-import { knownDaosForChain } from '../config/clearpath/knownDaos'
+import { knownDaosForChain } from '../lib/clearpath/knownDaos'
 import { getPortfolioChainIds } from '../config/assetTaxonomy'
 
 // Ethereum mainnet (1) is a first-class VALUE network (spec 048): selectable, portfolio-eligible,
@@ -20,23 +20,33 @@ describe('Ethereum mainnet value network (spec 048; ClearPath since spec 042)', 
     expect(getPortfolioChainIds({ includeTestnets: false })).toContain(1)
   })
 
-  it('enables ONLY clearpath among capabilities', () => {
+  it('enables clearpath, and — since spec 067 — swap + liquidity', () => {
     const caps = getNetwork(1).capabilities
     expect(caps.clearpath).toBe(true)
-    expect(caps.dex).toBe(false)
+    // Spec 067 SUPERSEDES spec 048's no-in-app-swap cut on Ethereum: the DEX ships
+    // wherever Uniswap is deployed. That earlier state reflected the absence of a
+    // `dex` config block, not a standing product constraint (research R4a).
+    expect(caps.dex).toBe(true)
+    expect(caps.liquidity).toBe(true)
+    expect(caps.bridge).toBe(true)
+    // Still no wager infra deployed here, and no bundler configured for passkey submission —
+    // both self-disclose off. Ethereum's passkey block exists (the chain carries EntryPoint v0.6
+    // + the CREATE2 proxy) but stays unconfigured, so the capability is false by configuration.
     expect(caps.passkeyAccounts).toBe(false)
     expect(caps.polymarketSidebets).toBe(false)
     expect(caps.friendMarkets).toBe(false)
   })
 
-  it('has no wager/membership/DEX deployment (features self-disable honestly)', () => {
+  it('has no wager/membership deployment (features self-disable honestly)', () => {
     expect(getContractAddressForChain('wagerRegistry', 1)).toBeUndefined()
     expect(getContractAddressForChain('membershipManager', 1)).toBeUndefined()
-    expect(getNetwork(1).dex).toBeNull()
-    // The Network tab reflects the honest truth: wagers/swap off, clearpath on.
+    // A Uniswap V3 `dex` block IS configured as of spec 067 (swap + liquidity).
+    expect(getNetwork(1).dex?.positionManager).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    // The Network tab reflects the honest truth: wagers off, clearpath on, and — as of
+    // spec 067 — swap ON (Uniswap V3 is configured here now).
     const feats = getNetworkFeatures(1)
     expect(feats.find((f) => f.key === 'wagers').deployed).toBe(false)
-    expect(feats.find((f) => f.key === 'swap').deployed).toBe(false)
+    expect(feats.find((f) => f.key === 'swap').deployed).toBe(true)
     expect(feats.find((f) => f.key === 'clearpath').deployed).toBe(true)
   })
 

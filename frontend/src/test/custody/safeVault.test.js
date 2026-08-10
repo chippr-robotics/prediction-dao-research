@@ -12,6 +12,7 @@ import {
   buildCreateVaultCalldata,
   loadVault,
   isVaultOwner,
+  parseVaultAddressInput,
 } from '../../lib/custody/safeVault'
 import { getSafeContracts } from '../../config/safeContracts'
 import { SAFE_SETUP_ABI } from '../../abis/SafeProxyFactory'
@@ -158,5 +159,28 @@ describe('isVaultOwner', () => {
     expect(isVaultOwner(vault, O1)).toBe(true)
     expect(isVaultOwner(vault, O3)).toBe(false)
     expect(isVaultOwner({ isSafe: false }, O1)).toBe(false)
+  })
+})
+
+describe('parseVaultAddressInput (spec 068 — EIP-3770-prefixed pastes)', () => {
+  it('passes a bare address through untouched, with no hint', () => {
+    expect(parseVaultAddressInput(O1)).toEqual({ address: O1, chainHint: null })
+    expect(parseVaultAddressInput(`  ${O1}  `)).toEqual({ address: O1, chainHint: null })
+  })
+
+  it('strips recognized prefixes and maps them to chain hints (case-insensitive)', () => {
+    expect(parseVaultAddressInput(`ETC:${O1}`)).toEqual({ address: O1, chainHint: 61 })
+    expect(parseVaultAddressInput(`ETCM:${O1}`)).toEqual({ address: O1, chainHint: 63 })
+    expect(parseVaultAddressInput(`etcm:${O1}`)).toEqual({ address: O1, chainHint: 63 })
+    expect(parseVaultAddressInput(`matic:${O1}`)).toEqual({ address: O1, chainHint: 137 })
+  })
+
+  it('strips an unrecognized prefix without inventing a hint', () => {
+    expect(parseVaultAddressInput(`weird-chain:${O1}`)).toEqual({ address: O1, chainHint: null })
+  })
+
+  it('leaves non-address input alone for the caller to reject', () => {
+    expect(parseVaultAddressInput('ETCM:not-an-address')).toEqual({ address: 'ETCM:not-an-address', chainHint: null })
+    expect(parseVaultAddressInput('')).toEqual({ address: '', chainHint: null })
   })
 })

@@ -1,6 +1,7 @@
-/* Spec 032 — Data backup panel. Theme-variable driven (light/dark) — no hardcoded palette. */
+/* Spec 032 — Data backup panel. Theme-variable driven (light/dark) — no hardcoded palette.
+   The panel renders as a collapsible AccordionSection; the restore choice and the
+   destructive remove confirmation live in ActionSheets. */
 .backup-panel { color: var(--text-primary); }
-.backup-title { margin: 0 0 0.5rem; font-weight: 600; }
 .backup-intro { color: var(--text-secondary); margin: 0 0 1rem; font-size: 0.9rem; line-height: 1.5; }
 
 .backup-notice {
@@ -31,10 +32,6 @@
 
 .backup-cost { color: var(--text-muted, var(--text-secondary)); font-size: 0.78rem; margin: 0.3rem 0 0; }
 
-.backup-restore {
-  margin-top: 0.8rem; border: 1px solid var(--border-color); border-radius: 8px;
-  background: var(--bg-secondary); padding: 0.8rem;
-}
 .backup-restore-q { margin: 0 0 0.5rem; font-weight: 600; font-size: 0.88rem; }
 .backup-radio { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.35rem 0; font-size: 0.85rem; line-height: 1.4; }
 .backup-radio input { margin-top: 0.2rem; }

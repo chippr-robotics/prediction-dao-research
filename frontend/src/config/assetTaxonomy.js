@@ -25,6 +25,7 @@
  */
 import { NETWORKS } from './networks'
 import { getContractAddressForChain } from './contracts'
+import { getBitcoinNetwork } from './bitcoinNetworks'
 
 // The five app-aligned regulatory categories (FR-004) plus the honest
 // `unclassified` fallback (FR-012). Order is display order.
@@ -103,11 +104,13 @@ const BASELINE_SET = new Set(SEC_COMMODITY_BASELINE)
  * is the canonical mainnet whose NATIVE coin the symbol is — a native
  * instance on that chain renders its logo without a network badge (FR-026);
  * every other instance (wrapped, bridged, testnet) carries the hosting
- * network's badge.
+ * network's badge. `homeNetwork` is the non-EVM equivalent (spec 061): a
+ * string id from bitcoinNetworks.js for underlyings whose home chain is not
+ * an EVM network.
  */
 export const UNDERLYING_META = {
   ETH: { name: 'Ethereum', homeChainId: 1 },
-  BTC: { name: 'Bitcoin', homeChainId: null },
+  BTC: { name: 'Bitcoin', homeChainId: null, homeNetwork: 'bitcoin' },
   MATIC: { name: 'Polygon', homeChainId: 137 },
   POL: { name: 'Polygon', homeChainId: 137 },
   ETC: { name: 'Ethereum Classic', homeChainId: 61 },
@@ -127,6 +130,9 @@ export const UNDERLYING_META = {
   MORPHO: { name: 'Morpho', homeChainId: null },
   PYUSD: { name: 'PayPal USD', homeChainId: null },
   FIDD: { name: 'Fidelity Digital Dollar', homeChainId: null },
+  // Staking derivatives (spec 065). Liquid staking tokens held as positions.
+  WSTETH: { name: 'Lido Wrapped Staked ETH', homeChainId: 1 },
+  SPOL: { name: 'Polygon Staked POL', homeChainId: 1 },
 }
 
 export function getUnderlyingMeta(symbol) {
@@ -150,6 +156,33 @@ const CURATED_REGISTRY = {
       decimals: 18,
       categoryId: 'digital-commodities',
       baselineSymbol: 'ETH',
+    },
+    {
+      // Lido wstETH (spec 065) — the liquid staking token members hold after
+      // staking ETH via Lido. Value-accruing yield derivative.
+      address: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
+      symbol: 'wstETH',
+      name: 'Lido Wrapped Staked ETH',
+      decimals: 18,
+      categoryId: 'digital-securities',
+    },
+    {
+      // Polygon sPOL (spec 065) — Polygon's official native liquid staking
+      // token, minted on L1 after staking POL. Value-accruing.
+      address: '0x3B790d651e950497c7723D47B24E6f61534f7969',
+      symbol: 'sPOL',
+      name: 'Polygon Staked POL',
+      decimals: 18,
+      categoryId: 'digital-securities',
+    },
+    {
+      // POL on Ethereum L1 (spec 065) — the staking token for Polygon
+      // delegation and sPOL. Verify against VITE_POL_TOKEN_L1 at build time.
+      address: '0x455e53CBB86018Ac2B8092FdCd39d8444aFFC3F6',
+      symbol: 'POL',
+      name: 'Polygon',
+      decimals: 18,
+      categoryId: 'digital-commodities',
     },
     {
       // Tether USD on Ethereum mainnet — transactional stablecoin by known issuer
@@ -461,4 +494,33 @@ export function getPortfolioRegistry(chainId) {
   }
 
   return Array.from(byId.values())
+}
+
+/**
+ * Native-Bitcoin portfolio asset for a non-EVM bitcoin network (spec 061,
+ * FR-008). Not part of getPortfolioRegistry — that registry is keyed by EVM
+ * chainId and scanned via RPC; the bitcoin balance source in usePortfolio
+ * feeds this descriptor instead. It aggregates with WBTC under the single
+ * `BTC` underlying via the existing baseline roll-up, and prices through the
+ * already-configured BTC/USD feeds (priceFeeds.js, key `BTC`).
+ *
+ * Returns null for non-bitcoin ids (soft-fail, mirrors getPortfolioRegistry's
+ * empty-registry behavior for unknown chains).
+ */
+export function getBitcoinPortfolioAsset(networkId) {
+  const net = getBitcoinNetwork(networkId)
+  if (!net) return null
+  return {
+    id: 'btc-native',
+    // String network id in the chainId slot — consumers on the bitcoin path
+    // are guarded by isBitcoinNetworkId and never pass this to EVM code.
+    chainId: net.id,
+    kind: 'native',
+    symbol: 'BTC',
+    name: net.isTestnet ? 'Bitcoin (Testnet)' : 'Bitcoin',
+    decimals: 8,
+    categoryId: 'digital-commodities',
+    source: 'sec-baseline',
+    baselineSymbol: 'BTC',
+  }
 }

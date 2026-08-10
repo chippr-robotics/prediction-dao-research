@@ -10,6 +10,8 @@
 
 import { getContractAddressForChain } from './contracts'
 import { getNetwork } from './networks'
+import { isBitcoinNetworkId } from './bitcoinNetworks'
+import { isPasskeySupported } from './passkeySupport'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
@@ -70,6 +72,15 @@ export const NETWORK_FEATURES = [
     deployed: (chainId) => Boolean(getNetwork(chainId)?.capabilities?.dex),
   },
   {
+    key: 'passkeyAccounts',
+    label: 'Passkey Accounts',
+    description: 'Sign in and transact with a passkey instead of a browser wallet.',
+    // Both halves, via the shared gate: a bundler to relay the UserOp AND a deployed account
+    // factory. Reporting the network-config flag alone would tag a chain "deployed" on the
+    // strength of an env var (spec 041 FR-004).
+    deployed: (chainId) => isPasskeySupported(chainId),
+  },
+  {
     key: 'clearpath',
     label: 'ClearPath DAOs',
     description: 'Discover, track, and act on governance DAOs (OpenZeppelin Governor, Governor Bravo).',
@@ -84,11 +95,17 @@ export const NETWORK_FEATURES = [
  * @returns {{ key: string, label: string, description: string, deployed: boolean }[]}
  */
 export function getNetworkFeatures(chainId) {
+  // Boundary type guard (spec 061, network-registry rule 1): non-EVM string
+  // ids must never flow into getContractAddressForChain / getNetwork, whose
+  // fallback would dishonestly report the DEFAULT network's capabilities.
+  // Bitcoin surfaces read BITCOIN_NETWORKS.capabilities instead; here every
+  // EVM protocol feature is truthfully undeployed.
+  const isBitcoin = isBitcoinNetworkId(chainId)
   return NETWORK_FEATURES.map(({ key, label, description, deployed }) => ({
     key,
     label,
     description,
-    deployed: deployed(chainId),
+    deployed: isBitcoin ? false : deployed(chainId),
   }))
 }
 

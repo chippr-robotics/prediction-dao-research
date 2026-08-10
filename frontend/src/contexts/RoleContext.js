@@ -21,6 +21,9 @@ export const ROLES = {
   ACCOUNT_MODERATOR: 'ACCOUNT_MODERATOR',  // ACCOUNT_MODERATOR_ROLE — freeze
   ROLE_MANAGER: 'ROLE_MANAGER',            // ROLE_MANAGER_ROLE — grant/revoke memberships
   SANCTIONS_ADMIN: 'SANCTIONS_ADMIN',      // SANCTIONS_ADMIN_ROLE — deny-list (on SanctionsGuard)
+  FEE_ADMIN: 'FEE_ADMIN',                  // FEE_ADMIN_ROLE — platform-fee rates (on FeeRouter, spec 060)
+  STAKING_ADMIN: 'STAKING_ADMIN',          // STAKING_ADMIN_ROLE — staking provider addrs + validator allowlist (on StakingRouter, spec 066)
+  LIQUIDITY_ADMIN: 'LIQUIDITY_ADMIN',      // LIQUIDITY_ADMIN_ROLE — bridge routes + curated pools (on BOTH BridgeRouter and LiquidityRouter, spec 067)
 }
 
 export const ROLE_INFO = {
@@ -60,6 +63,24 @@ export const ROLE_INFO = {
     premium: false,
     isAdminRole: true
   },
+  [ROLES.FEE_ADMIN]: {
+    name: 'Fee Administrator',
+    description: 'Set platform-fee rates (within their hard caps) on the FeeRouter — wrapper services and the Polymarket builder fee',
+    premium: false,
+    isAdminRole: true
+  },
+  [ROLES.STAKING_ADMIN]: {
+    name: 'Staking Administrator',
+    description: 'Manage staking provider addresses and the curated validator allowlist on the StakingRouter (the fee rate is set by the Fee Administrator)',
+    premium: false,
+    isAdminRole: true
+  },
+  [ROLES.LIQUIDITY_ADMIN]: {
+    name: 'Liquidity Administrator',
+    description: 'Curate bridge routes and the supplied pool list, and set their limits and addresses, on the BridgeRouter and LiquidityRouter (the fee rate is set by the Fee Administrator)',
+    premium: false,
+    isAdminRole: true
+  },
 }
 
 /**
@@ -72,6 +93,9 @@ export const ADMIN_ROLES = [
   ROLES.ACCOUNT_MODERATOR,
   ROLES.ROLE_MANAGER,
   ROLES.SANCTIONS_ADMIN,
+  ROLES.FEE_ADMIN,
+  ROLES.STAKING_ADMIN,
+  ROLES.LIQUIDITY_ADMIN,
 ]
 
 export function isAdminRole(role) {

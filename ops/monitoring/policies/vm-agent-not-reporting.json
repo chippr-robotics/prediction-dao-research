@@ -1,0 +1,35 @@
+{
+  "displayName": "FairWins \u2014 Ops Agent not reporting (memory/disk alerts are blind)",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "The Ops Agent stopped sending metrics from a FairWins VM.\n\n### Why this policy exists\nThe memory and disk policies depend entirely on `agent.googleapis.com/*`. If the agent dies, those policies do not fail \u2014 they go **silent**, which is indistinguishable from health. This policy is the guard against that: it makes the loss of monitoring itself an alert.\n\nIt is a metric-absence condition on `agent.googleapis.com/agent/uptime`, so it fires when the agent stops, is uninstalled, loses its `roles/monitoring.metricWriter` grant, or the VM dies. (When the VM dies you will get this *and* `VM down` \u2014 that is intentional redundancy, not noise; the VM-down policy is hypervisor-sourced and is the authoritative one.)\n\n### Triage\n```\ngcloud compute ssh <vm> --zone=us-central1-a --tunnel-through-iap \\\n  --command 'sudo systemctl status google-cloud-ops-agent --no-pager; sudo journalctl -u google-cloud-ops-agent -n 50 --no-pager'\n```\nIf the agent is running but not shipping, check the VM service account still holds `roles/monitoring.metricWriter`. Note the two VMs run as **different** service accounts by design (`266380754692-compute@` for the bundler, `fairwins-relay-engine@` for the gateway) \u2014 a grant fixed on one is not fixed on the other."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Ops Agent metrics absent for 10m",
+      "conditionAbsent": {
+        "filter": "metric.type=\"agent.googleapis.com/agent/uptime\" AND resource.type=\"gce_instance\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_MEAN",
+            "groupByFields": [
+              "resource.label.instance_id"
+            ]
+          }
+        ],
+        "duration": "600s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "604800s"
+  },
+  "severity": "WARNING",
+  "enabled": true
+}

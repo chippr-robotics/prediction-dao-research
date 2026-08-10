@@ -6,9 +6,120 @@
 }
 
 .account-feed-title {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 1rem;
   color: var(--text-primary);
+}
+
+/* Header row: title left, on-demand tools (search / filter) right. */
+.account-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.account-feed-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Icon tool buttons — sized explicitly (two-class selector) so App.css's
+   mobile tap-target rule pads them consistently rather than unpredictably. */
+.account-feed-tools .account-feed-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full, 9999px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.account-feed-tools .account-feed-tool.active {
+  border-color: var(--brand-secondary, #4c9aff);
+  color: var(--brand-secondary, #4c9aff);
+}
+
+.account-feed-tool-badge {
+  font-weight: 600;
+}
+
+.account-feed-filter-wrap {
+  position: relative;
+}
+
+.account-feed-filter-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 160px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+.account-feed-filter-menu .account-feed-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-feed-filter-menu .account-feed-filter-option:hover {
+  background: var(--bg-primary, #f7f9fa);
+}
+
+.account-feed-filter-menu .account-feed-filter-option.active {
+  color: var(--brand-secondary, #4c9aff);
+  font-weight: 600;
+}
+
+.account-feed-filter-check {
+  display: inline-flex;
+  width: 16px;
+  justify-content: center;
+}
+
+.account-feed-search {
+  margin: 0 0 10px;
+}
+
+.account-feed-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  font-size: 0.9rem;
+}
+
+.account-feed-search-input:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 1px;
 }
 
 .account-feed-list {
@@ -17,6 +128,33 @@
   padding: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* Each day/week bucket is its own <ul> under an <h4> (see the component: headers must not be
+   direct children of a list). Inherits the flat column look the single list had. */
+.account-feed-group-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Date-group header (spec 074 follow-up, default "by day"): deliberately
+   understated — small, muted, uppercase — with extra breathing room above it
+   so a new bucket reads as a soft line break rather than a loud section. */
+.account-feed-group-header {
+  padding: 14px 2px 4px;
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.account-feed-group-header:first-child {
+  padding-top: 0;
 }
 
 .account-feed-row {
@@ -94,29 +232,6 @@
 }
 
 /* --- spec 051: unified ledger feed --- */
-
-.account-feed-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0 0 10px;
-}
-
-.account-feed-filter {
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--text-secondary);
-  border-radius: var(--radius-full, 9999px);
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.account-feed-filter.active {
-  background: var(--brand-secondary, #4C9AFF);
-  border-color: var(--brand-secondary, #4C9AFF);
-  color: #fff;
-}
 
 .account-feed-icon.tone-failed {
   background: rgba(229, 83, 61, 0.18);

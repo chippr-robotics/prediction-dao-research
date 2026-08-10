@@ -1,5 +1,5 @@
 /**
- * Honest-availability tests for /v1/onramp/* (spec 060 US2): config-off fail-closed states,
+ * Honest-availability tests for /v1/onramp/* (spec 081 US2): config-off fail-closed states,
  * dynamic catalog gating, and live re-validation at mint time.
  */
 import { describe, it, expect } from 'vitest'

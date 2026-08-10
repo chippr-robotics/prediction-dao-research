@@ -199,26 +199,10 @@ export const WagerSortKey = {
   STATUS: 'status',
 }
 
-// ── My Wagers card-grid density (spec 017) ──────────────────────────
-// Controls how much each collapsed wager card shows. Compact is the default;
-// Comfortable adds an opponent/time preview line. Session-scoped (sessionStorage)
-// so it survives reopening the modal within a session but does not persist
-// long-term.
-export const MyWagersDensity = {
-  COMPACT: 'compact',
-  COMFORTABLE: 'comfortable',
-}
-
-export const MY_WAGERS_DENSITY_KEY = 'fairwins.myWagers.density'
-
-// ── My Wagers view mode (spec 018) ──────────────────────────────────
-// Grid = expandable cards (default); Table = compact rows. Session-scoped.
-export const MyWagersView = {
-  GRID: 'grid',
-  TABLE: 'table',
-}
-
-export const MY_WAGERS_VIEW_KEY = 'fairwins.myWagers.view'
+// My Wagers has ONE list view — the table (WagerTable), at every viewport. The
+// spec 017 card-grid density and the spec 018/019 grid↔table view mode are gone
+// with the grid itself: a collapsed card hid its actions, so a phone user had to
+// rotate to landscape to reach the resolution flow.
 
 // Terminal statuses — wagers in these states are considered "history"
 export const TERMINAL_STATUSES = new Set([

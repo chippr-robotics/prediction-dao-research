@@ -3,6 +3,8 @@ import { ethers } from 'ethers'
 import { useAccount } from 'wagmi'
 import { useWeb3 } from './useWeb3'
 import { getContractAddressForChain } from '../config/contracts'
+import { membershipChainId } from '../config/networks'
+import { getReadProvider } from '../utils/rpcProvider'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 
 /**
@@ -53,6 +55,9 @@ function emptyDetails(roleName) {
     isExpired: false,
     daysRemaining: null,
     hasRole: false,
+    // FR-004: `readable: false` means the reference chain would not answer, so tier 0 here is
+    // UNKNOWN rather than "no membership". Consumers must not render the two the same way.
+    readable: true,
     wagersCreated: 0,
     wagerLimit: 0,
     canCreateWager: false,
@@ -73,14 +78,21 @@ export function useRoleDetails() {
     const roleBytes = ROLE_BYTES32[roleName]
     if (!roleBytes) return null
 
-    // Resolve the MembershipManager for the wallet's connected chain so a
-    // membership held on one network is not read on another (the address used to
-    // be build-bound while the provider was the wallet's — a chain mismatch).
-    const managerAddr = getContractAddressForChain('membershipManager', chainId)
+    // ── MEMBERSHIP READS THE REFERENCE CHAIN (spec 071 FR-003) ────────────────────────────
+    // This used to resolve against the wallet's connected chain, which is why a member
+    // connected anywhere other than the reference chain saw tier None with no expiry: on
+    // mainnet the MembershipManager exists on Polygon and nowhere else, so the lookup found
+    // no contract and returned an empty membership. Both the address AND the provider now
+    // come from the reference chain, so they cannot disagree.
+    const refChain = membershipChainId()
+    const managerAddr = getContractAddressForChain('membershipManager', refChain)
     if (!managerAddr) return emptyDetails(roleName)
+    const readProvider =
+      Number(refChain) === Number(chainId) && provider ? provider : getReadProvider(refChain)
+    if (!readProvider) return { ...emptyDetails(roleName), readable: false }
 
     try {
-      const mgr = new ethers.Contract(managerAddr, MEMBERSHIP_MANAGER_ABI, provider)
+      const mgr = new ethers.Contract(managerAddr, MEMBERSHIP_MANAGER_ABI, readProvider)
       const m = await mgr.getMembership(address, roleBytes)
       const details = emptyDetails(roleName)
 
@@ -119,8 +131,10 @@ export function useRoleDetails() {
 
       return details
     } catch (err) {
+      // Unknown, not "no membership" (FR-004). Returning a bare emptyDetails here told a member
+      // whose reference chain blipped that they owned nothing.
       console.error(`Error fetching ${roleName} details:`, err)
-      return emptyDetails(roleName)
+      return { ...emptyDetails(roleName), readable: false }
     }
   }, [address, provider, chainId])
 

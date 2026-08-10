@@ -25,6 +25,30 @@ function formatAmount(holding) {
   return formatAssetAmount(holding.balance, holding.asset.symbol, holding.asset.kind)
 }
 
+/**
+ * Bitcoin instance disclosures (spec 061, FR-009/FR-018): pending value is
+ * never presented as final, and Stamps-protected value explains why
+ * total ≠ spendable. Only rendered for holdings carrying `holding.bitcoin`
+ * (native BTC from the bitcoin balance source) — EVM instances are untouched.
+ */
+function bitcoinInstanceNotes(holding) {
+  const btc = holding.bitcoin
+  if (!btc) return []
+  const notes = []
+  if (btc.pendingSats) {
+    const sign = btc.pendingSats > 0 ? '+' : '−'
+    notes.push(`${sign}${formatAssetAmount(Math.abs(btc.pendingSats) / 1e8, 'BTC')} pending`)
+  }
+  if (btc.protectedSats > 0) {
+    notes.push(
+      `${formatAssetAmount(btc.protectedSats / 1e8, 'BTC')} protected (${
+        btc.stampsDegraded ? 'Stamps check degraded — treated as protected' : 'Bitcoin Stamps'
+      })`,
+    )
+  }
+  return notes
+}
+
 // Action eligibility per instance — actions the app cannot perform render
 // disabled with a reason, never as dead buttons (constitution III).
 function actionsFor(instance) {
@@ -35,7 +59,13 @@ function actionsFor(instance) {
     {
       id: 'trade',
       label: 'Trade',
-      enabled: asset.kind !== 'nft' && Boolean(net?.dex),
+      // `capabilities.dex`, NOT the raw `net.dex` block. The raw block is only "this network has
+      // DEX addresses configured"; the capability additionally requires the network to be in
+      // SWAP_CHAIN_IDS, which is the FR-016a allow-list deciding where in-app swapping is actually
+      // offered. Reading the raw block bypasses that allow-list, so a network whose addresses are
+      // configured but which is deliberately not allow-listed would show an enabled Trade action
+      // leading to a surface that will not serve it.
+      enabled: asset.kind !== 'nft' && Boolean(net?.capabilities?.dex),
       reason: asset.kind === 'nft' ? 'Collectibles cannot be traded here' : 'No in-app trading on this network',
       to: `/wallet?tab=trade&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
@@ -43,7 +73,7 @@ function actionsFor(instance) {
       id: 'transfer',
       label: 'Transfer',
       enabled: asset.kind === 'native' || asset.categoryId === 'payment-stablecoins',
-      reason: 'Pay & Transfer supports native and stablecoin sends',
+      reason: 'Transfer supports native and stablecoin sends',
       to: `/wallet?tab=paytransfer&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
     {
@@ -60,11 +90,22 @@ function actionsFor(instance) {
       to: `/wallet?tab=earn&view=lend&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
     {
+      // Stake (spec 065): stake this asset through the Earn → Stake area.
+      // Enabled when the instance's network supports staking and the asset is
+      // stakeable there (ETH via Lido; POL via sPOL + Polygon delegation).
       id: 'stake',
       label: 'Stake',
-      enabled: false,
-      reason: 'Staking is not available in the app yet',
-      to: null,
+      enabled:
+        asset.kind !== 'nft' &&
+        Boolean(net?.staking) &&
+        ['ETH', 'POL'].includes((asset.symbol || '').toUpperCase()),
+      reason:
+        asset.kind === 'nft'
+          ? 'Collectibles cannot be staked'
+          : net?.staking
+            ? 'This asset cannot be staked yet'
+            : 'Staking is not available on this network',
+      to: `/wallet?tab=earn&view=stake&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
   ]
 }
@@ -179,6 +220,11 @@ export default function AssetDetailSheet({ aggregate, onClose }) {
                   <span className="asset-sheet-instance-meta">
                     {holding.network} · {SOURCE_LABELS[holding.asset.source] || holding.asset.source}
                   </span>
+                  {bitcoinInstanceNotes(holding).map((note) => (
+                    <span key={note} className="asset-sheet-instance-meta asset-sheet-instance-bitcoin">
+                      {note}
+                    </span>
+                  ))}
                 </span>
                 <span className="asset-sheet-instance-values">
                   <SensitiveValue className="asset-sheet-instance-balance">{formatAmount(holding)}</SensitiveValue>

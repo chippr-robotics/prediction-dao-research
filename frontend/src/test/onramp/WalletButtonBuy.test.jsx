@@ -1,5 +1,5 @@
 /**
- * Wallet-sheet Buy button gating (spec 060 US1/US2). The Buy action renders ONLY when the static
+ * Wallet-sheet Buy button gating (spec 081 US1/US2). The Buy action renders ONLY when the static
  * capability, the configured gateway, AND the live catalog all agree — everywhere else the sheet
  * is byte-identical to pre-feature (never a dead button). Uses the WalletButton.test.jsx provider
  * scaffolding; the REAL onrampAvailable runs (capability + env), only the catalog fetch is mocked.

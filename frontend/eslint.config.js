@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // 'dist' alone matches only the top-level build; each mini-app package emits its own
+  // (spec 073), and linting generated bundles reports errors nobody can fix at source.
+  globalIgnores(['dist', 'miniapps/*/dist']),
   {
     files: ['**/*.{js,jsx}'],
     ignores: ['cypress/**', 'src/test/**'],

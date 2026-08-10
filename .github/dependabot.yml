@@ -1,0 +1,107 @@
+# Dependency updates (spec 075, T092).
+#
+# Only possible now that there is ONE lockfile — previously four independent lockfiles plus two
+# unlocked units meant Dependabot could not see the tree as a whole. There is currently no
+# vulnerability gate anywhere in CI while `npm audit` reports findings on every install, so this is
+# the first automated pressure on that.
+#
+# NOTE the interaction with spec 075's exact-pinning rule: @openzeppelin/contracts,
+# @openzeppelin/contracts-upgradeable, @chainlink/contracts, @uma/core and
+# @safe-global/safe-contracts contribute SOLIDITY SOURCE, so a bump changes compiled bytecode.
+# Those PRs must be treated as contract changes: run the byte-diff gate
+# (scripts/codegen/bytecode-digest.js) and expect a NEW baseline to be recorded deliberately, not
+# incidentally. They are grouped separately so they are never mixed into a routine tooling bump.
+version: 2
+updates:
+  - package-ecosystem: npm
+    # Open updates against `staging`, not `main` (spec 076, FR-018).
+    #
+    # Since `staging` exists the promotion rule is ACTIVE, and it admits only `staging`,
+    # `hotfix/*` and generated release records into main — so a dependabot branch targeting main
+    # is unmergeable by construction. It would fail the same check on every run and go stale
+    # behind main while it waited.
+    #
+    # A dependency bump is an ordinary change: it reaches production by promotion, having first
+    # run on staging. That matters most for the group this repository can least take on faith —
+    # a solidity-sources bump alters compiled bytecode, which is exactly the kind of change that
+    # should not arrive on main without having run somewhere first.
+    target-branch: staging
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Bumping any of these changes deployed bytecode. Isolated so the diff is unmistakable.
+      solidity-sources:
+        patterns:
+          - "@openzeppelin/contracts"
+          - "@openzeppelin/contracts-upgradeable"
+          - "@chainlink/contracts"
+          - "@uma/core"
+          - "@safe-global/safe-contracts"
+      dev-tooling:
+        dependency-type: development
+        exclude-patterns:
+          - "@openzeppelin/*"
+          - "@chainlink/*"
+          - "@uma/*"
+          - "@safe-global/*"
+    ignore:
+      # Pinned deliberately: hardhat's internal evmVersion default is a build input (spec 075
+      # FR-001), so a major bump must be adopted with the byte-diff gate, not auto-merged.
+      - dependency-name: hardhat
+        update-types: ["version-update:semver-major"]
+
+      # The rest of the hardhat TOOLCHAIN, for the same reason. `hardhat` alone was ignored, but
+      # its plugins move in lockstep with it: Dependabot offered hardhat-toolbox ^6->^7,
+      # hardhat-ethers ^3->^4 and hardhat-ignition ^0.15->^3.1 in one grouped PR (#1047), which is
+      # a Hardhat 3 migration touching every test and deploy script — arriving as a routine
+      # "dev-tooling" bump. Ignoring only the root package let the migration in through the side
+      # door.
+      - dependency-name: "@nomicfoundation/*"
+        update-types: ["version-update:semver-major"]
+
+      # These two decide DEPLOYED PROXY BYTECODE, and no gate covers it. `upgrades.deployProxy`
+      # (scripts/deploy/lib/upgradeable.js) deploys the ERC1967Proxy artifact BUNDLED INSIDE the
+      # plugin — a different compile from anything in artifacts/contracts/**, which is all the
+      # byte-diff gate hashes. So a major bump here can silently change the CREATE2 address of a
+      # proxy this repo documents as living at a stable address. See #1039 (finding M4) and #1049.
+      - dependency-name: "@openzeppelin/hardhat-upgrades"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@openzeppelin/upgrades-core"
+        update-types: ["version-update:semver-major"]
+
+      # chai's ceiling is set by a hold we chose, not by chai. hardhat-chai-matchers@2 peers
+      # `chai@^4.2.0`, and that plugin is pinned to v2 by the @nomicfoundation/* rule above
+      # pending the Hardhat 3 migration (#1053). Dependabot offered chai 6 in the dev-tooling
+      # group (#1084) and the install FAILED outright with ERESOLVE — an unsatisfiable
+      # combination, not a lockfile artifact. Lift this together with #1053, not before.
+      - dependency-name: chai
+        update-types: ["version-update:semver-major"]
+
+      # `solc` is the COMPILER, not tooling, and it is exact-pinned for that reason.
+      # hardhat.config.js resolves solc/soljson.js and compiles WITH IT whenever FORCE_SOLCJS=true
+      # or in Codespaces (see the compiler subtask, ~line 190) — so its version decides deployed
+      # bytecode on that path. Dependabot moved the exact pin 0.8.24 -> 0.8.36 inside a "dev-tooling"
+      # group (#1084); the byte-diff gate did not catch it because the local run used the native
+      # binary, i.e. the fallback that would have changed bytes was simply not exercised. ANY
+      # update, not just major.
+      - dependency-name: solc
+
+  - package-ecosystem: github-actions
+    # Open updates against `staging`, not `main` (spec 076, FR-018).
+    #
+    # Since `staging` exists the promotion rule is ACTIVE, and it admits only `staging`,
+    # `hotfix/*` and generated release records into main — so a dependabot branch targeting main
+    # is unmergeable by construction. It would fail the same check on every run and go stale
+    # behind main while it waited.
+    #
+    # A dependency bump is an ordinary change: it reaches production by promotion, having first
+    # run on staging. That matters most for the group this repository can least take on faith —
+    # a solidity-sources bump alters compiled bytecode, which is exactly the kind of change that
+    # should not arrive on main without having run somewhere first.
+    target-branch: staging
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

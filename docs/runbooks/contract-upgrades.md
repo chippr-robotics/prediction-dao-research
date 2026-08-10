@@ -60,6 +60,27 @@ npm run verify:amoy                     # verifies the implementation; explorer 
 npm run sync:frontend-contracts:amoy    # frontend points at the PROXY address (stable)
 ```
 
+### Source verification reports a PARTIAL match — this is expected, not an incident
+
+Since spec 080 the compiler is configured with `metadata.bytecodeHash: "none"`, which keeps the
+source-file fingerprint out of the compiled bytes. That is deliberate: it is what stops a file move
+or a directory rename from silently relocating every CREATE2 address.
+
+The consequence lands here. A verifier that compares the *embedded provenance hash* — Sourcify's
+"perfect match", for instance — will report a **partial** match rather than an exact one, because
+there is no longer a fingerprint to compare. Verifiers that recompile from the declared compiler
+settings are unaffected, and both explorers this repo uses do that:
+
+| Verifier | Result |
+|---|---|
+| Etherscan / Blockscout (`npm run verify:<network>`, `scripts/deploy/verify.js`) | **verifies normally** — they replay the declared settings |
+| Sourcify-style provenance comparison | **partial match** — expected, not a failure |
+
+**Do not "fix" a partial match by re-enabling the metadata hash.** Doing so re-couples every
+deterministic address to the source tree layout, which is the defect spec 080 exists to remove. If a
+partial match is ever a hard requirement for a particular chain or listing, that is a decision to
+take deliberately with the address consequence understood.
+
 Validate on Amoy (see `specs/025-upgradeable-registry/quickstart.md` §5): run the full wager lifecycle
 against the proxy and confirm parity with the legacy registry; confirm the deployments record has
 `wagerRegistry` (proxy), `wagerRegistryImpl`, and the legacy address; confirm the frontend shows legacy

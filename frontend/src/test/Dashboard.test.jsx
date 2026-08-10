@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { useChainId } from 'wagmi'
 import Dashboard from '../components/fairwins/Dashboard'
 import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext, DexContext } from '../contexts'
 import { OPEN_RESOLUTION_TYPES } from '../hooks/useOpenChallengeCreate'
+
+/** Renders the live URL, so a test can assert what a component's own navigate() left behind. */
+function LocationProbe() {
+  const { pathname, search } = useLocation()
+  return <span data-testid="loc">{`${pathname}${search}`}</span>
+}
 
 // Stub the create modal to record the props each QuickActions card opens it with,
 // so we can assert the button → flow wiring (participant / oracle / all) without
@@ -257,14 +263,6 @@ describe('Dashboard Component', () => {
       expect(screen.getByText('Quick Actions')).toBeInTheDocument()
     })
 
-    it('should not show the demo mode badge by default', () => {
-      // The demo badge only renders when VITE_USE_MOCK_WAGERS=true (a dev-only
-      // env var). In production tests the toggle is gone, so the badge should
-      // be absent.
-      renderWithProviders(<Dashboard />)
-      expect(screen.queryByText('Demo Mode')).not.toBeInTheDocument()
-    })
-
     it('should not show redundant connected wallet subtitle', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByText(/Connected:/)).not.toBeInTheDocument()
@@ -336,6 +334,27 @@ describe('Dashboard Component', () => {
       const modal = screen.getByTestId('unified-modal')
       expect(modal).toHaveAttribute('data-phrase', 'river tiger kite zoo')
       expect(modal).toHaveAttribute('data-auto', 'true')
+    })
+
+    /*
+     * Consuming the code clears it from the URL — it is a secret, and leaving it there re-fires the
+     * effect and gets it bookmarked. It used to clear it by navigating to the bare pathname, which
+     * was safe only while this surface owned a whole route (`/wagers`). It renders inside
+     * `/wallet?tab=paytransfer&view=wagers` now (spec 073), where the query is what selects the
+     * section and the view: dropping it wholesale would land the member on the Account tab in the
+     * middle of accepting a challenge.
+     */
+    it('clears the code from the URL but keeps the params that decide where the member is', () => {
+      render(providers(
+        <><Dashboard /><LocationProbe /></>,
+        ['/wallet?tab=paytransfer&view=wagers&oc=take&code=river%20tiger%20kite%20zoo'],
+      ))
+      // Still consumed.
+      expect(screen.getByTestId('unified-modal')).toHaveAttribute('data-phrase', 'river tiger kite zoo')
+      // Secret gone, section intact.
+      const url = screen.getByTestId('loc').textContent
+      expect(url).toBe('/wallet?tab=paytransfer&view=wagers')
+      expect(url).not.toMatch(/code=/)
     })
   })
 

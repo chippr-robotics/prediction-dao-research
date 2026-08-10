@@ -1,5 +1,5 @@
 /**
- * chainId → Coinbase Onramp network slug (spec 060, research R4).
+ * chainId → Coinbase Onramp network slug (spec 081, research R4).
  *
  * Static layer of the two-layer availability gate: only mainnets that could plausibly be
  * onramped are mapped — testnets are honestly Buy-free by construction. The dynamic layer

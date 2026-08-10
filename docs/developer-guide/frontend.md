@@ -40,7 +40,7 @@ frontend/src/
 
 | Route | Page | Notes |
 |-------|------|-------|
-| `/` | LandingPage | public marketing page |
+| `/` | LandingRoute | public marketing page — forwards returning visitors to `/app` (see below) |
 | `/terms`, `/risk`, `/privacy` | LegalDocPage | versioned, hash-linked legal documents |
 | `/app` (aliases `/main`, `/fairwins`) | Dashboard | main workspace, inside `AppLayout` (Header + EntryGate + Footer) |
 | `/wallet` | WalletPage | Account Center: Account / Membership / Security / Preferences / Swap tabs |
@@ -48,12 +48,41 @@ frontend/src/
 | `/admin` | AdminPanel | the operations control plane, grouped by operator area; role-gated (Admin / Guardian / Account Moderator / Role Manager / Compliance Officer) — see `docs/runbooks/operations-control-plane.md` |
 | `*` | redirect to `/` | |
 
+### Getting to a connected account
+
+Nothing in the app works without a connected account, so the path to one is
+kept as short as it can honestly be:
+
+1. **`/` forwards returning visitors** (`components/LandingRoute.jsx`). Any
+   browser that has attached an account before — a recorded passkey, or a wagmi
+   `recentConnectorId` — and has acknowledged the entry gate goes straight to
+   `/app`. First-time visitors still get the marketing page. Escape hatches,
+   both remembered for the tab session: **Leave** on the entry gate, and
+   `/?stay=1`.
+2. **Entering the app prompts to unlock** (`components/wallet/AutoConnectPrompt.jsx`,
+   mounted in `AppLayout`). It opens the shared ConnectModal once, after the
+   eligibility gate is acknowledged and after wagmi's eager reconnect has
+   **settled** (`connectionStatus` on the wallet context) — a restored session
+   is never interrupted, and a deliberate sign-out is never undone by a
+   re-prompt. Dismissing it leaves the member disconnected with the header and
+   in-panel Connect buttons intact.
+3. **The dialog opens where the member can act** (`components/wallet/ConnectModal.jsx`).
+   When this browser already knows a usable passkey it opens on the account
+   chooser — unlock in one tap instead of methods → Passkey → chooser. The
+   choice itself is unchanged (issue #849: the app never guesses which account),
+   and *More sign-in options* reaches every connector. A browser with no
+   recorded passkey still opens on the methods list.
+
+Spec 045 FR-001 still holds throughout: these surfaces *open* the one shared
+ConnectModal, they never render connector choices of their own.
+
 ## Getting started
 
 ```bash
 npm run frontend           # dev server, from the repo root
 # or
-cd frontend && npm install && npm run dev
+npm install          # root install covers every workspace (spec 075)
+npm run frontend     # == npm run dev --workspace frontend
 ```
 
 ## Contract configuration
@@ -118,6 +147,30 @@ wager grid stays direct-from-chain so a subgraph outage degrades gracefully.
 counterparty public keys in `KeyRegistry`, and envelope-encrypts wager terms
 before pinning to IPFS. Decryption is lazy — triggered when the user opens a
 wager's details. See [Encryption Architecture](encryption-architecture.md).
+
+### Settings surfaces: collapsed sections + sheets
+
+The **Recovery** tab (`?tab=security`) hosts several independent, high-stakes
+features (data backup, controllers, wallet-based recovery, legacy keys, the
+encryption key, recovery codes). Each panel renders itself as an
+`AccordionSection` inside the tab's `AccordionGroup`
+(`components/account/AccordionSection.jsx`, `AccordionGroup.jsx`):
+
+- **Collapsed by default**, with a one-line `summary` of the panel's current
+  state and an optional `badge` when it needs attention — the tab opens as a
+  scannable list, not a wall of controls.
+- **One section open at a time** (`exclusive`, the group default). Group state
+  is in memory, so returning to the tab always starts tidy.
+- Children stay **mounted** while collapsed (that is what the
+  `grid-template-rows: 0fr → 1fr` animation needs) but the region is `inert`, so
+  nothing inside is focusable or announced until it opens.
+- Panels keep their own `return null` gating: wrap the accordion **inside** the
+  panel, and render `ActionSheet`s as **siblings** of the section, never inside
+  the collapsible region (an inert ancestor would disable the sheet).
+- Consequential or destructive actions — restore, remove a backup, link a
+  wallet, remove a controller, delete a recovered key — confirm in an
+  `ActionSheet` (centered card on desktop, bottom sheet on mobile) that states
+  the consequence first.
 
 ### Network handling
 

@@ -1,0 +1,85 @@
+# infra/vm/bundler/docker-compose.yml — the alto ERC-4337 bundler + origin-lock nginx on GCE.
+#
+# NETWORK MODEL: nginx joins alto's network namespace (`network_mode: "service:alto"`), reproducing
+# Cloud Run's sidecar namespace exactly. Consequence you must NOT "fix": the nginx image bakes
+# `upstream 127.0.0.1:3000` (services/alto-bundler/nginx/bundler.conf.template) and that is CORRECT
+# here. Rewriting it for a bridge network would be a needless image rebuild.
+#
+# Only the namespace OWNER (alto) may declare `ports:`, and it publishes to LOOPBACK ONLY — the host
+# nginx terminates TLS on :443 and proxies to 127.0.0.1:8080. Nothing binds a VPC-reachable interface.
+#
+# Recreating alto invalidates nginx's namespace. ALWAYS act on the whole project
+# (`systemctl restart fairwins-stack@bundler`), never `docker restart` a single container.
+#
+# Resource limits mirror the right-sized Cloud Run values (PR #1000) so an e2-small cannot be starved
+# by a leak in either container. Measured 30d p99 for the whole instance was 0.358 vCPU / 0.261 GiB.
+name: fairwins-bundler
+
+services:
+  # ---- namespace owner: alto (localhost-only; the host nginx is the only route in) ----
+  alto:
+    container_name: fairwins-bundler-alto
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto:v1.2.7
+    restart: unless-stopped
+    pull_policy: missing          # boot must not depend on the registry being reachable
+    ports:
+      - "127.0.0.1:8080:8080"     # host nginx -> nginx sidecar (which proxies to :3000 in-namespace)
+    env_file:
+      - /run/fairwins/alto.env    # ALTO_EXECUTOR_PRIVATE_KEYS + ALTO_UTILITY_PRIVATE_KEY ONLY
+    environment:
+      ALTO_ENTRYPOINTS: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"   # EntryPoint v0.6
+      ALTO_RPC_URL: "https://rpc-mainnet.matic.quiknode.pro"
+      ALTO_SAFE_MODE: "false"
+      ALTO_PORT: "3000"
+      ALTO_API_VERSION: "v1,v2"
+      ALTO_NETWORK_NAME: "polygon"
+      # MUST stay "true" on Polygon (verified 2026-07-12). With false, alto v1.2.7's filterOps
+      # references a simulations contract that isn't deployed and throws a swallowed error BEFORE any
+      # broadcast — ops validate but the executor never sends, its nonce freezes, every UserOp times
+      # out. Do NOT set false.
+      ALTO_DEPLOY_SIMULATIONS_CONTRACT: "true"
+      # Polygon public RPCs report a stale ~25-30 gwei priority fee under congestion (real p50 has hit
+      # 110-135), so alto underprices bundles. These lift the suggestion so bundles land during spikes.
+      ALTO_GAS_PRICE_MULTIPLIERS: "400,500,600"
+      # Cuts alto's log volume, which was measured at 1,025 MB/mo — 75% of the entire project's log
+      # ingest — at 13 req/day, because the default level pretty-prints raw EVM bytecode one line per
+      # token. That verbosity also burns the CPU this VM is sized against.
+      ALTO_LOG_LEVEL: "info"
+    cpus: 0.85
+    mem_limit: 896m
+    healthcheck:
+      # alto binds its listener only AFTER a successful eth_chainId round trip (measured 8.79s boot),
+      # so a TCP check would pass before it can serve. This asserts the real JSON-RPC surface.
+      # NOTE: /healthz on the nginx sidecar is a static `return 200` that never touches alto
+      # (bundler.conf.template:52-55) — it must never be used as a bundler healthcheck.
+      test: ["CMD-SHELL", "wget -qO- --post-data='{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_supportedEntryPoints\",\"params\":[]}' --header='Content-Type: application/json' http://127.0.0.1:3000 | grep -q 0x5FF137D4 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s           # >> the measured 8.79s boot, with headroom for a slow RPC
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ---- origin-lock nginx, INSIDE alto's namespace ----
+  nginx:
+    container_name: fairwins-bundler-nginx
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto-bundler-nginx:latest
+    restart: unless-stopped
+    pull_policy: missing
+    network_mode: "service:alto"  # shares alto's namespace => `upstream 127.0.0.1:3000` is correct
+    depends_on:
+      alto:
+        condition: service_started
+    env_file:
+      - /run/fairwins/nginx.env   # ORIGIN_LOCK_SECRET ONLY — never the executor key
+    # The image's entrypoint renders the secret into /etc/nginx/conf.d/default.conf via envsubst.
+    # On Cloud Run that was an ephemeral container FS; here docker's writable layer is on the boot
+    # disk, so we mount the render target on tmpfs to keep it out of persistent storage.
+    tmpfs:
+      - /etc/nginx/conf.d:rw,mode=0755
+    cpus: 0.15
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

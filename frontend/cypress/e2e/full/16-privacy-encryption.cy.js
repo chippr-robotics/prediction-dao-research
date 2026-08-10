@@ -31,9 +31,9 @@ const DESC = 'E2E private encrypted wager details'
 function connect(account) {
   cy.clearLocalStorage()
   cy.mockWeb3Provider({ account })
-  cy.visit('/fairwins')
+  cy.visitWagers()
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
 }
 
@@ -58,8 +58,8 @@ describe('Privacy & Encryption (E2E)', () => {
     connect(CREATOR)
     cy.openMyWagers('created')
     // Listed as private/encrypted (the cleartext description is not shown on-chain).
-    cy.contains('.wc-card', /private|encrypted/i, { timeout: 15000 }).should('exist')
-    cy.contains('.wc-card', DESC).should('not.exist')
+    cy.contains('.mm-table-row', /private|encrypted/i, { timeout: 15000 }).should('exist')
+    cy.contains('.mm-table-row', DESC).should('not.exist')
   })
 
   it('[PRV-02] the invited opponent sees public fields, but the private details stay encrypted', () => {
@@ -87,9 +87,12 @@ describe('Privacy & Encryption (E2E)', () => {
     cy.interceptIpfs()
     connect(CREATOR)
     cy.openMyWagers('created')
-    cy.contains('.wc-card', /private|encrypted/i, { timeout: 15000 }).first().click()
+    // The row carries an inline Decrypt control — no need to open the detail view
+    // first (My Wagers is one table view at every viewport).
+    cy.contains('.mm-table-row', /private|encrypted/i, { timeout: 15000 })
+      .first()
+      .within(() => cy.contains('button', /^decrypt$/i).click())
     // Asking to read the encrypted details fetches the stored blob from (mocked) IPFS.
-    cy.contains('button', /decrypt wager details/i, { timeout: 15000 }).click()
     cy.wait('@ipfsFetch', { timeout: 15000 }).its('response.statusCode').should('eq', 200)
   })
 

@@ -1,0 +1,323 @@
+/**
+ * Earn → Supply (spec 067, US2). Extends the Earn area's tokens rather than
+ * re-declaring them: the pool list must read as the same product as the Lend
+ * vault list, so shared pieces (.earn-btn, .earn-state, .earn-positions,
+ * .earn-freshness) keep coming from Earn.css and only the pool-row shape and
+ * its honest-state treatments live here.
+ *
+ * Two states carry visual weight on purpose:
+ *   .supply-row-closed    a pool not taking deposits. Outlined and muted,
+ *                         never hidden and never un-openable — it stays
+ *                         visible and withdrawable while a member's money is
+ *                         in it (FR-024).
+ *   .supply-estimate-flag every position figure is a live estimate, and says so
+ *                         beside the number rather than only in a tooltip
+ *                         (FR-020).
+ */
+
+.supply-view {
+  gap: 0.9rem;
+}
+
+/* --- availability + honest notes ------------------------------------------ */
+
+.supply-availability,
+.supply-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.supply-note {
+  border-left: 3px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  padding-left: 0.6rem;
+}
+
+/* --- pool list ------------------------------------------------------------ */
+
+.supply-pool-list,
+.supply-position-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* --- the scannable pool row ------------------------------------------------
+ *
+ * A dense two-line row: identity and size on the first line, everything that
+ * qualifies it on the second. The whole row is the control that opens the
+ * pool's sheet, so it is sized and spaced like the Lend vault row it sits
+ * beside. The left accent bar carries the pool KIND at a glance, and turns
+ * muted the moment the pool stops taking deposits.
+ */
+
+.supply-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  /* Longhand, not the `border-left` shorthand: an undefined brand token would make
+     the whole shorthand invalid and take the border with it, leaving a borderless
+     row. This way the accent can only lose its colour, never the row its edge. */
+  border-left-width: 3px;
+  border-left-color: var(--brand-primary, #36b37e);
+  border-radius: 10px;
+  background: var(--bg-secondary, transparent);
+  color: var(--text-primary, inherit);
+  text-align: left;
+  font: inherit;
+}
+
+button.supply-row {
+  cursor: pointer;
+}
+
+.supply-row.bridge {
+  border-left-color: var(--text-secondary);
+}
+
+button.supply-row:hover,
+button.supply-row:focus-visible {
+  border-color: var(--brand-primary);
+}
+
+/* Closed to new deposits — visibly different, still fully readable and still
+   openable, because the member's exit is inside the sheet it opens (FR-024). */
+.supply-row-closed {
+  border-style: dashed;
+  border-left-style: solid;
+  border-left-color: var(--text-secondary);
+  background: transparent;
+}
+
+.supply-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.supply-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.supply-row-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  flex: none;
+  max-width: 45%;
+  text-align: right;
+}
+
+/* One line per leg of the total. A pair's two amounts stack rather than wrapping
+   mid-figure, which would read as one broken number. */
+.supply-row-total-value {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.supply-row-total-label,
+.supply-row-facts {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.supply-row-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+.supply-row-facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+/* A figure we could not source, dimmed rather than dressed up as a number. */
+.supply-row-absent {
+  opacity: 0.75;
+}
+
+.supply-row-chip {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.supply-row-chip.trading {
+  color: var(--brand-primary);
+}
+
+.supply-row-chip.bridge,
+.supply-row-chip.position {
+  color: var(--text-secondary);
+}
+
+.supply-row-chip.closed {
+  color: var(--danger-color, #c0392b);
+}
+
+.supply-card-logos {
+  display: inline-flex;
+  flex: none;
+}
+
+/* A pair reads as one unit: the second glyph overlaps the first. */
+.supply-card-logos.pair > :nth-child(2) {
+  margin-left: -0.55rem;
+}
+
+.supply-kind-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid currentColor;
+}
+
+.supply-kind-badge.trading {
+  color: var(--brand-primary);
+}
+
+.supply-kind-badge.bridge {
+  color: var(--text-secondary);
+}
+
+.supply-kind-badge.closed {
+  color: var(--danger-color, #c0392b);
+}
+
+/* --- figures --------------------------------------------------------------
+ *
+ * Shared by the member's own positions and by the facts block at the head of a
+ * pool's sheet — the estimated return and the total the dense row is too tight
+ * to carry in full (FR-017). One shape, so the two read as one product.
+ */
+
+.supply-facts,
+.supply-position-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+}
+
+.supply-facts > div,
+.supply-position-figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 8rem;
+}
+
+.supply-facts dt,
+.supply-position-figures dt {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.supply-facts dd,
+.supply-position-figures dd {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-weight: 600;
+}
+
+/* Why a number is missing, in place of the number. Never an invented zero. */
+.supply-figure-note {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  max-width: 34rem;
+}
+
+.supply-estimate-flag {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.supply-estimate-legend {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+/* --- risk, state ---------------------------------------------------------- */
+
+.supply-card-risk,
+.supply-card-state {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.supply-card-state {
+  border-left: 3px solid var(--danger-color, #c0392b);
+  padding-left: 0.6rem;
+}
+
+/* --- positions ------------------------------------------------------------ */
+
+.supply-position {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 10px;
+}
+
+.supply-position-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.supply-position-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-weight: 600;
+  min-width: 0;
+}

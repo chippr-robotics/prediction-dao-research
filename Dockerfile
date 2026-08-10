@@ -2,19 +2,43 @@
 # Stage 1: Build the React application
 FROM node:22-alpine AS build
 
+# Build from the REPO ROOT, not frontend/ (spec 075). There is one root lockfile now, so
+# `COPY frontend/package*.json` matched only package.json and `npm ci` failed outright with
+# "can only install with an existing package-lock.json". Restoring a child lockfile is not the
+# fix either: frontend/package.json declares @fairwins/intent-types and @fairwins/miniapp-build,
+# which are `private: true` workspace packages that can never resolve from the registry.
+WORKDIR /app
+
+# Manifests first, so a source-only change does not invalidate the install layer.
+COPY package.json package-lock.json ./
+COPY frontend/package.json ./frontend/
+COPY packages/intent-types/package.json ./packages/intent-types/
+COPY tools/miniapp-build/package.json ./tools/miniapp-build/
+
+RUN npm ci --workspace frontend --include-workspace-root=false
+
+# The linked workspace SOURCES. `npm ci` writes a workspace link whether or not the target
+# directory exists — a missing one yields a DANGLING symlink and an install that looks clean,
+# which is exactly how the relay-gateway image built successfully and then crashed on boot.
+COPY packages/intent-types/ ./packages/intent-types/
+COPY tools/miniapp-build/ ./tools/miniapp-build/
+
+# Source + tenant manifests (spec 072 — the tenant-branding plugin resolves tenants/ as a
+# sibling of the frontend tree; the build fails loudly if the directory is missing).
+COPY frontend/ ./frontend/
+COPY tenants/ ./tenants/
+
 WORKDIR /app/frontend
-
-# Copy package files
-COPY frontend/package*.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy source code
-COPY frontend/ .
 
 # Build arguments for environment variables (baked into JS bundle at build time)
 # Note: VITE_PINATA_JWT is NOT included here - it's handled at runtime via nginx proxy
+# Tenant selection (spec 072): one image = one tenant. Unset => the default
+# (fairwins) tenant, byte-identical to the pre-072 build.
+# Build stamp for the nav drawer's version label (src/config/buildInfo.js). Passed as a build ARG
+# rather than derived: .dockerignore excludes .git, so the image build cannot run `git rev-parse`.
+# Unset resolves to 'dev', which the drawer displays honestly instead of hiding the label.
+ARG VITE_COMMIT_SHA
+ARG VITE_TENANT_ID
 ARG VITE_WALLETCONNECT_PROJECT_ID
 ARG VITE_APP_URL
 ARG VITE_NETWORK_ID
@@ -31,8 +55,16 @@ ARG VITE_BUNDLER_URLS_POLYGON
 # Sponsored-paymaster endpoint (spec 050): the relay-gateway's /v1/paymaster. Set => passkey UserOps
 # are gasless (FairWins sponsors gas); unset => the account self-funds and the UI discloses honestly.
 ARG VITE_SPONSOR_PAYMASTER_POLYGON
+# Release identity (spec 076, FR-029/FR-032). Baked in at build so the running app can name the
+# release it came from. VITE_APP_VERSION is the tag at the built commit, or empty when the commit
+# is not a published release — in which case the app reports `unreleased+<sha>` rather than the
+# nearest tag (FR-031). Never hardcode either value; both come from the build.
+ARG VITE_APP_VERSION
+ARG VITE_GIT_SHA
 
 # Set environment variables from build args
+ENV VITE_COMMIT_SHA=${VITE_COMMIT_SHA}
+ENV VITE_TENANT_ID=${VITE_TENANT_ID}
 ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
 ENV VITE_APP_URL=${VITE_APP_URL}
 ENV VITE_NETWORK_ID=${VITE_NETWORK_ID}
@@ -43,6 +75,8 @@ ENV VITE_WAGER_SOURCE=${VITE_WAGER_SOURCE}
 ENV VITE_RELAYER_URL=${VITE_RELAYER_URL}
 ENV VITE_BUNDLER_URLS_POLYGON=${VITE_BUNDLER_URLS_POLYGON}
 ENV VITE_SPONSOR_PAYMASTER_POLYGON=${VITE_SPONSOR_PAYMASTER_POLYGON}
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
+ENV VITE_GIT_SHA=${VITE_GIT_SHA}
 
 # Build the application
 RUN npm run build

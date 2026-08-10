@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Contract, formatUnits } from 'ethers'
 import { useWallet } from './useWalletManagement'
 import { makeReadProvider } from '../utils/rpcProvider'
+import { useEndpointsRevision } from './useRpcEndpoints'
 import { NETWORKS } from '../config/networks'
 import { getPortfolioRegistry } from '../config/assetTaxonomy'
 
@@ -25,10 +26,13 @@ export function useAccountAssets(accountAddress) {
     () => getPortfolioRegistry(numericChainId).filter((a) => a.kind === 'native' || a.kind === 'erc20'),
     [numericChainId],
   )
+  const endpointRevision = useEndpointsRevision()
+  // Rebuilt when the member repoints this network (spec 069).
   const provider = useMemo(() => {
     const net = NETWORKS[numericChainId]
     return net?.rpcUrl ? makeReadProvider(net.rpcUrl, numericChainId) : null
-  }, [numericChainId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericChainId, endpointRevision])
 
   const [holdings, setHoldings] = useState([])
 

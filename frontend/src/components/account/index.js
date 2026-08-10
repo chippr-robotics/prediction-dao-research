@@ -1,5 +1,6 @@
-/** Barrel for Account dashboard components (spec 020). */
-export { default as AccountDashboard } from './AccountDashboard'
+/** Barrel for Account dashboard components (spec 020; unified view spec 074). */
+export { default as MyAccountView } from './MyAccountView'
+export { default as AccountCardsCarousel } from './AccountCardsCarousel'
 export { default as SummaryTiles } from './SummaryTiles'
 export { default as PnlChart } from './PnlChart'
 export { default as ActivityBreakdowns } from './ActivityBreakdowns'

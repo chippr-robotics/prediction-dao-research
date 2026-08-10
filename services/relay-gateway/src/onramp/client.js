@@ -1,6 +1,6 @@
 /**
  * Coinbase Developer Platform (CDP) Onramp API client for the /v1/onramp/* buy-crypto proxy
- * (spec 060, research R2/R3).
+ * (spec 081, research R2/R3).
  *
  * Mirrors src/polymarket/client.js: thin fetch adapter with a bounded timeout, an injectable
  * fetchImpl for tests, retries on 5xx/transport for reads (`fetchBuyOptions`), and NO retry for

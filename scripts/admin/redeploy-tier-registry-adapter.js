@@ -1,5 +1,7 @@
 const { ethers } = require("hardhat");
 
+const { SALT_PREFIXES } = require("../deploy/lib/constants");
+
 /**
  * Redeploy TierRegistryAdapter with MARKET_MAKER_ROLE support
  *
@@ -52,7 +54,7 @@ async function main() {
   // Step 1: Deploy new TierRegistryAdapter
   console.log("\n[1/5] Deploying new TierRegistryAdapter...");
 
-  const salt = generateSalt("FairWinsDAO-v1.0-TierRegistryAdapter-v3-market-maker-role");
+  const salt = generateSalt(SALT_PREFIXES.CORE + "TierRegistryAdapter-v3-market-maker-role");
   const TierRegistryAdapter = await ethers.getContractFactory("TierRegistryAdapter");
   const deployTx = await TierRegistryAdapter.getDeployTransaction();
   const initCodeHash = ethers.keccak256(deployTx.data);

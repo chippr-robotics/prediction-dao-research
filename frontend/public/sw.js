@@ -10,6 +10,162 @@
 const CACHE_VERSION = 'fairwins-shell-v1'
 const OFFLINE_URLS = ['/', '/index.html', '/manifest.webmanifest']
 
+/* ------------------------------------------------------------------------- *
+ * Mini-app package cache (spec 073 T043, research R10)
+ *
+ * The one place this worker DOES cache aggressively, and it is safe for a
+ * reason the shell cache cannot claim: package URLs are CONTENT-ADDRESSED.
+ * `/ipfs/<cid>/<path>` names bytes by their own hash, so the bytes behind a
+ * given URL can never change. A new app version is a new CID, which is a new
+ * URL, which is a cache miss — the staleness risk that keeps the rest of this
+ * worker network-first simply does not exist here.
+ *
+ * THIS CACHE IS NOT A TRUST BOUNDARY. The loader re-verifies every byte it gets
+ * — manifest keccak against the on-chain hash, then per-file sha256 — AFTER the
+ * response is handed over, cached or not. So a poisoned or corrupted cache
+ * entry cannot execute; it fails the same integrity check a poisoned gateway
+ * response would (FR-011). Nor can the cache resurrect a suspended app: launch
+ * re-reads the registry first, and status is decided on-chain, never here
+ * (FR-010).
+ * ------------------------------------------------------------------------- */
+
+const MINIAPP_CACHE = 'fairwins-miniapp-packages-v1'
+
+/** Every cache this worker owns; anything else found at activate is swept. */
+const OWNED_CACHES = [CACHE_VERSION, MINIAPP_CACHE]
+
+/**
+ * Entry ceiling for the package cache.
+ *
+ * Packages are small (one ES module plus stylesheets) but the origin's storage
+ * budget is shared with the member's own data. A bound is not optional: without
+ * one, every version of every app the member ever launched accumulates forever,
+ * and the browser evicts the whole origin — including the member's ledger and
+ * address book — rather than the part that is disposable.
+ */
+const MINIAPP_CACHE_MAX_ENTRIES = 60
+
+/**
+ * Where the LRU index lives, inside the package cache itself.
+ *
+ * The Cache API records no access time and no insertion order, so eviction
+ * needs its own bookkeeping. An in-memory Map would be wrong: a service worker
+ * is terminated aggressively between events, so the index would reset to empty
+ * every few minutes and the cache would grow unbounded while believing it was
+ * empty. Keeping it in the cache means it survives exactly as long as the
+ * entries it describes.
+ *
+ * The host is `.invalid` (RFC 2606) so this synthetic key can never collide
+ * with a real gateway URL and can never be resolved on a network.
+ */
+const MINIAPP_INDEX_URL = 'https://miniapp-cache-index.fairwins.invalid/index.json'
+
+/** CIDv0 (`Qm…`, base58btc) or CIDv1 (`b…`, base32) — the two forms a gateway serves. */
+const CID_PATTERN = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,})$/
+
+/**
+ * Is this a mini-app package file?
+ *
+ * Classified by URL SHAPE — an `/ipfs/<cid>/<path>` path — rather than against a
+ * gateway allowlist, because the worker has no access to the app's build-time
+ * gateway configuration and a member may point the app at their own gateway
+ * (spec 069's bring-your-own-node principle). Shape is the honest test anyway:
+ * what makes cache-first safe is that the URL names its own content, and that
+ * is true of any gateway serving that path.
+ *
+ * A bare `/ipfs/<cid>` with no file path is NOT matched — the loader always
+ * requests a named file within the package, and a directory listing is not
+ * content whose immutability we can reason about.
+ */
+function isMiniAppPackageUrl(rawUrl) {
+  let url
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
+  const segments = url.pathname.split('/').filter(Boolean)
+  if (segments.length < 3 || segments[0] !== 'ipfs') return false
+  return CID_PATTERN.test(segments[1])
+}
+
+/**
+ * Move `url` to the head of the LRU index and report what that pushes out.
+ *
+ * Pure — no Cache API, no clock, no worker state — so the eviction policy can
+ * be tested directly (T044) instead of inferred from cache behaviour.
+ *
+ * @param {string[]} index - urls, most recently used FIRST
+ * @param {string} url
+ * @param {number} max
+ * @returns {{index: string[], evict: string[]}}
+ */
+function touchMiniAppIndex(index, url, max) {
+  const withoutUrl = (Array.isArray(index) ? index : []).filter(
+    (entry) => typeof entry === 'string' && entry !== url,
+  )
+  const next = [url, ...withoutUrl]
+  const limit = Math.max(1, max)
+  return { index: next.slice(0, limit), evict: next.slice(limit) }
+}
+
+/** Read the LRU index, tolerating a missing or damaged one (it is a hint, not data). */
+async function readMiniAppIndex(cache) {
+  try {
+    const stored = await cache.match(MINIAPP_INDEX_URL)
+    if (!stored) return []
+    const parsed = await stored.json()
+    return Array.isArray(parsed) ? parsed.filter((e) => typeof e === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/** Record a use of `url` and evict whatever that pushes past the ceiling. */
+async function recordMiniAppUse(cache, url) {
+  try {
+    const { index, evict } = touchMiniAppIndex(await readMiniAppIndex(cache), url, MINIAPP_CACHE_MAX_ENTRIES)
+    await Promise.all(evict.map((stale) => cache.delete(stale)))
+    await cache.put(
+      MINIAPP_INDEX_URL,
+      new Response(JSON.stringify(index), { headers: { 'Content-Type': 'application/json' } }),
+    )
+  } catch {
+    // Bookkeeping is best-effort. Failing to record a use must never fail the
+    // fetch that triggered it — the worst case is an over-large cache the
+    // browser will evict on its own terms.
+  }
+}
+
+/**
+ * Cache-first for one package file.
+ *
+ * On a miss the network response is cached only when it is a real, readable
+ * success: an `opaque` response has an unreadable body and an unknowable
+ * status, so storing one would occupy the budget with bytes nothing can use.
+ * A failed revalidation falls back to the cached copy — the bytes are still
+ * verified downstream, so serving them offline is safe.
+ */
+async function serveMiniAppPackage(request) {
+  const cache = await caches.open(MINIAPP_CACHE)
+  const cached = await cache.match(request)
+  if (cached) {
+    await recordMiniAppUse(cache, request.url)
+    return cached
+  }
+  const response = await fetch(request)
+  if (response && response.ok && response.type !== 'opaque') {
+    try {
+      await cache.put(request, response.clone())
+      await recordMiniAppUse(cache, request.url)
+    } catch {
+      // Quota or a non-storable response — serve it anyway.
+    }
+  }
+  return response
+}
+
 self.addEventListener('install', (event) => {
   // NOTE: we deliberately do NOT call skipWaiting() here. On a fresh install there is
   // no controlling worker, so the new worker activates immediately anyway. On an UPDATE
@@ -33,7 +189,11 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      // Sweep caches this worker no longer owns. The package cache MUST be in
+      // OWNED_CACHES: it is not versioned with the shell (its entries are
+      // immutable and outlive a deploy), so a bare `k !== CACHE_VERSION` filter
+      // would silently delete every cached package on every activation.
+      .then((keys) => Promise.all(keys.filter((k) => !OWNED_CACHES.includes(k)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   )
 })
@@ -87,6 +247,15 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   // Only handle GET navigations for the offline fallback; everything else is network-only.
   if (request.method !== 'GET') return
+
+  // Mini-app package files are content-addressed and therefore cache-first
+  // (spec 073 T043). Checked before the navigation branch because a package URL
+  // is never a navigation, and before the network-only default because this is
+  // the one class of request where a cached copy cannot be stale.
+  if (isMiniAppPackageUrl(request.url)) {
+    event.respondWith(serveMiniAppPackage(request))
+    return
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith(

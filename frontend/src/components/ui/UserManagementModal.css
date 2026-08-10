@@ -314,14 +314,17 @@
   background: var(--danger-color-hover, #b91c1c);
 }
 
-/* Demo Mode Section */
-.demo-mode-section {
+/* Network toggle (Testnet/Mainnet) */
+/* Renamed from .demo-mode-* : this block styles the live Testnet/Mainnet switcher, not demo
+   mode. The old names were a leftover, and once demo mode was removed they would have read as
+   dead code to the next person cleaning up — deleting them breaks network switching. */
+.network-toggle-section {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.toggle-demo-btn {
+.toggle-network-btn {
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
@@ -334,11 +337,11 @@
   align-self: flex-start;
 }
 
-.toggle-demo-btn:hover {
+.toggle-network-btn:hover {
   background: var(--primary-button-hover, #2F9E6E);
 }
 
-.demo-mode-description {
+.network-toggle-description {
   margin: 0;
   font-size: 14px;
   color: var(--color-text-secondary);

@@ -6,6 +6,13 @@ vi.mock('../../../hooks/useOpenChallengeAccept', () => ({
   useOpenChallengeAccept: () => ({ accept, busy: false, lookup: vi.fn(), discover: vi.fn(), error: null }),
 }))
 
+// Recovery-code vault: control saveCode/canUse so we can assert the taker's code is auto-saved.
+const saveCode = vi.fn().mockResolvedValue(undefined)
+let vaultCanUse = true
+vi.mock('../../../hooks/useOpenChallengeCodeVault', () => ({
+  useOpenChallengeCodeVault: () => ({ saveCode, canUse: vaultCanUse }),
+}))
+
 import TakeChallengePanel from '../TakeChallengePanel'
 import { UIContext } from '../../../contexts/UIContext'
 import { WalletContext } from '../../../contexts/WalletContext'
@@ -20,7 +27,12 @@ function renderPanel(ui, wallet = connectedWallet) {
 }
 
 describe('TakeChallengePanel (spec 037, US1)', () => {
-  beforeEach(() => { accept.mockReset(); connectedWallet.openConnectModal.mockReset() })
+  beforeEach(() => {
+    accept.mockReset()
+    connectedWallet.openConnectModal.mockReset()
+    saveCode.mockReset().mockResolvedValue(undefined)
+    vaultCanUse = true
+  })
 
   it('shows terms + funding steps and accepts (onProgress passed through)', async () => {
     accept.mockResolvedValue({ txHash: '0xdef' })
@@ -86,6 +98,28 @@ describe('TakeChallengePanel (spec 037, US1)', () => {
     renderPanel(<TakeChallengePanel code="river tiger kite zoo" match={matchOpen} onClose={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: /lock in/i }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no longer open/i))
+  })
+
+  it('auto-saves the code to the recovery vault on accept so re-reads are transparent', async () => {
+    accept.mockResolvedValue({ txHash: '0xdef' })
+    renderPanel(<TakeChallengePanel code="river tiger kite zoo" match={matchOpen} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /lock in/i }))
+    await waitFor(() => expect(saveCode).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'river tiger kite zoo', wagerId: '4', description: 'Will it snow?' })
+    ))
+    // Success copy reflects the transparent save (no "keep your code" burden).
+    expect(await screen.findByText(/re-read the private terms anytime from My Wagers, no code needed/i)).toBeInTheDocument()
+  })
+
+  it('still completes the take when the vault is unavailable (save is best-effort)', async () => {
+    accept.mockResolvedValue({ txHash: '0xdef' })
+    vaultCanUse = false
+    renderPanel(<TakeChallengePanel code="river tiger kite zoo" match={matchOpen} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /lock in/i }))
+    expect(await screen.findByText(/taken the challenge/i)).toBeInTheDocument()
+    expect(saveCode).not.toHaveBeenCalled()
+    // Falls back to the "keep your code" guidance rather than falsely claiming it was saved.
+    expect(screen.getByText(/keep your code to re-read the private terms/i)).toBeInTheDocument()
   })
 
   it('routes a success toast into the notification system (spec 037)', async () => {

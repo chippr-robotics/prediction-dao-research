@@ -66,3 +66,52 @@ export function signGlyph(n) {
   if (num < 0) return '▼'
   return '—'
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+}
+
+/**
+ * Calendar-day bucket label for the activity feed's "group by day" view
+ * (spec 074 follow-up). Mirrors `formatRelativeTime`'s honesty rule: a
+ * missing/invalid timestamp never gets a fabricated date, it gets its own
+ * named bucket instead.
+ */
+export function dayGroupLabel(ts, now = Date.now()) {
+  const t = Number(ts)
+  if (!Number.isFinite(t) || t <= 0) return 'Undated'
+  const d = new Date(t)
+  const diffDays = Math.round((startOfDay(new Date(now)) - startOfDay(d)) / DAY_MS)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  const sameYear = d.getFullYear() === new Date(now).getFullYear()
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: sameYear ? undefined : 'numeric',
+  })
+}
+
+function startOfWeek(date) {
+  const offset = (date.getDay() + 6) % 7 // days since Monday
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() - offset).getTime()
+}
+
+/** Calendar-week bucket label ("This week" / "Last week" / "Week of ...") for the activity feed. */
+export function weekGroupLabel(ts, now = Date.now()) {
+  const t = Number(ts)
+  if (!Number.isFinite(t) || t <= 0) return 'Undated'
+  const start = startOfWeek(new Date(t))
+  const diffWeeks = Math.round((startOfWeek(new Date(now)) - start) / (7 * DAY_MS))
+  if (diffWeeks === 0) return 'This week'
+  if (diffWeeks === 1) return 'Last week'
+  const sameYear = new Date(start).getFullYear() === new Date(now).getFullYear()
+  return `Week of ${new Date(start).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: sameYear ? undefined : 'numeric',
+  })}`
+}

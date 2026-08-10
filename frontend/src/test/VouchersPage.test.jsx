@@ -145,11 +145,17 @@ describe('VouchersPage (spec 026)', () => {
     expect(screen.getByText(/aren’t available on this network yet/i)).toBeInTheDocument()
   })
 
-  it('redirects to landing when the wallet is not connected', () => {
-    useWallet.mockReturnValue({ account: null, isConnected: false })
+  it('keeps a disconnected visitor here with a connect prompt instead of bouncing them to landing', () => {
+    const openConnectModal = vi.fn()
+    useWallet.mockReturnValue({ account: null, isConnected: false, openConnectModal })
     useVouchers.mockReturnValue(baseVouchers)
-    const { container } = renderPage()
-    // Navigate renders nothing; the page heading must be absent.
-    expect(container.querySelector('.vch-page')).toBeNull()
+    renderPage()
+
+    // The deep link is not thrown away: connecting drops the member straight
+    // into the vouchers they came for.
+    expect(screen.getByRole('heading', { name: /Membership Vouchers/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Redeem/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    expect(openConnectModal).toHaveBeenCalled()
   })
 })

@@ -17,6 +17,10 @@ export {
   useWalletConnection
 } from './useWalletManagement'
 
+// The chain the WALLET is on (issue #1030) — prefer this over wagmi's `useChainId()`,
+// which can only ever report a chain this build configures.
+export { useWalletChainId } from './useWalletChainId'
+
 // DEX hooks
 export { useDex } from './useDex'
 

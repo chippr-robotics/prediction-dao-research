@@ -5,6 +5,15 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      # Tenant selection (spec 072): this pipeline builds the DEFAULT (fairwins)
+      # instance. A per-tenant instance is the same pipeline with its own
+      # VITE_TENANT_ID + tenant URLs and its own Cloud Run service — see
+      # docs/runbooks/tenant-operations.md.
+      # Stamps the nav drawer's build label so a bug report pins an exact commit (buildInfo.js).
+      - '--build-arg'
+      - 'VITE_COMMIT_SHA=$SHORT_SHA'
+      - '--build-arg'
+      - 'VITE_TENANT_ID=fairwins'
       - '--build-arg'
       - 'VITE_WALLETCONNECT_PROJECT_ID=c30d7d7a8d575fe3dcc72ed55e5b287e'
       - '--build-arg'
@@ -42,6 +51,15 @@ steps:
       # KMS signer). Set => passkey transfers are gasless; unset => the account self-funds and the
       # confirm UI discloses the native fee honestly (never a false "sponsored").
       - 'VITE_SPONSOR_PAYMASTER_POLYGON=https://relay.fairwins.app/v1/paymaster'
+      - '--build-arg'
+      # Release identity (spec 076). $_APP_VERSION is set by the release workflow to the tag at this
+      # commit; it is EMPTY for any build that is not a published release (a manual trigger, a
+      # rebuild of an untagged commit), and the app then reports `unreleased+<sha>` rather than
+      # claiming the nearest tag. Reporting a version the build is not would make every other
+      # guarantee in spec 076 unreliable — see FR-031.
+      - 'VITE_APP_VERSION=${_APP_VERSION}'
+      - '--build-arg'
+      - 'VITE_GIT_SHA=$COMMIT_SHA'
       - '-t'
       - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
       - '-t'
@@ -112,6 +130,14 @@ steps:
 images:
   - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
   - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:latest'
+
+substitutions:
+  # Release identity (spec 076). Declared with an EMPTY default on purpose: a Cloud Build trigger
+  # firing on a main push has no way to know whether the release workflow has tagged that commit
+  # yet, and guessing would produce a build that claims a release it may not be. Empty means the
+  # app self-describes as `unreleased+<sha>`, which is the honest answer (FR-031). The release
+  # workflow passes a real value when it builds a tagged commit.
+  _APP_VERSION: ''
 
 options:
   logging: CLOUD_LOGGING_ONLY

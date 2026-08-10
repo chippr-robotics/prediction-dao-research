@@ -12,10 +12,20 @@ import { useAddressBook } from '../../hooks/useAddressBook'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { getNetwork, getSelectableNetworks, getCurrentChainId } from '../../config/networks'
 import { addressKey, listEntries } from '../../lib/addressBook/addressBookStore'
+import { isVaultAddress } from '../../lib/custody/vaultAddressBook'
+import { loadVaultReferences } from '../../lib/custody/vaultReferences'
 function IconPlus() {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="ab-icon">
       <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z" />
+    </svg>
+  )
+}
+
+function IconSearch() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="ab-search-icon">
+      <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z" />
     </svg>
   )
 }
@@ -32,6 +42,9 @@ function networkName(chainId) {
 
 export default function AddressBookPanel({ address }) {
   const wallet = useWallet()
+  // Spec 068 — the member's own vaults, used only to badge matching entries. Nothing is stored on
+  // the entry itself: the book's loader rebuilds a fixed field list, so a type key would be lost.
+  const vaultRefs = useMemo(() => (address ? loadVaultReferences(address) : []), [address])
   const activeChainId = wallet?.chainId ?? getCurrentChainId()
   const {
     book,
@@ -55,6 +68,23 @@ export default function AddressBookPanel({ address }) {
     const entries = listEntries(book)
     if (entries.length) screen(entries)
   }, [book, screen])
+
+  // Meta row (design 3a): total saved addresses, and how many contacts carry a
+  // non-clear screening state.
+  const savedCount = useMemo(
+    () => contacts.reduce((n, c) => n + c.addresses.length, 0),
+    [contacts],
+  )
+  const needsReview = useMemo(
+    () =>
+      contacts.filter((c) =>
+        c.addresses.some((a) => {
+          const s = getStatus(a.address, a.chainId)
+          return s === 'restricted' || s === 'uncertain'
+        }),
+      ).length,
+    [contacts, getStatus],
+  )
 
   // Filter contacts by the search query (nickname or any address) (FR-015).
   const filteredContacts = useMemo(() => {
@@ -114,9 +144,28 @@ export default function AddressBookPanel({ address }) {
         </div>
         <div className="ab-panel-head-actions">
           <AddressBookImportExport />
+        </div>
+      </div>
+
+      <div className="ab-search">
+        <label htmlFor="ab-search" className="ab-sr-only">
+          Search
+        </label>
+        <div className="ab-search-row">
+          <div className="ab-search-box">
+            <IconSearch />
+            <input
+              id="ab-search"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name or address"
+              autoComplete="off"
+            />
+          </div>
           <button
             type="button"
-            className="ab-btn ab-btn-primary"
+            className="ab-btn ab-btn-primary ab-add-btn"
             onClick={() => setEditing({ contact: null })}
             aria-label="Add contact"
           >
@@ -124,18 +173,18 @@ export default function AddressBookPanel({ address }) {
             <span className="ab-btn-label">Add contact</span>
           </button>
         </div>
-      </div>
-
-      <div className="ab-field ab-search">
-        <label htmlFor="ab-search">Search</label>
-        <input
-          id="ab-search"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or address"
-          autoComplete="off"
-        />
+        {contacts.length > 0 && (
+          <div className="ab-meta-row">
+            <span className="ab-meta-count">
+              {savedCount === 1 ? '1 saved address' : `${savedCount} saved addresses`}
+            </span>
+            {needsReview > 0 && (
+              <span className="ab-meta-review">
+                {needsReview === 1 ? '1 needs review' : `${needsReview} need review`}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {contacts.length === 0 ? (
@@ -154,6 +203,8 @@ export default function AddressBookPanel({ address }) {
               contact={contact}
               getStatus={getStatus}
               networkName={networkName}
+              // Spec 068 — badge entries that are the member's own multisig vaults.
+              isVault={contact.addresses.some((a) => isVaultAddress(vaultRefs, a.address, a.chainId))}
               onEdit={(c) => setEditing({ contact: c })}
               onDeleteContact={deleteContact}
             />

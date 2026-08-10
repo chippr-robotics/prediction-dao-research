@@ -17,188 +17,35 @@
  *   which keeps the request shape to a single `uniquenessMarker` field.
  */
 import { ethers } from 'ethers'
-import { GatewayError } from '../errors.js'
+/*
+ * Struct definitions come from @fairwins/intent-types (spec 075, FR-024/FR-025) — the SAME module
+ * the frontend signs with, so signer and verifier cannot disagree.
+ *
+ * This file previously carried its own copy of INTENT_TYPES and of the EIP-3009
+ * ReceiveWithAuthorization table, kept in step with the frontend by hand. That held for 26 of 27
+ * structs: `InvalidateNonce` existed in contracts/upgradeable/SignerIntentBase.sol and in the
+ * frontend and was ABSENT here, so a relayed invalidateNonce was an unknown action at this gateway.
+ *
+ * The package is authored Node-resolvable (extensioned imports + an explicit `exports` map)
+ * precisely so this service can import it; the frontend's copy never could be imported here.
+ */
+import { CONTRACT_DOMAINS, INTENT_TYPES, RECEIVE_WITH_AUTHORIZATION_TYPES } from '@fairwins/intent-types'
 
 // ---------------------------------------------------------------------------
 // EIP-712 domains (per verifying contract; chainId + verifyingContract added at runtime)
 // ---------------------------------------------------------------------------
+//
+// CONTRACT_DOMAINS was a local literal here until spec 075's follow-up: the same five name/version
+// pairs also lived in the frontend and in the claim-code signer, with nothing tying any copy to the
+// Solidity. The domain separator is half of the EIP-712 digest, so a drifted domain is exactly as
+// fatal as a drifted struct — a signature that verifies nowhere — and it had no gate at all.
+// It now comes from the package and is asserted against each contract's own `__EIP712_init(...)`
+// arguments by test/intent/TypehashParity.test.js.
+//
+// Re-exported so verify.js and the tests keep importing domains from this module.
+export { CONTRACT_DOMAINS, INTENT_TYPES, RECEIVE_WITH_AUTHORIZATION_TYPES }
+import { GatewayError } from '../errors.js'
 
-export const CONTRACT_DOMAINS = {
-  wagerRegistry: { name: 'FairWins WagerRegistry', version: '1' },
-  membershipManager: { name: 'FairWins MembershipManager', version: '1' },
-  // Tier-2 group pools (spec 035/036). The FACTORY verifies createPoolWithSig against its own domain;
-  // the CLONE verifies the six actor twins against a per-clone domain (verifyingContract = the clone),
-  // so pool signer-attributed actions target the factory but recover under `wagerPool` with the pool
-  // address as verifyingContract (the domain/target split — see ACTIONS + verify.js).
-  wagerPool: { name: 'FairWins WagerPool', version: '1' },
-  wagerPoolFactory: { name: 'FairWins WagerPoolFactory', version: '1' },
-  // Callsign registry (spec 054) — its own domain; register/change/requestRepoint execute only while
-  // the signer holds Gold+ (revert otherwise), so the gateway SHOULD pre-screen tier before relaying.
-  callsignRegistry: { name: 'FairWins CallsignRegistry', version: '1' },
-}
-
-// ---------------------------------------------------------------------------
-// EIP-712 struct definitions (verbatim from intent-eip712-schemas.md)
-// ---------------------------------------------------------------------------
-
-const TAIL = [
-  { name: 'nonce', type: 'bytes32' },
-  { name: 'validAfter', type: 'uint256' },
-  { name: 'validBefore', type: 'uint256' },
-]
-
-export const INTENT_TYPES = {
-  CreateWagerIntent: [
-    { name: 'creator', type: 'address' },
-    { name: 'opponent', type: 'address' },
-    { name: 'arbitrator', type: 'address' },
-    { name: 'token', type: 'address' },
-    { name: 'creatorStake', type: 'uint128' },
-    { name: 'opponentStake', type: 'uint128' },
-    { name: 'acceptDeadline', type: 'uint64' },
-    { name: 'resolveDeadline', type: 'uint64' },
-    { name: 'resolutionType', type: 'uint8' },
-    { name: 'conditionId', type: 'bytes32' },
-    { name: 'creatorIsYes', type: 'bool' },
-    { name: 'metadataHash', type: 'bytes32' },
-    { name: 'metadataUri', type: 'string' },
-    { name: 'termsVersionHash', type: 'bytes32' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TAIL,
-  ],
-  AcceptWagerIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'taker', type: 'address' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TAIL,
-  ],
-  ClaimPayoutIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'claimant', type: 'address' },
-    ...TAIL,
-  ],
-  ClaimRefundIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'actor', type: 'address' },
-    ...TAIL,
-  ],
-  DeclareDrawIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'actor', type: 'address' },
-    ...TAIL,
-  ],
-  RevokeDrawIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'actor', type: 'address' },
-    ...TAIL,
-  ],
-  CancelOpenIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'actor', type: 'address' },
-    ...TAIL,
-  ],
-  DeclineIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'actor', type: 'address' },
-    ...TAIL,
-  ],
-  DeclareWinnerIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'winner', type: 'address' },
-    { name: 'actor', type: 'address' },
-    ...TAIL,
-  ],
-  PurchaseTierIntent: [
-    { name: 'role', type: 'bytes32' },
-    { name: 'tier', type: 'uint8' },
-    { name: 'acceptedTermsHash', type: 'bytes32' },
-    { name: 'member', type: 'address' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TAIL,
-  ],
-  UpgradeTierIntent: [
-    { name: 'role', type: 'bytes32' },
-    { name: 'tier', type: 'uint8' },
-    { name: 'acceptedTermsHash', type: 'bytes32' },
-    { name: 'member', type: 'address' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TAIL,
-  ],
-  ExtendMembershipIntent: [
-    { name: 'role', type: 'bytes32' },
-    { name: 'member', type: 'address' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TAIL,
-  ],
-  RedeemVoucherIntent: [
-    { name: 'voucherId', type: 'uint256' },
-    { name: 'acceptedTermsHash', type: 'bytes32' },
-    { name: 'redeemer', type: 'address' },
-    ...TAIL,
-  ],
-
-  // ---- Tier-2 group pools (spec 035/036) ----
-  // Byte-identical to the on-chain typehashes: the six actor twins verify against the CLONE's domain
-  // (contracts/pools/WagerPool.sol), CreatePool against the FACTORY's domain (WagerPoolFactory.sol).
-  ApproveOutcome: [
-    { name: 'member', type: 'address' },
-    { name: 'proposalId', type: 'bytes32' },
-    ...TAIL,
-  ],
-  ClaimShare: [
-    { name: 'winner', type: 'address' },
-    { name: 'index', type: 'uint256' },
-    { name: 'recipient', type: 'address' },
-    ...TAIL,
-  ],
-  ProposeOutcome: [
-    { name: 'creator', type: 'address' },
-    { name: 'proposalId', type: 'bytes32' },
-    ...TAIL,
-  ],
-  CloseJoining: [
-    { name: 'creator', type: 'address' },
-    ...TAIL,
-  ],
-  Cancel: [
-    { name: 'creator', type: 'address' },
-    ...TAIL,
-  ],
-  Refund: [
-    { name: 'member', type: 'address' },
-    ...TAIL,
-  ],
-  CreatePool: [
-    { name: 'creator', type: 'address' },
-    { name: 'token', type: 'address' },
-    { name: 'buyIn', type: 'uint256' },
-    { name: 'maxMembers', type: 'uint32' },
-    { name: 'thresholdBips', type: 'uint16' },
-    { name: 'acceptDeadline', type: 'uint64' },
-    { name: 'resolveDeadline', type: 'uint64' },
-    ...TAIL,
-  ],
-
-  // ---- Callsign registry (spec 054) — signer-attributed, no payment leg ----
-  CommitCallsignIntent: [{ name: 'owner', type: 'address' }, { name: 'commitment', type: 'bytes32' }, ...TAIL],
-  RegisterCallsignIntent: [{ name: 'owner', type: 'address' }, { name: 'callsign', type: 'string' }, { name: 'salt', type: 'bytes32' }, ...TAIL],
-  ChangeCallsignIntent: [{ name: 'owner', type: 'address' }, { name: 'newCallsign', type: 'string' }, { name: 'salt', type: 'bytes32' }, ...TAIL],
-  ReleaseCallsignIntent: [{ name: 'owner', type: 'address' }, { name: 'callsignHash', type: 'bytes32' }, ...TAIL],
-  RequestRepointIntent: [{ name: 'owner', type: 'address' }, { name: 'callsignHash', type: 'bytes32' }, { name: 'newOwner', type: 'address' }, ...TAIL],
-  CancelRepointIntent: [{ name: 'owner', type: 'address' }, { name: 'callsignHash', type: 'bytes32' }, ...TAIL],
-}
-
-// EIP-3009 payment-leg typed data (token's own domain — native USDC version "2").
-export const RECEIVE_WITH_AUTHORIZATION_TYPES = {
-  ReceiveWithAuthorization: [
-    { name: 'from', type: 'address' },
-    { name: 'to', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'validAfter', type: 'uint256' },
-    { name: 'validBefore', type: 'uint256' },
-    { name: 'nonce', type: 'bytes32' },
-  ],
-}
 
 // ---------------------------------------------------------------------------
 // Signer-attributed entrypoint ABI (verbatim from withsig-entrypoints.md)

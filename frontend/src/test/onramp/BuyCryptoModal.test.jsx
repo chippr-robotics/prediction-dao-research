@@ -1,5 +1,5 @@
 /**
- * BuyCryptoModal (spec 060) — the pre-handoff disclosure. Verifies the FR-003 summary (asset,
+ * BuyCryptoModal (spec 081) — the pre-handoff disclosure. Verifies the FR-003 summary (asset,
  * network, full destination address), the honest custody/fee disclosure (FR-004/FR-008), the
  * Continue -> mint -> window.open handoff with popup-blocked fallback, the honest failure state,
  * and settlement honesty (US3: no synthetic pending/success claim after the handoff).

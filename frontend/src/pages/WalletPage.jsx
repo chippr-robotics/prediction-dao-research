@@ -8,19 +8,18 @@ import { usePwaUpdate } from '../hooks/usePwaUpdate'
 import { useChainTokens } from '../hooks/useChainTokens'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
-import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
+import { hasRegisteredKey } from '../utils/keyRegistryService'
 import TradePanel from '../components/fairwins/TradePanel'
 import EarnPanel from '../components/earn/EarnPanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
-import PortfolioPanel from '../components/wallet/PortfolioPanel'
 import CollectiblesPanel from '../components/collectibles/CollectiblesPanel'
 import PredictPanel from '../components/predict/PredictPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
-import TokensPanel from '../components/tokens/TokensPanel'
-import ClearPathPanel from '../components/clearpath/ClearPathPanel'
-import AccountDashboard from '../components/account/AccountDashboard'
+import CatalogPanel from '../components/miniapps/CatalogPanel'
+import MyAccountView from '../components/account/MyAccountView'
 import ControllersPanel from '../components/account/ControllersPanel'
 import RecoverAccountPanel from '../components/account/RecoverAccountPanel'
+import LegacyKeyRecoveryPanel from '../components/account/LegacyKeyRecoveryPanel'
 import NotificationProfilesPanel from '../components/account/NotificationProfilesPanel'
 import HomePreferencesPanel from '../components/account/HomePreferencesPanel'
 import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
@@ -29,44 +28,88 @@ import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPan
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import CallsignPanel from '../components/account/CallsignPanel'
 import BackupPanel from '../components/account/BackupPanel'
+import AccordionGroup from '../components/account/AccordionGroup'
+import AccordionSection from '../components/account/AccordionSection'
+import NetworkPanel from '../components/account/NetworkPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
-import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import SectionIconNav from '../components/nav/SectionIconNav'
-import { groupForTab } from '../config/appNav'
+import {
+  groupForTab,
+  isNavItemEnabledForTenant,
+  ACCOUNT_VIEWS,
+  ACCOUNT_DEFAULT_VIEW,
+  accountViewFromParam,
+  PORTFOLIO_PATH,
+} from '../config/appNav'
 import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../lib/predict/predictClient'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
+import NavIcon from '../components/nav/NavIcon'
+import { LEGAL_LINKS } from '../constants/legalLinks'
 import './WalletPage.css'
+
+// Icon per Settings → App → Legal & Policies row (issue #1025). Keyed by href
+// since that's the stable identity LEGAL_LINKS already uses as its list key.
+const LEGAL_LINK_ICONS = {
+  '/terms': 'reports',
+  '/risk': 'alert',
+  '/privacy': 'lock',
+}
+const LEGAL_LINK_ICON_DEFAULT = 'ban' // Account Moderation (deep-links into /terms)
 
 // My Account section panels, keyed by tab id. The section MENU now lives in the
 // global nav drawer + account button (see config/appNav.js) — this page just
 // hosts the panels and reads `?tab=` to pick one. WALLET_TABS is the flat list
 // used for deep-link/alias resolution and for the active tab's heading label.
-// (Account / Membership / Preferences are reached from the account button;
-// 'custody' is surfaced to users as "Protect".)
+// (Account / Membership / Network / Preferences are reached from the account button;
+// 'custody' is surfaced to users as "Protect" and 'paytransfer' as "Transfer" —
+// the ids stay stable so saved links keep resolving, spec 067 FR-002.)
 const WALLET_TABS = [
   { id: 'account', label: 'Account' },
   { id: 'membership', label: 'Membership' },
   { id: 'network', label: 'Network' },
   { id: 'preferences', label: 'Preferences' },
-  { id: 'security', label: 'Backup & Security' },
-  { id: 'portfolio', label: 'Portfolio' },
+  { id: 'security', label: 'Recovery' },
   { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
   { id: 'collectibles', label: 'Collect' },
   { id: 'predict', label: 'Predict' },
-  { id: 'paytransfer', label: 'Pay & Transfer' },
+  { id: 'paytransfer', label: 'Transfer' },
   { id: 'custody', label: 'Protect' },
   { id: 'addressbook', label: 'Address Book' },
   { id: 'reports', label: 'Reporting' },
-  { id: 'clearpath', label: 'ClearPath' },
-  { id: 'tokens', label: 'Token Mint' },
+  // Apps (spec 073) — the mini-app catalog, and the only Apps nav item. ClearPath and Token
+  // Mint stay listed below because their tabs still RENDER: they left the menu, not the app.
+  { id: 'apps', label: 'Apps' },
 ]
 
 // Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade"; the
-// old standalone Backup tab is now part of the combined "Backup & Security" panel).
+// old standalone Backup tab is now part of the combined "Recovery" panel).
+//
+// Spec 073 (FR-009). The Apps nav group collapsed to the single mini-app catalog entry, and both
+// apps that used to live in it are packages now: `?tab=tokens` and `?tab=clearpath` REDIRECT to
+// `/apps/token-mint` (T027) and `/apps/clearpath` (T029) via TAB_REDIRECTS below, so saved deep
+// links land where the feature actually lives. Wagers is absent from both maps and is NOT a
+// package: it moved into the Transfer section as `?tab=paytransfer&view=wagers`, and the legacy
+// `/wagers` route redirects there from App.jsx. This map must stay in parity with the copy in
+// components/nav/AppNavDrawer.jsx.
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
+
+/**
+ * Tabs that have BECOME mini-apps (spec 073 T027) or moved into another section. Unlike
+ * `TAB_ALIASES`, which renames a tab within this page, these leave the tab entirely — the
+ * feature now lives elsewhere, so a saved deep link has to land there rather than on a tab
+ * that no longer exists. Kept in parity with the same map in `components/nav/AppNavDrawer.jsx`.
+ *
+ * Portfolio (spec 074): the standalone tab folded into the unified My Account view as its
+ * `?view=portfolio`, so `?tab=portfolio` redirects to `/wallet?tab=account&view=portfolio`.
+ */
+const TAB_REDIRECTS = {
+  tokens: '/apps/token-mint',
+  clearpath: '/apps/clearpath',
+  portfolio: PORTFOLIO_PATH,
+}
 
 // Canonical Polymarket category slugs — kept here to keep WalletPage
 // self-contained. Order matches PolymarketBrowser's quick-filter row.
@@ -86,7 +129,7 @@ function WalletPage() {
   const isPasskey = loginMethod === 'passkey'
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
-  const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
+  const { isInitialized, isInitializing, registerKeyNow } = useEncryption()
   const { preferences, setPolymarketCategories } = useUserPreferences()
   const { capabilities } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
@@ -96,6 +139,17 @@ function WalletPage() {
   // Predict (spec 057): tab exists only on Polygon (capability) AND with a gateway proxy configured —
   // everywhere else it hides and deep links fall back (FR-018).
   const predictEnabled = Boolean(capabilities?.predict) && predictGatewayUrl() !== ''
+  // Apps (spec 073 FR-009): the mini-app catalog is a tenant feature ('miniapps'), not a chain
+  // capability — a tenant that has not enabled it has no Apps nav item, so the `?tab=apps` deep
+  // link must not render a section that tenant does not have. Gated the same way as the two
+  // chain-gated tabs above, and for the same reason: a tab reachable by URL but absent from every
+  // menu is exactly how a "dead tab" gets shipped.
+  //
+  // Only the NEW tab is gated. The `?tab=clearpath` / `?tab=tokens` redirects above are not
+  // tenant-filtered: a tenant without mini-apps has no package to serve either way, and the
+  // redirect landing on the catalog's honest unavailable state is a better answer than a tab that
+  // silently falls back to Account.
+  const miniAppsEnabled = isNavItemEnabledForTenant('apps')
   const {
     isStandalone: pwaStandalone,
     canPrompt: pwaCanPrompt,
@@ -110,11 +164,23 @@ function WalletPage() {
   const [searchParams] = useSearchParams()
   // The section is driven by `?tab=` so the global nav drawer and the account
   // button can route straight to a panel (e.g. the update toast → ?tab=preferences).
+  const requestedTab = searchParams.get('tab')
+  /*
+   * A tab that has become a mini-app leaves this page. Done as an effect rather than during
+   * render because a redirect is a side effect, and done with `replace` so the member's Back
+   * button returns to wherever they came from rather than bouncing off the dead tab again.
+   */
+  const redirectTo = TAB_REDIRECTS[requestedTab] || null
+  useEffect(() => {
+    if (redirectTo) navigate(redirectTo, { replace: true })
+  }, [redirectTo, navigate])
+
   const [activeTab, setActiveTab] = useState(() => {
-    const requested = searchParams.get('tab')
+    const requested = requestedTab
     const resolved = TAB_ALIASES[requested] || requested
     if (resolved === 'collectibles' && !collectiblesEnabled) return 'account'
     if (resolved === 'predict' && !predictEnabled) return 'account'
+    if (resolved === 'apps' && !miniAppsEnabled) return 'account'
     return WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account'
   })
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -150,9 +216,11 @@ function WalletPage() {
   }, [address, provider])
 
   const handleRegisterKey = useCallback(async () => {
-    // Passkey sessions have no ethers signer — keys derive from the WebAuthn PRF master seed and the
-    // on-chain registration is submitted through the smart account (sendCalls), all inside
-    // ensureInitialized(). Classic wallets keep the signer path (sign the derivation message → register tx).
+    // registerKeyNow derives the account's encryption keys and AWAITS the on-chain registration,
+    // login-method agnostic: a passkey submits through the smart account (sendCalls / one WebAuthn
+    // ceremony), a classic wallet signs the register tx. Awaiting it — rather than the old
+    // fire-and-forget + poll — is what lets a passkey user actually see success or a real failure
+    // reason instead of a status stuck on "Not registered".
     if (!address || (!signer && !isPasskey)) {
       setKeyError('Not connected. Please sign in again.')
       return
@@ -160,35 +228,21 @@ function WalletPage() {
     setKeyRegisterLoading(true)
     setKeyError(null)
     try {
-      const result = await ensureInitialized()
-      if (!result?.publicKey) {
-        throw new Error('Failed to derive encryption keys')
+      await registerKeyNow()
+      // Confirm against the registry so the flip to "Registered" reflects on-chain truth. A passkey
+      // UserOp can take a moment to include, so poll briefly before reporting.
+      let registered = await hasRegisteredKey(address, provider)
+      for (let i = 0; !registered && isPasskey && i < 5; i++) {
+        await new Promise((r) => setTimeout(r, 2000))
+        registered = await hasRegisteredKey(address, provider)
       }
-      if (isPasskey) {
-        // ensureInitialized() already kicked off the on-chain registration (non-blocking, via sendCalls).
-        // Reflect it honestly: poll the registry briefly so the UI flips to "Registered" once it lands,
-        // and otherwise tell the user it's finishing rather than claiming failure.
-        let registered = await hasRegisteredKey(address, provider)
-        for (let i = 0; !registered && i < 5; i++) {
-          await new Promise((r) => setTimeout(r, 2000))
-          registered = await hasRegisteredKey(address, provider)
-        }
-        setKeyRegistered(registered)
-        if (!registered) {
-          setKeyError('Encryption key setup submitted — it can take a moment to finish. Use “Check Status” shortly.')
-        }
-        return
-      }
-      // ensureKeyRegistered checks on-chain first, only registers if needed
-      const wasNewlyRegistered = await ensureKeyRegistered(signer, address, result.publicKey)
-      setKeyRegistered(true)
-      if (!wasNewlyRegistered) {
-        // Key was already registered — not an error, just inform user
-        console.log('[WalletPage] Key was already registered on-chain')
+      setKeyRegistered(registered)
+      if (!registered && isPasskey) {
+        setKeyError('Encryption key setup submitted — it can take a moment to confirm. Use “Check Status” shortly.')
       }
     } catch (err) {
-      if (err.message.includes('rejected') || err.message.includes('denied')) {
-        setKeyError('Transaction was rejected.')
+      if (err.message.includes('rejected') || err.message.includes('denied') || err.name === 'CeremonyCancelled') {
+        setKeyError('Registration was cancelled.')
       } else if (err.message.includes('KeyAlreadyExists') || err.message.includes('0xe0accd63')) {
         // Key already exists on-chain — treat as success
         setKeyRegistered(true)
@@ -198,7 +252,7 @@ function WalletPage() {
     } finally {
       setKeyRegisterLoading(false)
     }
-  }, [ensureInitialized, signer, address, isPasskey, provider])
+  }, [registerKeyNow, signer, address, isPasskey, provider])
 
   // Auto-check key status when Security tab is shown
   useEffect(() => {
@@ -216,9 +270,11 @@ function WalletPage() {
     const resolved = TAB_ALIASES[requested] || requested
     const known = WALLET_TABS.some((t) => t.id === resolved)
     const available =
-      (resolved !== 'collectibles' || collectiblesEnabled) && (resolved !== 'predict' || predictEnabled)
+      (resolved !== 'collectibles' || collectiblesEnabled) &&
+      (resolved !== 'predict' || predictEnabled) &&
+      (resolved !== 'apps' || miniAppsEnabled)
     setActiveTab(known && available ? resolved : 'account')
-  }, [searchParams, collectiblesEnabled, predictEnabled])
+  }, [searchParams, collectiblesEnabled, predictEnabled, miniAppsEnabled])
 
   const handleCheckForUpdate = useCallback(async () => {
     setPwaChecking(true)
@@ -253,12 +309,21 @@ function WalletPage() {
   }, [isConnected, selectedPolymarketCategories, setPolymarketCategories])
 
   // Sibling sub-items for the mobile bottom icon nav — the group the active tab
-  // belongs to (Finance / Tools / Apps). Absent for account/membership/etc.
+  // belongs to (Finance / Tools / Apps). Absent for membership/network/etc.
+  //
+  // Spec 074: the Account tab has no section group (deliberately — it lives on
+  // the account button), so its bottom bar carries the unified view's THREE
+  // views (Activity / Portfolio / Stats) instead, in lockstep with
+  // MyAccountView's desktop tab strip via the shared ACCOUNT_VIEWS ids.
   const currentSectionGroup = groupForTab(activeTab)
-  const sectionNavItems = (currentSectionGroup?.items || []).filter(
-    (item) =>
-      (item.id !== 'collectibles' || collectiblesEnabled) && (item.id !== 'predict' || predictEnabled),
-  )
+  const isAccountTab = activeTab === 'account'
+  const accountView = accountViewFromParam(searchParams.get('view'))
+  const sectionNavItems = isAccountTab
+    ? ACCOUNT_VIEWS
+    : (currentSectionGroup?.items || []).filter(
+        (item) =>
+          (item.id !== 'collectibles' || collectiblesEnabled) && (item.id !== 'predict' || predictEnabled),
+      )
 
   return (
     <div className="wallet-page-wrapper">
@@ -291,7 +356,10 @@ function WalletPage() {
                 <div className="tab-content">
                 {activeTab === 'account' && (
                   <div className="profile-section" role="tabpanel">
-                    <AccountDashboard />
+                    {/* Spec 074 — the unified My Account experience: account card
+                        carousel + Activity/Portfolio/Stats views. The standalone
+                        Portfolio tab folded into it (see TAB_REDIRECTS). */}
+                    <MyAccountView />
 
                     {hasRole(ROLES.ADMIN) && (
                       <div className="section admin-section">
@@ -300,12 +368,6 @@ function WalletPage() {
                         <button onClick={handleNavigateToAdmin} className="admin-panel-btn">Role Management</button>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {activeTab === 'portfolio' && (
-                  <div className="portfolio-section" role="tabpanel">
-                    <PortfolioPanel />
                   </div>
                 )}
 
@@ -386,72 +448,96 @@ function WalletPage() {
 
                 {activeTab === 'network' && (
                   <div className="network-section" role="tabpanel">
-                    <NetworkSettings />
+                    <NetworkPanel />
                   </div>
                 )}
 
                 {activeTab === 'security' && (
                   <div className="security-section" role="tabpanel">
-                    {/* Backup + Security combined into one panel: the data-backup
-                        controls sit above the account-security controls. */}
-                    <BackupPanel />
-                    {/* Spec 045 US5/US6 — account controllers & recovery.
-                        ControllersPanel renders for passkey sessions (add a
-                        passkey / link a wallet as recovery); the recovery
-                        panel renders for wallet sessions (regain passkey
-                        access using a linked wallet). Each self-gates. */}
-                    <ControllersPanel />
-                    <RecoverAccountPanel />
-                    <div className="section">
-                      <h3>Encryption Key</h3>
-                      <p className="section-description">
-                        Your encryption key allows you to send and receive encrypted wagers. It is derived from
-                        {isPasskey ? ' your passkey' : ' your wallet signature'} and registered on-chain.
-                      </p>
+                    {/* Recovery collects several independent, high-stakes features. Each one
+                        renders as a COLLAPSED AccordionSection that states its own status in a
+                        line, so the tab opens as a scannable list rather than a stack of fully
+                        expanded panels; one section is open at a time, and every consequential
+                        or destructive action confirms in a bottom sheet. */}
+                    <p className="security-section__intro">
+                      Everything that protects your access to this account. Open a section to see or change it.
+                    </p>
+                    <AccordionGroup>
+                      {/* Data backup — encrypted backup/restore of device-local data (spec 032). */}
+                      <BackupPanel />
+                      {/* Spec 045 US5/US6 — account controllers & recovery.
+                          ControllersPanel renders for passkey sessions (add a
+                          passkey / link a wallet as recovery); the recovery
+                          panel renders for wallet sessions (regain passkey
+                          access using a linked wallet). Each self-gates. */}
+                      <ControllersPanel />
+                      <RecoverAccountPanel />
+                      {/* Recover an account from a legacy private key or word
+                          list, store it encrypted on-device, and move its funds
+                          to a smart account. Self-gates to connected sessions. */}
+                      <LegacyKeyRecoveryPanel />
+                      <AccordionSection
+                        id="encryption-key"
+                        title="Encryption key"
+                        summary={
+                          keyRegistered
+                            ? 'Registered on-chain'
+                            : isInitialized
+                              ? 'Derived on this device'
+                              : 'Not initialized'
+                        }
+                        badge={keyRegistered === false ? 'Not registered' : null}
+                        badgeTone="warn"
+                      >
+                        <p className="section-description">
+                          Your encryption key allows you to send and receive encrypted wagers. It is derived from
+                          {isPasskey ? ' your passkey' : ' your wallet signature'} and registered on-chain.
+                        </p>
 
-                      <div className="key-status-card">
-                        <div className="key-status-row">
-                          <span className="key-status-label">Local Keys:</span>
-                          <span className={`key-status-value ${isInitialized ? 'active' : 'inactive'}`}>
-                            {isInitializing ? 'Initializing...' : isInitialized ? 'Derived' : 'Not initialized'}
-                          </span>
+                        <div className="key-status-card">
+                          <div className="key-status-row">
+                            <span className="key-status-label">Local Keys:</span>
+                            <span className={`key-status-value ${isInitialized ? 'active' : 'inactive'}`}>
+                              {isInitializing ? 'Initializing...' : isInitialized ? 'Derived' : 'Not initialized'}
+                            </span>
+                          </div>
+                          <div className="key-status-row">
+                            <span className="key-status-label">On-chain Registration:</span>
+                            <span className={`key-status-value ${keyRegistered ? 'active' : keyRegistered === false ? 'inactive' : ''}`}>
+                              {keyCheckLoading ? 'Checking...' : keyRegistered === null ? 'Not checked' : keyRegistered ? 'Registered' : 'Not registered'}
+                            </span>
+                          </div>
                         </div>
-                        <div className="key-status-row">
-                          <span className="key-status-label">On-chain Registration:</span>
-                          <span className={`key-status-value ${keyRegistered ? 'active' : keyRegistered === false ? 'inactive' : ''}`}>
-                            {keyCheckLoading ? 'Checking...' : keyRegistered === null ? 'Not checked' : keyRegistered ? 'Registered' : 'Not registered'}
-                          </span>
-                        </div>
-                      </div>
 
-                      {keyError && (
-                        <div className="key-error" role="alert">
-                          {keyError}
-                        </div>
-                      )}
-
-                      <div className="key-actions">
-                        <button
-                          onClick={handleCheckKeyStatus}
-                          className="key-action-btn secondary"
-                          disabled={keyCheckLoading}
-                        >
-                          {keyCheckLoading ? 'Checking...' : 'Check Status'}
-                        </button>
-
-                        {!keyRegistered && (
-                          <button
-                            onClick={handleRegisterKey}
-                            className="key-action-btn primary"
-                            disabled={keyRegisterLoading}
-                          >
-                            {keyRegisterLoading ? 'Registering...' : 'Register Encryption Key'}
-                          </button>
+                        {keyError && (
+                          <div className="key-error" role="alert">
+                            {keyError}
+                          </div>
                         )}
-                      </div>
-                    </div>
 
-                    <RecoveryCodesPanel />
+                        <div className="key-actions">
+                          <button
+                            onClick={handleCheckKeyStatus}
+                            className="key-action-btn secondary"
+                            disabled={keyCheckLoading}
+                          >
+                            {keyCheckLoading ? 'Checking...' : 'Check Status'}
+                          </button>
+
+                          {!keyRegistered && (
+                            <button
+                              onClick={handleRegisterKey}
+                              className="key-action-btn primary"
+                              disabled={keyRegisterLoading}
+                            >
+                              {keyRegisterLoading ? 'Registering...' : 'Register Encryption Key'}
+                            </button>
+                          )}
+                        </div>
+                      </AccordionSection>
+
+                      <RecoveryCodesPanel />
+                    </AccordionGroup>
                   </div>
                 )}
 
@@ -602,6 +688,26 @@ function WalletPage() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Issue #1025 — moved from the side nav drawer's footer into
+                        Settings → App, after Install App / Software Update. */}
+                    <div className="section" id="legal-policies">
+                      <h3>Legal &amp; Policies</h3>
+                      <p className="section-description">
+                        Terms, risk disclosures, and other policies governing your use of FairWins.
+                      </p>
+                      <nav className="app-legal-links" aria-label="Legal and policy documents">
+                        {LEGAL_LINKS.map((link) => (
+                          <a key={link.href} href={link.href} className="app-legal-link-row">
+                            <span className="app-legal-link-icon" aria-hidden="true">
+                              <NavIcon name={LEGAL_LINK_ICONS[link.href] || LEGAL_LINK_ICON_DEFAULT} size={18} />
+                            </span>
+                            <span className="app-legal-link-label">{link.label}</span>
+                            <span className="app-legal-link-chevron" aria-hidden="true">›</span>
+                          </a>
+                        ))}
+                      </nav>
+                    </div>
                   </div>
                 )}
 
@@ -611,14 +717,12 @@ function WalletPage() {
                   </div>
                 )}
 
-                {activeTab === 'tokens' && (
-                  <div className="tokens-section" role="tabpanel">
-                    <TokensPanel />
-                  </div>
-                )}
-                {activeTab === 'clearpath' && (
-                  <div className="clearpath-section" role="tabpanel">
-                    <ClearPathPanel />
+                {/* Apps (spec 073 US1) — the mini-app catalog. The panel does its own registry
+                    read and is honest about every way that read can fail; this branch only
+                    decides that the section exists for this tenant. */}
+                {activeTab === 'apps' && miniAppsEnabled && (
+                  <div className="apps-section" role="tabpanel">
+                    <CatalogPanel />
                   </div>
                 )}
                 {activeTab === 'trade' && (
@@ -637,9 +741,21 @@ function WalletPage() {
                     sibling views (Finance / Tools / Apps), pinned to the bottom. */}
                 <SectionIconNav
                   items={sectionNavItems}
-                  activeId={activeTab}
-                  onSelect={(id) => navigate(`/wallet?tab=${id}`)}
-                  ariaLabel={currentSectionGroup ? `${currentSectionGroup.label} sections` : 'Section navigation'}
+                  activeId={isAccountTab ? accountView : activeTab}
+                  onSelect={(id) =>
+                    navigate(
+                      isAccountTab
+                        ? `/wallet?tab=account${id === ACCOUNT_DEFAULT_VIEW ? '' : `&view=${id}`}`
+                        : `/wallet?tab=${id}`,
+                    )
+                  }
+                  ariaLabel={
+                    isAccountTab
+                      ? 'Account views'
+                      : currentSectionGroup
+                        ? `${currentSectionGroup.label} sections`
+                        : 'Section navigation'
+                  }
                 />
               </div>
             </div>

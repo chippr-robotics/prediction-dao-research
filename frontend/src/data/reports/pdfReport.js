@@ -43,6 +43,10 @@ export function render(report) {
   if (report.totals?.overall?.failedCount > 0) {
     headerLines.push(`${report.totals.overall.failedCount} failed operation(s) listed but excluded from all totals.`)
   }
+  if (report.totals?.overall?.platformFeeUnknownCount > 0) {
+    const n = report.totals.overall.platformFeeUnknownCount
+    headerLines.push(`${n} entr${n === 1 ? 'y' : 'ies'} carry a platform fee that could not be valued in USD — marked "unknown".`)
+  }
   for (const line of headerLines) {
     doc.text(line, marginX, y)
     y += 13
@@ -63,8 +67,9 @@ export function render(report) {
   afterTableY += 13
   doc.setFontSize(8)
   for (const t of Object.values(report.totals.byTicker)) {
+    const moved = t.moved ? `, moved between your networks ${t.moved} (USD ${t.movedUsd.toFixed(2)})` : ''
     doc.text(
-      `${t.ticker}: deposits ${t.deposits}, payouts ${t.payouts}, refunds ${t.refunds}, net ${t.net}, USD ${t.usdValue.toFixed(2)}`,
+      `${t.ticker}: deposits ${t.deposits}, payouts ${t.payouts}, refunds ${t.refunds}, net ${t.net}, USD ${t.usdValue.toFixed(2)}${moved}`,
       marginX,
       afterTableY,
     )
@@ -80,8 +85,12 @@ export function render(report) {
     afterTableY += 13
     doc.setFontSize(8)
     for (const c of Object.values(byClass)) {
+      // The human activity name leads: "pool" alone cannot tell a wager pool
+      // from a liquidity pool (FR-039a).
+      const moved = c.movedUsd ? `, moved between your networks USD ${c.movedUsd.toFixed(2)}` : ''
+      const platformFees = c.platformFeesUsd ? `, platform fees USD ${c.platformFeesUsd.toFixed(2)}` : ''
       doc.text(
-        `${c.class}: ${c.count} entr${c.count === 1 ? 'y' : 'ies'}, in USD ${c.inUsd.toFixed(2)}, out USD ${c.outUsd.toFixed(2)}, USD ${c.usdValue.toFixed(2)}`,
+        `${c.label || c.class} (${c.class}): ${c.count} entr${c.count === 1 ? 'y' : 'ies'}, in USD ${c.inUsd.toFixed(2)}, out USD ${c.outUsd.toFixed(2)}, USD ${c.usdValue.toFixed(2)}${moved}${platformFees}`,
         marginX,
         afterTableY,
       )
@@ -91,11 +100,25 @@ export function render(report) {
 
   const o = report.totals.overall
   doc.text(`Overall: USD ${o.usdValue.toFixed(2)}, fees ${o.feesNative} ${o.feesNativeSymbol}`, marginX, afterTableY)
-  afterTableY += 18
+  afterTableY += 12
+  // Beside the overall, never inside it (FR-036).
+  if (o.movedUsd) {
+    doc.text(
+      `Moved between your own networks: USD ${o.movedUsd.toFixed(2)} — not income, not a disposal; excluded from the overall above.`,
+      marginX,
+      afterTableY,
+    )
+    afterTableY += 12
+  }
+  if (report.source === 'ledger' && (o.platformFeesUsd || o.platformFeeUnknownCount)) {
+    doc.text(`Platform fees charged: USD ${(o.platformFeesUsd || 0).toFixed(2)}`, marginX, afterTableY)
+    afterTableY += 12
+  }
+  afterTableY += 6
 
   doc.setFontSize(7)
   doc.setTextColor(90)
-  for (const note of [report.valuationNote, report.disclaimer]) {
+  for (const note of [report.valuationNote, report.selfTransferNote, report.disclaimer].filter(Boolean)) {
     const wrapped = doc.splitTextToSize(note, 760)
     doc.text(wrapped, marginX, afterTableY)
     afterTableY += 11 * wrapped.length + 4

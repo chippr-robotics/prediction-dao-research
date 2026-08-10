@@ -67,3 +67,43 @@ describe('useTransfer while operating as a vault', () => {
     expect(submit).not.toHaveBeenCalled()
   })
 })
+
+// Spec 062 — operating as a recovered legacy account must SIGN with that account's unlocked key (routed
+// through submit(), which uses the in-memory legacySigner), never fall through to the connected wallet.
+// Guards the security-review finding that selecting "Recovered" silently signed with the connected signer.
+describe('useTransfer while operating as a recovered legacy account', () => {
+  beforeEach(() => {
+    submit.mockReset()
+    activeAccount = { isLegacy: true, canActAsLegacy: true, submit }
+  })
+
+  it('sends a native transfer through the legacy signer (submit), not the connected wallet', async () => {
+    submit.mockResolvedValue({ kind: 'sent', txHash: '0xdeadbeef' })
+    const { result } = renderHook(() => useTransfer())
+    let out
+    await act(async () => {
+      out = await result.current.send({
+        kind: TRANSFER_KIND.NATIVE,
+        to: '0xbbbb000000000000000000000000000000000002',
+        amount: '2',
+      })
+    })
+    expect(submit).toHaveBeenCalledTimes(1)
+    const payload = submit.mock.calls[0][0]
+    expect(payload.to.toLowerCase()).toBe('0xbbbb000000000000000000000000000000000002')
+    expect(payload.value).toBe(2000000000000000000n) // 2e18
+    expect(payload.data).toBe('0x')
+    expect(out.sent).toBe(true)
+    expect(out.route).toBe('legacy')
+    expect(out.txHash).toBe('0xdeadbeef')
+  })
+
+  it('refuses to send when the recovered account is not unlocked on this network', async () => {
+    activeAccount = { isLegacy: true, canActAsLegacy: false, submit }
+    const { result } = renderHook(() => useTransfer())
+    await expect(
+      result.current.send({ kind: TRANSFER_KIND.NATIVE, to: '0xbbbb000000000000000000000000000000000002', amount: '1' }),
+    ).rejects.toThrow(/unlock|network/i)
+    expect(submit).not.toHaveBeenCalled()
+  })
+})

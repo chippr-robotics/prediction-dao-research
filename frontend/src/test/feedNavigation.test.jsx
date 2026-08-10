@@ -244,7 +244,7 @@ describe('Feed → wager navigation (spec 012 T018, FR-004/FR-016)', () => {
     expect(activityRef.current.markWagerRead).toHaveBeenCalledWith('42')
   })
 
-  it('marks the wager read when the user clicks a wager card (FR-004)', async () => {
+  it('marks the wager read when the user clicks a wager row (FR-004)', async () => {
     await renderDashboard(['/app'], [wager42()])
 
     // Open My Wagers normally via the quick action.
@@ -257,7 +257,7 @@ describe('Feed → wager navigation (spec 012 T018, FR-004/FR-016)', () => {
     expect(screen.queryByRole('button', { name: /back to list/i })).not.toBeInTheDocument()
     expect(activityRef.current.markWagerRead).not.toHaveBeenCalled()
 
-    // Expanding the card to preview the wager counts as viewing it (FR-004).
+    // Opening the row's detail view counts as viewing it (FR-004).
     await act(async () => {
       fireEvent.click(row)
     })
@@ -266,7 +266,7 @@ describe('Feed → wager navigation (spec 012 T018, FR-004/FR-016)', () => {
 
   it('renders per-tab count badges on the pill tabs (spec 017 FR-016)', async () => {
     // One created + one participating wager — each tab shows a count badge of
-    // the wagers it contains (the card-grid redesign reintroduces these).
+    // the wagers it contains.
     const markets = [
       wager42(),
       {

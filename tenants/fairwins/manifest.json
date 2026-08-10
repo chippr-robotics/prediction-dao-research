@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "id": "fairwins",
+  "lifecycle": "live",
+
+  "identity": {
+    "displayName": "FairWins",
+    "legalName": "FairWins",
+    "tagline": "Enterprise-grade digital asset infrastructure — self-custody, multi-chain, white-label.",
+    "metaDescription": "FairWins is self-custody digital asset infrastructure: embedded wallets, policy-governed custody, payments and settlement, markets connectivity, and built-in compliance screening across major networks — available white-label under your own brand.",
+    "domains": ["fairwins.app"],
+    "appUrl": "https://fairwins.app",
+    "docsUrl": "https://docs.FairWins.app",
+    "copyrightNotice": "ChipprRobotics LLC. Apache License 2.0",
+    "support": { "email": "Howdy@FairWins.App" },
+    "social": {
+      "x": "https://x.com/fairwins_app",
+      "discord": "https://discord.gg/rkYvPFdRRr",
+      "github": "https://github.com/chippr-robotics/prediction-dao-research",
+      "instagram": "https://instagram.com/fairwinsapp"
+    },
+    "legal": { "termsPath": "/terms", "privacyPath": "/privacy", "riskPath": "/risk" }
+  },
+
+  "brand": {
+    "logo": "/assets/logo_fairwins.svg",
+    "logoMark": "/assets/fairwins_no-text_logo.svg",
+    "favicon": "/assets/logo_fairwins.svg",
+    "appleTouchIcon": "/assets/fairwins_no-text_logo.svg",
+    "htmlTitle": "FairWins - Digital Asset Infrastructure",
+    "pwa": {
+      "name": "🍀FairWins",
+      "shortName": "FairWins",
+      "appleTitle": "🍀FairWins",
+      "themeColor": "#36B37E",
+      "backgroundColor": "#0E141B"
+    },
+    "theme": {
+      "base": {
+        "--brand-primary": "#36B37E",
+        "--brand-primary-rgb": "54, 179, 126",
+        "--brand-secondary": "#4C9AFF",
+        "--brand-secondary-rgb": "76, 154, 255",
+        "--brand-accent": "#7BDCB5",
+        "--brand-accent-rgb": "123, 220, 181",
+        "--semantic-win": "#2ECC71",
+        "--semantic-active": "#4C9AFF",
+        "--semantic-warning": "#F5A623",
+        "--semantic-loss": "#E5533D",
+        "--chart-series-a": "#36B37E",
+        "--chart-series-b": "#4C9AFF",
+        "--chart-series-c": "#7BDCB5",
+        "--chart-series-d": "#F5A623",
+        "--chart-series-e": "#9AA6B2"
+      },
+      "light": {
+        "--primary-button": "#36B37E",
+        "--primary-button-hover": "#2F9E6E",
+        "--primary-button-text": "#FFFFFF",
+        "--accent-color": "#4C9AFF",
+        "--highlight-color": "#7BDCB5"
+      },
+      "dark": {
+        "--primary-button": "#45C492",
+        "--primary-button-hover": "#5ED6A6",
+        "--primary-button-text": "#0E141B",
+        "--accent-color": "#4C9AFF",
+        "--highlight-color": "#7BDCB5"
+      }
+    }
+  },
+
+  "settings": {
+    "features": [
+      "wagers",
+      "pools",
+      "predict",
+      "collect",
+      "earn",
+      "staking",
+      "swap",
+      "bridge",
+      "protect",
+      "callsigns",
+      "miniapps",
+      "clearpath",
+      "token-mint",
+      "bitcoin",
+      "recovery"
+    ],
+    "chains": {
+      "mainnet": [137, 1, 10, 8453, 42161, 61],
+      "testnet": [80002, 63]
+    },
+    "membership": {
+      "tiers": { "bronze": 2, "silver": 8, "gold": 25, "platinum": 100 }
+    },
+    "fees": {
+      "polymarket.taker": 50,
+      "polymarket.maker": 0
+    },
+    "gateway": {
+      "relayerUrl": "https://relay.fairwins.app",
+      "bundlerUrls": {},
+      "paymaster": {}
+    },
+    "subgraph": { "urls": {} }
+  },
+
+  "contractSet": {
+    "mode": "shared",
+    "saltPrefix": null
+  }
+}

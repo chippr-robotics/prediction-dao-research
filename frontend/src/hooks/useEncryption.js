@@ -39,6 +39,7 @@ import {
   lookupPublicKey,
   hasRegisteredKey,
   ensureKeyRegistered,
+  registerEncryptionKey,
   buildRegisterKeyCalls,
   clearKeyCache
 } from '../utils/keyRegistryService.js'
@@ -341,6 +342,60 @@ export function useEncryption() {
   }, [signature, cachedVersion, keyPairs, isPasskey, applyKeyPairs, initializeKeys])
 
   /**
+   * Register this account's X25519 encryption key on-chain, AWAITING the write and surfacing
+   * real errors (unlike initializeKeys' passkey auto-register, which is deliberately non-blocking
+   * so wager creation isn't delayed and therefore can only warn on failure). This is what the
+   * explicit "Register Encryption Key" control needs: a passkey user must be able to see whether
+   * registration actually landed — and why it didn't — rather than a fire-and-forget that leaves
+   * the status stuck on "Not registered".
+   *
+   * @returns {Promise<{ publicKey: Uint8Array, alreadyRegistered: boolean }>}
+   * @throws when key derivation or the on-chain registration fails (caller surfaces the message)
+   */
+  const registerKeyNow = useCallback(async () => {
+    if (!account || (!signer && !isPasskey)) {
+      throw new Error('Connect your account to register an encryption key.')
+    }
+    const readProvider = signer?.provider || provider
+    // Whether the account already has a published on-chain key. This is the safety gate for the
+    // passkey bootstrap below: if a key IS published, its seed is authoritative and we must NEVER
+    // mint a fresh one; if it is NOT, a device that lacks local key material is free to bootstrap
+    // its own seed and register it, instead of dead-ending with "add it from another device".
+    const alreadyRegistered = Boolean(readProvider) && (await hasRegisteredKey(account, readProvider))
+
+    if (isPasskey) {
+      if (typeof sendCalls !== 'function') {
+        throw new Error('This account cannot register a key on the current transaction rail.')
+      }
+      const credentialId = readSession()?.credentialId
+      // allowInit only when nothing is published on-chain — a single-device passkey with a stale/
+      // foreign wrapped-seed blob (listCredentials > 0 but none for THIS credential) can now mint
+      // key material for itself and register, which is exactly the flow that was stranded before.
+      const keys = await ensurePasskeyEncryptionKeys({ account, credentialId, allowInit: !alreadyRegistered })
+      // Publish to hook state so backup, recovery codes, and encrypted wagers use these keys
+      // immediately — no second ceremony, and the (now-written) wrapped seed unblocks those surfaces.
+      applyKeyPairs({
+        x25519: { publicKey: keys.publicKey, privateKey: keys.privateKey },
+        xwing: { publicKey: keys.xwingPublicKey, secretKey: keys.xwingSecretKey },
+      })
+      setCachedVersion(CURRENT_ENCRYPTION_VERSION)
+      if (alreadyRegistered) return { publicKey: keys.publicKey, alreadyRegistered: true }
+      const termsHash = getCurrentDocument('terms')?.hash || null
+      // Awaited (not fire-and-forget): a relayer/paymaster outage or an undeployed KeyRegistry
+      // now surfaces to the caller instead of being swallowed as a console warning.
+      await sendCalls(buildRegisterKeyCalls(keys.publicKey, chainId, termsHash))
+      return { publicKey: keys.publicKey, alreadyRegistered: false }
+    }
+
+    // EOA: derive from the wallet signature and register with the signer.
+    const { publicKey } = await ensureInitialized()
+    if (!publicKey) throw new Error('Failed to derive encryption keys.')
+    if (alreadyRegistered) return { publicKey, alreadyRegistered: true }
+    await registerEncryptionKey(signer, publicKey)
+    return { publicKey, alreadyRegistered: false }
+  }, [account, signer, isPasskey, provider, sendCalls, chainId, applyKeyPairs, ensureInitialized])
+
+  /**
    * Create encrypted market metadata
    * Returns envelope ready for IPFS upload
    * Uses X-Wing (post-quantum) by default for new markets
@@ -627,6 +682,7 @@ export function useEncryption() {
     // Key management
     initializeKeys,
     ensureInitialized,
+    registerKeyNow,
     clearKeys,
 
     // Encryption operations

@@ -9,12 +9,15 @@ import { renderHook, waitFor } from '@testing-library/react'
 
 import { useConnect, useChainId } from 'wagmi'
 
-const { detectCapability, getNetwork } = vi.hoisted(() => ({
+const { detectCapability, getPasskeySupport } = vi.hoisted(() => ({
   detectCapability: vi.fn(),
-  getNetwork: vi.fn(),
+  getPasskeySupport: vi.fn(),
 }))
 vi.mock('../../lib/passkey/credentials', () => ({ detectCapability }))
-vi.mock('../../config/networks', () => ({ getNetwork }))
+// The hook gates on the JOINED support check (bundler configured AND account stack deployed),
+// not on `capabilities.passkeyAccounts` alone — a bundler URL with no factory would render a
+// login button that fails at account creation (spec 041 FR-004).
+vi.mock('../../config/passkeySupport', () => ({ getPasskeySupport }))
 
 import { useConnectorAvailability } from '../useConnectorAvailability'
 
@@ -29,7 +32,7 @@ beforeEach(() => {
   useConnect.mockReturnValue({ connect: vi.fn(), connectors: CONNECTORS })
   useChainId.mockReturnValue(137)
   detectCapability.mockResolvedValue({ available: true, platformAuthenticator: true })
-  getNetwork.mockReturnValue({ capabilities: { passkeyAccounts: true } })
+  getPasskeySupport.mockReturnValue({ supported: true, reason: null })
 })
 
 describe('useConnectorAvailability', () => {
@@ -48,12 +51,26 @@ describe('useConnectorAvailability', () => {
     expect(result.current.unavailableReason(CONNECTORS[2])).toMatch(/does not support/i)
   })
 
-  it('gates passkey on the active network even when the device is capable', async () => {
-    getNetwork.mockReturnValue({ capabilities: { passkeyAccounts: false } })
+  it('keeps passkey available even when the network cannot carry a transaction (the lockout fix)', async () => {
+    // Availability here means "can this member SIGN IN", which is device-scoped. Gating it on the
+    // network locked members out: the selected chain persists, so an unsupported chain hid the
+    // only way back in. Asserting availability stays TRUE while getPasskeySupport reports
+    // unsupported proves the hook does not consult it — the exact regression to prevent.
+    getPasskeySupport.mockReturnValue({ supported: false, reason: 'Not available on this network' })
     const { result } = renderHook(() => useConnectorAvailability())
     await waitFor(() => expect(result.current.isChecking).toBe(false))
-    expect(result.current.isAvailable(CONNECTORS[2])).toBe(false)
-    expect(result.current.unavailableReason(CONNECTORS[2])).toMatch(/network/i)
+    expect(result.current.isAvailable(CONNECTORS[2])).toBe(true)
+    expect(result.current.unavailableReason(CONNECTORS[2])).toBeUndefined()
+  })
+
+  it('never consults the network support gate at all (sign-in is chain-independent)', async () => {
+    // getPasskeySupport remains the right gate for the Network tab and for explaining why a
+    // TRANSACTION cannot be sent. It must simply play no part in whether a member may log in.
+    getPasskeySupport.mockClear()
+    const { result } = renderHook(() => useConnectorAvailability())
+    await waitFor(() => expect(result.current.isChecking).toBe(false))
+    expect(result.current.isAvailable(CONNECTORS[2])).toBe(true)
+    expect(getPasskeySupport).not.toHaveBeenCalled()
   })
 
   it('does not re-probe when the connectors array identity changes but content does not', async () => {

@@ -4,13 +4,31 @@
  * the single source of truth the sources, repository, UI, and report share.
  */
 
-/** Activity classes the ledger covers (FR-001). */
+/**
+ * Activity classes the ledger covers (FR-001).
+ *
+ * Append-only: historical client-ledger entries and the encrypted backup store
+ * these string values verbatim, so an existing entry is never reclassified or
+ * renamed. `POOL` stays reserved for *wager* pools (spec 034) — spec 067's
+ * liquidity supply is its own `LIQUIDITY` class so the two never collide
+ * (spec 067 research R6 / FR-039).
+ */
 export const LEDGER_CLASS = Object.freeze({
   WAGER: 'wager',
   TRANSFER: 'transfer',
   EARN: 'earn',
+  STAKING: 'staking',
   POOL: 'pool',
   MEMBERSHIP: 'membership',
+  // Spec 067 — cross-chain bridging and Earn → Supply liquidity positions.
+  BRIDGE: 'bridge',
+  LIQUIDITY: 'liquidity',
+  // Spec 073 — mini-app audit records: launches, app-requested transactions,
+  // integrity refusals, state changes and app-contextual log entries. The class
+  // carries no value of its own (FR-019/FR-020): a mini-app transaction that
+  // moves money is reported by the domain source that can substantiate the
+  // amount, and this record is the attribution — which app, which account, when.
+  MINIAPP: 'miniapp',
 })
 
 export const LEDGER_CLASSES = Object.freeze(Object.values(LEDGER_CLASS))

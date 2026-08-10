@@ -1,0 +1,219 @@
+/*
+ * Transfer → Bridge (spec 067, US1) — BridgeView + BridgeQuoteCard.
+ *
+ * Theme-aware and variable-driven like PayTransfer.css. Only the bridge's own layout
+ * lives here: the shared form primitives (`.earn-btn`, `.earn-amount-input`,
+ * `.earn-input-error`, `.earn-submit`) come from components/earn/Earn.css, which is in
+ * the same wallet-page bundle — the same cross-file reuse StakeSheet makes of the shared
+ * `.asset-sheet-*` styles. Nothing here is duplicated from there.
+ */
+
+.bridge-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.bridge-intro {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* One labelled control per row: selector, then its plain-language hint. */
+.bridge-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.bridge-label {
+  align-items: center;
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 600;
+  gap: 0.3rem;
+}
+
+.bridge-hint,
+.bridge-asof {
+  align-items: center;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  gap: 0.3rem;
+  margin: 0;
+}
+
+.bridge-asof {
+  font-size: 0.76rem;
+  opacity: 0.8;
+}
+
+.bridge-state {
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+
+/* A routine, non-blocking disclosure (a withheld network, a screening unknown, a
+   partial route read) — stated plainly inline, like .bridge-hint, never boxed.
+   Boxing every fact on the screen is what read as narrative clutter; a card is
+   reserved for a state that actually blocks the member (below). */
+.bridge-note {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* Honest unavailable / blocking blocks — same shape as .earn-unavailable so the two
+   sections read as one app. */
+.bridge-unavailable,
+.bridge-switch-note,
+.bridge-gas-warning,
+.bridge-submitted {
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 10px;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.88rem;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+}
+
+.bridge-unavailable p,
+.bridge-submitted p {
+  margin: 0;
+}
+
+/* A missing gas coin on the far side is a real consequence, so it is marked, not muted. */
+.bridge-gas-warning {
+  border-color: rgba(234, 179, 8, 0.5);
+}
+
+.bridge-switch-note {
+  border-color: var(--brand-primary, #6d28d9);
+}
+
+.bridge-submitted {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+/* ── Quote card ────────────────────────────────────────────────────────────────── */
+
+.bridge-quote {
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+}
+
+.bridge-quote-title {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.bridge-quote-headline,
+.bridge-quote-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.bridge-quote-headline > div,
+.bridge-quote-lines > div {
+  align-items: baseline;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.bridge-quote-headline dt,
+.bridge-quote-lines dt {
+  align-items: center;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  font-size: 0.86rem;
+  gap: 0.25rem;
+}
+
+.bridge-quote-headline dd,
+.bridge-quote-lines dd {
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  text-align: right;
+}
+
+.bridge-quote-received {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.bridge-quote-total {
+  border-top: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  padding-top: 0.4rem;
+}
+
+.bridge-quote-total dt,
+.bridge-quote-total dd {
+  font-weight: 600;
+}
+
+/* A figure the protocol did not give us. Never a zero. */
+.bridge-unknown {
+  color: var(--text-secondary, #6b7280);
+  font-style: italic;
+}
+
+.bridge-quote-validity {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: space-between;
+}
+
+.bridge-quote-fresh,
+.bridge-quote-stale {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  gap: 0.3rem;
+  margin: 0;
+}
+
+.bridge-quote-fresh {
+  color: var(--text-secondary, #6b7280);
+}
+
+.bridge-quote-stale {
+  color: var(--danger-color, #c0392b);
+}
+
+.bridge-attribution,
+.bridge-disclosure {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0;
+  opacity: 0.8;
+}
+
+@media (max-width: 480px) {
+  .bridge-quote-headline > div,
+  .bridge-quote-lines > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .bridge-quote-headline dd,
+  .bridge-quote-lines dd {
+    text-align: left;
+  }
+}

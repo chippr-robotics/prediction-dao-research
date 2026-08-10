@@ -1,7 +1,25 @@
+/**
+ * OracleAdaptersTab tests.
+ *
+ * Spec 071 US4 rewired this tab: adapter addresses no longer come from the build's single
+ * `contracts` record but from `getContractAddressForChain(key, scopeChainId)`, where the scope is
+ * a network the OPERATOR picks (seeded from the wallet's chain), and every WRITE is gated on the
+ * wallet actually being on that scoped chain. This suite was written before that and handed the
+ * tab a `contracts` prop with no `chainId`, so the scope seeded to the first cohort network, the
+ * addresses resolved empty, and every adapter read as "not deployed" — which is why the owner
+ * banner and all four write assertions failed.
+ *
+ * The behaviours asserted here are unchanged; what changed is the setup needed to reach them:
+ * a `chainId` the wallet is on, and a per-chain address book. The scope rules themselves are
+ * asserted at the bottom, because "the adapter is not deployed here" and "your wallet is on
+ * another network" are the two ways an operator's write is now legitimately withheld, and both
+ * must say so rather than fail silently.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
+import { NETWORKS, cohortChainIds } from '../config/networks'
 import OracleAdaptersTab from '../components/admin/OracleAdaptersTab'
 
 // Mock ethers so the component never makes real RPC calls. We intercept
@@ -30,6 +48,12 @@ const { dataFeedStub, functionsStub, umaStub } = vi.hoisted(() => {
   }
 })
 
+const ADAPTER_ADDRESSES = {
+  chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
+  chainlinkFunctionsAdapter: '0x074fC18C1E322a7537b53B8B2Bf0762629E3b532',
+  umaAdapter: '0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88',
+}
+
 vi.mock('ethers', async () => {
   const real = await vi.importActual('ethers')
   const stubs = {
@@ -53,32 +77,63 @@ vi.mock('ethers', async () => {
   }
 })
 
+// The address book is per chain now, so the tests decide which networks carry adapters.
+// Read lazily inside the mocked function (not in the factory body) so the module can be
+// mocked before this file's own bindings initialise.
+let adaptersDeployedOn = new Set()
+vi.mock('../config/contracts', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    getContractAddressForChain: (key, chainId) =>
+      adaptersDeployedOn.has(Number(chainId)) ? (ADAPTER_ADDRESSES[key] || '') : '',
+  }
+})
+
+// Reading a network the wallet is not on goes through the member's configured endpoint. The
+// contract instances are stubbed by address above, so the provider only has to be non-null.
+vi.mock('../lib/chains/estate', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, readProviderFor: () => ({ _fake: 'read provider' }) }
+})
+
 const adminAccount = '0x52502d049571C7893447b86c4d8B38e6184bF6e1'
+
+// Spec 071: the tab scopes to a network the operator picks, seeded from the wallet's chain when
+// that chain is in this build's cohort. HOME is where the wallet sits and adapters are deployed;
+// AWAY has adapters but no wallet; BARE has neither.
+const COHORT = cohortChainIds()
+const HOME = COHORT[0]
+const AWAY = COHORT[1]
+const BARE = COHORT[2]
+const nameOf = (chainId) => NETWORKS[chainId].name
 
 const defaultProps = {
   signer: { provider: {} },  // truthy is enough; ethers.Contract is mocked
   account: adminAccount,
-  contracts: {
-    chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
-    chainlinkFunctionsAdapter: '0x074fC18C1E322a7537b53B8B2Bf0762629E3b532',
-    umaAdapter: '0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88',
-  },
+  // The build's synced record — only ever consulted for the wallet's own chain, where it agrees
+  // with the per-chain address book by construction.
+  contracts: { ...ADAPTER_ADDRESSES },
+  chainId: HOME,
   runTx: vi.fn((fn) => fn()),
   pendingTx: false,
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  adaptersDeployedOn = new Set([HOME, AWAY])
   // Suppress jsdom alert() bubbles in the validation tests.
   vi.spyOn(window, 'alert').mockImplementation(() => {})
 })
 
 describe('OracleAdaptersTab', () => {
-  it('renders the three adapter sub-tabs', () => {
+  it('renders the three adapter sub-tabs', async () => {
     render(<OracleAdaptersTab {...defaultProps} />)
     expect(screen.getByRole('tab', { name: /chainlink data feed/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /chainlink functions/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /uma optimistic oracle/i })).toBeInTheDocument()
+    // Let the async owner read land inside the test rather than after it (act warning).
+    await screen.findByText(/\(you\)/i)
   })
 
   it('shows the owner banner with "(you)" when account === adapter.owner()', async () => {
@@ -99,6 +154,14 @@ describe('OracleAdaptersTab', () => {
     )
     await waitFor(() => {
       expect(screen.getByText(/NOT you/i)).toBeInTheDocument()
+    })
+  })
+
+  it('says an owner it could not read is unread — never "no owner"', async () => {
+    dataFeedStub.owner.mockRejectedValueOnce(new Error('rpc down'))
+    render(<OracleAdaptersTab {...defaultProps} />)
+    await waitFor(() => {
+      expect(screen.getByText(/could not be read/i)).toBeInTheDocument()
     })
   })
 
@@ -235,10 +298,60 @@ describe('OracleAdaptersTab', () => {
     expect(donId).toBe('0x66756e2d706f6c79676f6e2d616d6f792d310000000000000000000000000000')
   })
 
-  it('disables all submit buttons when pendingTx is true', () => {
+  it('disables all submit buttons when pendingTx is true', async () => {
     render(<OracleAdaptersTab {...defaultProps} pendingTx />)
     const buttons = screen.getAllByRole('button').filter(b => /setFeedAllowed|registerCondition|linkMarket/.test(b.textContent))
     expect(buttons.length).toBeGreaterThan(0)
     for (const b of buttons) expect(b).toBeDisabled()
+    // Let the async owner read land inside the test rather than after it (act warning).
+    await screen.findByText(/\(you\)/i)
+  })
+
+  // ── Spec 071 US4: the two ways a write is legitimately withheld, both stated in words ──────
+  describe('network scope', () => {
+    it('states "not deployed" on a network with no adapters, and refuses the write', async () => {
+      // No adapters there, and no synced record either — the build record only ever carries the
+      // wallet's own chain, which here is the bare one.
+      render(<OracleAdaptersTab {...defaultProps} chainId={BARE} contracts={{}} />)
+
+      expect(await screen.findByText(new RegExp(`Not deployed on ${nameOf(BARE)}`, 'i')))
+        .toBeInTheDocument()
+
+      await userEvent.type(
+        screen.getByPlaceholderText(/Chainlink AggregatorV3/i),
+        '0xF0d50568e3A7e8259E16663972b11910F89BD8e7',
+      )
+      await userEvent.click(screen.getByRole('button', { name: /setFeedAllowed/i }))
+
+      expect(defaultProps.runTx).not.toHaveBeenCalled()
+      expect(dataFeedStub.setFeedAllowed).not.toHaveBeenCalled()
+      expect(window.alert).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`not deployed on ${nameOf(BARE)}`, 'i')),
+      )
+    })
+
+    it('refuses a write for a network the wallet is not on, naming the one to switch to', async () => {
+      render(<OracleAdaptersTab {...defaultProps} />)
+
+      // Scope away from the wallet's chain. Reading AWAY is fine; signing for it is not.
+      fireEvent.change(screen.getByRole('combobox', { name: /^Network/i }), {
+        target: { value: String(AWAY) },
+      })
+      expect(await screen.findByText(
+        new RegExp(`reading ${nameOf(AWAY)} while your wallet is on ${nameOf(HOME)}`, 'i'),
+      )).toBeInTheDocument()
+
+      await userEvent.type(
+        screen.getByPlaceholderText(/Chainlink AggregatorV3/i),
+        '0xF0d50568e3A7e8259E16663972b11910F89BD8e7',
+      )
+      await userEvent.click(screen.getByRole('button', { name: /setFeedAllowed/i }))
+
+      expect(defaultProps.runTx).not.toHaveBeenCalled()
+      expect(dataFeedStub.setFeedAllowed).not.toHaveBeenCalled()
+      expect(window.alert).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`switch your wallet to ${nameOf(AWAY)}`, 'i')),
+      )
+    })
   })
 })

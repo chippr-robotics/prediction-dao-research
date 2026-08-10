@@ -112,8 +112,47 @@ server {
     # anywhere in the bundle). This is the PRODUCTION-deployed config (root Dockerfile →
     # default.conf.template); it must carry the same script-src as frontend/nginx.conf (guarded by
     # src/test/nginxCspScriptSrc.test.js) — the two diverged once on exactly this token.
-    # connect-src: dev RPC http://localhost:8545 removed from the production policy.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.seadn.io https://openseauserdata.com https://explorer-api.walletconnect.com https://explorer-api.walletconnect.org https://ipfs.fairwins.app https://gateway.pinata.cloud https://ipfs.io https://cloudflare-ipfs.com https://*.tile.openstreetmap.org; font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com https://fonts.reown.com; connect-src 'self' https://relay.fairwins.app https://bundler.fairwins.app https://fairwins-alto-bundler-266380754692.us-central1.run.app https://api.studio.thegraph.com https://rpc-amoy.polygon.technology https://polygon-amoy.infura.io https://polygon-bor-rpc.publicnode.com https://rpc.mordor.etccooperative.org https://etc.rivet.link https://ethereum-rpc.publicnode.com https://ethereum-sepolia-rpc.publicnode.com https://ethereum-hoodi-rpc.publicnode.com https://ipfs.fairwins.app https://gateway.pinata.cloud https://ipfs.io https://cloudflare-ipfs.com https://api.coingecko.com https://gamma-api.polymarket.com https://clob.polymarket.com https://polymarket.com https://api.morpho.org https://api.merkl.xyz wss://relay.walletconnect.com wss://relay.walletconnect.org https://relay.walletconnect.com https://relay.walletconnect.org https://rpc.walletconnect.com https://rpc.walletconnect.org https://explorer-api.walletconnect.com https://explorer-api.walletconnect.org https://verify.walletconnect.com https://verify.walletconnect.org https://pulse.walletconnect.com https://pulse.walletconnect.org https://api.web3modal.com https://api.web3modal.org https://keys.walletconnect.com https://keys.walletconnect.org https://notify.walletconnect.com https://notify.walletconnect.org https://echo.walletconnect.com https://echo.walletconnect.org https://push.walletconnect.com https://push.walletconnect.org https://*.cloudflareinsights.com; frame-src https://verify.walletconnect.com https://verify.walletconnect.org;" always;
+    # style-src carries fonts.googleapis.com for the STYLESHEET itself
+    # (src/components/tokens/tokens.css @imports the IBM Plex families); font-src covers the
+    # font FILES it then references. Both are needed — with only font-src the stylesheet is
+    # blocked and the app silently falls back to system fonts.
+    # connect-src: loopback http origins are ALLOWED (spec 069 member-run local nodes). The app's
+    # own defaults never point at localhost in production — that is config, not policy.
+    # Only localhost and 127.0.0.1 are listed: CSP's host-source grammar has no syntax for a
+    # bracketed IPv6 literal, so `http://[::1]:*` was rejected as an invalid source and dropped
+    # (logging a console error on every page load) while granting nothing. CSP_RPC_GRANTS in
+    # src/lib/network/endpointStore.js mirrors this, so the endpoint form refuses an IPv6
+    # loopback URL instead of saving one the browser will always block.
+    # connect-src carries a BROAD `https:` grant, deliberately (spec 069). A member may point
+    # any network at their OWN node — self-hosted in their cloud on a domain we cannot know at
+    # build time, or running locally — and the browser blocks any host missing from this policy
+    # before a request leaves the page, so a curated provider allowlist would make every
+    # self-hosted endpoint a dead network no matter how correct it is. A per-member policy is not
+    # expressible in a static header served to everyone, so the grant is scheme-wide.
+    #
+    # The named https hosts below are kept for documentation (they are the app's own defaults and
+    # services, asserted by src/test/nginxCspConnectSrc.test.js) even though `https:` subsumes them.
+    #
+    # Cost, stated plainly: with script-src carrying 'unsafe-inline', an injected script could
+    # POST to any https host rather than only to this list. The XSS entry point is unchanged —
+    # what widens is where data could go afterwards. Accepted to make member-run nodes real.
+    # `https:` does NOT loosen script-src/img-src/frame-src, which stay narrow.
+    #
+    # The three loopback origins are the local-node case: http:// is otherwise unusable from an
+    # https page (mixed content), and loopback is the ONLY http origin browsers treat as
+    # potentially trustworthy. A LAN address like http://192.168.1.5:8545 is still blocked by the
+    # browser as mixed content — the endpoint form says so instead of letting it fail silently.
+    #
+    # `blob:` in script-src (spec 073) is what lets a verified mini-app package run. Packages are
+    # fetched as BYTES over connect-src, checked against the on-chain manifestHash and per-file
+    # sha256 digests, and only then wrapped in a Blob and dynamically imported
+    # (frontend/src/lib/miniapps/loader.js, research R1). A blob: URL can be minted only by this
+    # app's own code, after verification, so the grant admits no third-party origin and no bytes
+    # nobody hashed. The alternative — importing the gateway URL directly — would have required
+    # `https:` in script-src, i.e. any origin may serve executable code. That is the line spec 069
+    # drew when it confined the scheme-wide grant to connect-src, and it stays drawn.
+    # Gated by src/test/nginxCspScriptSrc.test.js.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://*.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.seadn.io https://openseauserdata.com https://explorer-api.walletconnect.com https://explorer-api.walletconnect.org https://ipfs.fairwins.app https://gateway.pinata.cloud https://ipfs.io https://cloudflare-ipfs.com https://*.tile.openstreetmap.org; font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com https://fonts.reown.com; connect-src 'self' https://relay.fairwins.app https://bundler.fairwins.app https://fairwins-alto-bundler-266380754692.us-central1.run.app https://api.studio.thegraph.com https://rpc-amoy.polygon.technology https://polygon-amoy.infura.io https://polygon-bor-rpc.publicnode.com https://rpc.mordor.etccooperative.org https://etc.rivet.link https://ethereum-rpc.publicnode.com https://ethereum-sepolia-rpc.publicnode.com https://ethereum-hoodi-rpc.publicnode.com https://arbitrum-one-rpc.publicnode.com https://base-rpc.publicnode.com https://optimism-rpc.publicnode.com https: http://localhost:* http://127.0.0.1:* https://ipfs.fairwins.app https://gateway.pinata.cloud https://ipfs.io https://cloudflare-ipfs.com https://api.coingecko.com https://gamma-api.polymarket.com https://clob.polymarket.com https://polymarket.com https://api.morpho.org https://api.merkl.xyz wss://relay.walletconnect.com wss://relay.walletconnect.org https://relay.walletconnect.com https://relay.walletconnect.org https://rpc.walletconnect.com https://rpc.walletconnect.org https://explorer-api.walletconnect.com https://explorer-api.walletconnect.org https://verify.walletconnect.com https://verify.walletconnect.org https://pulse.walletconnect.com https://pulse.walletconnect.org https://api.web3modal.com https://api.web3modal.org https://keys.walletconnect.com https://keys.walletconnect.org https://notify.walletconnect.com https://notify.walletconnect.org https://echo.walletconnect.com https://echo.walletconnect.org https://push.walletconnect.com https://push.walletconnect.org https://*.cloudflareinsights.com; frame-src https://verify.walletconnect.com https://verify.walletconnect.org;" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     # HSTS: force HTTPS on this host. Once every *.fairwins.app subdomain is confirmed
     # HTTPS-only, strengthen to "max-age=31536000; includeSubDomains; preload" and submit

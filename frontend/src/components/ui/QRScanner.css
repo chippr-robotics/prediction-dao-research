@@ -8,7 +8,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1001;
+  /* Above the account ActionSheet (1500) and every modal that can host an
+     address field, since the scanner is almost always opened from inside one. */
+  z-index: 1600;
   backdrop-filter: blur(4px);
   animation: fadeIn 0.2s ease-out;
 }

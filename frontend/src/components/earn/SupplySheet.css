@@ -1,0 +1,174 @@
+/* SupplySheet (spec 067, US2) — styles for the supply/withdraw sheet only.
+ *
+ * The modal shell (`.asset-sheet-*`), the amount row, the mode tabs, the fact list, and the
+ * button variants all come from `components/earn/Earn.css`, which the Earn section already
+ * loads. Nothing here restates them — this file adds only what the Supply flow introduces:
+ * the pool-kind badge, the pair-selector fields, the fee-basis block, the disclosure GATE,
+ * and the withdrawal share picker.
+ *
+ * The disclosure is styled to READ like a gate rather than fine print: it is the requirement
+ * (FR-018/FR-019) that a member sees it, so it is given a border, a heading, and full-size
+ * body text — never a muted footnote.
+ */
+
+.supply-sheet .supply-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.9rem 0;
+}
+
+.supply-sheet .supply-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.supply-sheet .supply-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-secondary, #6b7280);
+}
+
+.supply-sheet .supply-note,
+.supply-sheet .supply-unavailable {
+  margin: 0.75rem 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.6rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.supply-sheet .supply-note {
+  background: var(--surface-muted, rgba(120, 120, 140, 0.1));
+  color: var(--text-primary, #111827);
+}
+
+.supply-sheet .supply-unavailable {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--text-primary, #111827);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+}
+
+.supply-sheet .supply-switch-note {
+  margin: 0.75rem 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* Pool kind, said in a word — trading and bridge pools carry different risks and
+   different fee treatment, so they never look alike. */
+.supply-sheet .supply-kind-badge {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  vertical-align: middle;
+}
+
+.supply-sheet .supply-kind-badge.trading {
+  background: rgba(37, 99, 235, 0.14);
+  color: #1d4ed8;
+}
+
+.supply-sheet .supply-kind-badge.bridge {
+  background: rgba(13, 148, 136, 0.14);
+  color: #0f766e;
+}
+
+/* The fee block states a RATE and what it applies to. There is deliberately no room in this
+   layout for a "fee amount" figure computed off the gross: the router charges on what the
+   pool actually consumed, so no such number exists before the mint. */
+.supply-sheet .supply-fee {
+  margin: 0.9rem 0;
+}
+
+.supply-sheet .supply-fee-basis {
+  margin: 0.45rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* The GATE. Visible, inline, and sized like body copy — never a tooltip and never fine print. */
+.supply-sheet .supply-disclosure {
+  margin: 1rem 0 0.6rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border-strong, rgba(120, 120, 140, 0.45));
+  border-radius: 0.65rem;
+  background: var(--surface-raised, rgba(120, 120, 140, 0.06));
+}
+
+.supply-sheet .supply-disclosure h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.supply-sheet .supply-disclosure p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.supply-sheet .supply-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0.4rem 0 0.9rem;
+  font-size: 0.87rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.supply-sheet .supply-ack input {
+  margin-top: 0.2rem;
+  flex: 0 0 auto;
+}
+
+.supply-sheet .supply-confirm-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.supply-sheet .supply-confirm-row .earn-submit {
+  flex: 1 1 auto;
+}
+
+.supply-sheet .supply-percent-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.supply-sheet .supply-percent-row .earn-btn.active {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 1px;
+}
+
+/* Every position figure moves with the market; the label says so next to the number rather
+   than only in a tooltip (FR-020). */
+.supply-sheet .supply-estimate {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-secondary, #6b7280);
+}
+
+@media (prefers-color-scheme: dark) {
+  .supply-sheet .supply-kind-badge.trading {
+    background: rgba(96, 165, 250, 0.18);
+    color: #93c5fd;
+  }
+
+  .supply-sheet .supply-kind-badge.bridge {
+    background: rgba(45, 212, 191, 0.18);
+    color: #5eead4;
+  }
+}

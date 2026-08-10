@@ -18,6 +18,7 @@ vi.mock('../config/contracts', async (importOriginal) => {
 })
 
 import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../utils/blockchainService'
+import { membershipChainId } from '../config/networks'
 import { makeSigner } from './helpers/chainMocks'
 
 // makeSigner (shared) returns a signer whose provider reports chainId via
@@ -89,26 +90,47 @@ describe('purchaseRoleWithStablecoin — onProgress callback (spec 022)', () => 
   })
 })
 
-describe('getUserTierOnChain — chain-aware tier read', () => {
+describe('getUserTierOnChain — membership reads the REFERENCE chain (spec 071 FR-003)', () => {
   beforeEach(() => resolverMock.mockReset())
   // The test env sets VITE_SKIP_BLOCKCHAIN_CALLS=true (vite.config.js) which
-  // short-circuits the function; un-skip it so the chain-aware resolution runs.
+  // short-circuits the function; un-skip it so the chain resolution runs.
   afterEach(() => vi.unstubAllEnvs())
 
-  it("resolves the membership contract for the passed chain id, not the build chain", async () => {
+  // This test used to assert the resolver was queried with the PASSED chain id, guarding a
+  // spec-008 bug where an Amoy tier leaked into the mainnet purchase view. Spec 071 supersedes
+  // that: membership lives in exactly one place per cohort, so the passed chain is ignored and
+  // the reference chain is used. The original leak is still prevented — by cohort separation
+  // (a mainnet build's reference chain is Polygon and can never be Amoy), asserted in
+  // test/lib/chains/membershipChain.test.js — rather than by echoing the wallet's chain.
+  it('ignores the passed chain id and resolves the reference chain', async () => {
     vi.stubEnv('VITE_SKIP_BLOCKCHAIN_CALLS', 'false')
-    // No membership contract on this chain -> tier 0. The point of the test is
-    // the resolver is queried with the wallet's chain id, guarding against the
-    // bug where a testnet (Amoy) tier leaked into the mainnet purchase view.
     resolverMock.mockReturnValue(undefined)
+
+    // Deliberately pass a cohort chain that is NOT the reference chain, so an implementation
+    // that echoed its argument back would fail here rather than pass by coincidence.
+    const notTheReferenceChain = 63
+    expect(notTheReferenceChain).not.toBe(membershipChainId())
+
+    await getUserTierOnChain(
+      '0x0000000000000000000000000000000000000001',
+      'WAGER_PARTICIPANT',
+      notTheReferenceChain
+    )
+
+    expect(resolverMock).toHaveBeenCalledWith('membershipManager', membershipChainId())
+    expect(resolverMock).not.toHaveBeenCalledWith('membershipManager', notTheReferenceChain)
+  })
+
+  it('reports "None" as a READ answer, distinct from an unreadable one (FR-004)', async () => {
+    vi.stubEnv('VITE_SKIP_BLOCKCHAIN_CALLS', 'false')
+    resolverMock.mockReturnValue(undefined) // no MembershipManager, no TierRegistry → genuinely none
 
     const res = await getUserTierOnChain(
       '0x0000000000000000000000000000000000000001',
       'WAGER_PARTICIPANT',
-      80002
+      membershipChainId()
     )
 
-    expect(resolverMock).toHaveBeenCalledWith('membershipManager', 80002)
-    expect(res).toEqual({ tier: 0, tierName: 'None' })
+    expect(res).toMatchObject({ tier: 0, tierName: 'None', readable: true })
   })
 })

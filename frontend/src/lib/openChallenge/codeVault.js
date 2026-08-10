@@ -72,6 +72,29 @@ export function hasVault(address) {
 }
 
 /**
+ * Read the wallet's raw at-rest vault envelope (opaque ciphertext) without decrypting it.
+ * Used by the spec-032 cross-device backup layer (syncedObjects): the envelope is already
+ * encrypted under this account's key material, and the SAME account (passkey master seed or
+ * wallet signature) re-derives that key on any device — so restoring the blob elsewhere makes
+ * the codes recoverable without ever exposing them to the backup channel in cleartext. Returns
+ * null when nothing is saved on this device.
+ */
+export function readVaultEnvelope(address) {
+  if (!address) return null
+  return readEnvelope(address)
+}
+
+/**
+ * Write a raw vault envelope for the wallet (the inverse of {@link readVaultEnvelope}), used by
+ * the spec-032 restore path. The envelope must be one produced by this module for this account —
+ * it stays encrypted at rest and is only openable with the account's key material.
+ */
+export function writeVaultEnvelope(address, envelope) {
+  if (!address || !envelope) return
+  writeEnvelope(address, envelope)
+}
+
+/**
  * Read and decrypt the saved code entries for a wallet. Returns [] when nothing is stored.
  * Throws a friendly error when an envelope exists but the key can't open it (wrong wallet / corrupt).
  */

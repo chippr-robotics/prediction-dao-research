@@ -30,7 +30,10 @@ vi.mock('../../config/contracts', () => ({
 
 import { passkeyConnector, readSession, writeSession, PASSKEY_CONNECTOR_ID } from '../passkey'
 import { ChainNotSupportedError } from '../../lib/passkey/smartAccount'
-import { rememberCredential, knownCredentials } from '../../lib/passkey/credentials'
+import { rememberCredential, knownCredentials, isTransactComplete } from '../../lib/passkey/credentials'
+import { computeAccountAddress, publicKeyToOwnerBytes } from '../../lib/passkey/smartAccount'
+import { p256 } from '@noble/curves/p256.js'
+import { sha256 } from '@noble/hashes/sha2.js'
 
 const ACCOUNT = '0x00000000000000000000000000000000000a11CE'
 const PUBLIC_KEY = { x: '0x' + '1'.repeat(64), y: '0x' + '2'.repeat(64) }
@@ -162,9 +165,24 @@ describe('connect', () => {
     expect(rec.publicKey).toBeUndefined() // junk was never persisted
   })
 
-  it('refuses unsupported networks with ChainNotSupportedError (FR-022)', async () => {
+  it('signs in on a network with NO passkey submission support (the lockout fix)', async () => {
+    // Chain 63 has no bundler in this mock. Sign-in must still work: it is a WebAuthn ceremony
+    // plus a LOCAL address derivation, needing no bundler, EntryPoint or RPC.
+    //
+    // This used to throw ChainNotSupportedError, which locked members out of their own accounts —
+    // the selected network persists, so a member who switched to an unsupported chain returned to
+    // find the passkey option refused on the chain they were already on, and switching away
+    // required signing in first. Submission support is enforced in buildAccount instead.
     const { connector } = makeConnector()
-    await expect(connector.connect({ chainId: 63 })).rejects.toBeInstanceOf(ChainNotSupportedError)
+    const out = await connector.connect({ chainId: 63 })
+    expect(out.accounts).toHaveLength(1)
+    expect(out.chainId).toBe(63)
+  })
+
+  it('derives the same account address whichever chain is connected to (FR-023)', async () => {
+    const a = await makeConnector().connector.connect({ chainId: 80002 })
+    const b = await makeConnector().connector.connect({ chainId: 63 })
+    expect(a.accounts[0]).toBe(b.accounts[0])
   })
 
   it('silent reconnect restores the session without any ceremony (FR-003)', async () => {
@@ -213,18 +231,144 @@ describe('session lifecycle', () => {
     expect(await connector.isAuthorized()).toBe(true)
   })
 
-  it('switchChain refuses unsupported chains and updates the session on supported ones', async () => {
+  it('switchChain allows an unsupported chain and keeps the session (never a one-way door)', async () => {
+    // Refusing here was the other half of the lockout: it made an unsupported chain unreachable
+    // AND unleavable. The member keeps their session and every read surface; only the write path
+    // is limited, and it says so at the point of action.
     const { connector, config } = makeConnector()
     await connector.connect({ chainId: 80002 })
-    await expect(connector.switchChain({ chainId: 63 })).rejects.toBeInstanceOf(ChainNotSupportedError)
-    expect(readSession().chainId).toBe(80002) // unchanged after refusal
-    await expect(connector.switchChain({ chainId: 137 })).rejects.toBeInstanceOf(ChainNotSupportedError) // 137 unconfigured in this mock
-    expect(config.emitter.emit).not.toHaveBeenCalledWith('change', { chainId: 63 })
+    await connector.switchChain({ chainId: 63 })
+    expect(readSession().chainId).toBe(63)
+    expect(config.emitter.emit).toHaveBeenCalledWith('change', { chainId: 63 })
+    // …and the member can always switch back.
+    await connector.switchChain({ chainId: 80002 })
+    expect(readSession().chainId).toBe(80002)
   })
 
   it('exposes the stable connector id used by walletLabel (vendor-neutral)', () => {
     const { connector } = makeConnector()
     expect(connector.id).toBe(PASSKEY_CONNECTOR_ID)
     expect(connector.type).toBe('passkey')
+  })
+})
+
+/**
+ * Cross-device sign-in: the passkey was created on another device (phone) and is synced here, so
+ * the ceremony succeeds but this browser has never recorded the account. Previously this failed
+ * with "This passkey is not yet linked to an account on this browser."
+ *
+ * Uses REAL P-256 signatures — the feature is a claim about what the maths permits, so mocking the
+ * crypto would test nothing.
+ */
+describe('cross-device sign-in (fresh browser, synced passkey)', () => {
+  const enc = (s) => new TextEncoder().encode(s)
+  const concat = (...a) => {
+    const out = new Uint8Array(a.reduce((n, x) => n + x.length, 0))
+    let o = 0
+    for (const x of a) { out.set(x, o); o += x.length }
+    return out
+  }
+
+  const makeAssertion = (priv, challenge) => {
+    const authenticatorData = concat(sha256(enc('fairwins.app')), new Uint8Array([0x05]), new Uint8Array([0, 0, 0, 1]))
+    const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
+    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false })
+    const der = sig.toDERRawBytes ? sig.toDERRawBytes() : sig.toBytes('der')
+    return { credentialId: 'cred-phone', authenticatorData, clientDataJSON, signature: new Uint8Array(der) }
+  }
+
+  it('resolves the account from the signature and leaves the session able to transact', async () => {
+    const priv = p256.utils.randomSecretKey()
+    const xy = `0x${Array.from(p256.getPublicKey(priv, false).subarray(1), (b) => b.toString(16).padStart(2, '0')).join('')}`
+
+    let n = 0
+    const getAssertion = vi.fn(async () => makeAssertion(priv, `challenge-${n++}`))
+    // localStorage is empty (beforeEach clears it) — the fresh-device condition.
+    expect(knownCredentials()).toHaveLength(0)
+
+    const { connector } = makeConnector({
+      getAssertion,
+      deriveAddress: undefined, // use the real local derivation
+      resolveAddress: undefined,
+    })
+    const out = await connector.connect({ chainId: 80002, mode: 'sign-in' })
+
+    expect(out.accounts).toHaveLength(1)
+    // Two ceremonies: one signature can never identify the key (see lib/passkey/crossDevice.js).
+    expect(getAssertion).toHaveBeenCalledTimes(2)
+
+    // The recovered key is persisted, so the very next action can sign without another recovery.
+    const record = knownCredentials().find((c) => c.credentialId === 'cred-phone')
+    expect(publicKeyToOwnerBytes(record.publicKey)).toBe(xy)
+    expect(isTransactComplete(record)).toBe(true)
+
+    // …and the address is exactly what that key derives.
+    expect(out.accounts[0].toLowerCase()).toBe(
+      computeAccountAddress({ ownersBytes: [xy], nonce: 0n }).toLowerCase()
+    )
+  })
+
+  it('refuses (no session) rather than guessing when the two confirmations disagree', async () => {
+    const a = p256.utils.randomSecretKey()
+    const b = p256.utils.randomSecretKey()
+    let n = 0
+    const getAssertion = vi.fn(async () => makeAssertion(n++ === 0 ? a : b, `challenge-${n}`))
+
+    const { connector } = makeConnector({ getAssertion, deriveAddress: undefined, resolveAddress: undefined })
+    await expect(connector.connect({ chainId: 80002, mode: 'sign-in' })).rejects.toThrow()
+    expect(readSession()).toBeNull()
+  })
+})
+
+describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
+  const enc = (s) => new TextEncoder().encode(s)
+  const concat = (...a) => {
+    const out = new Uint8Array(a.reduce((n, x) => n + x.length, 0))
+    let o = 0
+    for (const x of a) { out.set(x, o); o += x.length }
+    return out
+  }
+  const makeAssertion = (priv, challenge) => {
+    const authenticatorData = concat(sha256(enc('fairwins.app')), new Uint8Array([0x05]), new Uint8Array([0, 0, 0, 1]))
+    const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
+    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false })
+    return {
+      credentialId: 'cred-phone',
+      authenticatorData,
+      clientDataJSON,
+      signature: new Uint8Array(sig.toDERRawBytes ? sig.toDERRawBytes() : sig.toBytes('der')),
+    }
+  }
+
+  it('refuses when the derived account is deployed but does not list this passkey', async () => {
+    // The passkey was added as a SECOND controller to a pre-existing account, so its own key does
+    // not derive that account's address. Handing back the derived address would show the member an
+    // account that is not theirs.
+    const priv = p256.utils.randomSecretKey()
+    let n = 0
+    const { connector } = makeConnector({
+      getAssertion: vi.fn(async () => makeAssertion(priv, `c-${n++}`)),
+      deriveAddress: undefined,
+      resolveAddress: undefined,
+      readControllers: vi.fn().mockResolvedValue({
+        deployed: true,
+        controllers: [{ index: 0n, kind: 'passkey', ownerBytes: `0x${'9'.repeat(128)}` }],
+      }),
+    })
+    await expect(connector.connect({ chainId: 80002, mode: 'sign-in' })).rejects.toThrow(/cannot identify/i)
+    expect(readSession()).toBeNull()
+  })
+
+  it('still signs in when the chain is unreachable (sign-in never requires an RPC)', async () => {
+    const priv = p256.utils.randomSecretKey()
+    let n = 0
+    const { connector } = makeConnector({
+      getAssertion: vi.fn(async () => makeAssertion(priv, `c-${n++}`)),
+      deriveAddress: undefined,
+      resolveAddress: undefined,
+      readControllers: vi.fn().mockRejectedValue(new Error('RPC down')),
+    })
+    const out = await connector.connect({ chainId: 80002, mode: 'sign-in' })
+    expect(out.accounts).toHaveLength(1)
   })
 })

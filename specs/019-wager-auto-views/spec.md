@@ -4,6 +4,10 @@
 **Created**: 2026-06-18
 **Status**: Draft
 **Predecessor**: builds on specs 017 & 018 (My Wagers card grid + table view), merged.
+**Superseded in part**: spec 078 replaces FR-001/FR-002 — My Wagers now renders the
+table at every viewport and the card grid is gone. The breakpoint switch left the
+resolution flow unreachable on a phone (a collapsed card exposes no actions), so
+members had to rotate to landscape. FR-003..FR-006 still stand.
 
 **Input**: Iteration feedback to automate and simplify My Wagers:
 1. Small displays always use compact cards; wider displays use the table — chosen

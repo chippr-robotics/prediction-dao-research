@@ -1,0 +1,245 @@
+/* AccountCardsCarousel — the swipeable account cards atop the My Account view.
+   Theme-aware (post-launch feedback on spec 074): cards render on the theme's
+   surface tokens with a per-kind accent edge, so they read correctly in light
+   AND dark mode. Light-mode literals as fallbacks (repo convention). */
+
+.account-cards {
+  position: relative;
+}
+
+.account-cards-viewport {
+  position: relative;
+}
+
+.account-cards-track {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 4px 2px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.account-cards-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* One card per account — the "bank card" of the reference design. The button
+   itself is the listbox option AND the snap target. Two-class selector so the
+   16px padding survives App.css's mobile `button:not([role="switch"])`
+   tap-target padding (the card is far beyond 44px already). */
+.account-cards-track .account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+  width: min(78%, 320px);
+  scroll-snap-align: center;
+  min-height: 150px;
+  padding: 16px;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-left: 4px solid var(--brand-primary, #36b37e);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #1f2933);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition-fast, 0.15s), box-shadow var(--transition-fast, 0.15s);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.account-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+.account-card:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+
+/* Per-kind accent edge — identity color without abandoning the theme. */
+.account-card--vault {
+  border-left-color: var(--brand-secondary, #4c9aff);
+}
+
+.account-card--legacy {
+  border-left-color: var(--semantic-warning, #f5a623);
+}
+
+.account-card.is-active {
+  border-color: var(--brand-primary, #36b37e);
+  box-shadow: 0 0 0 2px var(--brand-primary, #36b37e), var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.account-card--vault.is-active {
+  border-left-color: var(--brand-primary, #36b37e);
+}
+
+.account-card--legacy.is-active {
+  border-left-color: var(--brand-primary, #36b37e);
+}
+
+.account-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.account-card-top .blockies-avatar {
+  border-radius: 50%;
+}
+
+.account-card-kind {
+  padding: 2px 8px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #5a6772);
+}
+
+.account-card-label {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary, #1f2933);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Quick-access portfolio total on the ACTIVE card (post-launch feedback). */
+.account-card-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.account-card-balance-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #5a6772);
+}
+
+.account-card-balance-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary, #1f2933);
+}
+
+.account-card-bottom {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.account-card-address {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #5a6772);
+}
+
+.account-card-network {
+  font-size: 0.75rem;
+  color: var(--text-muted, #8b98a5);
+}
+
+.account-card-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+  font-size: 0.75rem;
+  color: var(--text-muted, #8b98a5);
+}
+
+.account-card-state.is-active {
+  color: var(--brand-primary, #36b37e);
+  font-weight: 600;
+}
+
+/* Arrows — desktop/keyboard affordance; hidden on touch-first small screens
+   where swiping is the natural gesture. */
+.account-cards-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: var(--radius-full, 9999px);
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #1f2933);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.account-cards-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.account-cards-arrow--prev {
+  left: -6px;
+}
+
+.account-cards-arrow--next {
+  right: -6px;
+}
+
+@media (max-width: 768px) {
+  .account-cards-arrow {
+    display: none;
+  }
+}
+
+/* Position dots — deliberately minimal (post-launch feedback: they must not
+   dominate the page). App.css's mobile tap-target rule
+   (`button:not([role="switch"]) { min-width/min-height: 44px; padding: … }`)
+   outranks a single class, so the two-class selector pins every inflating
+   property. The dot LOOKS 6px (background clipped to the content box) while
+   the transparent padding keeps a ~22px touch target. */
+.account-cards-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+}
+
+.account-cards-dots .account-cards-dot {
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px;
+  border: none;
+  border-radius: 50%;
+  background: var(--border-color, #e3e7eb);
+  background-clip: content-box;
+  font-size: 0;
+  line-height: 0;
+  cursor: pointer;
+  transition: background-color var(--transition-fast, 0.15s);
+}
+
+.account-cards-dots .account-cards-dot:hover {
+  border: none;
+}
+
+.account-cards-dots .account-cards-dot.is-current {
+  background: var(--brand-primary, #36b37e);
+  background-clip: content-box;
+  padding: 7px;
+}

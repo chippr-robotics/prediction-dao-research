@@ -11,10 +11,20 @@ import './MembershipTreasuryOverview.css'
  * truncated window.
  *
  * Props:
- *   provider   — ethers provider for the read scan
- *   chainId    — connected chain (drives the cache key + address resolution)
- *   address    — MembershipManager address on this chain ('' when undeployed)
+ * Spec 071 (T046): memberships live on ONE chain, so this panel is pinned to the reference chain
+ * rather than given a network picker — there is no second membership estate to look at. What that
+ * requires of the caller is that `provider`, `chainId` and `address` all name the SAME chain: a
+ * wallet provider paired with the reference chain's address reads one chain's contract at
+ * another's address, and caches the answer under the wrong key.
+ *
+ * Props:
+ *   provider   — ethers provider for the read scan, on `chainId`
+ *   chainId    — the chain being read (drives the cache key); the membership reference chain
+ *   address    — MembershipManager address on that chain ('' when undeployed)
  *   accruedFees — live undrawn balance (USDC string) already read by the parent AdminPanel
+ *   accruedFeesReadable — whether that read SUCCEEDED. `false` renders as "could not be read",
+ *     never as $0.00: an operator who reads a zero accrued balance concludes the fees were
+ *     already withdrawn, and acts on it.
  */
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
@@ -81,7 +91,7 @@ function Tile({ label, value, tone }) {
   )
 }
 
-export default function MembershipTreasuryOverview({ provider, chainId, address, accruedFees }) {
+export default function MembershipTreasuryOverview({ provider, chainId, address, accruedFees, accruedFeesReadable = true }) {
   const configured = Boolean(address && ethers.isAddress(address))
   const stats = useMembershipTreasuryStats({ provider, chainId, address })
 
@@ -96,7 +106,8 @@ export default function MembershipTreasuryOverview({ provider, chainId, address,
       <div className="admin-card full-width">
         <div className="admin-card-header"><h3>Membership &amp; Treasury</h3></div>
         <p role="status" className="mto-muted">
-          MembershipManager is not deployed / configured on this network — no app-wide statistics to show.
+          MembershipManager is not deployed / configured on the membership network — no app-wide
+          statistics to show.
         </p>
       </div>
     )
@@ -161,7 +172,10 @@ export default function MembershipTreasuryOverview({ provider, chainId, address,
             <div className="mto-tiles" aria-label="Treasury growth summary">
               <Tile label={d.truncated ? 'Membership revenue (window)' : 'Membership revenue'} value={usd(d.revenue.total)} tone="accent" />
               <Tile label="Withdrawn to treasury" value={usd(d.revenue.withdrawn)} />
-              <Tile label="Accrued (undrawn, live)" value={usd(accruedFees)} />
+              <Tile
+                label="Accrued (undrawn, live)"
+                value={accruedFeesReadable === false ? 'Could not be read' : usd(accruedFees)}
+              />
             </div>
 
             <RevenueSparkline series={d.series} />

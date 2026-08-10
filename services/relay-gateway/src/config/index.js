@@ -8,8 +8,9 @@
  * or the process exits non-zero (fail loudly — never run against a stale/unknown target).
  *
  * Env:
- *   ENABLED_CHAIN_IDS          comma list (default "137,80002,63" — 61 has no deployment record yet;
- *                              enabling it without one fails the startup check by design)
+ *   ENABLED_CHAIN_IDS          comma list (default "137,80002,63" — 61's record has custody
+ *                              contracts only (no wagerRegistry), so enabling it fails the
+ *                              startup check by design until the full target set is pinned)
  *   RPC_URLS_<chainId>         comma list, failover order (default: built-in public pair, FR-007)
  *   ORIGIN_AUTH_SECRET         origin-lock shared secret (X-Origin-Auth). Unset => lock DISABLED
  *                              (dev only; production must set it — research.md §4 / SC-016)
@@ -57,10 +58,49 @@
  *   POLYMARKET_WRITE_QUOTA_GLOBAL      order/cancel writes/min across all callers (default 100)
  *   POLYMARKET_BUILDER_CODE    FairWins bytes32 builder code (spec 057, public; unset => unattributed,
  *                              orders still post — never stranded). Attaches to every order for fee + rewards.
- *   POLYMARKET_BUILDER_TAKER_FEE_BPS  builder fee on taker orders (default 50; hard cap 100 — fails boot if over)
- *   POLYMARKET_BUILDER_MAKER_FEE_BPS  builder fee on maker orders (default 0; hard cap 50 — fails boot if over)
+ *   POLYMARKET_BUILDER_TAKER_FEE_BPS  builder fee on taker orders (default 50; hard cap 100 — fails boot if over).
+ *                              Since spec 060 this is the FALLBACK served when the FeeRouter is
+ *                              unset/unreachable; the on-chain rate is the source of truth.
+ *   POLYMARKET_BUILDER_MAKER_FEE_BPS  builder fee on maker orders (default 0; hard cap 50 — fails boot if over).
+ *                              Fallback since spec 060, same as the taker fee.
+ *   BTC_ENABLED                'true' enables the /v1/bitcoin/* proxy (spec 061). Default false =>
+ *                              routes answer 503 bitcoin_disabled and the SPA soft-fails the capability
+ *   BTC_ESPLORA_URL            Esplora-compatible mainnet upstream (default https://mempool.space/api;
+ *                              swappable to blockstream.info or self-hosted electrs)
+ *   BTC_ESPLORA_TESTNET_URL    Esplora-compatible testnet4 upstream (default https://mempool.space/testnet4/api)
+ *   BTC_STAMPS_URL             stampchain.io-compatible Stamps indexer base. Unset => the stamps route
+ *                              answers degraded:true and the client fail-safes (protects unverified coins)
+ *   BTC_MAX_FEE_RATE           sat/vB clamp on fee responses (default 500; must be >= 1 when enabled)
+ *   BTC_TIMEOUT_MS             upstream request timeout (default 5000)
+ *   BTC_RETRIES                upstream retries on 5xx/transport for reads (default 1; broadcast never retries)
+ *   BTC_QUOTA_PER_IP           reads/min per caller IP (default 60 — polymarket parity)
+ *   BTC_QUOTA_GLOBAL           reads/min across all callers (default 300 — polymarket parity)
+ *   BTC_QUOTA_WINDOW_MS        quota window (default 60000)
+ *   BTC_WRITE_QUOTA_PER_IP     broadcasts/min per caller IP (default 20 — stricter than reads)
+ *   BTC_WRITE_QUOTA_GLOBAL     broadcasts/min across all callers (default 100)
+ *   BTC_KILLSWITCH             'true' => all /v1/bitcoin/* routes answer 503 bitcoin_killed (ops kill)
+ *   BRIDGE_ENABLED             'true' enables the /v1/bridge/* Across proxy (spec 067). Default false =>
+ *                              routes answer 503 bridge_disabled and the SPA hides the Bridge tab
+ *   BRIDGE_API_URL             Across API base (default https://app.across.to/api)
+ *   BRIDGE_CHAIN_IDS           comma list of chains bridging is offered between (default the spec-067
+ *                              five: 1,10,137,8453,42161 — all carry an Across SpokePool)
+ *   BRIDGE_TIMEOUT_MS          upstream request timeout (default 5000)
+ *   BRIDGE_RETRIES             upstream retries on 5xx/transport (default 1; all routes are reads)
+ *   BRIDGE_QUOTE_TTL_MS        quote cache TTL (default 10000 — single-flight only; a quote is NEVER
+ *                              served stale, the route 503s instead)
+ *   BRIDGE_STATUS_TTL_MS       deposit-status cache TTL (default 15000; stale IS served, marked)
+ *   BRIDGE_QUOTA_PER_IP        reads/min per caller IP (default 60 — polymarket parity)
+ *   BRIDGE_QUOTA_GLOBAL        reads/min across all callers (default 300)
+ *   BRIDGE_QUOTA_WINDOW_MS     quota window (default 60000)
+ *   BRIDGE_KILLSWITCH          'true' => all /v1/bridge/* routes answer 503 bridge_killed (ops kill)
+ *   FEE_ROUTER_ADDRESS         FeeRouter proxy (spec 060) serving the LIVE polymarket.taker/.maker bps.
+ *                              Defaults to the deployment record's feeRouter for FEE_ROUTER_CHAIN_ID;
+ *                              a set value that CONTRADICTS the record fails boot loudly. Unset and not
+ *                              in the record => env-fallback mode (pre-060 behavior).
+ *   FEE_ROUTER_CHAIN_ID        chain the FeeRouter is read on (default 137)
+ *   FEE_ROUTER_CACHE_TTL_MS    on-chain rate cache TTL (default 30000 — bounds admin-change latency)
  *   CDP_API_KEY_ID             Coinbase Developer Platform secret-API-key id for the /v1/onramp/* buy-crypto
- *                              proxy (spec 060). Either CDP var unset => those routes fail CLOSED with 503
+ *                              proxy (spec 081). Either CDP var unset => those routes fail CLOSED with 503
  *                              onramp_unconfigured (the Buy button hides; nothing else is affected)
  *   CDP_API_KEY_SECRET         CDP secret-API-key material (server-only; never logged, never sent to clients)
  *   ONRAMP_API_BASE_URL        CDP Onramp API base (default https://api.developer.coinbase.com)
@@ -132,7 +172,21 @@ function loadDeployment(deploymentsDir, chainId) {
  * @param {{deploymentsDir?: string}} [opts]
  */
 export function loadConfig(env = process.env, opts = {}) {
-  const deploymentsDir = opts.deploymentsDir || opt(env, 'DEPLOYMENTS_DIR', DEFAULT_DEPLOYMENTS_DIR)
+  // Tenant scope (spec 072, T023): one gateway process serves ONE tenant.
+  // TENANT_ID resolves the records dir to the tenant's dedicated estate
+  // (deployments/tenants/<id>/, same schema) — the FR-025 allowlist below then
+  // IS the tenant boundary: an intent targeting another tenant's contracts is
+  // refused because those addresses are simply not in this process's records.
+  // Unset (or the default tenant) reads the shared estate, exactly as before.
+  const tenantId = opt(env, 'TENANT_ID', '')
+  if (tenantId && !/^[a-z][a-z0-9-]{1,30}$/.test(tenantId)) {
+    throw new Error(`[relay-gateway] invalid TENANT_ID "${tenantId}" — must match ^[a-z][a-z0-9-]{1,30}$`)
+  }
+  const tenantScoped = Boolean(tenantId) && tenantId !== 'fairwins'
+  const defaultDir = tenantScoped
+    ? path.join(DEFAULT_DEPLOYMENTS_DIR, 'tenants', tenantId)
+    : DEFAULT_DEPLOYMENTS_DIR
+  const deploymentsDir = opts.deploymentsDir || opt(env, 'DEPLOYMENTS_DIR', defaultDir)
 
   const enabledChainIds = opt(env, 'ENABLED_CHAIN_IDS', '137,80002,63')
     .split(',')
@@ -253,6 +307,9 @@ export function loadConfig(env = process.env, opts = {}) {
   }
 
   return {
+    // Tenant this process serves (spec 072). null = the shared/default estate.
+    tenantId: tenantScoped ? tenantId : null,
+    deploymentsDir,
     enabledChainIds,
     chains,
     port: int(env, 'PORT', 8788),
@@ -382,7 +439,124 @@ export function loadConfig(env = process.env, opts = {}) {
         return bps
       })(),
     },
-    // Coinbase Onramp proxy (spec 060 buy-crypto): optional like the OpenSea/Polymarket modules — either
+    // Bitcoin proxy (spec 061): optional like the OpenSea/Polymarket proxies — disabled means the
+    // /v1/bitcoin/* routes 503 fail-closed (bitcoin_disabled) and the SPA soft-fails the capability;
+    // boot is unaffected. Fail-loud validation applies only when the module is ENABLED: a malformed
+    // upstream URL or a nonsensical fee clamp must stop the boot rather than serve garbage
+    // (same philosophy as the polymarket fee-cap boot check).
+    bitcoin: (() => {
+      const enabled = opt(env, 'BTC_ENABLED', 'false').toLowerCase() === 'true'
+      const esploraUrl = opt(env, 'BTC_ESPLORA_URL', 'https://mempool.space/api')
+      const esploraTestnetUrl = opt(env, 'BTC_ESPLORA_TESTNET_URL', 'https://mempool.space/testnet4/api')
+      const stampsUrl = opt(env, 'BTC_STAMPS_URL', null)
+      const maxFeeRate = int(env, 'BTC_MAX_FEE_RATE', 500)
+      if (enabled) {
+        const urls = [
+          ['BTC_ESPLORA_URL', esploraUrl],
+          ['BTC_ESPLORA_TESTNET_URL', esploraTestnetUrl],
+          ...(stampsUrl ? [['BTC_STAMPS_URL', stampsUrl]] : []),
+        ]
+        for (const [name, url] of urls) {
+          let ok = false
+          try {
+            ok = ['http:', 'https:'].includes(new URL(url).protocol)
+          } catch {
+            ok = false
+          }
+          if (!ok) throw new Error(`[relay-gateway] ${name}=${url} is not a valid http(s) URL`)
+        }
+        // Clamp sanity (contract: min >= 1, max >= min; the lower bound is the fixed 1 sat/vB floor).
+        if (maxFeeRate < 1) throw new Error(`[relay-gateway] BTC_MAX_FEE_RATE=${maxFeeRate} must be >= 1 sat/vB`)
+      }
+      return {
+        enabled,
+        esploraUrl,
+        esploraTestnetUrl,
+        stampsUrl,
+        maxFeeRate,
+        timeoutMs: int(env, 'BTC_TIMEOUT_MS', 5000),
+        retries: int(env, 'BTC_RETRIES', 1),
+        quotaPerIp: int(env, 'BTC_QUOTA_PER_IP', 60),
+        quotaGlobal: int(env, 'BTC_QUOTA_GLOBAL', 300),
+        quotaWindowMs: int(env, 'BTC_QUOTA_WINDOW_MS', 60_000),
+        // Broadcast: a separate, tighter per-IP quota (contract: stricter than reads).
+        writeQuotaPerIp: int(env, 'BTC_WRITE_QUOTA_PER_IP', 20),
+        writeQuotaGlobal: int(env, 'BTC_WRITE_QUOTA_GLOBAL', 100),
+        killSwitch: opt(env, 'BTC_KILLSWITCH', 'false').toLowerCase() === 'true',
+      }
+    })(),
+    // Cross-chain bridge proxy (spec 067): optional like the Bitcoin/Polymarket proxies — disabled
+    // means the /v1/bridge/* routes 503 fail-closed (bridge_disabled) and the SPA hides the Bridge
+    // tab for a stated reason (FR-053); boot is unaffected. Fail-loud validation applies only when
+    // the module is ENABLED, because a bad upstream URL or a one-chain route set cannot produce a
+    // single valid bridge and must stop the boot rather than 502 every request.
+    bridge: (() => {
+      const enabled = opt(env, 'BRIDGE_ENABLED', 'false').toLowerCase() === 'true'
+      const apiUrl = opt(env, 'BRIDGE_API_URL', 'https://app.across.to/api')
+      // The spec-067 launch matrix (research R8): every one of these carries an Across SpokePool.
+      // ETC/Mordor/Amoy are absent on purpose — no Across deployment exists there (FR-006c).
+      const chainIds = opt(env, 'BRIDGE_CHAIN_IDS', '1,10,137,8453,42161')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => {
+          const n = Number.parseInt(s, 10)
+          if (!Number.isInteger(n) || n <= 0) throw new Error(`[relay-gateway] invalid chainId in BRIDGE_CHAIN_IDS: ${s}`)
+          return n
+        })
+      if (enabled) {
+        let ok = false
+        try {
+          ok = ['http:', 'https:'].includes(new URL(apiUrl).protocol)
+        } catch {
+          ok = false
+        }
+        if (!ok) throw new Error(`[relay-gateway] BRIDGE_API_URL=${apiUrl} is not a valid http(s) URL`)
+        // A bridge needs two endpoints; one chain can only ever produce same-chain "routes".
+        if (new Set(chainIds).size < 2) {
+          throw new Error('[relay-gateway] BRIDGE_CHAIN_IDS must list at least two distinct chainIds when BRIDGE_ENABLED=true')
+        }
+      }
+      return {
+        enabled,
+        apiUrl,
+        chainIds,
+        timeoutMs: int(env, 'BRIDGE_TIMEOUT_MS', 5000),
+        retries: int(env, 'BRIDGE_RETRIES', 1),
+        // Quotes move with gas and relayer capital, so the window is short and the cache is used
+        // for single-flight de-dup only — routes.js refuses to serve a stale quote at all (FR-008).
+        quoteTtlMs: int(env, 'BRIDGE_QUOTE_TTL_MS', 10_000),
+        statusTtlMs: int(env, 'BRIDGE_STATUS_TTL_MS', 15_000),
+        quotaPerIp: int(env, 'BRIDGE_QUOTA_PER_IP', 60),
+        quotaGlobal: int(env, 'BRIDGE_QUOTA_GLOBAL', 300),
+        quotaWindowMs: int(env, 'BRIDGE_QUOTA_WINDOW_MS', 60_000),
+        killSwitch: opt(env, 'BRIDGE_KILLSWITCH', 'false').toLowerCase() === 'true',
+      }
+    })(),
+    // FeeRouter (spec 060): the on-chain source of truth for the Polymarket builder bps. The env
+    // takerFeeBps/makerFeeBps above become the FALLBACK when the router is unset or unreachable.
+    // The address defaults to the deployment record's feeRouter (same pinning philosophy as
+    // FR-025); an env override that CONTRADICTS the record fails boot loudly.
+    feeRouter: (() => {
+      const chainId = int(env, 'FEE_ROUTER_CHAIN_ID', 137)
+      const cacheTtlMs = int(env, 'FEE_ROUTER_CACHE_TTL_MS', 30_000)
+      const envAddress = opt(env, 'FEE_ROUTER_ADDRESS', null)
+      if (envAddress && !ADDRESS_RE.test(envAddress)) {
+        throw new Error('[relay-gateway] FEE_ROUTER_ADDRESS is not an address')
+      }
+      const deployment = loadDeployment(deploymentsDir, chainId)
+      const recorded = deployment?.contracts?.feeRouter && ADDRESS_RE.test(deployment.contracts.feeRouter)
+        ? deployment.contracts.feeRouter
+        : null
+      if (envAddress && recorded && envAddress.toLowerCase() !== recorded.toLowerCase()) {
+        throw new Error(
+          `[relay-gateway] FEE_ROUTER_ADDRESS=${envAddress} contradicts the deployment record's feeRouter ` +
+            `${recorded} for chain ${chainId} (${deployment.file}). Refusing to start.`
+        )
+      }
+      return { address: envAddress || recorded, chainId, cacheTtlMs }
+    })(),
+    // Coinbase Onramp proxy (spec 081 buy-crypto): optional like the OpenSea/Polymarket modules — either
     // CDP credential absent means the /v1/onramp/* routes 503 fail-closed and the SPA hides the wallet-sheet
     // Buy button; boot is unaffected (the onramp is a transitional convenience that must never couple to
     // the value paths, and config-off must leave zero residual UI).
@@ -407,5 +581,12 @@ export function loadConfig(env = process.env, opts = {}) {
     // /healthz + /status cache window: caps upstream RPC fan-out from the origin-lock-exempt health
     // route so it can't be looped to amplify load onto the operator's public RPCs.
     healthCacheMs: int(env, 'HEALTH_CACHE_MS', 5000),
+    // Build identity (spec 076, FR-030). Set by the deploy pipeline; absent on any build that is
+    // not a published release, in which case the health surface reports `unreleased+<sha>` rather
+    // than the nearest tag (FR-031). Public, non-secret — see the health handler in server.js.
+    build: {
+      version: opt(env, 'APP_VERSION', null),
+      gitSha: opt(env, 'GIT_SHA', null),
+    },
   }
 }

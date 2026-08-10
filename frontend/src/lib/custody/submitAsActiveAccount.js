@@ -48,7 +48,24 @@ export async function submitAsActiveAccount(payload, ctx) {
     await approveTx.wait()
     return { kind: 'proposed', safeTxHash }
   }
-  // personal mode — unchanged single-signer behaviour
+  // Single-signer mode (personal wallet, or a recovered legacy account whose
+  // unlocked signer is passed in). A `batch` (e.g. [approve, swap]) is sent as
+  // SEQUENTIAL signed transactions, each awaited to inclusion so ordering holds
+  // (the approve must be mined before the swap that relies on the allowance).
+  // An EOA cannot atomically batch, so this is the honest equivalent.
+  if (Array.isArray(payload.batch) && payload.batch.length > 0) {
+    let lastHash = null
+    for (const call of payload.batch) {
+      const tx = await ctx.signer.sendTransaction({
+        to: call.to,
+        value: call.value ?? 0n,
+        data: call.data ?? '0x',
+      })
+      if (tx?.wait) await tx.wait()
+      lastHash = tx?.hash ?? tx
+    }
+    return { kind: 'sent', txHash: lastHash }
+  }
   const sent = await ctx.signer.sendTransaction({
     to: payload.to,
     value: payload.value ?? 0n,

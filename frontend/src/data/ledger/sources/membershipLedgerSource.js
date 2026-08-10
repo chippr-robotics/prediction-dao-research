@@ -8,6 +8,7 @@
  * Chains without a subgraph return [] — a disclosed gap.
  */
 import { querySubgraph } from './subgraphClient'
+import { getContractAddressForChain } from '../../../config/contracts'
 import { onchainEntryId } from '../identity'
 import { LEDGER_CLASS, LEDGER_DIRECTION, LEDGER_STATUS, PROVENANCE, TS_PROVENANCE, VALUATION_STATUS } from '../constants'
 
@@ -59,7 +60,16 @@ export function createMembershipLedgerSource(deps = {}) {
     class: LEDGER_CLASS.MEMBERSHIP,
     async list({ account, chainId }) {
       const data = await query(chainId, VOUCHER_QUERY, { account })
-      if (!data) return []
+      if (!data) {
+        // Same reasoning as poolLedgerSource: an empty array is a FULFILLED
+        // promise, so `ledgerRepository` would never record the gap and the
+        // report would total as if voucher history were complete. Refuse only
+        // where vouchers actually exist on the chain.
+        if (getContractAddressForChain('membershipVoucher', chainId)) {
+          throw new Error(`membership ledger: chain ${chainId} has vouchers but no subgraph to read them from`)
+        }
+        return []
+      }
       const entries = []
       for (const v of data.minted || []) {
         if (!v.mintTxHash) continue

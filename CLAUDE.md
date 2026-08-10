@@ -38,6 +38,9 @@ artifacts live under `specs/<feature>/`.
 - `npm run test:frontend` — frontend tests
 - `npm run frontend` — run the frontend dev server
 - `npm run sync:frontend-contracts` — regenerate frontend contract artifacts
+- Only run the **full** frontend suite (`vitest run` with no filter) in CI — locally it
+  OOMs this environment. Scope local runs to specific files/dirs
+  (`npx vitest run src/test/foo.test.js`).
 
 ## Guardrails
 
@@ -75,9 +78,17 @@ artifacts live under `specs/<feature>/`.
   `WagerRegistryCore` — the single storage-layout definition; never declare registry state
   anywhere else — and `check:storage-layout` validates the pair. In tests use
   `test/helpers/proxy.js#deployWagerRegistry` (deploys + wires both facets, returns a merged-ABI
-  contract). The EIP-712 intent structs exist in THREE places that must stay byte-identical:
-  the contract typehashes, `frontend/src/lib/relay/intentTypes.js`, and
-  `services/relay-gateway/src/intent/intentTypes.js`. The relayer (spec 036:
+  contract). The EIP-712 intent structs have **ONE source since spec 075** —
+  `@fairwins/intent-types` — and `frontend/src/lib/relay/intentTypes.js` and
+  `services/relay-gateway/src/intent/intentTypes.js` are re-exports, not copies. Never
+  reintroduce a local table: `test/intent/TypehashParity.test.js` checks the package against
+  typehashes parsed out of the **contracts** (both directions — a struct the Solidity verifies
+  but the package lacks fails too), and `services/relay-gateway/test/actionCoverage.test.js`
+  checks the gateway's action table against it. The **domains** (`name`/`version`) are the one
+  piece still hand-synced across `intentTypes.js` in both trees plus
+  `frontend/src/utils/claimCode/deriveFromCode.js`, with nothing tying them to the contract that
+  verifies the signature — a correct type table under a wrong domain still produces an invalid
+  signature (issue #1038). The relayer (spec 036:
   `services/relay-gateway` policy gateway + `services/oz-relayer` engine config) is optional
   infrastructure — every gasless flow keeps a self-submit fallback (never-stranded rule).
   See `docs/developer-guide/gasless-intents.md` + `docs/runbooks/relayer-operations.md`.
@@ -133,7 +144,265 @@ artifacts live under `specs/<feature>/`.
   never hidden, never "free". Resolve nothing through `wagerRegistry`. Builder code + fee are public
   config; the CLOB API key + L2 creds are gateway-only secrets. Boot fails loudly if the fee exceeds the
   caps. See `docs/developer-guide/predict-polymarket.md` + `specs/057-predict-polymarket/`.
-- **Buy crypto (spec 060) is a deliberately minimal, removable convenience — wallet-sheet ONLY.**
+- **Platform fees (spec 060) have ONE source of truth: the `FeeRouter`** (UUPS proxy, deployment keys
+  `feeRouter` / `feeRouterImpl`, `contracts/fees/`). Every configurable fee lives there as a
+  `bytes32 serviceId` (keccak of e.g. `earn.lend`, `polymarket.taker`) with a per-service hard cap
+  (wrapped services ≤ 250 bps; Polymarket keeps its spec-057 caps) — never hardcode a bps value in
+  client or gateway code, and never invent a second fee-config store (the gateway stays stateless
+  and only READS the router via `services/relay-gateway/src/fees/onchain.js`, env bps are fallback).
+  Wrapped charging is atomic (`depositToVaultWithFee`: fee → treasury + net → ERC-4626 vault in one
+  tx) and every member surface MUST disclose the live rate before signature and pass the quoted bps
+  as `maxFeeBps` (members can never be charged above what they saw); zero fee ⇒ no fee line and
+  byte-identical pre-060 behavior. New integrations (Lido, Polygon LST, Uniswap) REGISTER a service
+  (config only) instead of building their own fee path. `FEE_ADMIN_ROLE` edits rates from the
+  AdminPanel Fees tab; history = `FeeBpsChanged` events. See
+  `docs/developer-guide/platform-fees.md` + `docs/runbooks/fee-operations.md` + `specs/060-platform-fee-wrapper/`.
+- **Bitcoin (spec 061) is the FIRST NON-EVM network — portfolio/send/receive ONLY.** Bitcoin
+  networks are STRING ids (`'bitcoin'`, `'bitcoin-testnet'` = testnet4) in
+  `frontend/src/config/bitcoinNetworks.js`, parallel to (never inside) the numeric `NETWORKS`
+  map — never assign Bitcoin a numeric chainId and never pass its ids to
+  `getContractAddressForChain`/wagmi/subgraph code (guard boundaries with `isBitcoinNetworkId`).
+  Keys derive client-side from the spec-041 passkey master seed per
+  `specs/061-bitcoin-transactions/contracts/key-derivation-btc.md` — those constants
+  (HKDF info `fairwins-btc-seed-v1`, BIP84/BIP86 paths) are **wallet-breaking** if changed;
+  key material/xpubs never leave the client (gateway sees bare addresses + signed raw txs only).
+  Receive addresses ROTATE (never reissued; gap-limit-20 discovery rebuilds on recovery; cursor
+  never decreases). Stamps handling is FAIL-SAFE: a UTXO is spendable only when positively
+  verified stamp-free — degraded recognition ⇒ protected, never spent. Fee quotes expire (60s)
+  and the member-confirmed fee is a hard signing ceiling (`FeeOverrunError`); BTC sends are
+  NEVER gasless and the confirm UI must say the member pays the network fee. The gateway module
+  (`services/relay-gateway/src/bitcoin/`, `BTC_*` env) is optional — unset/disabled ⇒ every
+  Bitcoin surface hides/degrades honestly. See `docs/developer-guide/bitcoin.md` +
+  `docs/runbooks/bitcoin-operations.md` + `specs/061-bitcoin-transactions/`.
+- **Protect (specs 043 + 049 + 068) runs TWO policy guards side by side, on purpose.** Custody vaults
+  are Safe v1.4.1 multisigs; their optional on-chain policy is enforced by a guard singleton that is
+  deliberately **NOT upgradeable** (an upgrade key over a policy guard is a backdoor across every
+  vault). `SafePolicyGuard` (v1, flat rules) keeps enforcing for vaults that have not adopted
+  `SafePolicyGuardV2` (spec 068, deployment key `safePolicyGuardV2`) — migration is **vault-consented**
+  via a threshold-approved `setGuard`, never a release-time migration, and new rule types ship as a new
+  guard version. V2 policy is an **ordered rule array** replaced atomically by `setRules` (so add/edit/
+  remove/**reorder** are one proposal) evaluated **first-match-governs**, with exactly one fall-through:
+  an unmet approver requirement continues to the next rule of *strictly identical scope* (this is what
+  makes "A+B together, or C alone" expressible). **No matching rule ⇒ denial** — once a vault has rules,
+  silence is denial. Approver sets are verified against the vault's own on-chain `approvedHashes` at
+  `nonce()-1`, and an approver only counts **while still an owner**. Client seam is
+  `frontend/src/lib/custody/policyV2.js`; its `matchPreview` is a twin of on-chain matching and MUST be
+  changed in lockstep with the contract (the Solidity and Vitest suites share scenarios). Custody is
+  **multi-chain**: vault references carry `chainId`, the list spans chains with per-vault read providers
+  and failure isolation, and custody code MUST use strict `NETWORKS[chainId]` lookups (never
+  `getNetwork()`, which falls back to the default network) plus a wallet-chain check at submit time.
+  `safeProposalHub` needs a recorded deploy block per chain or proposal discovery is silently dead. Protect
+  lives in the **Tools** nav group (tab id `custody` unchanged). See
+  `docs/developer-guide/protect-policies.md` + `docs/runbooks/protect-policy-operations.md` +
+  `specs/068-protect-multi-chain-policies/`.
+- **Legacy account recovery (spec 062) is FRONTEND-ONLY** — the **Recovery** section (renamed from
+  "Backup & Security"; tab id `security` + `backup` alias unchanged). Members import an old EOA
+  **private key** or **BIP-39 word list**; the secret is encrypted at rest (AES-GCM under a
+  PBKDF2-650k passphrase key) and **NEVER** persisted in the clear, transmitted, or logged — only the
+  ciphertext blob is stored/backed up. `legacyKeyVault(account)` (in
+  `frontend/src/lib/recovery/legacyKeys.js`) is a per-account CRUD facade over
+  `legacyRecoveredKeysStore.js` (userStorage key `legacy_recovered_keys`, the single source of truth);
+  it rides the spec-032 backup via the non-network-scoped `legacyRecoveredKeys` synced object. Storing
+  completes recovery; **moving funds is OPTIONAL** — `sweepAllAssets` moves ALL supported fungible
+  assets (native + every `getPortfolioRegistry` ERC-20, ERC-20s first / native last with a gas
+  reserve) with **per-asset outcomes** (one failure never aborts the rest; NFTs excluded + disclosed).
+  Recovered accounts save to the address book via `useAddressBook()` (usable platform-wide) and the
+  recovery is audited via `captureLegacyRecovery` (client-ledger `legacy_account_recovered`, address +
+  type only, stable/idempotent entryId, **never** key material). See
+  `docs/developer-guide/legacy-account-recovery.md` + `specs/062-legacy-account-recovery/`.
+- **Bridging + supplied liquidity (spec 067) route through TWO UUPS routers that never take custody.**
+  `BridgeRouter` (`bridgeRouter`/`bridgeRouterImpl`, Across Protocol V3) powers the **Bridge** tab inside
+  **Transfer**; `LiquidityRouter` (`liquidityRouter`/`liquidityRouterImpl`, Uniswap V3 + Across HubPool)
+  powers the **Supply** section inside **Earn**. Neither is deployed on any network yet (issue #966).
+  Four rules govern every change here:
+  (1) **THE MEMBER IS THE DEPOSITOR.** `depositV3` is passed `msg.sender`, never `address(this)`, so an
+  unfilled Across deposit refunds to the MEMBER. That is why `IBridgeRouter` has **no rescue or
+  claim-refund function** — the absence is the design, and adding one would create the custody surface
+  the router exists to avoid. (2) **NO CUSTODY.** Uniswap position NFTs mint to the member; Across
+  **bridge-LP deposits never touch a FairWins contract at all** (a direct member call to the HubPool —
+  `addLiquidity` has no recipient parameter, research R3), so the contract *cannot* pause them and only
+  the app-honoured `enabled` flag withholds one. The Supply pause is therefore **"new Uniswap supplies"
+  only** — never label it "pooling". (3) **A PAUSE NEVER TRAPS VALUE**: it stops NEW bridges/supplies;
+  in-flight bridges settle or refund via Across, and positions stay withdrawable because exits never
+  routed through the router. There is no `removePool` — retiring is `setPoolEnabled(false)`, and retired
+  pools stay listed with their position count (FR-024). (4) **FEES**: two spec-060 services
+  (`bridge.transfer`, `liquidity.deposit`), both `ConfigOnly`, both **cap 250 bps / rate 0 at launch** —
+  never hardcode a bps value, never imply a fee ships non-zero. The member's `maxFeeBps` is a consent
+  ceiling, the cap binds the fee **amount** taken (not the rate a FeeRouter reports about itself), and
+  the fee is charged on **capital Uniswap actually consumed**, never on what was offered.
+  **Roles**: `LIQUIDITY_ADMIN_ROLE` curates routes/pools; `GUARDIAN_ROLE` pauses; `DEFAULT_ADMIN_ROLE`
+  owns the fund-path addresses (`spokePool`/`positionManager`/`feeRouter`/`sanctionsGuard`) — curating
+  badly is reversible, repointing a router is not. `GUARDIAN_ROLE` is **per-router** and does NOT inherit
+  the WagerRegistry guardian set; the admin tabs read authority from the router in scope
+  (`readRouterAuthority`), never from the app-wide role flags. **Availability**: Uniswap trading pools on
+  all five EVM mainnets (1/10/137/8453/42161); Across **bridge-LP on ETHEREUM ONLY** (the HubPool is an
+  L1 contract); ETC 61 and Mordor 63 have neither protocol and **cannot host these routers**. See
+  `docs/developer-guide/bridge-and-liquidity.md` + `docs/runbooks/bridge-liquidity-operations.md` +
+  `specs/067-bridge-pool-liquidity/`.
+
+- **Membership has ONE home, and the operations console reads the whole estate (spec 071).**
+  Membership lives on exactly one chain per environment cohort — Polygon on a mainnet build, Amoy on
+  a testnet build — resolved by `membershipChainId()` in `config/networks.js` and **derived** from
+  the existing `MAINNET_CHAIN_ID`/`TESTNET_CHAIN_ID` pair (never a second literal `137`, which would
+  silently read mainnet membership in a testnet build). `hasRoleOnChain`/`getUserTierOnChain`
+  **ignore the chain you pass** on the `WAGER_PARTICIPANT` path and always read the reference chain;
+  their admin-role branch still honours an explicit chain, because admin roles genuinely ARE
+  per-chain. Purchases settle on the reference chain too — membership is only readable from one
+  place if it is also written in one place. "All chains" ALWAYS means the build's **cohort**
+  (`cohortChainIds()`, never `listSupportedChainIds()`): constitution III forbids reads crossing the
+  testnet/mainnet boundary. Every estate read returns one of **three** states —
+  `read` / `not-deployed` / `unreadable` — and `value` exists only on `read` so `?? 0` has nowhere
+  to live; an unreachable chain must NEVER render as a zero, and any total missing one is labelled
+  partial and names it. Balances are **never summed across units** (`aggregate()` returns per-unit
+  subtotals only), and accrued (undrawn) is never added to treasury (received). Reads span chains;
+  **writes never do**: one transaction, one named chain, wallet required there, authority read from
+  the contract that will enforce it — and an *unconfirmed* authority read leaves the control offered
+  rather than hiding a killswitch on an RPC timeout. There is deliberately **no control that acts on
+  several chains at once**. Providers come from `getReadProvider`/`readProviderFor`, never
+  hand-built from `NETWORKS[chainId].rpcUrl`. See `docs/developer-guide/chain-estate-reads.md` +
+  `specs/071-multi-chain-admin-console/`.
+- **White-label tenants (spec 072): the tenant manifest is the single source of truth.**
+  `tenants/<id>/manifest.json` defines a tenant's identity, settings, and contract set;
+  `tenants/fairwins/` is the default tenant and MUST reproduce the current product exactly.
+  Never hardcode a tenant identity value (name, logo, URL, PWA metadata, support/legal links)
+  in shipped paths — resolve via `frontend/src/config/tenant.js` (`tenantBrand()`,
+  `isFeatureEnabled()`, `tenantThemeClass()`). Tenant selection is BUILD-TIME
+  (`VITE_TENANT_ID`, one origin = one tenant, no runtime switching); an unknown id fails
+  loudly and never falls back to another tenant. Theming rides the existing `platform-<id>`
+  CSS class seam (default tokens stay in `theme.css`; non-default tenants inject from the
+  manifest). Isolation for value is ON-CHAIN via separate proxy instances: `TENANT_ID=<id>`
+  on deploy scripts tenant-prefixes CREATE2 salts and records under
+  `deployments/tenants/<id>/` (same schema); a dedicated tenant resolves ONLY its own set —
+  absence stays absence, no fallback to the shared estate. Manifests never contain secrets;
+  `npm run tenants:validate` gates in CI. See `docs/developer-guide/white-label-tenants.md`
+  + `specs/072-white-label-tenants/`.
+- **Mini-apps (spec 073) are UNTRUSTED third-party code, and the host object is the whole of what
+  they get.** The Apps section serves packages published to IPFS and curated on-chain by the
+  `MiniAppRegistry` (UUPS proxy, keys `miniAppRegistry` / `miniAppRegistryImpl`). Five rules:
+  (1) **`launchable` IS the serving decision, NEVER `status`.** A Pending record with a prior
+  approval is a LIVE app whose update is in review (FR-003); gating on `status === Approved` would
+  let any vendor take their own app offline by submitting anything. `registryClient.normalizeApp`
+  READS the chain's `launchable` — never re-derive it. Approval is **content-committed**:
+  `approveApp(id, expectedManifestHash)` reverts `StaleProposal`, because reading the proposed tuple
+  at execution time let a vendor swap the package after review. **Never add an id-only overload.**
+  (2) **The registry has ONE home per cohort** — `miniAppChainId()`: **Polygon 137** on a mainnet
+  build, **Mordor 63** on a testnet one. Deployment targets are **Polygon and Mordor ONLY; Amoy is
+  deliberately not one**, which is why this is the one reference chain in the estate that does NOT
+  derive from `TESTNET_CHAIN_ID` (that would resolve every testnet build to a chain with no
+  registry). Never hardcode `137`: the catalog decides which packages the host EXECUTES, so
+  crossing the cohort boundary would run mainnet-curated code against testnet wallets.
+  (3) **The `host` object is the ENTIRE privileged surface** (`contracts/host-context.md`, hostApi
+  **2**): `appId`, `wallet` (`address`, `chainId`, `isConnected`, `requestConnect`, `switchChain`,
+  `submit`), `readProvider`, `contracts`, `network`, `networks`, `store`, `audit`, `toast`,
+  `navigate`. Wrappers, never handles — no signer, no context, no storage handle, and adding a key
+  grants it permanently to every third-party package. `wallet.submit` chooses the write rail
+  (classic signer vs passkey `sendCalls`) because an app cannot: identity first, so a passkey member
+  acting as a vault still gets a PROPOSAL. **Sanctions screening happens INSIDE `submit`**, before
+  any rail is touched — strictly stronger than an app-side pre-check, which a package could simply
+  skip. It resolves at **BROADCAST** — use `SubmitResult.wait()`, never report success from `submit`
+  alone, and note `wait()` takes NO timeout where `tx.wait(1, ms)` did, so each app must race its
+  own. `contracts(name)` is gated by a per-package manifest allowlist and **throws** for an
+  undeclared name (returning `null` would read as "not deployed"). `readProvider` is cached per
+  underlying provider — it must keep a STABLE identity, or any app using it as an effect dependency
+  spins.
+  (4) **Never bundle host config into a package.** `config/contracts.js` reaches `virtual:tenant`
+  (a hard build failure), and the preset's `envPrefix` turns any bundled `import.meta.env` read into
+  `undefined` — a bundled `NETWORKS` would report every subgraph as absent, which is a fabricated
+  fact, not an outage. Packages take configuration from the host at runtime. Equally: **nothing in
+  `frontend/miniapps/` may import from `frontend/src/`** — a package is built separately, frozen at
+  an immutable CID, and a bundled copy of a React context is a DIFFERENT context. The reverse also
+  holds and is the direction that actually broke: **nothing in `frontend/src/` may import a tree
+  that was converted into a package.** Both are gated by
+  `frontend/src/test/miniapps/packageBoundary.test.js` — a scoped vitest run cannot catch a stale
+  import, because the module simply never loads; only the full suite or a build will.
+  (5) **`blob:` in `script-src` is for mini-app packages ONLY** — verified bytes are imported from a
+  Blob URL (R1). Never add `https:` to `script-src`. The SW package cache
+  (`fairwins-miniapp-packages-v1`) is cache-first because CIDs are immutable, and is **not a trust
+  boundary**: after every retrieval, cache or network, the loader re-checks keccak(manifest bytes)
+  against the chain and the sha256 of **every byte it executes or injects** — the entry and the
+  declared stylesheets. It does NOT fetch files it will not use (`verifyAllDeclaredFiles` is off for
+  a launch, on for a curator review), so do not restate this as "every file in the manifest": the
+  invariant is that nothing unverified ever runs, not that everything declared is downloaded.
+  **Converted apps: Token Mint and ClearPath ONLY** (live on Polygon 137 and Mordor 63; ids are
+  per-registry and differ per chain — resolve by `idByName`/slug, never by id across cohorts).
+  **Wagers is deliberately NOT a mini-app and must not be converted** — most of its file closure
+  is shared with the host-retained `HomeScreen`/Trade surfaces, because
+  `HomeScreen` is itself a wager surface, so a package would mean two copies of `WagerTable`/
+  `wagerVm`/`wagerCardHelpers` drifting apart. It lives at **Finance ▸ Transfer ▸ Wagers**
+  (`WAGERS_VIEW`/`WAGERS_PATH` in `config/appNav.js`, rendered by `PayTransferPanel`); `/wagers`
+  redirects there. See the FR-030 amendment in `specs/073-miniapp-platform/spec.md`.
+  See `docs/developer-guide/miniapps.md` + `docs/runbooks/miniapp-registry-operations.md` +
+  `specs/073-miniapp-platform/`.
+- **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
+  The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
+  `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE
+  implementation — `frontend/src/lib/network/rpcEndpoints.js#resolveRpcEndpoints`, precedence
+  **member override → build default** (`NETWORKS[chainId].rpcUrl`) — consumed by BOTH
+  `utils/rpcProvider.js#makeReadProvider` (every ethers read) and `wagmi.js`'s transports. **Never
+  hand-build a provider from `NETWORKS[chainId].rpcUrl`**: go through `makeReadProvider` /
+  `getReadProvider(chainId)`, or `getRpcUrlForChain(chainId)` for a bare URL. A member failover yields
+  real failover (quorum-1 `FallbackProvider` / viem `fallback`), with the build default behind it so a
+  custom endpoint going dark never takes a network down. **Credential rules are absolute**: keys ride
+  in a request HEADER (never written into a URL by the app), attach to the PRIMARY endpoint only,
+  redact through `redactRpcUrl` at every display/log boundary, are device-scoped
+  (`fw_global_prefs.network_endpoints`, usable with no wallet connected) and are **deliberately absent
+  from `lib/backup/syncedObjects.js`** — do not add them. Saving is honest: an endpoint answering with
+  a DIFFERENT `eth_chainId` is refused (it would silently serve another chain's state), an unreachable
+  one saves with the failure shown. **Bring-your-own-node is supported**: any https host, plus loopback
+  http for a local node — which is why `connect-src` grants `https:` scheme-wide (a per-member
+  allowlist cannot exist in a static header). That grant is for `connect-src` ONLY; never extend it to
+  `script-src`/`frame-src`/`img-src`. `CSP_RPC_GRANTS` (endpointStore.js) and both nginx configs must
+  stay in sync (gated by `src/test/nginxCspConnectSrc.test.js`). Non-loopback `http://` is refused
+  (browser mixed-content blocking, not a policy we control). Reads pick up a change immediately
+  (`useEndpointsRevision` in provider memo deps); wallet transports are module-load-time, so the panel
+  discloses the reload instead of implying an instant switch. See
+  `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
+
+- **The repo is an npm WORKSPACE (spec 075): one root lockfile, 8 members, `contracts/` deliberately
+  NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
+  detail — **`monorepo-workspace`** (dependencies, adding a package, recovering a broken install)
+  and **`monorepo-verify`** (the gate suite and what each gate proves). Three rules are absolute,
+  each because it already went wrong here: (1) **Never recover an install with `npm install`** —
+  npm/cli#4828 silently drops optional platform binaries from node_modules AND the lockfile on
+  an incremental install, breaking every Vite build including the on-chain mini-app release path,
+  and re-running `npm install` cannot fix it (the lock is already wrong, so npm reports "up to
+  date"). Use `npm run deps:reinstall`. **`npm ci` does not fix it either** — measured: it exits 0
+  reporting "added 2955 packages" from a lockfile that *does* contain the entry, and still leaves
+  the binary uninstalled, because that entry is `optional` AND `peer` and npm skips optional peer
+  deps even when locked. If a `deps:reinstall` is interrupted (no lockfile, half-built
+  node_modules), restore the lockfile with `git checkout -- package-lock.json` and then install the
+  binary alone: `npm install --no-save @rolldown/binding-linux-x64-gnu@<version from the lockfile>` —
+  ~18s, and verified to leave `package-lock.json` byte-identical. **The binary's NAME moves with the
+  toolchain** — it was `@rollup/rollup-linux-x64-gnu` until Vite 8 (spec 077) replaced rollup with
+  rolldown, and rollup then left the tree entirely, so guidance naming the old package would have
+  read fine and helped nobody. Take the current name from `REQUIRED_OPTIONAL` in
+  `scripts/deps/check-dependency-hygiene.js`, which is the gate that enforces it; do not trust a
+  package name written in prose, including this one. **Dependabot triggers this
+  routinely**: 3 of 5 lockfile-touching Dependabot PRs in one week dropped the binary, and
+  `check:deps` is what catches it. (2) **Every dependency contributing Solidity source is
+  pinned EXACTLY** — a caret range makes deployed bytecode a function of when the lockfile was last
+  resolved; `@chainlink/contracts` floating 1.3.0→1.5.0 changed `ChainlinkFunctionsOracleAdapter`'s
+  bytecode and only the byte-diff gate caught it. **This includes the npm `solc` package itself** —
+  it is not tooling: `hardhat.config.js` (~L190) resolves `solc/soljson.js` and compiles WITH IT when
+  `FORCE_SOLCJS=true` or in Codespaces, so on that path its version decides bytecode. It is pinned
+  exact and dependabot-ignored for ANY update. Note the byte gate does NOT cover it: a run using the
+  native binary never exercises the solcjs path, so the gate passed a `0.8.24`→`0.8.36` bump (#1084).
+  A byte gate only covers inputs the run actually reaches — an input active only behind an env switch
+  is invisible to it. (3) **A shared package under `packages/` MUST be
+  resolvable by plain Node** (extensioned imports + explicit `exports`) — `frontend/src` has ~2,966
+  extensionless imports while the gateway is Node ESM, which is *why* the EIP-712 structs stayed
+  duplicated. Those structs + their action metadata now have ONE source, `@fairwins/intent-types`,
+  checked against the verifying contracts by `test/intent/TypehashParity.test.js` and
+  `services/relay-gateway/test/actionCoverage.test.js`. Any change touching dependencies, hoisting,
+  or the build preset MUST pass the byte gates (`scripts/codegen/bytecode-digest.js`,
+  `scripts/miniapps/record-build-digests.js`) — mini-app output bytes are keccak-committed
+  on-chain. **Both byte gates now RUN in CI** (`test.yml`: the bytecode diff in
+  `smart-contract-tests`, the mini-app bytes in their own `miniapp-bytes` job); until then they
+  were scripts nobody was required to run, and the mini-app one reported "output bytes unchanged"
+  after a *failed* build. A gate firing here is not a chore — getting it green means deliberately
+  re-recording a baseline, i.e. accepting that deployed bytecode or a published package changed.
+  See `specs/075-monorepo-workspaces/`.
+- **Buy crypto (spec 081) is a deliberately minimal, removable convenience — wallet-sheet ONLY.**
   A single Buy button on the wallet bottom sheet (the avatar/account sheet) hands off to
   **Coinbase's hosted Onramp** (session tokens minted by the relay-gateway's optional
   `src/onramp/` module from gateway-only CDP creds; destination sanctions-screened, fail closed).
@@ -143,10 +412,11 @@ artifacts live under `specs/<feature>/`.
   (capability `onramp`: 137 + 1 + 61, mirrored in `src/onramp/chains.js`; ETC 61 is
   "if-possible" — Buy shows there only when Coinbase's live catalog serves the network); no contract changes; no
   synthetic pending/settled state — balances update only from chain reads. See
-  `docs/developer-guide/buy-crypto-onramp.md` + `specs/060-coinbase-onramp/`.
+  `docs/developer-guide/buy-crypto-onramp.md` + `specs/081-coinbase-onramp/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/060-coinbase-onramp/plan.md
+at specs/080-deterministic-addresses/plan.md
+at specs/081-coinbase-onramp/plan.md
 <!-- SPECKIT END -->

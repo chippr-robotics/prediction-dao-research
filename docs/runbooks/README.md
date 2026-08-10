@@ -10,10 +10,12 @@ This directory contains step-by-step operational guides, integration procedures,
 - **[relayer-operations.md](./relayer-operations.md)** - Gasless intent relayer (spec 036): gateway/engine components, hot-key management, killswitch, OpenSea/Polymarket proxy ops, incident table
 - **[paymaster-operations.md](./paymaster-operations.md)** - Sponsored-gas paymaster (spec 050): deposit funding and runway, monitoring, killswitch, signer rotation, compromise response
 - **[callsigns-operations.md](./callsigns-operations.md)** - Deploy the `%callsign` naming registry, wire the frontend, grant operator roles, and moderate / tune / monitor it from the control plane (spec 054)
+- **[miniapp-registry-operations.md](./miniapp-registry-operations.md)** - Mini-app catalog curation (spec 073): verifying a submitted package before approval, the content-committed `approveApp`, suspend/reinstate/deprecate, gateway config, curator-role handoff, diagnostics
 - **[contract-upgrades.md](./contract-upgrades.md)** - UUPS proxy upgrade procedure: storage-layout gate, in-place upgrades, rollback
 
 ### Deploy
 - **[relayer-mordor-deploy.md](./relayer-mordor-deploy.md)** - First bring-up of the relayer stack on Mordor: GCP prerequisites, KMS keys, Cloud Run, origin lock, validation
+- **[vm-migration.md](./vm-migration.md)** - Cutover + rollback for moving the bundler and relay gateway off Cloud Run onto two GCE VMs: the single-executor invariant, the `cloudbuild.yaml` trap in both directions, functional verification, soak, decommission, and what the move gives up
 - **[zk-wager-pools-deploy.md](./zk-wager-pools-deploy.md)** - WagerPoolFactory (spec 034) append-only deploy, wiring matrix, subgraph publish
 - **[safe-proposal-hub-deploy.md](./safe-proposal-hub-deploy.md)** - SafeProposalHub (spec 043) events-only helper deploy
 

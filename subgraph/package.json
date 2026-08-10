@@ -1,6 +1,6 @@
 {
   "name": "prediction-dao-research-subgraph",
-  "version": "0.1.0",
+  "version": "1.5.1",
   "description": "Subgraph for the v2 WagerRegistry — indexes wagers + per-transfer WagerTransfer records (txHash) that power the My Wagers view, site stats, and the RPC-light tax/activity report.",
   "private": true,
   "scripts": {
@@ -11,11 +11,12 @@
     "deploy:studio": "graph deploy --node https://api.studio.thegraph.com/deploy/ prediction-dao-research",
     "create-local": "graph create --node http://localhost:8020/ prediction-dao-research",
     "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 prediction-dao-research",
-    "test": "graph test"
+    "test:matchstick": "graph test"
   },
   "devDependencies": {
-    "@graphprotocol/graph-cli": "0.80.0",
-    "@graphprotocol/graph-ts": "0.35.1",
+    "@fairwins/abi": "*",
+    "@graphprotocol/graph-cli": "0.98.1",
+    "@graphprotocol/graph-ts": "0.38.2",
     "matchstick-as": "0.6.0"
   }
 }

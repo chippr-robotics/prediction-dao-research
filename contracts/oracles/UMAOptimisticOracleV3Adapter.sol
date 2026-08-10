@@ -5,8 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3Interface.sol";
-import "@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3CallbackRecipientInterface.sol";
+import "../interfaces/IOptimisticOracleV3.sol";
 import "./IOracleAdapter.sol";
 
 /// @title UMAOptimisticOracleV3Adapter
@@ -16,7 +15,7 @@ import "./IOracleAdapter.sol";
 ///         assertions are escalated to UMA's DVM and resolved via the same callback.
 contract UMAOptimisticOracleV3Adapter is
     IOracleAdapter,
-    OptimisticOracleV3CallbackRecipientInterface,
+    IOptimisticOracleV3CallbackRecipient,
     Ownable,
     ReentrancyGuard
 {
@@ -47,7 +46,7 @@ contract UMAOptimisticOracleV3Adapter is
         bool exists;
     }
 
-    OptimisticOracleV3Interface public immutable oo;
+    IOptimisticOracleV3 public immutable oo;
 
     mapping(bytes32 => AssertionConfig) public conditions;
     mapping(bytes32 => bytes32) public assertionToCondition;
@@ -77,7 +76,7 @@ contract UMAOptimisticOracleV3Adapter is
 
     constructor(address admin, address _oo) Ownable(admin) {
         if (_oo == address(0)) revert InvalidAddress();
-        oo = OptimisticOracleV3Interface(_oo);
+        oo = IOptimisticOracleV3(_oo);
     }
 
     // ========== Admin ==========
@@ -157,7 +156,7 @@ contract UMAOptimisticOracleV3Adapter is
         emit AssertionMade(conditionId, assertionId, asserter);
     }
 
-    /// @inheritdoc OptimisticOracleV3CallbackRecipientInterface
+    /// @inheritdoc IOptimisticOracleV3CallbackRecipient
     function assertionResolvedCallback(bytes32 assertionId, bool assertedTruthfully) external onlyOO {
         bytes32 conditionId = assertionToCondition[assertionId];
         if (conditionId == bytes32(0)) revert UnknownAssertion();
@@ -172,7 +171,7 @@ contract UMAOptimisticOracleV3Adapter is
         emit ConditionResolved(conditionId, assertedTruthfully, 10_000, block.timestamp);
     }
 
-    /// @inheritdoc OptimisticOracleV3CallbackRecipientInterface
+    /// @inheritdoc IOptimisticOracleV3CallbackRecipient
     function assertionDisputedCallback(bytes32 assertionId) external onlyOO {
         bytes32 conditionId = assertionToCondition[assertionId];
         if (conditionId == bytes32(0)) revert UnknownAssertion();

@@ -4,7 +4,7 @@ import { fetchOnrampOptions, createOnrampSession } from '../../lib/onramp/onramp
 import './BuyCryptoModal.css'
 
 /**
- * BuyCryptoModal (spec 060) — the pre-handoff disclosure for the wallet-sheet Buy button.
+ * BuyCryptoModal (spec 081) — the pre-handoff disclosure for the wallet-sheet Buy button.
  *
  * Everything after "Continue to Coinbase" is Coinbase's own hosted experience (payment, KYC,
  * regional eligibility, delivery); FairWins' entire role is showing the member exactly what is

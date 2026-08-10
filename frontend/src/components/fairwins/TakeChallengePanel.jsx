@@ -1,5 +1,6 @@
 import { useState, useCallback, useContext } from 'react'
 import { useOpenChallengeAccept } from '../../hooks/useOpenChallengeAccept'
+import { useOpenChallengeCodeVault } from '../../hooks/useOpenChallengeCodeVault'
 import { usePolymarketMarket } from '../../hooks/usePolymarketMarket'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { ResolutionType } from '../../constants/wagerDefaults'
@@ -20,6 +21,11 @@ import './TakeChallengePanel.css'
  */
 export default function TakeChallengePanel({ code, match, onClose, onBuyMembership, onBack }) {
   const { accept, busy } = useOpenChallengeAccept()
+  // Recovery-code vault: once a taker binds themselves to a challenge, save their code
+  // (encrypted, account-scoped) so re-reading the private terms later is transparent — no
+  // re-typing the four words. canUse is false without a connected account; the save is
+  // best-effort and never blocks the (already-confirmed on-chain) acceptance.
+  const { saveCode, canUse: canBackup } = useOpenChallengeCodeVault()
   // Access the notification system directly (optional) so this panel still renders in tests without a
   // UIProvider, while routing the take-success event into the app's notification toasts (spec 037).
   const ui = useContext(UIContext)
@@ -35,6 +41,7 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
   const [progress, setProgress] = useState(null)
   const [txHash, setTxHash] = useState(null)
   const [error, setError] = useState(null)
+  const [codeSaved, setCodeSaved] = useState(false)
   const found = match
 
   // Oracle-settled open challenges (spec 041): the on-chain fields are authoritative for
@@ -55,12 +62,26 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
       setTxHash(hash)
       setPhase('accepted')
       ui?.showNotification?.('You’ve taken the challenge — your stake is escrowed.', 'success', 6000)
+      // Save the code to the recovery vault so the taker can re-read the terms later without
+      // re-entering it (transparent decryption). Best-effort: a declined ceremony or missing
+      // wallet must not undo the on-chain acceptance, so failure only leaves codeSaved false.
+      if (canBackup) {
+        try {
+          const desc = typeof found.terms === 'string' ? found.terms : found.terms?.description
+          await saveCode({
+            code,
+            wagerId: found.wagerId != null ? String(found.wagerId) : null,
+            description: desc || '',
+          })
+          setCodeSaved(true)
+        } catch { /* keep the take successful; manual re-entry stays available */ }
+      }
     } catch (err) {
       setError(err.message)
     } finally {
       setProgress(null)
     }
-  }, [accept, code, found, ui])
+  }, [accept, code, found, ui, canBackup, saveCode])
 
   if (!found) return null
 
@@ -69,7 +90,12 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
       <div className="fm-success">
         <div className="fm-success-icon" aria-hidden="true">&#10003;</div>
         <h3>You&apos;ve taken the challenge</h3>
-        <p className="fm-success-desc">You&apos;re now the bound opponent. Keep your code to re-read the private terms in future.</p>
+        <p className="fm-success-desc">
+          You&apos;re now the bound opponent.{' '}
+          {codeSaved
+            ? 'Your code is saved to this account — re-read the private terms anytime from My Wagers, no code needed.'
+            : 'Keep your code to re-read the private terms in future.'}
+        </p>
         <div className="fm-success-actions">
           <button type="button" className="fm-btn-primary fm-success-done" onClick={onClose}>Done</button>
         </div>

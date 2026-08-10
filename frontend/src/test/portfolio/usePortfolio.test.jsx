@@ -161,12 +161,20 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
     await waitFor(() => expect(latest.status).toBe('ready'))
 
     const eth = aggFor('ETH')
-    expect(eth.instances).toHaveLength(3)
     expect(eth.balance).toBeCloseTo(1.75)
     expect(eth.usd).toBeCloseTo(3500)
     // Home native first, wrapped and cross-chain instances after.
     expect(eth.instances[0].asset.kind).toBe('native')
-    expect(eth.instances.map((h) => h.asset.chainId)).toEqual([1, 1, 137])
+    // Assert the FUNDED instances rather than a raw count: ETH/WETH now exist on every
+    // spec-067 network (1, 10, 8453, 42161), so an exact instance count would break each
+    // time a network is added without telling us anything about the aggregation itself.
+    const funded = eth.instances.filter((h) => h.balance > 0)
+    expect(funded).toHaveLength(3)
+    expect(funded.map((h) => [h.asset.chainId, h.asset.kind])).toEqual([
+      [1, 'native'],
+      [1, 'erc20'],
+      [137, 'erc20'],
+    ])
     // The main list shows ONE ETH row — instances live in the sheet.
     expect(latest.aggregates.filter((a) => a.underlying === 'ETH')).toHaveLength(1)
   })
@@ -261,5 +269,51 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
       await latest.refresh()
     })
     expect(calls).toBeGreaterThan(callsAfterLoad)
+  })
+
+  it('remounting hydrates the last real snapshot instantly while a refresh runs (spec 074 follow-up)', async () => {
+    // First mount: a real read lands and warms the session snapshot cache.
+    fixtures.nativeBalances.set(137, 2n * 10n ** 18n)
+    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    const first = await renderPortfolio()
+    await waitFor(() => expect(latest.status).toBe('ready'))
+    expect(latest.totalUsd).toBeCloseTo(1)
+    const firstUpdated = latest.lastUpdated
+    first.unmount()
+
+    // Second mount with the background read HANGING: the member still sees the
+    // last real snapshot (status ready, same figures, same honest timestamp)
+    // instead of "Loading portfolio…".
+    fixtures.nativeBalances.set(137, () => new Promise(() => {}))
+    await renderPortfolio()
+    expect(latest.status).toBe('ready')
+    expect(latest.totalUsd).toBeCloseTo(1)
+    expect(latest.lastUpdated).toBe(firstUpdated)
+  })
+
+  it('persists snapshots to device storage and hydrates them after a reload (spec 074 follow-up)', async () => {
+    // A successful read writes the snapshot store (BigInt-safe round trip).
+    fixtures.nativeBalances.set(137, 4n * 10n ** 18n)
+    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    const first = await renderPortfolio()
+    await waitFor(() => expect(latest.status).toBe('ready'))
+    expect(latest.totalUsd).toBeCloseTo(2)
+    const stored = JSON.parse(localStorage.getItem('fw_portfolio_snapshots_v1'))
+    const keys = Object.keys(stored)
+    expect(keys.some((k) => k.startsWith(ADDRESS.toLowerCase()))).toBe(true)
+    first.unmount()
+
+    // Simulate a fresh page: a DIFFERENT account whose key exists only in
+    // device storage (never seen by this module's in-memory cache). Transplant
+    // the stored snapshot onto the other address's key, then mount with the
+    // network hanging — the stored figures hydrate instantly.
+    const OTHER = '0x00000000000000000000000000000000000000A1'
+    const myKey = keys.find((k) => k.startsWith(ADDRESS.toLowerCase()))
+    stored[myKey.replace(ADDRESS.toLowerCase(), OTHER.toLowerCase())] = stored[myKey]
+    localStorage.setItem('fw_portfolio_snapshots_v1', JSON.stringify(stored))
+    fixtures.nativeBalances.set(137, () => new Promise(() => {}))
+    await renderPortfolio({ wallet: makeWallet({ address: OTHER }) })
+    expect(latest.status).toBe('ready')
+    expect(latest.totalUsd).toBeCloseTo(2)
   })
 })

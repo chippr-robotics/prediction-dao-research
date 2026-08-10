@@ -12,9 +12,23 @@ import { parseEther, parseUnits } from 'ethers'
 const getPolicyStatus = vi.fn()
 const previewPolicy = vi.fn()
 vi.mock('../../lib/custody/policy', () => ({
-  getPolicyStatus: (...a) => getPolicyStatus(...a),
   previewPolicy: (...a) => previewPolicy(...a),
 }))
+// Spec 068 — status routing moved to policyV2 (it must recognize BOTH guard versions).
+vi.mock('../../lib/custody/policyV2', () => ({
+  getPolicyStatus: (...a) => getPolicyStatus(...a),
+  previewPolicyV2: vi.fn(async () => ({ ok: true, reason: null })),
+}))
+
+// Spec 068 — these surfaces now use the shared CustodyAddressField; the platform inputs are stubbed
+// so each suite stays a unit test (the field itself is covered by CustodyAddressField.test.jsx).
+vi.mock('../../components/ui/AddressInput', () => ({
+  default: ({ id, value, onChange, placeholder, disabled }) => (
+    <input id={id} value={value} onChange={onChange} placeholder={placeholder} disabled={disabled} />
+  ),
+}))
+vi.mock('../../components/ui/AddressBookButton', () => ({ default: () => <button type="button">Address book</button> }))
+vi.mock('../../components/ui/QRScanner', () => ({ default: () => null }))
 
 import ProposeTransactionForm from '../../components/custody/ProposeTransactionForm'
 import { buildTransferPayload } from '../../lib/custody/transfers'

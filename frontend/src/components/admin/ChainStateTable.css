@@ -1,0 +1,105 @@
+/* Per-chain state table (spec 071 FR-014). The three states are distinguished by TEXT first;
+   colour only reinforces, so the distinction survives for a colour-blind operator and in a
+   high-contrast theme (constitution V). */
+
+.chain-state {
+  margin: 0.75rem 0;
+}
+
+.chain-state-caption {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.chain-state-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.chain-state-table th,
+.chain-state-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  vertical-align: top;
+}
+
+.chain-state-table thead th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary, var(--color-text-secondary, #8895A1));
+}
+
+.chain-state-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* A definite answer: there is no contract here. Muted, but never absent. */
+.chain-state-absent {
+  color: var(--text-secondary, var(--color-text-secondary, #5A6772));
+  font-style: italic;
+}
+
+/* NOT an answer. Must never be mistaken for a zero, so it is the one state that gets a
+   warning colour AND its own wording AND the failure reason. */
+.chain-state-unreadable {
+  color: var(--color-warning, #B45309);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.chain-state-retry {
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.125rem 0.5rem;
+  cursor: pointer;
+}
+
+.chain-state-retry:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
+  outline-offset: 2px;
+}
+
+.chain-state-totals {
+  margin-top: 0.5rem;
+}
+
+.chain-state-total {
+  margin: 0.25rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.chain-state-total-scope {
+  color: var(--text-secondary, var(--color-text-secondary, #5A6772));
+  font-size: 0.8125rem;
+}
+
+/* A total computed while a chain was unreadable says so, and names what is missing. */
+.chain-state-partial {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-warning, #B45309);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

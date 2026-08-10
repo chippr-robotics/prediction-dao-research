@@ -11,9 +11,9 @@ import ModalSystem from './components/ui/ModalSystem'
 import AnnouncementRegion from './components/ui/AnnouncementRegion'
 
 // Main flow
-import LandingPage from './components/LandingPage'
+import LandingRoute from './components/LandingRoute'
 import HomeScreen from './components/fairwins/HomeScreen'
-import WagersPage from './components/fairwins/WagersPage'
+import { WAGERS_PATH } from './config/appNav'
 import Header from './components/Header'
 import Footer from './components/Footer'
 
@@ -22,8 +22,10 @@ import WalletPage from './pages/WalletPage'
 import VouchersPage from './pages/VouchersPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
 import PoolPage from './pages/PoolPage'
+import MiniAppWorkspace from './components/miniapps/MiniAppWorkspace'
 import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
 import EntryGate from './components/compliance/EntryGate'
+import AutoConnectPrompt from './components/wallet/AutoConnectPrompt'
 import { ActivityProvider } from './contexts/ActivityProvider.jsx'
 import { NavDrawerProvider } from './contexts/NavDrawerContext.jsx'
 import ActivityNotificationBridge from './components/notifications/ActivityNotificationBridge'
@@ -35,6 +37,7 @@ import AdminPanel from './components/AdminPanel'
 
 // dev
 import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
+import StagingBanner from './components/ui/StagingBanner'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
@@ -57,18 +60,26 @@ function AppLayout() {
       {/* App navigation redesign: the section menu ("us") is now a global left
           drawer opened by the clover logo, shared across every in-app route. */}
       <NavDrawerProvider>
-        <Header appMode />
-        <AppNavDrawer />
-        {/* Spec 043 (US3): persistent banner while operating as a vault, with switch-back. */}
-        <OperateAsIndicator />
-        {/* Spec 041: route a tapped push notification into in-app navigation. */}
-        <ActivityNotificationBridge />
-        {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
-        <EntryGate />
-        <Outlet />
-        {/* Spec 010 (US2): condensed legal/policy footer inside the app. The menu
-            drawer carries its own copy; /wallet relies on that to avoid duplication. */}
-        {showPageFooter && <Footer variant="condensed" />}
+        {/* `app-shell` reserves room for AppNavDrawer's persistent desktop icon
+            gutter (see AppNavDrawer.css) — the drawer itself is fixed-position
+            and ignores this padding, but everything below needs to clear it. */}
+        <div className="app-shell">
+          <Header appMode />
+          <AppNavDrawer />
+          {/* Spec 043 (US3): persistent banner while operating as a vault, with switch-back. */}
+          <OperateAsIndicator />
+          {/* Spec 041: route a tapped push notification into in-app navigation. */}
+          <ActivityNotificationBridge />
+          {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
+          <EntryGate />
+          {/* Entering the app with no account opens the unlock dialog by itself —
+              every surface below is inert until one is connected. */}
+          <AutoConnectPrompt />
+          <Outlet />
+          {/* Spec 010 (US2): condensed legal/policy footer inside the app. The menu
+              drawer carries its own copy; /wallet relies on that to avoid duplication. */}
+          {showPageFooter && <Footer variant="condensed" />}
+        </div>
       </NavDrawerProvider>
     </ActivityProvider>
   )
@@ -89,6 +100,10 @@ function AppContent() {
 
   return (
     <>
+      {/* Non-production marker (spec 076, FR-025/FR-026d). Renders nothing in production;
+          on the mainnet staging service it is also the real-funds disclosure. */}
+      <StagingBanner />
+
       {/* Development warning banner - always visible */}
       <DevelopmentWarningBanner />
 
@@ -128,7 +143,7 @@ function AppContent() {
       <Routes>
         <Route
           path="/"
-          element={<LandingPage />}
+          element={<LandingRoute />}
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
@@ -143,11 +158,21 @@ function AppContent() {
           <Route path="/app" element={<HomeScreen />} />
           <Route path="/main" element={<HomeScreen />} />
           <Route path="/fairwins" element={<HomeScreen />} />
-          <Route path="/wagers" element={<WagersPage />} />
+          {/* Wagers moved into Finance ▸ Transfer (spec 073) — it sits beside Transfer and
+              Bridge because all three are ways money leaves this section. `/wagers` stays a
+              live route rather than being deleted: it is on printed cards, saved links and
+              bookmarks, and a redirect costs nothing where a 404 costs a member their way in.
+              `replace` so Back returns where they came from instead of bouncing off it. */}
+          <Route path="/wagers" element={<Navigate to={WAGERS_PATH} replace />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
           <Route path="/pools/:address" element={<PoolPage />} />
+          {/* Spec 073: one mini-app workspace per registry listing. The slug is
+              derived from the listing's on-chain (unique) name, and the workspace
+              re-reads that record from the chain on every launch — a catalog card
+              is never what decides that something may run. */}
+          <Route path="/apps/:slug" element={<MiniAppWorkspace />} />
           <Route path="/admin" element={<AdminPanel />} />
         </Route>
 

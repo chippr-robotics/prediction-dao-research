@@ -11,6 +11,7 @@ function parseArgs(argv) {
     else if (a === '--chainId') out.chainId = Number(argv[++i])
     else if (a === '--deploymentFile') out.deploymentFile = argv[++i]
     else if (a === '--contractsFile') out.contractsFile = argv[++i]
+    else if (a === '--tenant') out.tenant = argv[++i]
   }
   return out
 }
@@ -19,28 +20,6 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
 }
 
-/**
- * Emit a plain-JSON ABI next to a hand-maintained `export const X_ABI = [ ... ]`
- * JS ABI module, so the subgraph (and any other JSON consumer) reads a generated
- * artifact rather than a hand-copied one (constitution V). The JS ABI body is a
- * JSON array literal, so we slice from the first `[` to the last `]` and validate
- * by parsing before writing.
- */
-function emitAbiJson({ jsAbiPath, jsonAbiPath }) {
-  if (!fs.existsSync(jsAbiPath)) {
-    console.warn(`ABI source not found, skipping JSON emit: ${jsAbiPath}`)
-    return
-  }
-  const src = fs.readFileSync(jsAbiPath, 'utf8')
-  const start = src.indexOf('[')
-  const end = src.lastIndexOf(']')
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error(`Could not locate ABI array literal in ${jsAbiPath}`)
-  }
-  const abi = JSON.parse(src.slice(start, end + 1)) // validates it is real JSON
-  fs.writeFileSync(jsonAbiPath, JSON.stringify(abi, null, 2) + '\n')
-  console.log(`Emitted JSON ABI: ${jsonAbiPath}`)
-}
 
 function findDeploymentFile({ deploymentsDir, network, chainId }) {
   // Prefer v2 file (P2P betting architecture)
@@ -134,18 +113,149 @@ function updateObjectLiteralValue(source, key, newValueLiteral, blockName = null
 }
 
 /**
- * Map chainId to the corresponding contracts block name in contracts.js.
- * Returns null if no block is known for this chain (caller falls back to whole-file update).
+ * chainId → the name of that chain's contracts block in contracts.js.
+ *
+ * This table MUST cover every chain in `NETWORK_CONTRACTS` (frontend/src/config/contracts.js).
+ * An unmapped chain is not a harmless gap — it is a silent cross-chain corruption. With a null
+ * blockName, `updateObjectLiteralValue` rewrites the FIRST `key:` line anywhere in the file, and
+ * the first block in contracts.js is MORDOR_CONTRACTS. So before this table covered chain 1,
+ * syncing an Ethereum-mainnet record wrote Ethereum's `bridgeRouter`/`liquidityRouter` addresses
+ * into the MORDOR block and left ETHEREUM_CONTRACTS empty: the frontend then handed Mordor users
+ * a contract address that only exists on chain 1, and the chain it was actually deployed on still
+ * read as undeployed. Nothing failed; the sync printed "Synced".
+ *
+ * Hence `resolveBlockName()` below refuses instead of falling back whenever the file uses the
+ * per-chain layout. Add a chain here AND add its block to contracts.js — one without the other is
+ * caught, loudly, at sync time.
  */
+const CHAIN_BLOCK_NAMES = {
+  1: 'ETHEREUM_CONTRACTS', // spec 067 — router-only control-plane network
+  10: 'OPTIMISM_CONTRACTS', // spec 067 — router-only control-plane network
+  61: 'ETC_CONTRACTS', // Ethereum Classic mainnet (hardhat network `etc`)
+  63: 'MORDOR_CONTRACTS',
+  137: 'POLYGON_CONTRACTS',
+  8453: 'BASE_CONTRACTS', // spec 067 — router-only control-plane network
+  42161: 'ARBITRUM_CONTRACTS', // spec 067 — router-only control-plane network
+  80002: 'AMOY_CONTRACTS',
+  1337: 'HARDHAT_CONTRACTS',
+  31337: 'HARDHAT_CONTRACTS',
+}
+
 function blockNameForChain(chainId) {
-  const map = {
-    63: 'MORDOR_CONTRACTS',
-    80002: 'AMOY_CONTRACTS',
-    137: 'POLYGON_CONTRACTS',
-    1337: 'HARDHAT_CONTRACTS',
-    31337: 'HARDHAT_CONTRACTS',
+  return CHAIN_BLOCK_NAMES[chainId] || null
+}
+
+/**
+ * Does this contracts file use the per-chain block layout, or the older flat single-network one
+ * (`export const DEPLOYED_CONTRACTS = { ... }`)?
+ *
+ * Only the flat layout has an unambiguous "the whole file is the block" meaning, so it is the one
+ * and only case where a whole-file update is safe. Detection is by NAME, not by shape: a loose
+ * `[A-Z_]+_CONTRACTS` pattern also matches the flat file's own `DEPLOYED_CONTRACTS`, which would
+ * misread the legacy layout as multi-network and refuse to sync it at all.
+ */
+function usesPerChainBlocks(source) {
+  if (/(?:const|let|var)\s+NETWORK_CONTRACTS\s*=\s*\{/.test(source)) return true
+  return Object.values(CHAIN_BLOCK_NAMES).some((name) =>
+    new RegExp(`(?:const|let|var)\\s+${name}\\s*=\\s*\\{`).test(source)
+  )
+}
+
+/**
+ * Decide which named block this deployment record may write into — or refuse.
+ *
+ * Refusing is the point. Every alternative to a correct block name writes the addresses of one
+ * chain into another chain's map (see blockNameForChain above), and a wrong address in
+ * contracts.js is indistinguishable from a right one until someone sends funds to it.
+ */
+function resolveBlockName(source, chainId, contractsFile) {
+  if (!usesPerChainBlocks(source)) {
+    // Flat legacy/fixture layout: one network per file, so there is nothing to target wrongly.
+    return null
   }
-  return map[chainId] || null
+
+  const blockName = blockNameForChain(chainId)
+  if (!blockName) {
+    throw new Error(
+      `No contracts block is mapped for chainId ${chainId}. ${contractsFile} uses the per-chain ` +
+        `layout, so writing without a target block would rewrite whichever block happens to be ` +
+        `first in the file (currently MORDOR_CONTRACTS) with this chain's addresses. ` +
+        `Add the chain to blockNameForChain() in ${path.relative(process.cwd(), __filename)} and ` +
+        `add its block + NETWORK_CONTRACTS entry to contracts.js, then re-run.`
+    )
+  }
+
+  const hasBlock = new RegExp(`(?:const|let|var)\\s+${blockName}\\s*=\\s*\\{`).test(source)
+  if (!hasBlock) {
+    throw new Error(
+      `chainId ${chainId} maps to block ${blockName}, but ${contractsFile} has no such block. ` +
+        `Add "const ${blockName} = { ... }" and register it in NETWORK_CONTRACTS (contracts.js) ` +
+        `before syncing this network — otherwise these addresses land in another chain's map.`
+    )
+  }
+
+  return blockName
+}
+
+/**
+ * Tenant mode (spec 072, T015): `--tenant <id>` reads the tenant's records
+ * from deployments/tenants/<id>/ and MERGES the per-chain v2 mapping into
+ * frontend/src/config/tenants/<id>.contracts.json — the generated set a
+ * dedicated tenant build resolves from (injected via virtual:tenant). It never
+ * touches contracts.js: the shared estate's maps stay the default tenant's.
+ */
+function syncTenant({ repoRoot, tenant, network, chainId, deploymentFileArg }) {
+  if (tenant === 'fairwins') {
+    throw new Error(
+      '--tenant fairwins is the default tenant (the shared estate); run the sync without --tenant.'
+    )
+  }
+  if (!/^[a-z][a-z0-9-]{1,30}$/.test(tenant)) {
+    throw new Error(`--tenant "${tenant}" is invalid — must match ^[a-z][a-z0-9-]{1,30}$`)
+  }
+
+  const deploymentsDir = path.join(repoRoot, 'deployments', 'tenants', tenant)
+  const deploymentFile = deploymentFileArg
+    ? path.resolve(repoRoot, deploymentFileArg)
+    : findDeploymentFile({ deploymentsDir, network, chainId })
+
+  if (!deploymentFile || !fs.existsSync(deploymentFile)) {
+    throw new Error(
+      `Tenant deployment JSON not found for "${tenant}". Looked for ${network} chainId=${chainId} ` +
+        `in ${deploymentsDir}. Deploy with TENANT_ID=${tenant} first, or pass --deploymentFile <path>.`
+    )
+  }
+
+  const deployment = readJson(deploymentFile)
+  const deployed = deployment.contracts || {}
+  const deploymentChainId = Number(deployment.chainId) || chainId
+
+  // Same v2 key surface as the shared sync below — one record schema (D5).
+  const record = {}
+  const keys = [
+    'wagerRegistry', 'membershipManager', 'membershipVoucher', 'voucherBatchMinter',
+    'keyRegistry', 'sanctionsGuard', 'tokenFactory', 'externalDAORegistry',
+    'backupPointerRegistry', 'wagerPoolFactory', 'callsignRegistry', 'feeRouter',
+    'stakingRouter', 'bridgeRouter', 'liquidityRouter', 'miniAppRegistry', 'safeProposalHub',
+    'safePolicyGuard', 'safePolicyGuardV2', 'policyGuardSetup', 'entryPoint',
+    'accountFactory', 'p256Verifier', 'polymarketAdapter', 'chainlinkDataFeedAdapter',
+    'chainlinkFunctionsAdapter', 'umaAdapter',
+  ]
+  for (const key of keys) {
+    if (deployed[key]) record[key] = deployed[key]
+  }
+  if (deployment.paymentToken) record.paymentToken = deployment.paymentToken
+  if (deployment.wmatic) record.wmatic = deployment.wmatic
+  if (deployment.deployer) record.deployer = deployment.deployer
+
+  const outPath = path.join(repoRoot, 'frontend', 'src', 'config', 'tenants', `${tenant}.contracts.json`)
+  fs.mkdirSync(path.dirname(outPath), { recursive: true })
+  const existing = fs.existsSync(outPath) ? readJson(outPath) : {}
+  existing[deploymentChainId] = record
+  fs.writeFileSync(outPath, JSON.stringify(existing, null, 2) + '\n')
+
+  console.log(`Synced tenant "${tenant}" contracts from: ${deploymentFile}`)
+  console.log(`Updated: ${outPath} (chain ${deploymentChainId})`)
 }
 
 function main() {
@@ -156,6 +266,11 @@ function main() {
 
   const network = args.network || 'amoy'
   const chainId = Number.isFinite(args.chainId) ? args.chainId : 80002
+
+  if (args.tenant) {
+    syncTenant({ repoRoot, tenant: args.tenant, network, chainId, deploymentFileArg: args.deploymentFile })
+    return
+  }
 
   const deploymentFile = args.deploymentFile
     ? path.resolve(repoRoot, args.deploymentFile)
@@ -174,7 +289,19 @@ function main() {
 
   const deployment = readJson(deploymentFile)
   const deployed = deployment.contracts || {}
-  const isV2 = Boolean(deployed.wagerRegistry || deployed.membershipManager && deployed.keyRegistry)
+
+  // Which mapping applies. The old test — "does the record have a wagerRegistry?" — assumed every
+  // v2 record contains the core escrow, which stopped being true with the spec-067 control-plane
+  // networks: Ethereum/Optimism/Base/Arbitrum host ONLY feeRouter + bridgeRouter + liquidityRouter
+  // and have no wagerRegistry at all. Such a record fell through to the v1 mapping, which carries
+  // none of those keys, so the sync copied nothing and still printed "Synced" — the exact silent
+  // no-op this file must not produce. The `-v2.json` filename and the v2 salt prefix are both
+  // written by the v2 deploy tooling, so either one is a positive statement of the record's shape;
+  // the contract probe stays as a fallback for hand-written records that predate both.
+  const isV2 =
+    /-v2\.json$/.test(deploymentFile) ||
+    String(deployment.saltPrefix || '').startsWith('FairWins-P2P-v2') ||
+    Boolean(deployed.wagerRegistry || (deployed.membershipManager && deployed.keyRegistry))
 
   let source = fs.readFileSync(contractsFile, 'utf8')
 
@@ -192,9 +319,17 @@ function main() {
         backupPointerRegistry: deployed.backupPointerRegistry, // spec 032 — encrypted-backup pointer registry
         wagerPoolFactory: deployed.wagerPoolFactory, // spec 034 — WagerPools factory, address-based (only where deployed)
         callsignRegistry: deployed.callsignRegistry, // spec 054 — %callsign naming registry (only where deployed)
+        feeRouter: deployed.feeRouter, // spec 060 — unified platform-fee registry + wrapper (only where deployed)
+        stakingRouter: deployed.stakingRouter, // spec 066 — staking control surface + liquid fee router (only where deployed)
+        bridgeRouter: deployed.bridgeRouter, // spec 067 — cross-chain bridge control surface + fee router (only where deployed)
+        liquidityRouter: deployed.liquidityRouter, // spec 067 — liquidity-supply control surface + fee router (only where deployed)
+        miniAppRegistry: deployed.miniAppRegistry, // spec 073 — mini-app catalog + curation authority (only where deployed)
         safeProposalHub: deployed.safeProposalHub, // spec 043 — Safe custody proposal broadcaster (only where deployed)
         safePolicyGuard: deployed.safePolicyGuard, // spec 049 — multisig policy engine guard (only where deployed)
-        policyGuardSetup: deployed.policyGuardSetup, // spec 049 — Safe.setup policy attach helper (only where deployed)
+        // spec 068 — ordered policy engine. Deployed ALONGSIDE v1, never replacing it: vaults adopt
+        // it through a threshold-approved setGuard, so both addresses must stay resolvable.
+        safePolicyGuardV2: deployed.safePolicyGuardV2,
+        policyGuardSetup: deployed.policyGuardSetup, // spec 049/068 — Safe.setup policy attach helper (guard-agnostic)
         entryPoint: deployed.entryPoint, // spec 041 — ERC-4337 EntryPoint v0.6 (canonical or self-deployed)
         accountFactory: deployed.accountFactory, // spec 041 — deterministic CoinbaseSmartWalletFactory (same address on every network)
         p256Verifier: deployed.p256Verifier, // spec 041 — only on networks needing an external P-256 verifier
@@ -230,15 +365,11 @@ function main() {
         nullifierRegistry: deployed.nullifierRegistry,
       }
 
-  // Determine target block in contracts.js (multi-network layout). If the file
-  // doesn't have a per-chain block, blockName stays null and we update globally
-  // (preserves backwards compatibility with the test fixture).
+  // Determine the target block in contracts.js. Null means (and now ONLY means) the flat
+  // single-network layout, where a whole-file update is unambiguous; anything else refuses
+  // rather than writing this chain's addresses into another chain's block.
   const deploymentChainId = Number(deployment.chainId) || chainId
-  let blockName = blockNameForChain(deploymentChainId)
-  if (blockName) {
-    const hasBlock = new RegExp(`(?:const|let|var)\\s+${blockName}\\s*=\\s*\\{`).test(source)
-    if (!hasBlock) blockName = null
-  }
+  const blockName = resolveBlockName(source, deploymentChainId, contractsFile)
 
   for (const [key, value] of Object.entries(mapping)) {
     if (!value) continue
@@ -255,12 +386,16 @@ function main() {
   console.log(`Synced frontend contracts from: ${deploymentFile}`)
   console.log(`Updated: ${contractsFile}`)
 
-  // Emit the JSON ABI the subgraph consumes (generated artifact, not hand-copied).
-  const abisDir = path.join(repoRoot, 'frontend', 'src', 'abis')
-  emitAbiJson({
-    jsAbiPath: path.join(abisDir, 'WagerRegistry.js'),
-    jsonAbiPath: path.join(abisDir, 'WagerRegistry.json'),
-  })
+  // ABI emission REMOVED (spec 075, FR-034). This used to derive the subgraph's WagerRegistry.json
+  // from the HAND-WRITTEN frontend/src/abis/WagerRegistry.js — the comment claimed "generated
+  // artifact, not hand-copied", but its source was hand-copied, so it laundered a hand-maintained
+  // ABI into something that looked generated. That hand-written ABI was missing 35 members of the
+  // merged two-facet registry, including 9 intents-facet errors the UI therefore could not decode.
+  // ABIs now come from `npm run codegen:abis` (packages/abi), generated from compiled artifacts and
+  // gated by `npm run check:abis`.
+  //
+  // The ADDRESS sync above stays: it regex-rewrites frontend/src/config/contracts.js in place, and
+  // untangling that is blocked on that file's transitive `virtual:tenant` import.
 }
 
 main()

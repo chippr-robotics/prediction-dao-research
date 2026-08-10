@@ -21,14 +21,11 @@ const TEST_ACCOUNTS = [
  */
 function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.visitWagers()
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
-    .first()
-    .click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
     .should('be.visible')
 }
@@ -62,12 +59,14 @@ function createAcceptAndResolve(config = {}) {
     .clear()
     .type(opts.opponent)
 
-  cy.wait(500)
+  // Wait for the address to RESOLVE, not a fixed 500ms. validateForm requires
+  // formData.opponentResolved (FriendMarketsModal.jsx:699-702), which AddressInput sets from an
+  // async callback; submitting first fails validation with "Opponent address is required" and the
+  // modal simply never reaches the success screen. AddressInput renders
+  // role="img" aria-label="Valid address" once resolution lands.
+  cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('exist')
 
-  cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-    .first()
-    .clear()
-    .type(opts.stake.toString())
+  cy.enterAmountViaKeypad('fm-stake', opts.stake.toString())
 
   if (opts.stakeToken) {
     cy.get('#fm-stake-token, [role="dialog"] .fm-token-select')
@@ -76,36 +75,23 @@ function createAcceptAndResolve(config = {}) {
   }
 
   if (opts.resolutionType !== undefined) {
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-      .first()
-      .select(opts.resolutionType.toString())
+    cy.selectResolutionType(opts.resolutionType.toString())
   }
 
-  // Disable encryption
-  cy.get('[role="dialog"]').then(($modal) => {
-    const encToggle = $modal.find('input[type="checkbox"]')
-    if (encToggle.length > 0 && encToggle.is(':checked')) {
-      cy.wrap(encToggle.first()).uncheck({ force: true })
-    }
-  })
+  // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
+  // from FriendMarketsModal several sprints ago (grep `checkbox` there returns nothing). The
+  // block that used to uncheck it was a no-op guarded by `if (length > 0)`, so it silently did
+  // nothing while the spec read as though it controlled encryption. (#1028)
 
-  cy.get('[role="dialog"], .modal')
-    .find('button[type="submit"], button')
-    .filter(':contains("Create")')
-    .click({ force: true })
+  cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
-  cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    expect(lower.includes('created') || lower.includes('success') || lower.includes('share')).to.be.true
-  })
+  cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 
   cy.get('[role="dialog"] button[aria-label="Close modal"], [role="dialog"] .fm-close-btn')
     .click({ force: true })
 
   // Step 2: Accept as opponent
   cy.switchAccount(1)
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
 
   cy.openMyWagers('participating')
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
@@ -129,8 +115,6 @@ function createAcceptAndResolve(config = {}) {
 
   // Step 4: Resolve as creator
   cy.switchAccount(0)
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
 
   cy.openMyWagers('created')
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
@@ -138,7 +122,7 @@ function createAcceptAndResolve(config = {}) {
     if (resolveBtn.length > 0) {
       cy.wrap(resolveBtn.first()).click({ force: true })
     } else {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -166,6 +150,14 @@ function createAcceptAndResolve(config = {}) {
 }
 
 describe('Claim Payouts', () => {
+  before(() => {
+    // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
+    // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
+    // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    cy.ensureWagerCapacity([0, 1])
+    cy.ensureEncryptionKeys([0, 1])
+  })
+
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
@@ -187,7 +179,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -232,7 +224,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -257,7 +249,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -311,7 +303,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -343,7 +335,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -385,7 +377,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -436,7 +428,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('created')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -469,7 +461,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -501,7 +493,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')

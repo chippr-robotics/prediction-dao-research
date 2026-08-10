@@ -13,6 +13,10 @@
 // with their display info for getDeployedNetworks(). Safe from import cycles:
 // networks.js intentionally does NOT import from this file.
 import { NETWORKS } from './networks'
+// Tenant contract-set resolution (spec 072): a DEDICATED tenant resolves only
+// its own generated set; shared-mode tenants (incl. the default) fall through
+// to the per-chain maps below. tenant.js has no import back into this file.
+import { isDedicatedTenant, tenantContractsForChain } from './tenant'
 
 // Mordor (Ethereum Classic testnet, chainId 63) — v2 P2P betting deployment.
 // CORE ONLY: no oracle adapters (ETC has no Polymarket/Chainlink/UMA), so those
@@ -44,23 +48,59 @@ const MORDOR_CONTRACTS = {
   // Callsigns (spec 054) — %callsign naming registry. Empty until `deploy-callsign-registry.js` runs;
   // populated by `npm run sync:frontend-contracts`.
   callsignRegistry: '',
+  // Mini-app registry (spec 073) — the curation authority for the Apps catalog. Empty until
+  // `deploy-miniapp-registry.js` runs; populated by `npm run sync:frontend-contracts`.
+  // Undeployed ⇒ the catalog says so and refuses every launch: a package is only ever fetched
+  // and executed against an Approved on-chain record (FR-010/FR-011), so "no registry" can
+  // never degrade into "run it anyway".
+  miniAppRegistry: '0xFEd626025225A3B1aB3BA72D429B8c9C74cb5058',
+  // Staking control surface (spec 066). Empty until `deploy-staking-router.js` runs; sync populates it.
+  // Undeployed ⇒ the member app falls back to spec-065 fee-free direct staking.
+  stakingRouter: '',
+  // Cross-chain bridge + liquidity supply (spec 067). Empty until
+  // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
+  // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
+  // per-network empty state (FR-051) — never invented availability.
+  bridgeRouter: '',
+  liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  feeRouter: '0x5249e3008Cb1Eb81B5BF39148B7760B1c36e516e',
+  entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
 const HARDHAT_CONTRACTS = {
   deployer: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
   treasury: '',
-  wagerRegistry: '0x260Fad26873AC132b34dD6FA5761DcfF0e26cbd0',
-  membershipManager: '0x81010Af3Ef2BBc092c898944D9D39E6c94124660',
-  keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
-  sanctionsGuard: '',
+  wagerRegistry: '0x9A676e781A523b5d0C0e43731313A708CB607508',
+  membershipManager: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707',
+  keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
+  sanctionsGuard: '0xA29BCB4a6355Ec3e2e62B280Bf0cA76C7927A207',
   polymarketAdapter: '0x19D004863fB8F5A1707091C120e08aA1FEE8d65F',
   paymentToken: '0x065606eeE0D7BB3d2e7959D56c3ca177625385a7',
   wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
   // spec 049 — multisig policy engine (synced from deployments/hardhat-chain1337-v2.json)
   safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
+  // Spec 068 ordered rule engine; deployed alongside v1 (both guards stay live — vaults adopt V2
+  // through a threshold-approved setGuard, never a forced migration).
+  safePolicyGuardV2: '0xc01E5F3EAFd2C0138e98382A3F54B6CeB3dc05cf',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
+  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
+  stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
+  // Cross-chain bridge + liquidity supply (spec 067). Empty until
+  // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
+  // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
+  // per-network empty state (FR-051) — never invented availability.
+  bridgeRouter: '',
+  liquidityRouter: '',
+  membershipVoucher: '0x4a1d81F8c3cd56b44d09a2abB42EeB7Ed83cfBf4',
+  voucherBatchMinter: '0xD238Dd92FdEF481DdFF65B396099EE9FB368684F',
+  tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)
@@ -84,6 +124,20 @@ const AMOY_CONTRACTS = {
   membershipVoucher: '0x33C8Ccacf6442Cf4238f01419e38C781cB859769',
   voucherBatchMinter: '0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
+  // Spec 073 — deliberately NOT a deployment target, and NOT "pending". The mini-app registry
+  // ships to Polygon and Mordor only, and `miniAppChainId()` sends every testnet build to
+  // Mordor 63. The key stays for shape parity with the other chains; deploying one here would
+  // create a second testnet catalog that nothing reads.
+  miniAppRegistry: '',
+  stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
+  // Cross-chain bridge + liquidity supply (spec 067). Empty until
+  // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
+  // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
+  // per-network empty state (FR-051) — never invented availability.
+  bridgeRouter: '',
+  liquidityRouter: '',
+  entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
 }
 
 // Polygon mainnet deployment (v2 — P2P betting architecture) — LIVE
@@ -117,6 +171,78 @@ const POLYGON_CONTRACTS = {
   safePolicyGuard: '0xa0F188776a65794cc06777412432e47dcB0d0c4B',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   callsignRegistry: '0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2', // spec 054 — %callsign naming registry (synced after deploy)
+  miniAppRegistry: '0x5a168Cc9FeFaf40e7BC536C8C61669e6d547A0A2', // spec 073 — mini-app catalog registry (synced after deploy)
+  stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
+  // Cross-chain bridge + liquidity supply (spec 067). Empty until
+  // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
+  // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
+  // per-network empty state (FR-051) — never invented availability.
+  bridgeRouter: '0x8064F3Cd9F8f113691B981d2B15EF85D95Abd551',
+  liquidityRouter: '0x13762c059c2A22E3bCd8A44F36EA44e8e3B22B31',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  feeRouter: '0xf8161fC26172621E9fbcc6c39500Bb14b0902B35',
+}
+
+// Ethereum Classic mainnet (chainId 61) — CUSTODY ONLY. ETC hosts no FairWins wager/membership
+// deployment; it gained a contracts block with spec 068 so Protect vaults can live there (Safe
+// v1.4.1 is canonical on ETC). Every other lookup honestly resolves empty.
+//   npx hardhat run scripts/deploy/custody/deploy-policy-guard-v2.js --network etc
+//   npm run sync:frontend-contracts -- --network etc --chainId 61
+const ETC_CONTRACTS = {
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
+}
+
+// Spec 067 bridge/liquidity networks. These chains host NO FairWins wager/membership
+// deployment — only the two spec-067 routers — so their maps carry just those keys and
+// every other lookup honestly resolves empty.
+const ETHEREUM_CONTRACTS = {
+  bridgeRouter: '0x258181DF2aa45EA3a3eAC748d6491D5e1f2675eE',
+  liquidityRouter: '0x1afcAC1949BD306F7D4818999f509941F2E85582',
+  feeRouter: '0xB9F80D6D4CfD3ecC60b63810aDF9d88931D0e3d3',
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
+}
+
+const OPTIMISM_CONTRACTS = {
+  bridgeRouter: '0x1afcAC1949BD306F7D4818999f509941F2E85582',
+  liquidityRouter: '0xA273aF8ebB76d1D0Dcd55692C1f5a7db956F7EED',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  feeRouter: '0x98218248CA53Dd88159979af20172C86b94e8B29',
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
+}
+
+const BASE_CONTRACTS = {
+  bridgeRouter: '0x1afcAC1949BD306F7D4818999f509941F2E85582',
+  liquidityRouter: '0xA273aF8ebB76d1D0Dcd55692C1f5a7db956F7EED',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  feeRouter: '0x98218248CA53Dd88159979af20172C86b94e8B29',
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
+}
+
+const ARBITRUM_CONTRACTS = {
+  bridgeRouter: '0x1afcAC1949BD306F7D4818999f509941F2E85582',
+  liquidityRouter: '0xA273aF8ebB76d1D0Dcd55692C1f5a7db956F7EED',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  feeRouter: '0x98218248CA53Dd88159979af20172C86b94e8B29',
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
 }
 
 const NETWORK_CONTRACTS = {
@@ -124,6 +250,13 @@ const NETWORK_CONTRACTS = {
   80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
   137: POLYGON_CONTRACTS,   // Polygon mainnet (v2) — LIVE
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
+  // Spec 068 — custody only (Protect vaults + policy engine; no wager/membership here).
+  61: ETC_CONTRACTS,        // Ethereum Classic mainnet
+  // Spec 067 — routers only (no wager/membership deployment on these chains).
+  1: ETHEREUM_CONTRACTS,    // Ethereum mainnet
+  10: OPTIMISM_CONTRACTS,   // Optimism
+  8453: BASE_CONTRACTS,     // Base
+  42161: ARBITRUM_CONTRACTS,// Arbitrum One
 }
 
 // Default to Polygon mainnet (137) — the primary network — when VITE_NETWORK_ID
@@ -141,10 +274,50 @@ export const DEPLOYED_CONTRACTS =
  * v1 used friendGroupMarketFactory; v2 uses wagerRegistry. Both kept here to
  * support legacy Mordor reads while Amoy migrates.
  */
+// NOTE (spec 068): `safeProposalHub` MUST carry a deployment block on every custody chain —
+// `useVaultProposals` refuses to scan without one, so a missing entry silently disables custody
+// proposal discovery on that chain even when the hub itself is deployed.
+// NOTE (spec 073): `miniAppRegistry` carries a placeholder block (0 = unknown, per
+// getDeploymentBlockForChain) on every chain whose contract map declares the key, so the slot is
+// written down rather than remembered. `deploy-miniapp-registry.js` records the real block in
+// `deployments/`; copy it here by hand like every other entry. Unlike `safeProposalHub` above,
+// a missing block disables nothing today — catalog and launch reads are view calls (research
+// R6), never event scans — so a 0 here cannot make the Apps section look available before the
+// registry exists; availability comes from the address being non-empty and the record Approved.
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
-  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315, wagerPoolFactory: 16495564 },
-  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
-  137: { friendGroupMarketFactory: 0, wagerRegistry: 89717915, membershipVoucher: 89717915, wagerPoolFactory: 89720731 },
+  63: {
+    friendGroupMarketFactory: 15658191,
+    wagerRegistry: 0,
+    membershipVoucher: 16404315,
+    wagerPoolFactory: 16495564,
+    safeProposalHub: 16645531,
+    miniAppRegistry: 16685064,
+  },
+  // Custody-only chains (spec 068). `safeProposalHub` MUST carry a block on every custody chain or
+  // useVaultProposals refuses to scan and proposal discovery is silently dead there.
+  61: { safeProposalHub: 25026893 }, // Ethereum Classic
+  10: { safeProposalHub: 154753770 }, // Optimism
+  8453: { safeProposalHub: 49158472 }, // Base
+  42161: { safeProposalHub: 488059169 }, // Arbitrum One
+  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024, miniAppRegistry: 0 },
+  // Polygon. Blocks marked (measured) were bisected with `eth_getCode` against an archive node
+  // rather than taken from a deploy script's report — the two disagreed by up to ten blocks, and
+  // a recorded block LATER than the real creation silently drops any event in between. The
+  // wagerRegistry bisection matched its recorded value exactly, which is what validates the rest.
+  137: {
+    friendGroupMarketFactory: 0,
+    wagerRegistry: 89717915,
+    membershipVoucher: 89717905, // measured (was 89717915 — 10 blocks late)
+    membershipManager: 89717895, // measured
+    tokenFactory: 89717942, // measured
+    wagerPoolFactory: 89720740, // measured (was 89720731)
+    chainlinkDataFeedAdapter: 87937162, // measured
+    chainlinkFunctionsAdapter: 87937176, // measured
+    umaAdapter: 87937184, // measured
+    safeProposalHub: 90120743,
+    miniAppRegistry: 91265680,
+  },
+  1337: { safeProposalHub: 4, safePolicyGuardV2: 2, miniAppRegistry: 0 },
 }
 
 export const DEPLOYMENT_BLOCKS =
@@ -168,6 +341,13 @@ export function getDeploymentBlockForChain(contractName, chainId) {
  * @returns {string} Contract address
  */
 export function getContractAddress(contractName) {
+  // Dedicated tenant (spec 072): the tenant's own generated set is the ONLY
+  // source — no env overrides, no shared-estate fallback. Absence stays absence.
+  if (isDedicatedTenant()) {
+    const tenantSet = tenantContractsForChain(ACTIVE_CHAIN_ID)
+    return tenantSet ? tenantSet[contractName] : undefined
+  }
+
   // Check environment variables first (for custom deployments)
   // Support both legacy style (VITE_ROLEMANAGER_ADDRESS) and snake-case style (VITE_ROLE_MANAGER_ADDRESS)
   const upper = contractName.toUpperCase()
@@ -204,6 +384,13 @@ export function getContractAddress(contractName) {
  */
 export function getContractAddressForChain(contractName, chainId) {
   if (chainId == null) return getContractAddress(contractName)
+  // Dedicated tenant (spec 072): resolve ONLY from the tenant's own set —
+  // a chain absent from it reads as not-deployed for this tenant, never as
+  // the shared estate's deployment (FR-003/D6).
+  if (isDedicatedTenant()) {
+    const tenantSet = tenantContractsForChain(chainId)
+    return tenantSet ? tenantSet[contractName] : undefined
+  }
   const chainContracts = NETWORK_CONTRACTS[chainId]
   return chainContracts ? chainContracts[contractName] : undefined
 }

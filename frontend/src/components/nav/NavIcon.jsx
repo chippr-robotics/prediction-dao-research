@@ -29,6 +29,8 @@ const ICON_PATHS = {
   star: <><path d="m12 3.6 2.6 5.2 5.8.9-4.2 4.1 1 5.7-5.2-2.7-5.2 2.7 1-5.7-4.2-4.1 5.8-.9L12 3.6Z" /></>,
   key: <><circle cx="8" cy="12" r="3.5" /><path d="M11.3 11h8.9M17 11v3M20.2 11v2.4" /></>,
   power: <><path d="M12 3.5v8" /><path d="M6.8 7a8 8 0 1 0 10.4 0" /></>,
+  // Hamburger — opens/closes the collapsible section rail.
+  menu: <><path d="M4 7h16M4 12h16M4 17h16" /></>,
   grid: <><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></>,
   alert: <><path d="M12 4 2.8 20h18.4L12 4Z" /><path d="M12 10v5M12 17.6v.01" /></>,
   layers: <><path d="M12 4 3 9l9 5 9-5-9-5Z" /><path d="m3 14 9 5 9-5" /></>,
@@ -40,6 +42,10 @@ const ICON_PATHS = {
   copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
   check: <><path d="m5 12.5 4.5 4.5L19 6.5" /></>,
   user: <><circle cx="12" cy="8" r="3.5" /><path d="M5.5 20c.8-4.2 12.2-4.2 13 0" /></>,
+  // My Account bottom nav — Activity: a clock face, "what happened recently".
+  clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
+  // Activity feed toolbar — search: the universal magnifier.
+  search: <><circle cx="11" cy="11" r="6.5" /><path d="m15.8 15.8 4.7 4.7" /></>,
   trending: <><path d="M4 15.5 9.5 10l3.5 3.5L20 6" /><path d="M15.5 6H20v4.5" /></>,
   // Collectibles (spec 055) — a faceted gem: unique, collectible, display-worthy.
   gem: <><path d="M7 4h10l4 6-9 10L3 10l4-6Z" /><path d="M3 10h18" /><path d="M9.5 10 12 4l2.5 6L12 20l-2.5-10Z" /></>,

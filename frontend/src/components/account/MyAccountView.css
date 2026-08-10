@@ -1,0 +1,96 @@
+/* MyAccountView — unified Account tab body (spec 074): carousel on top, one
+   of three views below. Theme tokens with light-mode literal fallbacks. */
+
+.my-account {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Frozen account selection: the cards + view switcher pin below the (sticky)
+   site header while only the view content scrolls. The offset var is measured
+   at runtime from the header's live box (MyAccountView effect). Requires no
+   scroll-container ancestors — .wallet-page clips with `overflow: clip`, not
+   `hidden`, exactly so this can stick to the window scroll. */
+.my-account-sticky {
+  /* Matches .tab-content's padding (24px desktop / 16px ≤768px) so the bleed
+     below spans the host panel edge-to-edge. */
+  --my-account-bleed: 24px;
+  position: sticky;
+  top: var(--my-account-sticky-top, 0px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--color-surface, var(--bg-secondary, #ffffff));
+  /* Bleed over the host panel's padding so scrolling content disappears
+     cleanly under the frozen block instead of peeking out beside it. */
+  margin: calc(-1 * var(--my-account-bleed)) calc(-1 * var(--my-account-bleed)) 0;
+  padding: 16px var(--my-account-bleed) 8px;
+  border-bottom: 1px solid var(--border-color, #e3e7eb);
+}
+
+@media (max-width: 768px) {
+  .my-account-sticky {
+    --my-account-bleed: 16px;
+  }
+}
+
+.my-account-freshness {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Desktop view switcher — same shape as the Transfer section's .pt-tabs.
+   Hidden on mobile, where WalletPage's bottom icon bar (SectionIconNav)
+   carries the same three views: exactly one switcher per width (FR-007). */
+.my-account-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary, #ffffff);
+  width: fit-content;
+}
+
+.my-account-tab {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast, 0.15s), color var(--transition-fast, 0.15s);
+}
+
+.my-account-tab:hover {
+  color: var(--text-primary, #1f2933);
+}
+
+.my-account-tab.active {
+  background: var(--brand-primary, #36b37e);
+  color: #ffffff;
+}
+
+.my-account-tab:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .my-account-tabs {
+    display: none;
+  }
+}
+
+.my-account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

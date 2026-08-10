@@ -1,0 +1,25 @@
+{
+  "name": "@fairwins/intent-types",
+  "version": "1.5.1",
+  "private": true,
+  "type": "module",
+  "description": "The single definition of every FairWins EIP-712 intent struct and domain (spec 075). Zero runtime dependencies; resolvable by plain Node and by Vite.",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src"
+  ],
+  "//gates": [
+    "This package declares no test script ON PURPOSE (as does @fairwins/abi). It used to declare",
+    "'vitest run', which exited 1 with 'No test files found' — vitest was never a dependency here",
+    "and no test file was ever added, so the script only ever reported a failure that meant nothing.",
+    "Its definitions cannot be verified in isolation anyway: they are correct only relative to the",
+    "Solidity that verifies them and the gateway that implements them, both of which live outside",
+    "this directory. The two gates that do that are:",
+    "  test/intent/TypehashParity.test.js            (structs + domains vs the contracts, both ways)",
+    "  services/relay-gateway/test/actionCoverage.test.js (declared actions vs relayed actions)"
+  ]
+}

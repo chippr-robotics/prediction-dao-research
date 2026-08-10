@@ -20,6 +20,18 @@ vi.mock('../hooks', () => ({
   useWallet: () => ({ isConnected: true, address: REQUESTER, chainId: 137, openConnectModal: vi.fn() }),
 }))
 vi.mock('../hooks/useChainTokens', () => ({ useChainTokens: () => TOKENS }))
+// Spec 064: the panels derive their asset list from useSelectableAssets. Stub it on
+// chain 137 (matching the mocked connected chain) so the USDC request round-trips.
+const rtNative = { key: '137:native', chainId: 137, kind: 'native', address: null, symbol: 'POL', name: 'Polygon', decimals: 18, networkName: 'Polygon', balance: 5 }
+const rtStable = { key: `137:${USDC.toLowerCase()}`, chainId: 137, kind: 'erc20', address: USDC, symbol: 'USDC', name: 'USD Coin', decimals: 6, networkName: 'Polygon', balance: 1000 }
+const rtApi = { options: [rtStable, rtNative], defaultKey: rtStable.key, isGasless: () => true }
+vi.mock('../hooks/useSelectableAssets', () => ({ useSelectableAssets: () => rtApi, default: () => rtApi }))
+vi.mock('../hooks/useActiveAccount', () => ({
+  useActiveAccount: () => ({ identity: { mode: 'personal' }, isVault: false, isLegacy: false }),
+}))
+vi.mock('../hooks/useBitcoinWallet', () => ({
+  useBitcoinWallet: () => ({ status: 'idle', receive: { nextReceiveAddress: () => null } }),
+}))
 vi.mock('../hooks/useClipboard', () => ({ useClipboard: () => ({ copied: false, copy: vi.fn() }) }))
 vi.mock('qrcode.react', () => ({
   QRCodeSVG: (props) => <svg data-testid="request-qr" data-value={props.value} />,
@@ -92,7 +104,8 @@ describe('Request → scan → Pay round trip (spec 058 US2/SC-003)', () => {
     // 3. Everything is prefilled, ready to confirm.
     expect(screen.getByLabelText('To')).toHaveValue(REQUESTER)
     expect(screen.getByTestId('amount-keypad-hero')).toHaveTextContent('12.5')
-    expect(screen.getByLabelText('Currency')).toHaveValue('stable')
+    // The universal selector's trigger shows the resolved currency (USDC).
+    expect(screen.getByRole('button', { name: 'Currency' })).toHaveTextContent('USDC')
     expect(screen.getByLabelText('Note')).toHaveValue('pizza night')
     const pay = screen.getByRole('button', { name: /^pay$/i })
     await vi.waitFor(() => expect(pay).toBeEnabled())

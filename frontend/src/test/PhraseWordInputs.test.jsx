@@ -75,7 +75,22 @@ describe('PhraseWordInputs (four-word phrase entry with type-ahead)', () => {
   it('pasting a full phrase spreads the words across all four boxes', () => {
     render(<Harness />)
     const [first] = boxes()
-    fireEvent.paste(first, { clipboardData: { getData: () => 'crystal orbit harbor violet' } })
-    expect(screen.getByTestId('phrase')).toHaveTextContent('crystal|orbit|harbor|violet')
+    fireEvent.paste(first, { clipboardData: { getData: () => 'crystal orbit harbor velvet' } })
+    expect(screen.getByTestId('phrase')).toHaveTextContent('crystal|orbit|harbor|velvet')
+  })
+
+  it('spreads a full phrase that arrives without a paste event (autofill, voice typing)', () => {
+    render(<Harness />)
+    const [first] = boxes()
+    // Some input paths hand the box a whole phrase as one change; keeping only the first word
+    // would silently drop the rest and leave the phrase unlookupable.
+    fireEvent.change(first, { target: { value: 'crystal orbit harbor velvet' } })
+    expect(screen.getByTestId('phrase')).toHaveTextContent('crystal|orbit|harbor|velvet')
+  })
+
+  it('spreads a phrase into the remaining boxes when it lands mid-row', () => {
+    render(<Harness initial={['crystal', '', '', '']} />)
+    fireEvent.change(boxes()[1], { target: { value: 'orbit harbor velvet' } })
+    expect(screen.getByTestId('phrase')).toHaveTextContent('crystal|orbit|harbor|velvet')
   })
 })

@@ -1,5 +1,5 @@
 /**
- * Honest-availability degraded states (spec 060 US2) at the modal level: the pre-handoff surface
+ * Honest-availability degraded states (spec 081 US2) at the modal level: the pre-handoff surface
  * itself re-validates and degrades honestly — unavailable message instead of a broken flow, and a
  * mid-sheet network switch re-evaluates against the new chain before any handoff.
  */

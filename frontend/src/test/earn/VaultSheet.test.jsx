@@ -34,6 +34,14 @@ vi.mock('../../lib/earn/vaultActions', async (importOriginal) => {
 })
 vi.mock('../../utils/rpcProvider', () => ({ makeReadProvider: () => ({}) }))
 
+// The live platform-fee quote (spec 060) is mocked so tests control whether a
+// fee applies; default = no fee system on the chain (pre-060 behavior).
+const mockFee = vi.hoisted(() => ({ impl: null }))
+vi.mock('../../lib/fees/feeQuote', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, fetchFeeQuote: (...args) => mockFee.impl(...args) }
+})
+
 import VaultSheet from '../../components/earn/VaultSheet'
 
 const VAULT = {
@@ -76,15 +84,24 @@ beforeEach(() => {
   }
   mockBuilders.deposit.mockReset().mockResolvedValue({ calls: DEPOSIT_CALLS, requiresApproval: true })
   mockBuilders.withdraw.mockReset().mockResolvedValue({ calls: [DEPOSIT_CALLS[1]] })
+  mockFee.impl = vi.fn().mockResolvedValue({ available: false, bps: 0, capBps: 0, routerAddress: null })
 })
+
+/** Deposits are gated until the live fee quote resolves (spec 060, FR-015). */
+async function depositQuoteReady() {
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /deposit usdc/i })).not.toBeDisabled(),
+  )
+}
 
 function renderSheet(userState = USER_STATE, vault = VAULT) {
   return render(<VaultSheet vault={vault} userState={userState} onClose={vi.fn()} onActionComplete={vi.fn()} />)
 }
 
 describe('VaultSheet deposit validation (pre-wallet)', () => {
-  it('rejects zero, junk, and over-balance amounts with plain reasons', () => {
+  it('rejects zero, junk, and over-balance amounts with plain reasons', async () => {
     renderSheet()
+    await depositQuoteReady()
     const input = screen.getByLabelText(/amount/i)
     const submit = screen.getByRole('button', { name: /deposit usdc/i })
 
@@ -149,6 +166,7 @@ describe('VaultSheet network-transparent write rail (useEarnSend)', () => {
     // pre-confirmation: the hook switches as part of the submission.
     mockWallet.current = { address: '0xac', chainId: 137 }
     renderSheet(USER_STATE, ETH_VAULT)
+    await depositQuoteReady()
     expect(screen.getByText(/on Ethereum/i)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: /deposit usdc/i }))
@@ -164,6 +182,7 @@ describe('VaultSheet network-transparent write rail (useEarnSend)', () => {
       sendOnChain: vi.fn().mockResolvedValue({ route: 'userop', state: 'included', txHash: '0xtx1' }),
     }
     renderSheet()
+    await depositQuoteReady()
     expect(screen.getByText(/one passkey confirmation/i)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: /deposit usdc/i }))
@@ -188,8 +207,55 @@ describe('VaultSheet network-transparent write rail (useEarnSend)', () => {
       .fn()
       .mockResolvedValue({ route: 'userop', state: 'failed', reason: 'user operation reverted' })
     renderSheet()
+    await depositQuoteReady()
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: /deposit usdc/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be completed/i)
+  })
+})
+
+describe('VaultSheet platform-fee disclosure (spec 060)', () => {
+  const ROUTER = '0x00000000000000000000000000000000000000f1'
+  const FEE_QUOTE = { available: true, bps: 50, capBps: 250, routerAddress: ROUTER }
+
+  it('shows the fee line — rate, amount, and net — before any signature', async () => {
+    mockFee.impl = vi.fn().mockResolvedValue(FEE_QUOTE)
+    renderSheet()
+    await depositQuoteReady()
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '20' } })
+    expect(screen.getByText(/fairwins platform fee \(0\.50%\)/i)).toBeInTheDocument()
+    // 20 USDC at 50 bps: 0.1 fee, 19.9 into the vault.
+    expect(screen.getByText(/^0\.1 USDC$/)).toBeInTheDocument()
+    expect(screen.getByText(/goes into the vault/i)).toBeInTheDocument()
+    expect(screen.getByText(/^19\.9 USDC$/)).toBeInTheDocument()
+  })
+
+  it('passes the quote through to the deposit batch builder (consent ceiling)', async () => {
+    mockFee.impl = vi.fn().mockResolvedValue(FEE_QUOTE)
+    renderSheet()
+    await depositQuoteReady()
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: /deposit usdc/i }))
+    await waitFor(() => expect(mockBuilders.deposit).toHaveBeenCalledTimes(1))
+    expect(mockBuilders.deposit.mock.calls[0][0].feeQuote).toEqual(FEE_QUOTE)
+  })
+
+  it('shows NO fee line when no fee applies (zero-fee parity with pre-060 UX)', async () => {
+    renderSheet()
+    await depositQuoteReady()
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '20' } })
+    expect(screen.queryByText(/platform fee/i)).not.toBeInTheDocument()
+  })
+
+  it('pauses deposits (never an understated rate) when the quote cannot be read', async () => {
+    mockFee.impl = vi.fn().mockRejectedValue(new Error('rpc down'))
+    renderSheet()
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(/fee rate could not be confirmed/i),
+    )
+    expect(screen.getByRole('button', { name: /deposit usdc/i })).toBeDisabled()
+    // Withdrawals stay available — the fee never applies to exits.
+    fireEvent.click(screen.getByRole('tab', { name: /withdraw/i }))
+    expect(screen.getByRole('button', { name: /withdraw usdc/i })).not.toBeDisabled()
   })
 })

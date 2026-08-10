@@ -8,13 +8,22 @@ export const DOMAIN_META = {
   dao: { label: 'DAO' },
   token: { label: 'Token' },
   membership: { label: 'Membership' },
-  pools: { label: 'Pool' },
+  // Spec 067 FR-039a / research R6: this label used to read the bare word "Pool", which becomes
+  // indistinguishable from an Earn → Supply liquidity entry once both appear in the same feed.
+  // "Pool" stays reserved for wager pools; the label spells that out.
+  pools: { label: 'Wager Pool' },
   // Spec 043 custody (Safe multisig vault) events.
   custody: { label: 'Custody' },
   // Spec 035 intent lifecycle entries (emitted via useIntentAction's onActivity callback).
   intents: { label: 'Gasless' },
   // Spec 050 earn (lending & rewards) events.
   earn: { label: 'Earn' },
+  // Spec 065 staking (liquid & delegated) events.
+  staking: { label: 'Staking' },
+  // Spec 067 cross-chain bridge (deposit, delivered, refunded, needs attention) events.
+  bridge: { label: 'Bridge' },
+  // Spec 067 Earn → Supply liquidity events (supply, withdraw, fee claim, pool closed).
+  liquidity: { label: 'Liquidity' },
 }
 
 /** Display label for a domain key (falls back to the key itself for an unknown/future domain). */

@@ -5,6 +5,16 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import { Interface, getAddress } from 'ethers'
+// Spec 068 — these surfaces now use the shared CustodyAddressField; the platform inputs are stubbed
+// so each suite stays a unit test (the field itself is covered by CustodyAddressField.test.jsx).
+vi.mock('../../components/ui/AddressInput', () => ({
+  default: ({ id, value, onChange, placeholder, disabled }) => (
+    <input id={id} value={value} onChange={onChange} placeholder={placeholder} disabled={disabled} />
+  ),
+}))
+vi.mock('../../components/ui/AddressBookButton', () => ({ default: () => <button type="button">Address book</button> }))
+vi.mock('../../components/ui/QRScanner', () => ({ default: () => null }))
+
 import OwnersThresholdPanel from '../../components/custody/OwnersThresholdPanel'
 import { SAFE_ABI } from '../../abis/Safe'
 

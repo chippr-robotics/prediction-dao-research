@@ -1,0 +1,17 @@
+{
+  "name": "@fairwins/miniapp-build",
+  "version": "1.5.1",
+  "private": true,
+  "description": "Shared Vite build preset that packages a FairWins mini-app (spec 073).",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./index.js": "./index.js",
+    "./constants.js": "./constants.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "vite": "^8.2.1"
+  }
+}

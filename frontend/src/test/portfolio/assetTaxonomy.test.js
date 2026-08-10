@@ -44,14 +44,17 @@ describe('TAXONOMY_CATEGORIES', () => {
 })
 
 describe('getPortfolioChainIds', () => {
-  it('scans mainnets only by default (Ethereum, Ethereum Classic, Polygon)', () => {
-    expect(new Set(getPortfolioChainIds())).toEqual(new Set([1, 61, 137]))
+  it('scans mainnets only by default (incl. the spec-067 bridge networks)', () => {
+    // Optimism (10), Base (8453) and Arbitrum (42161) join as first-class value
+    // networks in spec 067 (FR-006b) — a member must be able to SEE what they
+    // bridged, so portfolio inclusion is part of offering the route at all.
+    expect(new Set(getPortfolioChainIds())).toEqual(new Set([1, 10, 61, 137, 8453, 42161]))
   })
 
   it('adds Sepolia, Hoodi, Amoy, and Mordor when testnets are enabled', () => {
     // Hoodi (560048) joins the Ethereum family testnets (spec 048).
     expect(new Set(getPortfolioChainIds({ includeTestnets: true }))).toEqual(
-      new Set([1, 61, 137, 11155111, 560048, 80002, 63]),
+      new Set([1, 10, 61, 137, 8453, 42161, 11155111, 560048, 80002, 63]),
     )
   })
 

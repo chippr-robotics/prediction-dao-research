@@ -219,3 +219,49 @@ describe('createReportDataSource.getWagerEvents (bounded window, adaptive chunki
     expect(Math.min(...sizes)).toBeLessThan(5000)
   })
 })
+
+/*
+ * Spec 069 — the report reads the chain it is a report ABOUT.
+ *
+ * `getProvider` used to be `makeReadProvider(NETWORK_CONFIG.rpcUrl, opts.chainId)`: the URL came
+ * from the build's default network, the chain id from the caller. Whenever those disagreed the
+ * report asked one chain's node about another chain's transaction hashes, got nothing back, and
+ * reported the gas fees as absent rather than as unread — a fabricated fact, and the exact shape
+ * spec 069 forbids (never hand a provider a URL that can contradict the chain it is for).
+ */
+describe('the report reads the chain it was asked for (spec 069)', () => {
+  afterEach(() => { vi.resetModules(); vi.doUnmock('../../utils/rpcProvider') })
+
+  async function withProviderSpy(impl) {
+    vi.resetModules()
+    const getReadProvider = vi.fn(impl)
+    vi.doMock('../../utils/rpcProvider', async (importOriginal) => ({
+      ...(await importOriginal()),
+      getReadProvider,
+    }))
+    const mod = await import('../../data/reports/reportDataSource')
+    return { create: mod.createReportDataSource, getReadProvider }
+  }
+
+  it('resolves the provider from the report chain, not the build default', async () => {
+    const { create, getReadProvider } = await withProviderSpy(() => ({ getBlockNumber: async () => 1 }))
+    create({ chainId: 63, repository: { listMyWagers: async () => ({ items: [], hasMore: false }) } })
+    // Mordor, on a build whose default network is not Mordor.
+    expect(getReadProvider).toHaveBeenCalledWith(63)
+  })
+
+  it('refuses when the chain has no endpoint, rather than falling through to the default network', async () => {
+    // A null provider would reach ethers as "use the default network" — the same wrong-chain read
+    // by a quieter route. It has to be a refusal.
+    const { create } = await withProviderSpy(() => null)
+    expect(() => create({ chainId: 63, repository: { listMyWagers: async () => ({ items: [] }) } }))
+      .toThrow(/no rpc endpoint is configured for network 63/i)
+  })
+
+  it('still honours an explicitly injected provider (the testing seam)', async () => {
+    const { create, getReadProvider } = await withProviderSpy(() => ({ getBlockNumber: async () => 1 }))
+    const injected = { getBlockNumber: async () => 42 }
+    create({ chainId: 63, provider: injected, repository: { listMyWagers: async () => ({ items: [] }) } })
+    expect(getReadProvider).not.toHaveBeenCalled()
+  })
+})

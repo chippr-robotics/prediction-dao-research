@@ -1,0 +1,158 @@
+# Staging build + deploy (spec 076, FR-023/FR-026/FR-026a).
+#
+# TWO SERVICES FROM ONE COMMIT. That is the whole design, and it is not an accident of convenience:
+#
+#   frontend/src/config/networks.js:1017  getCurrentChainId() -> import.meta.env.VITE_NETWORK_ID
+#   frontend/src/config/networks.js:917   buildIsTestnet()    -> NETWORKS[that].isTestnet
+#   frontend/src/config/networks.js:981   cohortChainIds()    -> filters on that boolean
+#
+# Vite folds VITE_NETWORK_ID into the bundle at build time, so ONE IMAGE RESOLVES EXACTLY ONE
+# COHORT. FR-026a requires staging to reach every cohort the product supports, so staging is two
+# images — not one image with a runtime cohort switch, which would put a testnet/mainnet seam into
+# code that also ships to production and would make constitution III's boundary a runtime value
+# instead of a build-time fact.
+#
+#   staging          VITE_NETWORK_ID=137    the promotion mirror — what main will run next
+#   staging-testnet  VITE_NETWORK_ID=80002  safe rehearsal, no real funds
+#
+# THE MAINNET STAGING SERVICE TOUCHES REAL FUNDS. It has its own funded accounts, gas wallet,
+# paymaster deposit and origin-lock secret (FR-026c/FR-027) and holds NO admin or deployer key, but
+# the transactions it sends are real. VITE_STAGING_BANNER makes the app say so (FR-026d).
+#
+# Everything not listed in specs/076-monorepo-semantic-versioning/contracts/environments.md as an
+# enumerated difference MUST match production, and the promotion check enforces that (FR-027a).
+
+steps:
+  # ---- 1. Mainnet-cohort staging image (the promotion mirror) -----------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-mainnet
+    args:
+      - 'build'
+      - '--build-arg'
+      # Nav-drawer build label (buildInfo.js, added on main while spec 076 was in flight). Mirrored
+      # here because production sets it: an unenumerated difference blocks a promotion, and staging
+      # showing a different build label than production would defeat the point of the mirror.
+      - 'VITE_COMMIT_SHA=$SHORT_SHA'
+      - '--build-arg'
+      - 'VITE_TENANT_ID=fairwins'
+      - '--build-arg'
+      - 'VITE_WALLETCONNECT_PROJECT_ID=c30d7d7a8d575fe3dcc72ed55e5b287e'
+      # Enumerated difference 1: hostname.
+      - '--build-arg'
+      - 'VITE_APP_URL=https://staging.fairwins.app'
+      # Enumerated difference 5: staging points at its OWN relayer/bundler/paymaster, never
+      # production's — a staging defect must not be able to drain or rate-limit production's.
+      - '--build-arg'
+      - 'VITE_RELAYER_URL=https://relay-staging.fairwins.app'
+      - '--build-arg'
+      - 'VITE_BUNDLER_URLS_POLYGON=https://bundler-staging.fairwins.app'
+      - '--build-arg'
+      - 'VITE_SPONSOR_PAYMASTER_POLYGON=https://relay-staging.fairwins.app/v1/paymaster'
+      # NOT an enumerated difference — these MUST match production, or staging is not a mirror.
+      - '--build-arg'
+      - 'VITE_NETWORK_ID=137'
+      - '--build-arg'
+      - 'VITE_RPC_URL=https://polygon-bor-rpc.publicnode.com'
+      - '--build-arg'
+      - 'VITE_IPFS_GATEWAY=https://gateway.pinata.cloud'
+      - '--build-arg'
+      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.2.0'
+      - '--build-arg'
+      - 'VITE_WAGER_SOURCE=subgraph'
+      # Enumerated difference 4: the non-production marker (FR-025) and the real-funds disclosure
+      # (FR-026d). `mainnet` is what makes the app say actions here are REAL, not a simulation.
+      - '--build-arg'
+      - 'VITE_STAGING_BANNER=mainnet'
+      # Enumerated difference 6: release identity. A candidate, never a production release.
+      - '--build-arg'
+      - 'VITE_APP_VERSION=${_RC_VERSION}'
+      - '--build-arg'
+      - 'VITE_GIT_SHA=$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging:$COMMIT_SHA'
+      - '.'
+
+  # ---- 2. Testnet-cohort staging image ----------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-testnet
+    args:
+      - 'build'
+      - '--build-arg'
+      # Nav-drawer build label (buildInfo.js, added on main while spec 076 was in flight). Mirrored
+      # here because production sets it: an unenumerated difference blocks a promotion, and staging
+      # showing a different build label than production would defeat the point of the mirror.
+      - 'VITE_COMMIT_SHA=$SHORT_SHA'
+      - '--build-arg'
+      - 'VITE_TENANT_ID=fairwins'
+      - '--build-arg'
+      - 'VITE_WALLETCONNECT_PROJECT_ID=c30d7d7a8d575fe3dcc72ed55e5b287e'
+      - '--build-arg'
+      - 'VITE_APP_URL=https://staging-testnet.fairwins.app'
+      - '--build-arg'
+      - 'VITE_RELAYER_URL=https://relay-staging.fairwins.app'
+      # THE difference that makes this service exist: the testnet cohort. Amoy (80002) resolves
+      # membership on Amoy and the mini-app registry on Mordor (63), per miniAppChainId().
+      - '--build-arg'
+      - 'VITE_NETWORK_ID=80002'
+      - '--build-arg'
+      - 'VITE_IPFS_GATEWAY=https://gateway.pinata.cloud'
+      - '--build-arg'
+      - 'VITE_WAGER_SOURCE=subgraph'
+      - '--build-arg'
+      - 'VITE_STAGING_BANNER=testnet'
+      - '--build-arg'
+      - 'VITE_APP_VERSION=${_RC_VERSION}'
+      - '--build-arg'
+      - 'VITE_GIT_SHA=$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging-testnet:$COMMIT_SHA'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging:$COMMIT_SHA']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging-testnet:$COMMIT_SHA']
+
+  # ---- 3. Deploy both ---------------------------------------------------------------------------
+  # Separate services with separate secrets (FR-027). A failed deploy fails loudly and leaves the
+  # previous revision serving, which correctly keeps reporting the version it is actually running
+  # rather than the one that was intended (FR-028).
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'prediction-dao-research-staging'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'prediction-dao-research-staging-testnet'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging-testnet:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+substitutions:
+  # The release candidate this build carries, supplied by .github/workflows/staging-deploy.yml.
+  # Empty means the app self-describes as `unreleased+<sha>` — honest, never a guessed tag (FR-031).
+  _RC_VERSION: ''
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging:$COMMIT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging-testnet:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

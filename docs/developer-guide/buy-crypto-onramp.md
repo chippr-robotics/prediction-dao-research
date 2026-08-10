@@ -1,4 +1,4 @@
-# Buy Crypto — Coinbase Onramp (spec 060)
+# Buy Crypto — Coinbase Onramp (spec 081)
 
 A single **Buy** button on the wallet bottom sheet (the account sheet opened from
 the header avatar) that hands the member to **Coinbase's hosted Onramp
@@ -59,7 +59,7 @@ WalletButton (Buy, gated)                      relay-gateway                    
 | `frontend/src/components/wallet/BuyCryptoModal.jsx` | pre-handoff disclosure + handoff |
 | `frontend/src/components/wallet/WalletButton.jsx` | the gated Buy button |
 | `frontend/src/test/onramp/` | client/modal/gating/degraded-state tests |
-| `specs/060-coinbase-onramp/` | spec, plan, research, API contract |
+| `specs/081-coinbase-onramp/` | spec, plan, research, API contract |
 
 ## Configuration (gateway env; see `.env.example`)
 
@@ -74,7 +74,7 @@ Error surface: `onramp_unconfigured` (503, feature off), `unsupported_chain` /
 `unsupported_asset` / `invalid_address` (400), `screened` (403),
 `screening_unavailable` (503, fail closed), `quota_exceeded` (429),
 `killswitch_active` (503), `upstream_error` / `upstream_rejected` (502). Full
-contract: `specs/060-coinbase-onramp/contracts/gateway-api.md`.
+contract: `specs/081-coinbase-onramp/contracts/gateway-api.md`.
 
 ## Turning it off / removing it
 

@@ -9,21 +9,33 @@ description: >
   network fetch entirely.
 
 inputs:
-  solc-version:
-    description: Solidity compiler version to provision (must match hardhat.config.js).
+  solc-versions:
+    description: >
+      Comma-separated Solidity compiler versions to provision. MUST cover every version in
+      hardhat.config.js's `compilers[]` (spec 075, T026). Previously this action took a single
+      version defaulting to 0.8.24 and no call site overrode it, so the cache key never mentioned
+      0.8.23 and the account-contract compiler was re-fetched from the network on every cold run.
     required: false
-    default: '0.8.24'
+    default: '0.8.24,0.8.23'
 
 runs:
   using: composite
   steps:
     # Persist the seeded compiler across runs and jobs. On a cache hit the seed
     # step below is fully offline (no network at all).
+    # actions/cache keys may not contain commas, and `solc-versions` is comma-separated. Derive a
+    # key-safe form rather than interpolating the raw list (spec 075: this exact mistake turned the
+    # whole Smart Contract Tests job red with "cannot contain commas").
+    - name: Derive a cache-key-safe version list
+      id: solckey
+      shell: bash
+      run: echo "slug=$(echo '${{ inputs.solc-versions }}' | tr ',' '-' | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+
     - name: Restore Hardhat solc compiler cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/hardhat-nodejs/compilers-v2
-        key: hardhat-solc-${{ runner.os }}-${{ inputs.solc-version }}
+        key: hardhat-solc-${{ runner.os }}-${{ steps.solckey.outputs.slug }}
         restore-keys: |
           hardhat-solc-${{ runner.os }}-
 
@@ -35,11 +47,19 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        ver='${{ inputs.solc-version }}'
         platform='linux-amd64'   # GitHub-hosted runners are ubuntu-latest
         dir="$HOME/.cache/hardhat-nodejs/compilers-v2/${platform}"
         mirror="https://raw.githubusercontent.com/ethereum/solc-bin/gh-pages/${platform}"
         mkdir -p "$dir"
+
+        # Seed EVERY pinned version. hardhat.config.js declares two compilers (0.8.24 for 116
+        # contracts, 0.8.23 for the 4 vendored account contracts); missing either one puts a
+        # network fetch back on the critical path.
+        IFS=',' read -ra VERSIONS <<< '${{ inputs.solc-versions }}'
+        for ver in "${VERSIONS[@]}"; do
+        ver="$(echo "$ver" | tr -d '[:space:]')"
+        [ -n "$ver" ] || continue
+        echo "::group::solc ${ver}"
 
         # Cache hit: a solc binary for this version is already present. Skip all
         # network access so a mirror outage can't fail an otherwise-warm run.
@@ -47,7 +67,8 @@ runs:
         if [ -f "$dir/list.json" ] && [ -n "$existing" ]; then
           chmod +x "$existing"
           echo "solc ${ver} already cached (${existing}); skipping mirror fetch."
-          exit 0
+          echo "::endgroup::"
+          continue
         fi
 
         # Cold cache: fetch the build index, resolve the exact filename + expected
@@ -70,6 +91,8 @@ runs:
         mv "${dir}/${fname}.tmp" "${dir}/${fname}"
         chmod +x "${dir}/${fname}"
         echo "Pre-seeded solc ${ver} (${fname}) from mirror; checksum verified."
+        echo "::endgroup::"
+        done
 
     # With the compiler pre-seeded, this should not touch the network. Keep a
     # bounded retry + generous timeout purely as a safety net; a genuine long

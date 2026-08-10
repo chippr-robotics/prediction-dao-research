@@ -93,13 +93,44 @@ describe('RecentActivityFeed (spec 051 US1)', () => {
     expect(screen.getByText(/unvalued/i)).toBeInTheDocument()
   })
 
-  it('filters by activity class', async () => {
+  it('filters by activity class from the filter dropdown (spec 074 follow-up)', async () => {
     const user = userEvent.setup()
     render(<RecentActivityFeed entries={entries} chainId={80002} />)
-    await user.click(screen.getByRole('button', { name: 'Transfers' }))
+    // Class options are behind the Filter button, not an always-on chip row.
+    expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /filter activity by type/i }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Transfers' }))
     expect(screen.queryByText('Payout')).not.toBeInTheDocument()
     expect(screen.getByText('Transfer')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'All activity' }))
+    // Picking closes the menu; the active class shows on the button badge.
+    expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument()
+    expect(screen.getByText('Transfers')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /filter activity by type/i }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'All activity' }))
+    expect(screen.getByText('Payout')).toBeInTheDocument()
+  })
+
+  it('searches transactions behind the search icon (spec 074 follow-up)', async () => {
+    const user = userEvent.setup()
+    render(<RecentActivityFeed entries={entries} chainId={80002} />)
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /search activity/i }))
+    const input = screen.getByRole('searchbox', { name: /search activity/i })
+    await user.type(input, 'payout')
+    expect(screen.getByText('Payout')).toBeInTheDocument()
+    expect(screen.queryByText('Deposit')).not.toBeInTheDocument()
+    // A tx-hash fragment locates the transaction too.
+    await user.clear(input)
+    await user.type(input, TX_B.slice(0, 10))
+    expect(screen.getByText('Deposit')).toBeInTheDocument()
+    expect(screen.queryByText('Payout')).not.toBeInTheDocument()
+    // No matches → honest "no matching activity" state, not the generic empty.
+    await user.clear(input)
+    await user.type(input, 'zzz-no-match')
+    expect(screen.getByText(/no matching activity/i)).toBeInTheDocument()
+    // Collapsing search clears the query.
+    await user.click(screen.getByRole('button', { name: /hide activity search/i }))
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
     expect(screen.getByText('Payout')).toBeInTheDocument()
   })
 
@@ -112,6 +143,33 @@ describe('RecentActivityFeed (spec 051 US1)', () => {
     render(<RecentActivityFeed entries={entries} chainId={80002} />)
     const rows = screen.getAllByRole('listitem')
     expect(within(rows[0]).getByText('Payout')).toBeInTheDocument()
+  })
+
+  it('groups activity by day by default, with an "Undated" bucket for missing timestamps', () => {
+    render(<RecentActivityFeed entries={entries} chainId={80002} />)
+    // Default grouping shouldn't badge the button — "By day" is the baseline.
+    expect(screen.queryByText('By day')).not.toBeInTheDocument()
+    expect(screen.getByText('Today')).toBeInTheDocument()
+    expect(screen.getByText('Undated')).toBeInTheDocument()
+    // Group headers are presentational, not list rows — order-of-rows checks stay unaffected.
+    const rows = screen.getAllByRole('listitem')
+    expect(within(rows[0]).getByText('Payout')).toBeInTheDocument()
+  })
+
+  it('switches grouping via the Group control (spec 074 follow-up)', async () => {
+    const user = userEvent.setup()
+    render(<RecentActivityFeed entries={entries} chainId={80002} />)
+    await user.click(screen.getByRole('button', { name: /group activity/i }))
+    expect(screen.getByRole('menuitemradio', { name: 'By day' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(screen.getByRole('menuitemradio', { name: 'No grouping' }))
+    expect(screen.queryByText('Today')).not.toBeInTheDocument()
+    expect(screen.queryByText('Undated')).not.toBeInTheDocument()
+    expect(screen.getByText('No grouping')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /group activity/i }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'By week' }))
+    expect(screen.getByText('This week')).toBeInTheDocument()
+    expect(screen.getByText('Undated')).toBeInTheDocument()
   })
 
   it('discloses stale classes and the pruning marker', () => {

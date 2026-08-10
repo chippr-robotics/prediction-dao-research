@@ -1,0 +1,30 @@
+/*
+ * The fixture package's own stylesheet (spec 073, task T014).
+ *
+ * Every selector is class-scoped under `.fixture-app` — no element, `:root` or
+ * global selector — because a mini-app's styling must not be able to reach host
+ * or sibling-app presentation (FR-014). A fixture that broke that rule would be
+ * a bad example of the format it exists to demonstrate.
+ */
+
+.fixture-app {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.fixture-app__title {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.fixture-app__id {
+  margin: 0;
+  font-family: monospace;
+}
+
+.fixture-app__action {
+  align-self: flex-start;
+  padding: 0.375rem 0.75rem;
+}

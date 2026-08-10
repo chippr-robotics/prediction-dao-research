@@ -35,6 +35,7 @@ import {
   buildDepositCalls,
   buildWithdrawCalls,
 } from '../../lib/earn/vaultActions'
+import { fetchFeeQuote, splitFee, bpsToPercent, FEE_SERVICES } from '../../lib/fees/feeQuote'
 import { queueEarnAction } from '../../lib/earn/earnActivityBuffer'
 import { captureEarnAction } from '../../data/ledger'
 import { formatApy } from '../../lib/earn/format'
@@ -59,6 +60,25 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
   const [inputError, setInputError] = useState(null)
   // idle | approving | confirming | done | error
   const [txState, setTxState] = useState({ step: 'idle', txUrl: null, error: null })
+  // Live platform-fee quote (spec 060). null = loading; { failed: true } = the
+  // router exists but the rate could not be read — deposits are blocked rather
+  // than shown a possibly-understated rate (FR-015).
+  const [feeQuote, setFeeQuote] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const provider = makeReadProvider(vaultNetwork.rpcUrl, vault.chainId)
+    fetchFeeQuote({ serviceId: FEE_SERVICES.EARN_LEND, chainId: vault.chainId, provider })
+      .then((quote) => {
+        if (!cancelled) setFeeQuote(quote)
+      })
+      .catch(() => {
+        if (!cancelled) setFeeQuote({ failed: true, available: false, bps: 0 })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [vault.chainId, vaultNetwork.rpcUrl])
 
   useEffect(() => {
     restoreFocusRef.current = document.activeElement
@@ -113,6 +133,13 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
       : validateWithdrawAmount({ amount, maxWithdrawAssets: userState?.maxWithdrawAssets ?? null })
   }
 
+  // The fee applies only to deposits, only when the router quotes a nonzero
+  // live rate. `feeBlocked` = we KNOW a router exists but couldn't read the
+  // rate — never proceed on a rate we can't stand behind (FR-015).
+  const feeApplies = mode === 'deposit' && Boolean(feeQuote?.available && feeQuote.bps > 0)
+  const feeBlocked = mode === 'deposit' && Boolean(feeQuote?.failed)
+  const feeSplit = feeApplies && amount != null && amount > 0n ? splitFee(amount, feeQuote.bps) : null
+
   const submit = async () => {
     const check = validate()
     if (!check.ok) {
@@ -120,6 +147,15 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
       return
     }
     setInputError(null)
+    if (feeBlocked) {
+      setTxState({
+        step: 'error',
+        txUrl: null,
+        error:
+          'The platform fee rate could not be confirmed right now, so deposits are paused. Nothing was moved — please try again shortly.',
+      })
+      return
+    }
     // Never a silent no-op (constitution III): sessions that can't transact
     // on this vault's network see the reason instead of a dead tap.
     if (!address || !canTransact) {
@@ -141,7 +177,13 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
       let message
       let busyStep
       if (mode === 'deposit') {
-        const built = await buildDepositCalls({ vault, account: address, amount, provider })
+        const built = await buildDepositCalls({
+          vault,
+          account: address,
+          amount,
+          provider,
+          feeQuote: feeApplies ? feeQuote : null,
+        })
         calls = built.calls
         busyStep = built.requiresApproval ? 'approving' : 'confirming'
         message = `Deposited ${fmt(amount, decimals, symbol)} into ${vault.name}`
@@ -316,6 +358,23 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
                       <dd>{fmt(userState.assets, decimals, symbol)}</dd>
                     </div>
                   )}
+                  {feeApplies && (
+                    <>
+                      <div>
+                        <dt>
+                          FairWins platform fee ({bpsToPercent(feeQuote.bps)})
+                          <InfoTip label="About the platform fee" className="earn-info">
+                            {EARN_TIPS.platformFee}
+                          </InfoTip>
+                        </dt>
+                        <dd>{feeSplit ? fmt(feeSplit.feeAmount, decimals, symbol) : '—'}</dd>
+                      </div>
+                      <div>
+                        <dt>Goes into the vault</dt>
+                        <dd>{feeSplit ? fmt(feeSplit.netAmount, decimals, symbol) : '—'}</dd>
+                      </div>
+                    </>
+                  )}
                 </>
               ) : (
                 <>
@@ -388,6 +447,16 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
               </p>
             )}
 
+            {/* The live rate could not be read while a fee router exists on
+                this network — pause deposits rather than risk showing a rate
+                lower than what would be charged (spec 060, FR-015). */}
+            {feeBlocked && (
+              <p className="earn-input-error" role="alert">
+                The platform fee rate could not be confirmed right now, so deposits are paused.
+                Withdrawals are unaffected — please try again shortly.
+              </p>
+            )}
+
             {/* Sessions that can't transact on this vault's network get the
                 reason up front instead of a doomed submit (constitution III). */}
             {!canTransact && (
@@ -399,7 +468,7 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
               type="button"
               className="earn-btn primary earn-submit"
               onClick={submit}
-              disabled={busy || !canTransact}
+              disabled={busy || !canTransact || (mode === 'deposit' && (feeQuote == null || feeBlocked))}
               title={canTransact ? undefined : cannotTransactReason(vault.chainId)}
             >
               {txState.step === 'switching'

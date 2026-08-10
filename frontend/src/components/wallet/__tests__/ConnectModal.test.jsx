@@ -6,6 +6,10 @@
  *  - in-app account picker when several passkeys are known (FR-007), with the
  *    chosen credential pinned into the connect call;
  *  - errors surface in the dialog; ceremony cancellation resets silently.
+ *
+ * Onboarding step-reduction: when this browser already knows a usable passkey
+ * the dialog OPENS on that chooser (unlock in one tap) instead of methods →
+ * Passkey → chooser, with every connector still one tap away.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -165,7 +169,6 @@ describe('ConnectModal — multi-passkey account picker (US3)', () => {
     rememberCredential({ credentialId: 'c-only', publicKey: PK(1), address: '0x' + 'a'.repeat(40), label: 'Phone' })
     const user = userEvent.setup()
     render(<ConnectModal />)
-    await user.click(screen.getByText('Passkey').closest('button'))
 
     // A member with one recorded passkey is still presented with a choice
     // (acceptance #1) rather than being locked to the first credential.
@@ -186,7 +189,6 @@ describe('ConnectModal — multi-passkey account picker (US3)', () => {
     rememberCredential({ credentialId: 'c2', publicKey: PK(2), address: '0x' + 'b'.repeat(40), label: 'Laptop' })
     const user = userEvent.setup()
     render(<ConnectModal />)
-    await user.click(screen.getByText('Passkey').closest('button'))
 
     expect(screen.getByTestId('passkey-picker')).toBeInTheDocument()
     expect(mockWallet.connectWallet).not.toHaveBeenCalled()
@@ -203,7 +205,6 @@ describe('ConnectModal — multi-passkey account picker (US3)', () => {
     rememberCredential({ credentialId: 'c-broken', address: '0x' + 'b'.repeat(40), label: 'Broken' }) // no key
     const user = userEvent.setup()
     render(<ConnectModal />)
-    await user.click(screen.getByText('Passkey').closest('button'))
     // The picker lists only the usable record; the broken one never appears.
     expect(screen.getByTestId('passkey-picker')).toBeInTheDocument()
     expect(screen.getByText('Phone')).toBeInTheDocument()
@@ -221,7 +222,6 @@ describe('ConnectModal — multi-passkey account picker (US3)', () => {
     rememberCredential({ credentialId: 'c2', publicKey: PK(2), address: '0x' + 'b'.repeat(40), label: 'Laptop' })
     const user = userEvent.setup()
     render(<ConnectModal />)
-    await user.click(screen.getByText('Passkey').closest('button'))
 
     await user.click(screen.getByText('Use a different passkey…'))
     // Discoverable request (no allowCredentials) so passkeys this browser has
@@ -240,10 +240,54 @@ describe('ConnectModal — multi-passkey account picker (US3)', () => {
     rememberCredential({ credentialId: 'c2', publicKey: PK(2), address: '0x' + 'b'.repeat(40), label: 'Stale' })
     const user = userEvent.setup()
     render(<ConnectModal />)
-    await user.click(screen.getByText('Passkey').closest('button'))
     await user.click(screen.getByLabelText(/Remove Stale/))
     expect(screen.queryByText('Stale')).not.toBeInTheDocument()
     const stored = JSON.parse(localStorage.getItem('fairwins.passkey.credentials.v1'))
     expect(stored.map((c) => c.credentialId)).toEqual(['c1'])
+  })
+})
+
+describe('ConnectModal — returning members unlock in one tap', () => {
+  beforeEach(() => {
+    markExplainerSeen()
+  })
+
+  it('opens straight on the unlock chooser when this browser knows a passkey', () => {
+    rememberCredential({ credentialId: 'c1', publicKey: PK(1), address: '0x' + 'a'.repeat(40), label: 'Phone' })
+    render(<ConnectModal />)
+
+    // No methods list to walk through first — the account is one tap away.
+    expect(screen.getByTestId('passkey-picker')).toBeInTheDocument()
+    expect(screen.queryByTestId('connect-options')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Unlock your account' })).toBeInTheDocument()
+  })
+
+  it('still reaches every other connector from the chooser', async () => {
+    rememberCredential({ credentialId: 'c1', publicKey: PK(1), address: '0x' + 'a'.repeat(40), label: 'Phone' })
+    const user = userEvent.setup()
+    render(<ConnectModal />)
+
+    await user.click(screen.getByText('More sign-in options'))
+    expect(screen.getByTestId('connect-options')).toBeInTheDocument()
+    await user.click(screen.getByText('WalletConnect').closest('button'))
+    expect(mockWallet.connectWallet).toHaveBeenCalledWith('walletConnect', undefined)
+  })
+
+  it('returns to the chooser — not backwards to the methods list — when a ceremony is cancelled', async () => {
+    rememberCredential({ credentialId: 'c1', publicKey: PK(1), address: '0x' + 'a'.repeat(40), label: 'Phone' })
+    const cancelled = Object.assign(new Error('Passkey prompt was cancelled'), { name: 'CeremonyCancelled' })
+    mockWallet.connectWallet = vi.fn().mockRejectedValue(cancelled)
+    const user = userEvent.setup()
+    render(<ConnectModal />)
+
+    await user.click(screen.getByText('Phone').closest('button'))
+    await waitFor(() => expect(screen.getByTestId('passkey-picker')).toBeInTheDocument())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('a browser with no recorded passkey still opens on the methods list', () => {
+    render(<ConnectModal />)
+    expect(screen.getByTestId('connect-options')).toBeInTheDocument()
+    expect(screen.queryByTestId('passkey-picker')).not.toBeInTheDocument()
   })
 })

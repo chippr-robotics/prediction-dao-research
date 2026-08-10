@@ -176,12 +176,15 @@ export default function UnifiedLookupModal({ isOpen, onClose, onBuyMembership, i
                     onChange={setWords}
                     disabled={status === 'resolving'}
                   />
-                  <span className="fm-hint">e.g. crystal orbit harbor violet</span>
+                  {/* Every word of the example must itself be a wordlist word — the boxes validate
+                      against the same list, so an illustrative phrase that fails validation would
+                      leave "Find" disabled for anyone who follows it literally. */}
+                  <span className="fm-hint">e.g. crystal orbit harbor velvet</span>
                 </div>
 
                 {status === 'result' && result?.kind === 'format-error' && (
                   <div className="fm-error-banner" role="alert">
-                    {result.message} Enter exactly four words, e.g. “crystal orbit harbor violet”.
+                    {result.message} Enter exactly four words, e.g. “crystal orbit harbor velvet”.
                   </div>
                 )}
                 {status === 'result' && result?.kind === 'none' && (

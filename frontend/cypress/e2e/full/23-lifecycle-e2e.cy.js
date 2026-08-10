@@ -46,12 +46,12 @@ describe('End-to-End Lifecycle Scenarios', () => {
       })
       // User-visible: the creator can reach their wagers list (rows render).
       cy.mockWeb3Provider({ account: CREATOR })
-      cy.visit('/fairwins')
+      cy.visitWagers()
       cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-      cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+      cy.selectInjectedConnector()
       cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
       cy.openMyWagers('created')
-      cy.get('.wc-card', { timeout: 15000 }).should('exist')
+      cy.get('.mm-table-row', { timeout: 15000 }).should('exist')
     })
   })
 

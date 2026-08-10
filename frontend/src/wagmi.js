@@ -1,7 +1,10 @@
 import { http, createConfig } from 'wagmi'
-import { mainnet, sepolia } from 'wagmi/chains'
+import { fallback } from 'viem'
+import { arbitrum, base, mainnet, optimism, sepolia } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
 import { passkeyConnector } from './connectors/passkey'
+import { resolveRpcEndpoints } from './lib/network/rpcEndpoints'
+import { tenantBrand } from './config/tenant'
 
 // Define Hoodi — Ethereum's long-lived proof-of-stake testnet (spec 048). Not a
 // wagmi/chains built-in, so declared inline like the ETC-family chains. RPC/explorer
@@ -157,11 +160,45 @@ const resolveAppUrl = () => {
     return window.location.origin
   }
 
-  // As a last resort, return a fallback domain
-  return 'https://fairwins.app'
+  // As a last resort, return the active tenant's canonical URL (spec 072)
+  return tenantBrand().appUrl
 }
 
 const appUrl = resolveAppUrl()
+
+/**
+ * Transport for one chain, honouring the member's own endpoint (spec 069).
+ *
+ * Precedence per chain: the member's endpoint (+ their failover, + the build default behind
+ * it) → `VITE_RPC_URL` when this is the env-selected chain → the curated default. A member
+ * endpoint yields a viem `fallback` transport so a rate-limited or down provider hands over
+ * instead of taking the wallet's chain with it.
+ *
+ * These are built ONCE at module load. localStorage is synchronous so that is fine, but it
+ * also means a member who repoints a network needs a reload before wallet-signed
+ * transactions use the new route — which the Network panel states plainly rather than
+ * implying an instant switch.
+ */
+function transportFor(chainId, defaultUrl) {
+  const envUrl = networkId === chainId ? rpcUrl : undefined
+  const fallbackUrl = envUrl || defaultUrl || undefined
+  const route = resolveRpcEndpoints(chainId)
+
+  if (route.source !== 'member' || !route.primary) {
+    // Pre-069 behavior exactly: `http()` with no URL lets viem use the chain's own rpcUrls.
+    return http(fallbackUrl)
+  }
+
+  const options = Object.keys(route.primary.headers).length
+    ? { fetchOptions: { headers: route.primary.headers } }
+    : undefined
+  const transports = [http(route.primary.url, options)]
+  if (route.failover) transports.push(http(route.failover.url))
+  if (fallbackUrl && fallbackUrl !== route.primary.url && fallbackUrl !== route.failover?.url) {
+    transports.push(http(fallbackUrl))
+  }
+  return fallback(transports)
+}
 
 // Define supported chains. Polygon mainnet is first so it is wagmi's default
 // chain (used by useChainId when no wallet is connected), matching the primary
@@ -169,7 +206,22 @@ const appUrl = resolveAppUrl()
 // Exported so config-parity tests can assert every selectable network (config/networks.js)
 // is registered here — otherwise switchChain cannot reach it. Polygon stays first (wagmi
 // default chain — FR-015).
-export const chains = [polygon, amoy, ethereumClassic, mordor, mainnet, sepolia, hoodi, hardhat]
+// Spec 067 adds arbitrum, base and optimism — every `selectable: true` network in
+// config/networks.js MUST be registered here or switchChain cannot reach it (there is a
+// config-parity test asserting exactly that).
+export const chains = [
+  polygon,
+  amoy,
+  ethereumClassic,
+  mordor,
+  mainnet,
+  sepolia,
+  hoodi,
+  arbitrum,
+  base,
+  optimism,
+  hardhat,
+]
 
 // Create wagmi config
 export const config = createConfig({
@@ -183,10 +235,10 @@ export const config = createConfig({
     walletConnect({
       projectId: walletConnectProjectId,
       metadata: {
-        name: 'Prediction DAO',
-        description: 'Decentralized prediction markets and wagers',
+        name: tenantBrand().displayName,
+        description: tenantBrand().tagline || tenantBrand().displayName,
         url: appUrl,
-        icons: [`${appUrl}/assets/fairwins_no-text_logo.svg`]
+        icons: [`${appUrl}${tenantBrand().logoMark}`]
       },
       showQrModal: true,
     }),
@@ -195,14 +247,18 @@ export const config = createConfig({
     passkeyConnector(),
   ],
   transports: {
-    [amoy.id]: http(networkId === 80002 ? rpcUrl : 'https://rpc-amoy.polygon.technology'),
-    [polygon.id]: http(networkId === 137 ? rpcUrl : 'https://polygon-bor-rpc.publicnode.com'),
-    [ethereumClassic.id]: http(),
-    [mordor.id]: http(networkId === 63 ? rpcUrl : 'https://rpc.mordor.etccooperative.org'),
+    [amoy.id]: transportFor(80002, 'https://rpc-amoy.polygon.technology'),
+    [polygon.id]: transportFor(137, 'https://polygon-bor-rpc.publicnode.com'),
+    [ethereumClassic.id]: transportFor(61, null),
+    [mordor.id]: transportFor(63, 'https://rpc.mordor.etccooperative.org'),
     // Ethereum family (spec 048) — defaults mirror config/networks.js.
-    [mainnet.id]: http(networkId === 1 ? rpcUrl : 'https://ethereum-rpc.publicnode.com'),
-    [sepolia.id]: http(networkId === 11155111 ? rpcUrl : 'https://ethereum-sepolia-rpc.publicnode.com'),
-    [hoodi.id]: http(networkId === 560048 ? rpcUrl : 'https://ethereum-hoodi-rpc.publicnode.com'),
+    [mainnet.id]: transportFor(1, 'https://ethereum-rpc.publicnode.com'),
+    [sepolia.id]: transportFor(11155111, 'https://ethereum-sepolia-rpc.publicnode.com'),
+    [hoodi.id]: transportFor(560048, 'https://ethereum-hoodi-rpc.publicnode.com'),
+    // Spec 067 bridge/liquidity networks — defaults mirror config/networks.js.
+    [arbitrum.id]: transportFor(42161, 'https://arbitrum-one-rpc.publicnode.com'),
+    [base.id]: transportFor(8453, 'https://base-rpc.publicnode.com'),
+    [optimism.id]: transportFor(10, 'https://optimism-rpc.publicnode.com'),
     [hardhat.id]: http('http://localhost:8545'),
   },
 })

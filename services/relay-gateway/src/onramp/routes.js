@@ -1,7 +1,7 @@
 /**
- * Coinbase Onramp buy-crypto proxy routes — /v1/onramp/* (spec 060).
+ * Coinbase Onramp buy-crypto proxy routes — /v1/onramp/* (spec 081).
  *
- * Contract: specs/060-coinbase-onramp/contracts/gateway-api.md.
+ * Contract: specs/081-coinbase-onramp/contracts/gateway-api.md.
  * Pipeline per request: killswitch -> fail-closed credential check -> chain mapping -> param
  * validation -> destination sanctions screen (mints only) -> quota -> upstream call. The gateway
  * holds the CDP secret key and mints single-use hosted-session tokens (secure init); clients only

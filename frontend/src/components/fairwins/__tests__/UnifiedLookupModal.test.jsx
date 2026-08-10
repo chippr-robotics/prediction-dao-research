@@ -17,6 +17,13 @@ import UnifiedLookupModal from '../UnifiedLookupModal'
 
 function setState(s) { mockState.current = { status: 'idle', result: null, submit, reset, ...s } }
 
+// The phrase is entered one word per box (spec 037 feedback), so drive all four.
+const wordBoxes = () => [0, 1, 2, 3].map((i) => screen.getByRole('textbox', { name: `Word ${i + 1}` }))
+const typePhrase = (phrase) => {
+  const boxes = wordBoxes()
+  phrase.split(' ').forEach((w, i) => fireEvent.change(boxes[i], { target: { value: w } }))
+}
+
 describe('UnifiedLookupModal (spec 037, US1)', () => {
   beforeEach(() => { submit.mockReset(); reset.mockReset(); setState({}) })
 
@@ -26,15 +33,52 @@ describe('UnifiedLookupModal (spec 037, US1)', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('shows one phrase input (no type selector) and submits the phrase without any signature', () => {
+  it('shows one phrase entry (no type selector) and submits the phrase without any signature', () => {
     setState({})
     render(<UnifiedLookupModal isOpen onClose={() => {}} />)
-    const input = screen.getByLabelText(/four-word phrase/i, { selector: 'input' })
-    fireEvent.change(input, { target: { value: 'crystal orbit harbor violet' } })
+    // One "Four-word phrase" entry, taken a word at a time (four boxes, not a free-text field).
+    const boxes = wordBoxes()
+    expect(screen.getByLabelText(/four-word phrase/i, { selector: '[role="group"]' })).toContainElement(boxes[0])
+    typePhrase('crystal orbit harbor velvet')
     fireEvent.click(screen.getByRole('button', { name: /^find$/i }))
-    expect(submit).toHaveBeenCalledWith('crystal orbit harbor violet')
+    expect(submit).toHaveBeenCalledWith('crystal orbit harbor velvet')
     // No "take a challenge" / "join a pool" type tabs — a single entry point (FR-001/002).
     expect(screen.queryByRole('tab')).toBeNull()
+  })
+
+  it('accepts a whole phrase dropped into one box (paste, autofill, voice)', () => {
+    setState({})
+    render(<UnifiedLookupModal isOpen onClose={() => {}} />)
+    // A phrase can arrive in a single box with no paste event to intercept; every word must survive.
+    fireEvent.change(wordBoxes()[0], { target: { value: 'crystal orbit harbor velvet' } })
+    fireEvent.click(screen.getByRole('button', { name: /^find$/i }))
+    expect(submit).toHaveBeenCalledWith('crystal orbit harbor velvet')
+  })
+
+  it('will not look up a phrase that is not four wordlist words', () => {
+    setState({})
+    render(<UnifiedLookupModal isOpen onClose={() => {}} />)
+    const find = () => screen.getByRole('button', { name: /^find$/i })
+    expect(find()).toBeDisabled() // nothing typed yet
+
+    typePhrase('crystal orbit harbor')
+    expect(find()).toBeDisabled() // only three words
+
+    fireEvent.change(wordBoxes()[3], { target: { value: 'zzzz' } })
+    expect(find()).toBeDisabled() // fourth word is not in the wordlist
+    fireEvent.click(find())
+    expect(submit).not.toHaveBeenCalled()
+
+    fireEvent.change(wordBoxes()[3], { target: { value: 'velvet' } })
+    expect(find()).toBeEnabled()
+  })
+
+  it('offers an example phrase the form will actually accept', () => {
+    setState({})
+    render(<UnifiedLookupModal isOpen onClose={() => {}} />)
+    const example = screen.getByText(/^e\.g\. /i).textContent.replace(/^e\.g\. /i, '').trim()
+    typePhrase(example)
+    expect(screen.getByRole('button', { name: /^find$/i })).toBeEnabled()
   })
 
   it('moves the lookup guidance behind an info icon (spec 039 US2)', () => {

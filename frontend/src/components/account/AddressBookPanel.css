@@ -1,13 +1,41 @@
+/*
+ * Address Book (Spec 021, redesigned per issue #1023) — light, airy layout:
+ * elevated rounded contact cards, colored network pills (NetworkPill.css),
+ * a large rounded search input, and generous spacing. Colors ride the theme
+ * tokens so tenant themes and dark mode keep working.
+ */
+
 .ab-panel {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .ab-panel-head-titles {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.ab-panel-head-titles h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Screen-reader-only text (search label keeps its accessible name while the
+   visual affordance is the icon + placeholder). */
+.ab-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Address input + inline QR scan button inside the contact edit modal. */
@@ -29,7 +57,7 @@
   width: 42px;
   min-width: 42px;
   border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 0.375rem;
+  border-radius: 0.625rem;
   background: var(--bg-primary, #f8fafc);
   color: inherit;
   cursor: pointer;
@@ -43,8 +71,8 @@
 
 .ab-scan-btn:hover,
 .ab-scan-btn:focus-visible {
-  border-color: var(--brand-primary, #2563eb);
-  color: var(--brand-primary, #2563eb);
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
 }
 
 .ab-panel-head {
@@ -65,67 +93,284 @@
 .ab-field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 
 .ab-field label,
 .ab-addresses-fieldset legend {
   font-size: 0.8rem;
   font-weight: 600;
+  color: var(--text-secondary, #5a6772);
 }
 
 .ab-field input,
 .ab-field select {
-  padding: 0.5rem 0.6rem;
+  padding: 0.55rem 0.75rem;
   border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 0.375rem;
+  border-radius: 0.625rem;
   background: var(--bg-primary, #fff);
   color: var(--text-primary, #0f172a);
   font: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.ab-search input {
+.ab-field input:focus-visible,
+.ab-field select:focus-visible {
+  outline: none;
+  border-color: var(--brand-primary, #36b37e);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+}
+
+/* Large rounded search input with a leading icon (issue #1023). */
+.ab-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ab-search-icon {
+  position: absolute;
+  left: 1rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--text-muted, #8a959e);
+  pointer-events: none;
+}
+
+.ab-search-box input {
   width: 100%;
+  padding: 0.75rem 1.1rem 0.75rem 2.6rem;
+  font: inherit;
+  font-size: 0.95rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 999px;
+  background: var(--bg-secondary, #fff);
+  color: var(--text-primary, #0f172a);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ab-search-box input::placeholder {
+  color: var(--text-muted, #8a959e);
+}
+
+.ab-search-box input:focus-visible {
+  outline: none;
+  border-color: var(--brand-primary, #36b37e);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+}
+
+/* Search + round green add button on one line (design 3a). */
+.ab-search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.ab-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ab-search-box {
+  flex: 1;
+  min-width: 0;
+}
+
+.ab-add-btn {
+  flex: none;
+}
+
+/* Icon-only circle on small screens (the label span is display:none there). */
+@media (max-width: 639.98px) {
+  .ab-add-btn {
+    width: 48px;
+    height: 48px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .ab-add-btn .ab-icon {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+}
+
+/* Meta row: saved-address count left, amber needs-review count right. */
+.ab-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ab-meta-count {
+  color: var(--text-muted, #8a959e);
+}
+
+.ab-meta-review {
+  color: #b45309;
+}
+
+:root.theme-dark .ab-meta-review {
+  color: #fbbf24;
 }
 
 .ab-contact-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
 }
 
+/* Compact expandable roster card (issue #1023, design 3a). */
 .ab-contact-card {
   border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 0.5rem;
-  padding: 0.75rem;
+  border-radius: 1rem;
+  padding: 0.9rem 1rem;
   background: var(--bg-secondary, #fff);
   color: var(--text-primary, #0f172a);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.65rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 20px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.15s;
 }
 
-.ab-contact-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem;
+.ab-contact-card:hover {
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05), 0 10px 28px rgba(15, 23, 42, 0.09);
+}
+
+/* Collapsed row: two lines on mobile, one roster line on wider screens. */
+.ab-contact-main {
+  display: grid;
+  grid-template-areas:
+    'avatar name flag'
+    'line line btn';
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 0.65rem;
+  row-gap: 0.55rem;
+}
+
+@media (min-width: 720px) {
+  .ab-contact-main {
+    grid-template-areas: 'avatar name line flag btn';
+    grid-template-columns: auto minmax(130px, 200px) 1fr auto auto;
+  }
+}
+
+.ab-contact-avatar {
+  grid-area: avatar;
+  flex: none;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--brand-primary, #36b37e);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.14);
 }
 
 .ab-contact-name {
+  grid-area: name;
   display: flex;
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .ab-contact-nickname {
+  font-size: 1rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
 }
 
-.ab-contact-actions {
+.ab-contact-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 0.26rem 0.55rem;
+  border-radius: 999px;
+  color: var(--brand-secondary, #4c9aff);
+  background: rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.14);
+  border: 1px solid rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.35);
+  white-space: nowrap;
+}
+
+.ab-contact-flag {
+  grid-area: flag;
   display: flex;
-  gap: 0.35rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.ab-contact-flag:empty {
+  display: none;
+}
+
+.ab-contact-line {
+  grid-area: line;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.ab-contact-netcount {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #8a959e);
+  white-space: nowrap;
+}
+
+.ab-details-btn {
+  grid-area: btn;
+  justify-self: end;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  padding: 0.45rem 0 0.45rem 0.6rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand-primary, #36b37e);
+  line-height: 1;
+  border-radius: 0.55rem;
+}
+
+.ab-details-btn:hover,
+.ab-details-btn:focus-visible {
+  color: var(--primary-button-hover, #2f9e6e);
+  outline: none;
+}
+
+.ab-details-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+}
+
+/* Expanded details: per-network addresses, notes, then Edit / Delete. */
+.ab-contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+@media (min-width: 720px) {
+  .ab-contact-details {
+    padding-left: 3.05rem;
+  }
 }
 
 .ab-address-list {
@@ -134,41 +379,64 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
 
 .ab-address-row {
   border-top: 1px solid var(--border-color, #f1f5f9);
-  padding-top: 0.5rem;
+  padding-top: 0.65rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.35rem;
+}
+
+.ab-address-netlabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #5a6772);
 }
 
 .ab-address-main {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.ab-address-value {
+.ab-address-value,
+.ab-address-full {
   font-family: ui-monospace, monospace;
   font-size: 0.85rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.5rem;
+  background: var(--bg-primary, #f1f5f9);
+  color: var(--text-primary, #0f172a);
 }
 
-.ab-address-network {
-  font-size: 0.75rem;
-  color: var(--text-muted, #64748b);
-  background: var(--bg-primary, #f1f5f9);
-  padding: 0.1rem 0.4rem;
-  border-radius: 0.375rem;
+.ab-address-full {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  word-break: break-all;
 }
 
 .ab-address-notes {
   margin: 0;
   font-size: 0.8rem;
+  line-height: 1.5;
   color: var(--text-muted, #64748b);
+}
+
+.ab-contact-actions {
+  display: flex;
+  gap: 0.5rem;
+  border-top: 1px solid var(--border-color, #f1f5f9);
+  padding-top: 0.5rem;
 }
 
 .ab-address-edit-row {
@@ -181,10 +449,20 @@
 
 .ab-empty {
   border: 1px dashed var(--border-color, #cbd5e1);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
+  border-radius: 1rem;
+  padding: 2rem 1.5rem;
   text-align: center;
   color: var(--text-muted, #64748b);
+  background: var(--bg-secondary, #fff);
+}
+
+.ab-empty h3 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary, #0f172a);
+}
+
+.ab-empty p {
+  margin: 0;
 }
 
 .ab-btn {
@@ -192,13 +470,13 @@
   border: none;
   background: transparent;
   color: var(--text-muted, #64748b);
-  border-radius: 0.375rem;
-  padding: 0.3rem;
+  border-radius: 0.55rem;
+  padding: 0.35rem;
   font: inherit;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
   line-height: 1;
   transition: color 0.1s, background 0.1s;
 }
@@ -227,11 +505,11 @@
   }
 
   .ab-btn-sm {
-    padding: 0.3rem 0.55rem;
+    padding: 0.35rem 0.6rem;
   }
 
   .ab-btn-xs {
-    padding: 0.2rem 0.45rem;
+    padding: 0.25rem 0.5rem;
   }
 }
 
@@ -241,19 +519,24 @@
 
 .ab-btn-xs {
   font-size: 0.72rem;
-  align-self: flex-start;
 }
 
 .ab-btn-primary {
-  background: var(--brand-primary, #2563eb);
-  color: #fff;
-  padding: 0.4rem 0.75rem;
+  background: var(--primary-button, var(--brand-primary, #36b37e));
+  color: var(--primary-button-text, #fff);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
 
 .ab-btn-primary:hover,
 .ab-btn-primary:focus-visible {
-  background: var(--primary-button-hover, #1d4ed8);
-  color: #fff;
+  background: var(--primary-button-hover, #2f9e6e);
+  color: var(--primary-button-text, #fff);
+}
+
+.ab-btn-primary:focus-visible {
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
 }
 
 .ab-btn-danger {
@@ -297,24 +580,28 @@
 .ab-modal {
   background: var(--bg-secondary, #fff);
   color: var(--text-primary, #0f172a);
-  border-radius: 0.6rem;
-  padding: 1.25rem;
+  border-radius: 1rem;
+  padding: 1.5rem;
   width: min(560px, 100%);
   max-height: 90vh;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
+  box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.1));
 }
 
 .ab-modal-title {
   margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .ab-addresses-fieldset {
   border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 0.5rem;
-  padding: 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -339,7 +626,7 @@
 
 .ab-conflict {
   border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 0.4rem;
+  border-radius: 0.6rem;
   padding: 0.5rem;
   display: flex;
   flex-direction: column;

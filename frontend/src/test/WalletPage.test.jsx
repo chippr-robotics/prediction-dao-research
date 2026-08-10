@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import WalletPage from '../pages/WalletPage'
 import { WalletContext, UIContext } from '../contexts'
+import { LEGAL_LINKS } from '../constants/legalLinks'
 
 // Spec 011 — Account tab entry point for the address QR modal
 // (contracts/address-qr-ui-contract.md, W1–W2). Wallet state is mocked at the
@@ -58,6 +59,57 @@ vi.mock('../utils/keyRegistryService', () => ({
   hasRegisteredKey: vi.fn().mockResolvedValue(false),
   ensureKeyRegistered: vi.fn(),
 }))
+// Spec 074 — the Account tab body renders the unified view (card carousel +
+// Portfolio/Activity/Stats). Mock the portfolio seams (the default view) and
+// the switcher seam so this entry-point test stays free of the multi-chain
+// scans and custody/legacy async loads behind them.
+vi.mock('../components/wallet/PortfolioPanel', () => ({
+  default: () => <div data-testid="portfolio-panel" />,
+}))
+vi.mock('../hooks/usePortfolio', () => {
+  const usePortfolio = () => ({
+    status: 'ready',
+    isLoading: false,
+    error: null,
+    holdings: [],
+    aggregates: [],
+    categories: [],
+    totalUsd: 0,
+    failedAssets: [],
+    priceMap: new Map(),
+    showTestnetAssets: false,
+    showZeroBalances: false,
+    lastUpdated: null,
+    refresh: vi.fn(),
+  })
+  return { default: usePortfolio, usePortfolio }
+})
+vi.mock('../hooks/useAccountSwitcher', () => {
+  const useAccountSwitcher = () => ({
+    accounts: [
+      {
+        id: 'personal',
+        kind: 'personal',
+        // Literal (not the ADDRESS const): vi.mock factories run before the
+        // test file body, so file-scope consts are still in their TDZ here.
+        address: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+        label: 'Personal wallet',
+      },
+    ],
+    currentId: 'personal',
+    choose: vi.fn(),
+    unlockEntry: null,
+    setUnlockEntry: vi.fn(),
+    onUnlocked: vi.fn(),
+    hasChoices: false,
+  })
+  return {
+    useAccountSwitcher,
+    default: useAccountSwitcher,
+    ACCOUNT_KIND_TAG: { vault: 'Multisig', legacy: 'Recovered' },
+    shortAccountAddr: (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : ''),
+  }
+})
 
 const ADDRESS = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
@@ -195,5 +247,34 @@ describe('WalletPage — section routing', () => {
     const { container } = renderPage(connectedWalletContext, '/wallet?tab=membership')
     expect(container.querySelector('.wallet-portal-current')).toBeFalsy()
     expect(container.querySelector('.wallet-portal-topbar')).toBeFalsy()
+  })
+})
+
+// Issue #1025 — Terms & Conditions / Risk Disclosure / Privacy Policy / Account
+// Moderation moved out of the side nav drawer into Settings → App, after
+// Install App / Software Update.
+describe('WalletPage — Preferences → App → Legal & Policies (issue #1025)', () => {
+  const PREFERENCES_ROUTE = '/wallet?tab=preferences'
+
+  it('lists all four legal/policy links, each pointing at its existing in-app route', () => {
+    renderPage(connectedWalletContext, PREFERENCES_ROUTE)
+    expect(screen.getByRole('heading', { name: /legal & policies/i })).toBeInTheDocument()
+
+    for (const { label, href } of LEGAL_LINKS) {
+      expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toHaveAttribute('href', href)
+    }
+  })
+
+  it('positions Legal & Policies after Install App and Software Update', () => {
+    const { container } = renderPage(connectedWalletContext, PREFERENCES_ROUTE)
+    const headings = Array.from(container.querySelectorAll('.preferences-group-heading, h3')).map(
+      (el) => el.textContent
+    )
+    const installIdx = headings.indexOf('Install App')
+    const updateIdx = headings.indexOf('Software Update')
+    const legalIdx = headings.indexOf('Legal & Policies')
+    expect(installIdx).toBeGreaterThanOrEqual(0)
+    expect(updateIdx).toBeGreaterThan(installIdx)
+    expect(legalIdx).toBeGreaterThan(updateIdx)
   })
 })

@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { CALLSIGN_REGISTRY_ABI, CallsignStatus } from '../../abis/callsignRegistry'
 import { getContractAddressForChain } from '../../config/contracts'
+import { estateNetworks, networkName, readProviderFor } from '../../lib/chains/estate'
+import { NetworkScopeCard } from './scopeControls'
+import { useScopedChain } from './scopeGate'
 import { normalizeCallsign, isValidCallsign, formatCallsign } from '../../lib/callsigns/normalizeCallsign'
 import { useCallsignRegistryMetrics } from '../../hooks/useCallsignRegistryMetrics'
 import './CallsignRegistryAdmin.css'
@@ -55,11 +58,19 @@ function humanDuration(seconds) {
 }
 
 export default function CallsignRegistryAdmin({ signer, account, contracts, chainId, runTx, pendingTx }) {
+  // Spec 071 US4: the registry is per network — a callsign on one chain is not one on another.
+  const callsignNetworks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId, setScopeChainId } = useScopedChain(callsignNetworks, chainId)
+  const onScopeNetwork = Number(scopeChainId) === Number(chainId)
   const address = useMemo(
-    () => getContractAddressForChain('callsignRegistry', chainId) || contracts?.callsignRegistry || '',
-    [chainId, contracts],
+    () => getContractAddressForChain('callsignRegistry', scopeChainId) || (Number(scopeChainId) === Number(chainId) ? contracts?.callsignRegistry : '') || '',
+    [scopeChainId, chainId, contracts],
   )
-  const provider = signer?.provider || null
+  // Reads come from the scoped chain; only writes use the wallet's signer.
+  const provider = useMemo(
+    () => readProviderFor(scopeChainId, chainId, signer?.provider || null),
+    [scopeChainId, chainId, signer],
+  )
   const configured = Boolean(address && ethers.isAddress(address))
 
   const reader = useMemo(
@@ -230,6 +241,24 @@ export default function CallsignRegistryAdmin({ signer, account, contracts, chai
 
   return (
     <section aria-labelledby="callsignadmin-heading" className="callsign-admin">
+      <NetworkScopeCard
+        title="Callsigns"
+        description="The callsign registry for one network. A callsign registered on one chain is not registered on another."
+        networks={callsignNetworks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('callsignRegistry', id))}
+        walletChainId={chainId}
+        onRefresh={() => {}}
+        lastReadAt={null}
+        notDeployedLabel="no CallsignRegistry"
+      />
+      {!onScopeNetwork && (
+        <p className="card-info warning-text" role="status">
+          Reading {networkName(scopeChainId)}; your wallet is on {networkName(chainId)}. Changes are
+          signed on {networkName(scopeChainId)} — switch your wallet to make one.
+        </p>
+      )}
       <h3 id="callsignadmin-heading">Callsign registry</h3>
       <p className="callsign-admin__addr">
         Registry: <span title={address}>{shortAddr(address)}</span>
@@ -320,7 +349,7 @@ export default function CallsignRegistryAdmin({ signer, account, contracts, chai
               autoComplete="off"
               spellCheck="false"
             />
-            <button type="button" className="confirm-btn" onClick={doLookup} disabled={pendingTx}>Look up</button>
+            <button type="button" className="confirm-btn" onClick={doLookup} disabled={!onScopeNetwork || pendingTx}>Look up</button>
           </div>
         </div>
         {lookupError && <p role="alert" className="callsign-admin__error">{lookupError}</p>}
@@ -388,7 +417,7 @@ export default function CallsignRegistryAdmin({ signer, account, contracts, chai
               <option value={3}>Gold</option>
               <option value={4}>Platinum</option>
             </select>
-            <button type="button" className="confirm-btn" onClick={saveGate} disabled={pendingTx || gateTier === config.minTier}>
+            <button type="button" className="confirm-btn" onClick={saveGate} disabled={!onScopeNetwork || pendingTx || gateTier === config.minTier}>
               Set gate
             </button>
           </div>
@@ -421,8 +450,8 @@ export default function CallsignRegistryAdmin({ signer, account, contracts, chai
               autoComplete="off"
             />
             <div className="callsign-admin__mod-actions">
-              <button type="button" className="confirm-btn primary" onClick={() => onRoleGrant(true)} disabled={pendingTx || !ethers.isAddress(roleForm.address.trim())}>Grant</button>
-              <button type="button" className="confirm-btn danger" onClick={() => onRoleGrant(false)} disabled={pendingTx || !ethers.isAddress(roleForm.address.trim())}>Revoke</button>
+              <button type="button" className="confirm-btn primary" onClick={() => onRoleGrant(true)} disabled={!onScopeNetwork || pendingTx || !ethers.isAddress(roleForm.address.trim())}>Grant</button>
+              <button type="button" className="confirm-btn danger" onClick={() => onRoleGrant(false)} disabled={!onScopeNetwork || pendingTx || !ethers.isAddress(roleForm.address.trim())}>Revoke</button>
             </div>
           </div>
           <p className="callsign-admin__hint">Role hashes are the keccak256 of the role names; the curator role also administers the reserved list.</p>

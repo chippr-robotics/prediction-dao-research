@@ -22,14 +22,11 @@ const TEST_ACCOUNTS = [
  */
 function connectWalletAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.visitWagers()
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
-    .first()
-    .click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
     .should('be.visible')
 }
@@ -56,16 +53,19 @@ function openAndFillWagerForm(config = {}) {
       .first()
       .clear()
       .type(config.opponent)
-    // Wait for address resolution
-    cy.wait(500)
+    /*
+     * Wait for the address to RESOLVE, not a fixed 500ms. validateForm requires
+     * formData.opponentResolved; submitting first fails validation and the modal never reaches the
+     * success screen, so the failure surfaces 60s later as a timeout on the success copy and points
+     * at the transaction instead of at the form. The same fix was already applied to CRE-11 lower in
+     * THIS file — one copy got it, the helper serving CRE-01..CRE-09 did not.
+     */
+    cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('exist')
   }
 
   // Set stake amount
   if (config.stake) {
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-      .first()
-      .clear()
-      .type(config.stake.toString())
+    cy.enterAmountViaKeypad('fm-stake', config.stake.toString())
   }
 
   // Set stake token
@@ -77,17 +77,21 @@ function openAndFillWagerForm(config = {}) {
 
   // Set resolution type
   if (config.resolutionType !== undefined) {
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-      .first()
-      .select(config.resolutionType.toString())
+    cy.selectResolutionType(config.resolutionType.toString())
   }
 
   // Set arbitrator
   if (config.arbitrator) {
-    cy.get('[role="dialog"]').within(() => {
-      cy.get('input[placeholder*="0x"]').last().clear().type(config.arbitrator)
-    })
-    cy.wait(500)
+    /*
+     * `#fm-arbitrator` (FriendMarketsModal.jsx:1586), not `input[placeholder*="0x"]).last()`.
+     * The arbitrator input only renders once ResolutionType.ThirdParty is selected, so before that
+     * `.last()` is the OPPONENT field — the helper would overwrite the opponent with the
+     * arbitrator address and leave the arbitrator empty, which then fails validation
+     * ("Arbitrator address is required for third-party resolution", :720).
+     * Waits for resolution rather than a fixed 500ms, same as the opponent field.
+     */
+    cy.get('#fm-arbitrator', { timeout: 10000 }).clear().type(config.arbitrator)
+    cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('have.length.greaterThan', 1)
   }
 
   // Set odds multiplier (offer)
@@ -98,60 +102,39 @@ function openAndFillWagerForm(config = {}) {
       .trigger('input')
   }
 
-  // Toggle encryption
-  if (config.encrypted === false) {
-    cy.get('[role="dialog"]').then(($modal) => {
-      const encToggle = $modal.find('input[type="checkbox"]')
-      if (encToggle.length > 0 && encToggle.is(':checked')) {
-        cy.wrap(encToggle.first()).uncheck({ force: true })
-      }
-    })
-  }
+  // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
+  // from FriendMarketsModal several sprints ago (grep `checkbox` there returns nothing). The
+  // block that used to uncheck it was a no-op guarded by `if (length > 0)`, so it silently did
+  // nothing while the spec read as though it controlled encryption. (#1028)
 }
 
 /**
  * Submit the wager creation form and wait for TX completion.
  */
 function submitWagerForm() {
-  cy.get('[role="dialog"], .modal')
-    .find('button[type="submit"], button')
-    .filter(':contains("Create")')
-    .click({ force: true })
+  cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
   // Wait for transaction to be submitted and confirmed.
   // The form transitions through verify → approve → create → complete.
-  cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    // Success is indicated by the success screen with share options
-    const isComplete = lower.includes('created') ||
-                      lower.includes('success') ||
-                      lower.includes('share') ||
-                      lower.includes('qr') ||
-                      lower.includes('invite')
-    // Or an error we need to assert on
-    const isError = lower.includes('error') ||
-                   lower.includes('failed') ||
-                   lower.includes('rejected')
-    expect(isComplete || isError).to.be.true
-  })
+  cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 }
 
 /**
  * Assert wager was created successfully (success screen visible).
  */
 function assertWagerCreated() {
-  cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    const isSuccess = lower.includes('created') ||
-                     lower.includes('success') ||
-                     lower.includes('share') ||
-                     lower.includes('qr code') ||
-                     lower.includes('invite link')
-    expect(isSuccess).to.be.true
-  })
+  cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 }
 
 describe('Wager Creation with Real Transactions', () => {
+  before(() => {
+    // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
+    // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
+    // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    cy.ensureWagerCapacity([0, 1])
+    cy.ensureEncryptionKeys([0, 1])
+  })
+
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
@@ -193,17 +176,13 @@ describe('Wager Creation with Real Transactions', () => {
 
     submitWagerForm()
 
-    // Native token may not be supported in v2 (ERC20-only).
-    // Assert either success or a clear error explaining the limitation.
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('not supported') ||
-                          lower.includes('native') ||
-                          lower.includes('erc20')
-      expect(validOutcome).to.be.true
-    })
+    /*
+     * Native collateral may legitimately be REFUSED — v2 is ERC20-only — so this accepts either
+     * outcome, as the comment always promised. Retrying (`cy.contains` + `should`) rather than the
+     * original one-shot `invoke('text').then()`, which read the DOM before the tx settled.
+     * Tightening this to success-only would fail the test for behaving correctly.
+     */
+    cy.contains(/Wager Created|not supported|native|erc20/i, { timeout: 60000 }).should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -223,14 +202,7 @@ describe('Wager Creation with Real Transactions', () => {
 
     submitWagerForm()
 
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('share') ||
-                          lower.includes('balance') // may fail if no WMATIC balance
-      expect(validOutcome).to.be.true
-    })
+    cy.contains('Wager Created', { timeout: 60000 }).should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -304,17 +276,12 @@ describe('Wager Creation with Real Transactions', () => {
 
     submitWagerForm()
 
-    // Encrypted wager may fail if opponent hasn't registered key.
-    // Either success or a clear error about encryption key is valid.
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('encryption key') ||
-                          lower.includes('register') ||
-                          lower.includes('unencrypted')
-      expect(validOutcome).to.be.true
-    })
+    /*
+     * Success-only is correct here NOW: cy.ensureEncryptionKeys([0,1]) in before() guarantees the
+     * opponent holds a key, so the "opponent hasn't registered a key" branch this used to tolerate
+     * is unreachable. Tolerating it would let a genuine encryption regression pass.
+     */
+    cy.contains('Wager Created', { timeout: 60000 }).should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -334,7 +301,10 @@ describe('Wager Creation with Real Transactions', () => {
     // Verify the derived acceptance deadline is displayed (deterministic, not
     // editable) via the glanceable "Accept by" timeline tile.
     cy.get('[role="dialog"]').within(() => {
-      cy.contains('Accept by').should('be.visible')
+      // `exist`, not `be.visible`: the deadline tiles sit below the fold of the scrollable modal.
+      // The claim is that the acceptance deadline is RENDERED; whether the modal scrolls to it is a
+      // separate UX question (#1019). Same class as the success heading.
+      cy.contains('Accept by').should('exist')
       cy.get('.fm-stat-tile.is-accept .fm-stat-time').should('exist')
       cy.get('.fm-stat-tile.is-accept .fm-stat-time').invoke('text').should('not.be.empty').and('not.equal', '—')
     })
@@ -362,10 +332,7 @@ describe('Wager Creation with Real Transactions', () => {
       .clear()
       .type(TEST_ACCOUNTS[1])
 
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-      .first()
-      .clear()
-      .type('5')
+    cy.enterAmountViaKeypad('fm-stake', '5')
 
     // Set a custom end date (7 days from now)
     const futureDate = new Date()
@@ -376,13 +343,7 @@ describe('Wager Creation with Real Transactions', () => {
       .clear()
       .type(formattedDate)
 
-    // Disable encryption for simplicity
-    cy.get('[role="dialog"]').then(($modal) => {
-      const encToggle = $modal.find('input[type="checkbox"]')
-      if (encToggle.length > 0 && encToggle.is(':checked')) {
-        cy.wrap(encToggle.first()).uncheck({ force: true })
-      }
-    })
+    // Encryption is ON by default and no longer optional (see note above).
 
     submitWagerForm()
     assertWagerCreated()
@@ -418,9 +379,15 @@ describe('Wager Creation with Real Transactions', () => {
       cy.get('#fm-description, input[type="text"]').first().clear().type('CRE-11: Offer 5x odds')
 
       cy.get('input[placeholder*="0x"]').first().clear().type(TEST_ACCOUNTS[1])
-      cy.wait(500)
 
-      cy.get('#fm-stake, input[type="number"]').first().clear().type('10')
+  // Wait for the address to RESOLVE, not a fixed 500ms. validateForm requires
+  // formData.opponentResolved (FriendMarketsModal.jsx:699-702), which AddressInput sets from an
+  // async callback; submitting first fails validation with "Opponent address is required" and the
+  // modal simply never reaches the success screen. AddressInput renders
+  // role="img" aria-label="Valid address" once resolution lands.
+  cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('exist')
+
+      cy.enterAmountViaKeypad('fm-stake', '10')
 
       // Set odds to 5x (500)
       cy.get('.fm-odds-presets button').then(($buttons) => {
@@ -431,13 +398,6 @@ describe('Wager Creation with Real Transactions', () => {
       })
     })
 
-    // Disable encryption
-    cy.get('[role="dialog"]').then(($modal) => {
-      const encToggle = $modal.find('input[type="checkbox"]')
-      if (encToggle.length > 0 && encToggle.is(':checked')) {
-        cy.wrap(encToggle.first()).uncheck({ force: true })
-      }
-    })
 
     // Verify odds summary shows correct values
     cy.get('[role="dialog"]').within(() => {
@@ -446,14 +406,7 @@ describe('Wager Creation with Real Transactions', () => {
 
     submitWagerForm()
 
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('share') ||
-                          lower.includes('error')
-      expect(validOutcome).to.be.true
-    })
+    cy.contains('Wager Created', { timeout: 60000 }).should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -473,9 +426,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (polyOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(polyOption.val())
+        cy.selectResolutionType(polyOption.val())
 
         // The Polymarket browser should appear
         cy.get('[role="dialog"]').invoke('text').then((text) => {
@@ -504,9 +455,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (clOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(clOption.val())
+        cy.selectResolutionType(clOption.val())
 
         // Oracle condition picker should appear
         cy.get('[role="dialog"]').invoke('text').then((text) => {
@@ -535,9 +484,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (cfOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(cfOption.val())
+        cy.selectResolutionType(cfOption.val())
 
         cy.get('[role="dialog"]').invoke('text').then((text) => {
           const lower = text.toLowerCase()
@@ -564,9 +511,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (umaOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(umaOption.val())
+        cy.selectResolutionType(umaOption.val())
 
         cy.get('[role="dialog"]').invoke('text').then((text) => {
           const lower = text.toLowerCase()
@@ -593,9 +538,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (polyOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(polyOption.val())
+        cy.selectResolutionType(polyOption.val())
 
         // The PolymarketBrowser component should render inside the form
         cy.get('[role="dialog"]').then(($modal) => {

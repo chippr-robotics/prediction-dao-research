@@ -12,11 +12,12 @@ import OpenChallengeModal from './OpenChallengeModal'
 import { OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import GroupPoolModal from './GroupPoolModal'
 import UnifiedLookupModal from './UnifiedLookupModal'
-import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
+import { parseTakeChallengeParams, stripTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketTickerCrawler from './PolymarketTickerCrawler'
 import QRScanner from '../ui/QRScanner'
 import AddressQRModal from '../ui/AddressQRModal'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import Badge from '../ui/Badge'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
@@ -458,6 +459,9 @@ function WelcomeView({ onConnect }) {
 
 function Dashboard() {
   const { isConnected, account } = useWallet()
+  // Spec 063 (US1): Share/Receive shows the acting account's address (vault/recovered), not always
+  // the connected wallet, so shared receive addresses match the selected account.
+  const { address: receiveAddress } = useEffectiveAccount()
   const { connectWallet } = useWalletConnection()
   const { preferences: _preferences } = useUserPreferences()
   const { hasRole, blockchainSynced } = useWalletRoles()
@@ -468,11 +472,6 @@ function Dashboard() {
   // working when rendered outside WagerActivityProvider (legacy tests).
   const activity = useWagerActivityOptional()
   const actionNeededCount = activity?.actionNeededCount ?? 0
-  // Demo mode is dev-only — set VITE_USE_MOCK_WAGERS=true in your .env to
-  // bypass the wallet gate and view the dashboard with sample data. Production
-  // never sets this so the badge and welcome bypass stay off.
-  const demoMode = import.meta.env?.VITE_USE_MOCK_WAGERS === 'true'
-
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
@@ -515,20 +514,25 @@ function Dashboard() {
     if (openWagerId == null) return
     setInitialWagerId(String(openWagerId))
     setShowMyWagers(true)
-    navigate(location.pathname, { replace: true, state: {} })
-  }, [location.state, location.pathname, navigate])
+    // Clears the history STATE only — `location.search` is carried through unchanged. This surface
+    // renders inside `/wallet?tab=paytransfer&view=wagers` now, where the query is what selects the
+    // section; navigating to the bare pathname would drop it and bounce the member to Account.
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: {} })
+  }, [location.state, location.pathname, location.search, navigate])
 
   // Shared-phrase deep link (feature 024 / spec 037): a shared QR / link of the form
   // /app?oc=take&code=<four words> now opens the unified phrase lookup, pre-filled and auto-resolved,
-  // which finds whichever thing the words point to (challenge or pool). After consuming it we strip the
-  // query so it doesn't re-trigger on re-render or get bookmarked with the code.
+  // which finds whichever thing the words point to (challenge or pool). After consuming it we strip
+  // the CODE from the query so it doesn't re-trigger on re-render or get bookmarked with the secret
+  // in it — but only the code: everything else in the query stays, because this surface now lives
+  // inside `/wallet?tab=paytransfer&view=wagers` and those params are what keep the member here.
   useEffect(() => {
     const code = parseTakeChallengeParams(location.search)
     if (code) {
       setUnifiedInitialPhrase(code)
       setUnifiedAutoResolve(true)
       setShowUnifiedLookup(true)
-      navigate(location.pathname, { replace: true, state: {} })
+      navigate(`${location.pathname}${stripTakeChallengeParams(location.search)}`, { replace: true, state: {} })
     }
   }, [location.search, location.pathname, navigate])
 
@@ -629,7 +633,7 @@ function Dashboard() {
   }, [navigate])
 
   // Not connected state — show welcome/onboarding view
-  if (!isConnected && !demoMode) {
+  if (!isConnected) {
     return (
       <div className="dashboard-container">
         <WelcomeView onConnect={() => connectWallet()} />
@@ -644,7 +648,6 @@ function Dashboard() {
         <div className="header-content">
           <div className="header-title-row">
             <h1>Quick Actions</h1>
-            {demoMode && <span className="demo-mode-badge">Demo Mode</span>}
           </div>
         </div>
       </header>
@@ -754,7 +757,7 @@ function Dashboard() {
         <AddressQRModal
           isOpen
           onClose={() => setShowAddressQR(false)}
-          address={account}
+          address={receiveAddress || account}
           variant="quick"
         />
       )}

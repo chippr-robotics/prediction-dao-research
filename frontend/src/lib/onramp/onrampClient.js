@@ -1,5 +1,5 @@
 /**
- * Onramp gateway client (spec 060) — the SPA side of the relay-gateway's /v1/onramp/* buy-crypto
+ * Onramp gateway client (spec 081) — the SPA side of the relay-gateway's /v1/onramp/* buy-crypto
  * proxy. The gateway holds the CDP credentials and mints single-use Coinbase hosted-session tokens
  * (secure init) after screening the destination; this client only ever sees the finished
  * pay.coinbase.com URL. Soft-fail by design: with VITE_RELAYER_URL unset — or on any error — the

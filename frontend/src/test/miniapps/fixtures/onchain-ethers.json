@@ -1,0 +1,12 @@
+{
+  "appId": "fixture-ethers",
+  "version": "1.0.0",
+  "approved": {
+    "cid": "bafybeifixtureethersminiapppackage075t033exampleaaaaaaaa",
+    "manifestHash": "0x9c225a74617ae7501f78f93d459157e97edb2e60fc4010d105afc773f86e94fb",
+    "version": 1
+  },
+  "files": {
+    "entry.js": "4c02733ee89d12df9ad49512d3a0deb2051435e1faf651ab7beb6562d8d1fa4f"
+  }
+}

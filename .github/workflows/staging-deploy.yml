@@ -1,0 +1,88 @@
+name: Staging Deploy
+
+# Every merge into `staging` becomes a release candidate and is deployed to BOTH staging services
+# (spec 076, FR-002/FR-023/FR-026a).
+#
+# The candidate number comes from scripts/release/version.js — the same authority that computes
+# production versions, so a candidate and the release it becomes cannot disagree.
+#
+# Note the candidate BASE is recomputed on every merge: a candidate that was v1.3.1-rc.1 becomes
+# v1.4.0-rc.2 when a `feat` lands. The base tracks the accumulated classification rather than the
+# first guess.
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+
+concurrency:
+  # One candidate at a time. Two concurrent runs would race for the same -rc.N tag.
+  group: staging-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  candidate:
+    name: Tag and deploy a release candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Compute the release candidate
+        id: rc
+        run: |
+          set -euo pipefail
+          node scripts/release/version.js --rc --explain | tee rc-explain.txt
+          RC=$(node scripts/release/version.js --rc)
+          if [ -z "$RC" ] || [ "$RC" = "undefined" ]; then
+            echo "::notice::Nothing to deploy: no classified commits since the last release."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$RC" >> "$GITHUB_OUTPUT"
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+          {
+            echo "### Release candidate"
+            echo ""
+            echo '```'
+            cat rc-explain.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tag the candidate
+        if: steps.rc.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.rc.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::candidate tag $TAG already exists — candidates are immutable too."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release candidate $TAG"
+          git push origin "$TAG"
+
+      # Both services, one commit, one candidate number. See cloudbuild.staging.yaml for why there
+      # are two of them rather than one image reaching both cohorts.
+      - name: Build and deploy both staging services
+        if: steps.rc.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          echo "Submitting cloudbuild.staging.yaml with _RC_VERSION=${{ steps.rc.outputs.version }}"
+          echo "This step requires a Google Cloud service account with Cloud Build submit rights;"
+          echo "see docs/runbooks/release-and-promotion.md for the one-time setup."
+          gcloud builds submit \
+            --config cloudbuild.staging.yaml \
+            --substitutions "_RC_VERSION=${{ steps.rc.outputs.version }}" \
+            .

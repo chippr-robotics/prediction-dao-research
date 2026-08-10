@@ -2,9 +2,9 @@
  * Per-device notification delivery preferences.
  *
  * FairWins notifications are derived client-side by the ActivityProvider poll
- * loop (spec 031). Each notification belongs to a domain (wagers, dao, token,
- * membership, pools). This module lets a user pick, per domain, how that
- * domain's notifications are DELIVERED:
+ * loop (spec 031). Each notification belongs to a domain (see
+ * NOTIFICATION_CATEGORIES below). This module lets a user pick, per domain, how
+ * that domain's notifications are DELIVERED:
  *
  *   - 'push'   → raise a real OS/phone notification (Web Notifications API via
  *                the service worker) AND an in-app toast + feed entry.
@@ -41,6 +41,12 @@ export const NOTIFICATION_CATEGORIES = [
   { domain: 'dao', label: 'Governance', description: 'Proposals to vote on, queue, or execute' },
   { domain: 'token', label: 'Token admin', description: 'Role changes and pause/unpause events' },
   { domain: 'custody', label: 'Custody', description: 'Vault approvals needed, executions, owner/threshold changes, and policy rule changes' },
+  { domain: 'staking', label: 'Staking', description: 'Stakes, unstakes, rewards, and unbonding ready to withdraw' },
+  // Spec 067 (FR-038): bridging and liquidity are each independently controllable. Both are appended
+  // without a saved mode, so getNotificationPrefs() resolves them to DEFAULT_MODE ('app') — a new
+  // category is delivered, never silently off.
+  { domain: 'bridge', label: 'Bridge', description: 'Cross-chain transfers delivered, refunded, or needing your attention' },
+  { domain: 'liquidity', label: 'Liquidity', description: 'Supplied and withdrawn positions, fees to claim, and pools closed to new deposits' },
 ]
 
 const KNOWN_DOMAINS = NOTIFICATION_CATEGORIES.map((c) => c.domain)
