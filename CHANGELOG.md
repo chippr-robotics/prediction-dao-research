@@ -14,6 +14,27 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.5.2 — 2026-08-10
+
+Promoted from: none — released directly from main
+Previous release: v1.5.1 · Range: `v1.5.1..v1.5.2` (1 commits)
+
+### 🧹 Maintenance
+
+- chore(release): consolidate 10 lost release records, and stop them accumulating (#1119)
+
+### Artifacts
+
+Range: `v1.5.1..v1.5.2`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.2.0` |
+
 ## v1.5.1 — 2026-08-10
 
 > **Consolidated record.** This entry covers the whole range **v1.2.5 → v1.5.1**, i.e. it also

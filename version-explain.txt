@@ -1,8 +1,6 @@
-previous: v1.2.4
-commits:  3
-  [unclassified] Merge pull request #1088 from chippr-robotics/claude/monorepo-semantic-versioning-kkk4lq
-  [fix -> patch] grant pull-requests write; require same-repo for the release exemption
-  [fix -> patch] open a PR for the release record; backfill v1.0.0-v1.2.3
+previous: v1.5.1
+commits:  1
+  [chore -> patch] consolidate 10 lost release records, and stop them accumulating (#1119)
 bump:     patch
 reason:   computed
-next:     v1.2.5
+next:     v1.5.2
