@@ -315,3 +315,46 @@ jobs:
               body,
             })
             core.notice(`Opened release-record PR #${pr.data.number} for ${version}`)
+
+            /*
+             * A PR OPENED BY GITHUB_TOKEN GETS NO CHECKS, SO IT CAN NEVER MERGE.
+             *
+             * GitHub deliberately does not fire workflow events for actions taken with the default
+             * GITHUB_TOKEN — it is how recursive workflow loops are prevented. The consequence here
+             * is that this pull request is created with ZERO check runs, and every required status
+             * check sits at "Expected — waiting for status to be reported" forever.
+             *
+             * Measured on #1120: 0 checks reported, mergeable=MERGEABLE but mergeStateStatus=BLOCKED,
+             * and `gh pr merge` refused with "the base branch policy prohibits the merge". A
+             * close/reopen (a real user token) took it from 0 to 23 checks immediately.
+             *
+             * So the record is born unmergeable, which is how the changelog fell ten versions behind
+             * the tags and lost v1.2.4 (#1119). #1121 taught the promotion rule to ADMIT this branch;
+             * that fix is necessary but not sufficient, because the checks never ran at all.
+             *
+             * Closing and reopening from the same token does NOT help — the exemption is per-token,
+             * not per-action. The durable fix is to create the PR with an App or PAT token; until one
+             * is provisioned this says so loudly rather than leaving a silently stuck PR, because a
+             * blocked release record looks identical to one nobody has got round to merging.
+             */
+            const checks = await github.rest.checks.listForRef({
+              ...context.repo, ref: pr.data.head.sha, per_page: 1,
+            })
+            if (checks.data.total_count === 0) {
+              core.warning(
+                `Release-record PR #${pr.data.number} has NO check runs, because GITHUB_TOKEN does not ` +
+                'trigger workflow events. Required checks will never report and the PR cannot merge. ' +
+                'Close and REOPEN it by hand to fire the events, or provision an App/PAT token for ' +
+                'this step. See the note in .github/workflows/release.yml.'
+              )
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: pr.data.number,
+                body:
+                  '> **This PR has no checks and cannot merge as-is.**\n>\n' +
+                  '> It was opened by `GITHUB_TOKEN`, and GitHub does not fire workflow events for that ' +
+                  'token, so no required status check will ever report. **Close and reopen this PR** to ' +
+                  'trigger them.\n>\n' +
+                  '> The durable fix is an App or PAT token for the PR-creation step in ' +
+                  '`.github/workflows/release.yml`.',
+              })
+            }
