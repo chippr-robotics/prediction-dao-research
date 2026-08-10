@@ -14,6 +14,28 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.2.8 — 2026-08-09
+
+Promoted from: none — released directly from main
+Previous release: v1.2.7 · Range: `v1.2.7..v1.2.8` (2 commits)
+
+### 🧹 Maintenance
+
+- chore(deps): Bump actions/setup-python from 5 to 7 (#1093)
+- chore(deps): Bump actions/setup-go from 5 to 7 (#1094)
+
+### Artifacts
+
+Range: `v1.2.7..v1.2.8`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | unchanged | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | unchanged | `v0.2.0` |
+
 ## v1.2.3 — 2026-08-09
 
 Promoted from: none — released directly from main

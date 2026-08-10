@@ -1,0 +1,7 @@
+previous: v1.2.7
+commits:  2
+  [chore -> patch] Bump actions/setup-python from 5 to 7 (#1093)
+  [chore -> patch] Bump actions/setup-go from 5 to 7 (#1094)
+bump:     patch
+reason:   computed
+next:     v1.2.8
