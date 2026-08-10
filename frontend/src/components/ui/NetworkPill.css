@@ -1,0 +1,134 @@
+.ab-net-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* Per-chain hues (light mode). Text/background pairs meet WCAG AA. */
+.ab-net-pill--polygon {
+  color: #6d28d9;
+  background: #ede9fe;
+  border-color: #ddd6fe;
+}
+
+.ab-net-pill--amoy {
+  color: #a21caf;
+  background: #fae8ff;
+  border-color: #f5d0fe;
+}
+
+.ab-net-pill--eth {
+  color: #3730a3;
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+}
+
+.ab-net-pill--etc {
+  color: #047857;
+  background: #d1fae5;
+  border-color: #a7f3d0;
+}
+
+.ab-net-pill--mordor {
+  color: #0f766e;
+  background: #ccfbf1;
+  border-color: #99f6e4;
+}
+
+.ab-net-pill--arb {
+  color: #0369a1;
+  background: #e0f2fe;
+  border-color: #bae6fd;
+}
+
+.ab-net-pill--base {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.ab-net-pill--op {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.ab-net-pill--btc {
+  color: #c2410c;
+  background: #ffedd5;
+  border-color: #fed7aa;
+}
+
+.ab-net-pill--other {
+  color: var(--text-secondary, #475569);
+  background: var(--bg-primary, #f1f5f9);
+  border-color: var(--border-color, #e2e8f0);
+}
+
+/* Dark theme (class-based, matching the app's .theme-dark toggle). */
+:root.theme-dark .ab-net-pill--polygon {
+  color: #c4b5fd;
+  background: rgba(109, 40, 217, 0.22);
+  border-color: rgba(139, 92, 246, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--amoy {
+  color: #f0abfc;
+  background: rgba(162, 28, 175, 0.22);
+  border-color: rgba(217, 70, 239, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--eth {
+  color: #a5b4fc;
+  background: rgba(55, 48, 163, 0.28);
+  border-color: rgba(99, 102, 241, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--etc {
+  color: #6ee7b7;
+  background: rgba(4, 120, 87, 0.24);
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--mordor {
+  color: #5eead4;
+  background: rgba(15, 118, 110, 0.26);
+  border-color: rgba(20, 184, 166, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--arb {
+  color: #7dd3fc;
+  background: rgba(3, 105, 161, 0.26);
+  border-color: rgba(14, 165, 233, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--base {
+  color: #93c5fd;
+  background: rgba(29, 78, 216, 0.26);
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--op {
+  color: #fca5a5;
+  background: rgba(185, 28, 28, 0.26);
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--btc {
+  color: #fdba74;
+  background: rgba(194, 65, 12, 0.26);
+  border-color: rgba(249, 115, 22, 0.45);
+}
+
+:root.theme-dark .ab-net-pill--other {
+  color: var(--text-secondary, #aab6c2);
+  background: rgba(122, 133, 144, 0.18);
+  border-color: var(--border-color, #23303d);
+}
