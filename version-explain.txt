@@ -1,0 +1,6 @@
+previous: v1.4.0
+commits:  1
+  [chore -> patch] Bump express from 4.22.2 to 5.2.1 (#1098)
+bump:     patch
+reason:   computed
+next:     v1.4.1
