@@ -69,6 +69,23 @@ export default function AddressBookPanel({ address }) {
     if (entries.length) screen(entries)
   }, [book, screen])
 
+  // Meta row (design 3a): total saved addresses, and how many contacts carry a
+  // non-clear screening state.
+  const savedCount = useMemo(
+    () => contacts.reduce((n, c) => n + c.addresses.length, 0),
+    [contacts],
+  )
+  const needsReview = useMemo(
+    () =>
+      contacts.filter((c) =>
+        c.addresses.some((a) => {
+          const s = getStatus(a.address, a.chainId)
+          return s === 'restricted' || s === 'uncertain'
+        }),
+      ).length,
+    [contacts, getStatus],
+  )
+
   // Filter contacts by the search query (nickname or any address) (FR-015).
   const filteredContacts = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -127,15 +144,6 @@ export default function AddressBookPanel({ address }) {
         </div>
         <div className="ab-panel-head-actions">
           <AddressBookImportExport />
-          <button
-            type="button"
-            className="ab-btn ab-btn-primary"
-            onClick={() => setEditing({ contact: null })}
-            aria-label="Add contact"
-          >
-            <IconPlus />
-            <span className="ab-btn-label">Add contact</span>
-          </button>
         </div>
       </div>
 
@@ -143,17 +151,40 @@ export default function AddressBookPanel({ address }) {
         <label htmlFor="ab-search" className="ab-sr-only">
           Search
         </label>
-        <div className="ab-search-box">
-          <IconSearch />
-          <input
-            id="ab-search"
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name or address"
-            autoComplete="off"
-          />
+        <div className="ab-search-row">
+          <div className="ab-search-box">
+            <IconSearch />
+            <input
+              id="ab-search"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name or address"
+              autoComplete="off"
+            />
+          </div>
+          <button
+            type="button"
+            className="ab-btn ab-btn-primary ab-add-btn"
+            onClick={() => setEditing({ contact: null })}
+            aria-label="Add contact"
+          >
+            <IconPlus />
+            <span className="ab-btn-label">Add contact</span>
+          </button>
         </div>
+        {contacts.length > 0 && (
+          <div className="ab-meta-row">
+            <span className="ab-meta-count">
+              {savedCount === 1 ? '1 saved address' : `${savedCount} saved addresses`}
+            </span>
+            {needsReview > 0 && (
+              <span className="ab-meta-review">
+                {needsReview === 1 ? '1 needs review' : `${needsReview} need review`}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {contacts.length === 0 ? (
