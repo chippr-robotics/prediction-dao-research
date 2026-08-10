@@ -549,7 +549,8 @@ describe('BridgeView — one quote per input change (issue #1027)', () => {
     const callsAfterFailure = fetchBridgeQuote.mock.calls.length
 
     // Give a re-render-driven loop more than a full debounce window (400ms) to refire.
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    // Nothing periodic runs in the error state, so just past the debounce is enough.
+    await new Promise((resolve) => setTimeout(resolve, 600))
     expect(fetchBridgeQuote.mock.calls.length).toBe(callsAfterFailure)
     expect(screen.getByText(BRIDGE_UNAVAILABLE.gateway)).toBeInTheDocument()
     expect(screen.queryByText(/Getting a price/i)).not.toBeInTheDocument()
@@ -563,7 +564,9 @@ describe('BridgeView — one quote per input change (issue #1027)', () => {
     await screen.findByRole('region', { name: /What this transfer costs/i })
 
     // The countdown re-renders every second while a quote is on screen; none of those
-    // renders may turn into another fetch while the inputs are unchanged.
+    // renders may turn into another fetch while the inputs are unchanged. The full
+    // second is load-bearing here: a shorter wait would never span a countdown tick,
+    // and the tick is exactly the re-render this test exists to prove harmless.
     await new Promise((resolve) => setTimeout(resolve, 1_000))
     expect(fetchBridgeQuote).toHaveBeenCalledTimes(1)
   })
