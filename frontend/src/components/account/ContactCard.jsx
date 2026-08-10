@@ -141,7 +141,9 @@ export default function ContactCard({
           className="ab-details-btn"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          aria-controls={detailsId}
+          // The details region only exists in the DOM while expanded, so only
+          // reference it then (a dangling aria-controls id fails axe).
+          aria-controls={expanded ? detailsId : undefined}
           aria-label={`${expanded ? 'Close' : 'Show'} details for ${contact.nickname}`}
         >
           {expanded ? 'Close' : 'Details'}
