@@ -9,11 +9,18 @@
 Move the contract toolchain from Hardhat 2.29.0 to Hardhat 3.12.0, preserving every safety property
 that currently protects 26 live upgradeable implementations across 7 chains, and deploying nothing.
 
-The migration is governed by one fact: **Hardhat 3 changes the compiled output of all 96
-bytecode-producing contracts.** Executable code is unchanged — the difference is confined to the
-appended CBOR metadata block, because Hardhat 3 renames source units (`project/contracts/…`,
-`npm/@chainlink/contracts@1.3.0/…`) and those names hash into it. Everything else in this plan
-exists to prove that claim per contract, and to keep the gates honest while it is proven.
+The migration *was* governed by one fact: Hardhat 3 changes the compiled output of all 96
+bytecode-producing contracts, because it renames source units (`project/contracts/…`,
+`npm/@chainlink/contracts@1.3.0/…`) and those names hash into the appended CBOR metadata block.
+
+**Spec 080 is now sequenced ahead of this work and removes that fact** (Phase 0B). It takes the
+source fingerprint out of compiled output entirely, so the rename has nothing left to change and this
+migration becomes byte-neutral. The verification machinery for the byte change — a metadata-stripping
+harness across 96 contracts, a deliberate baseline re-record, the deterministic-address consequence —
+is retained in `research.md` and in the requirements because it is exactly what applies if 080 is
+deferred, but with 080 in place it is vacuous rather than merely satisfied.
+
+What remains as the dominant cost is unchanged, and is not Hardhat's API surface.
 
 The dominant cost is not Hardhat's API changes. It is that Hardhat 3 requires an ESM repository root,
 which is atomic across the 274 files that reach Hardhat. The approach is to make that flip
@@ -66,7 +73,7 @@ config).
 | **V. Accessible, Consistent Frontend** | **N/A.** The frontend is untouched; the module-system change is confined to the repository root scope. |
 | **Tech stack** — "introducing a new core technology requires justification" | **Justification required and given below.** |
 | **Key management** | **Attention required.** The config's `require()` closure that must become `.cjs` (R1a) includes the floppy-key admin-key loader. Renaming touches the admin key path, so it is changed deliberately and reviewed, not swept up in a codemod. No key material is read, logged, or moved. |
-| **Deployments** — "deterministic deployment scripts and recorded `deployments/` artifacts are the source of truth" | **Tension, surfaced not waived.** Determinism is weakened by construction: CREATE2 addresses derive from creation bytecode, which changes. Nothing already recorded moves; the effect is on future deploys of deterministically-addressed contracts (R6, FR-006). Resolution is to enumerate them and require explicit sign-off before any such deploy, and to record the option (`bytecodeHash: "none"`) that would restore determinism at a larger cost. |
+| **Deployments** — "deterministic deployment scripts and recorded `deployments/` artifacts are the source of truth" | **RESOLVED by sequencing, not waived.** The original tension was that CREATE2 addresses derive from creation bytecode, which this migration changes. Spec 080 lands first and removes the source fingerprint from compiled output, so the rename moves no address at all — the constitutional property is *strengthened* rather than weakened, because addresses stop depending on where source files live. The enumeration in `data-model.md` remains valuable regardless: it records which contracts are deterministic and by which mechanism. If 080 is deferred, the original tension returns in full and R6/FR-006 apply as written. |
 
 ### New core technology justification
 
@@ -139,11 +146,41 @@ to attribute any change to the toolchain rather than to relocation.
 Ordered by **risk retired per change**, not by structure. Every phase must leave `main` with gates
 that run and give an honest verdict (FR-019), and each is independently mergeable.
 
-### Phase 0 — Prerequisite (not part of this feature)
+### Phase 0 — Prerequisites (not part of this feature)
 
-Removal of `@uma/core` (PR #1089). It nests OpenZeppelin 4.9.6 against a root of 5.4.0; Hardhat 3
-resolves per package and the two `IERC20` declarations collide, failing the first compile outright.
-**Nothing in this plan can begin until it lands.**
+**A. Removal of `@uma/core` (PR #1089).** It nests OpenZeppelin 4.9.6 against a root of 5.4.0;
+Hardhat 3 resolves per package and the two `IERC20` declarations collide, failing the first compile
+outright. Nothing in this plan can begin until it lands.
+
+**B. Spec 080 — deterministic addresses — lands FIRST.** *(Re-sequenced 2026-08-09.)*
+
+This is not a dependency of convenience; it removes most of this plan's risk and roughly half its
+verification work. Hardhat 3 changes the compiled output of all 96 contracts *for exactly one
+reason*: it renames source units, and those names are hashed into the appended metadata block. Spec
+080 removes the source fingerprint from that block entirely — measured, the block collapses from 51
+bytes to 10 and the remainder is the compiler version alone:
+
+```
+a1 64 "solc" 43 000818        // no ipfs hash, no source reference
+```
+
+Once compiled output no longer depends on source names, **the rename has nothing to change**.
+
+What that deletes from this plan, if 080 lands first:
+
+| Previously required | After 080 |
+|---|---|
+| Metadata-stripping harness across all 96 contracts (R2) | **Not needed** — bytecode is expected to be byte-identical, so the existing gate suffices unchanged |
+| Deliberate re-record of the compiled-output baseline (FR-002) | **Not needed** — nothing to re-record |
+| Capturing pre-migration artifacts to compare against | **Not needed** |
+| FR-006 / R6 deterministic-address consequence | **Dissolved** — addresses stop depending on source names, which is the whole point of 080 |
+
+**Do not begin Phase 4 before 080 has landed.** Doing so pays the same bytecode change twice: once
+for the source-unit rename, then again when the metadata setting changes. Phases 1–3 carry no
+bytecode change and may proceed in parallel with 080.
+
+If 080 is abandoned or deferred, this plan reverts to its original form — R2, R6, and the baseline
+re-record all return. They are retained in `research.md` rather than deleted for that reason.
 
 ### Phase 1 — Make the module flip non-atomic *(still on Hardhat 2)*
 
@@ -198,5 +235,5 @@ parked (#1086, #1051) and record why they were not unblocked by this.
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
-| Determinism of CREATE2 addresses is weakened, against the constitution's "deterministic deployment scripts … are the source of truth" | CREATE2 addresses derive from creation bytecode, and creation bytecode necessarily changes when source-unit names change. It cannot be avoided while adopting Hardhat 3. | Disabling the metadata hash (`bytecodeHash: "none"`) would restore determinism, but it *also* changes bytecode relative to what is deployed today **and** severs the source-verification link entirely — trading a bounded, documented consequence for a broader one. Recorded in R6 as the option to revisit if cross-chain address parity proves load-bearing. |
+| ~~Determinism of CREATE2 addresses is weakened~~ — **no longer a violation** | Cross-chain address parity was confirmed load-bearing (48 of 51 contracts are already inconsistent across chains), which is what promoted the parked option into spec 080. With 080 sequenced first, this migration moves no address. | The alternative — accepting the weakening and requiring sign-off per deploy — was the original plan and is retained in `research.md` as the fallback if 080 is deferred. It was rejected as the primary because it makes every future deploy carry a manual check that a build setting can remove permanently. |
 | A mass file-extension rename (Phase 1) touching the admin-key loading path | Hardhat 3's ESM requirement is atomic across 274 files; staging through `.cjs` is the only measured way to make the flip reviewable and keep `main` green throughout (R1, R1a). | A single big-bang change was rejected as unreviewable (FR-018). A long-lived integration branch was rejected as primary because it defeats FR-019 for `main` and would conflict with every concurrent change to `scripts/` and `test/`; it is held as the fallback if Phase 3 destabilises. |

@@ -311,5 +311,11 @@ smaller dependency surface and one less way for bytecode to change unnoticed.
 
 - Removal of the conflicting external package version (in flight separately) must land first, as it
   blocks the first compile on the new toolchain.
+- **Spec 080 (deterministic addresses) is sequenced ahead of this work** *(2026-08-09)*. It makes the
+  compiled output independent of source file names, which is the sole reason this migration changes
+  compiled output at all. With it in place this migration becomes byte-neutral: FR-001's per-contract
+  verification, FR-002's deliberate re-record, and FR-006's deterministic-address consequence all
+  become vacuous rather than merely satisfied. They remain written here because they are exactly what
+  applies if 080 is deferred.
 - The parked dependency updates that this migration unblocks are tracked separately and are
   consequences of this work rather than part of it.
