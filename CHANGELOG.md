@@ -14,6 +14,27 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.3.1 — 2026-08-09
+
+Promoted from: none — released directly from main
+Previous release: v1.3.0 · Range: `v1.3.0..v1.3.1` (1 commits)
+
+### 📚 Documentation
+
+- spec: Hardhat 3 toolchain migration (079) (#1102)
+
+### Artifacts
+
+Range: `v1.3.0..v1.3.1`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | unchanged | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | unchanged | `v0.2.0` |
+
 ## v1.2.3 — 2026-08-09
 
 Promoted from: none — released directly from main

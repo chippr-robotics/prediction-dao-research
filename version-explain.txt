@@ -1,0 +1,6 @@
+previous: v1.3.0
+commits:  1
+  [spec -> patch] Hardhat 3 toolchain migration (079) (#1102)
+bump:     patch
+reason:   computed
+next:     v1.3.1
