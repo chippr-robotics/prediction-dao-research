@@ -1,14 +1,15 @@
 /**
- * ContactCard (Spec 021) — one address-book contact: nickname plus its grouped
- * addresses (network, shortened address, notes), each with an optional
- * sanctions RestrictionTag. A contact containing a restricted address is marked
- * at the contact level (FR-012).
+ * ContactCard (Spec 021, roster redesign per issue #1023 design 3a) — one
+ * address-book contact as a compact expandable row: avatar, nickname, a
+ * contact-level screening flag, the primary address with copy, and a network
+ * count. "Details" expands to per-network full addresses (each with its own
+ * copy action and notes) plus the Edit / Delete actions. A contact containing
+ * a restricted address is flagged at the contact level (FR-012).
  */
 
 import { useState } from 'react'
 import { addressKey } from '../../lib/addressBook/addressBookStore'
 import RestrictionTag from './RestrictionTag'
-import NetworkPill from '../ui/NetworkPill'
 
 function shorten(addr) {
   if (!addr || addr.length < 12) return addr
@@ -16,6 +17,21 @@ function shorten(addr) {
 }
 
 const noStatus = () => 'clear'
+
+// Worst screening status across a contact's addresses, for the contact-level flag.
+const STATUS_RANK = { restricted: 3, uncertain: 2, loading: 1, clear: 0 }
+function worstStatus(statuses) {
+  return statuses.reduce(
+    (worst, s) => ((STATUS_RANK[s] || 0) > (STATUS_RANK[worst] || 0) ? s : worst),
+    'clear',
+  )
+}
+
+function initialsOf(name) {
+  const words = (name || '').trim().split(/\s+/).filter(Boolean)
+  const letters = words.slice(0, 2).map((w) => w.charAt(0).toUpperCase())
+  return letters.join('') || '?'
+}
 
 function IconEdit() {
   return (
@@ -59,8 +75,12 @@ export default function ContactCard({
   isVault = false,
 }) {
   const [copiedKey, setCopiedKey] = useState(null)
+  const [expanded, setExpanded] = useState(false)
   const statuses = contact.addresses.map((a) => getStatus(a.address, a.chainId))
-  const containsRestricted = statuses.includes('restricted')
+  const flag = worstStatus(statuses)
+  const primary = contact.addresses[0]
+  const netCount = contact.addresses.length
+  const detailsId = `ab-details-${contact.id}`
 
   function handleCopy(addr, key) {
     navigator.clipboard.writeText(addr).then(() => {
@@ -69,87 +89,111 @@ export default function ContactCard({
     })
   }
 
-  const initial = (contact.nickname || '?').trim().charAt(0).toUpperCase() || '?'
+  function copyButton(addr, key) {
+    const copied = copiedKey === key
+    return (
+      <button
+        type="button"
+        className={`ab-btn ab-btn-xs ab-copy-btn${copied ? ' ab-copy-btn--copied' : ''}`}
+        onClick={() => handleCopy(addr, key)}
+        aria-label={`Copy address ${addr}`}
+      >
+        {copied ? <IconCheck /> : <IconCopy />}
+        <span className="ab-sr-only">{copied ? 'Copied!' : 'Copy'}</span>
+      </button>
+    )
+  }
 
   return (
     <div className="ab-contact-card">
-      <div className="ab-contact-head">
-        <div className="ab-contact-id">
-          <span className="ab-contact-avatar" aria-hidden="true">
-            {initial}
+      <div className="ab-contact-main">
+        <span className="ab-contact-avatar" aria-hidden="true">
+          {initialsOf(contact.nickname)}
+        </span>
+        <div className="ab-contact-name">
+          <span className="ab-contact-nickname">{contact.nickname}</span>
+          {/* Spec 068 — a multisig vault is an ordinary address-book entry, badged by matching the
+              member's own vault references rather than by storing a type on the entry (the book is
+              a synced object whose loader rebuilds a fixed field list, so an extra key would be
+              dropped). Renaming it here renames it everywhere the vault appears. */}
+          {isVault && <span className="ab-contact-tag">Multisig</span>}
+        </div>
+        {/* Contact-level screening flag: worst status across the contact's
+            addresses (FR-012). RestrictionTag renders nothing when clear. */}
+        <div className="ab-contact-flag">
+          <RestrictionTag status={flag} />
+        </div>
+        <div className="ab-contact-line">
+          {primary && (
+            <>
+              <code className="ab-address-value" title={primary.address}>
+                {shorten(primary.address)}
+              </code>
+              {copyButton(primary.address, addressKey(primary.address, primary.chainId))}
+            </>
+          )}
+          <span className="ab-contact-netcount">
+            {netCount === 1 ? '1 network' : `${netCount} networks`}
           </span>
-          <div className="ab-contact-name">
-            <span className="ab-contact-nickname">{contact.nickname}</span>
-            {/* Spec 068 — a multisig vault is an ordinary address-book entry, badged by matching the
-                member's own vault references rather than by storing a type on the entry (the book is
-                a synced object whose loader rebuilds a fixed field list, so an extra key would be
-                dropped). Renaming it here renames it everywhere the vault appears. */}
-            {isVault && <span className="ab-contact-tag">Multisig</span>}
-            {containsRestricted && (
-              <span className="ab-contact-restricted-flag">
-                <RestrictionTag status="restricted" />
-              </span>
-            )}
-          </div>
         </div>
-        <div className="ab-contact-actions">
-          <button
-            type="button"
-            className="ab-btn ab-btn-sm"
-            onClick={() => onEdit?.(contact)}
-            aria-label={`Edit contact ${contact.nickname}`}
-          >
-            <IconEdit />
-            <span className="ab-btn-label">Edit</span>
-          </button>
-          <button
-            type="button"
-            className="ab-btn ab-btn-sm ab-btn-danger"
-            onClick={() => onDeleteContact?.(contact.id)}
-            aria-label={`Delete contact ${contact.nickname}`}
-          >
-            <IconTrash />
-            <span className="ab-btn-label">Delete</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="ab-details-btn"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          aria-label={`${expanded ? 'Close' : 'Show'} details for ${contact.nickname}`}
+        >
+          {expanded ? 'Close' : 'Details'}
+        </button>
       </div>
 
-      <ul className="ab-address-list">
-        {contact.addresses.map((a, i) => {
-          const key = addressKey(a.address, a.chainId)
-          const copied = copiedKey === key
-          return (
-            <li key={key} className="ab-address-row">
-              <div className="ab-address-main">
-                <code className="ab-address-value" title={a.address}>
-                  {shorten(a.address)}
-                </code>
-                <button
-                  type="button"
-                  className={`ab-btn ab-btn-xs ab-copy-btn${copied ? ' ab-copy-btn--copied' : ''}`}
-                  onClick={() => handleCopy(a.address, key)}
-                  aria-label={`Copy address ${a.address}`}
-                >
-                  {copied ? <IconCheck /> : <IconCopy />}
-                  <span className="ab-btn-label">{copied ? 'Copied!' : 'Copy'}</span>
-                </button>
-              </div>
-              <div className="ab-address-tags">
-                <NetworkPill chainId={a.chainId} name={networkName(a.chainId)} />
-              </div>
-              {/* Screening status sits on its own line below the network pills so
-                  an Unscreened/Restricted state is never lost in the tag row
-                  (issue #1023). RestrictionTag renders nothing when clear. */}
-              {statuses[i] && statuses[i] !== 'clear' && (
-                <div className="ab-address-status">
-                  <RestrictionTag status={statuses[i]} />
-                </div>
-              )}
-              {a.notes && <p className="ab-address-notes">{a.notes}</p>}
-            </li>
-          )
-        })}
-      </ul>
+      {expanded && (
+        <div className="ab-contact-details" id={detailsId}>
+          <ul className="ab-address-list">
+            {contact.addresses.map((a, i) => {
+              const key = addressKey(a.address, a.chainId)
+              return (
+                <li key={key} className="ab-address-row">
+                  <div className="ab-address-netlabel">
+                    <span>{networkName(a.chainId)}</span>
+                    {statuses[i] && statuses[i] !== 'clear' && (
+                      <RestrictionTag status={statuses[i]} />
+                    )}
+                  </div>
+                  <div className="ab-address-main">
+                    <code className="ab-address-full" title={a.address}>
+                      {a.address}
+                    </code>
+                    {copyButton(a.address, `${key}:full`)}
+                  </div>
+                  {a.notes && <p className="ab-address-notes">{a.notes}</p>}
+                </li>
+              )
+            })}
+          </ul>
+          <div className="ab-contact-actions">
+            <button
+              type="button"
+              className="ab-btn ab-btn-sm"
+              onClick={() => onEdit?.(contact)}
+              aria-label={`Edit contact ${contact.nickname}`}
+            >
+              <IconEdit />
+              <span>Edit</span>
+            </button>
+            <button
+              type="button"
+              className="ab-btn ab-btn-sm ab-btn-danger"
+              onClick={() => onDeleteContact?.(contact.id)}
+              aria-label={`Delete contact ${contact.nickname}`}
+            >
+              <IconTrash />
+              <span>Delete</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
