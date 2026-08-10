@@ -14,6 +14,27 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.5.1 — 2026-08-10
+
+Promoted from: none — released directly from main
+Previous release: v1.5.0 · Range: `v1.5.0..v1.5.1` (1 commits)
+
+### 🐛 Bug Fixes
+
+- fix(frontend): stop the Bridge quote fetch loop that flickered between pricing and unavailable (#1111)
+
+### Artifacts
+
+Range: `v1.5.0..v1.5.1`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | unchanged | `v0.2.0` |
+
 ## v1.2.5 — 2026-08-09
 
 Promoted from: none — released directly from main
