@@ -1,0 +1,6 @@
+previous: v1.2.6
+commits:  1
+  [fix -> patch] drop @uma/core — 1,138 packages (−35.5%) for 199 lines of Solidity (#1089)
+bump:     patch
+reason:   computed
+next:     v1.2.7
