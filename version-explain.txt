@@ -1,8 +1,6 @@
-previous: v1.2.4
-commits:  3
-  [unclassified] Merge pull request #1088 from chippr-robotics/claude/monorepo-semantic-versioning-kkk4lq
-  [fix -> patch] grant pull-requests write; require same-repo for the release exemption
-  [fix -> patch] open a PR for the release record; backfill v1.0.0-v1.2.3
+previous: v1.5.3
+commits:  1
+  [fix -> patch] a release record opened by GITHUB_TOKEN gets no checks and cannot merge (#1130)
 bump:     patch
 reason:   computed
-next:     v1.2.5
+next:     v1.5.4
