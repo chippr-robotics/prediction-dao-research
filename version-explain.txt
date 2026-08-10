@@ -1,0 +1,6 @@
+previous: v1.4.1
+commits:  1
+  [chore -> patch] Bump @scure/bip39 from 1.6.0 to 2.2.0 (#1100)
+bump:     patch
+reason:   computed
+next:     v1.4.2

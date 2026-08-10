@@ -14,6 +14,27 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.4.2 — 2026-08-10
+
+Promoted from: none — released directly from main
+Previous release: v1.4.1 · Range: `v1.4.1..v1.4.2` (1 commits)
+
+### 🧹 Maintenance
+
+- chore(deps): Bump @scure/bip39 from 1.6.0 to 2.2.0 (#1100)
+
+### Artifacts
+
+Range: `v1.4.1..v1.4.2`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | unchanged | `v0.2.0` |
+
 ## v1.2.3 — 2026-08-09
 
 Promoted from: none — released directly from main
