@@ -26,7 +26,10 @@ concurrency:
 
 permissions:
   contents: write
-  pull-requests: read
+  # `write`, not `read`: the final step OPENS a pull request for the generated release record
+  # (github.rest.pulls.create). With `read` the token 403s at runtime and the release job fails at
+  # its last step — the precise failure this PR exists to remove. Reported by review on #1088.
+  pull-requests: write
 
 jobs:
   release:
@@ -163,20 +166,91 @@ jobs:
             })
 
       # FR-037: the changelog is produced by the release process, never hand-written.
-      - name: Update CHANGELOG.md
+      # FR-037 + FR-007a. This commit lands via a PULL REQUEST, not a push to main.
+      #
+      # It used to `git push origin HEAD:main`, and that failed on every one of the first seven
+      # releases once branch protection arrived:
+      #
+      #   remote: error: GH013: Repository rule violations found for refs/heads/main.
+      #   - Changes must be made through a pull request.
+      #   - 2 of 2 required status checks are expected.
+      #
+      # The alternative was a ruleset bypass for the bot. Opening a PR was chosen instead: the
+      # protection on the branch that deploys to members stays intact with no exception, and the
+      # generated commit gets the same checks as anything else. The cost is a small PR per release.
+      - name: Prepare the changelog and manifest commit
         if: steps.gate.outputs.proceed == 'true'
+        id: changelog
         run: |
           set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="release/${VERSION}-changelog"
+
           node scripts/release/changelog.js \
-            --version "${{ steps.version.outputs.version }}" \
+            --version "$VERSION" \
             --previous "${{ steps.version.outputs.previous }}" \
             --artifacts artifacts.md
+
+          # Sync the repository version into every non-mini-app manifest (FR-007a). The tracked list
+          # is DERIVED from the workspace globs, so it cannot fall behind the workspace. Mini-apps
+          # version independently and are deliberately untouched (FR-007).
+          node scripts/release/sync-manifest-versions.js --version "$VERSION"
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          # Sync the repository version into every non-mini-app manifest (FR-007a). Mini-apps are
-          # versioned independently and are deliberately untouched here (FR-007).
-          node scripts/release/sync-manifest-versions.js --version "${{ steps.version.outputs.version }}"
-          git add package.json frontend/package.json services/*/package.json subgraph/package.json packages/*/package.json tools/miniapp-build/package.json
-          git commit -m "chore(release): ${{ steps.version.outputs.version }} [skip release]"
-          git push origin HEAD:main
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "chore(release): ${VERSION} [skip release]"
+
+          # `--force-with-lease` compares against refs/remotes/origin/$BRANCH, so that ref has to
+          # exist for the lease to mean anything. `fetch-depth: 0` above does fetch every branch
+          # today — but relying on that couples this push to a checkout implementation detail, and
+          # anyone shrinking fetch-depth for speed would silently turn the lease into a no-op
+          # ("stale info" rejection) exactly on the re-run path it exists to protect.
+          #
+          # So fetch it explicitly when it exists. `ls-remote` is a question, not a swallowed
+          # failure: a genuine transport error still fails the step under `set -e`.
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+          fi
+          git push origin "$BRANCH" --force-with-lease
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Open the release-record pull request
+        if: steps.gate.outputs.proceed == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const version = '${{ steps.version.outputs.version }}'
+            const head = '${{ steps.changelog.outputs.branch }}'
+            const body = [
+              `Generated release record for **${version}**.`,
+              '',
+              'Produced by `.github/workflows/release.yml` — the changelog and the manifest versions',
+              'are generated, never hand-written (spec 076, FR-037/FR-007a). Review and merge; there',
+              'is nothing to edit here.',
+              '',
+              `The tag \`${version}\` and its GitHub Release are already published and immutable —`,
+              'this pull request only brings the in-repo record into line with them.',
+              '',
+              '---',
+              '_Generated by [Claude Code](https://claude.ai/code)_',
+            ].join('\n')
+
+            // A re-run of the same release reuses its branch, so reuse the open PR too rather than
+            // failing on "a pull request already exists".
+            const existing = await github.rest.pulls.list({
+              ...context.repo, state: 'open', head: `${context.repo.owner}:${head}`,
+            })
+            if (existing.data.length > 0) {
+              core.notice(`Release-record PR already open: #${existing.data[0].number}`)
+              return
+            }
+            const pr = await github.rest.pulls.create({
+              ...context.repo,
+              title: `chore(release): ${version}`,
+              head,
+              base: 'main',
+              body,
+            })
+            core.notice(`Opened release-record PR #${pr.data.number} for ${version}`)

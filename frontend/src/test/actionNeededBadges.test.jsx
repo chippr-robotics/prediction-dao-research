@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
-import WagerCardGrid from '../components/fairwins/WagerCardGrid'
+import WagerTable from '../components/fairwins/WagerTable'
 import {
   WalletContext,
   ThemeContext,
@@ -244,9 +243,11 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
     })
   })
 
-  describe('MyMarketsModal wager cards', () => {
+  describe('MyMarketsModal wager rows', () => {
+    // My Wagers has one list view — the table — so a row's actions are always on
+    // screen. The action-needed tag is therefore the fallback, not the headline:
+    // it appears only where no control in the row already says what is pending.
     it('shows a Refund button on exactly the wager that needs a refund', async () => {
-      const user = userEvent.setup()
       activityRef.current = baseActivity({
         actionNeededByWagerId: { '1': 'refund', '2': null }
       })
@@ -256,21 +257,18 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         render(modalUi(markets))
       })
 
-      // Actions live in the expanded card — open Wager One to reveal them.
-      await user.click(screen.getByText('Wager One'))
-      const card1 = screen.getByText('Wager One').closest('.wc-card')
-      expect(within(card1).getByRole('button', { name: /^refund$/i })).toBeInTheDocument()
-      // The button replaces the badge — no redundant status pill.
+      // No expansion, no rotation — the button is in the row.
+      const row1 = screen.getByText('Wager One').closest('tr')
+      expect(within(row1).getByRole('button', { name: /^refund$/i })).toBeInTheDocument()
+      // The button replaces the tag — no redundant status pill.
       expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
 
-      // Wager Two needs nothing — even expanded it has no Refund.
-      await user.click(screen.getByText('Wager Two'))
-      const card2 = screen.getByText('Wager Two').closest('.wc-card')
-      expect(within(card2).queryByRole('button', { name: /^refund$/i })).not.toBeInTheDocument()
+      // Wager Two needs nothing — no Refund on its row.
+      const row2 = screen.getByText('Wager Two').closest('tr')
+      expect(within(row2).queryByRole('button', { name: /^refund$/i })).not.toBeInTheDocument()
     })
 
     it('shows a Respond to Draw button when a draw is proposed', async () => {
-      const user = userEvent.setup()
       activityRef.current = baseActivity({
         actionNeededByWagerId: { '1': 'respondDraw' }
       })
@@ -279,39 +277,106 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         render(modalUi([wagerOne()]))
       })
 
-      await user.click(screen.getByText('Wager One'))
-      const card = screen.getByText('Wager One').closest('.wc-card')
-      expect(within(card).getByRole('button', { name: /respond to draw/i })).toBeInTheDocument()
+      const row = screen.getByText('Wager One').closest('tr')
+      expect(within(row).getByRole('button', { name: /respond to draw/i })).toBeInTheDocument()
       expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
     })
 
-    // While collapsed, the action-needed tag is the ONLY signal that a card
-    // needs attention (its action button lives in the expanded body, and the
-    // phone grid never auto-expands). Once expanded the matching button shows,
-    // so the now-redundant tag is dropped.
-    it.each(['accept', 'claim', 'resolve', 'refund', 'respondDraw'])(
-      'tags the collapsed card for "%s", then drops the redundant tag once expanded',
-      async (kind) => {
-        const user = userEvent.setup()
-        activityRef.current = baseActivity({
-          actionNeededByWagerId: { '1': kind }
-        })
+    it('tags a wager whose needed action has no control in the row', async () => {
+      // An active wager the member neither won nor can resolve: the watcher says
+      // "claim", but nothing in the row offers it. Without the tag the row would
+      // look inert, which is exactly what FR-007 exists to prevent.
+      activityRef.current = baseActivity({
+        actionNeededByWagerId: { '1': 'claim' }
+      })
 
-        await act(async () => {
-          render(modalUi([wagerOne()]))
-        })
+      await act(async () => {
+        render(modalUi([wagerOne()]))
+      })
 
-        // Collapsed: the tag flags the wager without the user opening it.
-        expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(1)
+      expect(screen.queryByRole('button', { name: /^claim$/i })).not.toBeInTheDocument()
+      const tags = document.querySelectorAll('.wc-action-needed')
+      expect(tags).toHaveLength(1)
+      expect(tags[0]).toHaveTextContent(/claim/i)
+    })
 
-        // Expanding reveals the matching button → the duplicate tag drops.
-        await user.click(screen.getByText('Wager One'))
-        expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
+    // `showResolveCountdown` only means the resolve control was *offered* — it
+    // renders nothing for a wallet with no resolution authority, and a countdown
+    // before the window opens. Neither is a Resolve button, so neither may
+    // suppress the tag: that is precisely how a row ends up looking inert.
+    it('keeps the "resolve" tag when the resolve control renders no button', async () => {
+      // wagerOne: ME is a lone participant, not the creator and not
+      // participants[1], so ResolveButtonWithCountdown renders nothing at all.
+      activityRef.current = baseActivity({
+        actionNeededByWagerId: { '1': 'resolve' }
+      })
+
+      await act(async () => {
+        render(modalUi([wagerOne()]))
+      })
+
+      const row = screen.getByText('Wager One').closest('tr')
+      expect(within(row).queryByRole('button', { name: /^resolve$/i })).not.toBeInTheDocument()
+      const tags = document.querySelectorAll('.wc-action-needed')
+      expect(tags).toHaveLength(1)
+      expect(tags[0]).toHaveTextContent(/resolve/i)
+    })
+
+    it('drops the "resolve" tag once the row shows a real Resolve button', async () => {
+      const resolvable = {
+        id: '9',
+        description: 'Resolvable Wager',
+        creator: ME,
+        participants: [ME, OTHER],
+        resolutionType: 0,
+        status: 'active',
+        marketType: 'friend',
+        // Past trading end (ms) → the resolve window is open right now.
+        tradingEndTime: Date.now() - 60 * 60 * 1000,
       }
-    )
+      activityRef.current = baseActivity({
+        actionNeededByWagerId: { '9': 'resolve' }
+      })
+
+      await act(async () => {
+        render(modalUi([resolvable]))
+      })
+      await act(async () => {
+        screen.getByRole('tab', { name: /created/i }).click()
+      })
+
+      const row = screen.getByText('Resolvable Wager').closest('tr')
+      expect(within(row).getByRole('button', { name: /^resolve$/i })).toBeInTheDocument()
+      expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
+    })
+
+    it('drops the tag for a wager whose Accept control is in the row', async () => {
+      // A pending offer addressed to the member renders "View Offer", so the
+      // "accept" tag would just duplicate it.
+      const pending = {
+        id: '5',
+        description: 'Pending Offer',
+        creator: OTHER,
+        participants: [OTHER, ME],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() + 24 * 60 * 60 * 1000,
+        marketType: 'friend',
+        tradingEndTime: futureEnd()
+      }
+      activityRef.current = baseActivity({
+        actionNeededByWagerId: { '5': 'accept' }
+      })
+
+      await act(async () => {
+        render(modalUi([pending]))
+      })
+
+      const row = screen.getByText('Pending Offer').closest('tr')
+      expect(within(row).getByRole('button', { name: /view offer/i })).toBeInTheDocument()
+      expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
+    })
 
     it('removes the Refund button when the action is no longer needed', async () => {
-      const user = userEvent.setup()
       activityRef.current = baseActivity({
         actionNeededByWagerId: { '1': 'refund', '2': null }
       })
@@ -322,8 +387,6 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         view = render(modalUi(markets))
       })
 
-      // Expand Wager One to reveal its Refund action.
-      await user.click(screen.getByText('Wager One'))
       expect(screen.getByRole('button', { name: /^refund$/i })).toBeInTheDocument()
 
       activityRef.current = baseActivity({
@@ -337,13 +400,12 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
     })
 
-    it('suppresses the "refund" badge when the row shows a Clear/Reclaim button', async () => {
-      const user = userEvent.setup()
+    it('suppresses the "refund" tag when the row shows a Clear/Reclaim button', async () => {
       // An expired pending offer → computedStatus EXPIRED → the row renders a
-      // Clear button, which makes the "refund" action badge redundant. The
-      // My Wagers modal no longer surfaces expired offers (spec 040 US6 removed
-      // the Expired filter), so this suppression is exercised at the card level
-      // where the logic lives.
+      // Clear button, which makes the "refund" tag redundant. The My Wagers modal
+      // no longer surfaces expired offers (spec 040 US6 removed the Expired
+      // filter), so this suppression is exercised at the row level where the
+      // logic lives.
       const expired = {
         id: '7',
         description: 'Expired Offer',
@@ -360,13 +422,14 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       })
 
       render(
-        <WagerCardGrid
+        <WagerTable
           markets={[expired]}
           account={ME}
           getStatusClass={() => 'status-expired'}
           getStatusLabel={() => 'Expired'}
           getTimeRemaining={() => 'Expired'}
           formatDate={() => 'Jun 1, 2026'}
+          onSelect={vi.fn()}
           onClearExpired={vi.fn()}
           onResolve={vi.fn()}
           onAccept={vi.fn()}
@@ -376,14 +439,12 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       )
 
       expect(screen.getByText('Expired Offer')).toBeInTheDocument()
-      // Expand the card to reveal its actions.
-      await user.click(screen.getByText('Expired Offer'))
-      // The Clear button is present, so the refund badge is suppressed.
+      // The Clear button is present, so the refund tag is suppressed.
       expect(screen.getByRole('button', { name: /^clear$/i })).toBeInTheDocument()
       expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
     })
 
-    it('renders without crashing (and without badges) outside the provider', async () => {
+    it('renders without crashing (and without tags) outside the provider', async () => {
       activityRef.current = null
 
       await act(async () => {

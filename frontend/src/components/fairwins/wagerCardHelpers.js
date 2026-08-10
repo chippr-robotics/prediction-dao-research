@@ -3,9 +3,9 @@ import { WagerStatus as MarketStatus } from '../../constants/wagerDefaults'
 /**
  * Shared, presentation-only helpers for the My Wagers views (spec 017).
  *
- * Extracted from MyMarketsModal so the card grid (WagerCardGrid / WagerCard) and
- * the modal can share the same display logic without a circular import. These are
- * pure functions of their inputs — no React, no side effects.
+ * Extracted from MyMarketsModal so the list (WagerTable) and the modal can share
+ * the same display logic without a circular import. These are pure functions of
+ * their inputs — no React, no side effects.
  */
 
 const ZERO_ADDRESS_RE = /^0x0{40}$/i

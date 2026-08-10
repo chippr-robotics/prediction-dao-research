@@ -1,19 +1,6 @@
 import { WagerStatus as MarketStatus } from '../../constants/wagerDefaults'
 import { getMarketDisplayTitle, getRowOutcome, isWinnerUnpaid, formatShortAddress } from './wagerCardHelpers'
 
-// Action kinds whose row already renders a matching button, so the duplicate
-// status badge is just noise (mirrors the former MarketsTable behavior).
-const ACTION_BADGES_WITH_BUTTON = new Set(['accept', 'claim', 'resolve'])
-
-// Stable avatar tint for the comfortable-density preview line (from the mockup).
-const AVATAR_PALETTE = ['#fca5a5', '#fdba74', '#86efac', '#93c5fd', '#c4b5fd', '#f9a8d4', '#67e8f9']
-export function avatarColor(seed) {
-  const s = String(seed || '')
-  let n = 0
-  for (const ch of s) n += ch.charCodeAt(0)
-  return AVATAR_PALETTE[n % AVATAR_PALETTE.length]
-}
-
 /**
  * Pick the right countdown source: pending/expired offers use the *acceptance*
  * deadline, everything else the trading/resolve end.
@@ -32,9 +19,9 @@ export function rowTimeLeft(market, getTimeRemaining) {
 /**
  * Build the shared, presentation-only view model for one wager (spec 017/018).
  *
- * Used by both the grid (WagerCardGrid/WagerCard) and the table (WagerTable) so
- * status, metadata, encryption state, and contextual actions stay identical
- * across views. Pure: all side effects flow through the callbacks in `ctx`.
+ * Consumed by WagerTable — the single My Wagers list view — so status, metadata,
+ * encryption state, and contextual actions are derived in one place rather than
+ * inline in the markup. Pure: all side effects flow through the callbacks in `ctx`.
  *
  * @param {object} market
  * @param {object} ctx - formatters, predicates, action callbacks, in-flight
@@ -85,11 +72,6 @@ export function buildWagerVm(market, ctx) {
         : (market.decryptionError || market.ipfsEnvelopeError)
           ? 'unavailable'
           : 'locked'
-
-  const termsRaw = market.decryptedMetadata?.terms || market.decryptedMetadata?.description || ''
-  const terms = termsRaw && termsRaw !== displayTitle ? termsRaw : ''
-  // Only encrypted wagers that have been decrypted can be re-hidden (FR-002).
-  const canHideTerms = Boolean(market.isEncrypted) && encState === 'revealed' && Boolean(terms)
 
   // Counterparty / creator labels (on-chain public; display only).
   const others = [market.creator, ...(market.participants || [])]
@@ -143,11 +125,6 @@ export function buildWagerVm(market, ctx) {
   const canClaimRow = typeof onClaim === 'function' && isWinnerUnpaid(market, account)
   const showRefundBtn = actionNeeded === 'refund' && !showClearBtn && typeof onRefund === 'function'
   const showDrawBtn = actionNeeded === 'respondDraw' && typeof onResolve === 'function'
-
-  const actionBadgeRedundant =
-    ACTION_BADGES_WITH_BUTTON.has(actionNeeded) ||
-    (actionNeeded === 'refund' && (showClearBtn || showRefundBtn)) ||
-    showDrawBtn
 
   const actions = []
   if (showAcceptBtn) {
@@ -203,15 +180,11 @@ export function buildWagerVm(market, ctx) {
     timeLeft,
     outcome,
     encState,
-    terms,
-    canHideTerms,
     meta,
     actions,
     actionNeeded,
-    actionBadgeRedundant,
     opponent,
     opponentAddress,
     draw,
-    avatarColor: avatarColor(others[0] || idStr),
   }
 }

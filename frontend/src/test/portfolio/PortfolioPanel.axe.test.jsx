@@ -109,7 +109,7 @@ describe('Portfolio accessibility (WCAG 2.1 AA)', () => {
   it('collapsed category state has no violations', async () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot())
     const { container } = renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /payment stablecoins \$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /payment stablecoins\W+\$/i }))
     expect(await axe(container)).toHaveNoViolations()
   })
 
@@ -123,7 +123,7 @@ describe('Portfolio accessibility (WCAG 2.1 AA)', () => {
   it('open asset detail sheet has no violations', async () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot())
     const { container } = renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /ethereum eth 2 instances/i }))
+    fireEvent.click(screen.getByRole('button', { name: /ethereum\W+eth\W+2 instances/i }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })

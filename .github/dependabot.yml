@@ -59,6 +59,23 @@ updates:
       - dependency-name: "@openzeppelin/upgrades-core"
         update-types: ["version-update:semver-major"]
 
+      # chai's ceiling is set by a hold we chose, not by chai. hardhat-chai-matchers@2 peers
+      # `chai@^4.2.0`, and that plugin is pinned to v2 by the @nomicfoundation/* rule above
+      # pending the Hardhat 3 migration (#1053). Dependabot offered chai 6 in the dev-tooling
+      # group (#1084) and the install FAILED outright with ERESOLVE — an unsatisfiable
+      # combination, not a lockfile artifact. Lift this together with #1053, not before.
+      - dependency-name: chai
+        update-types: ["version-update:semver-major"]
+
+      # `solc` is the COMPILER, not tooling, and it is exact-pinned for that reason.
+      # hardhat.config.js resolves solc/soljson.js and compiles WITH IT whenever FORCE_SOLCJS=true
+      # or in Codespaces (see the compiler subtask, ~line 190) — so its version decides deployed
+      # bytecode on that path. Dependabot moved the exact pin 0.8.24 -> 0.8.36 inside a "dev-tooling"
+      # group (#1084); the byte-diff gate did not catch it because the local run used the native
+      # binary, i.e. the fallback that would have changed bytes was simply not exercised. ANY
+      # update, not just major.
+      - dependency-name: solc
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

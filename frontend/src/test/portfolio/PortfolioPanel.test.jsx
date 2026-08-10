@@ -153,7 +153,7 @@ describe('PortfolioPanel aggregate rows', () => {
     expect(screen.queryByText('Total portfolio balance')).not.toBeInTheDocument()
 
     const commodities = screen.getByRole('region', { name: 'Digital Commodities' })
-    const ethRow = within(commodities).getByRole('button', { name: /ethereum eth 3 instances/i })
+    const ethRow = within(commodities).getByRole('button', { name: /ethereum\W+eth\W+3 instances/i })
     expect(ethRow).toHaveTextContent('3 instances · 2 networks')
     expect(ethRow).toHaveTextContent('$3,500.00')
     // Single-instance aggregates name their network directly.
@@ -164,7 +164,7 @@ describe('PortfolioPanel aggregate rows', () => {
   it('renders unpriced aggregates with an em dash, never $0.00', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
-    const etcRow = screen.getByRole('button', { name: /ethereum classic 2 etc/i })
+    const etcRow = screen.getByRole('button', { name: /ethereum classic\W+2 etc/i })
     expect(within(etcRow).getByText('price unavailable')).toBeInTheDocument()
     expect(within(etcRow).queryByText('$0.00')).not.toBeInTheDocument()
   })
@@ -172,7 +172,7 @@ describe('PortfolioPanel aggregate rows', () => {
   it('opens the asset detail sheet when a row is tapped (FR-024)', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /ethereum eth 3 instances/i }))
+    fireEvent.click(screen.getByRole('button', { name: /ethereum\W+eth\W+3 instances/i }))
 
     const sheet = screen.getByRole('dialog', { name: /ethereum details/i })
     expect(sheet).toBeInTheDocument()
@@ -188,7 +188,7 @@ describe('PortfolioPanel aggregate rows', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
 
-    const toggle = screen.getByRole('button', { name: /payment stablecoins \$/i })
+    const toggle = screen.getByRole('button', { name: /payment stablecoins\W+\$/i })
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
 
     fireEvent.click(toggle)

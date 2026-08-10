@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ethers } from 'ethers'
+import { resolveControlState, countdownLabel } from './resolveWindow'
 
 /**
  * Resolve button with resolve-window countdown.
@@ -9,14 +9,14 @@ import { ethers } from 'ethers'
  * Before tradingEndTime it shows a live countdown instead; after the deadline it
  * renders nothing (the Claim Refund flow takes over).
  *
- * Extracted from MyMarketsModal (spec 017) so both the card grid and the detail
+ * Extracted from MyMarketsModal (spec 017) so both the list rows and the detail
  * view can import it without a circular dependency.
  *
  * @param {object}   props
  * @param {object}   props.market
  * @param {Function} props.onResolve
  * @param {string}   props.account
- * @param {('compact'|'full')} [props.variant='compact'] - 'compact' for cards/rows,
+ * @param {('compact'|'full')} [props.variant='compact'] - 'compact' for rows,
  *   'full' for the detail view.
  */
 export default function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'compact' }) {
@@ -27,54 +27,12 @@ export default function ResolveButtonWithCountdown({ market, onResolve, account,
     return () => clearInterval(id)
   }, [])
 
-  const userAddr = account?.toLowerCase()
-  const isCreator = market.creator?.toLowerCase() === userAddr
-  const isOpponent = market.participants?.length > 1 &&
-    market.participants[1]?.toLowerCase() === userAddr
-  const isArbitrator = market.arbitrator &&
-    market.arbitrator !== ethers.ZeroAddress &&
-    market.arbitrator.toLowerCase() === userAddr
+  const { state, msUntilOpen } = resolveControlState(market, account, now)
 
-  const resType = market.resolutionType ?? 0
-  const isAuthorized = (() => {
-    if (resType === 0) return isCreator || isOpponent || isArbitrator
-    if (resType === 1) return isCreator
-    if (resType === 2) return isOpponent
-    if (resType === 3) return isArbitrator
-    return false
-  })()
+  if (state === 'none') return null
 
-  // A draw returns both stakes and so needs BOTH participants to agree; allow
-  // either participant to open the resolution flow to propose/confirm a draw on
-  // participant-resolved types (Either/Creator/Opponent), even when they cannot
-  // declare a winner (e.g. the opponent on a Creator-resolved wager).
-  const canProposeDraw = (resType === 0 || resType === 1 || resType === 2) && (isCreator || isOpponent)
-
-  if (!isAuthorized && !canProposeDraw) return null
-
-  const status = market.computedStatus || market.status
-  if (status === 'resolved' || status === 'disputed' || status === 'cancelled' ||
-      status === 'canceled' || status === 'refunded' || status === 'expired' ||
-      status === 'declined' || status === 'pending_acceptance') {
-    return null
-  }
-
-  // Resolve-window gate. Resolution is only allowed in
-  // [tradingEndTime, resolveDeadlineTime]:
-  //   - before tradingEndTime  → show a countdown, no resolve button
-  //   - after resolveDeadlineTime → nothing (the Claim Refund flow takes over)
-  // Fall back to "resolvable" when the timestamps are missing (e.g. legacy wagers).
-  const tradingEndTime = market.tradingEndTime
-  const resolveDeadlineTime = market.resolveDeadlineTime
-  if (typeof resolveDeadlineTime === 'number' && now > resolveDeadlineTime) {
-    return null
-  }
-  if (typeof tradingEndTime === 'number' && now < tradingEndTime) {
-    const diff = tradingEndTime - now
-    const days = Math.floor(diff / 86400000)
-    const hours = Math.floor((diff % 86400000) / 3600000)
-    const minutes = Math.floor((diff % 3600000) / 60000)
-    const label = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+  if (state === 'countdown') {
+    const label = countdownLabel(msUntilOpen)
     if (variant === 'full') {
       return (
         <div className="mm-resolve-countdown-full" title="Resolution opens after the wager's end time">

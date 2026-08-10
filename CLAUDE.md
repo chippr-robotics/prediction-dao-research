@@ -325,10 +325,10 @@ artifacts live under `specs/<feature>/`.
   invariant is that nothing unverified ever runs, not that everything declared is downloaded.
   **Converted apps: Token Mint and ClearPath ONLY** (live on Polygon 137 and Mordor 63; ids are
   per-registry and differ per chain — resolve by `idByName`/slug, never by id across cohorts).
-  **Wagers is deliberately NOT a mini-app and must not be converted** — 69% of its file closure
-  (22 of 32 files) is shared with the host-retained `HomeScreen`/Trade surfaces, because
-  `HomeScreen` is itself a wager surface, so a package would mean two copies of `WagerCard`/
-  `WagerList`/`wagerVm` drifting apart. It lives at **Finance ▸ Transfer ▸ Wagers**
+  **Wagers is deliberately NOT a mini-app and must not be converted** — most of its file closure
+  is shared with the host-retained `HomeScreen`/Trade surfaces, because
+  `HomeScreen` is itself a wager surface, so a package would mean two copies of `WagerTable`/
+  `wagerVm`/`wagerCardHelpers` drifting apart. It lives at **Finance ▸ Transfer ▸ Wagers**
   (`WAGERS_VIEW`/`WAGERS_PATH` in `config/appNav.js`, rendered by `PayTransferPanel`); `/wagers`
   redirects there. See the FR-030 amendment in `specs/073-miniapp-platform/spec.md`.
   See `docs/developer-guide/miniapps.md` + `docs/runbooks/miniapp-registry-operations.md` +
@@ -382,7 +382,13 @@ artifacts live under `specs/<feature>/`.
   `check:deps` is what catches it. (2) **Every dependency contributing Solidity source is
   pinned EXACTLY** — a caret range makes deployed bytecode a function of when the lockfile was last
   resolved; `@chainlink/contracts` floating 1.3.0→1.5.0 changed `ChainlinkFunctionsOracleAdapter`'s
-  bytecode and only the byte-diff gate caught it. (3) **A shared package under `packages/` MUST be
+  bytecode and only the byte-diff gate caught it. **This includes the npm `solc` package itself** —
+  it is not tooling: `hardhat.config.js` (~L190) resolves `solc/soljson.js` and compiles WITH IT when
+  `FORCE_SOLCJS=true` or in Codespaces, so on that path its version decides bytecode. It is pinned
+  exact and dependabot-ignored for ANY update. Note the byte gate does NOT cover it: a run using the
+  native binary never exercises the solcjs path, so the gate passed a `0.8.24`→`0.8.36` bump (#1084).
+  A byte gate only covers inputs the run actually reaches — an input active only behind an env switch
+  is invisible to it. (3) **A shared package under `packages/` MUST be
   resolvable by plain Node** (extensioned imports + explicit `exports`) — `frontend/src` has ~2,966
   extensionless imports while the gateway is Node ESM, which is *why* the EIP-712 structs stayed
   duplicated. Those structs + their action metadata now have ONE source, `@fairwins/intent-types`,

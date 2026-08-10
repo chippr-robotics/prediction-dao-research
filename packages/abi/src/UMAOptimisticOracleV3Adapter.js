@@ -322,7 +322,7 @@ export const UMAOptimisticOracleV3AdapterAbi = [
     "name": "oo",
     "outputs": [
       {
-        "internalType": "contract OptimisticOracleV3Interface",
+        "internalType": "contract IOptimisticOracleV3",
         "name": "",
         "type": "address"
       }

@@ -157,11 +157,29 @@ test("subjectsSince reads the real history rather than reporting zero (regressio
   assert.equal(got, expected, `parsed ${got} commits but git counts ${expected}`);
 });
 
-test("nextVersion on the real repository does not report empty-range (regression)", () => {
-  // The exact assertion that would have failed on the shipped code in CI.
+test("nextVersion never reports empty-range while commits exist in the range (regression)", () => {
+  // Originally this asserted `reason !== "empty-range"` unconditionally, which was only correct
+  // while the repo had no tags. Once HEAD sat exactly on the newest release tag, an empty range
+  // became the RIGHT answer and the test failed on correct behaviour.
+  //
+  // The invariant that actually matters is narrower: empty-range may only be reported when the
+  // range really is empty. Asserted against rev-list, which is the independent source.
+  const { execFileSync } = require("child_process");
+  const cur = currentRelease();
+  const range = cur ? `${cur.tag}..HEAD` : "HEAD";
+  const actual = Number.parseInt(
+    execFileSync("git", ["rev-list", "--count", range], { encoding: "utf8" }).trim(),
+    10,
+  );
+
   const r = nextVersion();
-  assert.notEqual(r.reason, "empty-range", "a non-empty history must never report empty-range");
-  assert.ok(r.classifications.length > 0, "classifications must not be empty on a real history");
+  if (actual > 0) {
+    assert.notEqual(r.reason, "empty-range", `${actual} commits in ${range} must not read as empty`);
+    assert.ok(r.classifications.length > 0, "classifications must not be empty on a non-empty range");
+  } else {
+    assert.equal(r.reason, "empty-range", "a genuinely empty range must say so");
+    assert.equal(r.release, null, "and must produce no release (FR-021)");
+  }
 });
 
 test("a git failure propagates instead of becoming 'no release'", () => {
