@@ -19,14 +19,25 @@ vi.mock('wagmi', () => ({
 
 vi.mock('../../hooks', () => ({
   useWalletRoles: vi.fn(() => ({ roles: [], hasRole: vi.fn(() => false), rolesLoading: false, refreshRoles: vi.fn() })),
+  // Staging's custody stack (useCustodyVaults) reaches useWallet through this barrel too.
+  useWallet: vi.fn(() => ({
+    isConnected: true,
+    address: '0x1234567890123456789012345678901234567890',
+    account: '0x1234567890123456789012345678901234567890',
+    chainId: 137,
+    signer: null,
+    provider: null,
+  })),
+  useWeb3: vi.fn(() => ({ signer: {} })),
 }))
 
 vi.mock('../../hooks/useDex', () => ({
   useDex: vi.fn(() => ({ balances: { stable: '4.99' }, loading: false })),
 }))
 
+// chainId comes from useNetworkMode (issue #1030), not wagmi's useChainId.
 vi.mock('../../hooks/useNetworkMode', () => ({
-  useNetworkMode: vi.fn(() => ({ network: { chainId: 137, name: 'Polygon' } })),
+  useNetworkMode: vi.fn(() => ({ network: { chainId: 137, name: 'Polygon' }, chainId: 137 })),
 }))
 
 vi.mock('../../hooks/useRoleDetails', () => ({
@@ -49,6 +60,7 @@ vi.mock('../../components/ui/AddressQRModal', () => ({ default: () => null }))
 vi.mock('../../components/ui/PremiumPurchaseModal', () => ({ default: () => null }))
 
 import { useAccount, useChainId } from 'wagmi'
+import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { fetchOnrampOptions } from '../../lib/onramp/onrampClient'
 
 const ADDRESS = '0x1234567890123456789012345678901234567890'
@@ -95,6 +107,7 @@ beforeEach(() => {
   import.meta.env.VITE_RELAYER_URL = GW
   useAccount.mockReturnValue({ address: ADDRESS, isConnected: true })
   useChainId.mockReturnValue(137)
+  useNetworkMode.mockReturnValue({ network: { chainId: 137, name: 'Polygon' }, chainId: 137 })
   fetchOnrampOptions.mockResolvedValue({ chainId: 137, available: true, assets: ['USDC'], defaultAsset: 'USDC' })
 })
 afterEach(() => {
@@ -129,6 +142,7 @@ describe('Buy button gating', () => {
     const user = userEvent.setup()
     for (const chainId of [80002, 63, 11155111]) {
       useChainId.mockReturnValue(chainId)
+      useNetworkMode.mockReturnValue({ network: { chainId, name: `Chain ${chainId}` }, chainId })
       const { unmount } = renderButton()
       await openSheet(user)
       expect(screen.queryByRole('button', { name: /buy crypto/i })).not.toBeInTheDocument()
