@@ -55,7 +55,7 @@ jobs:
     name: SPA image builds
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # `--target build` stops before nginx: the build stage is where the workspace install and
       # the Vite build happen, which is the whole risk surface. Building the runtime stage too
@@ -79,7 +79,7 @@ jobs:
     name: Relay gateway image builds and boots
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build the relay-gateway image
         run: docker build -f services/relay-gateway/Dockerfile -t fairwins-relay-gateway:ci .

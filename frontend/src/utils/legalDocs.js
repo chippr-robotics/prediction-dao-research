@@ -18,7 +18,7 @@
  * explicitly-versioned canonicalization if ever required.
  */
 
-import { sha256 } from '@noble/hashes/sha256'
+import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/ciphers/utils'
 
 // Versioned document sources (Vite ?raw). Each VERSION is pinned to IPFS per-version (not
