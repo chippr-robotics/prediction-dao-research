@@ -110,10 +110,40 @@ calling `initialize` afterwards is a *message call*, not part of the initcode. N
 window by putting init data back into the constructor would close it and destroy parity at the same
 time. That trap is the reason FR-015 exists.
 
-**Not yet decided, for the design phase**: whether the factory restricts who may deploy (a permission
-model) or is permissionless with the salt providing uniqueness. Permissionless is simpler and the
-address is already determined by the salt and initcode; a permission model adds an admin key to a
-contract that otherwise needs none.
+### R4a: Authority model — DECIDED: permissioned
+
+**Decision (2026-08-09): the factory is permissioned.** Only an authorised deployer may use it.
+
+**The trap this decision walks into, and the constraint that avoids it.** A factory's own address is
+derived from its initcode, which includes its constructor arguments. So embedding an owner makes the
+**factory's address a function of that owner** — and if the owner were chain-specific, the factory
+would land at a *different address on every chain*, destroying the determinism it exists to provide.
+A permissioned factory implemented naively defeats the entire feature.
+
+**Why it is nonetheless safe here — measured**: the deployer is a single address across the whole
+estate, identical on all 7 chains that record one:
+
+```
+amoy · arbitrum · base · mainnet · mordor · optimism · polygon
+  -> 0x52502d049571C7893447b86c4d8B38e6184bF6e1   (1 distinct deployer)
+```
+
+**Binding requirement**: the authorised party embedded in the factory MUST be an address that is
+identical on every chain in the cohort. This is a property of the *scheme*, not an implementation
+detail — a future move to a per-chain admin (a Safe deployed at differing addresses, for instance)
+would silently fork the factory address. The design must therefore either embed a chain-independent
+address, or bind authority to `msg.sender` via the salt so nothing is embedded at all.
+
+**Consequence to carry into the security review (FR-021 / T030)**: the authorised party today is a
+**hot EOA**, and issue #966 already records that every live contract is admin-ed by that one key.
+This decision adds another privileged position to it. That is a reason to sequence the admin handoff,
+not a reason to reverse the decision — but the review must consider it explicitly rather than
+inheriting it silently.
+
+**Alternative not taken**: permissionless, with the salt providing uniqueness. Simpler and adds no
+privileged position, but any party could occupy a predicted address first — and because addresses are
+now *published in advance* by design, that is a materially easier target than it would be otherwise.
+The permissioned model was chosen for that reason.
 
 ---
 

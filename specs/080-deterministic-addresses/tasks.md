@@ -138,10 +138,17 @@ byte-neutral.**
 **Note**: the window does not exist today — this work creates it (US2 takes init data out of the
 constructor to get parity). It is closed rather than accepted.
 
-- [ ] T024 [US3] 🚧 **GATE (FR-021)** Decide and record the factory's authority model —
-      **permissioned or permissionless** — before implementation. A factory that deploys *and*
-      initializes on others' behalf is a privileged position, and this is still an open design
-      decision, not an implementation detail
+- [x] T024 [US3] 🚧 **GATE (FR-021)** ~~Decide~~ **DECIDED 2026-08-09: permissioned** (research.md
+      R4a). Binding constraint that follows: the authorised party MUST be an address identical on
+      every chain in the cohort, because the factory's own address derives from its initcode and
+      therefore from its constructor arguments — a per-chain owner would fork the factory address and
+      destroy the determinism it exists to provide. Verified viable: the deployer is a single address
+      (`0x52502d…`) across all 7 chains that record one
+- [ ] T024a [US3] Implement authority so it cannot become chain-specific by accident — either embed a
+      chain-independent address or bind authority to `msg.sender` via the salt so nothing is embedded
+- [ ] T024b [US3] 🚧 **GATE** Assert in test that the factory's predicted address is identical across
+      two disposable chains configured with different admin sets — the regression that would silently
+      undo T024's constraint
 - [ ] T025 [US3] Implement the deploy-and-init factory in `contracts/deploy/`, CREATE2-deploying the
       proxy and calling `initialize` in one transaction
 - [ ] T026 [US3] Deploy the factory itself through the Safe Singleton Factory so it has the same
