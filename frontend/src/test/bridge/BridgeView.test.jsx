@@ -34,10 +34,19 @@ const sendOnChain = vi.fn()
 const canTransactOn = vi.fn(() => true)
 
 vi.mock('../../hooks/useWalletManagement', () => ({ useWallet: () => walletState }))
+// Fresh array + object identities on EVERY render, exactly like the real hooks under a
+// portfolio poll or balance read. Stable identities here are what hid the issue-1027 quote
+// loop from this suite — keep the churn (see 'one quote per input change' below).
 vi.mock('../../hooks/useSelectableAssets', () => ({
-  useSelectableAssets: () => ({ options: selectableOptions, defaultKey: null, isGasless: () => false }),
+  useSelectableAssets: () => ({
+    options: selectableOptions.map((o) => ({ ...o })),
+    defaultKey: null,
+    isGasless: () => false,
+  }),
 }))
-vi.mock('../../hooks/usePortfolio', () => ({ default: () => ({ holdings: portfolioHoldings, status: 'ready' }) }))
+vi.mock('../../hooks/usePortfolio', () => ({
+  default: () => ({ holdings: portfolioHoldings.map((h) => ({ ...h })), status: 'ready' }),
+}))
 vi.mock('../../hooks/useEarnSend', () => ({
   useEarnSend: () => ({
     sendOnChain,
@@ -513,6 +522,50 @@ describe('BridgeView — honest unavailable states (T083, FR-051/FR-053/FR-054)'
     await user.type(screen.getByLabelText(/^Amount/), '100')
     expect(await screen.findByText(BRIDGE_UNAVAILABLE.fees)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Try again/i })).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+describe('BridgeView — one quote per input change (issue #1027)', () => {
+  // The hook seams above hand back fresh object identities on every render, like the real
+  // hooks do. Pre-fix, the quote debounce was keyed on `loadQuote`'s identity, so every
+  // quote completion re-rendered, re-armed the timer, and fetched again — an endless loop
+  // that flickered between "Getting a price…" and the unavailable copy. These tests pin
+  // the fix: the debounce is keyed on the quote's INPUTS, so a settled state stays put.
+
+  it('holds a failed quote steady instead of looping between loading and unavailable', async () => {
+    const err = Object.assign(new Error('gateway unreachable'), {
+      code: 'network_error',
+      retryable: true,
+      disabled: false,
+    })
+    fetchBridgeQuote.mockRejectedValue(err)
+    const user = userEvent.setup()
+    render(<BridgeView />)
+    await screen.findByText(/Route availability as of/i)
+    await user.type(screen.getByLabelText(/^Amount/), '100')
+
+    expect(await screen.findByText(BRIDGE_UNAVAILABLE.gateway)).toBeInTheDocument()
+    const callsAfterFailure = fetchBridgeQuote.mock.calls.length
+
+    // Give a re-render-driven loop more than a full debounce window (400ms) to refire.
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    expect(fetchBridgeQuote.mock.calls.length).toBe(callsAfterFailure)
+    expect(screen.getByText(BRIDGE_UNAVAILABLE.gateway)).toBeInTheDocument()
+    expect(screen.queryByText(/Getting a price/i)).not.toBeInTheDocument()
+  })
+
+  it('fetches exactly one quote for a typed amount despite unstable hook identities', async () => {
+    const user = userEvent.setup()
+    render(<BridgeView />)
+    await screen.findByText(/Route availability as of/i)
+    await user.type(screen.getByLabelText(/^Amount/), '100')
+    await screen.findByRole('region', { name: /What this transfer costs/i })
+
+    // The countdown re-renders every second while a quote is on screen; none of those
+    // renders may turn into another fetch while the inputs are unchanged.
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    expect(fetchBridgeQuote).toHaveBeenCalledTimes(1)
   })
 })
 

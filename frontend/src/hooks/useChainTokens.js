@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useChainId } from 'wagmi'
 import { getNetwork, getCurrentChainId } from '../config/networks'
 
@@ -9,26 +10,33 @@ import { getNetwork, getCurrentChainId } from '../config/networks'
  * Capabilities flow through here so screens can decide whether to gate
  * features (e.g. Polymarket-pegged side bets only render on chains where
  * Polymarket's CTF lives).
+ *
+ * The returned object is memoized on the chain id: consumers put it (and
+ * lists derived from it, e.g. useSelectableAssets options) in dependency
+ * arrays, and a fresh object every render turns those into every-render
+ * effects (issue #1027 — the Bridge quote loop).
  */
 export function useChainTokens() {
   const wagmiChainId = useChainId()
   const chainId = wagmiChainId || getCurrentChainId()
-  const n = getNetwork(chainId)
 
-  return {
-    chainId,
-    networkName: n?.name || '',
-    isPrimary: Boolean(n?.isPrimary),
-    isTestnet: Boolean(n?.isTestnet),
-    capabilities: n?.capabilities || {},
-    native: n?.nativeCurrency?.symbol || '',
-    nativeName: n?.nativeCurrency?.name || '',
-    nativeDecimals: n?.nativeCurrency?.decimals || 18,
-    stable: n?.stablecoin?.symbol || 'STABLE',
-    stableName: n?.stablecoin?.name || '',
-    stableAddress: n?.stablecoin?.address || null,
-    stableDecimals: n?.stablecoin?.decimals || 6,
-  }
+  return useMemo(() => {
+    const n = getNetwork(chainId)
+    return {
+      chainId,
+      networkName: n?.name || '',
+      isPrimary: Boolean(n?.isPrimary),
+      isTestnet: Boolean(n?.isTestnet),
+      capabilities: n?.capabilities || {},
+      native: n?.nativeCurrency?.symbol || '',
+      nativeName: n?.nativeCurrency?.name || '',
+      nativeDecimals: n?.nativeCurrency?.decimals || 18,
+      stable: n?.stablecoin?.symbol || 'STABLE',
+      stableName: n?.stablecoin?.name || '',
+      stableAddress: n?.stablecoin?.address || null,
+      stableDecimals: n?.stablecoin?.decimals || 6,
+    }
+  }, [chainId])
 }
 
 export default useChainTokens
