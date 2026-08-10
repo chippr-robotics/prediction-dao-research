@@ -400,5 +400,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/079-hardhat-3-migration/plan.md
+at specs/080-deterministic-addresses/plan.md
 <!-- SPECKIT END -->
