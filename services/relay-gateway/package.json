@@ -21,7 +21,7 @@
     "@google-cloud/kms": "^5.5.1",
     "@polymarket/builder-signing-sdk": "^1.0.0",
     "ethers": "^6.17.0",
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "helmet": "^8.0.0"
   },
   "devDependencies": {
