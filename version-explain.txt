@@ -1,0 +1,6 @@
+previous: v1.2.8
+commits:  1
+  [chore -> patch] Bump release-drafter/release-drafter from 6 to 7 (#1095)
+bump:     patch
+reason:   computed
+next:     v1.2.9
