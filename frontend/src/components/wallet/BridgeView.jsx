@@ -417,15 +417,39 @@ export default function BridgeView({ onRecorded } = {}) {
     }
   }, [canQuote, source, destination, route, amountRaw, symbol, decimals, address, destinationNativeRaw])
 
+  // The debounce below MUST re-arm only when the quote's actual INPUTS change, so it is
+  // keyed on this primitive signature — never on `loadQuote`'s identity. The surrounding
+  // hooks rebuild their option objects on unrelated re-renders (a portfolio poll, a
+  // balance read), which gives `source`/`destination` fresh identities and `loadQuote` a
+  // fresh identity with them; keying the effect on the callback turned every quote
+  // completion into a re-render into another fetch, an endless loop that flickered
+  // between "getting a price" and the failure copy (issue #1027).
+  const quoteKey = canQuote
+    ? [
+        source.key,
+        destination.key,
+        route.routeId,
+        String(amountRaw),
+        address || '',
+        // In the signature so a destination balance read landing AFTER the quote still
+        // refreshes the FR-012 gas disclosure — a value change, not an identity change.
+        String(destinationNativeRaw ?? 'unknown'),
+      ].join('|')
+    : null
+  const loadQuoteRef = useRef(loadQuote)
   useEffect(() => {
-    if (!canQuote) {
+    loadQuoteRef.current = loadQuote
+  })
+
+  useEffect(() => {
+    if (!quoteKey) {
       quoteSeqRef.current += 1 // abandon anything in flight for a route that no longer applies
       setQuoteState({ status: 'idle', quote: null, error: null })
       return undefined
     }
-    const timer = setTimeout(loadQuote, QUOTE_DEBOUNCE_MS)
+    const timer = setTimeout(() => loadQuoteRef.current(), QUOTE_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [canQuote, loadQuote])
+  }, [quoteKey])
 
   const quote = quoteState.quote
   const stale = quote ? isQuoteStale(quote, now) : false
