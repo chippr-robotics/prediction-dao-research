@@ -14,6 +14,18 @@
 version: 2
 updates:
   - package-ecosystem: npm
+    # Open updates against `staging`, not `main` (spec 076, FR-018).
+    #
+    # Since `staging` exists the promotion rule is ACTIVE, and it admits only `staging`,
+    # `hotfix/*` and generated release records into main — so a dependabot branch targeting main
+    # is unmergeable by construction. It would fail the same check on every run and go stale
+    # behind main while it waited.
+    #
+    # A dependency bump is an ordinary change: it reaches production by promotion, having first
+    # run on staging. That matters most for the group this repository can least take on faith —
+    # a solidity-sources bump alters compiled bytecode, which is exactly the kind of change that
+    # should not arrive on main without having run somewhere first.
+    target-branch: staging
     directory: /
     schedule:
       interval: weekly
@@ -77,6 +89,18 @@ updates:
       - dependency-name: solc
 
   - package-ecosystem: github-actions
+    # Open updates against `staging`, not `main` (spec 076, FR-018).
+    #
+    # Since `staging` exists the promotion rule is ACTIVE, and it admits only `staging`,
+    # `hotfix/*` and generated release records into main — so a dependabot branch targeting main
+    # is unmergeable by construction. It would fail the same check on every run and go stale
+    # behind main while it waited.
+    #
+    # A dependency bump is an ordinary change: it reaches production by promotion, having first
+    # run on staging. That matters most for the group this repository can least take on faith —
+    # a solidity-sources bump alters compiled bytecode, which is exactly the kind of change that
+    # should not arrive on main without having run somewhere first.
+    target-branch: staging
     directory: /
     schedule:
       interval: weekly
