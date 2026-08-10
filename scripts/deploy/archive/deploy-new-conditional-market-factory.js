@@ -3,6 +3,8 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
+const { SALT_PREFIXES } = require("../lib/constants");
+
 /**
  * Deploy a new ConditionalMarketFactory with the correct TieredRoleManager
  *
@@ -120,7 +122,7 @@ async function main() {
   console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   // Deploy new ConditionalMarketFactory
-  const saltPrefix = "FairWinsDAO-v1.0-";
+  const saltPrefix = SALT_PREFIXES.CORE;
   const newSalt = generateSalt(saltPrefix + "ConditionalMarketFactory-v2-fixed");
 
   const marketFactory = await deployDeterministic(

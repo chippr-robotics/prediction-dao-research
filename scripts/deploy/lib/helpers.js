@@ -256,6 +256,261 @@ async function verifyOnBlockscout({ name, address, contract, constructorArgument
 }
 
 // =============================================================================
+// DEPLOYED-CODE IDENTITY  (spec 080 — T016 / T017, FR-008 / FR-009, G3)
+// =============================================================================
+//
+// `getCode(addr) !== "0x"` answers "is something there", which is not the question a deterministic
+// deployment has to answer. G3 names THREE outcomes, and the middle one is the only safe reason to
+// skip a deployment:
+//
+//   address free                  -> deploy, then verify it landed as predicted
+//   address holds OUR contract    -> recognised as already deployed, skipped, no transaction
+//   address holds SOMETHING ELSE  -> incident: stop, do not proceed
+//
+// Deciding between the last two means comparing the code on chain against the artifact, and two
+// regions legitimately differ there. Both are masked below; nothing else is.
+//
+//   1. The trailing CBOR metadata block. Its content is provenance (an IPFS hash of the sources),
+//      not behaviour.
+//   2. Immutable slots. solc ZERO-FILLS them in `deployedBytecode` and the constructor writes them
+//      at deploy time, so the artifact never equals the chain for a contract that has any.
+//      Measured, not assumed: VoucherBatchMinter carries 16 such 32-byte ranges, so a plain
+//      comparison would report a false incident for it on every re-run.
+//
+// Anything undecidable fails CLOSED — reported as an incident with its own message — because the
+// cost of a false incident is a loud stop an operator can read, and the cost of a false skip is a
+// deployment silently not happening.
+//
+// KNOWN BOUNDARY, stated rather than papered over: masked ranges are excluded, not compared, so
+// THE SAME contract compiled identically but constructed with DIFFERENT arguments classifies as a
+// match. Measured directly — planting a MembershipVoucher built with other constructor arguments at
+// the predicted address was accepted as "already deployed". That is sound here and only here: the
+// address is CREATE2(factory, salt, keccak(initCode)) and initCode CONTAINS the constructor
+// arguments, so a differently-constructed instance cannot occupy this address without a 160-bit
+// collision. Do not lift this comparison to an address that is not initcode-committed — at a plain
+// CREATE address it would not carry that argument.
+
+/** Normalise a bytecode field to lowercase hex without `0x`. Any doubt is an error, never a guess. */
+function normalizeCodeHex(value) {
+  if (typeof value !== "string") return { ok: false, reason: "not a string" };
+  const hex = (value.startsWith("0x") ? value.slice(2) : value).toLowerCase();
+  if (hex === "") return { ok: true, hex: "", empty: true };
+  if (!/^[0-9a-f]+$/.test(hex)) {
+    return {
+      ok: false,
+      reason: hex.includes("__")
+        ? "contains an unlinked library placeholder"
+        : "contains non-hex characters",
+    };
+  }
+  if (hex.length % 2 !== 0) return { ok: false, reason: "has an odd number of hex digits" };
+  return { ok: true, hex, empty: false };
+}
+
+/**
+ * Split the trailing solc CBOR metadata block off a runtime object.
+ *
+ * A deliberately MINIMAL mirror of `scripts/codegen/compare-stripped.js#splitMetadata` — that file
+ * is a CLI that runs `main()` and calls `process.exit()` at import time, so requiring it here would
+ * terminate the deploy script. It is not imported; it is re-derived.
+ *
+ * It is also minimal on purpose. compare-stripped.js fully PARSES the CBOR because it decides
+ * whether two build trees are equivalent, where a lax strip produces a false "identical". Here the
+ * fallback on any doubt is to strip NOTHING and compare the whole object, which can only make the
+ * comparison stricter — the failure direction is a false incident (loud), never a false skip.
+ */
+function splitTrailingMetadata(hex) {
+  const bytes = hex.length / 2;
+  if (bytes < 3) return { code: hex, block: "", blockBytes: 0, stripped: false };
+  const declared = parseInt(hex.slice(-4), 16);
+  if (!Number.isFinite(declared)) return { code: hex, block: "", blockBytes: 0, stripped: false };
+  const blockBytes = declared + 2;
+  // The block must leave code behind; a block that is the whole object is not a metadata trailer.
+  if (blockBytes >= bytes) return { code: hex, block: "", blockBytes: 0, stripped: false };
+  const codeBytes = bytes - blockBytes;
+  const header = parseInt(hex.slice(codeBytes * 2, codeBytes * 2 + 2), 16);
+  // CBOR major type 5 (map): solc emits a1/a2/a3 here.
+  if ((header & 0xe0) !== 0xa0) return { code: hex, block: "", blockBytes: 0, stripped: false };
+  return {
+    code: hex.slice(0, codeBytes * 2),
+    block: hex.slice(codeBytes * 2),
+    blockBytes,
+    stripped: true,
+  };
+}
+
+/** Flatten hardhat/solc `{ [key]: [{start,length}] }` reference maps into a byte-range list. */
+function flattenRefs(refMap) {
+  const ranges = [];
+  for (const key of Object.keys(refMap || {})) {
+    for (const r of refMap[key] || []) {
+      if (Number.isInteger(r?.start) && Number.isInteger(r?.length)) {
+        ranges.push({ start: r.start, length: r.length, key });
+      }
+    }
+  }
+  return ranges;
+}
+
+const immutableRefCache = new Map();
+
+/**
+ * Resolve the deployed-bytecode immutable ranges for a contract.
+ *
+ * Hardhat ARTIFACTS do not carry `immutableReferences` (measured: the artifact has exactly
+ * `_format, contractName, sourceName, abi, bytecode, deployedBytecode, linkReferences,
+ * deployedLinkReferences`) — build-info does. `artifacts.getBuildInfo` resolves the exact build-info
+ * for this fully-qualified name via its `.dbg.json`, so this never has to guess between two
+ * same-named contracts.
+ *
+ * Returns `{ ok:true, ranges }`, or `{ ok:false, reason }` when build-info is unavailable — which is
+ * NOT treated as "there are no immutables", because that is the assumption that turns into a false
+ * incident.
+ */
+async function deployedImmutableRanges(artifact) {
+  const fqName = `${artifact.sourceName}:${artifact.contractName}`;
+  if (immutableRefCache.has(fqName)) return immutableRefCache.get(fqName);
+
+  let result;
+  try {
+    const buildInfo = await hre.artifacts.getBuildInfo(fqName);
+    const compiled = buildInfo?.output?.contracts?.[artifact.sourceName]?.[artifact.contractName];
+    if (!compiled) {
+      result = { ok: false, reason: `build-info has no compiled output for ${fqName}` };
+    } else {
+      result = { ok: true, ranges: flattenRefs(compiled?.evm?.deployedBytecode?.immutableReferences) };
+    }
+  } catch (e) {
+    result = { ok: false, reason: `build-info unreadable for ${fqName}: ${e?.message || String(e)}` };
+  }
+  immutableRefCache.set(fqName, result);
+  return result;
+}
+
+/** Compare two equal-length hex strings, ignoring the given byte ranges. */
+function diffOutsideMask(aHex, bHex, ranges) {
+  const byteLen = aHex.length / 2;
+  const masked = new Uint8Array(byteLen);
+  for (const r of ranges) {
+    const end = Math.min(r.start + r.length, byteLen);
+    for (let i = Math.max(0, r.start); i < end; i++) masked[i] = 1;
+  }
+  const unmaskedDiffs = [];
+  let maskedDiffs = 0;
+  for (let i = 0; i < byteLen; i++) {
+    if (aHex.charCodeAt(i * 2) === bHex.charCodeAt(i * 2) && aHex.charCodeAt(i * 2 + 1) === bHex.charCodeAt(i * 2 + 1)) {
+      continue;
+    }
+    if (masked[i]) maskedDiffs++;
+    else unmaskedDiffs.push(i);
+  }
+  return { unmaskedDiffs, maskedDiffs };
+}
+
+/**
+ * Decide whether the runtime code at an address is the code this artifact produces.
+ *
+ * @returns {Promise<{state:'match'|'mismatch'|'indeterminate', summary:string, detail:string[]}>}
+ */
+async function classifyDeployedCode(artifact, onChainCode) {
+  const detail = [];
+  const label = artifact?.contractName || "the target contract";
+
+  const chain = normalizeCodeHex(onChainCode);
+  if (!chain.ok) return { state: "indeterminate", summary: `on-chain code ${chain.reason}`, detail };
+  if (chain.empty) return { state: "indeterminate", summary: "no code at the address", detail };
+
+  const artifactRaw = artifact?.deployedBytecode;
+  if (typeof artifactRaw !== "string" || artifactRaw === "" || artifactRaw === "0x") {
+    return {
+      state: "indeterminate",
+      summary: `no artifact deployedBytecode available for ${label} to compare against`,
+      detail,
+    };
+  }
+
+  // Unlinked library placeholders (`__$…$__`) are not hex. Zero them out and mask those ranges:
+  // the artifact cannot know the library addresses, and the CREATE2 address already commits to the
+  // linked initcode, so the linked libraries follow from the code matching everywhere else.
+  const linkRanges = flattenRefs(artifact.deployedLinkReferences);
+  let artifactHexRaw = artifactRaw.startsWith("0x") ? artifactRaw.slice(2) : artifactRaw;
+  if (linkRanges.length) {
+    const chars = artifactHexRaw.split("");
+    for (const r of linkRanges) {
+      for (let i = r.start * 2; i < (r.start + r.length) * 2 && i < chars.length; i++) chars[i] = "0";
+    }
+    artifactHexRaw = chars.join("");
+    detail.push(`masked ${linkRanges.length} library link range(s)`);
+  }
+
+  const local = normalizeCodeHex(artifactHexRaw);
+  if (!local.ok) {
+    return {
+      state: "indeterminate",
+      summary: `the ${label} artifact deployedBytecode ${local.reason}`,
+      detail,
+    };
+  }
+
+  const onChain = splitTrailingMetadata(chain.hex);
+  const expected = splitTrailingMetadata(local.hex);
+  if (onChain.stripped !== expected.stripped) {
+    detail.push(
+      `metadata block: ${onChain.stripped ? `${onChain.blockBytes} B on chain` : "none recognised on chain"}, ` +
+        `${expected.stripped ? `${expected.blockBytes} B in artifact` : "none recognised in artifact"}`
+    );
+  } else if (onChain.block !== expected.block) {
+    detail.push(`metadata block differs (${onChain.blockBytes} B on chain vs ${expected.blockBytes} B in artifact)`);
+  }
+
+  if (onChain.code.length !== expected.code.length) {
+    return {
+      state: "mismatch",
+      summary:
+        `runtime code length differs — ${onChain.code.length / 2} bytes on chain vs ` +
+        `${expected.code.length / 2} bytes for ${artifact.contractName}`,
+      detail,
+    };
+  }
+
+  const immutables = await deployedImmutableRanges(artifact);
+  const maskRanges = [...linkRanges, ...(immutables.ok ? immutables.ranges : [])];
+  const { unmaskedDiffs, maskedDiffs } = diffOutsideMask(onChain.code, expected.code, maskRanges);
+
+  if (unmaskedDiffs.length === 0) {
+    if (immutables.ok && immutables.ranges.length) {
+      detail.push(
+        `masked ${immutables.ranges.length} immutable range(s); ${maskedDiffs} byte(s) inside them ` +
+          `differ, as expected for constructor-set immutables`
+      );
+    }
+    return { state: "match", summary: `runtime code matches ${artifact.contractName}`, detail };
+  }
+
+  // Differences outside every known-variable region. If immutables could not be resolved we cannot
+  // honestly call this a foreign contract — but we equally cannot call it ours, so it stops here.
+  if (!immutables.ok) {
+    detail.push(immutables.reason);
+    return {
+      state: "indeterminate",
+      summary:
+        `runtime code differs from ${artifact.contractName} in ${unmaskedDiffs.length} byte(s), and the ` +
+        `immutable ranges could not be resolved, so the difference cannot be attributed`,
+      detail,
+    };
+  }
+
+  const shown = unmaskedDiffs.slice(0, 5).map((i) => `0x${i.toString(16)}`).join(", ");
+  return {
+    state: "mismatch",
+    summary:
+      `runtime code differs from ${artifact.contractName} in ${unmaskedDiffs.length} byte(s) outside ` +
+      `every metadata/immutable/library region`,
+    detail: [...detail, `first differing offset(s): ${shown}${unmaskedDiffs.length > 5 ? ", …" : ""}`],
+  };
+}
+
+// =============================================================================
 // DEPLOYMENT HELPERS
 // =============================================================================
 
@@ -270,9 +525,17 @@ async function verifyOnBlockscout({ name, address, contract, constructorArgument
 async function deployDeterministic(contractName, constructorArgs, salt, deployer, options) {
   console.log(`\nDeploying ${contractName} deterministically...`);
 
+  // Read the artifact once: it is the diagnostic source for the size log below AND the reference
+  // the deployed code is checked against (T016/T017), so it is no longer a throw-away.
+  let artifact = null;
+  try {
+    artifact = await hre.artifacts.readArtifact(contractName);
+  } catch {
+    // getContractFactory below fails with a better message if the artifact is genuinely missing.
+  }
+
   // Diagnostics: show runtime code size
   try {
-    const artifact = await hre.artifacts.readArtifact(contractName);
     const runtimeBytes = hexByteLength(artifact?.deployedBytecode);
     const maxRuntimeBytes = Number(process.env.MAX_RUNTIME_BYTES ?? DEFAULT_MAX_RUNTIME_BYTES);
     if (runtimeBytes > 0) {
@@ -323,15 +586,53 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
 
   console.log(`  Predicted address: ${deterministicAddress}`);
 
-  // Check if contract is already deployed
+  // ---------------------------------------------------------------------------------------------
+  // T018 / FR-010 / G3 — the deployment facility must exist BEFORE anything is sent.
+  //
+  // The predicted address above is derived from the Safe Singleton Factory's address. If that
+  // factory has no code on this chain, the address is a fiction: a transaction to it is a plain
+  // value transfer to an account with no code, which SUCCEEDS and deploys nothing. So this is
+  // checked before the occupancy check and before any transaction, and it never falls back.
+  // ---------------------------------------------------------------------------------------------
+  await ensureSingletonFactory({ quiet: true });
+
+  // ---------------------------------------------------------------------------------------------
+  // T017 / FR-009 / G3 — three states at the predicted address, not two.
+  // ---------------------------------------------------------------------------------------------
   const existingCode = await ethers.provider.getCode(deterministicAddress);
   if (existingCode !== "0x") {
-    console.log(`  ✓ Contract already deployed at this address`);
-    return {
-      address: deterministicAddress,
-      contract: ContractFactory.attach(deterministicAddress),
-      alreadyDeployed: true
-    };
+    const verdict = await classifyDeployedCode(artifact, existingCode);
+    for (const line of verdict.detail) console.log(`    ${line}`);
+
+    if (verdict.state === "match") {
+      console.log(`  ✓ Contract already deployed at this address (${verdict.summary}) — skipping, no transaction`);
+      return {
+        address: deterministicAddress,
+        contract: ContractFactory.attach(deterministicAddress),
+        alreadyDeployed: true,
+        codeVerified: true,
+      };
+    }
+
+    const network = await ethers.provider.getNetwork();
+    throw new Error(
+      `INCIDENT — ${deterministicAddress} is occupied by something that is not ${contractName}.\n` +
+        `  chain:    ${hre.network.name} (chainId ${network.chainId})\n` +
+        `  address:  ${deterministicAddress}\n` +
+        `  salt:     ${salt}\n` +
+        `  verdict:  ${verdict.state} — ${verdict.summary}\n` +
+        (verdict.detail.length ? `  detail:   ${verdict.detail.join("; ")}\n` : "") +
+        `  on-chain runtime: ${hexByteLength(existingCode)} bytes\n` +
+        `\n` +
+        `Deployment STOPPED. This address is CREATE2-derived from the factory, this salt and this ` +
+        `initcode, so foreign code here means one of those three inputs is not what this script ` +
+        `thinks it is. Do NOT redeploy around it: identify what is at the address first ` +
+        (verdict.state === "indeterminate"
+          ? `(a stale or partial artifact tree also lands here — re-run \`npm run compile\` and retry ` +
+            `before concluding anything)`
+          : `(explorer, or \`eth_getCode\` against a second RPC)`) +
+        `.`
+    );
   }
 
   // Deploy using Safe Singleton Factory
@@ -396,10 +697,18 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
   console.log(`  ✓ Deployed in tx: ${receipt.hash}`);
   console.log(`  ✓ Gas used: ${receipt.gasUsed.toString()}`);
 
-  // Verify deployment. Poll rather than read once: a load-balanced RPC can serve the receipt from a
-  // node that has the block and then serve `getCode` from one that does not yet, so a single read
-  // can report "no code" for a deployment that in fact succeeded. Seen on Base, where it aborted a
-  // multi-contract run midway and left the deployment record unwritten for a live contract.
+  // ---------------------------------------------------------------------------------------------
+  // T016 / FR-008 — verify it landed at the PREDICTED address, and that what landed is ours.
+  //
+  // Poll rather than read once: a load-balanced RPC can serve the receipt from a node that has the
+  // block and then serve `getCode` from one that does not yet, so a single read can report "no code"
+  // for a deployment that in fact succeeded. Seen on Base, where it aborted a multi-contract run
+  // midway and left the deployment record unwritten for a live contract.
+  //
+  // "Some code exists" is NOT the check. A successful receipt proves the factory call did not
+  // revert; it does not prove the contract is at the address this script is about to record. The
+  // code found there is classified against the artifact, exactly as on the skip path.
+  // ---------------------------------------------------------------------------------------------
   let deployedCode = "0x";
   for (let attempt = 0; attempt < 10; attempt++) {
     deployedCode = await ethers.provider.getCode(deterministicAddress);
@@ -409,28 +718,62 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
   }
   if (deployedCode === "0x") {
     throw new Error(
-      `Deployment failed - no code at ${deterministicAddress} after ${receipt.hash} (status ${receipt.status}). ` +
-        `If the receipt succeeded, re-check the address on an explorer before redeploying.`,
+      `Deployment failed - no code at the predicted address ${deterministicAddress} after ${receipt.hash} ` +
+        `(status ${receipt.status}). If the receipt succeeded, re-check the address on an explorer ` +
+        `before redeploying.`,
     );
   }
+
+  const landed = await classifyDeployedCode(artifact, deployedCode);
+  if (landed.state !== "match") {
+    const network = await ethers.provider.getNetwork();
+    throw new Error(
+      `INCIDENT — ${contractName} did not land as predicted.\n` +
+        `  chain:    ${hre.network.name} (chainId ${network.chainId})\n` +
+        `  expected: ${deterministicAddress}\n` +
+        `  salt:     ${salt}\n` +
+        `  tx:       ${receipt.hash}\n` +
+        `  verdict:  ${landed.state} — ${landed.summary}\n` +
+        (landed.detail.length ? `  detail:   ${landed.detail.join("; ")}\n` : "") +
+        `\n` +
+        `The transaction succeeded but the code at the predicted address is not this contract's. ` +
+        `Do NOT record this address. Establish what the factory actually created (trace the tx) ` +
+        `before any further deployment on this chain.`
+    );
+  }
+  for (const line of landed.detail) console.log(`    ${line}`);
+  console.log(`  ✓ Verified at predicted address ${deterministicAddress} (${landed.summary})`);
 
   return {
     address: deterministicAddress,
     contract: ContractFactory.attach(deterministicAddress),
-    alreadyDeployed: false
+    alreadyDeployed: false,
+    codeVerified: true,
   };
 }
 
-/**
- * Ensure Safe Singleton Factory is available on the network
- * Auto-deploys on local networks if needed
- */
-async function ensureSingletonFactory() {
-  const network = await ethers.provider.getNetwork();
-  const factoryInfo = getSingletonFactoryInfo(Number(network.chainId));
+// Chains whose factory has already been reported present in this process. Only the LOG is
+// suppressed — the `getCode` check itself always runs, so a chain reset mid-script is still caught.
+const singletonFactoryReported = new Set();
 
-  if (!factoryInfo) {
-    console.warn(`⚠️  Safe Singleton Factory info not found for chain ${network.chainId}`);
+/**
+ * Ensure Safe Singleton Factory is available on the network.
+ *
+ * Auto-deploys on local networks (from the project's presigned transaction, so the factory lands at
+ * the SAME address there as everywhere else — that is not a fallback, it is the same facility).
+ * On any other network an absent factory is fatal: see the error text below for why there is
+ * deliberately no alternative path (T018 / FR-010 / G3).
+ *
+ * @param {{quiet?: boolean}} [opts] - `quiet` suppresses the success line for per-contract callers.
+ */
+async function ensureSingletonFactory(opts = {}) {
+  const quiet = Boolean(opts.quiet);
+  const network = await ethers.provider.getNetwork();
+  const chainId = Number(network.chainId);
+  const factoryInfo = getSingletonFactoryInfo(chainId);
+
+  if (!factoryInfo && !singletonFactoryReported.has(chainId)) {
+    console.warn(`⚠️  Safe Singleton Factory info not found for chain ${chainId}`);
   }
 
   let factoryCode = await ethers.provider.getCode(SINGLETON_FACTORY_ADDRESS);
@@ -476,13 +819,28 @@ async function ensureSingletonFactory() {
 
     if (factoryCode === "0x") {
       throw new Error(
-        `Safe Singleton Factory not deployed at ${SINGLETON_FACTORY_ADDRESS}. ` +
-        `Please deploy the factory first or use a different deployment method.`
+        `Safe Singleton Factory is NOT deployed on this chain — deployment stopped before ` +
+          `any transaction was sent.\n` +
+          `  chain:   ${hre.network.name} (chainId ${chainId})\n` +
+          `  factory: ${SINGLETON_FACTORY_ADDRESS} (no code)\n` +
+          (factoryInfo
+            ? `  A presigned deployment transaction EXISTS for this chain in ` +
+              `@safe-global/safe-singleton-factory (signer ${factoryInfo.signerAddress}). Fund that ` +
+              `signer and broadcast \`factoryInfo.transaction\`, then re-run.\n`
+            : `  @safe-global/safe-singleton-factory has no presigned transaction for chain ${chainId}. ` +
+              `Request one upstream (github.com/safe-global/safe-singleton-factory) before deploying here.\n`) +
+          `\n` +
+          `There is deliberately NO fallback to a plain (nonce-based) deployment. A fallback would ` +
+          `produce a working contract at an address nobody predicted, on one chain only, and it ` +
+          `would look exactly like success — which is the drift this deployment path exists to end.`
       );
     }
   }
 
-  console.log("✓ Safe Singleton Factory verified");
+  if (!quiet && !singletonFactoryReported.has(chainId)) {
+    console.log("✓ Safe Singleton Factory verified");
+  }
+  singletonFactoryReported.add(chainId);
   return SINGLETON_FACTORY_ADDRESS;
 }
 
@@ -678,6 +1036,8 @@ module.exports = {
   // Deployment
   deployDeterministic,
   ensureSingletonFactory,
+  classifyDeployedCode,
+  splitTrailingMetadata,
 
   // Initialization
   tryInitialize,

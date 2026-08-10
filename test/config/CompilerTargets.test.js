@@ -65,6 +65,56 @@ describe("Compiler configuration: EVM target is declared, not inherited", functi
     });
   });
 
+  /*
+   * The same argument as evmVersion, for the metadata mode (spec 080, FR-001).
+   *
+   * `metadata.bytecodeHash: "none"` keeps the source-file fingerprint out of the compiled bytes, so
+   * moving or renaming a source file cannot move a contract's bytecode — and therefore cannot move
+   * any CREATE2 address derived from it. An entry that omits it silently reverts to embedding the
+   * fingerprint, which does not fail anything: it just quietly makes that contract's address
+   * path-dependent again. Exactly the invisible regression the evmVersion pin exists to prevent,
+   * which is why it is pinned the same way rather than left to a code review to notice.
+   */
+  describe("metadata mode is declared, not inherited (spec 080)", function () {
+    const MODE = "none";
+
+    it("declares bytecodeHash on every compiler entry", function () {
+      const compilers = hre.userConfig.solidity.compilers;
+      const bad = compilers
+        .filter((c) => c.settings?.metadata?.bytecodeHash !== MODE)
+        .map((c) => `${c.version} (${c.settings?.metadata?.bytecodeHash ?? "undeclared"})`);
+
+      expect(
+        bad,
+        `compiler entries not declaring metadata.bytecodeHash="${MODE}": ${bad.join(", ")}. ` +
+          "An undeclared entry embeds the source fingerprint, making its addresses path-dependent."
+      ).to.deep.equal([]);
+    });
+
+    it("declares bytecodeHash on every per-file override", function () {
+      const overrides = hre.userConfig.solidity.overrides || {};
+      const bad = Object.entries(overrides)
+        .filter(([, cfg]) => cfg.settings?.metadata?.bytecodeHash !== MODE)
+        .map(([file]) => file);
+
+      expect(
+        bad.length,
+        `${bad.length} of ${Object.keys(overrides).length} overrides do not declare ` +
+          `metadata.bytecodeHash="${MODE}", e.g. ${bad.slice(0, 3).join(", ")}`
+      ).to.equal(0);
+    });
+
+    it("the effective config reaching solc carries it too", function () {
+      // userConfig is what we wrote; config is what solc is actually handed. Asserting only the
+      // former would pass while a plugin rewrote the latter.
+      const compilers = hre.config.solidity.compilers;
+      const bad = compilers
+        .filter((c) => c.settings?.metadata?.bytecodeHash !== MODE)
+        .map((c) => c.version);
+      expect(bad, `resolved compiler entries missing the metadata mode: ${bad.join(", ")}`).to.deep.equal([]);
+    });
+  });
+
   describe("effective value reaching solc (hre.config)", function () {
     it("pins every compiler entry to the deployable target", function () {
       for (const c of hre.config.solidity.compilers) {

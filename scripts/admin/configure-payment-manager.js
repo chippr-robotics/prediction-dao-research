@@ -9,6 +9,8 @@
 const hre = require("hardhat");
 const { ethers } = require("hardhat");
 
+const { SALT_PREFIXES } = require("../deploy/lib/constants");
+
 // Safe Singleton Factory address
 const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 
@@ -111,7 +113,7 @@ async function main() {
   console.log("Treasury address:", treasuryAddress);
 
   // Deploy MembershipPaymentManager
-  const saltPrefix = "ClearPathDAO-Modular-v1.0-";
+  const saltPrefix = SALT_PREFIXES.RBAC;
   const membershipPaymentManager = await deployDeterministic(
     "MembershipPaymentManager",
     [treasuryAddress],

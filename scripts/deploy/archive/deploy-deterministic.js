@@ -4,6 +4,8 @@ const { getSingletonFactoryInfo } = require("@safe-global/safe-singleton-factory
 const fs = require("fs");
 const path = require("path");
 
+const { SALT_PREFIXES } = require("../lib/constants");
+
 // Safe Singleton Factory address (same on all EVM networks)
 const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 
@@ -583,7 +585,7 @@ async function main() {
   console.log();
 
   // Use a consistent salt prefix for all contracts in this project
-  const saltPrefix = "FairWinsDAO-v1.0-";
+  const saltPrefix = SALT_PREFIXES.CORE;
   
   // Deploy all contracts deterministically
   const deployments = {};

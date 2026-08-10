@@ -315,6 +315,19 @@ module.exports = {
             runs: 1,  // Optimize for deployment size over runtime gas
           },
           viaIR: true,
+          // PIN THE METADATA MODE (spec 080, FR-001). Do NOT remove.
+          //
+          // `bytecodeHash: "none"` keeps the source-file fingerprint OUT of the compiled bytes.
+          // With it the appended CBOR block carries the compiler version and nothing else
+          // (measured: 51 bytes -> 10, `a1 "solc" 000818`), so moving or renaming a source file
+          // cannot move a contract's bytecode — and therefore cannot move any CREATE2 address
+          // derived from it. Without it, reorganising the source tree silently relocates every
+          // deterministic address, which is deferred maintenance dressed as determinism.
+          //
+          // Cost, accepted deliberately: verifiers that compare embedded provenance report a
+          // PARTIAL rather than exact match. Verifiers that recompile from declared settings
+          // (Etherscan, Blockscout — both used by scripts/deploy/verify.js) are unaffected.
+          metadata: { bytecodeHash: "none" },
           // PIN THE EVM TARGET (spec 075, FR-001). Do NOT remove, and do NOT add a compiler
           // entry or an override without it — test/config/CompilerTargets.test.js fails the
           // suite if you do.
@@ -337,6 +350,9 @@ module.exports = {
         // on every platform network including the later ETC/Mordor increment (FR-022/FR-023).
         version: "0.8.23",
         settings: {
+          // spec 080, FR-001 — see the 0.8.24 entry. Both profiles must adopt this or a
+          // class of addresses stays path-dependent.
+          metadata: { bytecodeHash: "none" },
           optimizer: {
             enabled: true,
             runs: 1,
@@ -409,7 +425,7 @@ module.exports = {
         // while the resolved config reported it on all 38, so the omission was invisible.
       ].map((f) => [
         f,
-        { version: "0.8.24", settings: { optimizer: { enabled: true, runs: 1 }, viaIR: false, evmVersion: "paris" } },
+        { version: "0.8.24", settings: { optimizer: { enabled: true, runs: 1 }, viaIR: false, evmVersion: "paris", metadata: { bytecodeHash: "none" } } },
       ])
     ),
   },
