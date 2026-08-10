@@ -1,0 +1,6 @@
+previous: v1.2.9
+commits:  1
+  [feat -> minor] modernize Address Book UI with colored network pills (#1023) (#1106)
+bump:     minor
+reason:   computed
+next:     v1.3.0

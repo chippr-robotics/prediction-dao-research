@@ -14,6 +14,27 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.3.0 — 2026-08-09
+
+Promoted from: none — released directly from main
+Previous release: v1.2.9 · Range: `v1.2.9..v1.3.0` (1 commits)
+
+### 🚀 Features
+
+- feat(frontend): modernize Address Book UI with colored network pills (#1023) (#1106)
+
+### Artifacts
+
+Range: `v1.2.9..v1.3.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | unchanged | `v0.2.0` |
+
 ## v1.2.3 — 2026-08-09
 
 Promoted from: none — released directly from main
