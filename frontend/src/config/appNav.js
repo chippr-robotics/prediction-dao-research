@@ -158,25 +158,21 @@ const RAW_NAV_GROUPS = [
       // Recovery — data backup, account controllers, legacy key/word-list
       // recovery, and encryption keys, combined into one panel (tab id
       // 'security', kept stable). The old 'backup' tab id is a deep-link alias
-      // (see WalletPage TAB_ALIASES).
+      // (see TAB_ALIASES above).
       { id: 'security', label: 'Recovery', icon: 'lock' },
       { id: 'reports', label: 'Reporting', icon: 'reports' },
-      // 'network' deliberately absent (spec 069): network settings moved to the account
-      // button beside Preferences. The app reads every supported network at once, so the
-      // active chain is a per-transaction detail rather than a tool you go to — and the
-      // panel is now mostly endpoint configuration, which belongs with settings. The
-      // tab id stays 'network' so saved links keep resolving (WalletPage hosts it).
-    ],
-  },
-  {
-    label: 'Apps',
-    items: [
       // Apps (spec 073 FR-009) — ONE entry for the whole mini-app catalog, replacing the
-      // hardcoded per-app items this group used to carry (ClearPath, Token Mint). The section
+      // hardcoded per-app items the nav used to carry (ClearPath, Token Mint). The section
       // is no longer a fixed list the host ships: which apps exist is decided by the on-chain
       // registry, so the nav can only name the door, not the rooms behind it. `?tab=apps`
       // renders CatalogPanel (what the registry says is launchable); launching mounts the
       // verified package at the absolute route `/apps/<slug>` (MiniAppWorkspace).
+      //
+      // It sits in TOOLS rather than owning a group (spec 081). Since 073 collapsed the Apps
+      // group to this single entry, a group of its own bought a heading, a rule and — once
+      // sections became accordions — a whole fold, all to hold one row. A heading whose group
+      // can never gain a second member is chrome, not structure. The `apps` tab id and the
+      // `/apps/<slug>` routes are unchanged, so every deep link keeps resolving.
       //
       // ClearPath and Token Mint keep their `?tab=clearpath` / `?tab=tokens` panels and deep
       // links exactly as they are today — they are simply no longer surfaced here. They become
@@ -185,6 +181,11 @@ const RAW_NAV_GROUPS = [
       // mini-app that has not been registered would make the catalog claim a verified package
       // exists when none does — the one thing this surface must never do.
       { id: 'apps', label: 'Apps', icon: 'grid' },
+      // 'network' deliberately absent (spec 069): network settings moved to the account
+      // button beside Settings. The app reads every supported network at once, so the
+      // active chain is a per-transaction detail rather than a tool you go to — and the
+      // panel is now mostly endpoint configuration, which belongs with settings. The
+      // tab id stays 'network' so saved links keep resolving (WalletPage hosts it).
     ],
   },
 ]

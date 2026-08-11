@@ -25,6 +25,7 @@ import HomePreferencesPanel from '../components/account/HomePreferencesPanel'
 import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
 import PortfolioPreferencesPanel from '../components/account/PortfolioPreferencesPanel'
 import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPanel'
+import NavigationPreferencesPanel from '../components/account/NavigationPreferencesPanel'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import CallsignPanel from '../components/account/CallsignPanel'
 import BackupPanel from '../components/account/BackupPanel'
@@ -572,6 +573,7 @@ function WalletPage() {
                     <AccordionGroup openId={settingsOpenSection}>
                       {/* Each preference panel supplies its own card header + summary. */}
                       <HomePreferencesPanel />
+                      <NavigationPreferencesPanel />
                       <WalletDisplayPreferencesPanel address={address} />
                       <PortfolioPreferencesPanel />
                       <PrivacyPreferencesPanel />

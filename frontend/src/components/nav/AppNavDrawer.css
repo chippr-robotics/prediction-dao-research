@@ -107,6 +107,313 @@
   padding: 9px 12px;
 }
 
+/* ---------------------------------------------------------------------------
+   Sticky menu filter (spec 081)
+   ---------------------------------------------------------------------------
+   The drawer is the scroll container (`overflow-y: auto` above), so a sticky
+   field here rides to the top edge as the section list scrolls under it. The
+   header above it is NOT sticky — the member scrolled past "Menu" on purpose. */
+.app-nav-search {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 12px;
+  background: var(--bg-secondary, var(--color-surface, #fff));
+  border-bottom: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+}
+
+/* Visually hidden, not removed: the field keeps a real label rather than leaning
+   on its placeholder, which assistive tech is not obliged to announce. */
+.app-nav-search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-nav-search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.app-nav-search-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 36px 8px 12px;
+  border: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  border-radius: 8px;
+  background: var(--bg-primary, var(--color-surface-secondary, #f9fafb));
+  color: var(--text-primary, var(--color-text, #1F2933));
+  font-size: 14px;
+}
+
+.app-nav-search-input:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
+  outline-offset: -1px;
+}
+
+/* Chrome/Safari draw their own search cancel button; ours is the labelled one. */
+.app-nav-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.app-nav-search-clear {
+  position: absolute;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary, var(--color-text-secondary, #5A6772));
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.app-nav-search-clear:hover {
+  color: var(--text-primary, var(--color-text, #1F2933));
+}
+
+.app-nav-search-clear:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
+  outline-offset: -2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Pinned apps strip (spec 081)
+   ---------------------------------------------------------------------------
+   ONE row tall regardless of pin count — that bound is the whole point (see the
+   component header). Overflow scrolls horizontally; the `+N more` control wraps
+   it into a grid in place when the member asks for the rest. */
+.app-nav-drawer .pinned-apps-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+}
+
+/* The tiles themselves. One row tall, scrolling sideways if the cap ever outgrows the drawer's
+   width — never taller, which is the bound this whole component exists to hold. */
+.app-nav-drawer .pinned-apps-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.app-nav-drawer .pinned-apps-strip--all .pinned-apps-row {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.app-nav-drawer .pinned-app-tile {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  /* 5 tiles + 4 gaps = 294px, i.e. exactly the content width of the 320px mobile drawer, so the
+     default cap fits with no sideways scroll at all. */
+  width: 54px;
+  padding: 6px 2px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary, var(--color-text-secondary, #5A6772));
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.app-nav-drawer .pinned-app-tile:hover {
+  background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.04)));
+  color: var(--text-primary, var(--color-text, #1F2933));
+}
+
+.app-nav-drawer .pinned-app-tile:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
+  outline-offset: -2px;
+}
+
+/* Same glass tile as the section rows — a pinned app is recognisable as the
+   same kind of thing, just presented smaller — holding the app's curated store
+   illustration (spec 077 `artworkFor`), so a shortcut looks like the card the
+   member pinned it from. */
+.app-nav-drawer .pinned-app-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
+  border: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.14);
+  line-height: 1;
+}
+
+.app-nav-drawer .pinned-app-tile-icon .miniapp-art {
+  width: 28px;
+  height: 28px;
+}
+
+.app-nav-drawer .pinned-app-tile.active {
+  color: var(--brand-primary, var(--color-primary, #36B37E));
+}
+
+.app-nav-drawer .pinned-app-tile.active .pinned-app-tile-icon {
+  color: var(--brand-primary, var(--color-primary, #36B37E));
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+  border-color: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.32);
+}
+
+/* The label is decorative here: the full name is the button's accessible name,
+   so clipping this string loses nothing an assistive user needed.
+
+   It wraps to TWO lines rather than ellipsing on the first, because a 56px tile
+   ellipses a one-word name down to a single letter — "T…" identifies nothing,
+   and a tile nobody can identify is not a shortcut. Two short lines fit "Token
+   Mint" whole; anything longer still clamps, with the full name on the button. */
+/* Wraps to two lines at WORD boundaries rather than ellipsing on the first: a
+   54px tile ellipses a one-word name down to a single letter, and "T…" over a
+   generic illustration identifies nothing. Longer names still clamp, with the
+   full name on the button itself. */
+.app-nav-drawer .pinned-app-tile-label {
+  /* A plain two-line box, NOT `line-clamp`. The standard `line-clamp` shorthand resets `display`
+     (it implies `display: block` + `continue: discard`), which overrode the `-webkit-box` next to
+     it and collapsed the label to a 14px sliver that clipped every name to two or three letters.
+     A max-height of two lines with overflow hidden does the same job with no display trickery. */
+  width: 100%;
+  max-height: 2.3em; /* 2 lines at line-height 1.15 */
+  overflow: hidden;
+  line-height: 1.15;
+  text-align: center;
+  /* Breaks only a word that cannot fit on its own — "Token Mint" still wraps between words. */
+  overflow-wrap: break-word;
+}
+
+/* Below the tiles, in the drawer's own vertical flow — never inside the
+   horizontally scrolling row. A count that discloses hidden pins must not be
+   the one element capable of scrolling out of sight. */
+.app-nav-drawer .pinned-app-more {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: var(--brand-primary, var(--color-primary, #36B37E));
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.app-nav-drawer .pinned-app-more:hover {
+  color: var(--text-primary, var(--color-text, #1F2933));
+}
+
+.app-nav-drawer .pinned-app-more:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Compact density (spec 081 FR-020..FR-023)
+   ---------------------------------------------------------------------------
+   Scoped under the drawer root ONLY. These rules must never move into
+   PortalNav.css: that file is also the Admin Panel's and My Account's rail, and
+   a nav-drawer density preference has no business tightening either of them.
+
+   Every interactive target below stays at or above 36x36 CSS px — above WCAG
+   2.2 AA Target Size (Minimum) (24x24), and roughly a third more rows per screen
+   than the ~48px comfortable row. */
+.app-nav-drawer--compact .portal-nav {
+  gap: 1px;
+  padding: 4px 8px;
+}
+
+.app-nav-drawer--compact .portal-nav-item {
+  /* 26px tile + 2*5px padding = 36px. */
+  padding: 5px 10px;
+  font-size: 13px;
+  gap: 7px;
+}
+
+.app-nav-drawer--compact .portal-nav-item-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+
+.app-nav-drawer--compact .portal-nav-group-toggle {
+  min-height: 36px;
+  padding: 7px 10px;
+}
+
+.app-nav-drawer--compact .portal-nav-group-toggle:not(:first-child) {
+  margin-top: 6px;
+  padding-top: 8px;
+}
+
+.app-nav-drawer--compact .app-nav-search {
+  padding: 6px 8px;
+}
+
+.app-nav-drawer--compact .app-nav-search-input {
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 13px;
+}
+
+.app-nav-drawer--compact .pinned-apps-strip {
+  gap: 2px;
+  padding: 6px 8px;
+}
+
+.app-nav-drawer--compact .pinned-apps-row {
+  gap: 4px;
+}
+
+.app-nav-drawer--compact .pinned-app-tile {
+  width: 48px;
+  padding: 3px 2px;
+  font-size: 9px;
+}
+
+.app-nav-drawer--compact .pinned-app-tile-icon {
+  /* 30px tile + 2*3px padding = 36px. */
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.app-nav-drawer--compact .pinned-app-tile-icon .miniapp-art {
+  width: 22px;
+  height: 22px;
+}
+
+.app-nav-drawer--compact .app-nav-drawer-header {
+  padding: 10px 12px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-nav-drawer,
   .app-nav-drawer.open {

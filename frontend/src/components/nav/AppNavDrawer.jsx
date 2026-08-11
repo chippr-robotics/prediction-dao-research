@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useNavDrawer } from '../../contexts/NavDrawerContext.js'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import PortalNav from '../ui/PortalNav'
 import NavIcon from './NavIcon'
+import PinnedAppsStrip from './PinnedAppsStrip'
 import Footer from '../Footer'
 import {
   HOME_ITEM,
@@ -19,6 +20,14 @@ import { useChainTokens } from '../../hooks/useChainTokens'
 import { collectiblesGatewayUrl } from '../../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../../lib/predict/predictClient'
 import { loadFavoriteApps, subscribeFavoriteApps } from '../../lib/miniapps/favorites'
+import { filterNavGroups, filterNavItems } from '../../lib/nav/filterNav'
+import {
+  sectionKey,
+  isSectionExpanded,
+  toggleSection,
+  loadNavDensity,
+  subscribeNavPreferences,
+} from '../../lib/nav/navPreferences'
 import './AppNavDrawer.css'
 
 // Renamed tabs resolve through the shared `TAB_ALIASES` map (config/appNav.js), so the drawer
@@ -42,18 +51,24 @@ import './AppNavDrawer.css'
  */
 const TAB_TO_MINIAPP = { tokens: 'apps', clearpath: 'apps' }
 
-// The drawer list = a top "Quick Access" group (Home, Portfolio, favorited mini-apps) + the
-// section groups. Built per render because item visibility is chain-aware (spec 055: Collectibles
-// hides entirely on networks OpenSea doesn't serve or with no gateway configured).
+// The drawer list = a top "Quick Access" group (Home, Portfolio) + the section groups. Built per
+// render because item visibility is chain-aware (spec 055: Collectibles hides entirely on
+// networks OpenSea doesn't serve or with no gateway configured).
+//
+// Favorited mini-apps used to be spliced into Quick Access here as full-width rows. Since spec
+// 081 they render as a separate horizontal strip above this list instead — pins are unbounded,
+// and the section meant to be the member's shortcut strip was the section pushing every other
+// group off the bottom of a phone screen. Home and Portfolio stay as rows: they are destinations
+// the product ships, not shortcuts the member chose.
 //
 // Wagers used to be spliced into the Apps group here, because it was an absolute `/wagers` route
 // rather than a `/wallet?tab=` section and so was not carried by NAV_GROUPS' tenant filter. That
 // splice is gone: Wagers is now a view inside Finance ▸ Transfer (spec 073), reached through the
 // Transfer entry NAV_GROUPS already carries, and gated by PayTransferPanel on the same `wagers`
 // tenant feature. One fewer place for the menu and the routes to disagree.
-function buildDrawerGroups(visibility, favoriteItems) {
+function buildDrawerGroups(visibility) {
   return [
-    { label: 'Quick Access', items: [HOME_ITEM, PORTFOLIO_ITEM, ...favoriteItems] },
+    { label: 'Quick Access', items: [HOME_ITEM, PORTFOLIO_ITEM] },
     ...visibleNavGroups(visibility, NAV_GROUPS),
   ]
 }
@@ -62,8 +77,16 @@ function buildDrawerGroups(visibility, favoriteItems) {
 // (the on-chain registry carries no app icon, so the first letter of its name stands in for one,
 // same as any other icon-less drawer entry would in the collapsed rail) so a favorited app is
 // recognisable at a glance in the EXPANDED menu too, not just the icon-only gutter.
+// `slug` rides along so the pinned strip can look up the SAME curated store artwork the catalog
+// card shows (spec 077 `artworkFor`) — a shortcut should look like the thing it launches.
 function favoriteToNavItem(favorite) {
-  return { id: `favorite-${favorite.id}`, label: favorite.name, to: `/apps/${favorite.slug}`, showIcon: true }
+  return {
+    id: `favorite-${favorite.id}`,
+    label: favorite.name,
+    slug: favorite.slug,
+    to: `/apps/${favorite.slug}`,
+    showIcon: true,
+  }
 }
 
 // Which drawer entry reflects the current route, so the open menu highlights it.
@@ -106,6 +129,12 @@ function resolveActiveId(location, favoriteItems) {
  * section is always one click away. Selecting an entry routes to the section
  * and returns to the gutter; the copyright footer only fits once expanded (the
  * legal/policy links that used to sit here moved to Settings → App, issue #1025).
+ *
+ * Spec 081 shapes the EXPANDED panel so its height is bounded by design: sections fold, pinned
+ * apps are one capped strip rather than unbounded rows, a sticky field filters across the whole
+ * menu, and a device preference tightens the rows. The collapsed desktop gutter is untouched by
+ * all of it — 64px has no room for a heading, a field, or a strip, and every section's glyph
+ * must stay reachable there.
  */
 export default function AppNavDrawer() {
   const { isOpen, close, toggle } = useNavDrawer()
@@ -125,22 +154,73 @@ export default function AppNavDrawer() {
     [favorites],
   )
 
+  // Section folds and row density are device-scoped preferences that can also be changed from
+  // the Preferences panel, so the drawer re-reads them on every store commit rather than owning
+  // the state itself (same subscribe idiom as favorites, above).
+  const [prefsRevision, bumpPrefs] = useState(0)
+  useEffect(() => subscribeNavPreferences(() => bumpPrefs((n) => n + 1)), [])
+  const density = loadNavDensity()
+
+  // A filter is per-open, never persisted: a member who typed "rec" last week did not ask for a
+  // narrowed menu today. Cleared whenever the drawer opens.
+  const [query, setQuery] = useState('')
+  useEffect(() => {
+    if (isOpen) setQuery('')
+  }, [isOpen])
+
   const activeId = resolveActiveId(location, favoriteItems)
-  const drawerGroups = useMemo(
+  const allGroups = useMemo(
     () =>
-      buildDrawerGroups(
-        {
-          collectibles: Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== '',
-          predict: Boolean(capabilities?.predict) && predictGatewayUrl() !== '',
-        },
-        favoriteItems,
-      ),
-    [capabilities, favoriteItems],
+      buildDrawerGroups({
+        collectibles: Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== '',
+        predict: Boolean(capabilities?.predict) && predictGatewayUrl() !== '',
+      }),
+    [capabilities],
   )
+
+  const filtering = query.trim() !== ''
+  const drawerGroups = useMemo(() => filterNavGroups(allGroups, query), [allGroups, query])
+  const visibleFavorites = useMemo(() => filterNavItems(favoriteItems, query), [favoriteItems, query])
 
   // Desktop never fully closes: `collapsed` is the icon gutter, `isOpen` is the
   // expanded panel. Mobile keeps the original fully-hidden/fully-open pair.
   const collapsed = !isMobile && !isOpen
+
+  // The section that owns the highlighted item, so it can be force-expanded below.
+  const activeGroupKey = useMemo(() => {
+    const owner = allGroups.find((group) => group.items.some((item) => item.id === activeId))
+    return owner ? sectionKey(owner.label) : null
+  }, [allGroups, activeId])
+
+  /*
+   * Effective expansion, computed per render and NEVER written back:
+   *   filter active  > the section owning the current page > the member's stored choice.
+   *
+   * A filter is a statement about the RESULT SET — a match hidden inside a fold would make the
+   * drawer report fewer hits than it found. And the item marked as the current page must never be
+   * invisible. Both are overrides of what to DISPLAY; folding Tools while sitting on Recovery is
+   * still remembered for when the member leaves it.
+   */
+  const expandedSections = useMemo(() => {
+    const out = {}
+    for (const group of drawerGroups) {
+      const key = sectionKey(group.label)
+      out[key] = filtering || key === activeGroupKey || isSectionExpanded(key)
+    }
+    return out
+    // `prefsRevision` is the store's change signal — `isSectionExpanded` reads a module-level
+    // snapshot the linter cannot see, so the revision is what makes this memo re-run on a toggle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerGroups, filtering, activeGroupKey, prefsRevision])
+
+  const collapsibleGroups = useMemo(
+    () => ({
+      expanded: expandedSections,
+      keyFor: (group) => sectionKey(group.label),
+      onToggle: (key) => toggleSection(key),
+    }),
+    [expandedSections],
+  )
 
   // Close on Escape while open.
   useEffect(() => {
@@ -165,11 +245,15 @@ export default function AppNavDrawer() {
     return () => document.removeEventListener('mousedown', onPointerDown)
   }, [isOpen, isMobile, close])
 
-  const handleSelect = (id) => {
-    const favorite = favoriteItems.find((item) => item.id === id)
-    navigate(favorite ? favorite.to : pathForNavItem(id))
-    close()
-  }
+  const handleSelect = useCallback(
+    (id) => {
+      const favorite = favoriteItems.find((item) => item.id === id)
+      navigate(favorite ? favorite.to : pathForNavItem(id))
+      setQuery('')
+      close()
+    },
+    [favoriteItems, navigate, close],
+  )
 
   // Mobile: always fully closes. Desktop: flips between gutter and expanded.
   const handleToggleClick = () => {
@@ -190,7 +274,9 @@ export default function AppNavDrawer() {
       <aside
         ref={drawerRef}
         id="app-nav-drawer"
-        className={`app-nav-drawer ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}
+        className={`app-nav-drawer ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''} ${
+          density === 'compact' ? 'app-nav-drawer--compact' : ''
+        }`}
         aria-hidden={isMobile && !isOpen}
         aria-label="Site navigation"
       >
@@ -206,6 +292,38 @@ export default function AppNavDrawer() {
           </button>
         </div>
 
+        {!collapsed && (
+          <div className="app-nav-search">
+            <label className="app-nav-search-label" htmlFor="app-nav-search-input">
+              Filter menu
+            </label>
+            <div className="app-nav-search-field">
+              <input
+                id="app-nav-search-input"
+                type="search"
+                className="app-nav-search-input"
+                placeholder="Search menu…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              {filtering && (
+                <button
+                  type="button"
+                  className="app-nav-search-clear"
+                  aria-label="Clear menu filter"
+                  onClick={() => setQuery('')}
+                >
+                  <span aria-hidden="true">✕</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!collapsed && (
+          <PinnedAppsStrip items={visibleFavorites} activeId={activeId} onSelect={handleSelect} />
+        )}
+
         <PortalNav
           variant="nav"
           groups={drawerGroups}
@@ -213,6 +331,10 @@ export default function AppNavDrawer() {
           onSelect={handleSelect}
           ariaLabel="Site sections"
           collapsed={collapsed}
+          collapsibleGroups={collapsibleGroups}
+          emptyMessage={
+            filtering && visibleFavorites.length === 0 ? `No menu entries match “${query.trim()}”` : undefined
+          }
         />
 
         {!collapsed && <Footer variant="drawer" />}

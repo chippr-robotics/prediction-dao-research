@@ -82,6 +82,90 @@
   padding-top: 12px;
 }
 
+/* ---------------------------------------------------------------------------
+   Collapsible group headings (spec 081) — the accordion form
+   ---------------------------------------------------------------------------
+   Only rendered when a host opts in with `collapsibleGroups`; the Admin Panel
+   and My Account rails keep the presentational <span> heading above. The button
+   inherits every heading rule (it carries the same class) and adds the layout
+   for the chevron plus a real interactive target. */
+.portal-nav-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  /* Comfortable density: a 36px+ target once the 11px text and this padding add up. */
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.portal-nav-group-toggle:not(:first-child) {
+  margin-top: 10px;
+  border-top: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  padding-top: 12px;
+}
+
+.portal-nav-group-toggle:hover {
+  color: var(--text-primary, var(--color-text, #1F2933));
+  background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.04)));
+}
+
+.portal-nav-group-toggle:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
+  outline-offset: -2px;
+}
+
+/* Chevron drawn from two borders so it needs no icon asset and inherits currentColor.
+   Points down when collapsed ("this will open"), up once expanded. */
+.portal-nav-group-chevron {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-bottom: 2px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.portal-nav-group-toggle.expanded .portal-nav-group-chevron {
+  margin-bottom: -2px;
+  transform: rotate(-135deg);
+}
+
+/* The items a heading governs. A flex column so the wrapper is invisible to the
+   rail's own layout — the rows sit exactly where they did as direct children. */
+.portal-nav-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* A rail filtered down to nothing. */
+.portal-nav-empty {
+  margin: 0;
+  padding: 16px 12px;
+  font-size: 13px;
+  color: var(--text-tertiary, var(--color-text-secondary, #8895A1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-nav-group-chevron {
+    transition: none;
+  }
+}
+
 .portal-nav-item {
   display: flex;
   align-items: center;

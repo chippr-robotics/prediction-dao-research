@@ -25,8 +25,16 @@
  * opts in with `showIcon: true`, in which case it gets the same initial-letter
  * fallback the collapsed rail always shows — for entries whose glyph IS their
  * name, like a favorited mini-app's Quick Access shortcut.
+ *
+ * `collapsibleGroups` (spec 081) turns the group headings into accordion toggles.
+ * It is OPT-IN and absent by default, because this component is also the Admin
+ * Panel's and My Account's rail: when it is not passed, the render path below is
+ * byte-for-byte the one those surfaces have always taken (a presentational
+ * `<span>` heading followed by bare items). Only the nav drawer passes it. It is
+ * also ignored entirely while `collapsed` — the 64px desktop gutter has no room
+ * for a control, and every section's glyph must stay reachable there.
  */
-import { Fragment } from 'react'
+import { Fragment, useId } from 'react'
 import NavIcon from '../nav/NavIcon'
 import './PortalNav.css'
 
@@ -39,8 +47,14 @@ export default function PortalNav({
   variant = 'tabs',
   collapsed = false,
   id,
+  collapsibleGroups,
+  emptyMessage,
 }) {
   const isTabs = variant === 'tabs'
+  // Namespaces the generated `aria-controls` ids so two rails on one page cannot collide.
+  const railId = useId()
+  // Collapse is a property of the EXPANDED panel only (see the header comment).
+  const accordion = collapsed ? null : collapsibleGroups
 
   const renderItem = (item) => (
     <button
@@ -68,6 +82,59 @@ export default function PortalNav({
     </button>
   )
 
+  // Accordion form: the heading becomes the control, and the items it governs live in a
+  // labelled group that is UNMOUNTED when collapsed. Not `display: none` — a heading claiming
+  // aria-expanded="false" while its items remain in the DOM and the tab order is claiming
+  // something untrue, and query-based tests would keep finding rows the member cannot reach.
+  const renderCollapsibleGroup = (group, index) => {
+    const key = accordion.keyFor ? accordion.keyFor(group) : group.label
+    const expanded = accordion.expanded?.[key] === true
+    // The DOM id is sanitized INDEPENDENTLY of the logical key. `key` may be any string a host
+    // chooses — with no `keyFor` it is the raw label, and "Quick Access" would put a space in an
+    // id. `aria-controls` is a space-separated IDREF list, so that does not merely look wrong: it
+    // parses as two references, neither of which exists, and the heading silently controls
+    // nothing. The index keeps it unique when two labels sanitize to the same thing.
+    const panelId = `${railId}-${index}-${String(key).replace(/[^a-zA-Z0-9_-]+/g, '-')}`
+    return (
+      <Fragment key={group.label}>
+        <button
+          type="button"
+          className={`portal-nav-group-label portal-nav-group-toggle ${expanded ? 'expanded' : ''}`}
+          // "<label> section", not the bare label: a group and one of its items can legitimately
+          // share a name (the Apps group holds the single "Apps" catalog entry since spec 073),
+          // and two adjacent buttons both announced as "Apps" is ambiguous by ear and ambiguous
+          // to a by-name query. The visible text is a substring of this, so WCAG 2.5.3 Label in
+          // Name still holds.
+          aria-label={`${group.label} section`}
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          onClick={() => accordion.onToggle?.(key)}
+        >
+          <span className="portal-nav-group-toggle-text">{group.label}</span>
+          <span className="portal-nav-group-chevron" aria-hidden="true" />
+        </button>
+        {expanded && (
+          <div id={panelId} role="group" aria-label={group.label} className="portal-nav-group-items">
+            {group.items.map(renderItem)}
+          </div>
+        )}
+      </Fragment>
+    )
+  }
+
+  const renderPlainGroup = (group) => (
+    <Fragment key={group.label}>
+      <span className="portal-nav-group-label" role="presentation">
+        {group.label}
+      </span>
+      {group.items.map(renderItem)}
+    </Fragment>
+  )
+
+  // A rail filtered down to nothing says so out loud. Rendering an empty panel would read as
+  // "the menu is broken", not "nothing matched what you typed".
+  const isEmpty = groups ? groups.length === 0 : !items?.length
+
   return (
     <nav
       id={id}
@@ -76,16 +143,17 @@ export default function PortalNav({
       aria-orientation={isTabs ? 'vertical' : undefined}
       aria-label={ariaLabel}
     >
-      {groups
-        ? groups.map((group) => (
-            <Fragment key={group.label}>
-              <span className="portal-nav-group-label" role="presentation">
-                {group.label}
-              </span>
-              {group.items.map(renderItem)}
-            </Fragment>
-          ))
-        : items.map(renderItem)}
+      {isEmpty && emptyMessage ? (
+        <p className="portal-nav-empty" role="status">
+          {emptyMessage}
+        </p>
+      ) : groups ? (
+        groups.map((group, index) =>
+          accordion ? renderCollapsibleGroup(group, index) : renderPlainGroup(group),
+        )
+      ) : (
+        items.map(renderItem)
+      )}
     </nav>
   )
 }
