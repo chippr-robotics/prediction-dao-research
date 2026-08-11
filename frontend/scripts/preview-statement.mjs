@@ -84,7 +84,7 @@ async function main() {
     generatedAt: Date.UTC(2026, 7, 1, 9, 12),
     source: 'ledger',
     lineItems,
-    totals: computeTotals(lineItems, 'POL'),
+    totals: computeTotals(lineItems, extra.nativeSymbol || 'POL'),
     staleClasses: [],
     prunedBefore: null,
     valuationNote:
@@ -124,7 +124,13 @@ async function main() {
     ['07-empty', report([], PERIODS.july), { type: 'full' }],
     [
       '08-testnet',
-      report(month.slice(0, 8), { ...PERIODS.july, label: 'July 2026' }, { chainId: 63, networkName: 'Mordor', isTestnet: true }),
+      report(month.slice(0, 8), { ...PERIODS.july, label: 'July 2026' }, {
+        chainId: 63, networkName: 'Mordor', isTestnet: true,
+        // Mordor's native asset is ETC, not POL. The app derives this from the
+        // chain config; the preview has to say it explicitly or the sample
+        // statement denominates gas in a currency that chain does not use.
+        nativeSymbol: 'ETC',
+      }),
       { type: 'full' },
     ],
     [

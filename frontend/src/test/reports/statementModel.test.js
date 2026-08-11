@@ -14,9 +14,11 @@ import {
   buildFlowSeries,
   chooseBucket,
   decimalsFor,
+  formatList,
   formatTokenAmount,
   formatUsd,
   formatUsdSigned,
+  splitHash,
 } from '../../data/reports/statement/model'
 import { STATEMENT_TYPES } from '../../data/reports/statement/reportTypes'
 import { computeTotals } from '../../data/reports/reportBuilder'
@@ -206,6 +208,81 @@ describe('what the figures cannot account for', () => {
   it('names stale classes the way the rest of the document names them', () => {
     const model = buildStatementModel(report([entry()], { staleClasses: ['earn', 'staking'] }))
     expect(model.staleClassLabels).toEqual(['Earn', 'Staking'])
+  })
+
+  // A page-one banner alone let a reader reconcile an incomplete row with no
+  // signal that it was incomplete.
+  it('marks a class that could not be fully read wherever it appears', () => {
+    const model = buildStatementModel(
+      report([entry({ class: 'earn', kind: 'vault_deposit' }), entry({ class: 'wager' })], {
+        staleClasses: ['earn'],
+      }),
+    )
+    const rows = model.activity.rows
+    expect(rows.find((r) => r.key === 'earn').label).toBe('Earn (partial)')
+    expect(rows.find((r) => r.key === 'earn').partial).toBe(true)
+    expect(rows.find((r) => r.key === 'wager').partial).toBe(false)
+  })
+
+  // Same rule as the platform fee: a dash reads as zero, and the document
+  // cannot claim nothing moved when it could not value what did.
+  it('counts unvalued neutral entries apart from valued ones, per class', () => {
+    const model = buildStatementModel(
+      report([
+        entry({ class: 'miniapp', valueDirection: 'none', valuationStatus: 'unvalued', usdValue: 0 }),
+        entry({ class: 'staking', kind: 'unstake_request', valueDirection: 'none', usdValue: 1240 }),
+      ]),
+    )
+    const miniapp = model.activity.rows.find((r) => r.key === 'miniapp')
+    expect(miniapp.neutralUnvalued).toBe(1)
+    expect(miniapp.neutralUsd).toBe(0)
+    expect(model.activity.rows.find((r) => r.key === 'staking').neutralUsd).toBe(1240)
+  })
+
+  it('does not report an unvalued bridge as zero dollars moved', () => {
+    const model = buildStatementModel(
+      report([
+        entry({ class: 'bridge', valueDirection: 'none', selfTransfer: true, valuationStatus: 'unvalued', usdValue: 0 }),
+      ]),
+    )
+    expect(model.summary.movedCount).toBe(1)
+    expect(model.summary.movedUnvalued).toBe(1)
+    expect(model.summary.movedUsd).toBe(0)
+  })
+
+  // A transaction that reverts still burns gas — real money out of the wallet.
+  // computeTotals skips failed entries wholesale, so it never sees that fee.
+  it('counts gas spent on failed operations and reports it separately', () => {
+    const model = buildStatementModel(
+      report([
+        entry({ feeNative: 0.01 }),
+        entry({ status: 'failed', feeNative: 0.0031, failureReason: 'Reverted' }),
+      ]),
+    )
+    expect(model.summary.networkFeesFailed).toBeCloseTo(0.0031, 6)
+    expect(model.summary.networkFees).toBeCloseTo(0.0131, 6)
+  })
+})
+
+describe('prose helpers', () => {
+  // "Earn, Staking could not be read" is not a sentence.
+  it('joins a list the way a sentence does', () => {
+    expect(formatList(['Earn'])).toBe('Earn')
+    expect(formatList(['Earn', 'Staking'])).toBe('Earn and Staking')
+    expect(formatList(['Earn', 'Staking', 'Wager'])).toBe('Earn, Staking and Wager')
+  })
+
+  // Left to wrap on its own, a hash broke wherever the column ran out and a
+  // bridge row (which carries two) doubled in height.
+  it('splits a hash at a fixed midpoint so both halves are equal', () => {
+    const hash = `0x${'a'.repeat(64)}`
+    const [first, second] = splitHash(hash).split('\n')
+    expect(first.length).toBe(second.length)
+    expect(first + second).toBe(hash)
+  })
+
+  it('leaves a short reference alone', () => {
+    expect(splitHash('0xabc')).toBe('0xabc')
   })
 })
 

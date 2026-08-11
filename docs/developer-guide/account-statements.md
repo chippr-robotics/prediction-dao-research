@@ -98,6 +98,16 @@ changes what the statement claims.
    closing notes, which a member reconciling the tiles never reaches.
 8. **Pending is not settled.** It is counted and disclosed as pending; no caption
    calls the whole set settled.
+9. **A class that could not be fully read is marked `(partial)` wherever it
+   appears.** A page-one banner alone let a reader reconcile an incomplete row
+   with no signal that it was incomplete.
+10. **An unvalued entry reads "unvalued", never `$0.00` or a dash.** Same rule as
+    the fee cell: "could not be valued" is a different claim from "there was
+    none", and both `$0.00` and a dash assert the second one.
+11. **Gas spent on a reverted transaction is counted and disclosed.**
+    `computeTotals` skips failed entries wholesale, so their gas never reaches
+    `overall.feesNative` — but a revert still burns gas, and that is real money
+    out of the member's wallet. The model adds it back and the tile says so.
 
 ## Previewing a design change
 

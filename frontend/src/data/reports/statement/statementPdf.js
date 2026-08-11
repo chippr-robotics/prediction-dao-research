@@ -25,6 +25,8 @@ import {
   formatTokenAmount,
   formatDate,
   formatDateTime,
+  formatList,
+  splitHash,
   formatUsd,
   formatUsdSigned,
 } from './model'
@@ -189,19 +191,35 @@ function renderFees(ctx) {
   const s = model.summary
   const bridgesInScope = !model.scopeClasses || model.scopeClasses.includes('bridge')
   const scoped = Boolean(model.scopeClasses)
+
+  // Reserve the tiles AND the notes that explain them. Measured after the fact
+  // the callout was widowed onto the next page, where it read as a preamble to
+  // whatever section happened to follow it.
+  const feeNote = s.platformFeeUnknownCount
+    ? `${s.platformFeeUnknownCount} entr${s.platformFeeUnknownCount === 1 ? 'y carries' : 'ies carry'} a platform fee ` +
+      'that could not be valued in USD. Those fees are shown as “unknown” in the register and are NOT included in ' +
+      'the platform fee total above — the total is therefore a lower bound, not a complete figure.'
+    : null
+  const needs = 76 + (feeNote ? measureNote(ctx, feeNote, { title: 'x' }) : 0)
+
   sectionHeading(
     ctx,
     'Fees and cross-network movement',
     scoped
       ? 'Figures below cover only the activity types this statement includes.'
       : undefined,
+    { needs },
   )
 
   const tiles = [
     {
       label: 'NETWORK FEES PAID',
       value: `${formatAmount(s.networkFees)} ${s.networkFeeSymbol}`.trim(),
-      sub: scoped ? 'Gas on the transactions covered here' : 'Gas on your transactions',
+      sub: s.networkFeesFailed
+        ? `Includes ${formatAmount(s.networkFeesFailed)} ${s.networkFeeSymbol} on failed operations`.trim()
+        : scoped
+          ? 'Gas on the transactions covered here'
+          : 'Gas on your transactions',
     },
     {
       label: 'PLATFORM FEES CHARGED',
@@ -250,15 +268,7 @@ function renderFees(ctx) {
     )
   }
 
-  if (s.platformFeeUnknownCount > 0) {
-    noteBlock(
-      ctx,
-      `${s.platformFeeUnknownCount} entr${s.platformFeeUnknownCount === 1 ? 'y carries' : 'ies carry'} a platform fee ` +
-        'that could not be valued in USD. Those fees are shown as “unknown” in the register and are NOT included in ' +
-        'the platform fee total above — the total is therefore a lower bound, not a complete figure.',
-      { tone: 'warn', title: 'Platform fees not fully valued' },
-    )
-  }
+  if (feeNote) noteBlock(ctx, feeNote, { tone: 'info', title: 'Platform fees not fully valued' })
   return ctx
 }
 
@@ -273,11 +283,15 @@ function renderCharts(ctx) {
   const top = ctx.y
   text(ctx, 'Flow over the period', PAGE.margin, top, { size: 8, weight: 'bold' })
   text(ctx, 'Money in and out per activity type', PAGE.margin + chartW + 18, top, { size: 8, weight: 'bold' })
+  // The unit belongs in the subtitle, not on the axis rule (see charts.js).
+  text(ctx, 'USD, gross in and out', PAGE.margin + chartW + 18, top + 9, { size: 6.5, color: theme.inkMuted })
 
-  const flowBottom = drawFlowChart(ctx.doc, { x: PAGE.margin, y: top + 6, w: chartW, h: chartH }, model.flow, theme)
+  text(ctx, 'USD in and out per day', PAGE.margin, top + 9, { size: 6.5, color: theme.inkMuted })
+
+  const flowBottom = drawFlowChart(ctx.doc, { x: PAGE.margin, y: top + 14, w: chartW, h: chartH }, model.flow, theme)
   const breakdownBottom = drawBreakdownChart(
     ctx.doc,
-    { x: PAGE.margin + chartW + 18, y: top + 6, w: chartW, h: chartH },
+    { x: PAGE.margin + chartW + 18, y: top + 14, w: chartW, h: chartH },
     model.activity.chartRows,
     theme,
   )
@@ -289,7 +303,9 @@ function renderCharts(ctx) {
   if (model.flow.undated > 0) {
     caveats.push(
       `${model.flow.undated} entr${model.flow.undated === 1 ? 'y has' : 'ies have'} no usable date and cannot be ` +
-        'placed on the timeline — they are in the totals and the register, but not in the chart on the left.',
+        `placed on the timeline. ${model.flow.undated === 1 ? 'It is' : 'They are'} in the totals and the ` +
+        `register, but not in the chart on the left, and ${model.flow.undated === 1 ? 'its' : 'their'} ` +
+        'membership of this period cannot be confirmed against the public record.',
     )
   }
   if (model.activity.folded > 0) {
@@ -298,7 +314,7 @@ function renderCharts(ctx) {
         'separately in the activity breakdown table.',
     )
   }
-  if (model.summary.movedUsd > 0) {
+  if (model.summary.movedCount > 0) {
     caveats.push(
       'Value moved between your own networks is absent from both charts: it is neither money in nor money out.',
     )
@@ -346,15 +362,19 @@ function renderTokens(ctx) {
     startY: ctx.y,
     head: [head],
     body,
+    // Fixed widths, and the table wraps to their sum. Left to stretch, a
+    // one-row variant distributed all its slack between the figures and opened
+    // gulfs inside the data.
+    tableWidth: 'wrap',
     columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 68 },
-      1: { halign: 'right', cellWidth: 44 },
-      2: { halign: 'right', textColor: theme.positive },
-      3: { halign: 'right', textColor: theme.negative },
-      4: { halign: 'right', fontStyle: 'bold' },
-      5: { halign: 'right', fontStyle: 'bold' },
-      6: { halign: 'right', cellWidth: 76, textColor: theme.inkMuted },
-      7: { halign: 'right', cellWidth: 76, textColor: theme.inkMuted },
+      0: { fontStyle: 'bold', cellWidth: 62 },
+      1: { halign: 'right', cellWidth: 36 },
+      2: { halign: 'right', cellWidth: 64, textColor: theme.positive },
+      3: { halign: 'right', cellWidth: 64, textColor: theme.negative },
+      4: { halign: 'right', cellWidth: 70, fontStyle: 'bold' },
+      5: { halign: 'right', cellWidth: 74, fontStyle: 'bold' },
+      6: { halign: 'right', cellWidth: 66, textColor: theme.inkMuted },
+      7: { halign: 'right', cellWidth: 66, textColor: theme.inkMuted },
     },
     didParseCell: (data) => {
       if (data.section !== 'body') return
@@ -400,7 +420,9 @@ function renderActivity(ctx) {
       formatUsd(r.outUsd),
       formatUsdSigned(r.inUsd - r.outUsd),
       r.movedUsd ? formatUsd(r.movedUsd) : '-',
-      r.neutralUsd ? formatUsd(r.neutralUsd) : '-',
+      // Same rule as the fee cell below: a dash reads as zero, and "could not
+      // be valued" is a different claim from "there was none".
+      unvaluedCell(r.neutralUsd, r.neutralUnvalued),
       // A fee nobody reported is not a fee of zero, and a dash reads as zero.
       platformFeeCell(r),
     ]),
@@ -419,6 +441,17 @@ function renderActivity(ctx) {
 }
 
 /**
+ * A USD figure some entries could not contribute to. `$0.00` beside an unvalued
+ * entry claims nothing moved; a dash claims the same thing more quietly. Both
+ * are wrong when the truth is "we could not value it".
+ */
+function unvaluedCell(usd, unvaluedCount) {
+  if (!usd && !unvaluedCount) return '-'
+  if (!usd) return `${unvaluedCount} unvalued`
+  return unvaluedCount ? `${formatUsd(usd)} + ${unvaluedCount} unvalued` : formatUsd(usd)
+}
+
+/**
  * Platform fee for one activity row. An UNKNOWN fee is named: rendered as the
  * same dash used for "no fee", it would tell a member they were charged nothing
  * when the truth is that nobody recorded what they were charged.
@@ -433,7 +466,10 @@ function platformFeeCell(row) {
 /** Direction glyph + colour for a register amount. */
 function amountFacts(item, theme) {
   const vd = item.valueDirection ?? null
-  if (vd === 'none') return { sign: '±', color: theme.inkSoft }
+  // No sign at all, in neutral ink. The '±' it used to carry reads as a
+  // measurement tolerance to a banking audience, and being neither green nor
+  // red it looked like a rendering fallback rather than a decision.
+  if (vd === 'none') return { sign: '', color: theme.inkMuted }
   const inward = vd != null ? vd === 'in' : item.direction === 'payout' || item.direction === 'refund'
   return inward ? { sign: '+', color: theme.positive } : { sign: '-', color: theme.negative }
 }
@@ -441,8 +477,10 @@ function amountFacts(item, theme) {
 /** The reference block for one entry — complete hashes, never truncated (FR-006). */
 function referenceCell(item) {
   const lines = []
-  if (item.txHash) lines.push(item.txHash)
-  if (item.destinationTxHash) lines.push(`to ${item.destinationNetworkName || 'destination network'}:`, item.destinationTxHash)
+  if (item.txHash) lines.push(splitHash(item.txHash))
+  if (item.destinationTxHash) {
+    lines.push(`on ${item.destinationNetworkName || 'destination network'}:`, splitHash(item.destinationTxHash))
+  }
   if (!lines.length) lines.push(item.entryId ? `no transaction · ${item.entryId}` : 'no transaction reference')
   return lines.join('\n')
 }
@@ -476,9 +514,10 @@ function renderRegister(ctx) {
     numeric: [4, 5],
     head: [['Date (UTC)', 'Activity', 'Details', 'Reference', 'Amount', 'Value (USD)']],
     body: model.settled.map((it) => [
-      // One word, so the date column keeps its single-line rhythm; the note
-      // under the charts explains what an undated entry is.
-      it.timestamp == null ? 'Unavailable' : formatDate(it.timestamp),
+      // A dash in the ordinary date style. Set bold amber it was the only
+      // colour in the column and read as an error stamp on a row that is
+      // perfectly valid and fully counted; the caption explains the dash.
+      it.timestamp == null ? '—' : formatDate(it.timestamp),
       it.classLabel || it.class || 'Activity',
       describeEntry(it),
       referenceCell(it),
@@ -493,7 +532,10 @@ function renderRegister(ctx) {
       2: { cellWidth: 108 },
       // A 66-character hash needs the room to break cleanly in two; starved of
       // it, it ragged into four lines and doubled the row height.
-      3: { cellWidth: 156, font: FONT.mono, fontSize: 5.4, textColor: theme.inkMuted },
+      // Large enough and dark enough to read off paper. At 5.4pt in muted grey
+      // the hashes did not survive a monochrome print, which broke the caption's
+      // promise that each line can be checked against the public record.
+      3: { cellWidth: 156, font: FONT.mono, fontSize: 6.2, textColor: theme.inkSoft },
       4: { cellWidth: 88, halign: 'right', fontStyle: 'bold' },
       5: { cellWidth: 71, halign: 'right' },
     },
@@ -502,12 +544,7 @@ function renderRegister(ctx) {
       const item = model.settled[data.row.index]
       if (!item) return
       if (data.column.index === 4) data.cell.styles.textColor = amountFacts(item, theme).color
-      // An entry with no real date says so where the date belongs; a fabricated
-      // one would be indistinguishable from a real reading.
-      if (data.column.index === 0 && item.timestamp == null) {
-        data.cell.styles.textColor = theme.warning
-        data.cell.styles.fontStyle = 'bold'
-      }
+      if (data.column.index === 0 && item.timestamp == null) data.cell.styles.textColor = theme.inkMuted
       if (data.column.index === 5 && item.valuationStatus === 'unvalued') {
         data.cell.styles.textColor = theme.warning
       }
@@ -528,9 +565,11 @@ function renderFailed(ctx) {
   noteBlock(
     ctx,
     `${model.failed.length} operation${model.failed.length === 1 ? '' : 's'} did not complete. ` +
-      'No value moved, and none of them contribute to any total, chart or balance on this statement. They are ' +
-      'listed here so the record of the period is complete.',
-    { tone: 'warn', title: 'Excluded from every total on this statement' },
+      `${model.failed.length === 1 ? 'It moved' : 'They moved'} no value, and ` +
+      `${model.failed.length === 1 ? 'it contributes' : 'none of them contribute'} to any total or chart on ` +
+      'this statement. A transaction that reverts still consumes gas, so the network fee it cost IS included ' +
+      'in network fees paid. They are listed here so the record of the period is complete.',
+    { tone: 'info', title: 'Excluded from every total on this statement' },
   )
 
   statementTable(ctx, {
@@ -539,18 +578,18 @@ function renderFailed(ctx) {
     numeric: [4],
     head: [['Date (UTC)', 'Activity', 'Details', 'Reason', 'Attempted amount']],
     body: model.failed.map((it) => [
-      it.timestamp == null ? 'Unavailable' : formatDate(it.timestamp),
+      it.timestamp == null ? '—' : formatDate(it.timestamp),
       it.classLabel || it.class || 'Activity',
       describeEntry(it),
       it.failureReason || 'Not recorded',
       `${formatTokenAmount(it.amountNumber, model.amountDecimals[it.tokenTicker] ?? 2)} ${it.tokenTicker || ''}`.trim(),
     ]),
     columnStyles: {
-      0: { cellWidth: 54 },
-      1: { cellWidth: 56, fontStyle: 'bold' },
-      2: { cellWidth: 150 },
-      3: { cellWidth: 130, textColor: theme.negative },
-      4: { halign: 'right', textColor: theme.inkMuted },
+      0: { cellWidth: 50 },
+      1: { cellWidth: 54, fontStyle: 'bold' },
+      2: { cellWidth: 156 },
+      3: { cellWidth: 156, textColor: theme.negative },
+      4: { cellWidth: 84, halign: 'right', textColor: theme.inkMuted },
     },
     bodyStyles: { fillColor: theme.washWarn },
     alternateRowStyles: { fillColor: theme.washWarn },
@@ -691,9 +730,9 @@ export function renderStatement(report, options = {}) {
   if (model.staleClasses.length) {
     noteBlock(
       ctx,
-      `${model.staleClassLabels.join(', ')} could not be read for this network. Activity in ` +
-        `${model.staleClasses.length === 1 ? 'that category' : 'those categories'} may be missing from every ` +
-        'figure, chart and table below. This is not a confirmed zero — it is a gap in what could be loaded.',
+      `${formatList(model.staleClassLabels)} could not be fully read for this network, so the figures below ` +
+        'may include only PART of that activity. Every affected row is marked "(partial)" where it appears. ' +
+        'This is not a confirmed zero — it is a gap in what could be loaded.',
       { tone: 'warn', title: 'Incomplete data — figures below may understate your activity' },
     )
   }
@@ -735,8 +774,8 @@ function renderEmpty(ctx) {
   noteBlock(
     ctx,
     model.staleClasses.length
-      ? `No activity was found for ${model.period.label} — but ${model.staleClasses.join(', ')} could not be read, ` +
-          'so this is not a confirmed zero. Activity in those categories would not appear here.'
+      ? `No activity was found for ${model.period.label} — but ${formatList(model.staleClassLabels)} could not ` +
+          'be read, so this is not a confirmed zero. Activity in those categories would not appear here.'
       : model.scopeClasses
         ? 'No activity was recorded within the activity types this statement covers. Other activity on this ' +
           'account in this period would not appear here.'

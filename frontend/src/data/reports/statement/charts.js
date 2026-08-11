@@ -20,14 +20,20 @@
 const LEGEND_SWATCH = 6
 const HAIRLINE = 0.4
 
-/** Compact USD for an axis tick: `1.2k`, `340`, `2.5m`. */
+/**
+ * Compact USD for a chart label: `$1.2k`, `$340`, `$2.5m`.
+ *
+ * The currency symbol is not decoration. These labels sit inches from table
+ * cells reading `$2,000.00`, and an unmarked `2k` beside them reads as a
+ * different quantity in a different unit.
+ */
 export function compactUsd(n) {
   const v = Math.abs(Number(n) || 0)
-  if (v >= 1e9) return `${trim(v / 1e9)}b`
-  if (v >= 1e6) return `${trim(v / 1e6)}m`
-  if (v >= 1e3) return `${trim(v / 1e3)}k`
-  if (v >= 1) return String(Math.round(v))
-  return v === 0 ? '0' : v.toFixed(2)
+  if (v >= 1e9) return `$${trim(v / 1e9)}b`
+  if (v >= 1e6) return `$${trim(v / 1e6)}m`
+  if (v >= 1e3) return `$${trim(v / 1e3)}k`
+  if (v >= 1) return `$${Math.round(v)}`
+  return v === 0 ? '$0' : `$${v.toFixed(2)}`
 }
 
 function trim(n) {
@@ -289,15 +295,24 @@ export function drawBreakdownChart(doc, { x, y, w, h }, rows, theme) {
     )
   })
 
-  // One scale rule under the bars, naming the gross quantity they encode.
+  // A scale a reader can actually use: ticks across the rule, not just its
+  // ends. The unit lives in the panel subtitle, so the last tick can sit hard
+  // against the axis terminus instead of being pushed inboard by a caption.
   const baseY = top + rowH * rows.length + 2
   doc.setDrawColor(theme.chart.grid[0], theme.chart.grid[1], theme.chart.grid[2])
   doc.setLineWidth(HAIRLINE)
   doc.line(plotX, baseY, plotX + plotW, baseY)
   setInk(doc, theme.chart.label)
   doc.setFontSize(6.5)
-  doc.text('0', plotX, baseY + 7)
-  doc.text(`${compactUsd(scaleMax)} USD in / out`, plotX + plotW, baseY + 7, { align: 'right' })
+  const ticks = 3
+  for (let i = 0; i <= ticks; i++) {
+    const value = (scaleMax / ticks) * i
+    const tx = plotX + (plotW / ticks) * i
+    doc.line(tx, baseY, tx, baseY + 2)
+    doc.text(compactUsd(value), tx, baseY + 8, {
+      align: i === 0 ? 'left' : i === ticks ? 'right' : 'center',
+    })
+  }
 
   return Math.max(y + h, baseY + 12)
 }

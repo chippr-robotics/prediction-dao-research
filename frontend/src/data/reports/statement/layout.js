@@ -40,18 +40,19 @@ export const FONT = Object.freeze({ sans: 'helvetica', mono: 'courier' })
 export function createContext({ theme, brand, model }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
   doc.setFont(FONT.sans, 'normal')
-  // Pages that already carry a header. Tables add their own pages without going
-  // through newPage(), so without this a long register produced pages with no
-  // masthead at all — a loose sheet of financial figures identifying nobody.
-  return { doc, theme, brand, model, y: PAGE.margin, page: 1, headered: new Set([1]) }
+  // page number -> the section that STARTS on it (null when the page only
+  // continues the previous one). Consumed when headers are stamped.
+  return { doc, theme, brand, model, y: PAGE.margin, page: 1, pageSections: new Map([[1, null]]) }
 }
 
-/** Draw the continuation header on the current page unless it already has one. */
+/**
+ * Note that the current page exists. Tables add pages without going through
+ * newPage(), and a page nobody recorded would end up with no header at all — a
+ * loose sheet of financial figures identifying nobody.
+ */
 export function ensureHeader(ctx) {
   const page = ctx.doc.getCurrentPageInfo().pageNumber
-  if (ctx.headered.has(page)) return ctx
-  ctx.headered.add(page)
-  drawContinuationHeader(ctx)
+  if (!ctx.pageSections.has(page)) ctx.pageSections.set(page, null)
   return ctx
 }
 
@@ -184,8 +185,16 @@ export function drawMasthead(ctx, { title, subtitle, rows }) {
   return ctx
 }
 
-/** Slim repeat of the statement's identity on every page after the first. */
-export function drawContinuationHeader(ctx) {
+/**
+ * Slim repeat of the statement's identity on every page after the first.
+ *
+ * Stamped at the END of the run, not when the page is created. A page is
+ * created while the PREVIOUS section is still finishing, so a header drawn then
+ * names the wrong section — page two would announce "Fees (continued)" above a
+ * table headed "Movement by asset". By stamp time the document knows which
+ * section actually starts on each page, and which pages are a continuation.
+ */
+function drawContinuationHeader(ctx, sectionLabel) {
   const { theme, brand, model } = ctx
   fill(ctx, theme.band)
   ctx.doc.rect(0, 0, PAGE.width, 46, 'F')
@@ -195,7 +204,7 @@ export function drawContinuationHeader(ctx) {
   text(ctx, brand.displayName, PAGE.margin, 22, { size: 9.5, weight: 'bold', color: theme.bandInk })
   // Name the section as well as the document: a page separated from the stack
   // has to say what it is, not just who it belongs to.
-  const where = ctx.section ? `${model.title} — ${ctx.section} (continued)` : model.title
+  const where = sectionLabel ? `${model.title} — ${sectionLabel}` : model.title
   text(ctx, where, PAGE.margin, 34, { size: 7, color: theme.bandInkSoft })
   // The network belongs on EVERY page, not just the first: a testnet page
   // detached from the stack, showing dollar figures and naming no network, is
@@ -226,8 +235,15 @@ export function drawContinuationHeader(ctx) {
 export function stampFooters(ctx, { note }) {
   const { doc, theme, brand, model } = ctx
   const total = doc.getNumberOfPages()
+  let carried = null // the section a continuation page belongs to
   for (let p = 1; p <= total; p++) {
     doc.setPage(p)
+
+    const starts = ctx.pageSections.get(p) || null
+    if (starts) carried = starts
+    // Page one carries the masthead already.
+    if (p > 1) drawContinuationHeader(ctx, starts || (carried ? `${carried} (continued)` : null))
+
     stroke(ctx, theme.rule)
     doc.setLineWidth(0.4)
     doc.line(PAGE.margin, PAGE.bodyBottom + 8, PAGE.width - PAGE.margin, PAGE.bodyBottom + 8)
@@ -264,6 +280,10 @@ export function sectionHeading(ctx, title, standfirst, { needs = 0 } = {}) {
   // foot of a page with the table overleaf.
   ensure(ctx, Math.max(standfirst ? 52 : 40, needs))
   ctx.section = title
+  // The FIRST section to begin on a page names that page; a later one on the
+  // same page does not rename it out from under the reader's eye.
+  const page = ctx.doc.getCurrentPageInfo().pageNumber
+  if (!ctx.pageSections.get(page)) ctx.pageSections.set(page, title)
   const { theme } = ctx
   fill(ctx, theme.accent)
   ctx.doc.rect(PAGE.margin, ctx.y - 8, 2.5, 11, 'F')

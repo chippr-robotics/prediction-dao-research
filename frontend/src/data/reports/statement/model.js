@@ -90,6 +90,29 @@ export function decimalsFor(values) {
   return 6
 }
 
+/**
+ * `A`, `A and B`, `A, B and C`. The statement names lists of activity types in
+ * running prose, and "Earn, Staking could not be read" is not a sentence.
+ */
+export function formatList(items) {
+  const list = items.filter(Boolean).map(String)
+  if (list.length <= 1) return list[0] || ''
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`
+}
+
+/**
+ * A 66-character hash split at a FIXED midpoint. Left to wrap on its own it
+ * broke wherever the column ran out, producing ragged unequal lines and — for a
+ * bridge, which carries two — a row of double height. Both halves are equal and
+ * the break is always in the same place, so two hashes can be compared by eye.
+ */
+export function splitHash(hash) {
+  const value = String(hash || '')
+  if (value.length < 40) return value
+  const half = Math.ceil(value.length / 2)
+  return `${value.slice(0, half)}\n${value.slice(half)}`
+}
+
 /** `12 Jun 2026` — unambiguous across locales, unlike a numeric date. */
 export function formatDate(ms) {
   if (ms == null) return 'Date unavailable'
@@ -258,7 +281,8 @@ export function buildTokenRows(items) {
  * folded into a single "Other" row. Past about six categories adjacent bars
  * stop being distinguishable, and the full list is in the table below anyway.
  */
-export function buildActivityBreakdown(byClass, items = []) {
+export function buildActivityBreakdown(byClass, items = [], staleClasses = []) {
+  const stale = new Set(staleClasses)
   // `byClass.movedUsd` is EVERY neutral entry, which conflates a bridge between
   // the member's own networks with value that simply moved neither way. The
   // statement reports those in different columns, so the split is re-derived
@@ -268,9 +292,10 @@ export function buildActivityBreakdown(byClass, items = []) {
   const extra = {}
   for (const it of items) {
     const key = it.class || 'wager'
-    const e = (extra[key] ||= { bridgeUsd: 0, neutralUsd: 0, feeUnknown: 0 })
+    const e = (extra[key] ||= { bridgeUsd: 0, neutralUsd: 0, neutralUnvalued: 0, feeUnknown: 0 })
     if (isNeutralDirection(it.valueDirection ?? null)) {
       if (isSelfTransfer(it)) e.bridgeUsd += it.usdValue || 0
+      else if (it.valuationStatus === 'unvalued') e.neutralUnvalued += 1
       else e.neutralUsd += it.usdValue || 0
     }
     if (it.platformFee?.status === PLATFORM_FEE_STATUS.UNKNOWN) e.feeUnknown += 1
@@ -279,12 +304,17 @@ export function buildActivityBreakdown(byClass, items = []) {
   const rows = Object.values(byClass || {})
     .map((c) => ({
       key: c.class,
-      label: c.label || classLabel(c.class),
+      // A class the sources could not fully read is marked wherever it appears.
+      // A page-one banner alone let a reader reconcile an incomplete row with
+      // no signal that it was incomplete.
+      label: `${c.label || classLabel(c.class)}${stale.has(c.class) ? ' (partial)' : ''}`,
+      partial: stale.has(c.class),
       count: c.count,
       inUsd: c.inUsd,
       outUsd: c.outUsd,
       movedUsd: extra[c.class]?.bridgeUsd || 0,
       neutralUsd: extra[c.class]?.neutralUsd || 0,
+      neutralUnvalued: extra[c.class]?.neutralUnvalued || 0,
       platformFeesUsd: c.platformFeesUsd,
       platformFeeUnknownCount: extra[c.class]?.feeUnknown || 0,
       volumeUsd: c.inUsd + c.outUsd + c.movedUsd,
@@ -302,14 +332,15 @@ export function buildActivityBreakdown(byClass, items = []) {
       outUsd: acc.outUsd + r.outUsd,
       movedUsd: acc.movedUsd + r.movedUsd,
       neutralUsd: acc.neutralUsd + r.neutralUsd,
+      neutralUnvalued: acc.neutralUnvalued + r.neutralUnvalued,
       platformFeesUsd: acc.platformFeesUsd + r.platformFeesUsd,
       platformFeeUnknownCount: acc.platformFeeUnknownCount + r.platformFeeUnknownCount,
       volumeUsd: acc.volumeUsd + r.volumeUsd,
     }),
     {
       key: '__other__', label: `Other (${tail.length} types)`, count: 0,
-      inUsd: 0, outUsd: 0, movedUsd: 0, neutralUsd: 0, platformFeesUsd: 0,
-      platformFeeUnknownCount: 0, volumeUsd: 0,
+      inUsd: 0, outUsd: 0, movedUsd: 0, neutralUsd: 0, neutralUnvalued: 0,
+      platformFeesUsd: 0, platformFeeUnknownCount: 0, volumeUsd: 0,
     },
   )
   return { rows, chartRows: [...head, other], folded: tail.length }
@@ -360,17 +391,29 @@ export function buildStatementModel(report, options = {}) {
   // Labelling the second as the first would tell a member they bridged money
   // they never bridged, so the statement counts them separately.
   const bridges = settled.filter((it) => isSelfTransfer(it))
-  const movedUsd = bridges.reduce((s, it) => s + (it.usdValue || 0), 0)
+  const movedUsd = bridges
+    .filter((it) => it.valuationStatus !== 'unvalued')
+    .reduce((s, it) => s + (it.usdValue || 0), 0)
+  const movedUnvalued = bridges.filter((it) => it.valuationStatus === 'unvalued').length
   const neutralOther = settled.filter(
     (it) => isNeutralDirection(it.valueDirection ?? null) && !isSelfTransfer(it),
   )
   const neutralOtherUsd = neutralOther.reduce((s, it) => s + (it.usdValue || 0), 0)
   const neutralOtherUnvalued = neutralOther.filter((it) => it.valuationStatus === 'unvalued').length
 
+  // computeTotals skips failed entries wholesale, so their gas never reaches
+  // `overall.feesNative`. But a transaction that reverts still burns gas — that
+  // is real money out of the member's wallet, and a fee total that omits it
+  // under-reports what the period cost them.
+  const failedFeesNative = failed.reduce(
+    (s, it) => s + (typeof it.feeNative === 'number' ? it.feeNative : 0),
+    0,
+  )
+
   const tokens = buildTokenRows(settled)
   // Shared by the register so one asset reads with one precision document-wide.
   const amountDecimals = Object.fromEntries(tokens.map((t) => [t.ticker, t.decimals]))
-  const breakdown = buildActivityBreakdown(byClass, settled)
+  const breakdown = buildActivityBreakdown(byClass, settled, report.staleClasses || [])
   const flow = buildFlowSeries(settled, report.period)
 
   return {
@@ -396,6 +439,7 @@ export function buildStatementModel(report, options = {}) {
       net: moneyIn - moneyOut,
       movedUsd,
       movedCount: bridges.length,
+      movedUnvalued,
       neutralOtherUsd,
       neutralOtherCount: neutralOther.length,
       neutralOtherUnvalued,
@@ -403,7 +447,8 @@ export function buildStatementModel(report, options = {}) {
       pendingCount,
       recordedCount: inScope.length,
       failedCount: failed.length,
-      networkFees: overall.feesNative || 0,
+      networkFees: (overall.feesNative || 0) + failedFeesNative,
+      networkFeesFailed: failedFeesNative,
       networkFeeSymbol: overall.feesNativeSymbol || '',
       platformFeesUsd: overall.platformFeesUsd || 0,
       platformFeeUnknownCount: feeUnknownCount,

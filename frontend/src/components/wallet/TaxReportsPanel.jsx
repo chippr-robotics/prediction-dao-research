@@ -189,7 +189,15 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
         </div>
       )}
 
-      <ReportHistoryList entries={entries} onRedownload={redownload} onRemove={removeEntry} />
+      {/* A re-download must honour the SAME statement choices as a fresh one.
+          Passing `redownload` straight through dropped them, so a member who
+          picked a wagering statement got a full account statement back from
+          their own history — with different totals under the same label. */}
+      <ReportHistoryList
+        entries={entries}
+        onRedownload={(entry, format) => redownload(entry, format, statementOptions)}
+        onRemove={removeEntry}
+      />
     </div>
   )
 }
