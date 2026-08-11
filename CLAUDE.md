@@ -333,6 +333,32 @@ artifacts live under `specs/<feature>/`.
   redirects there. See the FR-030 amendment in `specs/073-miniapp-platform/spec.md`.
   See `docs/developer-guide/miniapps.md` + `docs/runbooks/miniapp-registry-operations.md` +
   `specs/073-miniapp-platform/`.
+- **The nav drawer's height is BOUNDED BY DESIGN (spec 081), and the rail it uses is shared.**
+  `components/ui/PortalNav.jsx` renders the Admin Panel's and My Account's rails as well as the
+  drawer, so the accordion behaviour is **opt-in via `collapsibleGroups`** — absent, the component
+  MUST take the exact render path those surfaces have always taken (a presentational `<span>`
+  heading, no buttons, nothing collapsed; gated by `src/test/PortalNav.test.jsx`). A collapsed
+  section is **UNMOUNTED, not `display:none`** — a heading claiming `aria-expanded="false"` over
+  rows still in the DOM and the tab order is claiming something untrue, so a test asserting on a
+  folded section's item must open it first. Section headings are named **`"<label> section"`**
+  because a group and one of its items can share a name (Tools holds an item called "Apps").
+  Expansion precedence is **filter > active section > stored**, and neither override is ever
+  written back — folding Tools while sitting on Recovery must survive leaving it. Pinned mini-apps
+  are ONE capped strip (`VISIBLE_PINNED_CAP = 5`), never rows again: the drawer's height with 5
+  pins and with 50 must be identical, and the "Show all N (+K)" control sits BELOW the scrolling
+  row (inside it, the one element that discloses hidden pins was itself the first scrolled out of
+  view). Tiles show the catalog's own `artworkFor(slug)` (spec 077) — no new icon field on the
+  registry record, the manifest, or the host object. `nav_sections` + `nav_density` are
+  device-scoped in `fw_global_prefs` and **deliberately absent from
+  `lib/backup/syncedObjects.js`** (a test asserts it); section keys are DERIVED from group labels,
+  so a renamed or hidden group needs no migration. Compact density (a Settings card) is one class on the drawer root
+  with **every** compact rule scoped under it in `AppNavDrawer.css` — never in `PortalNav.css`,
+  which the other two rails read — with a hard 36×36 CSS px floor per interactive target. Note
+  `src/index.css` carries a global `button { padding: 0.6em 1.2em }`: new drawer button classes
+  MUST be written `.app-nav-drawer .<class>` or their content box silently collapses. The Apps
+  group is GONE — the catalog entry lives in **Tools** (tab id `apps` and `/apps/<slug>`
+  unchanged). The desktop 64px gutter renders none of this. See
+  `docs/developer-guide/nav-drawer.md` + `specs/081-nav-drawer-density/`.
 - **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
   The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
   `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE

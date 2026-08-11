@@ -118,6 +118,13 @@ const ALLOW = {
   "virtual:tenant": "Vite virtual module supplied by frontend/vite-plugins/tenant-branding.js",
   "@fairwins/miniapp-sdk": "host-provided shared scope, externalized by the mini-app build preset",
   "k6": "k6 runtime built-in (k6/http, k6/data, k6/metrics) in services/relay-gateway/load/ — supplied by the k6 binary, never an npm package",
+  // scripts/ui/capture-nav-drawer.mjs (spec 081) — a dev-time screenshot harness, never imported
+  // by a shipped path or a merge gate. It resolves playwright from a scratch dir via NODE_PATH and
+  // fails loudly with instructions if it is absent. Declaring it would re-resolve the lockfile,
+  // which is the exposure FR-004 below exists to prevent (npm/cli#4828 drops the optional platform
+  // binary and breaks every Vite build, including the keccak-committed mini-app release path).
+  // A screenshot does not justify that risk.
+  "playwright": "dev-only screenshot harness (scripts/ui/capture-nav-drawer.mjs); resolved via NODE_PATH from outside the repo so the lockfile is never re-resolved — see specs/081-nav-drawer-density/research.md R8",
 };
 
 /** Bare specifier -> package name (`@scope/pkg/sub` -> `@scope/pkg`). */

@@ -293,6 +293,9 @@ describe('WalletPage — Settings tab', () => {
     const { container } = renderPage(connectedWalletContext, SETTINGS_ROUTE)
     expect(cardTitles(container)).toEqual([
       'Home screen',
+      // Menu density (spec 081) — the nav drawer's Comfortable/Compact choice, beside the other
+      // "how this app looks" cards rather than buried in the drawer itself.
+      'Menu density',
       'Wallet',
       'Portfolio',
       'Privacy',
@@ -316,6 +319,8 @@ describe('WalletPage — Settings tab', () => {
     ).map((el) => el.textContent)
     expect(summaries).toContain('Testnet tokens hidden · Zero balances hidden')
     expect(summaries).toContain('All categories')
+    // Menu density (spec 081) states its current value in the header like every other card.
+    expect(summaries).toContain('Comfortable')
   })
 
   it('opens one card at a time', () => {

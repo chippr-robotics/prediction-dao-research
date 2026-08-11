@@ -23,7 +23,7 @@
  * host decides to render, not what that section then reads from the chain.
  */
 import { useEffect } from 'react'
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 
@@ -81,6 +81,7 @@ vi.mock('../../utils/keyRegistryService', () => ({
 
 import WalletPage from '../../pages/WalletPage'
 import AppNavDrawer from '../../components/nav/AppNavDrawer'
+import { __resetNavPreferencesForTests } from '../../lib/nav/navPreferences'
 
 const walletContext = {
   address: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
@@ -236,9 +237,23 @@ function renderDrawer(route = '/app') {
   )
 }
 
-describe('AppNavDrawer — the Apps group after the rewire (spec 073 FR-009)', () => {
-  it('offers one Apps entry and no per-app entries', () => {
+// Spec 081: the Apps catalog entry moved into TOOLS (a group that could only ever hold that one
+// row did not earn a heading of its own), and Tools is an accordion that defaults to folded — so
+// the entry is UNMOUNTED until the header is activated. The header is named "Tools section" so a
+// group heading is never confusable with an item inside it.
+function openAppsSection() {
+  fireEvent.click(screen.getByRole('button', { name: 'Tools section' }))
+}
+
+describe('AppNavDrawer — the Apps entry after the rewire (spec 073 FR-009)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    __resetNavPreferencesForTests()
+  })
+
+  it('offers one Apps entry, inside Tools, and no per-app entries', () => {
     renderDrawer()
+    openAppsSection()
     expect(screen.getByRole('button', { name: 'Apps' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'ClearPath' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Token Mint' })).toBeNull()
@@ -246,6 +261,7 @@ describe('AppNavDrawer — the Apps group after the rewire (spec 073 FR-009)', (
 
   it('routes the Apps entry to the catalog tab', () => {
     renderDrawer()
+    openAppsSection()
     fireEvent.click(screen.getByRole('button', { name: 'Apps' }))
     expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=apps')
   })
@@ -264,6 +280,8 @@ describe('AppNavDrawer — the Apps group after the rewire (spec 073 FR-009)', (
     // `/apps/<slug>` is where a catalog launch lands, so the menu keeps pointing at the section
     // the member is actually in rather than showing nothing selected.
     renderDrawer('/apps/token-mint')
+    // No openAppsSection(): the section holding the current page force-expands (spec 081 FR-004),
+    // so the highlighted entry is never hidden inside a fold.
     expect(screen.getByRole('button', { name: 'Apps' })).toHaveAttribute('aria-current', 'page')
   })
 
@@ -277,6 +295,7 @@ describe('AppNavDrawer — the Apps group after the rewire (spec 073 FR-009)', (
     // never flashes with nothing selected on the way through.
     renderDrawer('/wagers')
     expect(screen.getByRole('button', { name: 'Transfer' })).toHaveAttribute('aria-current', 'page')
+    openAppsSection()
     expect(screen.getByRole('button', { name: 'Apps' })).not.toHaveAttribute('aria-current')
 
     cleanup()
