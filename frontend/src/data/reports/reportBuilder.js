@@ -34,8 +34,15 @@ import {
   SELF_TRANSFER_NOTE,
 } from './activityClassification'
 
+/**
+ * Deliberately un-branded. This string is printed verbatim on every export, and
+ * a white-label tenant's members must not be told they are reading a record of
+ * someone else's platform (spec 072 — never hardcode a tenant identity in a
+ * shipped path). The statement carries the tenant's name in its masthead and
+ * footer, where it belongs.
+ */
 export const REPORT_DISCLAIMER =
-  'This is an informational record of your on-chain FairWins activity — wagers, ' +
+  'This is an informational record of your on-chain activity — wagers, ' +
   'transfers, bridges, liquidity, wager pools, earn, and membership — not tax advice. ' +
   'The platform does not compute tax owed. Consult a qualified professional.'
 
@@ -59,7 +66,7 @@ function isParty(wager, account) {
  *  would report a self-transfer as a disposal; folding both legs in would
  *  double-count it. Only the platform fee actually charged is a cost, and that
  *  is accumulated separately in `platformFeesUsd`. */
-function computeTotals(lineItems, nativeSymbol) {
+export function computeTotals(lineItems, nativeSymbol) {
   const byTicker = {}
   // Collate settled activity by class (wager/transfer/bridge/liquidity/earn/
   // wager pool/membership) so the multi-use ledger reads as a per-activity

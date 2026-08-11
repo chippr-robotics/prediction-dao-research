@@ -7,11 +7,14 @@
  * ledger tracks (wager/transfer/earn/pool/membership) on the connected network.
  */
 
+import { useState } from 'react'
 import { useTaxReport, REPORT_STATUS } from '../../hooks/useTaxReport'
 import { PERIOD_KINDS } from '../../utils/reportPeriods'
 import { classLabel } from '../../data/reports/activityClassification'
+import { defaultSections, STATEMENT_TYPES } from '../../data/reports/statement/reportTypes'
 import ReportPeriodSelector from './ReportPeriodSelector'
 import ReportHistoryList from './ReportHistoryList'
+import StatementOptions from './StatementOptions'
 
 function Totals({ totals, showByClass = false }) {
   const byClass = showByClass && totals.byClass ? Object.values(totals.byClass) : []
@@ -74,12 +77,20 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
     generate, downloadPdf, downloadCsv, redownload, removeEntry,
   } = useTaxReport(hookOptions)
 
+  // Statement type + sections (issue #1026). Defaults to the complete account
+  // statement, so a member who never opens the options gets the whole record.
+  const [statementOptions, setStatementOptions] = useState({
+    type: STATEMENT_TYPES.FULL,
+    classes: null,
+    sections: defaultSections(),
+  })
+
   const generating = status === REPORT_STATUS.GENERATING
 
   // One-click: build the current month-to-date report and download it as a PDF.
   const exportCurrentMonth = async () => {
     const built = await generate({ kind: PERIOD_KINDS.CURRENT_MONTH })
-    if (built) downloadPdf(built)
+    if (built) downloadPdf(built, statementOptions)
   }
 
   if (!account) {
@@ -94,9 +105,9 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
     <div className="tax-reports-section">
       <h3>Reporting</h3>
       <p className="tax-reports-intro">
-        Generate a downloadable record of your on-chain activity — wagers, transfers, bridges,
-        liquidity, wager pools, earn, and membership — for a chosen period on the connected network.
-        This is an informational record, not tax advice.
+        Generate a statement of your on-chain activity — wagers, transfers, bridges, liquidity, wager
+        pools, earn, and membership — for a chosen period on the connected network. Choose a statement
+        type and what to include below. This is an informational record, not tax advice.
       </p>
 
       <div className="report-quick-actions">
@@ -104,6 +115,8 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
           Export current month (PDF)
         </button>
       </div>
+
+      <StatementOptions value={statementOptions} onChange={setStatementOptions} disabled={generating} />
 
       <ReportPeriodSelector onGenerate={generate} disabled={generating} />
 
@@ -165,8 +178,13 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
             </>
           )}
           <div className="report-download-actions">
-            <button type="button" onClick={() => downloadPdf()}>Download PDF</button>
-            <button type="button" onClick={() => downloadCsv()}>Download CSV</button>
+            {/* The PDF is the statement, so it carries the type and section
+                choices; the CSV is the complete machine-readable record and is
+                deliberately never narrowed by them. */}
+            <button type="button" onClick={() => downloadPdf(undefined, statementOptions)}>
+              Download statement (PDF)
+            </button>
+            <button type="button" onClick={() => downloadCsv()}>Download full data (CSV)</button>
           </div>
         </div>
       )}
