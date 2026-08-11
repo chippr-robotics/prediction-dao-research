@@ -15,10 +15,10 @@
  */
 
 import { x25519 } from '@noble/curves/ed25519'
-import { ml_kem768 } from '@noble/post-quantum/ml-kem'
-import { hkdf } from '@noble/hashes/hkdf'
-import { sha256 } from '@noble/hashes/sha256'
-import { sha3_256 } from '@noble/hashes/sha3'
+import { ml_kem768 } from '@noble/post-quantum/ml-kem.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { sha3_256 } from '@noble/hashes/sha3.js'
 import { chacha20poly1305, xchacha20poly1305 } from '@noble/ciphers/chacha'
 import { randomBytes } from '@noble/ciphers/webcrypto'
 import { bytesToHex, hexToBytes, utf8ToBytes, concatBytes } from '@noble/ciphers/utils'
@@ -362,7 +362,7 @@ export function encryptEnvelope(data, recipients, signingVersion = CURRENT_ENCRY
     )
 
     // Derive key encryption key from shared secret
-    const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), ENVELOPE_INFO, 32)
+    const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), utf8ToBytes(ENVELOPE_INFO), 32)
 
     // Encrypt DEK with KEK
     const keyNonce = randomBytes(12)
@@ -418,7 +418,7 @@ export function decryptEnvelope(envelope, myAddress, myPrivateKey) {
   const sharedSecret = x25519.getSharedSecret(myPrivateKey, ephemeralPublicKey)
 
   // Derive key encryption key
-  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), ENVELOPE_INFO, 32)
+  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), utf8ToBytes(ENVELOPE_INFO), 32)
 
   // Decrypt the DEK
   const keyNonce = hexToBytes(wrappedKeyEntry.nonce)
@@ -466,7 +466,7 @@ export function addRecipient(envelope, existingRecipientAddress, existingRecipie
   // Decrypt DEK
   const ephemeralPublicKey = hexToBytes(wrappedKeyEntry.ephemeralPublicKey)
   const sharedSecret = x25519.getSharedSecret(existingRecipientPrivateKey, ephemeralPublicKey)
-  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), ENVELOPE_INFO, 32)
+  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), utf8ToBytes(ENVELOPE_INFO), 32)
   const keyNonce = hexToBytes(wrappedKeyEntry.nonce)
   const wrappedKey = hexToBytes(wrappedKeyEntry.wrappedKey)
   const keyCipher = chacha20poly1305(kek, keyNonce)
@@ -475,7 +475,7 @@ export function addRecipient(envelope, existingRecipientAddress, existingRecipie
   // Encrypt DEK for new recipient
   const ephemeralKeyPair = generateEphemeralKeyPair()
   const newSharedSecret = x25519.getSharedSecret(ephemeralKeyPair.privateKey, newRecipient.publicKey)
-  const newKek = hkdf(sha256, newSharedSecret, new Uint8Array(0), ENVELOPE_INFO, 32)
+  const newKek = hkdf(sha256, newSharedSecret, new Uint8Array(0), utf8ToBytes(ENVELOPE_INFO), 32)
   const newKeyNonce = randomBytes(12)
   const newKeyCipher = chacha20poly1305(newKek, newKeyNonce)
   const newWrappedDek = newKeyCipher.encrypt(dek)
@@ -542,7 +542,7 @@ export function encryptEnvelopeXWing(data, recipients, signingVersion = CURRENT_
     const { cipherText, sharedSecret } = xwingEncapsulate(recipient.publicKey)
 
     // Derive Key Encryption Key (KEK) from X-Wing shared secret
-    const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), XWING_ENVELOPE_INFO, 32)
+    const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), utf8ToBytes(XWING_ENVELOPE_INFO), 32)
 
     // Encrypt DEK with KEK
     const keyNonce = randomBytes(12)
@@ -596,7 +596,7 @@ export function decryptEnvelopeXWing(envelope, myAddress, mySecretKey) {
   const sharedSecret = xwingDecapsulate(xwingCiphertext, mySecretKey)
 
   // Derive Key Encryption Key
-  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), XWING_ENVELOPE_INFO, 32)
+  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), utf8ToBytes(XWING_ENVELOPE_INFO), 32)
 
   // Decrypt the DEK
   const keyNonce = hexToBytes(wrappedKeyEntry.nonce)
@@ -643,7 +643,7 @@ export function addRecipientXWing(envelope, existingRecipientAddress, existingRe
   // Decrypt DEK using X-Wing
   const xwingCiphertext = hexToBytes(wrappedKeyEntry.xwingCiphertext)
   const sharedSecret = xwingDecapsulate(xwingCiphertext, existingRecipientSecretKey)
-  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), XWING_ENVELOPE_INFO, 32)
+  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), utf8ToBytes(XWING_ENVELOPE_INFO), 32)
   const keyNonce = hexToBytes(wrappedKeyEntry.nonce)
   const wrappedKey = hexToBytes(wrappedKeyEntry.wrappedKey)
   const keyCipher = chacha20poly1305(kek, keyNonce)
@@ -651,7 +651,7 @@ export function addRecipientXWing(envelope, existingRecipientAddress, existingRe
 
   // Encrypt DEK for new recipient using X-Wing
   const { cipherText: newCiphertext, sharedSecret: newSharedSecret } = xwingEncapsulate(newRecipient.publicKey)
-  const newKek = hkdf(sha256, newSharedSecret, new Uint8Array(0), XWING_ENVELOPE_INFO, 32)
+  const newKek = hkdf(sha256, newSharedSecret, new Uint8Array(0), utf8ToBytes(XWING_ENVELOPE_INFO), 32)
   const newKeyNonce = randomBytes(12)
   const newKeyCipher = chacha20poly1305(newKek, newKeyNonce)
   const newWrappedDek = newKeyCipher.encrypt(dek)

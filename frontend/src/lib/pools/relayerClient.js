@@ -72,7 +72,7 @@ export function makePoolRelayer(chainId) {
         body: JSON.stringify(payload),
       })
     } catch (e) {
-      throw new Error(`Gasless relay request failed: ${e.message}`)
+      throw new Error(`Gasless relay request failed: ${e.message}`, { cause: e })
     }
 
     let data = null

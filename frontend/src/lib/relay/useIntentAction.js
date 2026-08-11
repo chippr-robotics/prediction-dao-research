@@ -239,7 +239,7 @@ export function useIntentAction({
 
       setStatus(INTENT_STATUS.PENDING)
       const deadline = Date.now() + maxPollMs
-      let last = accepted
+      let last
       while (Date.now() <= deadline) {
         try {
           last = await relayer.pollStatus(accepted.intentId)

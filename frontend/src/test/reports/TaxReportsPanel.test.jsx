@@ -36,8 +36,10 @@ describe('TaxReportsPanel (Story 1 + Story 2)', () => {
     await waitFor(() => expect(screen.getByText(/5 transfer\(s\)/i)).toBeInTheDocument())
     expect(screen.getByText(/Totals/i)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /download pdf/i }))
-    fireEvent.click(screen.getByRole('button', { name: /download csv/i }))
+    // The PDF is the branded statement (issue #1026); the CSV stays the full
+    // machine-readable record and is never narrowed by the statement options.
+    fireEvent.click(screen.getByRole('button', { name: /download statement \(pdf\)/i }))
+    fireEvent.click(screen.getByRole('button', { name: /download full data \(csv\)/i }))
     expect(saveAs).toHaveBeenCalledTimes(2)
 
     // a history entry now appears

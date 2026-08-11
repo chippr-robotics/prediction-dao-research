@@ -23,11 +23,26 @@ wait_for() {  # wait_for <description> <command...>
 
 case "$ROLE" in
   bundler)
+    # Probe alto DIRECTLY at :3000 inside the namespace, not host :8080.
+    # Host :8080 is the origin-lock nginx, and when the lock is armed it 403s any request without
+    # Cloudflare's X-Origin-Auth header — so a local probe through it fails no matter how healthy
+    # alto is. Sending the header from here would mean reading the secret and risking it on a
+    # command line; going straight to alto avoids both and tests the thing we actually care about.
     wait_for "alto serving eth_supportedEntryPoints" bash -c \
-      'curl -fsS -m 10 -X POST http://127.0.0.1:8080/ -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_supportedEntryPoints\",\"params\":[]}" | grep -q 0x5FF137D4'
-    # Proves the RPC round trip alto depends on, not just that it is listening.
+      'docker exec fairwins-bundler-alto wget -qO- --timeout=8 --header="Content-Type: application/json" --post-data="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_supportedEntryPoints\",\"params\":[]}" http://127.0.0.1:3000 | grep -q 0x5FF137D4'
+    # Proves the RPC round trip alto depends on (it binds its listener only after one), not just
+    # that it is listening.
     wait_for "alto reporting chainId 0x89 (Polygon)" bash -c \
-      'curl -fsS -m 10 -X POST http://127.0.0.1:8080/ -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_chainId\",\"params\":[]}" | grep -q 0x89'
+      'docker exec fairwins-bundler-alto wget -qO- --timeout=8 --header="Content-Type: application/json" --post-data="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_chainId\",\"params\":[]}" http://127.0.0.1:3000 | grep -q 0x89'
+    # The origin lock itself must be ARMED — a 403 from host :8080 is the proof. If this returns 200
+    # the lock is disabled (fail-open) and the bundler is exposed to anything that reaches the origin.
+    if curl -s -o /dev/null -m 10 -w '%{http_code}' -X POST http://127.0.0.1:8080/ \
+         -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+       | grep -q 403; then
+      log "OK: origin lock ARMED (host :8080 rejects an unauthenticated request)"
+    else
+      log "WARNING: origin lock appears DISABLED — host :8080 answered an unauthenticated request"
+    fi
     ;;
   gateway)
     wait_for "gateway /status responding" bash -c \

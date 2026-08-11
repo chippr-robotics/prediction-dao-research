@@ -120,7 +120,7 @@ async function loadStats(chainId) {
   if (cached && Date.now() - cached.ts < STATS_TTL_MS) return cached.value
 
   let live = emptyStats()
-  let isLive = false
+  let isLive
   try {
     live = SUBGRAPH_URL ? await fetchFromSubgraph() : await fetchFromRpc(chainId)
     isLive = true

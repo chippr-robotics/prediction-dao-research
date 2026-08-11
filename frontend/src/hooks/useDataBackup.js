@@ -102,7 +102,7 @@ export function useDataBackup() {
         if (!cancelled) { setLastBackupAt(null); setHasRemote(false) }
         return
       }
-      let remote = false
+      let remote
       try { remote = !!(await readPointer(account)) } catch { remote = false }
       if (!cancelled) {
         setLastBackupAt(getUserPreference(account, LAST_BACKUP_KEY, null, true))

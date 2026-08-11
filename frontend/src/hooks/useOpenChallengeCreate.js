@@ -128,7 +128,7 @@ export function useOpenChallengeCreate() {
         const raw = sim.reason || sim.shortMessage || sim.message || ''
         const isAllowanceRevert = /(exceeds|insufficient) allowance/i.test(raw)
         if (!(isAllowanceRevert && allowance < stakeWei)) {
-          throw new Error(translateOpenCreateRevert(raw))
+          throw new Error(translateOpenCreateRevert(raw), { cause: sim })
         }
       }
 

@@ -22,9 +22,27 @@ RC=0
 
 case "$ROLE" in
   bundler)
-    if curl -fsS -m 10 -X POST http://127.0.0.1:8080/ -H 'Content-Type: application/json' \
-         -d '{"jsonrpc":"2.0","id":1,"method":"eth_supportedEntryPoints","params":[]}' 2>/dev/null \
-         | grep -q 0x5FF137D4; then ok entrypoints; else bad "alto not serving eth_supportedEntryPoints"; fi
+    # Straight to alto at :3000 inside the namespace. Host :8080 is the origin-lock nginx, which
+    # 403s any request lacking Cloudflare's X-Origin-Auth header once the lock is armed — probing
+    # through it reports a perfectly healthy alto as down, every minute, forever.
+    if docker exec fairwins-bundler-alto wget -qO- --timeout=8 \
+         --header='Content-Type: application/json' \
+         --post-data='{"jsonrpc":"2.0","id":1,"method":"eth_supportedEntryPoints","params":[]}' \
+         http://127.0.0.1:3000 2>/dev/null | grep -q 0x5FF137D4; then
+      ok entrypoints
+    else
+      bad "alto not serving eth_supportedEntryPoints"
+    fi
+    # alto binds its listener only after a successful RPC round trip, so a stale/failing upstream
+    # shows up here rather than as a dead port.
+    if docker exec fairwins-bundler-alto wget -qO- --timeout=8 \
+         --header='Content-Type: application/json' \
+         --post-data='{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+         http://127.0.0.1:3000 2>/dev/null | grep -q 0x89; then
+      ok chainid
+    else
+      bad "alto RPC round trip failing (no chainId 0x89)"
+    fi
 
     # Re-check the single-alto invariant every minute: a merge to main can re-arm Cloud Run at any
     # time and this VM cannot prevent that — it can only detect it fast.

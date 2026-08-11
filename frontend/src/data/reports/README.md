@@ -29,10 +29,23 @@ enumerate wagers ─► deriveTransfers ─► enrichTransfers ─► filter per
 | `receiptEnrichment.js` | Adds txHash/timestamp/fee from blocks + receipts |
 | `valuation.js` | $1.00 par USD value + cost basis (structured for a future feed) |
 | `tokenMeta.js` | Stablecoin ticker/decimals (config + on-chain fallback) |
-| `pdfReport.js` / `csvReport.js` | Render the report; `file-saver` triggers download |
+| `pdfReport.js` | App seam to the branded statement document (see below) |
+| `statement/` | The **account statement** PDF — issue #1026, `docs/developer-guide/account-statements.md` |
+| `csvReport.js` | The complete machine-readable export; `file-saver` triggers download |
 | `reportHistoryStore.js` | localStorage metadata history (add/list/remove), per account+chainId |
 
 I/O (chain reads) is injected via `dataSource` so the modules are unit-tested
 without a provider; see `src/test/reports/` and `src/test/fixtures/wagers.js`.
 
 `utils/reportPeriods.js` resolves preset/custom periods to UTC ranges.
+
+## Two exports, two jobs
+
+The **PDF is a statement**: a member-facing banking-style document, branded from
+the tenant manifest, and narrowable by statement type (account / wagering /
+earnings / transfers / custom) and by section. Every narrowing is disclosed on
+page one — a scoped statement must never read as a complete one.
+
+The **CSV is the record**: every column, every entry, never narrowed by the
+statement options. When the two could diverge, the CSV is the one to trust and
+the statement says so.

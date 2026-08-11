@@ -155,7 +155,7 @@ export function useTokenFactory() {
       // `owner()` exists only on v1 — calling it on a v2 token returns empty data ("missing revert data"),
       // so it must not be read here. Live owner/roles come from detectCapabilities instead.
       if (record.standard === TOKEN_STANDARD.OPEN_ERC721) {
-        let paused = false
+        let paused
         try {
           paused = await new ethers.Contract(record.tokenAddress, ['function paused() view returns (bool)'], reader).paused()
         } catch {
@@ -173,7 +173,7 @@ export function useTokenFactory() {
         reader
       )
       const [supply, decimals] = await Promise.all([c.totalSupply(), c.decimals()])
-      let paused = false
+      let paused
       try {
         paused = await c.paused()
       } catch {

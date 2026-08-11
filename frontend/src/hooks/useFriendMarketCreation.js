@@ -357,7 +357,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           ipfsCid = uploaded.cid
           metadataReference = buildEncryptedIpfsReference(ipfsCid)
         } catch (e) {
-          throw new Error(`Failed to upload encrypted metadata: ${e.message}`)
+          throw new Error(`Failed to upload encrypted metadata: ${e.message}`, { cause: e })
         }
       } else {
         metadataReference = data.data.description || 'Friend Wager'
@@ -447,7 +447,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           await registry[createMethod].staticCall(...createArgs)
         } catch (simError) {
           const reason = simError.reason || simError.shortMessage || simError.message || ''
-          throw new Error(translateRevert(reason))
+          throw new Error(translateRevert(reason), { cause: simError })
         }
 
         onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
@@ -505,7 +505,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           onProgress({ step: 'create', message: 'Validating transaction...' })
           await registry[createMethod].staticCall(...createArgs, { from: userAddress })
         } catch (simError) {
-          throw new Error(translateRevert(simError.reason || simError.shortMessage || simError.message || ''))
+          throw new Error(translateRevert(simError.reason || simError.shortMessage || simError.message || ''), { cause: simError })
         }
         calls.push({
           target: wagerRegistryAddress,
@@ -600,10 +600,10 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
     } catch (error) {
       console.error('Error creating wager:', error)
       if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-        throw new Error('Transaction was rejected in your wallet.')
+        throw new Error('Transaction was rejected in your wallet.', { cause: error })
       }
       if (error.code === 'INSUFFICIENT_FUNDS') {
-        throw new Error('Insufficient funds to cover the stake and gas.')
+        throw new Error('Insufficient funds to cover the stake and gas.', { cause: error })
       }
       throw error
     }
