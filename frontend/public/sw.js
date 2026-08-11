@@ -226,7 +226,7 @@ self.addEventListener('notificationclick', (event) => {
 // (notifications are derived client-side), but wiring this listener now means a
 // future backend can deliver push without another service-worker change.
 self.addEventListener('push', (event) => {
-  let payload = {}
+  let payload
   try {
     payload = event.data ? event.data.json() : {}
   } catch {

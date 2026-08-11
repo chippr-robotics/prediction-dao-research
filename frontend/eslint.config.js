@@ -29,6 +29,13 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
       // Allow calling setState in effects for initial data loading patterns
       'react-hooks/set-state-in-effect': 'warn',
+      // React Compiler readiness rules (eslint-plugin-react-hooks 7.1+). This codebase does not
+      // run the React Compiler, and these flag patterns that are correct today: Date.now() read
+      // at render time for "is this expired/live" UI, a useMemo deliberately snapshotting a
+      // timestamp rather than ticking with it, and dependency arrays the compiler's own inference
+      // disagrees with but plain React semantics do not require. Kept as warnings, not silenced.
+      'react-hooks/purity': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
     },
   },
   // Configuration for Cypress test files

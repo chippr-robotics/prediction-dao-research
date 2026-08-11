@@ -530,7 +530,7 @@ function FriendMarketsModal({
   const handleQrScanSuccess = (decodedText) => {
     // Try to extract Ethereum address from scanned data
     let address = decodedText
-    let isFromTrustedSource = false
+    let isFromTrustedSource
 
     // If it's a URL, try to extract address from path or query
     try {

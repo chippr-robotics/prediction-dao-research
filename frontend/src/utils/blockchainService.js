@@ -1154,7 +1154,7 @@ export async function grantRoleOnChain(signer, userAddress, roleName, _durationD
     }
   } catch (error) {
     console.error('Error granting role on-chain:', error)
-    throw new Error(error.message || 'Failed to grant role on-chain')
+    throw new Error(error.message || 'Failed to grant role on-chain', { cause: error })
   }
 }
 
@@ -1399,14 +1399,14 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
       } catch (approveError) {
         console.error('Approve failed:', approveError)
         if (approveError.code === 'ACTION_REJECTED' || approveError.code === 4001) {
-          throw new Error('Transaction rejected by user')
+          throw new Error('Transaction rejected by user', { cause: approveError })
         }
         // Check for wallet authorization errors (code 4100)
         if (approveError.code === 4100 || approveError.message?.includes('4100') || approveError.message?.includes('not been authorized')) {
-          throw new Error('Wallet authorization lost. Please reconnect your wallet and try again.')
+          throw new Error('Wallet authorization lost. Please reconnect your wallet and try again.', { cause: approveError })
         }
         // Try to provide more helpful error message
-        throw new Error(`Failed to approve the stablecoin. Please ensure you have enough native token for gas and try again. Details: ${approveError.message || 'Unknown error'}`)
+        throw new Error(`Failed to approve the stablecoin. Please ensure you have enough native token for gas and try again. Details: ${approveError.message || 'Unknown error'}`, { cause: approveError })
       }
     } else {
       emit('approve', 'skipped')
@@ -1456,13 +1456,13 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
     console.error('Error purchasing role:', error)
 
     if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-      throw new Error('Transaction rejected by user')
+      throw new Error('Transaction rejected by user', { cause: error })
     } else if (error.code === 4100 || error.message?.includes('4100') || error.message?.includes('not been authorized')) {
-      throw new Error('Wallet authorization lost. Please reconnect your wallet and try again.')
+      throw new Error('Wallet authorization lost. Please reconnect your wallet and try again.', { cause: error })
     } else if (error.message?.includes('Insufficient stablecoin balance')) {
       throw error
     } else {
-      throw new Error(error.message || 'Transaction failed')
+      throw new Error(error.message || 'Transaction failed', { cause: error })
     }
   }
 }
@@ -1738,11 +1738,11 @@ export async function registerZKKey(signer, publicKey) {
     console.error('Error registering ZK key:', error)
 
     if (error.code === 'ACTION_REJECTED') {
-      throw new Error('Transaction rejected by user')
+      throw new Error('Transaction rejected by user', { cause: error })
     } else if (error.message.includes('not deployed')) {
       throw error
     } else {
-      throw new Error(error.message || 'ZK key registration failed')
+      throw new Error(error.message || 'ZK key registration failed', { cause: error })
     }
   }
 }

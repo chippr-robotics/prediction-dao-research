@@ -22,44 +22,6 @@ export function RoleProvider({ children }) {
   const [isLoading, setIsLoading] = useState(false)
   const [blockchainSynced, setBlockchainSynced] = useState(false)
 
-  // Load roles when wallet connects
-  useEffect(() => {
-    if (isConnected && account) {
-      loadRoles(account, chainId)
-    } else {
-      // Reset to empty when disconnected
-      setRoles([])
-      setBlockchainSynced(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, isConnected, chainId])
-
-  /**
-   * Load roles from both localStorage and blockchain
-   * Blockchain is the source of truth - local storage is synced to match
-   */
-  const loadRoles = useCallback(async (walletAddress, activeChainId) => {
-    setIsLoading(true)
-    try {
-      // First load from local storage (immediate response), scoped to the chain
-      const localRoles = getUserRoles(walletAddress, activeChainId)
-      setRoles(localRoles)
-
-      // Then sync with blockchain (authoritative source)
-      const onChainRoles = await syncRolesWithBlockchain(walletAddress, localRoles, activeChainId)
-      if (onChainRoles) {
-        setRoles(onChainRoles)
-        setBlockchainSynced(true)
-      }
-    } catch (error) {
-      console.error('Error loading user roles:', error)
-      // Keep local roles on error
-    } finally {
-      setIsLoading(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   /**
    * Sync local roles with blockchain state
    * If a role exists on-chain but not locally, add it
@@ -97,6 +59,44 @@ export function RoleProvider({ children }) {
       return null
     }
   }, [])
+
+  /**
+   * Load roles from both localStorage and blockchain
+   * Blockchain is the source of truth - local storage is synced to match
+   */
+  const loadRoles = useCallback(async (walletAddress, activeChainId) => {
+    setIsLoading(true)
+    try {
+      // First load from local storage (immediate response), scoped to the chain
+      const localRoles = getUserRoles(walletAddress, activeChainId)
+      setRoles(localRoles)
+
+      // Then sync with blockchain (authoritative source)
+      const onChainRoles = await syncRolesWithBlockchain(walletAddress, localRoles, activeChainId)
+      if (onChainRoles) {
+        setRoles(onChainRoles)
+        setBlockchainSynced(true)
+      }
+    } catch (error) {
+      console.error('Error loading user roles:', error)
+      // Keep local roles on error
+    } finally {
+      setIsLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Load roles when wallet connects
+  useEffect(() => {
+    if (isConnected && account) {
+      loadRoles(account, chainId)
+    } else {
+      // Reset to empty when disconnected
+      setRoles([])
+      setBlockchainSynced(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, isConnected, chainId])
 
   const hasRole = useCallback((role) => {
     if (!account) return false

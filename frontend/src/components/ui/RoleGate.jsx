@@ -33,7 +33,7 @@ function RoleGate({
   }
 
   // Check if user has required roles
-  let hasAccess = false
+  let hasAccess
   if (requiredAllRoles.length > 0) {
     hasAccess = hasAllRoles(requiredAllRoles)
   } else if (requiredRoles.length > 0) {

@@ -25,7 +25,7 @@ export async function enrichTransfers(rawTransfers = [], { chainId, fetchOnChain
     const meta = await resolveTokenMeta(row.tokenAddress, chainId, { fetchOnChain })
     const key = String(row.tokenAddress || '').toLowerCase()
     tokenMetaByAddress[key] = meta
-    let amount = 0
+    let amount
     try {
       amount = Number(formatUnits(BigInt(row.amountRaw ?? 0), meta.decimals))
     } catch {

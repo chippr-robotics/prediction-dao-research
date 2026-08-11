@@ -167,7 +167,7 @@ function sanitizeData(stored) {
  */
 function readPersisted(account, appId) {
   if (!account) return emptyData()
-  let stored = null
+  let stored
   try {
     stored = getUserPreference(account, appStoreFeatureKey(appId), null, true)
   } catch {

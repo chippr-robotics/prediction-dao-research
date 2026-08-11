@@ -139,7 +139,7 @@ function findRouteForPair(routes, source, destination) {
 /** The Across deposit id in a mined receipt, or null when no deposit log is present. */
 function depositIdFromReceipt(receipt) {
   for (const log of receipt?.logs || []) {
-    let parsed = null
+    let parsed
     try {
       parsed = SPOKE_POOL_IFACE.parseLog({ topics: [...(log.topics || [])], data: log.data })
     } catch {
@@ -488,7 +488,7 @@ export default function BridgeView({ onRecorded } = {}) {
       const provider = readProviderFor(originChainId)
       if (!provider || !txHash || !address) return false
       for (let attempt = 0; attempt < RECEIPT_ATTEMPTS; attempt += 1) {
-        let receipt = null
+        let receipt
         try {
           receipt = await provider.getTransactionReceipt(txHash)
         } catch {

@@ -15,10 +15,9 @@ import { render } from '@testing-library/react'
 import {
   MiniAppHostProvider,
   useMiniAppHost,
-  MiniAppHostError,
-  HOST_REFUSAL,
   STATE_AUDIT_WINDOW_MS,
 } from '../../lib/miniapps/hostContext'
+import { MiniAppHostError, HOST_REFUSAL } from '../../lib/miniapps/hostRefusal.js'
 import { appStoreStorageKey, __resetMiniAppStores } from '../../lib/miniapps/store'
 import { NETWORKS } from '../../config/networks'
 
