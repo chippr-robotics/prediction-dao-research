@@ -1,6 +1,7 @@
-previous: v1.5.4
-commits:  1
-  [fix -> patch] bundler cutover complete — remove the step that would recreate the deleted Cloud Run service (#1134)
+previous: v1.5.5
+commits:  2
+  [unclassified] Merge pull request #1135 from chippr-robotics/release/v1.5.5-changelog
+  [chore -> patch] v1.5.5 [skip release]
 bump:     patch
 reason:   computed
-next:     v1.5.5
+next:     v1.5.6
