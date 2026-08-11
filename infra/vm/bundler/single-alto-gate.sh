@@ -49,8 +49,21 @@ fail() { printf '[single-alto-gate] REFUSE: %s\n' "$*" >&2; exit 1; }
 err_file="$(mktemp)"
 trap 'rm -f "$err_file"' EXIT
 set +e
+# Parse JSON, NOT --format='value(a,b)'. gcloud omits absent fields entirely rather than emitting an
+# empty column, so when minScale is absent (which is the SAFE state — it means 0) the ingress value
+# shifts into $1 and the gate read "minScale=internal". It failed closed, so nothing unsafe happened,
+# but it blocked a legitimate cutover. Positional parsing of possibly-empty fields is ambiguous by
+# construction; read the document instead.
 desc="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT" \
-          --format='value(spec.template.metadata.annotations["autoscaling.knative.dev/minScale"],metadata.annotations["run.googleapis.com/ingress"])' 2>"$err_file")"
+          --format=json 2>"$err_file" \
+        | python3 -c '
+import sys, json
+d = json.load(sys.stdin)
+t = d.get("spec", {}).get("template", {}).get("metadata", {}).get("annotations", {}) or {}
+s = d.get("metadata", {}).get("annotations", {}) or {}
+# Absent minScale means 0; absent ingress means "all" (Cloud Run default, the UNSAFE one).
+print(t.get("autoscaling.knative.dev/minScale", "0"), s.get("run.googleapis.com/ingress", "all"))
+' 2>>"$err_file")"
 rc=$?
 set -e
 
@@ -88,7 +101,15 @@ else
       --filter="metric.type=\"run.googleapis.com/container/instance_count\" AND resource.labels.service_name=\"$SERVICE\"" \
       --format='value(points[0].value.int64Value)' 2>/dev/null | head -1 || true)"
   if [ -z "${active:-}" ]; then
-    log "NOTE: could not read instance_count (advisory check only; the structural checks above passed)."
+    # This fired in the real cutover and the overlap it exists to catch happened anyway: the VM's
+    # service account has roles/run.viewer but NOT roles/monitoring.viewer, so the metric read
+    # returned nothing and this degraded to a notice. Two altos ran for ~4 minutes.
+    # It stays advisory (the structural checks are the guarantee, and they held), but the wording
+    # must not imply the check passed — it did not run. Grant roles/monitoring.viewer to make it real.
+    log "WARNING: instance_count is UNREADABLE — this check did NOT run (likely missing roles/monitoring.viewer)."
+    log "         A draining Cloud Run instance would be invisible here. Note that 'services update'"
+    log "         itself starts an instance to health-check the new revision, so a disarm performed"
+    log "         moments ago may still be draining. Prefer deleting the service outright."
   elif [ "$active" != "0" ]; then
     fail "Cloud Run '$SERVICE' still reports $active live instance(s). Wait for them to drain."
   fi

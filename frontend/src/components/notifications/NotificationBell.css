@@ -44,16 +44,16 @@
   color: var(--text-primary);
 }
 
-/* With unread activity the bell needs to read clearly against the header.
-   Tint the button with the brand color and brighten the glyph so it stands
-   out instead of fading into the surface behind it. */
+/* With unread activity the bell needs to read clearly against the header, so
+   tint the background and border with the brand color. The glyph itself
+   deliberately stays on --text-primary (not --brand-primary) — recoloring it
+   to match this tint put a mid-saturation green stroke on the same pale
+   green-tinted background (~2.25:1 in light mode, below the 3:1 WCAG floor
+   for graphical icons), which reads as an empty circle. The badge, tint, and
+   border already carry the "unread" signal without the glyph recoloring. */
 .notification-bell.has-unread {
   background: color-mix(in srgb, var(--brand-primary) 18%, var(--bg-secondary));
   border-color: var(--brand-primary);
-}
-
-.notification-bell.has-unread .notification-bell-icon {
-  color: var(--brand-primary);
 }
 
 .notification-bell:focus-visible {

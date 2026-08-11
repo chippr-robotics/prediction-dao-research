@@ -151,8 +151,23 @@ least one real relayed intent and one paymaster-sponsored UserOp succeeded.
 #     refuses to touch fairwins-alto-bundler.
 
 # 5c. Lock 1 — make Cloud Run structurally unable to serve a bundler.
+#
+# TRAP, OBSERVED IN THE REAL CUTOVER: `services update` CREATES A NEW REVISION, and deploying a
+# revision starts an instance to health-check it — even with --min-instances=0. So the act of
+# disarming Cloud Run itself briefly runs an alto (measured: instance_count went 1 -> 2 -> 1).
+# Starting the VM's alto immediately after this command therefore OVERLAPS two executors.
 gcloud run services update fairwins-alto-bundler --region us-central1 \
   --min-instances=0 --ingress=internal
+
+# 5c-bis. WAIT FOR THE DRAIN. Do not skip. Poll until this reports 0 for two consecutive readings.
+until [ "$(gcloud monitoring time-series list --project chippr-bots-site-wp \
+    --filter='metric.type="run.googleapis.com/container/instance_count" AND resource.labels.service_name="fairwins-alto-bundler"' \
+    --format='value(points[0].value.int64Value)' 2>/dev/null | head -1)" = "0" ]; do
+  echo "Cloud Run still has a live instance; waiting..."; sleep 60
+done
+# Faster and stronger alternative, if you are not keeping Cloud Run as a rollback target: delete the
+# service outright. A deleted service cannot start an instance at all, and the gate reads NOT_FOUND.
+#   gcloud run services delete fairwins-alto-bundler --region us-central1
 
 # 5d. Confirm the gate agrees. It checks all three paths plus live instance count.
 gcloud compute ssh fairwins-bundler --zone us-central1-a --tunnel-through-iap \
