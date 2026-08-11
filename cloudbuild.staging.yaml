@@ -154,5 +154,17 @@ images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging:$COMMIT_SHA'
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/prediction-dao-research/staging-testnet:$COMMIT_SHA'
 
+# STATED, because the default is 10 minutes and this file spends most of it.
+#
+# Cloud Build's implicit timeout is 600s. This config builds the SPA TWICE — a full workspace
+# install and Vite build per cohort — then pushes and deploys both. The first real run took ~6
+# minutes of that 600s, on a build with no layer cache to lose. A dependency that grows the install,
+# a slower builder, or a third cohort would push it over, and the failure would arrive as a TIMEOUT
+# on a build that was working fine — read as flakiness, retried, and hit again.
+#
+# 30 minutes is ~5x the measured run. It is not there to let a hung build sit: it is there so the
+# ceiling is a number someone chose rather than one nobody noticed.
+timeout: 1800s
+
 options:
   logging: CLOUD_LOGGING_ONLY
