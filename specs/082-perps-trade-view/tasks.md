@@ -9,17 +9,17 @@
 
 ## Phase 2 — Foundational (blocking)
 
-- [ ] T010 [US1] Gateway `src/perps/normalize.js`: venue payload → PerpPair /
+- [x] T010 [US1] Gateway `src/perps/normalize.js`: venue payload → PerpPair /
       PerpPosition DTOs per contracts/gateway-perps-api.md; null-preserving; funding
       interval explicit per venue (Gains v10 hourly, GMX hourly net rate, HL hourly)
-- [ ] T011 [US1] Gateway `src/perps/client.js`: Gains (3 chains) / GMX / Hyperliquid
+- [x] T011 [US1] Gateway `src/perps/client.js`: Gains (3 chains) / GMX / Hyperliquid
       clients, injected `fetchImpl`, timeouts, read retries
-- [ ] T012 [US1] Gateway `src/perps/routes.js`: `/v1/perps/pairs|positions|config`,
+- [x] T012 [US1] Gateway `src/perps/routes.js`: `/v1/perps/pairs|positions|config`,
       pipeline (killswitch → config → validation → quota → cache), per-venue
       isolation, stale-marked cache ≤10×TTL
-- [ ] T013 [US1] Gateway config env block + boot HL fee-cap check (≤10 bps) +
+- [x] T013 [US1] Gateway config env block + boot HL fee-cap check (≤10 bps) +
       `.env.example`; `server.js` mount + `/status.perps`
-- [ ] T014 [P] [US1] Gateway tests `test/perps.test.js`: fixtures per venue,
+- [x] T014 [P] [US1] Gateway tests `test/perps.test.js`: fixtures per venue,
       normalization, merge, degradation, quotas, killswitch, unconfigured 503,
       boot cap throw, config source chain|env-fallback
 

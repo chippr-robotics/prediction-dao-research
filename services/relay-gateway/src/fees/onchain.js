@@ -25,6 +25,10 @@ export const FEE_SERVICE_IDS = {
   // gateway never becomes a second source of truth for a rate.
   bridgeTransfer: ethers.id('bridge.transfer'),
   liquidityDeposit: ethers.id('liquidity.deposit'),
+  // Spec 082. The Hyperliquid builder fee is the one platform-priced perps rate; the gateway
+  // READS it for /v1/perps/config and member disclosure — enforcement happens when an order
+  // carries the builder tuple (execution spec), and the rate's home stays the FeeRouter.
+  perpsHlBuilder: ethers.id('perps.hyperliquid.builder'),
 }
 
 // Spec-067 caps, re-applied at read time like the spec-057 ones above (defense in depth).
@@ -34,6 +38,9 @@ export const LIQUIDITY_DEPOSIT_CAP_BPS = 250
 // Spec-057 hard caps, re-applied at read time (defense in depth).
 const TAKER_CAP_BPS = 100
 const MAKER_CAP_BPS = 50
+
+// Spec-082 cap: Hyperliquid's own 10 bps limit on perps builder fees, re-applied at read time.
+export const PERPS_HL_BUILDER_CAP_BPS = 10
 
 // How long a stale cached value may still be served during an RPC outage before
 // callers drop to env fallback (bounded staleness beats flapping).
@@ -54,6 +61,8 @@ export function createFeeRouterReader(config, providers, opts = {}) {
 
   let cached = null // { takerBps, makerBps, fetchedAt }
   let inflight = null
+  let cachedPerps = null // { bps, fetchedAt }
+  let inflightPerps = null
 
   async function readBps(serviceId, capBps, label) {
     const data = FEE_BPS_IFACE.encodeFunctionData('feeBps', [serviceId])
@@ -102,5 +111,32 @@ export function createFeeRouterReader(config, providers, opts = {}) {
     }
   }
 
-  return { enabled, address: fr.address ?? null, getPolymarketBps }
+  /**
+   * Live Hyperliquid builder-fee bps (spec 082), or null when callers must fall back to the
+   * env-configured value and mark `source: 'env-fallback'`. Same bounded-staleness rules as
+   * getPolymarketBps.
+   */
+  async function getPerpsHlBuilderBps() {
+    if (!enabled) return null
+    if (cachedPerps && now() - cachedPerps.fetchedAt < fr.cacheTtlMs) return cachedPerps.bps
+    if (!inflightPerps) {
+      inflightPerps = readBps(FEE_SERVICE_IDS.perpsHlBuilder, PERPS_HL_BUILDER_CAP_BPS, 'perps.hyperliquid.builder')
+        .then((bps) => {
+          cachedPerps = { bps, fetchedAt: now() }
+          return bps
+        })
+        .finally(() => {
+          inflightPerps = null
+        })
+    }
+    try {
+      return await inflightPerps
+    } catch (err) {
+      log(`[relay-gateway] FeeRouter perps read failed: ${err?.message || err}`)
+      if (cachedPerps && now() - cachedPerps.fetchedAt < fr.cacheTtlMs * STALE_FACTOR) return cachedPerps.bps
+      return null
+    }
+  }
+
+  return { enabled, address: fr.address ?? null, getPolymarketBps, getPerpsHlBuilderBps }
 }
