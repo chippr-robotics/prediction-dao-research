@@ -109,6 +109,41 @@ changes what the statement claims.
     `overall.feesNative` — but a revert still burns gas, and that is real money
     out of the member's wallet. The model adds it back and the tile says so.
 
+## The Reporting page
+
+`TaxReportsPanel` is a statement **centre**, not a form: one primary action, the
+statement you just made, and the ones you made before. Every choice lives in
+`reporting/StatementSheet` — a bottom sheet that opens with a complete account
+statement for the current month already selected, so the common case is open →
+Generate → done.
+
+The split between what is shown and what is folded away is not cosmetic:
+
+- **Statement type is never hidden.** It narrows which activity is reported, so
+  it changes the totals, and the sheet states the scope of the selected type and
+  warns before generating when it narrows the statement.
+- **Sections are folded behind a disclosure.** They change what is printed,
+  never a figure.
+
+`reporting/reportingIcons.js` is the one place that decides which glyph stands
+for which type, section, class and period, resolved against the shared
+`NavIcon` set. An icon is never the only label — every one is rendered beside
+its text.
+
+Three things that broke here and are worth not repeating:
+
+1. **A sheet must import the `.asset-sheet-*` shell itself.** That CSS lives in
+   `AssetDetailSheet.css` and is imported by that component alone; relying on
+   another surface having mounted first left the sheet unstyled and unpositioned
+   on a page that renders nothing else.
+2. **Only use tokens that exist.** `--bg-tertiary` is not defined in
+   `theme.css`, so every use fell back to a hardcoded light grey and rendered
+   light-on-light in dark mode. Resting surfaces are a tint of `--text-primary`,
+   which adapts to whichever theme is active.
+3. **Brand tokens, not `--color-primary`.** The old page rendered its only
+   button in the generic indigo on the one page that produces a *branded
+   document*.
+
 ## Previewing a design change
 
 The statement's layout cannot be asserted in a unit test. Render it and look:
@@ -128,6 +163,24 @@ cross-chain bridge and a failed operation.
 The preview loads the real renderer through Vite's SSR pipeline so
 `virtual:tenant` resolves; it is not a reimplementation.
 
+For the **page** rather than the document:
+
+```bash
+node frontend/scripts/shoot-reporting.mjs /tmp/shots
+```
+
+It starts the app's own dev server, mounts the real panel with fixture data
+through the `hookOptions` seam the panel already exposes for tests, and drives
+the pre-installed Chromium over CDP — no Playwright, because an incremental
+`npm install` in this workspace risks the optional platform binaries
+(`scripts/deps/reinstall.sh`). Nine states × two viewports, including dark mode,
+the empty period and a failed generation.
+
+It also **measures**: every run reports console errors, uncaught exceptions, and
+any element extending past its container. A clipped control is invisible in a
+screenshot you skim and obvious in a measurement — that check is what caught the
+action button being cut in half by the panel's `overflow: clip`.
+
 ## Tests
 
 | File | Covers |
@@ -135,5 +188,6 @@ The preview loads the real renderer through Vite's SSR pipeline so
 | `statementTheme.test.js` | Contrast floors hold for adversarial brands |
 | `statementModel.test.js` | Scope re-derivation, neutral/bridge split, disclosure counts |
 | `statementPdf.test.js` | Renders every degenerate shape; file names never collide |
-| `StatementOptions.test.jsx` | The picker warns about scope and reaches the renderer |
+| `StatementSheet.test.jsx` | Smart defaults, scope warnings, period validation, modal behaviour |
+| `TaxReportsPanel.test.jsx` | Generate → download → result card in one pass |
 | `reportsAccessibility.test.jsx` | axe over the panel and the custom picker |

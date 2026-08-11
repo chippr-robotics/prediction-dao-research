@@ -57,6 +57,15 @@ const ICON_PATHS = {
   // finder-pattern corners plus scattered data pixels, universally read as "QR".
   qrcode: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h3v3" /><path d="M20 14v.01" /><path d="M14 20v.01" /><path d="M20 20v.01" /><path d="M17 17v.01" /></>,
   // Home bottom bar (spec 058) — Pay: value leaving, an up-right outgoing arrow.
+  // Reporting (issue #1026 follow-up): the statement generator is icon-led, so
+  // the set needs a document/period/action vocabulary alongside the nav glyphs.
+  list: <><path d="M4 6.5h3M4 12h3M4 17.5h3" /><path d="M10 6.5h10M10 12h10M10 17.5h10" /></>,
+  calendar: <><rect x="3.5" y="5.5" width="17" height="15" rx="2" /><path d="M3.5 10h17" /><path d="M8 3.5v4M16 3.5v4" /></>,
+  download: <><path d="M12 4v10" /><path d="m8 10.5 4 4 4-4" /><path d="M4.5 17.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-1.5" /></>,
+  plus: <><path d="M12 5.5v13M5.5 12h13" /></>,
+  table: <><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M3.5 9.5h17" /><path d="M9.5 9.5v10" /></>,
+  percent: <><circle cx="7.5" cy="7.5" r="2.5" /><circle cx="16.5" cy="16.5" r="2.5" /><path d="M18.5 5.5 5.5 18.5" /></>,
+  chevronDown: <><path d="m6 9.5 6 6 6-6" /></>,
   arrowOut: <><path d="M7 17 17 7" /><path d="M9.5 7H17v7.5" /></>,
   // Home bottom bar (spec 058) — Request: value arriving, a down-left incoming arrow.
   arrowIn: <><path d="M17 7 7 17" /><path d="M14.5 17H7V9.5" /></>,

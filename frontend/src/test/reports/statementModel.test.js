@@ -205,6 +205,22 @@ describe('what the figures cannot account for', () => {
     expect(model.summary.neutralOtherCount).toBe(1)
   })
 
+  // Spec 067 FR-039a — "pool" alone cannot tell a wager pool from a liquidity
+  // pool, and a statement can legitimately contain both.
+  it('names a wager pool and a liquidity pool distinctly', () => {
+    const model = buildStatementModel(
+      report([
+        entry({ class: 'pool', kind: 'pool_join', valueDirection: 'out', usdValue: 25 }),
+        entry({ class: 'liquidity', kind: 'lp_supply', valueDirection: 'out', usdValue: 200 }),
+        entry({ class: 'bridge', valueDirection: 'none', selfTransfer: true, usdValue: 500 }),
+      ]),
+    )
+    const labels = model.activity.rows.map((r) => r.label)
+    expect(labels).toContain('Wager Pool')
+    expect(labels).toContain('Liquidity')
+    expect(labels).toContain('Bridge')
+  })
+
   it('names stale classes the way the rest of the document names them', () => {
     const model = buildStatementModel(report([entry()], { staleClasses: ['earn', 'staking'] }))
     expect(model.staleClassLabels).toEqual(['Earn', 'Staking'])

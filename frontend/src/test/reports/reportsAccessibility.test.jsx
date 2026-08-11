@@ -2,10 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import TaxReportsPanel from '../../components/wallet/TaxReportsPanel'
-import ReportPeriodSelector from '../../components/wallet/ReportPeriodSelector'
 import ReportHistoryList from '../../components/wallet/ReportHistoryList'
-import StatementOptions from '../../components/wallet/StatementOptions'
-import { defaultSections, STATEMENT_TYPES } from '../../data/reports/statement/reportTypes'
+import StatementSheet from '../../components/wallet/reporting/StatementSheet'
 import { makeFixtureDataSource, USER, REGISTRY, CHAIN_ID } from '../fixtures/wagers'
 
 const NOW = Date.UTC(2026, 5, 18)
@@ -25,8 +23,10 @@ const hookOptions = (saveAs = vi.fn()) => ({
 beforeEach(() => localStorage.clear())
 
 describe('Tax Reports accessibility (WCAG 2.1 AA, Constitution V)', () => {
-  it('period selector has no axe violations', async () => {
-    const { container } = render(<ReportPeriodSelector onGenerate={vi.fn()} nowMs={NOW} />)
+  it('the generate sheet has no axe violations', async () => {
+    const { container } = render(
+      <StatementSheet onClose={vi.fn()} onGenerate={vi.fn()} nowMs={NOW} networkName="Polygon" account="0xabc" />,
+    )
     expect(await axe(container)).toHaveNoViolations()
   })
 
@@ -36,21 +36,22 @@ describe('Tax Reports accessibility (WCAG 2.1 AA, Constitution V)', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  // Issue #1026: the custom mode reveals a second group of checkboxes, which is
-  // the state most likely to lose its labelling.
-  it('statement options have no axe violations, including the custom picker', async () => {
-    const value = { type: STATEMENT_TYPES.CUSTOM, classes: ['wager'], sections: defaultSections() }
-    const { container } = render(<StatementOptions value={value} onChange={vi.fn()} />)
+  // The custom type and the sections disclosure each reveal a second group of
+  // controls — the states most likely to lose their labelling.
+  it('the sheet has no axe violations with every group revealed', async () => {
+    const { container } = render(
+      <StatementSheet onClose={vi.fn()} onGenerate={vi.fn()} nowMs={NOW} networkName="Polygon" account="0xabc" />,
+    )
+    fireEvent.click(screen.getByRole('radio', { name: 'Custom' }))
+    fireEvent.click(screen.getByRole('button', { name: /sections/i }))
     expect(await axe(container)).toHaveNoViolations()
   })
 
   it('the panel has no axe violations after generating a report', async () => {
     const { container } = render(<TaxReportsPanel hookOptions={hookOptions()} />)
-    fireEvent.click(screen.getByLabelText('Custom range'))
-    fireEvent.change(screen.getByLabelText('Custom start date'), { target: { value: '2026-01-01' } })
-    fireEvent.change(screen.getByLabelText('Custom end date'), { target: { value: '2026-05-31' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate report/i }))
-    await waitFor(() => expect(screen.getByText(/5 transfer\(s\)/i)).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /new statement/i }))
+    fireEvent.click(screen.getByRole('button', { name: /generate statement/i }))
+    await waitFor(() => expect(screen.getByLabelText('Latest statement')).toBeInTheDocument())
     expect(await axe(container)).toHaveNoViolations()
   })
 })
