@@ -14,6 +14,33 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.5.5 — 2026-08-10
+
+Promoted from: none — released directly from main
+Previous release: v1.5.1 · Range: `v1.5.1..v1.5.5` (6 commits)
+
+### 🐛 Bug Fixes
+
+- fix(infra): bundler cutover complete — remove the step that would recreate the deleted Cloud Run service (#1134)
+- fix(ci): a release record opened by GITHUB_TOKEN gets no checks and cannot merge (#1130)
+- fix(ci): point dependabot at staging so its PRs are mergeable (#1122)
+
+### 🧹 Maintenance
+
+- chore(release): consolidate 10 lost release records, and stop them accumulating (#1119)
+
+### Artifacts
+
+Range: `v1.5.4..v1.5.5`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | unchanged | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.2.0` |
+
 ## v1.5.1 — 2026-08-10
 
 > **Consolidated record.** This entry covers the whole range **v1.2.5 → v1.5.1**, i.e. it also
