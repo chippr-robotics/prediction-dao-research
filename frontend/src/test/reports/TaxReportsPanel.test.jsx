@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import TaxReportsPanel from '../../components/wallet/TaxReportsPanel'
 import { makeFixtureDataSource, USER, REGISTRY, CHAIN_ID } from '../fixtures/wagers'
 
@@ -22,47 +22,59 @@ function hookOptions(saveAs) {
 
 beforeEach(() => localStorage.clear())
 
-describe('TaxReportsPanel (Story 1 + Story 2)', () => {
-  it('generates a report and shows transfer count, totals, and downloads', async () => {
+/** Open the sheet and generate with whatever is currently selected. */
+async function generateFromSheet({ period } = {}) {
+  fireEvent.click(screen.getByRole('button', { name: /new statement/i }))
+  if (period) fireEvent.click(screen.getByRole('radio', { name: period }))
+  fireEvent.click(screen.getByRole('button', { name: /generate statement/i }))
+}
+
+describe('TaxReportsPanel — the statement centre (issue #1026)', () => {
+  it('generates from the sheet with smart defaults and downloads in one pass', async () => {
     const saveAs = vi.fn()
     render(<TaxReportsPanel hookOptions={hookOptions(saveAs)} />)
 
-    // Custom range Jan–now 2026 (covers the fixture activity).
-    fireEvent.click(screen.getByLabelText('Custom range'))
-    fireEvent.change(screen.getByLabelText('Custom start date'), { target: { value: '2026-01-01' } })
-    fireEvent.change(screen.getByLabelText('Custom end date'), { target: { value: '2026-05-31' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate report/i }))
+    await generateFromSheet()
 
-    await waitFor(() => expect(screen.getByText(/5 transfer\(s\)/i)).toBeInTheDocument())
-    expect(screen.getByText(/Totals/i)).toBeInTheDocument()
-
-    // The PDF is the branded statement (issue #1026); the CSV stays the full
-    // machine-readable record and is never narrowed by the statement options.
-    fireEvent.click(screen.getByRole('button', { name: /download statement \(pdf\)/i }))
-    fireEvent.click(screen.getByRole('button', { name: /download full data \(csv\)/i }))
-    expect(saveAs).toHaveBeenCalledTimes(2)
-
-    // a history entry now appears
-    await waitFor(() => expect(screen.getByText(/saved reports/i)).toBeInTheDocument())
+    // The result lands on the page and the file downloads without a second trip.
+    await waitFor(() => expect(screen.getByLabelText('Latest statement')).toBeInTheDocument())
+    expect(saveAs).toHaveBeenCalledTimes(1)
+    // ...and the sheet gets out of the way once it has done its job.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('exports the current month in one click (generates + downloads a PDF)', async () => {
+  it('offers the finished statement in both formats from the result card', async () => {
     const saveAs = vi.fn()
     render(<TaxReportsPanel hookOptions={hookOptions(saveAs)} />)
+    await generateFromSheet()
+    await waitFor(() => expect(screen.getByLabelText('Latest statement')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: /export current month/i }))
-
-    // The current month-to-date (Jun 2026) covers the fixture activity, so a
-    // report is generated on screen and a single PDF download is triggered.
-    await waitFor(() => expect(saveAs).toHaveBeenCalledTimes(1))
-    expect(screen.getByText(/current month \(jun 2026\)/i)).toBeInTheDocument()
+    const card = screen.getByLabelText('Latest statement')
+    fireEvent.click(within(card).getByRole('button', { name: /pdf/i }))
+    fireEvent.click(within(card).getByRole('button', { name: /csv/i }))
+    expect(saveAs).toHaveBeenCalledTimes(3) // the generate download, plus these two
   })
 
-  it('shows a "no activity" empty state for an empty period', async () => {
+  it('shows the figures a member checks before opening the file', async () => {
     render(<TaxReportsPanel hookOptions={hookOptions(vi.fn())} />)
-    fireEvent.click(screen.getByLabelText('Last calendar year'))
-    fireEvent.click(screen.getByRole('button', { name: /generate report/i }))
-    await waitFor(() => expect(screen.getByText(/no wager activity in this period/i)).toBeInTheDocument())
+    await generateFromSheet({ period: 'Last 12 months' })
+    await waitFor(() => expect(screen.getByLabelText('Latest statement')).toBeInTheDocument())
+    const card = screen.getByLabelText('Latest statement')
+    for (const label of ['In', 'Out', 'Net', 'Entries']) {
+      expect(within(card).getByText(label)).toBeInTheDocument()
+    }
+  })
+
+  it('says so plainly when a period holds no activity', async () => {
+    render(<TaxReportsPanel hookOptions={hookOptions(vi.fn())} />)
+    await generateFromSheet({ period: 'Last tax year' })
+    await waitFor(() => expect(screen.getByText(/no activity recorded for this period/i)).toBeInTheDocument())
+  })
+
+  it('lists saved statements once one has been generated', async () => {
+    render(<TaxReportsPanel hookOptions={hookOptions(vi.fn())} />)
+    await generateFromSheet()
+    await waitFor(() => expect(screen.getByText(/saved statements/i)).toBeInTheDocument())
   })
 
   it('prompts to connect when no account', () => {
@@ -116,32 +128,25 @@ describe('TaxReportsPanel — bridge + liquidity (spec 067 FR-036/FR-039a)', () 
 
   async function generate() {
     render(<TaxReportsPanel hookOptions={{ ...hookOptions(vi.fn()), ledger }} />)
-    fireEvent.click(screen.getByLabelText('Custom range'))
+    fireEvent.click(screen.getByRole('button', { name: /new statement/i }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Custom range' }))
     fireEvent.change(screen.getByLabelText('Custom start date'), { target: { value: '2026-01-01' } })
     fireEvent.change(screen.getByLabelText('Custom end date'), { target: { value: '2026-05-31' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate report/i }))
-    await waitFor(() => expect(screen.getByText(/3 activity entries/i)).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /generate statement/i }))
+    await waitFor(() => expect(screen.getByLabelText('Latest statement')).toBeInTheDocument())
   }
 
-  it('names the wager pool and the liquidity pool distinctly (FR-039a)', async () => {
+  // The per-class breakdown now lives on the statement document rather than on
+  // this page (see statementModel/statementPdf tests for FR-039a naming). What
+  // the PAGE still owes a member is that the headline figures treat a bridge
+  // as neither money in nor money out.
+  it('keeps a cross-network move out of money in and money out (FR-036)', async () => {
     await generate()
-    expect(screen.getByText(/^Wager Pool:/)).toBeInTheDocument()
-    expect(screen.getByText(/^Liquidity:/)).toBeInTheDocument()
-    expect(screen.getByText(/^Bridge:/)).toBeInTheDocument()
-  })
-
-  it('states that a cross-network move is neither income nor a disposal (FR-036)', async () => {
-    await generate()
-    expect(screen.getByText(/Moving your own assets between networks is not income/i)).toBeInTheDocument()
-    expect(
-      screen.getByText(/Moved between your own networks: USD 500\.00 — not income and not a disposal/i),
-    ).toBeInTheDocument()
-    // The overall is the liquidity supply + the wager pool join only.
-    expect(screen.getByText(/Overall: USD 225\.00/)).toBeInTheDocument()
-  })
-
-  it('shows the platform fees actually charged as the cost of that activity', async () => {
-    await generate()
-    expect(screen.getByText(/Platform fees charged: USD 1\.50/)).toBeInTheDocument()
+    const card = screen.getByLabelText('Latest statement')
+    // Out is the liquidity supply (200) + the wager pool join (25); the 500
+    // bridge is in neither column, and the net is the difference of those two.
+    expect(within(card).getByText('$225.00')).toBeInTheDocument()
+    expect(within(card).getByText('-$225.00')).toBeInTheDocument()
+    expect(within(card).getByText('3')).toBeInTheDocument()
   })
 })

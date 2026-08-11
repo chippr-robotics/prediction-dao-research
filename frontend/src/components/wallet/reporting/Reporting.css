@@ -1,0 +1,607 @@
+/*
+ * Reporting section (issue #1026 follow-up).
+ *
+ * Three rules shape everything here:
+ *
+ * 1. Brand tokens, never the generic UI primary. The old panel rendered its
+ *    only real button in `--color-primary` (indigo) on a product whose brand is
+ *    green — on the one page that produces a *branded document*, which is the
+ *    worst possible place for the app and its output to disagree. Every accent
+ *    below reads `--brand-primary`, so a white-label tenant's reporting page
+ *    matches the statement it generates.
+ *
+ * 2. Interactive controls look interactive. The previous "Generate report"
+ *    button had padding and a radius and no fill or border, so the page's
+ *    primary action was invisible against the surface.
+ *
+ * 3. Only tokens that EXIST, and fallbacks that survive both themes. Resting
+ *    surfaces are a tint of `--text-primary` rather than a named grey: an
+ *    invented token silently falls back to its hardcoded value, and a hardcoded
+ *    light grey renders light-on-light in dark mode. That is exactly how the
+ *    unselected tiles and chips became unreadable in dark mode here.
+ */
+
+.tax-reports-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ---------------------------------------------------------------- the header */
+
+.statement-centre-head {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  justify-content: space-between;
+}
+/* The copy block must be allowed to SHRINK. Left at its natural width it
+   claimed the full measure and pushed the action button past the panel's clip
+   boundary, where the card silently cut it in half. */
+.statement-centre-copy {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.statement-centre-head .statement-primary-btn {
+  flex: none;
+}
+.statement-centre-head h3 {
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.statement-centre-head p {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0;
+  max-width: 34rem;
+}
+.statement-connect {
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+
+/* --------------------------------------------------------------- the buttons */
+
+.statement-primary-btn,
+.statement-secondary-btn,
+.statement-ghost-btn {
+  align-items: center;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 600;
+  gap: 0.45rem;
+  justify-content: center;
+  padding: 0.6rem 1.1rem;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+  white-space: nowrap;
+}
+.statement-primary-btn {
+  background: var(--brand-primary, #36b37e);
+  border: 1px solid var(--brand-primary, #36b37e);
+  color: var(--primary-button-text, #fff);
+}
+.statement-primary-btn:hover:not(:disabled) {
+  background: var(--primary-button-hover, #2f9e6e);
+}
+.statement-primary-btn.is-compact {
+  padding: 0.45rem 0.9rem;
+}
+.statement-secondary-btn {
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-primary, #111827);
+}
+.statement-secondary-btn:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36b37e);
+}
+.statement-ghost-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary, #6b7280);
+}
+.statement-ghost-btn:hover {
+  color: var(--brand-primary, #36b37e);
+}
+.statement-primary-btn:active:not(:disabled),
+.statement-secondary-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.statement-primary-btn:disabled,
+.statement-secondary-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.statement-primary-btn:focus-visible,
+.statement-secondary-btn:focus-visible,
+.statement-ghost-btn:focus-visible,
+.statement-icon-btn:focus-visible,
+.statement-chip:focus-visible,
+.statement-pill:focus-visible,
+.statement-type-tile:focus-visible,
+.statement-disclosure:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+
+.statement-icon-btn {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+.statement-icon-btn:hover {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
+}
+.statement-icon-btn.is-danger:hover {
+  border-color: var(--semantic-loss, #e5533d);
+  color: var(--semantic-loss, #e5533d);
+}
+
+/* ---------------------------------------------------------------- the status */
+
+.statement-status:empty {
+  display: none;
+}
+.statement-progress,
+.statement-error {
+  align-items: center;
+  border-radius: 10px;
+  display: flex;
+  font-size: 0.85rem;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+}
+.statement-progress {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 8%, transparent);
+  color: var(--text-primary, #111827);
+}
+.statement-error {
+  background: color-mix(in srgb, var(--semantic-loss, #e5533d) 10%, transparent);
+  color: var(--semantic-loss, #c0392b);
+}
+.statement-spinner {
+  animation: statementSpin 0.9s linear infinite;
+  border: 2px solid color-mix(in srgb, var(--brand-primary, #36b37e) 30%, transparent);
+  border-radius: 50%;
+  border-top-color: var(--brand-primary, #36b37e);
+  height: 14px;
+  width: 14px;
+}
+@keyframes statementSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .statement-spinner {
+    animation-duration: 3s;
+  }
+}
+
+/* ----------------------------------------------------------- the result card */
+
+.statement-result {
+  background: var(--surface-color, var(--bg-secondary, #fff));
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+.statement-result-head {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+}
+.statement-result-icon {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 12%, transparent);
+  border-radius: 10px;
+  color: var(--brand-primary, #36b37e);
+  display: flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+.statement-result-title h4 {
+  font-size: 1rem;
+  margin: 0;
+}
+.statement-result-title p {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  margin: 0.1rem 0 0;
+}
+.statement-result-figures {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+.statement-result-figures > div {
+  background: color-mix(in srgb, var(--text-primary, #111827) 6%, transparent);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+}
+.statement-result-figures dt {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.statement-result-figures dd {
+  font-size: 1.02rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  margin: 0.15rem 0 0;
+}
+.statement-result-figures .is-positive {
+  color: var(--semantic-win, #2ecc71);
+}
+.statement-result-figures .is-negative {
+  color: var(--semantic-loss, #e5533d);
+}
+.statement-result-empty {
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+.statement-result-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.statement-result-notes:empty {
+  display: none;
+}
+.statement-result-notes li {
+  align-items: flex-start;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  font-size: 0.78rem;
+  gap: 0.4rem;
+  line-height: 1.4;
+}
+.statement-result-notes li svg {
+  flex: none;
+  margin-top: 0.1rem;
+}
+.statement-result-notes .is-warning {
+  color: var(--semantic-warning, #b7791f);
+}
+.statement-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* -------------------------------------------------------- saved statements */
+
+.statement-saved h4 {
+  font-size: 0.95rem;
+  margin: 0 0 0.6rem;
+}
+.statement-saved-empty {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.83rem;
+  margin: 0;
+}
+.statement-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.statement-saved-item {
+  align-items: center;
+  background: var(--surface-color, var(--bg-secondary, #fff));
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.6rem 0.7rem;
+}
+.statement-saved-icon {
+  align-items: center;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+}
+.statement-saved-meta {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.statement-saved-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.statement-saved-date {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.75rem;
+}
+.statement-saved-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.statement-legal {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-muted, #9ca3af);
+  font-size: 0.72rem;
+  margin: 0;
+  padding-top: 0.8rem;
+}
+
+/* ------------------------------------------------------------- the sheet */
+
+.statement-sheet {
+  gap: 1rem;
+  padding-bottom: 1.4rem;
+}
+/* The sheet takes focus on open so screen readers land inside it. A visible
+   ring around the entire dialog reads as a rendering fault; the controls it
+   contains keep their own focus indicators. */
+.statement-sheet:focus,
+.statement-sheet:focus-visible {
+  outline: none;
+}
+.statement-sheet-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+.statement-sheet-header h3 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+.statement-sheet-context {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  margin: 0.15rem 0 0;
+}
+.statement-sheet-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.statement-sheet-label {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.statement-sheet-caption {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  margin: 0;
+}
+.statement-sheet-error {
+  color: var(--semantic-loss, #c0392b);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* Type tiles — icon-led, but the label is the accessible name. */
+.statement-type-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(6.2rem, 1fr));
+}
+.statement-type-tile {
+  align-items: center;
+  background: color-mix(in srgb, var(--text-primary, #111827) 6%, transparent);
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 0.4rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.statement-type-tile:hover {
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 45%, transparent);
+}
+.statement-type-tile.is-selected {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 10%, transparent);
+  border-color: var(--brand-primary, #36b37e);
+}
+.statement-type-icon {
+  align-items: center;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  justify-content: center;
+}
+.statement-type-tile.is-selected .statement-type-icon {
+  color: var(--brand-primary, #36b37e);
+}
+.statement-type-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* Period chips and toggle pills share one shape. */
+.statement-chip-row,
+.statement-class-picker,
+.statement-section-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.statement-chip,
+.statement-pill {
+  align-items: center;
+  background: color-mix(in srgb, var(--text-primary, #111827) 6%, transparent);
+  border: 1.5px solid var(--border-color, #e5e7eb);
+  border-radius: 999px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  display: inline-flex;
+  /* `flex: none` — a wrapping flex row shrinks its items below their content by
+     default, which cut the last chip in every row in half. */
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  gap: 0.35rem;
+  padding: 0.42rem 0.8rem;
+  white-space: nowrap;
+}
+.statement-chip:hover,
+.statement-pill:hover {
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 55%, transparent);
+}
+.statement-chip.is-selected {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 12%, transparent);
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #2f8f66);
+}
+.statement-pill {
+  font-weight: 500;
+}
+/* Sections default to ALL on, so an "on" pill is the resting state of seven
+   controls at once — tinting them all brand green turns the default into a
+   wall of colour. On reads as ordinary and present; off reads as withdrawn. */
+.statement-pill.is-on {
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 55%, transparent);
+}
+.statement-pill.is-on svg {
+  color: var(--brand-primary, #36b37e);
+}
+.statement-pill:not(.is-on) {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-muted, #9ca3af);
+}
+
+.statement-date-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.statement-date-range label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 8.5rem;
+}
+.statement-date-range span {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.72rem;
+}
+.statement-date-range input {
+  background: color-mix(in srgb, var(--text-primary, #111827) 6%, transparent);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: inherit;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.6rem;
+}
+
+.statement-disclosure {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.85rem;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  width: 100%;
+}
+.statement-disclosure-label {
+  font-weight: 600;
+}
+.statement-disclosure-value {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  margin-left: auto;
+}
+.statement-disclosure-chevron {
+  align-items: center;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  transition: transform 0.15s ease;
+}
+.statement-disclosure-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.statement-sheet-notice {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--semantic-warning, #f5a623) 12%, transparent);
+  border-radius: 10px;
+  color: var(--text-primary, #111827);
+  display: flex;
+  font-size: 0.78rem;
+  gap: 0.45rem;
+  line-height: 1.45;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+}
+.statement-sheet-notice.is-error {
+  background: color-mix(in srgb, var(--semantic-loss, #e5533d) 12%, transparent);
+}
+.statement-sheet-notice.is-error svg {
+  color: var(--semantic-loss, #c0392b);
+}
+.statement-sheet-notice svg {
+  color: var(--semantic-warning, #b7791f);
+  flex: none;
+  margin-top: 0.1rem;
+}
+
+.statement-sheet-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.statement-sheet-actions .statement-primary-btn {
+  /* `min-width: 0` so the label can shrink instead of pushing the CSV button
+     off the sheet — flex items default to their content width. */
+  flex: 1 1 0;
+  min-width: 0;
+  padding-block: 0.75rem;
+}
+.statement-sheet-actions .statement-secondary-btn {
+  flex: none;
+}
+.statement-sheet-foot {
+  color: var(--text-muted, #9ca3af);
+  font-size: 0.72rem;
+  margin: 0;
+  text-align: center;
+}
+
+/* On a phone the actions stay reachable while the choices scroll. */
+@media (max-width: 30rem) {
+  .statement-centre-head .statement-primary-btn {
+    width: 100%;
+  }
+  .statement-result-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,203 +1,280 @@
 /**
- * TaxReportsPanel — the "Reporting" tab content in My Account
- * (spec 016-wager-tax-report, extended by spec 051; contracts/reports-ui.md).
- * Wires the "export current month" quick action, the period selector, the
- * generation state machine, result/empty/error states, downloads, and the
- * saved-report history together. Reports cover every activity class the unified
- * ledger tracks (wager/transfer/earn/pool/membership) on the connected network.
+ * TaxReportsPanel — the "Reporting" tab in My Account
+ * (spec 016-wager-tax-report, extended by spec 051; contracts/reports-ui.md;
+ * redesigned for issue #1026).
+ *
+ * The page is now a statement CENTRE rather than a form: one primary action,
+ * the statement you just made, and the ones you made before. Every choice —
+ * type, period, sections — moved into StatementSheet, so nothing a member has
+ * to read stands between them and the thing they came for.
+ *
+ * What did NOT move is the disclosure. A statement that could not read part of
+ * your activity, or that excluded failed operations from its totals, says so
+ * here as well as on the document, because the figures on this page are the
+ * ones a member checks first.
  */
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTaxReport, REPORT_STATUS } from '../../hooks/useTaxReport'
-import { PERIOD_KINDS } from '../../utils/reportPeriods'
-import { classLabel } from '../../data/reports/activityClassification'
-import { defaultSections, STATEMENT_TYPES } from '../../data/reports/statement/reportTypes'
-import ReportPeriodSelector from './ReportPeriodSelector'
-import ReportHistoryList from './ReportHistoryList'
-import StatementOptions from './StatementOptions'
+import NavIcon from '../nav/NavIcon'
+import StatementSheet from './reporting/StatementSheet'
+import './reporting/Reporting.css'
+import { buildStatementModel, formatUsd, formatUsdSigned } from '../../data/reports/statement/model'
+import { TYPE_ICONS } from './reporting/reportingIcons'
 
-function Totals({ totals, showByClass = false }) {
-  const byClass = showByClass && totals.byClass ? Object.values(totals.byClass) : []
-  const overall = totals.overall
+/** The figures a member checks before opening the file. */
+function ResultCard({ report, statement, onDownload, onRemake }) {
+  const model = buildStatementModel(report, statement)
+  const summary = model.summary
+  const empty = model.settled.length === 0 && model.failed.length === 0
+
   return (
-    <div className="report-totals">
-      <h4>Totals by token</h4>
-      <ul>
-        {Object.values(totals.byTicker).map((t) => (
-          <li key={t.ticker}>
-            {t.ticker}: net {t.net} ({t.count} entries) — USD {t.usdValue.toFixed(2)}
-            {t.moved ? ` · moved between your own networks: ${t.moved} (USD ${t.movedUsd.toFixed(2)})` : ''}
-          </li>
-        ))}
-        <li>
-          Overall: USD {overall.usdValue.toFixed(2)} · fees {overall.feesNative}{' '}
-          {overall.feesNativeSymbol}
-        </li>
-        {/* Reported beside the overall, never inside it: moving your own assets
-            between networks is neither income nor a disposal (spec 067 FR-036). */}
-        {overall.movedUsd > 0 && (
-          <li>
-            Moved between your own networks: USD {overall.movedUsd.toFixed(2)} — not income and not a
-            disposal, so it is excluded from the overall above.
+    <section className="statement-result" aria-label="Latest statement">
+      <header className="statement-result-head">
+        <span className="statement-result-icon" aria-hidden="true">
+          <NavIcon name={TYPE_ICONS[model.type] || 'bank'} size={20} />
+        </span>
+        <div className="statement-result-title">
+          <h4>{model.title}</h4>
+          <p>
+            {model.period.label} · {model.networkName}
+            {model.isTestnet ? ' · testnet' : ''}
+          </p>
+        </div>
+      </header>
+
+      {empty ? (
+        <p className="statement-result-empty">No activity recorded for this period.</p>
+      ) : (
+        <dl className="statement-result-figures">
+          <div>
+            <dt>In</dt>
+            <dd className="is-positive">{formatUsd(summary.moneyIn)}</dd>
+          </div>
+          <div>
+            <dt>Out</dt>
+            <dd className="is-negative">{formatUsd(summary.moneyOut)}</dd>
+          </div>
+          <div>
+            <dt>Net</dt>
+            <dd className={summary.net < 0 ? 'is-negative' : 'is-positive'}>{formatUsdSigned(summary.net)}</dd>
+          </div>
+          <div>
+            <dt>Entries</dt>
+            <dd>{summary.entryCount}</dd>
+          </div>
+        </dl>
+      )}
+
+      {/* The same qualifications the document prints, at the point a member
+          first reads the numbers. */}
+      <ul className="statement-result-notes">
+        {model.staleClasses.length > 0 && (
+          <li className="is-warning">
+            <NavIcon name="alert" size={14} />
+            {`${model.staleClassLabels.join(', ')} could not be read — these figures may understate your activity.`}
           </li>
         )}
-        {(overall.platformFeesUsd > 0 || overall.platformFeeUnknownCount > 0) && (
+        {summary.failedCount > 0 && (
           <li>
-            Platform fees charged: USD {(overall.platformFeesUsd || 0).toFixed(2)}
-            {overall.platformFeeUnknownCount > 0
-              ? ` · ${overall.platformFeeUnknownCount} entr${overall.platformFeeUnknownCount === 1 ? 'y' : 'ies'} with a platform fee that could not be valued in USD (shown as “unknown”, excluded from this total)`
-              : ''}
+            <NavIcon name="ban" size={14} />
+            {`${summary.failedCount} failed operation${summary.failedCount === 1 ? '' : 's'} listed, excluded from every total.`}
+          </li>
+        )}
+        {model.scopeNote && (
+          <li className="is-warning">
+            <NavIcon name="alert" size={14} />
+            Partial statement — other activity in this period is not included.
           </li>
         )}
       </ul>
-      {byClass.length > 0 && (
-        <>
-          <h4>Totals by activity type</h4>
-          <ul>
-            {byClass.map((c) => (
-              // The human name, not the raw class: "pool" alone cannot tell a
-              // wager pool from a liquidity pool (FR-039a).
-              <li key={c.class}>
-                {c.label || classLabel(c.class)}: {c.count} entr{c.count === 1 ? 'y' : 'ies'} — USD{' '}
-                {c.usdValue.toFixed(2)}
-                {c.movedUsd ? ` · moved between your own networks: USD ${c.movedUsd.toFixed(2)}` : ''}
-                {c.platformFeesUsd ? ` · platform fees: USD ${c.platformFeesUsd.toFixed(2)}` : ''}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
+
+      <div className="statement-result-actions">
+        <button type="button" className="statement-primary-btn is-compact" onClick={() => onDownload('pdf')}>
+          <NavIcon name="download" size={16} />
+          PDF
+        </button>
+        <button type="button" className="statement-secondary-btn" onClick={() => onDownload('csv')}>
+          <NavIcon name="table" size={15} />
+          CSV
+        </button>
+        <button type="button" className="statement-ghost-btn" onClick={onRemake}>
+          Change
+        </button>
+      </div>
+    </section>
   )
 }
 
-export default function TaxReportsPanel({ hookOptions } = {}) {
+function SavedStatements({ entries, onRedownload, onRemove }) {
+  if (!entries.length) {
+    return (
+      <p className="statement-saved-empty">
+        Statements you generate are listed here and can be re-made at any time from the chain.
+      </p>
+    )
+  }
+  return (
+    <ul className="statement-saved-list">
+      {entries.map((entry) => (
+        <li key={entry.id} className="statement-saved-item">
+          <span className="statement-saved-icon" aria-hidden="true">
+            <NavIcon name="reports" size={18} />
+          </span>
+          <span className="statement-saved-meta">
+            <span className="statement-saved-label">{entry.label || 'Statement'}</span>
+            <span className="statement-saved-date">
+              Generated {new Date(entry.createdAt).toLocaleDateString()}
+            </span>
+          </span>
+          <span className="statement-saved-actions">
+            <button
+              type="button"
+              className="statement-icon-btn"
+              onClick={() => onRedownload(entry, 'pdf')}
+              aria-label={`Re-download ${entry.label} as PDF`}
+              title="PDF"
+            >
+              <NavIcon name="download" size={16} />
+            </button>
+            <button
+              type="button"
+              className="statement-icon-btn"
+              onClick={() => onRedownload(entry, 'csv')}
+              aria-label={`Re-download ${entry.label} as CSV`}
+              title="CSV"
+            >
+              <NavIcon name="table" size={16} />
+            </button>
+            <button
+              type="button"
+              className="statement-icon-btn is-danger"
+              onClick={() => onRemove(entry.id)}
+              aria-label={`Remove ${entry.label}`}
+              title="Remove"
+            >
+              <NavIcon name="ban" size={16} />
+            </button>
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export default function TaxReportsPanel({ hookOptions, previewOpenSheet = false } = {}) {
   const {
-    account, status, progress, report, error, entries, isEmpty,
+    account, chainId, status, progress, report, error, entries,
     generate, downloadPdf, downloadCsv, redownload, removeEntry,
   } = useTaxReport(hookOptions)
 
-  // Statement type + sections (issue #1026). Defaults to the complete account
-  // statement, so a member who never opens the options gets the whole record.
-  const [statementOptions, setStatementOptions] = useState({
-    type: STATEMENT_TYPES.FULL,
-    classes: null,
-    sections: defaultSections(),
-  })
+  const [sheetOpen, setSheetOpen] = useState(previewOpenSheet)
+  // The choices the CURRENT result was built from. Held so a re-download and a
+  // history re-make reproduce the same statement rather than a default one.
+  const [statement, setStatement] = useState(null)
 
   const generating = status === REPORT_STATUS.GENERATING
+  const networkName = hookOptions?.getNetwork?.(chainId)?.name || null
 
-  // One-click: build the current month-to-date report and download it as a PDF.
-  const exportCurrentMonth = async () => {
-    const built = await generate({ kind: PERIOD_KINDS.CURRENT_MONTH })
-    if (built) downloadPdf(built, statementOptions)
-  }
+  const handleGenerate = useCallback(
+    async ({ format, period, statement: choices }) => {
+      setStatement(choices)
+      const built = await generate(period)
+      if (!built) return
+      setSheetOpen(false)
+      if (format === 'csv') downloadCsv(built)
+      else downloadPdf(built, choices)
+    },
+    [generate, downloadCsv, downloadPdf],
+  )
+
+  const handleDownload = useCallback(
+    (format) => {
+      if (format === 'csv') downloadCsv()
+      else downloadPdf(undefined, statement || {})
+    },
+    [downloadCsv, downloadPdf, statement],
+  )
 
   if (!account) {
     return (
       <div className="tax-reports-section">
-        <p>Connect your wallet to generate an activity report.</p>
+        <p className="statement-connect">Connect your wallet to generate a statement.</p>
       </div>
     )
   }
 
   return (
     <div className="tax-reports-section">
-      <h3>Reporting</h3>
-      <p className="tax-reports-intro">
-        Generate a statement of your on-chain activity — wagers, transfers, bridges, liquidity, wager
-        pools, earn, and membership — for a chosen period on the connected network. Choose a statement
-        type and what to include below. This is an informational record, not tax advice.
-      </p>
-
-      <div className="report-quick-actions">
-        <button type="button" className="report-quick-btn" onClick={exportCurrentMonth} disabled={generating}>
-          Export current month (PDF)
+      <header className="statement-centre-head">
+        <div className="statement-centre-copy">
+          <h3>Statements</h3>
+          <p>A record of your on-chain activity you can file, share or hand to an accountant.</p>
+        </div>
+        <button
+          type="button"
+          className="statement-primary-btn"
+          onClick={() => setSheetOpen(true)}
+          disabled={generating}
+        >
+          <NavIcon name="plus" size={17} />
+          New statement
         </button>
-      </div>
+      </header>
 
-      <StatementOptions value={statementOptions} onChange={setStatementOptions} disabled={generating} />
-
-      <ReportPeriodSelector onGenerate={generate} disabled={generating} />
-
-      <div aria-live="polite" className="report-status">
+      <div aria-live="polite" className="statement-status">
         {generating && (
-          <p className="report-progress">
+          <p className="statement-progress">
+            <span className="statement-spinner" aria-hidden="true" />
             {progress.label} ({Math.round(progress.fraction * 100)}%)
           </p>
         )}
-        {status === REPORT_STATUS.ERROR && error && (
-          <p className="report-error" role="alert">{error}</p>
+        {/* While the sheet is open it owns the error, so the member reads it
+            once rather than seeing the same alert twice through the scrim. */}
+        {status === REPORT_STATUS.ERROR && error && !sheetOpen && (
+          <p className="statement-error" role="alert">
+            <NavIcon name="alert" size={15} />
+            {error}
+          </p>
         )}
       </div>
 
       {status === REPORT_STATUS.READY && report && (
-        <div className="report-result">
-          {isEmpty ? (
-            <>
-              <p className="report-empty">
-                {report.source === 'ledger'
-                  ? 'No activity in this period.'
-                  : 'No wager activity in this period.'}
-              </p>
-              {/*
-                The coverage note used to live only in the non-empty branch, which suppressed it
-                exactly when it mattered most: a period in which EVERY class failed to load
-                rendered as a bare "No activity in this period." — a total data-collection failure
-                presented as a truthful zero, and the one case a member cannot detect. An empty
-                report with unread classes is not a report of no activity; it is a report that
-                could not look.
-              */}
-              {report.staleClasses?.length > 0 && (
-                <p className="report-note" role="status">
-                  {`This is not a confirmed zero: ${report.staleClasses.join(', ')} could not be read for this network, so activity in those categories would not appear here.`}
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              <p>
-                {report.source === 'ledger'
-                  ? `${report.lineItems.length} activity entr${report.lineItems.length === 1 ? 'y' : 'ies'} for ${report.period.label} on ${report.networkName}.`
-                  : `${report.lineItems.length} transfer(s) for ${report.period.label} on ${report.networkName}.`}
-              </p>
-              {report.totals?.overall?.failedCount > 0 && (
-                <p className="report-note">
-                  {`${report.totals.overall.failedCount} failed operation(s) are listed but excluded from all totals.`}
-                </p>
-              )}
-              {report.staleClasses?.length > 0 && (
-                <p className="report-note" role="status">
-                  {`Could not refresh: ${report.staleClasses.join(', ')} — entries for these classes may be missing.`}
-                </p>
-              )}
-              {report.selfTransferNote && (
-                <p className="report-note">{report.selfTransferNote}</p>
-              )}
-              <Totals totals={report.totals} showByClass={report.source === 'ledger'} />
-            </>
-          )}
-          <div className="report-download-actions">
-            {/* The PDF is the statement, so it carries the type and section
-                choices; the CSV is the complete machine-readable record and is
-                deliberately never narrowed by them. */}
-            <button type="button" onClick={() => downloadPdf(undefined, statementOptions)}>
-              Download statement (PDF)
-            </button>
-            <button type="button" onClick={() => downloadCsv()}>Download full data (CSV)</button>
-          </div>
-        </div>
+        <ResultCard
+          report={report}
+          statement={statement || {}}
+          onDownload={handleDownload}
+          onRemake={() => setSheetOpen(true)}
+        />
       )}
 
-      {/* A re-download must honour the SAME statement choices as a fresh one.
-          Passing `redownload` straight through dropped them, so a member who
-          picked a wagering statement got a full account statement back from
-          their own history — with different totals under the same label. */}
-      <ReportHistoryList
-        entries={entries}
-        onRedownload={(entry, format) => redownload(entry, format, statementOptions)}
-        onRemove={removeEntry}
-      />
+      <section className="statement-saved">
+        <h4>Saved statements</h4>
+        <SavedStatements
+          entries={entries}
+          // A re-make honours the same choices as a fresh statement; passing the
+          // raw handler would silently return a different document under the
+          // same label.
+          onRedownload={(entry, format) => redownload(entry, format, statement || {})}
+          onRemove={removeEntry}
+        />
+      </section>
+
+      <p className="statement-legal">
+        Informational record of on-chain activity — not tax advice, and not a statement of account balances.
+      </p>
+
+      {sheetOpen && (
+        <StatementSheet
+          onClose={() => setSheetOpen(false)}
+          onGenerate={handleGenerate}
+          busy={generating}
+          error={status === REPORT_STATUS.ERROR ? error : null}
+          nowMs={hookOptions?.now?.()}
+          networkName={networkName}
+          account={account}
+        />
+      )}
     </div>
   )
 }
