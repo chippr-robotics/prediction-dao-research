@@ -1,7 +1,7 @@
-previous: v1.5.5
+previous: v1.5.6
 commits:  2
-  [unclassified] Merge pull request #1135 from chippr-robotics/release/v1.5.5-changelog
-  [chore -> patch] v1.5.5 [skip release]
+  [unclassified] Merge pull request #1139 from chippr-robotics/release/v1.5.6-changelog
+  [chore -> patch] v1.5.6 [skip release]
 bump:     patch
 reason:   computed
-next:     v1.5.6
+next:     v1.5.7

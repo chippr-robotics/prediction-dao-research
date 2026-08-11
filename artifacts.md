@@ -1,6 +1,6 @@
 ### Artifacts
 
-Range: `v1.5.5..v1.5.6`
+Range: `v1.5.6..v1.5.7`
 
 | Artifact | Status | Identity |
 |---|---|---|
