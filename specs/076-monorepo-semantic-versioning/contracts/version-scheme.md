@@ -42,6 +42,21 @@ range, not the last one. One `feat` among fifty `chore`s produces a minor releas
 No type maps to `none`. Every merged change contributes to a release, because a release that omits a
 merged change makes the record untrue.
 
+**The one exception, and why it is not a hole in that rule.** A commit whose subject or body carries
+`[skip release]` does not vote. The release process writes that marker on exactly one thing: the
+generated `chore(release): vX.Y.Z` record it commits after publishing. That commit is not a merged
+*change* — it is the writing-down of a release that already happened, so excluding it keeps the
+record true rather than making it incomplete.
+
+Without the exception the train runs on itself: the record reaches `main` inside a pull request, so
+the workflow-level guard (which inspects only the head commit of the push) sees a merge subject, the
+release runs, `chore(release)` classifies as a patch, and the version it mints has a record of its
+own that mints the next one. `v1.5.6` was cut from the merge of the `v1.5.5` record and `v1.5.7`
+from the merge of the `v1.5.6` one — three versions carrying no product change.
+
+It is the **marker** that is honoured, never the `chore(release)` scope: a real change to the release
+tooling is written with that scope too (`v1.5.2` was one), and it must keep counting.
+
 ## 3. What "breaking" means in THIS repository
 
 FR-003 requires this to be written down rather than left to judgment. A change is **breaking** —
