@@ -95,6 +95,12 @@ const PREDICT_CHAIN_IDS = new Set([137])
 // capability also requires real `dex` config, because ETC/Mordor/Amoy build
 // theirs from env vars and yield null when unset.
 const SWAP_CHAIN_IDS = new Set([1, 10, 61, 63, 137, 8453, 42161])
+// Buy crypto / Coinbase Onramp (spec 081): the wallet-sheet Buy button exists ONLY on mainnets
+// that could plausibly be onramped — never testnets. Static layer of the two-layer gate: the
+// relay-gateway's live Buy Options catalog is the dynamic layer and remains the authority, so
+// a listed chain (incl. Ethereum Classic 61) shows Buy ONLY if Coinbase's catalog actually
+// serves it. Mirrors services/relay-gateway/src/onramp/chains.js — keep the two in sync.
+const ONRAMP_CHAIN_IDS = new Set([1, 61, 137])
 
 const earnConfig = () => ({
   provider: { name: 'Morpho', url: 'https://app.morpho.org' },
@@ -233,6 +239,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
         // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
         // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
@@ -328,6 +335,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
         // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
@@ -416,6 +424,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
         // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
@@ -501,6 +510,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
         // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
         // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
@@ -562,6 +572,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
         liquidity: Boolean(this.dex?.positionManager),
@@ -616,6 +627,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
         liquidity: Boolean(this.dex?.positionManager),
@@ -661,6 +673,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
         liquidity: Boolean(this.dex?.positionManager),
@@ -734,6 +747,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
         // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
@@ -788,6 +802,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
         // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
@@ -840,6 +855,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
         // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
@@ -880,6 +896,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
         // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
