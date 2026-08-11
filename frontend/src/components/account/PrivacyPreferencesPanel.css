@@ -1,12 +1,9 @@
 /* Privacy (tilt-to-hide) preferences — mirrors the Portfolio switch idiom (spec 047). */
 
-.privacy-prefs {
+.privacy-prefs .acc__body {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-}
-.privacy-prefs-title {
-  margin: 0;
 }
 .privacy-prefs-row {
   align-items: center;

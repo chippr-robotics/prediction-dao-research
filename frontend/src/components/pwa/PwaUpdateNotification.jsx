@@ -6,7 +6,7 @@ import './PwaUpdateNotification.css'
 /**
  * PwaUpdateNotification — a small, dismissible toast shown when a newer version of the
  * installed app is ready. It doesn't apply the update itself; it routes the user to the
- * Software Update section of their wallet Preferences, where they confirm and install.
+ * Software update card in Settings, where they confirm and install.
  */
 export default function PwaUpdateNotification() {
   const { updateReady } = usePwaUpdate()
@@ -16,7 +16,7 @@ export default function PwaUpdateNotification() {
   if (!updateReady || dismissed) return null
 
   const goToUpdate = () => {
-    navigate('/wallet?tab=preferences#pwa-update')
+    navigate('/wallet?tab=settings#pwa-update')
     setDismissed(true)
   }
 

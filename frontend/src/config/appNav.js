@@ -7,7 +7,7 @@
  *   - WalletPage        — hosts the section panels, keyed by the same tab ids
  *
  * Every section item routes to `/wallet?tab=<id>` (the panels render there); the
- * Home entry is the dashboard. Account / Membership / Network / Preferences
+ * Home entry is the dashboard. Account / Membership / Network / Settings
  * intentionally live on the account button (top right), NOT in this menu, so they
  * are absent from the groups below.
  */
@@ -150,7 +150,7 @@ const RAW_NAV_GROUPS = [
       // 'network' deliberately absent (spec 069): network settings moved to the account
       // button beside Preferences. The app reads every supported network at once, so the
       // active chain is a per-transaction detail rather than a tool you go to — and the
-      // panel is now mostly endpoint configuration, which belongs with preferences. The
+      // panel is now mostly endpoint configuration, which belongs with settings. The
       // tab id stays 'network' so saved links keep resolving (WalletPage hosts it).
     ],
   },

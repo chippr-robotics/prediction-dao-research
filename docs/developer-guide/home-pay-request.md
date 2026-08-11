@@ -58,7 +58,7 @@ Device-scoped (works before connect), graceful fallbacks, `subscribe()` pub/sub.
 Currency is stored as a **kind**, never a symbol — the UI resolves the real
 per-network symbol via `useChainTokens()` (USDC on Polygon/Ethereum/Amoy/
 Sepolia, USC on ETC/Mordor). The settings UI is
-`components/account/HomePreferencesPanel.jsx` (WalletPage → Preferences → Home).
+`components/account/HomePreferencesPanel.jsx` (WalletPage → Settings → Home screen card).
 
 ## Tests
 

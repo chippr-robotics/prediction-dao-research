@@ -11,7 +11,7 @@ const SHOW_DELAY_MS = 1200
  *
  * Visibility rules (all must hold):
  *   - not already running standalone / installed,
- *   - the user hasn't permanently opted out ("Don't show again" → Preferences toggle),
+ *   - the user hasn't permanently opted out ("Don't show again" → Settings toggle),
  *   - the user hasn't dismissed it for this session,
  *   - AND either a native install prompt is available (Chromium) or we're on iOS
  *     Safari (which needs manual Add-to-Home-Screen instructions).

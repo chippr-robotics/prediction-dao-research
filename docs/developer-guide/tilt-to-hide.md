@@ -4,7 +4,7 @@ Spec: [`specs/047-mask-sensitive-values/`](../../specs/047-mask-sensitive-values
 
 Tilt-to-hide masks on-screen monetary figures automatically: on a mobile device,
 balances show while the phone is held at a viewing tilt and hide the moment it is
-laid flat. It is a single app-wide setting in **My Account → Preferences →
+laid flat. It is a single app-wide setting in **Settings →
 Privacy**, enabled by default, and it is display-only — underlying values and
 on-chain state never change.
 

@@ -332,7 +332,7 @@ describe('WalletButton Component - Wagers', () => {
       expect(screen.queryByText('Get USDC')).not.toBeInTheDocument()
       // Personal-account entries moved onto the account button.
       expect(screen.getByText('Account')).toBeInTheDocument()
-      expect(screen.getByText('Preferences')).toBeInTheDocument()
+      expect(screen.getByText('Settings')).toBeInTheDocument()
     })
 
     it('copies the wallet address from the account dropdown header', async () => {

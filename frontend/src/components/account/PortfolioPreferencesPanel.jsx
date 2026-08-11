@@ -1,8 +1,10 @@
 import { useUserPreferences } from '../../hooks/useUserPreferences'
+import AccordionSection from './AccordionSection'
+import NavIcon from '../nav/NavIcon'
 import './PortfolioPreferencesPanel.css'
 
 /**
- * PortfolioPreferencesPanel — the "Portfolio" area of the Preferences tab
+ * PortfolioPreferencesPanel — the "Portfolio" card of the Settings tab
  * (spec 044 v1.1 + v1.2). Two switches: whether the cross-chain portfolio
  * also scans test networks, and whether zero-balance assets are listed
  * (default hidden, FR-023).
@@ -35,9 +37,20 @@ function PortfolioPreferencesPanel() {
   const testnetsOn = Boolean(preferences?.showTestnetAssets)
   const zerosOn = Boolean(preferences?.showZeroBalances)
 
+  // Collapsed summary states BOTH switches — a member checking "why is my test
+  // token missing?" gets the answer without opening anything.
+  const summary = `Testnet tokens ${testnetsOn ? 'shown' : 'hidden'} · Zero balances ${
+    zerosOn ? 'shown' : 'hidden'
+  }`
+
   return (
-    <div className="portfolio-prefs">
-      <h3 className="portfolio-prefs-title">Portfolio</h3>
+    <AccordionSection
+      id="portfolio-prefs"
+      title="Portfolio"
+      summary={summary}
+      icon={<NavIcon name="coin" size={18} />}
+      className="portfolio-prefs"
+    >
       <PrefSwitch
         id="portfolio-prefs-testnet-label"
         label="Show testnet tokens"
@@ -60,7 +73,7 @@ function PortfolioPreferencesPanel() {
         on={zerosOn}
         onToggle={() => setShowZeroBalances(!zerosOn)}
       />
-    </div>
+    </AccordionSection>
   )
 }
 

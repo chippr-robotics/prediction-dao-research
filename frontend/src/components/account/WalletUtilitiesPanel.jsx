@@ -3,7 +3,7 @@ import './WalletUtilitiesPanel.css'
 /**
  * WalletUtilitiesPanel — de-emphasised wallet actions on the Account tab
  * (spec 020 US6, FR-017). Address display/copy, pool phrase language, and QR
- * code moved to the Preferences tab (WalletDisplayPreferencesPanel); the
+ * code moved to the Settings tab (WalletDisplayPreferencesPanel); the
  * sidebar identity's address is now click-to-copy. Disconnect stays here
  * because it's a session action, not a setting.
  */

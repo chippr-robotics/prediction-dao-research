@@ -1,9 +1,11 @@
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { usePrivacy } from '../../hooks/usePrivacy'
+import AccordionSection from './AccordionSection'
+import NavIcon from '../nav/NavIcon'
 import './PrivacyPreferencesPanel.css'
 
 /**
- * PrivacyPreferencesPanel — the "Privacy" area of the Preferences tab (spec 047).
+ * PrivacyPreferencesPanel — the "Privacy" card of the Settings tab (spec 047).
  *
  * A single app-wide tilt-to-hide switch (default on). On devices without motion
  * sensing (desktop / sensor-less) or where motion access is denied, the panel
@@ -39,9 +41,23 @@ function PrivacyPreferencesPanel() {
     sub = 'On — balances hide when you lay your phone flat and show when you hold it up.'
   }
 
+  // The collapsed summary must not claim the feature is working when it cannot:
+  // "On" on a sensor-less or permission-denied device says so in the header.
+  let summary = 'Tilt to hide off'
+  if (on && unsupported) summary = 'Tilt to hide on — inactive on this device'
+  else if (on && denied) summary = 'Tilt to hide on — motion access denied'
+  else if (on) summary = 'Tilt to hide on'
+
   return (
-    <div className="privacy-prefs">
-      <h3 className="privacy-prefs-title">Tilt to hide</h3>
+    <AccordionSection
+      id="privacy-prefs"
+      title="Privacy"
+      summary={summary}
+      badge={on && (unsupported || denied) ? 'Inactive' : null}
+      badgeTone="warn"
+      icon={<NavIcon name="lock" size={18} />}
+      className="privacy-prefs"
+    >
       <div className="privacy-prefs-row">
         <div className="privacy-prefs-text">
           <span className="privacy-prefs-label" id="privacy-prefs-tilt-label">
@@ -60,7 +76,7 @@ function PrivacyPreferencesPanel() {
           <span className="sr-only">{on ? 'Tilt to hide on' : 'Tilt to hide off'}</span>
         </button>
       </div>
-    </div>
+    </AccordionSection>
   )
 }
 

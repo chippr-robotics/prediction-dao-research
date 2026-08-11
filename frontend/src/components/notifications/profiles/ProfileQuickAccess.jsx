@@ -11,7 +11,7 @@ import './ProfileQuickAccess.css'
  * chat-list analog). Shows the active/first profile at a glance; expanding it
  * reveals every profile with manual on/off durations (on, "For 1 hour",
  * "Until <schedule end>"), plus "New profile" and "View settings" links into
- * the Preferences tab.
+ * the Settings tab.
  *
  * @param {{ onClose: () => void }} props onClose closes the parent feed panel
  *   before navigating away.
@@ -23,7 +23,7 @@ function ProfileQuickAccess({ onClose }) {
 
   const go = (hash) => {
     onClose()
-    navigate(`/wallet?tab=preferences${hash}`)
+    navigate(`/wallet?tab=settings${hash}`)
   }
 
   const headline = activeStatus.profile || profiles[0] || null

@@ -1,12 +1,9 @@
 /* Portfolio preferences (spec 044 follow-up) — mirrors the Notifications switch idiom. */
 
-.portfolio-prefs {
+.portfolio-prefs .acc__body {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-}
-.portfolio-prefs-title {
-  margin: 0;
 }
 .portfolio-prefs-row {
   align-items: center;
