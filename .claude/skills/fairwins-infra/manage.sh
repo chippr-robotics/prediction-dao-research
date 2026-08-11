@@ -60,7 +60,31 @@ get_ready() {  # Ready condition for a service name
     --format='value(status.conditions[0].status)' 2>/dev/null || echo "?"
 }
 
+# MIGRATED_TO_VM — the bundler no longer lives on Cloud Run.
+#
+# `manage.sh up` used to run --min-instances=1 on fairwins-alto-bundler. After the VM migration that
+# starts a SECOND executor against alto-executor-key-137 (both ALTO_EXECUTOR_PRIVATE_KEYS and
+# ALTO_UTILITY_PRIVATE_KEY resolve to that one secret), which collides nonces with the VM's alto and
+# is invisible in-band — both instances look healthy. min-instances>0 starts an instance regardless
+# of ingress, so --ingress=internal does NOT protect against this path.
+#
+# This is a hard refusal rather than a warning: the skill's own description tells the operator to run
+# `up` before testing gasless transactions, so it is the lever most likely to be pulled by reflex.
+MIGRATED_TO_VM="fairwins-alto-bundler"
+
 set_min() {  # service-name min-instances
+  if [ "$1" = "$MIGRATED_TO_VM" ]; then
+    cat >&2 <<EOF
+REFUSING: $1 has been migrated to a GCE VM (fairwins-bundler, us-central1-a).
+  Setting min-instances on it would start a second executor against the SAME key as the VM's alto,
+  colliding nonces with no in-band signal. Manage the bundler on the VM instead:
+    gcloud compute ssh fairwins-bundler --zone us-central1-a --tunnel-through-iap \\
+      --command 'sudo systemctl {start,stop,status} fairwins-stack@bundler'
+  To genuinely roll back to Cloud Run, follow the rollback in docs/runbooks/vm-migration.md --
+  it is a THREE-part action, and restoring the cloudbuild step is one of them.
+EOF
+    return 1
+  fi
   gcloud run services update "$1" --project="$PROJECT" --region="$REGION" \
     --min-instances="$2" --quiet >/dev/null
 }

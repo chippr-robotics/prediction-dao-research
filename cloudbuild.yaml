@@ -93,32 +93,24 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
 
-  # --- Alto ERC-4337 bundler origin-lock ingress (spec 041 SC-009) --------------------------------
-  # The bundler is a MULTI-container service (nginx origin-lock ingress + alto sidecar), so it is
-  # rolled out with `gcloud run services replace` of the full 2-container spec — a single-container
-  # `gcloud run deploy` (like the SPA step above) would drop the alto sidecar. Build the nginx image,
-  # then replace the service pinned to this commit. The alto sidecar env is reconciled to live in
-  # services/alto-bundler/deploy/service.yaml; the origin lock arms itself iff ORIGIN_LOCK_SECRET is
-  # present (fail-open). NOTE: this redeploys the bundler on every main merge — acceptable for a
-  # low-traffic bundler with a Secret-Manager executor key; add a path-filtered trigger later to scope it.
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto-bundler-nginx:$COMMIT_SHA'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto-bundler-nginx:latest'
-      - 'services/alto-bundler/nginx'
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '--all-tags', 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto-bundler-nginx']
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: bash
-    args:
-      - '-c'
-      - |
-        sed "s|alto-bundler-nginx:latest|alto-bundler-nginx:$COMMIT_SHA|" \
-          services/alto-bundler/deploy/service.yaml > /workspace/alto-bundler.rendered.yaml
-        gcloud run services replace /workspace/alto-bundler.rendered.yaml --region us-central1 --quiet
+  # --- Alto ERC-4337 bundler — REMOVED, and it must stay removed ---------------------------------
+  # This step used to build the origin-lock nginx image and `gcloud run services replace` the
+  # 2-container bundler service on EVERY merge to main. It is deleted because the bundler is moving
+  # to a GCE VM (infra/vm/, docs/runbooks/vm-migration.md), and the manifest it replaced from
+  # (services/alto-bundler/deploy/service.yaml) still carries `minScale: "1"` and `ingress: all`.
+  #
+  # Leaving it in place would mean any merge to main SILENTLY RE-ARMS the Cloud Run bundler. Because
+  # ALTO_EXECUTOR_PRIVATE_KEYS and ALTO_UTILITY_PRIVATE_KEY both resolve to the same secret
+  # (alto-executor-key-137), that is a second executor on ONE EOA: colliding nonces, stuck bundles,
+  # and — with ALTO_DEPLOY_SIMULATIONS_CONTRACT=true — a cold start that can emit a transaction from
+  # that wallet. There is no in-band detection; both instances look healthy.
+  #
+  # infra/vm/bundler/single-alto-gate.sh detects the condition within 60s and refuses to run the VM's
+  # alto, but it cannot PREVENT it — only the absence of this build step can.
+  #
+  # The inverse also holds: if the bundler is ever rolled BACK to Cloud Run, this step must be
+  # restored (or the manifest re-armed by hand), or the rollback target will be silently disarmed by
+  # the next merge. See the "inverted trap" section of the runbook.
 
   # --- Relay gateway (spec 036) — NOT built or deployed here -----------------------------------
   # The production relayer is a 3-CONTAINER Cloud Run service (policy gateway + from-source OZ
