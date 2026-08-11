@@ -52,9 +52,12 @@
   border-color: var(--brand-primary);
 }
 
-.notification-bell.has-unread .notification-bell-icon {
-  color: var(--brand-primary);
-}
+/* Keep the glyph on the high-contrast --text-primary token even when
+   unread — tinting it to --brand-primary here put a mid-saturation green
+   stroke on the same pale green-tinted background above (~2.25:1 in light
+   mode, below the 3:1 WCAG floor for graphical icons), which reads as an
+   empty circle. The badge + tint + border already carry the "unread"
+   signal, so the icon itself doesn't need to recolor. */
 
 .notification-bell:focus-visible {
   outline: 2px solid var(--brand-primary);
