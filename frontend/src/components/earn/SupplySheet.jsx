@@ -705,7 +705,7 @@ export default function SupplySheet({
     // member opened the sheet should be caught HERE, not by an opaque revert.
     setTxState({ step: 'checking', txUrl: null, error: null, note: null })
     const rpcUrl = NETWORKS[chainId]?.rpcUrl
-    let fresh = null
+    let fresh
     try {
       fresh = await readLiquidityPool({
         chainId,

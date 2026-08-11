@@ -83,13 +83,20 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     }
   }, [isOpen, handleClose])
 
-  // Auto-start scanning as soon as a camera is selected.
-  useEffect(() => {
-    if (!isOpen || !selectedCamera || scanning || starting || error) return
-    if (html5QrCodeRef.current) return
-    startScanning()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, selectedCamera, scanning, starting, error])
+  const handleScanSuccess = useCallback(async (decodedText) => {
+    await stopScanning()
+
+    try {
+      const url = new URL(decodedText)
+      if (onScanSuccess) {
+        onScanSuccess(decodedText, url)
+      }
+    } catch {
+      if (onScanSuccess) {
+        onScanSuccess(decodedText)
+      }
+    }
+  }, [onScanSuccess, stopScanning])
 
   const startScanning = async () => {
     if (!selectedCamera || html5QrCodeRef.current) return
@@ -138,20 +145,13 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     }
   }
 
-  const handleScanSuccess = useCallback(async (decodedText) => {
-    await stopScanning()
-
-    try {
-      const url = new URL(decodedText)
-      if (onScanSuccess) {
-        onScanSuccess(decodedText, url)
-      }
-    } catch {
-      if (onScanSuccess) {
-        onScanSuccess(decodedText)
-      }
-    }
-  }, [onScanSuccess, stopScanning])
+  // Auto-start scanning as soon as a camera is selected.
+  useEffect(() => {
+    if (!isOpen || !selectedCamera || scanning || starting || error) return
+    if (html5QrCodeRef.current) return
+    startScanning()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, selectedCamera, scanning, starting, error])
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {

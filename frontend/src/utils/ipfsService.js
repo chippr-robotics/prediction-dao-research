@@ -124,7 +124,7 @@ const fetchWithRetry = async (url, options = {}) => {
       
       // Don't retry on abort (timeout)
       if (error.name === 'AbortError') {
-        throw new Error('IPFS request timeout')
+        throw new Error('IPFS request timeout', { cause: error })
       }
       
       // Wait before retry (except on last attempt)
@@ -352,7 +352,7 @@ export const uploadJson = async (data, options = {}) => {
   try {
     jsonString = JSON.stringify(data)
   } catch (error) {
-    throw new Error(`Cannot stringify data: ${error.message}`)
+    throw new Error(`Cannot stringify data: ${error.message}`, { cause: error })
   }
 
   // Generate unique timestamped filename for auditing if name not explicitly provided
@@ -428,7 +428,7 @@ export const uploadJson = async (data, options = {}) => {
     clearTimeout(timeoutId)
 
     if (error.name === 'AbortError') {
-      throw new Error('Pinata upload timeout')
+      throw new Error('Pinata upload timeout', { cause: error })
     }
 
     // Re-throw auth errors as-is
@@ -436,7 +436,7 @@ export const uploadJson = async (data, options = {}) => {
       throw error
     }
 
-    throw new Error(`Pinata upload failed: ${error.message}`)
+    throw new Error(`Pinata upload failed: ${error.message}`, { cause: error })
   }
 }
 

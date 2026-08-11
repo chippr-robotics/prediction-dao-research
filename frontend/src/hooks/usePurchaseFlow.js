@@ -46,7 +46,7 @@ export function usePurchaseFlow(deps = {}) {
   const [keyRegOutcome, setKeyRegOutcome] = useState(null) // null | success | skipped | failed
 
   const paramsRef = useRef(null)
-  const receiptRef = useRef(null)
+  const [purchaseReceipt, setPurchaseReceipt] = useState(null)
   const publicKeyRef = useRef(null)
 
   const updateStep = useCallback((id, patch) => {
@@ -123,7 +123,7 @@ export function usePurchaseFlow(deps = {}) {
           if (result?.error) throw result.error
           receipt = result
         }
-        receiptRef.current = receipt
+        setPurchaseReceipt(receipt)
         // Defensively ensure approve (if present) + pay show completed.
         setSteps((prev) => prev.map((s) =>
           (s.id === 'approve' || s.id === 'pay') && s.state !== 'completed'
@@ -179,7 +179,7 @@ export function usePurchaseFlow(deps = {}) {
    */
   const start = useCallback(async (params) => {
     paramsRef.current = params
-    receiptRef.current = null
+    setPurchaseReceipt(null)
     publicKeyRef.current = null
     setKeyRegOutcome(null)
     setStatus('running')
@@ -224,7 +224,7 @@ export function usePurchaseFlow(deps = {}) {
 
   const reset = useCallback(() => {
     paramsRef.current = null
-    receiptRef.current = null
+    setPurchaseReceipt(null)
     publicKeyRef.current = null
     setSteps([])
     setStatus('idle')
@@ -255,7 +255,7 @@ export function usePurchaseFlow(deps = {}) {
     progressFraction,
     keyRegOutcome,
     canContinueAnyway,
-    purchaseReceipt: receiptRef.current,
+    purchaseReceipt,
     start,
     retry,
     continueAnyway,

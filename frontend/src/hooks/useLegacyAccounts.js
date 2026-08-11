@@ -17,7 +17,7 @@ export function useLegacyAccounts() {
   const { address } = useWallet()
   return useMemo(() => {
     if (!address) return []
-    let list = []
+    let list
     try {
       list = legacyKeyVault(address).list()
     } catch {

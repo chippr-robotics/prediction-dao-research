@@ -90,7 +90,7 @@ export function useBridgeAvailability({ chainId: overrideChainId } = {}) {
       return settle({ status: 'unavailable', reason: BRIDGE_UNAVAILABLE_REASON.ROUTER_UNDEPLOYED, config: null })
     }
 
-    let config = null
+    let config
     try {
       config = await readBridgeRouterConfig({
         chainId,

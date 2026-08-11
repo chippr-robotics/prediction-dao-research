@@ -54,7 +54,7 @@ export function createWagerSource({ fetchWagers = fetchFriendMarketsForUser, sca
 
       // Best-effort draw-proposer enrichment — the open-draw proposer is not in the registry struct (spec 017).
       // A failed/partial read retains prior draw state rather than fabricating revokes.
-      let scan = { proposals: [], ok: false }
+      let scan
       try {
         scan = await scanProposals({ chainId, wagerIds: ids })
       } catch {
