@@ -83,8 +83,16 @@ This matters because the mainnet staging service reaches the live Polygon estate
 account with production means a staging defect can drain or rate-limit something members depend on.
 FR-026c is not advice.
 
-Also set both to `noindex`, and grant the Actions identity `roles/cloudbuild.builds.editor` so
-`staging-deploy.yml` can submit `cloudbuild.staging.yaml`.
+Also set both to `noindex`.
+
+**Each service builds itself from the `staging` branch.** CI does not push images: the
+`Staging Candidate` workflow tags `vX.Y.Z-rc.N` and stops there. It used to submit
+`cloudbuild.staging.yaml`, which never worked in a single run — the grant it assumed was never
+made — and left every staging merge marked red by a step that had never functioned. A permanently
+red check reports nothing, and a genuinely stale staging service hid behind it for a day.
+
+So when a staging host is serving the wrong thing, the workflow run is the wrong place to look.
+See "Staging is serving an old build" below.
 
 ---
 
@@ -261,6 +269,36 @@ workflow tagged. The next release fixes it; nothing is broken.
 
 Staging failing does not block production — but a promotion should not proceed on a candidate nobody
 exercised. Fix staging first. Bypassing it is the thing this feature exists to stop.
+
+### Staging is serving an old build
+
+A staging host that is *up* and serving a tree from days ago looks exactly like a working staging
+service until someone goes looking for a change that should be there. Settle it from the bytes it is
+actually serving rather than from a workflow run:
+
+```bash
+BASE=https://<staging-host>
+ENTRY=$(curl -s "$BASE/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+curl -s "$BASE$ENTRY" > /tmp/deployed.js
+
+# A string the change ADDED, and one it REMOVED. Both answers matter:
+grep -c "New statement"    /tmp/deployed.js   # expect 1 once deployed
+grep -c "Reporting period" /tmp/deployed.js   # expect 0 once deployed
+```
+
+A string the repository no longer contains anywhere, still present in the deployed bundle, is proof
+the service has not rebuilt — not a routing or caching question, and nothing a hard refresh fixes.
+
+Two further reads, both cheap:
+
+- **The drawer footer.** `vX.Y.Z-rc.N` means the build carried a candidate identity;
+  `unreleased+<sha>` names the exact commit; a bare `unreleased` means the build got no
+  `VITE_APP_VERSION`/`VITE_GIT_SHA` at all, which tells you the builder is not passing them.
+- **Compare chunk hashes with production.** Identical `vendor-*.js` and `index-*.css` with a
+  different `contracts-*.js` says "same source tree, different build-time config" — i.e. staging is
+  configured correctly and is simply stale, rather than pointed at the wrong branch.
+
+Then go to the service's own build configuration. CI does not deploy staging (see §4).
 
 ---
 
