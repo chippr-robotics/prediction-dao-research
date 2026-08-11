@@ -41,6 +41,7 @@ import {
   ACCOUNT_DEFAULT_VIEW,
   accountViewFromParam,
   PORTFOLIO_PATH,
+  TAB_ALIASES,
 } from '../config/appNav'
 import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../lib/predict/predictClient'
@@ -94,9 +95,8 @@ const WALLET_TABS = [
   { id: 'apps', label: 'Apps' },
 ]
 
-// Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade"; the
-// old standalone Backup tab is now part of the combined "Recovery" panel; the
-// Preferences tab is now "Settings" — the app's global settings surface).
+// Legacy deep-link aliases live in config/appNav.js — the drawer resolves the same
+// map, and two copies of it drifted the last time a tab was renamed.
 //
 // Spec 073 (FR-009). The Apps nav group collapsed to the single mini-app catalog entry, and both
 // apps that used to live in it are packages now: `?tab=tokens` and `?tab=clearpath` REDIRECT to
@@ -105,7 +105,6 @@ const WALLET_TABS = [
 // package: it moved into the Transfer section as `?tab=paytransfer&view=wagers`, and the legacy
 // `/wagers` route redirects there from App.jsx. This map must stay in parity with the copy in
 // components/nav/AppNavDrawer.jsx.
-const TAB_ALIASES = { swap: 'trade', backup: 'security', preferences: 'settings' }
 
 /**
  * Tabs that have BECOME mini-apps (spec 073 T027) or moved into another section. Unlike
