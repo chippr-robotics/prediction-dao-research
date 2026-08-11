@@ -22,7 +22,7 @@ const MODE_HINTS = {
  * NotificationPreferencesPanel — the base-layer delivery controls: (1) enable
  * mobile push and (2) choose, per notification category, whether it's pushed
  * to the device, shown in-app only, or kept silent (feed only). Since spec 059
- * this no longer stands alone on the Preferences tab — it renders inside the
+ * this no longer stands alone on the Settings tab — it renders inside the
  * NotificationProfilesPanel's "Delivery settings" disclosure (`embedded`),
  * which suppresses the standalone heading/hint so the page has a single
  * Notifications section. Device-scoped (a phone's push permission is

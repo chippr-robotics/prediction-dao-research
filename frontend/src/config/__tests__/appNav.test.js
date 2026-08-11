@@ -62,20 +62,30 @@ describe('appNav — Network placement (spec 069 FR-001)', () => {
   })
 })
 
-// Spec 073 (US1, FR-009) — the Apps group is the mini-app CATALOG, not a hardcoded app list.
+// Spec 073 (US1, FR-009) — the Apps ENTRY is the mini-app CATALOG, not a hardcoded app list.
 //
 // The nav can no longer name the apps: which ones exist is decided by the on-chain registry, so
-// the group collapses to one entry that opens the catalog. The half of this change that must be
+// the group collapsed to one entry that opens the catalog. The half of this change that must be
 // invisible is the legacy one — ClearPath and Token Mint left the MENU, not the app, and their
 // tabs keep rendering until their packages are actually published (T027 / T029, R11 phasing).
-describe('appNav — Apps group is the mini-app catalog (spec 073 FR-009)', () => {
-  it('collapses the group to a single catalog entry', () => {
-    expect(groupNamed('Apps').items).toEqual([{ id: 'apps', label: 'Apps', icon: 'grid' }])
+//
+// Spec 081 finished the collapse: a group that holds exactly one row and can never gain a second
+// (the registry decides membership, not the nav) does not earn a heading, a separator and — now
+// that headings fold — a whole accordion. The entry moved into Tools. Only the GROUPING changed:
+// the `apps` tab id and the `/apps/<slug>` routes are untouched, which is what the assertions
+// below are really protecting.
+describe('appNav — the Apps entry is the mini-app catalog (spec 073 FR-009, spec 081)', () => {
+  it('is a single catalog entry, and lives in Tools rather than a group of its own', () => {
+    expect(groupNamed('Apps')).toBeUndefined()
+    expect(groupNamed('Tools').items).toContainEqual({ id: 'apps', label: 'Apps', icon: 'grid' })
+    // Exactly one entry app-wide — the door, not the rooms.
+    const appsEntries = NAV_GROUPS.flatMap((g) => g.items).filter((item) => item.id === 'apps')
+    expect(appsEntries).toHaveLength(1)
   })
 
-  it('routes the catalog to /wallet?tab=apps and keeps it in the Apps group', () => {
+  it('routes the catalog to /wallet?tab=apps, whichever group holds it', () => {
     expect(pathForNavItem('apps')).toBe('/wallet?tab=apps')
-    expect(groupForTab('apps').label).toBe('Apps')
+    expect(groupForTab('apps').label).toBe('Tools')
   })
 
   it('no longer surfaces ClearPath or Token Mint anywhere in the nav model', () => {
@@ -99,14 +109,16 @@ describe('appNav — Apps group is the mini-app catalog (spec 073 FR-009)', () =
   })
 
   it('keeps Wagers out of the group model — it is a view inside Transfer, not a section', () => {
-    expect(groupNamed('Apps').items.map((item) => item.id)).not.toContain('wagers')
+    expect(NAV_GROUPS.flatMap((g) => g.items).map((item) => item.id)).not.toContain('wagers')
     expect(pathForNavItem('wagers')).toBe('/wallet?tab=paytransfer&view=wagers')
   })
 
   it('drops the catalog entry through the chain-aware filter like any other item', () => {
-    const hidden = visibleNavGroups({ apps: false })
-    expect(hidden.some((group) => group.label === 'Apps')).toBe(false)
-    expect(visibleNavGroups({}).some((group) => group.label === 'Apps')).toBe(true)
+    const appsIds = (groups) => groups.flatMap((g) => g.items).map((item) => item.id)
+    expect(appsIds(visibleNavGroups({ apps: false }))).not.toContain('apps')
+    expect(appsIds(visibleNavGroups({}))).toContain('apps')
+    // Tools survives the catalog being hidden — it has other items, so only the row disappears.
+    expect(visibleNavGroups({ apps: false }).some((group) => group.label === 'Tools')).toBe(true)
   })
 })
 
@@ -131,22 +143,23 @@ describe('appNav — Apps group is tenant-gated on the miniapps feature', () => 
     return import('../appNav')
   }
 
-  it('removes the group entirely for a tenant without miniapps — never present-but-empty', async () => {
+  it('removes the entry entirely for a tenant without miniapps — never present-but-empty', async () => {
     const nav = await navWithoutFeature('miniapps')
     expect(nav.isNavItemEnabledForTenant('apps')).toBe(false)
-    expect(nav.NAV_GROUPS.some((group) => group.label === 'Apps')).toBe(false)
+    expect(nav.NAV_GROUPS.flatMap((g) => g.items).map((i) => i.id)).not.toContain('apps')
     expect(nav.groupForTab('apps')).toBeNull()
-    // Nothing else moves: the other sections are exactly as the default tenant sees them.
+    // Nothing else moves: the other sections are exactly as the default tenant sees them, and
+    // Tools survives losing one row because it has others.
     expect(nav.NAV_GROUPS.map((group) => group.label)).toEqual(['Finance', 'Tools'])
   })
 
-  it('leaves the Apps group intact for the default tenant, which enables miniapps', async () => {
+  it('leaves the catalog entry intact for the default tenant, which enables miniapps', async () => {
     // Same re-import path with a feature the tenant never had, proving the gate above is the
     // 'miniapps' flag rather than an artefact of re-importing the module.
     const nav = await navWithoutFeature('not-a-real-feature')
     expect(nav.isNavItemEnabledForTenant('apps')).toBe(true)
-    expect(nav.NAV_GROUPS.find((group) => group.label === 'Apps').items).toEqual([
+    expect(nav.NAV_GROUPS.find((group) => group.label === 'Tools').items).toContainEqual(
       { id: 'apps', label: 'Apps', icon: 'grid' },
-    ])
+    )
   })
 })

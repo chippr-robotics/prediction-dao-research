@@ -62,7 +62,7 @@ export function useOpenChallengeAccept() {
       try {
         await registry.acceptOpenWager.staticCall(wagerId, claimCodeSig)
       } catch (sim) {
-        throw new Error(translateAcceptRevert(sim.reason || sim.shortMessage || sim.message || ''))
+        throw new Error(translateAcceptRevert(sim.reason || sim.shortMessage || sim.message || ''), { cause: sim })
       }
 
       onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })
@@ -242,7 +242,7 @@ export function useOpenChallengeAccept() {
         // (expired, wrong signature, membership, …) is still surfaced.
         const isAllowanceRevert = /(exceeds|insufficient) allowance/i.test(raw)
         if (!(isAllowanceRevert && allowance < stake)) {
-          throw new Error(translateAcceptRevert(raw))
+          throw new Error(translateAcceptRevert(raw), { cause: sim })
         }
       }
       onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })

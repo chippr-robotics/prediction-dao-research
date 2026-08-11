@@ -35,10 +35,21 @@ jobs:
   release:
     name: Publish release
     runs-on: ubuntu-latest
-    # The CHANGELOG commit this job pushes must not trigger it again.
+    # A cheap short-circuit, and NOT the guard that holds.
+    #
+    # `head_commit` is the tip of the push. The CHANGELOG commit reaches `main` inside a pull
+    # request (see "Prepare the changelog and manifest commit" below), so the tip of that push is
+    # the MERGE commit — "Merge pull request #NNNN from …/release/vX.Y.Z-changelog" — and the
+    # marker one commit deeper is invisible here. This condition was the only defence, and the
+    # train ran on itself: v1.5.6 was cut from the merge of the v1.5.5 record and v1.5.7 from the
+    # merge of the v1.5.6 one, three versions with no product change in them.
+    #
+    # Broadening it to `github.event.commits.*.message` would be worse than useless — a promotion
+    # that back-merged a record would then skip the whole release. The marker is honoured where a
+    # commit's worth is actually decided, per-commit, in scripts/release/classify.js.
     if: "!contains(github.event.head_commit.message, '[skip release]')"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history AND tags: the version is computed from the commit range since the last
           # tag, so a shallow clone would silently produce a wrong answer rather than an error.

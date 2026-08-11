@@ -1,137 +1,50 @@
 /**
- * PDF renderer for the wager tax/activity report
- * (spec 016-wager-tax-report, FR-007/FR-008/FR-009; contracts/report-line-item.md).
+ * PDF entry point for the activity report (spec 016-wager-tax-report,
+ * FR-006/FR-007/FR-008/FR-009; contracts/report-line-item.md).
  *
- * Human-readable document: header (account, network, period, generated-at),
- * the canonical line-item table, per-stablecoin + overall totals, the par
- * valuation note, and the not-tax-advice disclaimer. Long hashes/addresses use
- * a small monospaced cell and wrap — never truncated (FR-006).
+ * The document itself is the branded account statement in ./statement/ (issue
+ * #1026). This module stays the stable seam the app and the report history call
+ * through: it resolves the ACTIVE TENANT's identity and palette and hands them
+ * to the pure renderer, so nothing downstream of here knows a tenant exists.
+ *
+ * Callers may pass a statement type, an explicit class scope, and section
+ * toggles; the defaults reproduce a complete account statement.
  */
 
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
-import { reportColumns, lineItemToRow } from './csvReport'
+import { renderStatement, statementFileName } from './statement/statementPdf'
+import { statementBrand, statementThemeForTenant } from './statement/brand'
+
+/** Tenant identity + palette, unless the caller injected their own (tests, preview). */
+function withTenant(options) {
+  return {
+    ...options,
+    brand: options.brand || statementBrand(),
+    theme: options.theme || statementThemeForTenant(),
+  }
+}
 
 /**
  * @param {object} report - ActivityReport from buildReport
+ * @param {object} [options] - { type, classes, sections, title, brand, theme }
  * @returns {Blob} application/pdf
  */
-export function render(report) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
-  const marginX = 32
-  let y = 40
-
-  doc.setFontSize(16)
-  // The ledger export spans every activity class; the legacy path is wager-only.
-  doc.text(report.source === 'ledger' ? 'FairWins Activity Report' : 'Wager Activity / Tax Report', marginX, y)
-  y += 20
-
-  doc.setFontSize(9)
-  const headerLines = [
-    `Account: ${report.account}`,
-    `Network: ${report.networkName}${report.isTestnet ? ' (testnet)' : ''} · chain ${report.chainId}`,
-    `Period: ${report.period.label}`,
-    `Generated: ${new Date(report.generatedAt).toISOString()}`,
-  ]
-  // Spec 051 disclosures mirror the CSV preamble.
-  if (report.staleClasses?.length) {
-    headerLines.push(`Coverage note: could not refresh ${report.staleClasses.join(', ')} — entries may be missing.`)
-  }
-  if (report.prunedBefore != null) {
-    headerLines.push(`Retention note: device-local entries before ${new Date(report.prunedBefore).toISOString()} were pruned.`)
-  }
-  if (report.totals?.overall?.failedCount > 0) {
-    headerLines.push(`${report.totals.overall.failedCount} failed operation(s) listed but excluded from all totals.`)
-  }
-  if (report.totals?.overall?.platformFeeUnknownCount > 0) {
-    const n = report.totals.overall.platformFeeUnknownCount
-    headerLines.push(`${n} entr${n === 1 ? 'y' : 'ies'} carry a platform fee that could not be valued in USD — marked "unknown".`)
-  }
-  for (const line of headerLines) {
-    doc.text(line, marginX, y)
-    y += 13
-  }
-
-  autoTable(doc, {
-    head: [reportColumns(report)],
-    body: report.lineItems.map((it) => lineItemToRow(it, report)),
-    startY: y + 6,
-    styles: { fontSize: 6, font: 'courier', cellPadding: 2, overflow: 'linebreak' },
-    headStyles: { fontSize: 6, fillColor: [40, 40, 40] },
-    margin: { left: marginX, right: marginX },
-  })
-
-  let afterTableY = (doc.lastAutoTable?.finalY || y) + 18
-  doc.setFontSize(9)
-  doc.text('Totals by token', marginX, afterTableY)
-  afterTableY += 13
-  doc.setFontSize(8)
-  for (const t of Object.values(report.totals.byTicker)) {
-    const moved = t.moved ? `, moved between your networks ${t.moved} (USD ${t.movedUsd.toFixed(2)})` : ''
-    doc.text(
-      `${t.ticker}: deposits ${t.deposits}, payouts ${t.payouts}, refunds ${t.refunds}, net ${t.net}, USD ${t.usdValue.toFixed(2)}${moved}`,
-      marginX,
-      afterTableY,
-    )
-    afterTableY += 12
-  }
-
-  // Collated per-activity breakdown for the multi-use ledger export.
-  const byClass = report.totals?.byClass
-  if (report.source === 'ledger' && byClass && Object.keys(byClass).length) {
-    afterTableY += 6
-    doc.setFontSize(9)
-    doc.text('Totals by activity type', marginX, afterTableY)
-    afterTableY += 13
-    doc.setFontSize(8)
-    for (const c of Object.values(byClass)) {
-      // The human activity name leads: "pool" alone cannot tell a wager pool
-      // from a liquidity pool (FR-039a).
-      const moved = c.movedUsd ? `, moved between your networks USD ${c.movedUsd.toFixed(2)}` : ''
-      const platformFees = c.platformFeesUsd ? `, platform fees USD ${c.platformFeesUsd.toFixed(2)}` : ''
-      doc.text(
-        `${c.label || c.class} (${c.class}): ${c.count} entr${c.count === 1 ? 'y' : 'ies'}, in USD ${c.inUsd.toFixed(2)}, out USD ${c.outUsd.toFixed(2)}, USD ${c.usdValue.toFixed(2)}${moved}${platformFees}`,
-        marginX,
-        afterTableY,
-      )
-      afterTableY += 12
-    }
-  }
-
-  const o = report.totals.overall
-  doc.text(`Overall: USD ${o.usdValue.toFixed(2)}, fees ${o.feesNative} ${o.feesNativeSymbol}`, marginX, afterTableY)
-  afterTableY += 12
-  // Beside the overall, never inside it (FR-036).
-  if (o.movedUsd) {
-    doc.text(
-      `Moved between your own networks: USD ${o.movedUsd.toFixed(2)} — not income, not a disposal; excluded from the overall above.`,
-      marginX,
-      afterTableY,
-    )
-    afterTableY += 12
-  }
-  if (report.source === 'ledger' && (o.platformFeesUsd || o.platformFeeUnknownCount)) {
-    doc.text(`Platform fees charged: USD ${(o.platformFeesUsd || 0).toFixed(2)}`, marginX, afterTableY)
-    afterTableY += 12
-  }
-  afterTableY += 6
-
-  doc.setFontSize(7)
-  doc.setTextColor(90)
-  for (const note of [report.valuationNote, report.selfTransferNote, report.disclaimer].filter(Boolean)) {
-    const wrapped = doc.splitTextToSize(note, 760)
-    doc.text(wrapped, marginX, afterTableY)
-    afterTableY += 11 * wrapped.length + 4
-  }
-
-  return doc.output('blob')
+export function render(report, options = {}) {
+  return renderStatement(report, withTenant(options))
 }
 
-/** Suggested download file name (FR-007), mirroring the CSV naming split. */
-export function fileName(report) {
+/**
+ * Suggested download file name (FR-007).
+ *
+ * The legacy wager-only path keeps its historical name byte-for-byte so
+ * existing tooling and saved-report history stay stable; a ledger-built
+ * statement is named for the tenant, the scope, the network and the period —
+ * a member downloading a wagering and an earnings statement for the same month
+ * must not end up with two files of the same name.
+ */
+export function fileName(report, options = {}) {
+  if (report?.source === 'ledger') return statementFileName(report, withTenant(options))
   const from = new Date(report.period.from).toISOString().slice(0, 10)
   const to = new Date(report.period.to).toISOString().slice(0, 10)
   const net = report.networkName.replace(/\s+/g, '-')
-  const stem = report.source === 'ledger' ? 'fairwins-activity' : 'wager-report'
-  return `${stem}_${net}_${from}_${to}.pdf`
+  return `wager-report_${net}_${from}_${to}.pdf`
 }

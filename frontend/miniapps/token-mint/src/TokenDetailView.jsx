@@ -263,7 +263,7 @@ function badgeClass(std) {
 }
 
 function CapBar({ live, caps }) {
-  let pct = 0
+  let pct
   try {
     const supply = parseFloat((live?.supplyDisplay || '0').split(' ')[0]) || 0
     const cap = parseFloat(ethers.formatUnits(caps.cap, caps.decimals)) || 0

@@ -1,7 +1,11 @@
-name: Staging Deploy
+name: Staging Candidate
 
-# Every merge into `staging` becomes a release candidate and is deployed to BOTH staging services
-# (spec 076, FR-002/FR-023/FR-026a).
+# Every merge into `staging` becomes a release candidate (spec 076, FR-002).
+#
+# It does NOT deploy. A Cloud Build trigger on this branch builds and deploys both staging services
+# from cloudbuild.staging.yaml; this workflow's whole job is to give that revision a candidate
+# NUMBER, so what is running on staging and what will be released from `main` are described by the
+# same authority.
 #
 # The candidate number comes from scripts/release/version.js — the same authority that computes
 # production versions, so a candidate and the release it becomes cannot disagree.
@@ -26,10 +30,10 @@ permissions:
 
 jobs:
   candidate:
-    name: Tag and deploy a release candidate
+    name: Tag a release candidate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -73,16 +77,26 @@ jobs:
           git tag -a "$TAG" -m "Release candidate $TAG"
           git push origin "$TAG"
 
-      # Both services, one commit, one candidate number. See cloudbuild.staging.yaml for why there
-      # are two of them rather than one image reaching both cohorts.
-      - name: Build and deploy both staging services
+      # DEPLOYMENT IS NOT DONE HERE. A Cloud Build trigger on this branch runs
+      # cloudbuild.staging.yaml, so a second pipeline pushing images at the same revision would be
+      # a second source of truth about what staging is running.
+      #
+      # This step used to submit cloudbuild.staging.yaml. It never once succeeded: the runs that
+      # reached it failed on `The required property [project] is not currently set` (no auth, no
+      # project — the one-time grant it depended on was never made), and the runs that were green
+      # had SKIPPED it. So every merge into `staging` since 2026-08-11T00:14 was marked red by a
+      # step that had never worked, which is worse than having no step at all: a red that is always
+      # red carries no information, and the genuinely stale staging service hid behind it.
+      - name: Say where the deploy happens
         if: steps.rc.outputs.proceed == 'true'
         run: |
-          set -euo pipefail
-          echo "Submitting cloudbuild.staging.yaml with _RC_VERSION=${{ steps.rc.outputs.version }}"
-          echo "This step requires a Google Cloud service account with Cloud Build submit rights;"
-          echo "see docs/runbooks/release-and-promotion.md for the one-time setup."
-          gcloud builds submit \
-            --config cloudbuild.staging.yaml \
-            --substitutions "_RC_VERSION=${{ steps.rc.outputs.version }}" \
-            .
+          {
+            echo "### Deployment"
+            echo ""
+            echo "Tagged \`${{ steps.rc.outputs.version }}\`. A Cloud Build trigger on this branch"
+            echo "builds and deploys both staging services from cloudbuild.staging.yaml —"
+            echo "nothing is submitted from CI."
+            echo ""
+            echo "If a staging host is not serving this commit, that trigger's build is the place"
+            echo "to look, not this run. See docs/runbooks/release-and-promotion.md."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -84,11 +84,9 @@ import { Interface } from 'ethers'
 import { AppCategory, AppStatus, APP_CATEGORY_LABELS, MINI_APP_REGISTRY_ABI } from '../../abis/miniAppRegistry'
 import { keccak256Hex } from '../../lib/miniapps/integrity'
 import { REGISTRY_STATUS } from '../../lib/miniapps/registryClient'
-import SubmitAppPanel, { PRECHECK, SUBMISSION_CHECKS } from '../../components/miniapps/SubmitAppPanel'
-
-// The pure rules ship as one frozen namespace (a .jsx module may only export components and
-// constants — see the note on SUBMISSION_CHECKS); unpacked here so the assertions read normally.
-const {
+import SubmitAppPanel from '../../components/miniapps/SubmitAppPanel'
+import {
+  PRECHECK,
   checkCid,
   checkDescription,
   checkManifestHash,
@@ -97,7 +95,7 @@ const {
   describeRegistryError,
   nameSlugWarning,
   precheckManifest,
-} = SUBMISSION_CHECKS
+} from '../../components/miniapps/submitAppChecks.js'
 
 const REGISTRY_CHAIN = 137
 const REGISTRY_ADDRESS = '0x5a168Cc9FeFaf40e7BC536C8C61669e6d547A0A2'

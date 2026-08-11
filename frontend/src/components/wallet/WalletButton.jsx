@@ -364,7 +364,7 @@ function WalletButton({ className = '' }) {
                     <span>Purchase Membership</span>
                   </button>
                 )}
-                {/* Network settings sit beside Preferences (spec 069) — RPC endpoints,
+                {/* Network settings sit beside Settings (spec 069) — RPC endpoints,
                     failover and API keys are member configuration, not a Tools section. */}
                 <button
                   onClick={() => { setIsOpen(false); navigate('/wallet?tab=network') }}
@@ -375,12 +375,12 @@ function WalletButton({ className = '' }) {
                   <span>Network</span>
                 </button>
                 <button
-                  onClick={() => { setIsOpen(false); navigate('/wallet?tab=preferences') }}
+                  onClick={() => { setIsOpen(false); navigate('/wallet?tab=settings') }}
                   className="action-button"
                   role="menuitem"
                 >
                   <span className="action-icon" aria-hidden="true"><NavIcon name="sliders" size={16} /></span>
-                  <span>Preferences</span>
+                  <span>Settings</span>
                 </button>
                 {hasRole(ROLES.ADMIN) && (
                   <button

@@ -83,8 +83,58 @@ This matters because the mainnet staging service reaches the live Polygon estate
 account with production means a staging defect can drain or rate-limit something members depend on.
 FR-026c is not advice.
 
-Also set both to `noindex`, and grant the Actions identity `roles/cloudbuild.builds.editor` so
-`staging-deploy.yml` can submit `cloudbuild.staging.yaml`.
+Also set both to `noindex`.
+
+### 5. Point a Cloud Build trigger at the `staging` branch
+
+**A Cloud Build trigger builds and deploys staging. CI does not.** The `Staging Candidate`
+workflow tags `vX.Y.Z-rc.N` and stops there — it used to submit `cloudbuild.staging.yaml` and never
+worked in a single run, because the grant it assumed was never made.
+
+```bash
+gcloud builds triggers create github \
+  --name=staging-branch-build \
+  --repo-owner=chippr-robotics \
+  --repo-name=prediction-dao-research \
+  --branch-pattern='^staging$' \
+  --build-config=cloudbuild.staging.yaml \
+  --description='Build + deploy both staging services on every push to staging'
+```
+
+The trigger's service account needs `roles/artifactregistry.writer` (push both images),
+`roles/run.admin` (deploy both services) and `roles/iam.serviceAccountUser` (act as each service's
+runtime identity). A trigger that can build but not deploy leaves the previous revision serving and
+reports success on the build — the exact shape of failure that hides a stale service.
+
+`_RC_VERSION` defaults to empty, so a branch-triggered build self-describes as `unreleased+<sha>`
+in the drawer rather than a candidate number. **That is correct and deliberate** (FR-031): the
+branch push does not know which candidate tag the workflow is about to mint, and a guessed tag is
+worse than an honest sha.
+
+> **Do not use Cloud Run's built-in "deploy from a repository" for this.** It builds the root
+> `Dockerfile` with no `--build-arg`, and every `VITE_*` in that image is then undefined: no
+> relayer URL (gasless silently degrades to self-submit), no subgraph URL, no version identity, no
+> `VITE_NETWORK_ID` — the cohort the whole two-service design exists to fix. Staging was in exactly
+> that state on 2026-08-11: a service that was up, looked fine, and mirrored production in nothing.
+> The build args are the point, and only `cloudbuild.staging.yaml` carries them. Verify with the
+> fingerprint check in "Staging is serving an old build" below.
+
+Production is the same shape — a trigger on `main` running `cloudbuild.yaml`.
+
+**A trigger must not carry `_VITE_*` substitutions.** The wizard writes a set of them when it
+creates a trigger, and they survive being repointed at a build config that does not read them. The
+production trigger carried `_VITE_NETWORK_ID: '80002'` and a `fairwins-amoy` subgraph URL that way —
+inert, because `cloudbuild.yaml` hardcodes its build args, and a loaded gun for exactly as long as
+that stays true. The day someone parameterises one of those args, production builds as Amoy. They
+were removed on 2026-08-11; if a trigger is ever recreated through the console, check for them:
+
+```bash
+gcloud builds triggers describe <trigger> --format='value(substitutions)'
+```
+
+Build configuration belongs in the build config, where it is reviewed in a pull request. The only
+substitution either file reads is its release identity (`_APP_VERSION` / `_RC_VERSION`), both
+declared with empty defaults in the file itself.
 
 ---
 
@@ -154,14 +204,47 @@ git fetch --unshallow    # or: git clone (without --depth) into a scratch direct
 
 ### The release published nothing
 
-Expected in two cases: an empty commit range, or no commit in the range carried a classification.
+Expected in three cases: an empty commit range, a range holding nothing but the generated release
+record, or no commit in the range carrying a classification.
 
 ```bash
 node scripts/release/version.js --explain
 ```
 
-prints every commit, how it classified, and which one set the bump. Commits shown as
-`[unclassified]` did not vote — merge commits and anything predating the convention.
+prints every commit, how it classified, and which one set the bump. Two kinds of commit do not vote:
+
+- `[unclassified]` — merge commits and anything predating the convention.
+- `[skipped]` — carries `[skip release]`, i.e. the release process's own paperwork.
+
+The three silences are reported as distinct reasons (`empty-range`, `only-skipped-commits`,
+`no-classified-commits`) because they mean different things. `only-skipped-commits` is the system
+working. `no-classified-commits` means nobody has established what the range contains.
+
+### The version keeps incrementing but nothing new ships
+
+Look at what the tags are actually sitting on:
+
+```bash
+git tag --list 'v*' | sort -V | tail -5 | while read t; do
+  echo "$t  $(git log -1 --format='%s' "$t^{commit}")"
+done
+```
+
+If a tag's commit is a merge of a `release/vX.Y.Z-changelog` branch, the release train is releasing
+its own paperwork rather than any product change, and the fix is in
+`scripts/release/classify.js#carriesSkipMarker` — see contracts/version-scheme.md §2. This happened
+for `v1.5.6` and `v1.5.7`.
+
+The second thing to check is whether the version is the *only* thing that moved:
+
+```bash
+git log --oneline origin/main..origin/staging | wc -l   # work merged but never promoted
+```
+
+`branch-policy.yml` opens a `release-drift` issue when `main` holds commits `staging` lacks. It does
+**not** watch the other direction, so work sitting unpromoted on `staging` raises nothing on its own.
+A non-zero count here with no open promotion PR means production is running without it. Promote it —
+see "Promoting to production" above.
 
 ### The tag already exists
 
@@ -228,6 +311,50 @@ workflow tagged. The next release fixes it; nothing is broken.
 
 Staging failing does not block production — but a promotion should not proceed on a candidate nobody
 exercised. Fix staging first. Bypassing it is the thing this feature exists to stop.
+
+### Staging is serving an old build
+
+A staging host that is *up* and serving a tree from days ago looks exactly like a working staging
+service until someone goes looking for a change that should be there. Settle it from the bytes it is
+actually serving rather than from a workflow run:
+
+```bash
+BASE=https://<staging-host>
+ENTRY=$(curl -s "$BASE/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+curl -s "$BASE$ENTRY" > /tmp/deployed.js
+
+# A string the change ADDED, and one it REMOVED. Both answers matter:
+grep -c "New statement"    /tmp/deployed.js   # expect 1 once deployed
+grep -c "Reporting period" /tmp/deployed.js   # expect 0 once deployed
+```
+
+A string the repository no longer contains anywhere, still present in the deployed bundle, is proof
+the service has not rebuilt — not a routing or caching question, and nothing a hard refresh fixes.
+
+**Then check it was built with its build args at all**, which is a different failure and a worse
+one. Vite folds `VITE_*` into the bundle, so the args a build received are readable from the bytes:
+
+```bash
+for s in relay-staging.fairwins.app staging.fairwins.app fairwins-polygon; do
+  printf '%-32s %s\n' "$s" "$(grep -c "$s" /tmp/deployed.js)"
+done
+```
+
+All zeros means the image was built with **no** `--build-arg` — not stale config, *absent* config.
+Such a build has no relayer, no subgraph, no version identity and no `VITE_NETWORK_ID`, so it is
+not a mirror of production in any respect, and the app degrades quietly rather than failing. Fix
+the trigger's build config (§5); rebuilding from the same source will not help.
+
+Two further reads, both cheap:
+
+- **The drawer footer.** `vX.Y.Z-rc.N` means the build carried a candidate identity;
+  `unreleased+<sha>` names the exact commit; a bare `unreleased` means the build got no
+  `VITE_APP_VERSION`/`VITE_GIT_SHA` at all, which tells you the builder is not passing them.
+- **Compare chunk hashes with production.** Identical `vendor-*.js` and `index-*.css` with a
+  different `contracts-*.js` says "same source tree, different build-time config" — i.e. staging is
+  configured correctly and is simply stale, rather than pointed at the wrong branch.
+
+Then go to the service's own build configuration. CI does not deploy staging (see §4).
 
 ---
 

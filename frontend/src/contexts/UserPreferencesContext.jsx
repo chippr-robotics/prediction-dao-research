@@ -26,25 +26,6 @@ export function UserPreferencesProvider({ children }) {
   })
   const [isLoading, setIsLoading] = useState(false)
 
-  // Load preferences when wallet connects
-  useEffect(() => {
-    if (isConnected && account) {
-      loadPreferences(account)
-    } else {
-      // Reset to defaults when disconnected
-      setPreferences({
-        recentSearches: [],
-        favoriteMarkets: [],
-        defaultSlippage: 0.5,
-        polymarketCategories: [],
-        showTestnetAssets: false,
-        showZeroBalances: false,
-        tiltToHide: true,
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, isConnected])
-
   const loadPreferences = useCallback((walletAddress) => {
     setIsLoading(true)
     try {
@@ -71,6 +52,25 @@ export function UserPreferencesProvider({ children }) {
       setIsLoading(false)
     }
   }, [])
+
+  // Load preferences when wallet connects
+  useEffect(() => {
+    if (isConnected && account) {
+      loadPreferences(account)
+    } else {
+      // Reset to defaults when disconnected
+      setPreferences({
+        recentSearches: [],
+        favoriteMarkets: [],
+        defaultSlippage: 0.5,
+        polymarketCategories: [],
+        showTestnetAssets: false,
+        showZeroBalances: false,
+        tiltToHide: true,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, isConnected])
 
   const savePreference = useCallback((key, value) => {
     if (!account) {

@@ -13,6 +13,7 @@ const {
   BASELINE_FILES,
   parseSubject,
   bodyDeclaresBreaking,
+  carriesSkipMarker,
   classify,
   aggregateBump,
 } = require("../classify");
@@ -141,6 +142,30 @@ test("escalation is inert when the changed-file list is unavailable", () => {
   // Commit-range classification has no file list; it must not fail closed there.
   assert.equal(classify({ subject: "chore: x" }).ok, true);
   assert.equal(classify({ subject: "chore: x", changedFiles: [] }).ok, true);
+});
+
+// ---- the release process's own paperwork --------------------------------------------------------
+
+test("the skip marker is recognised in a subject or a body, case-insensitively", () => {
+  assert.equal(carriesSkipMarker({ subject: "chore(release): v1.5.6 [skip release]" }), true);
+  assert.equal(carriesSkipMarker({ subject: "chore(release): v1.5.6 [SKIP RELEASE]" }), true);
+  assert.equal(carriesSkipMarker({ subject: "chore(release): v1.5.6 [skip-release]" }), true);
+  assert.equal(carriesSkipMarker({ subject: "chore(release): v1", body: "[skip release]" }), true);
+});
+
+test("nothing else is mistaken for the marker", () => {
+  // Notably a real change to the release tooling, which is written with this scope and must count.
+  assert.equal(carriesSkipMarker({ subject: "chore(release): consolidate lost records" }), false);
+  assert.equal(carriesSkipMarker({ subject: "feat(ci): skip flaky tests on release day" }), false);
+  assert.equal(carriesSkipMarker({}), false);
+});
+
+// The marker changes what a commit is WORTH, never whether it parses. A rejected subject would put
+// the merge gate in the business of policing the marker, which is not its job.
+test("a marked commit still classifies normally", () => {
+  const r = classify({ subject: "chore(release): v1.5.6 [skip release]" });
+  assert.equal(r.ok, true);
+  assert.equal(r.type, "chore");
 });
 
 // ---- aggregation ------------------------------------------------------------------------------

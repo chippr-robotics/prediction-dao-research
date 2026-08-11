@@ -333,23 +333,42 @@
   margin-bottom: 0;
 }
 
-/* Preferences tab — group headings cluster related settings so they're easy
-   to scan (Display / Wallet / Notifications / Markets / App). */
-.preferences-group-heading {
-  margin: 24px 0 8px;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-secondary);
+/* Settings tab — the app's global settings, built from the same collapsible
+   cards as Recovery: a scannable list of headings, one open at a time, with the
+   current value stated in each header. Styles here apply to expanded bodies. */
+.settings-section__intro {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary, #5a6772);
 }
 
-.preferences-group-heading:first-child {
+.settings-section .acc h3 {
+  margin: 0;
+  font-size: inherit;
+}
+
+.settings-section .acc__body h3,
+.settings-section .acc__body h4 {
+  font-size: 15px;
+  margin: 16px 0 8px;
+}
+
+.settings-section .acc__body > .section-description:first-child,
+.settings-section .acc__body > p:first-child {
   margin-top: 0;
 }
 
-.preferences-section .section {
-  margin-bottom: 16px;
+.settings-section .section-description {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* The legal link rows are the card's whole body — drop the list's own top gap. */
+.settings-section .app-legal-links {
+  margin-top: 0;
 }
 
 .profile-section h3 {
@@ -667,6 +686,73 @@
   gap: 16px;
   margin-top: 12px;
   flex-wrap: wrap;
+}
+
+/* Statement type + sections (issue #1026). The type changes what the totals
+   COVER, so its options get a full row each with their scope spelled out; the
+   section toggles only change what is printed and stay compact. */
+.reports-section .statement-type [role='radiogroup'] {
+  display: grid;
+  gap: 6px;
+}
+
+.reports-section .statement-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.reports-section .statement-option:hover {
+  background: var(--color-surface-hover, #f3f4f6);
+}
+
+.reports-section .statement-option-label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.reports-section .statement-option-blurb {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.reports-section .statement-classes {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.reports-section .statement-classes [role='group'],
+.reports-section .statement-sections [role='group'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.reports-section .statement-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.reports-section .statement-hint,
+.reports-section .statement-scope-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.reports-section .statement-scope-note {
+  padding: 6px 8px;
+  border-left: 3px solid var(--semantic-warning, #f5a623);
+  background: var(--color-surface-hover, #f7f7f8);
+  border-radius: 0 4px 4px 0;
 }
 
 .reports-section .custom-range label {
@@ -989,7 +1075,7 @@
 
 .key-action-btn.primary {
   color: white;
-  background: var(--color-primary, #36B37E);
+  background: var(--color-primary, var(--brand-primary, #36B37E));
 }
 
 .key-action-btn.primary:hover {
@@ -997,13 +1083,13 @@
 }
 
 .key-action-btn.secondary {
-  color: var(--color-text);
-  background: var(--color-surface-secondary);
-  border: 1px solid var(--color-border);
+  color: var(--color-text, var(--text-primary, #1f2933));
+  background: var(--color-surface-secondary, var(--bg-secondary, #f4f6f8));
+  border: 1px solid var(--color-border, var(--border-color, #e3e7eb));
 }
 
 .key-action-btn.secondary:hover {
-  border-color: var(--color-primary);
+  border-color: var(--color-primary, var(--brand-primary, #36B37E));
 }
 
 .key-action-btn:disabled {
@@ -1334,7 +1420,7 @@
   accent-color: #2d9cdb;
 }
 
-/* PWA install preference toggle (Preferences tab) */
+/* PWA install preference toggle (Settings tab) */
 .pwa-pref-toggle {
   display: flex;
   align-items: center;
@@ -1352,7 +1438,7 @@
   cursor: pointer;
 }
 
-/* Software Update section (Preferences tab) */
+/* Software update card (Settings tab) */
 .pwa-update-status {
   margin: 0.5rem 0 0.85rem;
   padding: 0.55rem 0.75rem;
@@ -1376,7 +1462,7 @@
   gap: 0.6rem;
 }
 
-/* Legal & Policies section (Preferences tab → App group, issue #1025) */
+/* Legal & policies card (Settings tab, issue #1025) */
 .app-legal-links {
   display: flex;
   flex-direction: column;

@@ -1,18 +1,11 @@
 /* NotificationProfilesPanel — Signal-style notification profiles on the
-   Preferences tab (spec 059). Sits above NotificationPreferencesPanel and
+   Settings tab (spec 059). Sits above NotificationPreferencesPanel and
    reuses its switch look (.notif-pref-switch) for on/off controls. */
 
-.notif-profiles-panel {
+.notif-profiles-panel .acc__body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.notif-profiles-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
 }
 
 .notif-profiles-hint {

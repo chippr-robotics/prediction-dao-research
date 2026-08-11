@@ -218,7 +218,7 @@ export async function previewPolicy(vaultAddress, chainId, { to, value = 0n, dat
  */
 export function decodePolicyError(revertData, opts = {}) {
   const fmt = opts.formatAmount || ((asset, amount) => `${amount} ${asset === NATIVE_ASSET ? '(native)' : shortAddress(asset)}`)
-  let parsed = null
+  let parsed
   try {
     parsed = guardIface.parseError(revertData)
   } catch {

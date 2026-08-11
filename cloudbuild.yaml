@@ -131,5 +131,12 @@ substitutions:
   # workflow passes a real value when it builds a tagged commit.
   _APP_VERSION: ''
 
+# STATED rather than inherited. Cloud Build's implicit default is 600s; production builds one image
+# and lands in ~3 minutes, so the default has never bitten here — but an implicit ceiling is one
+# nobody has agreed to, and the first time it is reached it presents as a TIMEOUT on a build that
+# was working. 20 minutes is ~6x the measured run. See cloudbuild.staging.yaml, which builds twice
+# and was already using most of the default.
+timeout: 1200s
+
 options:
   logging: CLOUD_LOGGING_ONLY

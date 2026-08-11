@@ -402,8 +402,8 @@ export function WalletProvider({ children }) {
     // `membershipReadable === false` means UNKNOWN, not "none" (FR-004). A member whose reference
     // chain blipped keeps whatever was cached rather than being told they own nothing, and the
     // unknown is surfaced so a gated action can attribute its refusal to the failed read.
-    let membershipHeld = false
-    let membershipReadable = true
+    let membershipHeld
+    let membershipReadable
     try {
       const r = await hasRoleOnChain(walletAddress, 'WAGER_PARTICIPANT', activeChainId, { detailed: true })
       membershipReadable = r?.readable !== false
@@ -623,7 +623,7 @@ export function WalletProvider({ children }) {
 
       // Check for user rejection
       if (error.code === 4001 || error.name === 'UserRejectedRequestError') {
-        throw new Error('Please approve the connection request')
+        throw new Error('Please approve the connection request', { cause: error })
       }
       throw error
     } finally {
@@ -689,7 +689,7 @@ export function WalletProvider({ children }) {
     } catch (error) {
       console.error('Error switching network:', error)
       const targetNet = getNetwork(target)
-      throw new Error(`Please manually switch to ${targetNet?.name || `chain ${target}`} in your wallet`)
+      throw new Error(`Please manually switch to ${targetNet?.name || `chain ${target}`} in your wallet`, { cause: error })
     }
   }, [switchChain])
 

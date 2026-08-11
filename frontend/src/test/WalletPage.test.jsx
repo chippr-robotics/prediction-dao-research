@@ -170,20 +170,33 @@ beforeEach(() => {
 })
 
 describe('WalletPage — address QR entry point', () => {
-  // Show QR Code (and pool phrase language) live in the Preferences panel's
-  // "Wallet" section. Preferences is now reached from the account button, so the
-  // panel is deep-linked here via ?tab=preferences rather than an in-page tab.
-  const PREFERENCES_ROUTE = '/wallet?tab=preferences'
+  // Show QR Code (and pool phrase language) live in the Settings tab's "Wallet"
+  // card. Settings is reached from the account button, so the panel is deep-linked
+  // here via ?tab=settings rather than an in-page tab. The cards are collapsed by
+  // default — jsdom does not enforce `inert`, so each test opens the card it uses
+  // rather than relying on collapsed content being reachable.
+  const SETTINGS_ROUTE = '/wallet?tab=settings'
+  const openWalletCard = () =>
+    fireEvent.click(screen.getByRole('button', { name: /^wallet/i }))
 
-  it('shows a "Show QR Code" button on the Preferences panel when connected (W1)', () => {
-    renderPage(connectedWalletContext, PREFERENCES_ROUTE)
+  it('shows a "Show QR Code" button in the Settings tab\'s Wallet card when connected (W1)', () => {
+    renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    openWalletCard()
     expect(
       screen.getByRole('button', { name: /show qr/i })
     ).toBeInTheDocument()
   })
 
+  it('still resolves the legacy ?tab=preferences deep link to the Settings tab', () => {
+    const { container } = renderPage(connectedWalletContext, '/wallet?tab=preferences')
+    expect(container.querySelector('.settings-section')).toBeTruthy()
+    openWalletCard()
+    expect(screen.getByRole('button', { name: /show qr/i })).toBeInTheDocument()
+  })
+
   it('opens the address QR modal with the connected address — one interaction (W1 / SC-001)', () => {
-    const { container } = renderPage(connectedWalletContext, PREFERENCES_ROUTE)
+    const { container } = renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    openWalletCard()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /show qr/i }))
@@ -194,8 +207,19 @@ describe('WalletPage — address QR entry point', () => {
     expect(screen.getByText(ADDRESS)).toBeInTheDocument()
   })
 
+  it('keeps the QR modal usable after its card is collapsed again (not inert)', () => {
+    renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    openWalletCard()
+    fireEvent.click(screen.getByRole('button', { name: /show qr/i }))
+    // Collapsing the card must not drag the open dialog into an inert subtree.
+    openWalletCard()
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.closest('[inert]')).toBeNull()
+  })
+
   it('closes the modal again via its close button (M3 wiring)', () => {
-    renderPage(connectedWalletContext, PREFERENCES_ROUTE)
+    renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    openWalletCard()
     fireEvent.click(screen.getByRole('button', { name: /show qr/i }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
 
@@ -204,7 +228,7 @@ describe('WalletPage — address QR entry point', () => {
   })
 
   it('renders the connect prompt with no section content when disconnected (W2 / FR-008)', () => {
-    renderPage(disconnectedWalletContext, PREFERENCES_ROUTE)
+    renderPage(disconnectedWalletContext, SETTINGS_ROUTE)
     expect(screen.getByText(/connect your wallet/i)).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: /show qr/i })
@@ -251,30 +275,102 @@ describe('WalletPage — section routing', () => {
 })
 
 // Issue #1025 — Terms & Conditions / Risk Disclosure / Privacy Policy / Account
-// Moderation moved out of the side nav drawer into Settings → App, after
-// Install App / Software Update.
-describe('WalletPage — Preferences → App → Legal & Policies (issue #1025)', () => {
-  const PREFERENCES_ROUTE = '/wallet?tab=preferences'
+// Moderation moved out of the side nav drawer into Settings, after Install app /
+// Software update.
+//
+// Settings itself is now a list of collapsed cards (the Recovery idiom): the tab
+// must scan as headings, and a deep link has to OPEN the card it names rather than
+// leave the member on a closed heading.
+describe('WalletPage — Settings tab', () => {
+  const SETTINGS_ROUTE = '/wallet?tab=settings'
 
-  it('lists all four legal/policy links, each pointing at its existing in-app route', () => {
-    renderPage(connectedWalletContext, PREFERENCES_ROUTE)
-    expect(screen.getByRole('heading', { name: /legal & policies/i })).toBeInTheDocument()
+  const cardTitles = (container) =>
+    Array.from(container.querySelectorAll('.settings-section .acc__title')).map(
+      (el) => el.textContent
+    )
+
+  it('renders every settings card collapsed, in order, with no card open', () => {
+    const { container } = renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    expect(cardTitles(container)).toEqual([
+      'Home screen',
+      // Menu density (spec 081) — the nav drawer's Comfortable/Compact choice, beside the other
+      // "how this app looks" cards rather than buried in the drawer itself.
+      'Menu density',
+      'Wallet',
+      'Portfolio',
+      'Privacy',
+      'Notifications',
+      'Markets',
+      'Install app',
+      'Software update',
+      'Legal & policies',
+    ])
+    const triggers = container.querySelectorAll('.settings-section .acc__trigger')
+    expect(triggers.length).toBeGreaterThan(0)
+    for (const trigger of triggers) {
+      expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    }
+  })
+
+  it('shows each collapsed card\'s current state in its header', () => {
+    const { container } = renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    const summaries = Array.from(
+      container.querySelectorAll('.settings-section .acc__summary')
+    ).map((el) => el.textContent)
+    expect(summaries).toContain('Testnet tokens hidden · Zero balances hidden')
+    expect(summaries).toContain('All categories')
+    // Menu density (spec 081) states its current value in the header like every other card.
+    expect(summaries).toContain('Comfortable')
+  })
+
+  it('opens one card at a time', () => {
+    renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    const portfolio = screen.getByRole('button', { name: /^portfolio/i })
+    const privacy = screen.getByRole('button', { name: /^privacy/i })
+
+    fireEvent.click(portfolio)
+    expect(portfolio).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(privacy)
+    expect(privacy).toHaveAttribute('aria-expanded', 'true')
+    expect(portfolio).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('lists all four legal/policy links in the Legal & policies card', () => {
+    renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    fireEvent.click(screen.getByRole('button', { name: /legal & policies/i }))
 
     for (const { label, href } of LEGAL_LINKS) {
       expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toHaveAttribute('href', href)
     }
   })
 
-  it('positions Legal & Policies after Install App and Software Update', () => {
-    const { container } = renderPage(connectedWalletContext, PREFERENCES_ROUTE)
-    const headings = Array.from(container.querySelectorAll('.preferences-group-heading, h3')).map(
-      (el) => el.textContent
+  it('positions Legal & policies after Install app and Software update', () => {
+    const { container } = renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    const titles = cardTitles(container)
+    expect(titles.indexOf('Install app')).toBeGreaterThanOrEqual(0)
+    expect(titles.indexOf('Software update')).toBeGreaterThan(titles.indexOf('Install app'))
+    expect(titles.indexOf('Legal & policies')).toBeGreaterThan(titles.indexOf('Software update'))
+  })
+
+  it('opens the Software update card when deep-linked with #pwa-update', () => {
+    renderPage(connectedWalletContext, '/wallet?tab=settings#pwa-update')
+    expect(screen.getByRole('button', { name: /software update/i })).toHaveAttribute(
+      'aria-expanded',
+      'true'
     )
-    const installIdx = headings.indexOf('Install App')
-    const updateIdx = headings.indexOf('Software Update')
-    const legalIdx = headings.indexOf('Legal & Policies')
-    expect(installIdx).toBeGreaterThanOrEqual(0)
-    expect(updateIdx).toBeGreaterThan(installIdx)
-    expect(legalIdx).toBeGreaterThan(updateIdx)
+    // Only the linked card opens — the rest stay tidy.
+    expect(screen.getByRole('button', { name: /^privacy/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    )
+  })
+
+  it('opens the Notifications card when deep-linked with #notification-profiles', () => {
+    renderPage(connectedWalletContext, '/wallet?tab=settings#notification-profiles')
+    expect(screen.getByRole('button', { name: /^notifications/i })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
   })
 })

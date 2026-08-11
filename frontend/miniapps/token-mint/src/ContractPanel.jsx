@@ -60,7 +60,7 @@ export default function ContractPanel({ token, caps, chainId }) {
    * member loses a cross-chain table; nobody gains a wider privileged surface.
    */
   const deployment = useMemo(() => {
-    let address = null
+    let address
     try {
       address = host.contracts('tokenFactory', chainId)
     } catch {

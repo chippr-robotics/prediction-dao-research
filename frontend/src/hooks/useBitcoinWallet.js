@@ -256,7 +256,7 @@ function schedulePoll(txid, startedAt = internals.now()) {
   const timer = setTimeout(async () => {
     internals.timers.delete(txid)
     if (epoch !== internals.epoch || !internals.gateway || !internals.wallet) return
-    let status = null
+    let status
     try {
       status = await internals.gateway.getTxStatus(internals.networkId, txid)
     } catch {

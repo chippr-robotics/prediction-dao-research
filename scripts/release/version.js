@@ -14,6 +14,9 @@
  *    read from a package.json — the manifests currently say 1.0.0 / 0.1.0 / 0.0.0 and inheriting
  *    any of them would be arbitrary.
  *  · EMPTY RANGE (FR-021): no commits since the last tag means NO release, not a version bump.
+ *  · THE RELEASE PROCESS DOES NOT RELEASE ITSELF: a commit marked `[skip release]` does not vote,
+ *    so a range holding only the generated CHANGELOG commit produces nothing. Without this the
+ *    train runs forever — each record mints the version whose record mints the next.
  *
  * Usage:
  *   node scripts/release/version.js                    # print the next version, e.g. v1.4.0
@@ -23,7 +26,7 @@
  *   node scripts/release/version.js --current          # highest published release, or "none"
  */
 const { execFileSync } = require("child_process");
-const { classify, aggregateBump } = require("./classify");
+const { classify, aggregateBump, carriesSkipMarker } = require("./classify");
 
 /** FR-006: chosen deliberately, not inherited from a manifest. See research R9. */
 const FIRST_VERSION = { major: 1, minor: 0, patch: 0 };
@@ -140,14 +143,19 @@ function nextVersion({ commits = null, current = undefined } = {}) {
   }
 
   const classifications = range.map((c) => {
+    // A commit carrying `[skip release]` does not vote, whatever it would otherwise classify as.
+    // See carriesSkipMarker() for why the workflow-level guard cannot be the only one.
+    if (carriesSkipMarker(c)) {
+      return { subject: c.subject, skipped: true, reason: "carries [skip release]" };
+    }
     const r = classify({ subject: c.subject, body: c.body });
     return { subject: c.subject, ...(r.ok ? r : { unclassified: true, reason: r.reason }) };
   });
 
-  // Merge commits and any historical subject that predates the convention simply do not vote.
-  // They still appear in --explain, so an operator can see they were ignored rather than
-  // silently dropped.
-  const bumps = classifications.filter((c) => !c.unclassified).map((c) => c.bump);
+  // Merge commits and any historical subject that predates the convention simply do not vote, and
+  // neither does anything the release process marked as its own paperwork. All three still appear
+  // in --explain, so an operator can see they were ignored rather than silently dropped.
+  const bumps = classifications.filter((c) => !c.unclassified && !c.skipped).map((c) => c.bump);
 
   if (!prev) {
     // FR-006: the first release is a constant. The accumulated classifications do not raise or
@@ -163,8 +171,14 @@ function nextVersion({ commits = null, current = undefined } = {}) {
 
   const bump = aggregateBump(bumps);
   if (!bump) {
-    // Commits exist but none classified. Do not invent a bump; say so.
-    return { release: null, reason: "no-classified-commits", previous: prev, classifications };
+    // Commits exist but none voted. Do not invent a bump; say WHICH of the two silences this is,
+    // because they mean opposite things to whoever reads the run: a range of nothing but release
+    // paperwork is the system working, while a range of unclassifiable subjects is a range whose
+    // content nobody has established.
+    const reason = classifications.some((c) => c.skipped)
+      ? "only-skipped-commits"
+      : "no-classified-commits";
+    return { release: null, reason, previous: prev, classifications };
   }
 
   const release = applyBump(prev, bump);
@@ -275,7 +289,11 @@ if (require.main === module) {
     console.log(`previous: ${result.previous ? result.previous.tag : "none"}`);
     console.log(`commits:  ${result.classifications.length}`);
     for (const c of result.classifications) {
-      const tag = c.unclassified ? "unclassified" : `${c.type}${c.breaking ? "!" : ""} -> ${c.bump}`;
+      const tag = c.skipped
+        ? "skipped"
+        : c.unclassified
+          ? "unclassified"
+          : `${c.type}${c.breaking ? "!" : ""} -> ${c.bump}`;
       console.log(`  [${tag}] ${c.subject}`);
     }
     console.log(`bump:     ${result.bump ?? "n/a"}`);

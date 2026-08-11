@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 import PortalNav from '../components/ui/PortalNav'
@@ -302,5 +302,179 @@ describe('WalletPage — saved /wallet?tab=paytransfer deep link (spec 067 FR-00
     expect(screen.getByTestId('paytransfer-panel')).toBeInTheDocument()
     // Not silently bounced to the Account fallback.
     expect(container.querySelector('.profile-section')).toBeNull()
+  })
+})
+
+/* ---------------------------------------------------------------------------------------------
+ * Spec 081 — opt-in accordion groups.
+ *
+ * PortalNav is shared by the Admin Panel, the My Account portal, and the global nav drawer. The
+ * blocks below prove the accordion behaviour is OPT-IN: without `collapsibleGroups` the component
+ * must take exactly the render path the two portal rails have always taken. A regression here
+ * would fold the Admin Panel's rail as a side effect of a nav-drawer feature.
+ * ------------------------------------------------------------------------------------------- */
+
+const ACCORDION_GROUPS = [
+  { label: 'Finance', items: [{ id: 'earn', label: 'Earn', icon: 'sprout' }, { id: 'trade', label: 'Trade' }] },
+  { label: 'Tools', items: [{ id: 'custody', label: 'Protect' }] },
+]
+
+describe('PortalNav — without collapsibleGroups (Admin / My Account rails)', () => {
+  it('renders group headings as presentational, not as controls', () => {
+    const { container } = render(
+      <PortalNav variant="tabs" groups={ACCORDION_GROUPS} activeId="earn" onSelect={() => {}} ariaLabel="Sections" />
+    )
+
+    const headings = Array.from(container.querySelectorAll('.portal-nav-group-label'))
+    expect(headings.map((el) => el.textContent)).toEqual(['Finance', 'Tools'])
+    for (const heading of headings) {
+      expect(heading.tagName).toBe('SPAN')
+      expect(heading).toHaveAttribute('role', 'presentation')
+      expect(heading).not.toHaveAttribute('aria-expanded')
+    }
+    expect(container.querySelector('.portal-nav-group-toggle')).toBeNull()
+    expect(container.querySelector('.portal-nav-group-items')).toBeNull()
+  })
+
+  it('renders every item in every group, none collapsed', () => {
+    render(<PortalNav variant="tabs" groups={ACCORDION_GROUPS} activeId="earn" onSelect={() => {}} ariaLabel="Sections" />)
+    expect(screen.getAllByRole('tab').map((el) => el.textContent)).toEqual(['Earn', 'Trade', 'Protect'])
+    expect(screen.getByRole('tab', { name: 'Earn' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('keeps the flat items form working', () => {
+    const onSelect = vi.fn()
+    render(
+      <PortalNav variant="tabs" items={ACCORDION_GROUPS[0].items} activeId="trade" onSelect={onSelect} ariaLabel="Sections" />
+    )
+    fireEvent.click(screen.getByRole('tab', { name: 'Earn' }))
+    expect(onSelect).toHaveBeenCalledWith('earn')
+  })
+})
+
+describe('PortalNav — with collapsibleGroups (the nav drawer)', () => {
+  const collapsible = (expanded, onToggle = () => {}) => ({
+    expanded,
+    keyFor: (group) => group.label.toLowerCase(),
+    onToggle,
+  })
+
+  it('turns headings into toggles that expose their state and the region they control', () => {
+    render(
+      <PortalNav
+        variant="nav"
+        groups={ACCORDION_GROUPS}
+        activeId="earn"
+        onSelect={() => {}}
+        ariaLabel="Sections"
+        collapsibleGroups={collapsible({ finance: true, tools: false })}
+      />
+    )
+
+    const finance = screen.getByRole('button', { name: /^Finance section$/ })
+    expect(finance).toHaveAttribute('aria-expanded', 'true')
+    const panel = document.getElementById(finance.getAttribute('aria-controls'))
+    expect(within(panel).getByRole('button', { name: 'Earn' })).toBeInTheDocument()
+
+    expect(screen.getByRole('button', { name: /^Tools section$/ })).toHaveAttribute('aria-expanded', 'false')
+    // Unmounted, not hidden.
+    expect(screen.queryByRole('button', { name: 'Protect' })).not.toBeInTheDocument()
+  })
+
+  it('reports the toggled group by its key', () => {
+    const onToggle = vi.fn()
+    render(
+      <PortalNav
+        variant="nav"
+        groups={ACCORDION_GROUPS}
+        activeId="earn"
+        onSelect={() => {}}
+        ariaLabel="Sections"
+        collapsibleGroups={collapsible({ finance: true, tools: false }, onToggle)}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /^Tools section$/ }))
+    expect(onToggle).toHaveBeenCalledWith('tools')
+  })
+
+  it('gives the panel a valid DOM id even when the key is not one', () => {
+    // `aria-controls` is a space-separated IDREF list, so a raw label like "Quick Access" would
+    // parse as two references to elements that do not exist — the heading would silently control
+    // nothing. The id is sanitized independently of the logical key.
+    render(
+      <PortalNav
+        variant="nav"
+        groups={[{ label: 'Quick Access', items: [{ id: 'home', label: 'Home' }] }]}
+        activeId="home"
+        onSelect={() => {}}
+        ariaLabel="Sections"
+        collapsibleGroups={{ expanded: { 'Quick Access': true }, onToggle: () => {} }}
+      />
+    )
+    const heading = screen.getByRole('button', { name: /^Quick Access section$/ })
+    const panelId = heading.getAttribute('aria-controls')
+    expect(panelId).not.toMatch(/\s/)
+    expect(document.getElementById(panelId)).toContainElement(
+      screen.getByRole('button', { name: 'Home' })
+    )
+  })
+
+  it('falls back to the group label when no keyFor is supplied', () => {
+    const onToggle = vi.fn()
+    render(
+      <PortalNav
+        variant="nav"
+        groups={ACCORDION_GROUPS}
+        activeId="earn"
+        onSelect={() => {}}
+        ariaLabel="Sections"
+        collapsibleGroups={{ expanded: { Finance: true }, onToggle }}
+      />
+    )
+    expect(screen.getByRole('button', { name: /^Finance section$/ })).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /^Tools section$/ }))
+    expect(onToggle).toHaveBeenCalledWith('Tools')
+  })
+
+  it('ignores collapsibleGroups entirely in the collapsed icon rail', () => {
+    // A 64px gutter has no room for a heading control, and folding it would strand sections
+    // behind a control that does not exist there.
+    const { container } = render(
+      <PortalNav
+        variant="nav"
+        groups={ACCORDION_GROUPS}
+        activeId="earn"
+        onSelect={() => {}}
+        ariaLabel="Sections"
+        collapsed
+        collapsibleGroups={collapsible({ finance: false, tools: false })}
+      />
+    )
+    expect(container.querySelector('.portal-nav-group-toggle')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Protect' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Earn' })).toBeInTheDocument()
+  })
+})
+
+describe('PortalNav — emptyMessage', () => {
+  it('says nothing matched rather than rendering a blank rail', () => {
+    render(
+      <PortalNav
+        variant="nav"
+        groups={[]}
+        activeId={null}
+        onSelect={() => {}}
+        ariaLabel="Sections"
+        emptyMessage="No menu entries match “zzz”"
+      />
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('No menu entries match')
+  })
+
+  it('renders nothing extra when the rail is empty but no message was supplied', () => {
+    const { container } = render(
+      <PortalNav variant="nav" groups={[]} activeId={null} onSelect={() => {}} ariaLabel="Sections" />
+    )
+    expect(container.querySelector('.portal-nav').childElementCount).toBe(0)
   })
 })
