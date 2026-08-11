@@ -121,6 +121,21 @@ worse than an honest sha.
 
 Production is the same shape — a trigger on `main` running `cloudbuild.yaml`.
 
+**A trigger must not carry `_VITE_*` substitutions.** The wizard writes a set of them when it
+creates a trigger, and they survive being repointed at a build config that does not read them. The
+production trigger carried `_VITE_NETWORK_ID: '80002'` and a `fairwins-amoy` subgraph URL that way —
+inert, because `cloudbuild.yaml` hardcodes its build args, and a loaded gun for exactly as long as
+that stays true. The day someone parameterises one of those args, production builds as Amoy. They
+were removed on 2026-08-11; if a trigger is ever recreated through the console, check for them:
+
+```bash
+gcloud builds triggers describe <trigger> --format='value(substitutions)'
+```
+
+Build configuration belongs in the build config, where it is reviewed in a pull request. The only
+substitution either file reads is its release identity (`_APP_VERSION` / `_RC_VERSION`), both
+declared with empty defaults in the file itself.
+
 ---
 
 ## Daily operation
