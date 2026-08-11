@@ -14,6 +14,59 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.6.0 — 2026-08-11
+
+Promoted from: v1.6.0-rc.8
+Previous release: v1.5.6 · Range: `v1.5.6..v1.6.0` (38 commits)
+
+### 🚀 Features
+
+- feat(nav): bound the drawer's height — accordions, capped pin strip, filter, compact density (spec 081)
+- feat(frontend): make Preferences the app's Settings, as expandable cards
+- feat(reports): statement centre with a bottom-sheet generator (#1026)
+- feat(reports): branded account statement PDF with charts and report types (#1026)
+
+### 🐛 Bug Fixes
+
+- fix(reports): statement corrections from design and audit review (#1026)
+- fix(ci): re-record token-mint mini-app byte baseline, bump its version
+
+### ♻️ Refactoring
+
+- refactor(frontend): give the renamed-tab alias map one home
+
+### 📚 Documentation
+
+- docs(staging): trigger substitutions are not a place for build config
+- docs(staging): name the Cloud Build trigger that builds staging, and the trap that emptied it
+- docs: consolidate stale has-unread comment in NotificationBell.css
+
+### 🏗️ Infrastructure
+
+- build(cloudbuild): state the build timeout instead of inheriting 600s
+- ci(staging): stop CI pretending to deploy staging
+
+### 🧹 Maintenance
+
+- chore(deps): land eslint 9 -> 10 + plugins, fix the new rules it enables
+- chore(deps): land this sprint's safe dependency and CI action bumps
+- chore(deps): Bump actions/deploy-pages from 4 to 5
+- chore(deps): Bump actions/checkout from 4 to 7
+- chore(deps): Bump @scure/base from 1.2.6 to 2.2.0
+- chore(deps): Bump dorny/paths-filter from 3 to 4
+
+### Artifacts
+
+Range: `v1.5.7..v1.6.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | moved | `clearpath` v1.0.1<br>`token-mint` v1.0.2 |
+| Subgraph endpoint | moved | `v0.2.0` |
+
 ## v1.5.6 — 2026-08-10
 
 Promoted from: none — released directly from main
