@@ -31,8 +31,8 @@
  */
 
 import { keccak256 } from 'ethers'
-import { sha256 } from '@noble/hashes/sha256'
-import { bytesToHex } from '@noble/hashes/utils'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { bytesToHex } from '@noble/hashes/utils.js'
 
 /** 64 hex characters — a SHA-256 or keccak-256 digest body, with no `0x` prefix. */
 const DIGEST_BODY = /^[0-9a-fA-F]{64}$/

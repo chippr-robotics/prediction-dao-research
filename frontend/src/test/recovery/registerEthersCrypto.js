@@ -9,10 +9,9 @@
  * to production — it only makes the mnemonic code path testable here.
  */
 import { ethers } from 'ethers'
-import { sha256 as nobleSha256 } from '@noble/hashes/sha256'
-import { sha512 as nobleSha512 } from '@noble/hashes/sha512'
-import { hmac as nobleHmac } from '@noble/hashes/hmac'
-import { pbkdf2 as noblePbkdf2 } from '@noble/hashes/pbkdf2'
+import { sha256 as nobleSha256, sha512 as nobleSha512 } from '@noble/hashes/sha2.js'
+import { hmac as nobleHmac } from '@noble/hashes/hmac.js'
+import { pbkdf2 as noblePbkdf2 } from '@noble/hashes/pbkdf2.js'
 
 const hashFor = (algo) => (algo === 'sha256' ? nobleSha256 : nobleSha512)
 
