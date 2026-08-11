@@ -53,6 +53,12 @@ major bump, whatever the type.
 The release bump is the **most significant** classification in the range, not the last one merged.
 One `feat` among fifty `chore`s is a minor release.
 
+One marker overrides all of this: a commit carrying `[skip release]` does not vote at all. It is
+written by the release process onto the `chore(release): vX.Y.Z` record it generates, so that
+writing a release down cannot itself cause a release. You will not normally type it — and if you
+find yourself wanting to, what you want is a type whose bump you can live with, not a commit that
+ships invisibly.
+
 ### What counts as breaking here
 
 Written down deliberately, because "breaking" is otherwise a judgment call. Use `!` when the change:

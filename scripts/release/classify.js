@@ -104,6 +104,35 @@ function bodyDeclaresBreaking(body) {
 }
 
 /**
+ * The marker the release process writes on its own paperwork, e.g.
+ * `chore(release): v1.5.6 [skip release]`.
+ */
+const SKIP_MARKER_RE = /\[skip[ -]release\]/i;
+
+/**
+ * Does this commit say, in its own words, that it must not cause a release?
+ *
+ * WHY THIS EXISTS. `release.yml` also checks for the marker, but it reads
+ * `github.event.head_commit.message` — and the generated CHANGELOG commit reaches `main` inside a
+ * pull request, so the head commit of that push is the MERGE commit, whose subject is
+ * "Merge pull request #NNNN from …/release/vX.Y.Z-changelog". The marker sits one commit deeper,
+ * the guard misses it, and the release runs. `chore(release)` then classifies as a patch and mints
+ * the next version, whose record is another such PR, which mints the next one.
+ *
+ * That is not a hypothetical: `v1.5.6` sits on the merge of the `v1.5.5` record and `v1.5.7` on the
+ * merge of the `v1.5.6` record — three versions carrying no product change, while the work waiting
+ * to ship sat on `staging` (issue #1026 follow-up, PR #1140).
+ *
+ * So the marker is honoured HERE, in the authority that decides what a commit is worth, where it
+ * holds however the commit arrived. Note it is the MARKER that is honoured and not the
+ * `chore(release)` scope: a real change to the release tooling is written `chore(release): …` too
+ * (v1.5.2 was exactly that), and it must keep counting.
+ */
+function carriesSkipMarker({ subject = "", body = "" } = {}) {
+  return SKIP_MARKER_RE.test(String(subject)) || SKIP_MARKER_RE.test(String(body));
+}
+
+/**
  * Escalation, §4. Returns an error string when a baseline edit rides on a trivial type, else null.
  * Note this only ever ESCALATES: a baseline edit on a `fix` or a `feat` passes untouched, because
  * those already assert that something real changed.
@@ -158,6 +187,8 @@ module.exports = {
   TRIVIAL_TYPES,
   parseSubject,
   bodyDeclaresBreaking,
+  SKIP_MARKER_RE,
+  carriesSkipMarker,
   checkBaselineEscalation,
   classify,
   aggregateBump,

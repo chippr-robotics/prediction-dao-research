@@ -154,14 +154,47 @@ git fetch --unshallow    # or: git clone (without --depth) into a scratch direct
 
 ### The release published nothing
 
-Expected in two cases: an empty commit range, or no commit in the range carried a classification.
+Expected in three cases: an empty commit range, a range holding nothing but the generated release
+record, or no commit in the range carrying a classification.
 
 ```bash
 node scripts/release/version.js --explain
 ```
 
-prints every commit, how it classified, and which one set the bump. Commits shown as
-`[unclassified]` did not vote — merge commits and anything predating the convention.
+prints every commit, how it classified, and which one set the bump. Two kinds of commit do not vote:
+
+- `[unclassified]` — merge commits and anything predating the convention.
+- `[skipped]` — carries `[skip release]`, i.e. the release process's own paperwork.
+
+The three silences are reported as distinct reasons (`empty-range`, `only-skipped-commits`,
+`no-classified-commits`) because they mean different things. `only-skipped-commits` is the system
+working. `no-classified-commits` means nobody has established what the range contains.
+
+### The version keeps incrementing but nothing new ships
+
+Look at what the tags are actually sitting on:
+
+```bash
+git tag --list 'v*' | sort -V | tail -5 | while read t; do
+  echo "$t  $(git log -1 --format='%s' "$t^{commit}")"
+done
+```
+
+If a tag's commit is a merge of a `release/vX.Y.Z-changelog` branch, the release train is releasing
+its own paperwork rather than any product change, and the fix is in
+`scripts/release/classify.js#carriesSkipMarker` — see contracts/version-scheme.md §2. This happened
+for `v1.5.6` and `v1.5.7`.
+
+The second thing to check is whether the version is the *only* thing that moved:
+
+```bash
+git log --oneline origin/main..origin/staging | wc -l   # work merged but never promoted
+```
+
+`branch-policy.yml` opens a `release-drift` issue when `main` holds commits `staging` lacks. It does
+**not** watch the other direction, so work sitting unpromoted on `staging` raises nothing on its own.
+A non-zero count here with no open promotion PR means production is running without it. Promote it —
+see "Promoting to production" above.
 
 ### The tag already exists
 

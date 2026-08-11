@@ -11,7 +11,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const { classify } = require("./classify");
+const { classify, carriesSkipMarker } = require("./classify");
 const { promotedFrom } = require("./version");
 
 const ROOT = path.join(__dirname, "..", "..");
@@ -80,6 +80,10 @@ function commitsIn(previous, version) {
 function group(commits) {
   const buckets = new Map(GROUPS.map((g) => [g.title, []]));
   for (const c of commits) {
+    // The same rule version.js votes by: a commit the release process marked as its own paperwork
+    // is not a change anyone released. Listing "chore(release): v1.5.6" under a later version would
+    // describe the machine to the reader instead of the product.
+    if (carriesSkipMarker(c)) continue;
     const r = classify({ subject: c.subject, body: c.body });
     if (!r.ok) continue; // merge commits and pre-convention subjects are not release notes
     const g =

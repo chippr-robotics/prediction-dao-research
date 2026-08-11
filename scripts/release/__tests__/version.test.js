@@ -108,6 +108,56 @@ test("unclassified commits are reported, not silently dropped", () => {
   assert.equal(fmt(r.release), "v1.3.3");
 });
 
+// ---- the release process must not release itself ------------------------------------------------
+//
+// Reproduced from the live failure. The generated CHANGELOG commit reaches `main` inside a pull
+// request, so the push that lands it is headed by a MERGE commit and release.yml's
+// `head_commit.message` guard never sees the marker. `chore(release)` then classified as a patch,
+// which minted a version whose own record minted the next one: v1.5.6 sits on the merge of the
+// v1.5.5 record, v1.5.7 on the merge of the v1.5.6 record.
+
+test("a range holding only the generated release record produces NO release", () => {
+  const commits = [
+    commit("Merge pull request #1139 from chippr-robotics/release/v1.5.6-changelog"),
+    commit("chore(release): v1.5.6 [skip release]"),
+  ];
+  const r = nextVersion({ commits, current: V(1, 5, 6) });
+  assert.equal(r.release, null);
+  // Not "no-classified-commits": that silence would mean nobody established what the range held.
+  assert.equal(r.reason, "only-skipped-commits");
+});
+
+test("a marked commit is reported as skipped rather than dropped", () => {
+  const commits = [commit("chore(release): v1.5.6 [skip release]")];
+  const r = nextVersion({ commits, current: V(1, 5, 6) });
+  assert.equal(r.classifications.length, 1);
+  assert.equal(r.classifications[0].skipped, true);
+});
+
+test("a marked commit does not suppress real work sharing its range", () => {
+  const commits = [
+    commit("chore(release): v1.5.6 [skip release]"),
+    commit("feat(reports): statement centre with a bottom-sheet generator"),
+  ];
+  const r = nextVersion({ commits, current: V(1, 5, 6) });
+  assert.equal(r.bump, "minor");
+  assert.equal(fmt(r.release), "v1.6.0");
+});
+
+// The marker is honoured, NOT the scope — v1.5.2 was a real change to the release tooling, written
+// `chore(release):` because that is what it was. Skipping by scope would have lost it.
+test("an unmarked chore(release) still counts", () => {
+  const commits = [commit("chore(release): consolidate 10 lost release records")];
+  const r = nextVersion({ commits, current: V(1, 5, 1) });
+  assert.equal(fmt(r.release), "v1.5.2");
+});
+
+test("the marker is honoured in a commit body too", () => {
+  const commits = [commit("chore(release): v2.0.0", "Generated record.\n\n[skip release]")];
+  const r = nextVersion({ commits, current: V(2, 0, 0) });
+  assert.equal(r.release, null);
+});
+
 test("the computed version is always greater than its predecessor (FR-005)", () => {
   for (const [prev, subject] of [
     [V(0, 9, 9), "fix: x"],
