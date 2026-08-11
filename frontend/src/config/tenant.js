@@ -90,6 +90,16 @@ export function tenantLinks() {
   }
 }
 
+/**
+ * The tenant's raw theme tokens (`brand.theme` — base/light/dark blocks of CSS
+ * custom properties). Surfaces that cannot consume CSS variables — the PDF
+ * statement renderer, for one — read the values from here so a tenant still
+ * brands them from the manifest alone.
+ */
+export function tenantThemeTokens() {
+  return ACTIVE_TENANT.brand.theme
+}
+
 /** Feature ids this tenant enables (validated subset of tenants/features.json). */
 export function tenantFeatures() {
   return ACTIVE_TENANT.settings.features

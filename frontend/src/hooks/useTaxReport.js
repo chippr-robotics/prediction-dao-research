@@ -136,10 +136,14 @@ export function useTaxReport(options = {}) {
     [account, chainId, buildReportFn, makeDataSource, ledger, networkOf, escrowOf, history, refreshHistory, now],
   )
 
+  // `statementOptions` chooses the statement type and sections (issue #1026).
+  // They are a RENDER-time choice, not a build-time one: the same generated
+  // report can be printed as a full account statement or a wagering statement
+  // without going back to the chain.
   const downloadPdf = useCallback(
-    (r = report) => {
+    (r = report, statementOptions = {}) => {
       if (!r) return
-      saveAs(pdfReport.render(r), pdfReport.fileName(r))
+      saveAs(pdfReport.render(r, statementOptions), pdfReport.fileName(r, statementOptions))
     },
     [report, saveAs],
   )
@@ -163,7 +167,7 @@ export function useTaxReport(options = {}) {
   // Regenerate a stored report on demand from immutable chain data and download
   // it, without adding a new history entry (FR-010 — re-download).
   const redownload = useCallback(
-    async (entry, format = 'pdf') => {
+    async (entry, format = 'pdf', statementOptions = {}) => {
       if (!entry || !account) return
       const period = {
         ...resolveCustomPeriod(Date.parse(entry.from), Date.parse(entry.to)),
@@ -183,7 +187,7 @@ export function useTaxReport(options = {}) {
       if (format === 'csv') {
         saveAs(new Blob([csvReport.render(built)], { type: 'text/csv;charset=utf-8' }), csvReport.fileName(built))
       } else {
-        saveAs(pdfReport.render(built), pdfReport.fileName(built))
+        saveAs(pdfReport.render(built, statementOptions), pdfReport.fileName(built, statementOptions))
       }
       return built
     },

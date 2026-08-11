@@ -4,6 +4,8 @@ import { axe } from 'vitest-axe'
 import TaxReportsPanel from '../../components/wallet/TaxReportsPanel'
 import ReportPeriodSelector from '../../components/wallet/ReportPeriodSelector'
 import ReportHistoryList from '../../components/wallet/ReportHistoryList'
+import StatementOptions from '../../components/wallet/StatementOptions'
+import { defaultSections, STATEMENT_TYPES } from '../../data/reports/statement/reportTypes'
 import { makeFixtureDataSource, USER, REGISTRY, CHAIN_ID } from '../fixtures/wagers'
 
 const NOW = Date.UTC(2026, 5, 18)
@@ -31,6 +33,14 @@ describe('Tax Reports accessibility (WCAG 2.1 AA, Constitution V)', () => {
   it('history list has no axe violations', async () => {
     const entries = [{ id: 'e1', label: 'Last month (May 2026)', from: '2026-05-01T00:00:00.000Z', to: '2026-05-31T23:59:59.999Z', createdAt: '2026-06-01T10:00:00.000Z' }]
     const { container } = render(<ReportHistoryList entries={entries} onRedownload={vi.fn()} onRemove={vi.fn()} />)
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  // Issue #1026: the custom mode reveals a second group of checkboxes, which is
+  // the state most likely to lose its labelling.
+  it('statement options have no axe violations, including the custom picker', async () => {
+    const value = { type: STATEMENT_TYPES.CUSTOM, classes: ['wager'], sections: defaultSections() }
+    const { container } = render(<StatementOptions value={value} onChange={vi.fn()} />)
     expect(await axe(container)).toHaveNoViolations()
   })
 
