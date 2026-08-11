@@ -51,7 +51,7 @@ describe('ProfileQuickAccess', () => {
     fireEvent.click(btn)
     expect(onClose).toHaveBeenCalled()
     expect(lastLocation.pathname + lastLocation.search + lastLocation.hash).toBe(
-      '/wallet?tab=preferences#notification-profiles-new'
+      '/wallet?tab=settings#notification-profiles-new'
     )
   })
 
@@ -136,7 +136,7 @@ describe('ProfileQuickAccess', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View settings' }))
     expect(onClose).toHaveBeenCalled()
     expect(lastLocation.pathname + lastLocation.search + lastLocation.hash).toBe(
-      '/wallet?tab=preferences#notification-profiles'
+      '/wallet?tab=settings#notification-profiles'
     )
   })
 })

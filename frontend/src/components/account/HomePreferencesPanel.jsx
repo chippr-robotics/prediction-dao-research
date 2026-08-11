@@ -14,6 +14,8 @@ import {
   setLandingViewPreference,
   resolveLandingView,
 } from '../../utils/landingViewPreference'
+import AccordionSection from './AccordionSection'
+import NavIcon from '../nav/NavIcon'
 import './HomePreferencesPanel.css'
 
 /**
@@ -24,6 +26,10 @@ import './HomePreferencesPanel.css'
  * apply on first paint, before any connect). Currency options are rendered
  * with the ACTIVE network's real symbols but stored as a network-agnostic
  * kind, so the setting follows the user honestly across networks.
+ *
+ * Renders as a collapsed card on the Settings tab: the header carries the
+ * title and a summary of the three current choices, so the whole tab scans in
+ * one screen and the member opens only the card they came for.
  */
 
 const MODE_LABELS = { pay: 'Pay', request: 'Request', wager: 'Wager' }
@@ -58,14 +64,24 @@ function HomePreferencesPanel() {
     { value: 'native', label: tokens.native || 'Network coin' },
   ]
 
-  return (
-    <div className="home-preferences-panel">
-      <h3 className="home-preferences-panel-title">Home screen</h3>
-      <p className="home-preferences-panel-hint">
-        Choose which screen the app opens on, what the Home screen starts on, and which currency
-        the amount starts in.
-      </p>
+  // Collapsed summary: the three choices this section owns, in the order they
+  // appear inside it — enough to tell whether it needs opening at all.
+  const summary = [
+    LANDING_VIEW_LABELS[landingView],
+    MODE_LABELS[mode],
+    currencyOptions.find((o) => o.value === kind)?.label,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
+  return (
+    <AccordionSection
+      id="home-screen"
+      title="Home screen"
+      summary={summary}
+      icon={<NavIcon name="home" size={18} />}
+      className="home-preferences-panel"
+    >
       <fieldset className="home-preferences-group">
         <legend className="home-preferences-legend">Opens on</legend>
         <div className="home-preferences-options" role="radiogroup" aria-label="Opens on">
@@ -123,11 +139,11 @@ function HomePreferencesPanel() {
           ))}
         </div>
         <p className="home-preferences-note">
-          Shown for the network you&apos;re on now ({tokens.networkName || 'current network'}); the
-          choice follows you to each network&apos;s own {tokens.stable ? 'stablecoin' : 'tokens'}.
+          Shown for {tokens.networkName || 'this network'}; the choice follows you to each
+          network&apos;s own {tokens.stable ? 'stablecoin' : 'tokens'}.
         </p>
       </fieldset>
-    </div>
+    </AccordionSection>
   )
 }
 

@@ -98,7 +98,7 @@ function BitcoinNetworkCard({ net }) {
 /**
  * NetworkPanel
  *
- * Network settings, reached from the account button beside Preferences (spec 069 — it used
+ * Network settings, reached from the account button beside Settings (spec 069 — it used
  * to be a Tools section, which no longer fits: FairWins reads every supported network at
  * once, so "which network am I on" is a per-transaction detail, not a place you go).
  *

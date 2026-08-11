@@ -40,11 +40,11 @@ describe('PwaUpdateNotification', () => {
     expect(screen.getByRole('button', { name: 'View update' })).toBeInTheDocument()
   })
 
-  it('routes to the Software Update section in Preferences on click', () => {
+  it('routes to the Software update card in Settings on click', () => {
     updateReady = true
     renderToast()
     fireEvent.click(screen.getByRole('button', { name: 'View update' }))
-    expect(navigateMock).toHaveBeenCalledWith('/wallet?tab=preferences#pwa-update')
+    expect(navigateMock).toHaveBeenCalledWith('/wallet?tab=settings#pwa-update')
     // Dismissed after navigating.
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })

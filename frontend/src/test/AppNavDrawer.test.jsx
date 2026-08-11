@@ -6,6 +6,7 @@ import AppNavDrawer from '../components/nav/AppNavDrawer'
 import { NavDrawerProvider } from '../contexts/NavDrawerContext.jsx'
 import { useNavDrawer } from '../contexts/NavDrawerContext.js'
 import { addFavoriteApp, __resetFavoriteAppsForTests } from '../lib/miniapps/favorites'
+import { TAB_ALIASES } from '../config/appNav'
 
 // useIsMobile() reads window.matchMedia('(max-width: 768px)'). setup.js mocks
 // matches: false for every query, i.e. desktop — which these tests rely on
@@ -126,6 +127,24 @@ describe('AppNavDrawer (global nav drawer)', () => {
     renderDrawer('/wallet?tab=security')
     expect(screen.getByRole('button', { name: 'Recovery' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Trade' })).not.toHaveAttribute('aria-current')
+  })
+
+  // The drawer used to keep its OWN copy of the renamed-tab map, with a comment asking it to stay
+  // in parity with WalletPage's; it drifted the first time a tab was renamed. Both now read the one
+  // exported map, so a legacy id still lights up the entry the tab was renamed to.
+  it('highlights the renamed section when the URL carries a legacy tab id', () => {
+    renderDrawer(`/wallet?tab=backup`)
+    expect(screen.getByRole('button', { name: 'Recovery' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('resolves every legacy tab id through the shared alias map', () => {
+    // Whatever the map says today, each alias must point at a real tab — a rename that forgets to
+    // add its alias here is how a saved link starts resolving to the Account fallback instead.
+    for (const [legacy, canonical] of Object.entries(TAB_ALIASES)) {
+      expect(canonical).toBeTruthy()
+      expect(legacy).not.toBe(canonical)
+    }
+    expect(TAB_ALIASES.preferences).toBe('settings')
   })
 
   it('contains a copyright-only footer, with no legal/policy links (issue #1025)', () => {

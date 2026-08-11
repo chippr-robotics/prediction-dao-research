@@ -12,6 +12,8 @@ import ProfileWizard from '../notifications/profiles/ProfileWizard'
 import ProfileScheduleFields from '../notifications/profiles/ProfileScheduleFields'
 import { profileStatusText } from '../notifications/profiles/statusText'
 import NotificationPreferencesPanel from './NotificationPreferencesPanel'
+import AccordionSection from './AccordionSection'
+import NavIcon from '../nav/NavIcon'
 import './NotificationProfilesPanel.css'
 
 /**
@@ -159,13 +161,16 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
 }
 
 /**
- * NotificationProfilesPanel — the single "Notifications" area of the
- * Preferences tab (spec 059). Lists this device's profiles with truthful
+ * NotificationProfilesPanel — the single "Notifications" card of the
+ * Settings tab (spec 059). Lists this device's profiles with truthful
  * active state, offers per-profile on/off, editing, deletion, and hosts the
  * 4-step creation wizard. The base-layer NotificationPreferencesPanel (which
  * keeps deciding HOW allowed updates are delivered) is embedded below in a
  * "Delivery settings" disclosure so the tab has exactly one notifications
  * section.
+ *
+ * Collapsed, the card reports which profile (if any) is currently silencing
+ * things — the one fact worth seeing without opening it.
  */
 function NotificationProfilesPanel() {
   const {
@@ -184,12 +189,15 @@ function NotificationProfilesPanel() {
   // Deep links from the quick-access surface: #notification-profiles scrolls
   // here; #notification-profiles-new also opens the wizard (covers hash
   // changes after mount — the initial hash is handled by the lazy state).
+  // The card itself is opened by the Settings tab, which maps the hash to this
+  // section id; scrolling targets the accordion header so the member lands on
+  // the heading of the card that just opened.
   useEffect(() => {
     const hash = location.hash
     if (hash !== '#notification-profiles' && hash !== '#notification-profiles-new') return
     const id = window.setTimeout(() => {
       if (hash === '#notification-profiles-new') setWizardOpen(true)
-      document.getElementById('notification-profiles')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      document.getElementById('notifications-header')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 50)
     return () => window.clearTimeout(id)
   }, [location.hash])
@@ -199,13 +207,24 @@ function NotificationProfilesPanel() {
     else enableProfile(profile.id)
   }
 
+  const active = activeStatus.profile
+  const summary = active
+    ? `${active.name} on`
+    : profiles.length === 0
+      ? 'No profiles'
+      : `${profiles.length} profile${profiles.length === 1 ? '' : 's'} · all off`
+
   return (
-    <div className="notif-profiles-panel" id="notification-profiles">
-      <h3 className="notif-profiles-title">Notification profiles</h3>
+    <AccordionSection
+      id="notifications"
+      title="Notifications"
+      summary={summary}
+      icon={<NavIcon name="broadcast" size={18} />}
+      className="notif-profiles-panel"
+    >
       <p className="notif-profiles-hint">
-        Profiles decide when you get interrupted: while one is on, only the
-        updates it allows will notify you — everything else waits quietly in
-        your activity feed. Turn profiles on manually or on a schedule.
+        While a profile is on, only the updates it allows will notify you — the rest wait in
+        your activity feed.
       </p>
 
       {wizardOpen ? (
@@ -214,8 +233,7 @@ function NotificationProfilesPanel() {
         <>
           {profiles.length === 0 ? (
             <p className="notif-profiles-empty">
-              No profiles yet. Create one — like Sleep or Work — to control
-              when FairWins can interrupt you.
+              No profiles yet — create one, like Sleep or Work.
             </p>
           ) : (
             <ul className="notif-profiles-list">
@@ -277,7 +295,7 @@ function NotificationProfilesPanel() {
           </button>
 
           {/* Base-layer delivery controls (spec 059 consolidation): the former
-              standalone Notifications section lives here so the Preferences
+              standalone Notifications section lives here so the Settings
               tab has exactly one notifications surface. Profiles decide WHEN
               you're interrupted; these decide HOW allowed updates arrive. */}
           <div className="notif-profiles-delivery">
@@ -301,7 +319,7 @@ function NotificationProfilesPanel() {
           </div>
         </>
       )}
-    </div>
+    </AccordionSection>
   )
 }
 

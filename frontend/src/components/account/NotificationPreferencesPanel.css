@@ -1,5 +1,5 @@
 /* NotificationPreferencesPanel — notification delivery controls on the
-   Preferences tab (mobile push / in-app / silent per category). Reuses the
+   Settings tab (mobile push / in-app / silent per category). Reuses the
    PreferencesPanel switch look for the master toggle and adds a segmented
    three-way control per category. */
 

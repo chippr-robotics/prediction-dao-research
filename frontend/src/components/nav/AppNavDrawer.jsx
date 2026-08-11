@@ -13,6 +13,7 @@ import {
   pathForNavItem,
   visibleNavGroups,
   isNavItemEnabledForTenant,
+  TAB_ALIASES,
 } from '../../config/appNav'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { collectiblesGatewayUrl } from '../../lib/collectibles/gatewayClient'
@@ -20,10 +21,10 @@ import { predictGatewayUrl } from '../../lib/predict/predictClient'
 import { loadFavoriteApps, subscribeFavoriteApps } from '../../lib/miniapps/favorites'
 import './AppNavDrawer.css'
 
-// Deep-link alias parity with WalletPage (the Swap tab is now "Trade"; the
-// old standalone Backup tab now lives inside the combined Security panel).
+// Renamed tabs resolve through the shared `TAB_ALIASES` map (config/appNav.js), so the drawer
+// highlights the right entry for a legacy deep link without keeping its own copy of the renames.
 //
-// Spec 073 (FR-009) — what this map deliberately does NOT contain yet. The Apps group
+// Spec 073 (FR-009) — what the mini-app map below deliberately does NOT contain yet. The Apps group
 // collapsed to the single mini-app catalog entry, so ClearPath and Token Mint no longer
 // appear in this menu; their `?tab=clearpath` / `?tab=tokens` deep links keep resolving to
 // the host-native panels WalletPage still renders, unchanged. They become aliases to the
@@ -31,10 +32,8 @@ import './AppNavDrawer.css'
 // (T029) — only in the conversion tasks that actually publish those packages, and not
 // before: an alias pointing at a mini-app nobody has registered turns a working deep link
 // into a dead end, and the catalog would be claiming a verified package that does not exist.
-// Wagers is NOT in this map and never will be — it did not become a package (see WAGERS_VIEW in
+// Wagers is NOT in that map and never will be — it did not become a package (see WAGERS_VIEW in
 // config/appNav.js); it moved into Finance ▸ Transfer, and `/wagers` redirects there from App.jsx.
-// This map must stay in parity with the copy in pages/WalletPage.jsx.
-const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
 /**
  * Tabs that have become mini-apps (spec 073 T027) — kept in parity with the same map in

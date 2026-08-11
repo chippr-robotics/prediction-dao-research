@@ -1,5 +1,5 @@
 /* PWA "update available" toast — a compact, dismissible card pinned bottom-center that
-   routes the user to the Software Update section in Preferences. Theme-variable driven so
+   routes the user to the Software update card in Settings. Theme-variable driven so
    it tracks light/dark. Sits above app chrome but below modal overlays. */
 
 .pwa-update-toast {

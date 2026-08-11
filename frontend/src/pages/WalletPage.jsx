@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useWallet, useWalletRoles } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
 import { useUserPreferences } from '../hooks/useUserPreferences'
@@ -41,6 +41,7 @@ import {
   ACCOUNT_DEFAULT_VIEW,
   accountViewFromParam,
   PORTFOLIO_PATH,
+  TAB_ALIASES,
 } from '../config/appNav'
 import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../lib/predict/predictClient'
@@ -58,18 +59,28 @@ const LEGAL_LINK_ICONS = {
 }
 const LEGAL_LINK_ICON_DEFAULT = 'ban' // Account Moderation (deep-links into /terms)
 
+// Settings deep links → the card each one means. Settings cards are collapsed by
+// default, so a link that only scrolled would leave the member staring at a closed
+// heading; these ids are the AccordionSection ids on the tab.
+const SETTINGS_HASH_SECTIONS = {
+  '#pwa-update': 'pwa-update',
+  '#legal-policies': 'legal-policies',
+  '#notification-profiles': 'notifications',
+  '#notification-profiles-new': 'notifications',
+}
+
 // My Account section panels, keyed by tab id. The section MENU now lives in the
 // global nav drawer + account button (see config/appNav.js) — this page just
 // hosts the panels and reads `?tab=` to pick one. WALLET_TABS is the flat list
 // used for deep-link/alias resolution and for the active tab's heading label.
-// (Account / Membership / Network / Preferences are reached from the account button;
+// (Account / Membership / Network / Settings are reached from the account button;
 // 'custody' is surfaced to users as "Protect" and 'paytransfer' as "Transfer" —
 // the ids stay stable so saved links keep resolving, spec 067 FR-002.)
 const WALLET_TABS = [
   { id: 'account', label: 'Account' },
   { id: 'membership', label: 'Membership' },
   { id: 'network', label: 'Network' },
-  { id: 'preferences', label: 'Preferences' },
+  { id: 'settings', label: 'Settings' },
   { id: 'security', label: 'Recovery' },
   { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
@@ -84,8 +95,8 @@ const WALLET_TABS = [
   { id: 'apps', label: 'Apps' },
 ]
 
-// Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade"; the
-// old standalone Backup tab is now part of the combined "Recovery" panel).
+// Legacy deep-link aliases live in config/appNav.js — the drawer resolves the same
+// map, and two copies of it drifted the last time a tab was renamed.
 //
 // Spec 073 (FR-009). The Apps nav group collapsed to the single mini-app catalog entry, and both
 // apps that used to live in it are packages now: `?tab=tokens` and `?tab=clearpath` REDIRECT to
@@ -94,7 +105,6 @@ const WALLET_TABS = [
 // package: it moved into the Transfer section as `?tab=paytransfer&view=wagers`, and the legacy
 // `/wagers` route redirects there from App.jsx. This map must stay in parity with the copy in
 // components/nav/AppNavDrawer.jsx.
-const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
 /**
  * Tabs that have BECOME mini-apps (spec 073 T027) or moved into another section. Unlike
@@ -161,9 +171,10 @@ function WalletPage() {
   const { updateReady: pwaUpdateReady, applyUpdate: pwaApplyUpdate, checkForUpdate: pwaCheckForUpdate } = usePwaUpdate()
   const [pwaChecking, setPwaChecking] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   // The section is driven by `?tab=` so the global nav drawer and the account
-  // button can route straight to a panel (e.g. the update toast → ?tab=preferences).
+  // button can route straight to a panel (e.g. the update toast → ?tab=settings).
   const requestedTab = searchParams.get('tab')
   /*
    * A tab that has become a mini-app leaves this page. Done as an effect rather than during
@@ -285,15 +296,23 @@ function WalletPage() {
     }
   }, [pwaCheckForUpdate])
 
-  // When routed here from the update toast (#pwa-update), reveal the section.
+  // Settings cards are collapsed by default, so a deep link has to name the card
+  // it means: the hash picks which one the group opens (see SETTINGS_HASH_SECTIONS),
+  // and the same effect scrolls its header into view. Read from the router's
+  // location rather than window.location so a hash arriving while the tab is
+  // already open still lands.
+  const settingsOpenSection =
+    activeTab === 'settings' ? SETTINGS_HASH_SECTIONS[location.hash] || null : null
+
   useEffect(() => {
-    if (activeTab !== 'preferences') return
-    if (typeof window === 'undefined' || window.location.hash !== '#pwa-update') return
+    if (!settingsOpenSection) return
     const id = window.setTimeout(() => {
-      document.getElementById('pwa-update')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 50)
+      document
+        .getElementById(`${settingsOpenSection}-header`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 60)
     return () => window.clearTimeout(id)
-  }, [activeTab])
+  }, [settingsOpenSection])
 
   const selectedPolymarketCategories = useMemo(
     () => preferences?.polymarketCategories || [],
@@ -541,173 +560,176 @@ function WalletPage() {
                   </div>
                 )}
 
-                {activeTab === 'preferences' && (
-                  <div className="preferences-section" role="tabpanel">
-                    <h2 className="preferences-group-heading">Home</h2>
-                    <div className="section">
+                {activeTab === 'settings' && (
+                  <div className="settings-section" role="tabpanel">
+                    {/* Settings is the app's global preference surface. Like Recovery, it is a
+                        list of COLLAPSED cards: each states its current value in the header, so
+                        the whole tab scans in one screen and the member opens only what they
+                        came for. One card is open at a time. */}
+                    <p className="settings-section__intro">
+                      How this app looks and behaves. Open a card to change it.
+                    </p>
+                    <AccordionGroup openId={settingsOpenSection}>
+                      {/* Each preference panel supplies its own card header + summary. */}
                       <HomePreferencesPanel />
-                    </div>
-
-                    <h2 className="preferences-group-heading">Wallet</h2>
-                    <div className="section">
                       <WalletDisplayPreferencesPanel address={address} />
-                    </div>
-
-                    <h2 className="preferences-group-heading">Portfolio</h2>
-                    <div className="section">
                       <PortfolioPreferencesPanel />
-                    </div>
-
-                    <h2 className="preferences-group-heading">Privacy</h2>
-                    <div className="section">
                       <PrivacyPreferencesPanel />
-                    </div>
-
-                    <h2 className="preferences-group-heading">Notifications</h2>
-                    <div className="section">
                       <NotificationProfilesPanel />
-                    </div>
 
-                    <h2 className="preferences-group-heading">Markets</h2>
-                    <div className="section">
-                      <h3>Polymarket Categories</h3>
-                      <p className="section-description">
-                        Pick the categories you care about. Your dashboard feed will surface markets in these categories first, and the in-wager market browser uses them as the default filter.
-                      </p>
+                      <AccordionSection
+                        id="markets"
+                        title="Markets"
+                        summary={
+                          selectedPolymarketCategories.length
+                            ? `${selectedPolymarketCategories.length} categor${selectedPolymarketCategories.length === 1 ? 'y' : 'ies'} followed`
+                            : 'All categories'
+                        }
+                        icon={<NavIcon name="trending" size={18} />}
+                      >
+                        <p className="section-description">
+                          Categories you pick surface first in your feed and preselect the market browser&apos;s filter.
+                        </p>
 
-                      {!polymarketSidebetsEnabled && (
-                        <div className="key-error" role="note">
-                          Polymarket integration is only available on Polygon chains. Switch your network to use these preferences.
+                        {!polymarketSidebetsEnabled && (
+                          <div className="key-error" role="note">
+                            Polymarket is only available on Polygon. Switch networks to use these.
+                          </div>
+                        )}
+
+                        <div className="polymarket-category-grid">
+                          {POLYMARKET_CATEGORY_OPTIONS.map(({ slug, label }) => {
+                            const checked = selectedPolymarketCategories.includes(slug)
+                            return (
+                              <label key={slug} className={`polymarket-category-option ${checked ? 'checked' : ''}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => togglePolymarketCategory(slug)}
+                                />
+                                <span>{label}</span>
+                              </label>
+                            )
+                          })}
                         </div>
-                      )}
 
-                      <div className="polymarket-category-grid">
-                        {POLYMARKET_CATEGORY_OPTIONS.map(({ slug, label }) => {
-                          const checked = selectedPolymarketCategories.includes(slug)
-                          return (
-                            <label key={slug} className={`polymarket-category-option ${checked ? 'checked' : ''}`}>
+                        {selectedPolymarketCategories.length > 0 && (
+                          <button
+                            type="button"
+                            className="key-action-btn secondary"
+                            onClick={() => setPolymarketCategories([])}
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </AccordionSection>
+
+                      <AccordionSection
+                        id="install-app"
+                        title="Install app"
+                        summary={pwaStandalone ? 'Installed on this device' : 'Runs in the browser'}
+                        icon={<NavIcon name="grid" size={18} />}
+                      >
+                        {pwaStandalone ? (
+                          <div className="key-status" role="note">
+                            FairWins is already installed and running as an app on this device.
+                          </div>
+                        ) : (
+                          <>
+                            <p className="section-description">
+                              Install FairWins for full-screen access — no app store, no download.
+                            </p>
+                            <label className="pwa-pref-toggle">
                               <input
                                 type="checkbox"
-                                checked={checked}
-                                onChange={() => togglePolymarketCategory(slug)}
+                                checked={!pwaPromptHidden}
+                                onChange={(e) => setPwaPromptHidden(!e.target.checked)}
                               />
-                              <span>{label}</span>
+                              <span>Show the install prompt when I visit in a browser</span>
                             </label>
-                          )
-                        })}
-                      </div>
 
-                      {selectedPolymarketCategories.length > 0 && (
-                        <button
-                          type="button"
-                          className="key-action-btn secondary"
-                          onClick={() => setPolymarketCategories([])}
+                            {pwaCanPrompt && (
+                              <button
+                                type="button"
+                                className="key-action-btn primary"
+                                onClick={pwaPromptInstall}
+                              >
+                                Install now
+                              </button>
+                            )}
+
+                            {pwaIsIos && !pwaCanPrompt && (
+                              <p className="section-description">
+                                On iOS, open the Share menu in Safari and choose{' '}
+                                <strong>Add to Home Screen</strong> to install.
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </AccordionSection>
+
+                      {/* Reached from the update toast via ?tab=settings#pwa-update — the hash
+                          map below opens this card, so the member lands on the button, not on a
+                          collapsed heading. */}
+                      <AccordionSection
+                        id="pwa-update"
+                        title="Software update"
+                        summary={pwaUpdateReady ? 'A new version is available' : "You're on the latest version"}
+                        badge={pwaUpdateReady ? 'Update ready' : null}
+                        badgeTone="info"
+                        icon={<NavIcon name="arrowIn" size={18} />}
+                      >
+                        <div
+                          className={`pwa-update-status ${pwaUpdateReady ? 'is-available' : 'is-current'}`}
+                          role="status"
                         >
-                          Clear all
-                        </button>
-                      )}
-                    </div>
-
-                    <h2 className="preferences-group-heading">App</h2>
-                    <div className="section">
-                      <h3>Install App</h3>
-                      <p className="section-description">
-                        FairWins is a progressive web app you can install to your device for
-                        quick, full-screen access — no app store, no download.
-                      </p>
-
-                      {pwaStandalone ? (
-                        <div className="key-status" role="note">
-                          FairWins is already installed and running as an app on this device.
+                          {pwaUpdateReady
+                            ? 'A new version is available. Installing it reloads the app.'
+                            : "You're running the latest version."}
                         </div>
-                      ) : (
-                        <>
-                          <label className="pwa-pref-toggle">
-                            <input
-                              type="checkbox"
-                              checked={!pwaPromptHidden}
-                              onChange={(e) => setPwaPromptHidden(!e.target.checked)}
-                            />
-                            <span>Show the install prompt when I visit in a browser</span>
-                          </label>
 
-                          {pwaCanPrompt && (
+                        <div className="pwa-update-buttons">
+                          {pwaUpdateReady && (
                             <button
                               type="button"
                               className="key-action-btn primary"
-                              onClick={pwaPromptInstall}
+                              onClick={pwaApplyUpdate}
                             >
-                              Install now
+                              Update now
                             </button>
                           )}
-
-                          {pwaIsIos && !pwaCanPrompt && (
-                            <p className="section-description">
-                              On iOS, open the Share menu in Safari and choose{' '}
-                              <strong>Add to Home Screen</strong> to install.
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    <div className="section" id="pwa-update">
-                      <h3>Software Update</h3>
-                      <p className="section-description">
-                        FairWins checks for new versions automatically in the background.
-                        When an update is ready you can install it here — it takes a moment
-                        and reloads the app.
-                      </p>
-
-                      <div
-                        className={`pwa-update-status ${pwaUpdateReady ? 'is-available' : 'is-current'}`}
-                        role="status"
-                      >
-                        {pwaUpdateReady
-                          ? 'A new version is available.'
-                          : "You're running the latest version."}
-                      </div>
-
-                      <div className="pwa-update-buttons">
-                        {pwaUpdateReady && (
                           <button
                             type="button"
-                            className="key-action-btn primary"
-                            onClick={pwaApplyUpdate}
+                            className="key-action-btn secondary"
+                            onClick={handleCheckForUpdate}
+                            disabled={pwaChecking}
                           >
-                            Update now
+                            {pwaChecking ? 'Checking\u2026' : 'Check for updates'}
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          className="key-action-btn secondary"
-                          onClick={handleCheckForUpdate}
-                          disabled={pwaChecking}
-                        >
-                          {pwaChecking ? 'Checking…' : 'Check for updates'}
-                        </button>
-                      </div>
-                    </div>
+                        </div>
+                      </AccordionSection>
 
-                    {/* Issue #1025 — moved from the side nav drawer's footer into
-                        Settings → App, after Install App / Software Update. */}
-                    <div className="section" id="legal-policies">
-                      <h3>Legal &amp; Policies</h3>
-                      <p className="section-description">
-                        Terms, risk disclosures, and other policies governing your use of FairWins.
-                      </p>
-                      <nav className="app-legal-links" aria-label="Legal and policy documents">
-                        {LEGAL_LINKS.map((link) => (
-                          <a key={link.href} href={link.href} className="app-legal-link-row">
-                            <span className="app-legal-link-icon" aria-hidden="true">
-                              <NavIcon name={LEGAL_LINK_ICONS[link.href] || LEGAL_LINK_ICON_DEFAULT} size={18} />
-                            </span>
-                            <span className="app-legal-link-label">{link.label}</span>
-                            <span className="app-legal-link-chevron" aria-hidden="true">›</span>
-                          </a>
-                        ))}
-                      </nav>
-                    </div>
+                      {/* Issue #1025 — moved from the side nav drawer's footer into Settings,
+                          after Install app / Software update. */}
+                      <AccordionSection
+                        id="legal-policies"
+                        title="Legal & policies"
+                        summary="Terms, risk, privacy, moderation"
+                        icon={<NavIcon name="reports" size={18} />}
+                      >
+                        <nav className="app-legal-links" aria-label="Legal and policy documents">
+                          {LEGAL_LINKS.map((link) => (
+                            <a key={link.href} href={link.href} className="app-legal-link-row">
+                              <span className="app-legal-link-icon" aria-hidden="true">
+                                <NavIcon name={LEGAL_LINK_ICONS[link.href] || LEGAL_LINK_ICON_DEFAULT} size={18} />
+                              </span>
+                              <span className="app-legal-link-label">{link.label}</span>
+                              <span className="app-legal-link-chevron" aria-hidden="true">›</span>
+                            </a>
+                          ))}
+                        </nav>
+                      </AccordionSection>
+                    </AccordionGroup>
                   </div>
                 )}
 
