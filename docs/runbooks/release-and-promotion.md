@@ -85,14 +85,41 @@ FR-026c is not advice.
 
 Also set both to `noindex`.
 
-**Each service builds itself from the `staging` branch.** CI does not push images: the
-`Staging Candidate` workflow tags `vX.Y.Z-rc.N` and stops there. It used to submit
-`cloudbuild.staging.yaml`, which never worked in a single run — the grant it assumed was never
-made — and left every staging merge marked red by a step that had never functioned. A permanently
-red check reports nothing, and a genuinely stale staging service hid behind it for a day.
+### 5. Point a Cloud Build trigger at the `staging` branch
 
-So when a staging host is serving the wrong thing, the workflow run is the wrong place to look.
-See "Staging is serving an old build" below.
+**A Cloud Build trigger builds and deploys staging. CI does not.** The `Staging Candidate`
+workflow tags `vX.Y.Z-rc.N` and stops there — it used to submit `cloudbuild.staging.yaml` and never
+worked in a single run, because the grant it assumed was never made.
+
+```bash
+gcloud builds triggers create github \
+  --name=staging-branch-build \
+  --repo-owner=chippr-robotics \
+  --repo-name=prediction-dao-research \
+  --branch-pattern='^staging$' \
+  --build-config=cloudbuild.staging.yaml \
+  --description='Build + deploy both staging services on every push to staging'
+```
+
+The trigger's service account needs `roles/artifactregistry.writer` (push both images),
+`roles/run.admin` (deploy both services) and `roles/iam.serviceAccountUser` (act as each service's
+runtime identity). A trigger that can build but not deploy leaves the previous revision serving and
+reports success on the build — the exact shape of failure that hides a stale service.
+
+`_RC_VERSION` defaults to empty, so a branch-triggered build self-describes as `unreleased+<sha>`
+in the drawer rather than a candidate number. **That is correct and deliberate** (FR-031): the
+branch push does not know which candidate tag the workflow is about to mint, and a guessed tag is
+worse than an honest sha.
+
+> **Do not use Cloud Run's built-in "deploy from a repository" for this.** It builds the root
+> `Dockerfile` with no `--build-arg`, and every `VITE_*` in that image is then undefined: no
+> relayer URL (gasless silently degrades to self-submit), no subgraph URL, no version identity, no
+> `VITE_NETWORK_ID` — the cohort the whole two-service design exists to fix. Staging was in exactly
+> that state on 2026-08-11: a service that was up, looked fine, and mirrored production in nothing.
+> The build args are the point, and only `cloudbuild.staging.yaml` carries them. Verify with the
+> fingerprint check in "Staging is serving an old build" below.
+
+Production is the same shape — a trigger on `main` running `cloudbuild.yaml`.
 
 ---
 
@@ -288,6 +315,20 @@ grep -c "Reporting period" /tmp/deployed.js   # expect 0 once deployed
 
 A string the repository no longer contains anywhere, still present in the deployed bundle, is proof
 the service has not rebuilt — not a routing or caching question, and nothing a hard refresh fixes.
+
+**Then check it was built with its build args at all**, which is a different failure and a worse
+one. Vite folds `VITE_*` into the bundle, so the args a build received are readable from the bytes:
+
+```bash
+for s in relay-staging.fairwins.app staging.fairwins.app fairwins-polygon; do
+  printf '%-32s %s\n' "$s" "$(grep -c "$s" /tmp/deployed.js)"
+done
+```
+
+All zeros means the image was built with **no** `--build-arg` — not stale config, *absent* config.
+Such a build has no relayer, no subgraph, no version identity and no `VITE_NETWORK_ID`, so it is
+not a mirror of production in any respect, and the app degrades quietly rather than failing. Fix
+the trigger's build config (§5); rebuilding from the same source will not help.
 
 Two further reads, both cheap:
 

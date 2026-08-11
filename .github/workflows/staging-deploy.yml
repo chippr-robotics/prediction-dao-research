@@ -2,9 +2,10 @@ name: Staging Candidate
 
 # Every merge into `staging` becomes a release candidate (spec 076, FR-002).
 #
-# It does NOT deploy. The staging Cloud Run services build from this branch themselves; this
-# workflow's whole job is to give that revision a candidate NUMBER, so what is running on staging
-# and what will be released from `main` are described by the same authority.
+# It does NOT deploy. A Cloud Build trigger on this branch builds and deploys both staging services
+# from cloudbuild.staging.yaml; this workflow's whole job is to give that revision a candidate
+# NUMBER, so what is running on staging and what will be released from `main` are described by the
+# same authority.
 #
 # The candidate number comes from scripts/release/version.js — the same authority that computes
 # production versions, so a candidate and the release it becomes cannot disagree.
@@ -76,9 +77,9 @@ jobs:
           git tag -a "$TAG" -m "Release candidate $TAG"
           git push origin "$TAG"
 
-      # DEPLOYMENT IS NOT DONE HERE. The staging Cloud Run services build from this branch
-      # themselves, so a second pipeline pushing images at the same revision would be a second
-      # source of truth about what staging is running.
+      # DEPLOYMENT IS NOT DONE HERE. A Cloud Build trigger on this branch runs
+      # cloudbuild.staging.yaml, so a second pipeline pushing images at the same revision would be
+      # a second source of truth about what staging is running.
       #
       # This step used to submit cloudbuild.staging.yaml. It never once succeeded: the runs that
       # reached it failed on `The required property [project] is not currently set` (no auth, no
@@ -92,9 +93,10 @@ jobs:
           {
             echo "### Deployment"
             echo ""
-            echo "Tagged \`${{ steps.rc.outputs.version }}\`. The staging Cloud Run services deploy"
-            echo "themselves from this branch — nothing is submitted from CI."
+            echo "Tagged \`${{ steps.rc.outputs.version }}\`. A Cloud Build trigger on this branch"
+            echo "builds and deploys both staging services from cloudbuild.staging.yaml —"
+            echo "nothing is submitted from CI."
             echo ""
-            echo "If a staging host is not serving this commit, the service's own build is the"
-            echo "place to look, not this run. See docs/runbooks/release-and-promotion.md."
+            echo "If a staging host is not serving this commit, that trigger's build is the place"
+            echo "to look, not this run. See docs/runbooks/release-and-promotion.md."
           } >> "$GITHUB_STEP_SUMMARY"
