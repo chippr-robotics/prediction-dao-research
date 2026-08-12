@@ -127,7 +127,7 @@ export async function readGainsStatus(chainId, deps) {
     makeContract = defaultMakeContract,
   } = deps ?? {}
 
-  let diamond = null
+  let diamond
   try {
     diamond = diamondFor(chainId)
   } catch {
@@ -204,7 +204,7 @@ export async function readGainsStatus(chainId, deps) {
 export async function readGmxStatus(chainId, deps) {
   const { addressesFor = gmxAddressesFor, getProvider = getReadProvider } = deps ?? {}
 
-  let addresses = null
+  let addresses
   try {
     addresses = addressesFor(chainId)
   } catch {

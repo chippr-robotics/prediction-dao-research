@@ -1037,6 +1037,10 @@ const EXIT_PATH = {
   // Naming a GMX market is what gives a GMX close a price to bound itself with, so the resolver
   // is on the exit path too: a gate reachable from here could withhold one.
   'lib/perps/gmxMarkets.js': '../../lib/perps/gmxMarkets.js',
+  // And what that market's scales make of a GMX position — the entry price, leverage and P&L a
+  // member reads before deciding to close. Same reason: it is on the exit path, so nothing in it
+  // may consult a gate.
+  'lib/perps/gmxDerived.js': '../../lib/perps/gmxDerived.js',
   'lib/perps/orderState.js': '../../lib/perps/orderState.js',
   // Phase 7: an exit REPORTS itself by queueing here (T070), so the buffer is on the exit path
   // even though it moves no money. A gate reachable from it would be a gate an exit runs
@@ -1276,6 +1280,7 @@ describe('(h) every perps module is classified, so the exit-path map cannot go s
    * which cannot express a decision about one.
    */
   const LIB_EXIT = [
+    'lib/perps/gmxDerived.js',
     'lib/perps/gmxMarkets.js',
     'lib/perps/orderState.js',
     'lib/perps/perpsActivityBuffer.js',

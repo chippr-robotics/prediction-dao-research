@@ -30,12 +30,16 @@ import sheetSource from '../../components/perps/PositionSheet.jsx?raw'
 import actionsSource from '../../components/perps/positionSheetActions.js?raw'
 import { GAINS_DIAMOND_ABI } from '../../abis/perps/gainsDiamond'
 import { GAINS_DIAMOND_BY_CHAIN, GMX_ADDRESSES_BY_CHAIN } from '../../config/perps'
+import { withGmxDerivedFigures } from '../../lib/perps/gmxDerived'
+import { buildGmxMarketIndex } from '../../lib/perps/gmxMarkets'
 import * as gains from '../../lib/perps/venues/gains'
 
 const ARBITRUM = 42161
 const MEMBER = '0xd504dC1ac094F45272f46b25A2874bDab45132Da'
 const MARKET = '0x47c031236e19d024b42f8AE6780E44A573170703'
 const USDC = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'
+/** Arbitrum WBTC.e — EIGHT decimals, which is the whole point of it being in this file. */
+const WBTC = '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f'
 const TX = `0x${'11'.repeat(32)}`
 
 const diamond = new Interface(GAINS_DIAMOND_ABI)
@@ -143,6 +147,7 @@ function renderSheet({
   sendOnChain,
   readFee,
   readProtection,
+  readQuote,
   sleep,
   tradeDeps,
   ...props
@@ -154,6 +159,10 @@ function renderSheet({
     // confirmation's own clock parks — so a test that is not about the confirmation sees exactly
     // the state a member sees while it is still in flight, and touches no network to do it.
     readProtection: readProtection ?? (async () => ({ ok: false, reason: 'unreadable' })),
+    // GMX's keeper-fee read, stubbed away by default. A GAINS position has no such fee, so the
+    // real one returns null immediately and nothing changes for the suite above; a rendered GMX
+    // position would otherwise reach for a provider, which is exactly what these tests do without.
+    readQuote: readQuote ?? (async () => null),
     sleep: sleep ?? parked,
     trade: {
       sendOnChain: send,
@@ -247,6 +256,119 @@ describe('the position as the venue reports it', () => {
       'href',
       expect.stringContaining('gains.trade'),
     )
+  })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * US1 acceptance 1, the GMX half — a figure FairWins worked out is never presented as the venue's
+ *
+ * The visual review found this sheet rendering six blank figures on a GMX position, because GMX's
+ * Reader returns raw venue units and no entry, leverage or P&L at all. Three of them are now
+ * composed from the pairs feed (`lib/perps/gmxDerived.js`), which makes the attribution sentence
+ * the thing under test: "every figure above is as GMX reports it" was true of six dashes and would
+ * be a lie over our own arithmetic.
+ * --------------------------------------------------------------------------------------------- */
+
+describe('a GMX position, where some figures are FairWins’ own arithmetic', () => {
+  /** The feed row for the position's market, in the shape `normalizeGmxPairs` publishes. */
+  const GMX_PAIRS = [
+    {
+      id: `gmx:${ARBITRUM}:BTC/USD:${MARKET}`,
+      venue: 'gmx',
+      chainId: ARBITRUM,
+      symbol: 'BTC/USD',
+      base: 'BTC',
+      quote: 'USD',
+      variant: 'WBTC.e-USDC',
+      price: 63_000,
+      market: MARKET,
+      collaterals: [
+        { symbol: 'WBTC.e', address: WBTC, decimals: 8, usdPrice: 62_990 },
+        { symbol: 'USDC', address: USDC, decimals: 6, usdPrice: 1 },
+      ],
+    },
+  ]
+
+  /** 0.02 BTC of a $1,000 long (so an entry of $50,000) backed by 100 USDC, marked at $63,000. */
+  const derivedGmx = (over = {}) =>
+    withGmxDerivedFigures(
+      [
+        gmxPosition({
+          symbol: 'BTC/USD',
+          raw: {
+            sizeInUsd: 1_000n * 10n ** 30n,
+            sizeInTokens: 2_000_000n, // 0.02 × 1e8 — WBTC is EIGHT decimals
+            collateralAmount: 100_000_000n, // 100 × 1e6 — USDC is SIX
+            isLong: true,
+          },
+          ...over,
+        }),
+      ],
+      buildGmxMarketIndex(GMX_PAIRS),
+    )[0]
+
+  it('shows the figures GMX’s own numbers imply, each tagged as calculated', async () => {
+    renderSheet({ position: derivedGmx(), markPrice: 63_000 })
+    await settle()
+
+    expect(factValue('Entry price')).toHaveTextContent('50,000.0')
+    expect(factValue('Leverage')).toHaveTextContent('10×')
+    // 0.02 × 63,000 − 1,000 = +$260.
+    expect(factValue('Unrealized P&L')).toHaveTextContent('+$260.00')
+    for (const label of ['Entry price', 'Leverage', 'Unrealized P&L']) {
+      expect(factValue(label).querySelector('.pps-derived')).toHaveTextContent('calculated')
+    }
+    // The current price is the venue's own, so it carries no tag.
+    expect(factValue('Current price').querySelector('.pps-derived')).toBeNull()
+  })
+
+  it('stops claiming every figure is the venue’s, and says the calculated P&L is not GMX’s settlement figure', async () => {
+    renderSheet({ position: derivedGmx(), markPrice: 63_000 })
+    await settle()
+
+    expect(screen.queryByText(/Every figure above is as GMX reports it/)).toBeNull()
+    expect(screen.getByText(/are not reported by GMX/)).toBeInTheDocument()
+    expect(screen.getByText(/is not what GMX will settle at/)).toBeInTheDocument()
+  })
+
+  it('leaves the venue-reported sentence exactly as it was when nothing was calculated', async () => {
+    renderSheet()
+    await settle()
+    expect(screen.getByText(/Every figure above is as Gains reports it/)).toBeInTheDocument()
+    expect(document.querySelector('.pps-derived')).toBeNull()
+  })
+
+  it('explains WHY there is no liquidation price rather than leaving a bare dash', async () => {
+    renderSheet({ position: derivedGmx(), markPrice: 63_000 })
+    await settle()
+
+    expect(factValue('Liquidation price')).toHaveTextContent('—')
+    expect(factValue('Liquidation price').querySelector('.pps-derived')).toBeNull()
+    expect(screen.getByText(/GMX does not publish a liquidation price/)).toBeInTheDocument()
+    expect(screen.getByText(/Your position can still be liquidated/)).toBeInTheDocument()
+  })
+
+  it('can now estimate the proceeds, and says GMX’s own fee is not taken out of them', async () => {
+    renderSheet({ position: derivedGmx(), markPrice: 63_000 })
+    await settle()
+
+    // $100 collateral + $260 P&L on a full close.
+    expect(screen.getByText('Estimated proceeds').parentElement).toHaveTextContent('$360.00')
+    expect(screen.getByText('GMX’s own fees').parentElement).toHaveTextContent('—')
+    expect(screen.getByText(/own fee for this exit is not published to this app/)).toBeInTheDocument()
+  })
+
+  it('renders “—” with no tag at all on a market the feed does not list, and never a zero', async () => {
+    const unlisted = withGmxDerivedFigures([gmxPosition()], buildGmxMarketIndex([]))[0]
+    renderSheet({ position: unlisted, markPrice: null })
+    await settle()
+
+    for (const label of ['Entry price', 'Leverage', 'Liquidation price', 'Unrealized P&L']) {
+      expect(factValue(label)).toHaveTextContent('—')
+      expect(factValue(label)).not.toHaveTextContent('0')
+    }
+    expect(document.querySelector('.pps-derived')).toBeNull()
+    expect(screen.getByText(/Every figure above is as GMX reports it/)).toBeInTheDocument()
   })
 })
 
@@ -849,5 +971,50 @@ describe('buildExitDescriptor / buildProtectDescriptor', () => {
     expect(built.ok).toBe(true)
     expect('sl' in built.descriptor.params).toBe(true)
     expect('tp' in built.descriptor.params).toBe(false)
+  })
+})
+
+/*
+ * Findings from the actor-critic VISUAL review (specs/083-.../screenshots/). Neither of these was
+ * catchable by the suite as it stood: the first is a formatting choice that only looks wrong next
+ * to a real four-figure price, and the second is two sentences that are each true in isolation and
+ * contradictory when rendered together.
+ */
+describe('PositionSheet — suggested protection levels (visual-review findings)', () => {
+  it('rounds a suggested level to what a member would type, not to float noise', async () => {
+    // A flat 8-decimal precision printed `4011.69153226` into the field for a $4,011 pair while the
+    // helper line beneath it said "At 4,011.7" — the same number, twice, disagreeing.
+    renderSheet({
+      position: gainsPosition({
+        symbol: 'ETH/USD',
+        entryPrice: 4102.4,
+        markPrice: 4180.4,
+        leverage: 12.4,
+        liquidationPrice: 3854.321987654321,
+      }),
+    })
+    await settle()
+
+    const stop = screen.getByLabelText(/Stop-loss price/i)
+    expect(stop.value).not.toBe('')
+    const decimals = (stop.value.split('.')[1] ?? '').length
+    expect(decimals).toBeLessThanOrEqual(2) // a >= 1000 price
+    // Rounding must never hand the member a pre-fill the sheet then refuses.
+    expect(screen.queryByText(/would be liquidated first/i)).not.toBeInTheDocument()
+  })
+
+  it('names the basis it actually used, and never claims a liquidation price it could not read', async () => {
+    // With a liquidation price the suggestion IS derived from it...
+    const { unmount } = renderSheet({ position: gainsPosition({ liquidationPrice: 54_000 }) })
+    await settle()
+    expect(screen.getByText(/worked out from this position’s own liquidation price/i)).toBeInTheDocument()
+    unmount()
+
+    // ...without one, suggestProtection falls back to leverage, so claiming the liquidation price
+    // would contradict the "could not be read" line this sheet renders directly below.
+    renderSheet({ position: gainsPosition({ liquidationPrice: null }) })
+    await settle()
+    expect(screen.queryByText(/worked out from this position’s own liquidation price/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/worked out from this position’s leverage/i)).toBeInTheDocument()
   })
 })

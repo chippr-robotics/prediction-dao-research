@@ -142,6 +142,14 @@
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   overflow-wrap: anywhere;
 }
+/* OUR OWN observation about the order — a timeout the venue never announced, which we derived from
+   block height. Deliberately NOT the quotation treatment above: no attribution label and no
+   monospace, because the monospace is what says "these are someone else's exact words". */
+.perps-orders-observation {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.82rem;
+  margin: 0;
+}
 
 .perps-orders-stats {
   display: grid;

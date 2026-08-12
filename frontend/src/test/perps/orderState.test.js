@@ -32,10 +32,12 @@ import {
   gmxEventSignal,
   isPendingState,
   isTerminalState,
+  isVenueStatedReason,
   orderStatusText,
   reduceOrderState,
   submissionSignal,
 } from '../../lib/perps/orderState'
+import { PERPS_GAINS_TIMEOUT_OBSERVATION } from '../../lib/perps/perpsCopy'
 
 const diamond = new Interface(GAINS_DIAMOND_ABI)
 
@@ -478,6 +480,50 @@ describe('Gains market-order timeout', () => {
 
   it('accepts the bigint block numbers ethers v6 hands back', () => {
     expect(gainsTimeoutSignal({ createdBlock: 1_000n, currentBlock: 1_200n, timeoutBlocks: 200n })).not.toBeNull()
+  })
+
+  it('states the timeout as OUR observation — the venue emitted nothing, so nothing is attributed', () => {
+    const signal = gainsTimeoutSignal(past)
+    // Source `'app'`, never `'gains'`: a timeout is derived from block height. Attributing it to the
+    // venue rendered as "Gains said: …" over a sentence Gains never produced.
+    expect(signal.reason.source).toBe('app')
+    expect(signal.reason.source).not.toBe('gains')
+    expect(isVenueStatedReason(signal.reason, 'gains')).toBe(false)
+    // It says how we know, rather than who told us.
+    expect(signal.reason.text).toBe(PERPS_GAINS_TIMEOUT_OBSERVATION)
+    expect(signal.reason.text).toMatch(/block height/)
+  })
+
+  it('does NOT collapse into the venue-stated case a real CancelReason occupies', () => {
+    const canceled = reduceOrderState(
+      atState(ORDER_STATE.VENUE_PENDING),
+      gainsEventSignal(canceledLog, { account: MEMBER, action: 'open' }),
+    )
+    // The venue's own decoded reason keeps its attribution…
+    expect(isVenueStatedReason(canceled.reason, 'gains')).toBe(true)
+    // …and our inference never gains one. Two different facts, two different treatments.
+    expect(isVenueStatedReason(gainsTimeoutSignal(past).reason, 'gains')).toBe(false)
+  })
+})
+
+describe('isVenueStatedReason', () => {
+  it('is true only for words the venue itself produced', () => {
+    expect(isVenueStatedReason({ text: 'OrderNotFulfillableAtAcceptablePrice', source: 'gmx' }, 'gmx')).toBe(true)
+    expect(isVenueStatedReason({ text: 'The price moved.', source: 'gains' }, 'gains')).toBe(true)
+    // Ours, another actor's, or another venue's — none of them may be attributed to this venue.
+    expect(isVenueStatedReason({ text: 'We worked this out.', source: 'app' }, 'gains')).toBe(false)
+    expect(isVenueStatedReason({ text: 'Wallet declined.', source: 'wallet' }, 'gains')).toBe(false)
+    expect(isVenueStatedReason({ text: 'Reverted.', source: 'chain' }, 'gains')).toBe(false)
+    expect(isVenueStatedReason({ text: 'Something.', source: 'gmx' }, 'gains')).toBe(false)
+  })
+
+  it('is total, and never attributes an empty or missing reason to anyone', () => {
+    for (const input of [null, undefined, 42, 'nope', {}, { text: 'x' }, { source: 'gains' }, { text: '   ', source: 'gains' }]) {
+      expect(() => isVenueStatedReason(input, 'gains')).not.toThrow()
+      expect(isVenueStatedReason(input, 'gains')).toBe(false)
+    }
+    expect(isVenueStatedReason({ text: 'x', source: 'gains' }, null)).toBe(false)
+    expect(isVenueStatedReason({ text: 'x', source: 'gains' }, '')).toBe(false)
   })
 })
 

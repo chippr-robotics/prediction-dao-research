@@ -480,7 +480,7 @@ function storedProtectionFrom(trade, index) {
 }
 
 async function readOneTrade(contract, account, index) {
-  let trade = null
+  let trade
   try {
     trade = await contract.getTrade(account, index)
   } catch {
@@ -604,7 +604,7 @@ export async function confirmStoredProtection(input) {
       await sleep(wait)
       if (!alive()) return { ok: false, reason: 'abandoned' }
     }
-    let read = null
+    let read
     try {
       read = await readStored({ venue, chainId, account, tradeIndex })
     } catch {

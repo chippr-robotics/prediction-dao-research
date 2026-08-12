@@ -96,6 +96,13 @@ export function buildGmxMarketIndex(pairs) {
       symbol: text(pair.symbol) ?? parsed.symbol,
       variant: text(pair.variant),
       price: positivePrice(pair.price),
+      // The market's base asset, and the collaterals GMX accepts on it with their decimals and the
+      // venue's own USD price. They are carried because a GMX position arrives in RAW VENUE UNITS
+      // and these are the only scales that turn it into money (`gmxDerived.js`) — a collateral
+      // whose decimals or price the feed did not publish is kept with those fields null rather than
+      // dropped, so a consumer sees "GMX did not price it" instead of "GMX does not accept it".
+      base: text(pair.base) ?? baseFromSymbol(text(pair.symbol) ?? parsed.symbol),
+      collaterals: collateralList(pair),
     })
 
     const seen = index.get(key)
@@ -169,6 +176,36 @@ function marketAddressOf(position) {
   if (typeof ref === 'string' && ADDRESS_RE.test(ref)) return ref
   const raw = position?.raw?.market
   return typeof raw === 'string' && ADDRESS_RE.test(raw) ? raw : null
+}
+
+/** 'BTC/USD' → 'BTC'. Display/scale metadata only — never used to match a market. */
+function baseFromSymbol(symbol) {
+  if (typeof symbol !== 'string' || !symbol.includes('/')) return null
+  return text(symbol.split('/')[0])
+}
+
+/**
+ * The feed's collateral entries for a market, normalized. An entry with no usable address is
+ * dropped (it names no token); decimals and price are kept as null when the feed did not publish
+ * them, because "GMX did not price this" is a fact a consumer must be able to see rather than
+ * infer from an absence.
+ */
+function collateralList(pair) {
+  const out = []
+  for (const c of Array.isArray(pair?.collaterals) ? pair.collaterals : []) {
+    const address = typeof c?.address === 'string' && ADDRESS_RE.test(c.address) ? c.address : null
+    if (!address) continue
+    const decimals = Number(c?.decimals)
+    out.push(
+      Object.freeze({
+        symbol: text(c?.symbol),
+        address,
+        decimals: Number.isInteger(decimals) && decimals >= 0 ? decimals : null,
+        usdPrice: positivePrice(c?.usdPrice),
+      }),
+    )
+  }
+  return Object.freeze(out)
 }
 
 /** Two feed records describe the same market when they name the same pair; price may move. */

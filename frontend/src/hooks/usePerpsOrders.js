@@ -529,9 +529,12 @@ async function loadGmxOrders(account, io) {
     return { orders: [], source: unreadableSource('gmx', chainId, 'This account could not be read on GMX.') }
   }
 
+  // Declared without an initializer on purpose: the catch below RETURNS, so every path that
+  // reaches the window-reporting code past the try has assigned both. They are reported to the
+  // member as the range actually searched, which is why they cannot be scoped to the try.
   let logs
-  let fromBlock = null
-  let toBlock = null
+  let fromBlock
+  let toBlock
   try {
     const head = toBlockNumber(await provider.getBlockNumber())
     if (head == null) throw new Error('the network did not report a block height')

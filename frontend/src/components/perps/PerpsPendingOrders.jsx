@@ -27,9 +27,11 @@
  *    (contracts/venue-calldata.md) — so this component never handles an index itself: it hands the
  *    whole order to that one function and the descriptor to the trade hook.
  *
- * 4. **Honest numbers.** Every figure the venue did not report renders '—'. Everything shown about
- *    an unexecuted order is labelled *requested*, because that is all it is: what the member asked
- *    for, not what the venue produced.
+ * 4. **Honest numbers, and honest attribution.** Every figure the venue did not report renders '—'.
+ *    Everything shown about an unexecuted order is labelled *requested*, because that is all it is:
+ *    what the member asked for, not what the venue produced. The same rule governs WORDS:
+ *    "<venue> said:" is reserved for text the venue actually produced, and our own observations —
+ *    a timeout, which the venue never announced — are stated in our own voice, unattributed.
  *
  * NEVER A DEAD CONTROL. The recovery button renders only when `order.recovery` exists — i.e. when
  * the venue's own timeout has been PROVEN and a usable handle came with it. A stuck order without
@@ -41,7 +43,7 @@ import PerpsVenueBadge from './PerpsVenueBadge'
 import { recoveryDescriptor } from './pendingOrderRecovery'
 import { usePerpsTrade } from '../../hooks/usePerpsTrade'
 import { PERP_VENUES } from '../../config/perps'
-import { ORDER_STATE } from '../../lib/perps/orderState'
+import { ORDER_STATE, isVenueStatedReason } from '../../lib/perps/orderState'
 import { formatLeverage, formatPairPrice, formatUsd } from '../../lib/perps/format'
 import './PerpsPendingOrders.css'
 
@@ -180,9 +182,17 @@ function OrderRow({ order, trade, active, onRecover }) {
   const remaining = order.timing?.blocksRemaining
   const venue = venueLabel(order.venue)
 
-  // The venue's own words, verbatim, and only when they add something the status line did not
-  // already say. Translating a venue's reason would mean inventing a cause we have not confirmed.
+  // A reason renders only when it adds something the status line did not already say.
   const reason = order.reason?.text && order.reason.text !== order.statusText ? order.reason : null
+
+  // WHO SAID IT decides how it is set. The venue's own words — a decoded Gains `CancelReason`,
+  // GMX's own error name — are attributed and quoted verbatim, because translating them would mean
+  // inventing a cause we have not confirmed. OUR OWN observations (a timeout, which the venue never
+  // announced and we derived from block height) are stated unattributed, in our own voice and in
+  // normal type: "Gains said:" over a sentence Gains never produced would be a lie told on the one
+  // surface a member reads when their collateral is stuck. The two must never collapse into one
+  // treatment — a sibling test holds them apart.
+  const venueStated = isVenueStatedReason(reason, order.venue)
 
   return (
     <li className={`perps-orders-row${attention ? ' perps-orders-row-attention' : ''}`}>
@@ -202,14 +212,17 @@ function OrderRow({ order, trade, active, onRecover }) {
       {/* The machine's own line. Never re-derived here — "sent" must never become "done". */}
       {order.statusText && <p className="perps-orders-status">{order.statusText}</p>}
 
-      {reason && (
-        <p className="perps-orders-reason">
-          <span className="perps-orders-reason-label">
-            {reason.source === order.venue ? `${venue} said:` : 'Why:'}
-          </span>{' '}
-          <span className="perps-orders-reason-text">{reason.text}</span>
-        </p>
-      )}
+      {reason &&
+        (venueStated ? (
+          <p className="perps-orders-reason" data-said-by="venue">
+            <span className="perps-orders-reason-label">{venue} said:</span>{' '}
+            <span className="perps-orders-reason-text">{reason.text}</span>
+          </p>
+        ) : (
+          <p className="perps-orders-observation" data-said-by="us">
+            {reason.text}
+          </p>
+        ))}
 
       {/* Everything below is what was REQUESTED. None of it is the position's state — the venue has
           not executed this order, so there is no position for it to be the state of (rule 4). */}

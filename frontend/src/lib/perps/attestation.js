@@ -112,7 +112,7 @@ export function isAttestationComplete(items) {
 
 /** The stored record, or null when this browser has never attested. Never throws. */
 export function readAttestation() {
-  let raw = null
+  let raw
   try {
     raw = localStorage.getItem(PERPS_ATTESTATION_KEY)
   } catch {

@@ -55,6 +55,7 @@ import {
   perpsManageFeatureEnabled,
 } from '../../config/perps'
 import { bpsToPct } from '../../lib/perps/format'
+import { withGmxDerivedFigures } from '../../lib/perps/gmxDerived'
 import { buildGmxMarketIndex, gmxMarketPrice, withGmxMarketSymbols } from '../../lib/perps/gmxMarkets'
 import { readVenueStatuses } from '../../lib/perps/venueStatus'
 import {
@@ -189,9 +190,23 @@ export default function PerpsView({ deps }) {
    * table, and must never decide whether their own position can be named. A market the feed does
    * not list stays `symbol: null` and renders '—' — `withGmxMarketSymbols` matches the market
    * address EXACTLY and never guesses a pair from a partial one. */
+  /* WHAT A GMX POSITION IS WORTH, composed at the same seam and for the same reason.
+   *
+   * GMX's Reader returns the position in RAW VENUE UNITS — a 1e30 notional, a size in the index
+   * token's decimals, collateral in the collateral token's — and no entry price, leverage or P&L.
+   * `usePerpsPositions` therefore published those as null (correctly: it fetches no market list),
+   * and a member closing a leveraged GMX position was shown almost nothing. The scales that turn
+   * those raw numbers into money are on the pairs feed already fetched above, so the arithmetic
+   * happens HERE, where both feeds meet — the hook still reads one venue and knows nothing about
+   * markets.
+   *
+   * `withGmxDerivedFigures` NAMES what it worked out (`derivedFields`), and both surfaces label
+   * those figures as calculated rather than as GMX's own — the derived P&L excludes GMX's
+   * borrowing and funding charges and the price impact of closing, so it is not what GMX will
+   * settle at. Any missing scale leaves the field null and it renders '—'. */
   const gmxMarkets = useMemo(() => buildGmxMarketIndex(markets.allPairs), [markets.allPairs])
   const positionRows = useMemo(
-    () => withGmxMarketSymbols(positions.positions, gmxMarkets),
+    () => withGmxDerivedFigures(withGmxMarketSymbols(positions.positions, gmxMarkets), gmxMarkets),
     [positions.positions, gmxMarkets],
   )
 

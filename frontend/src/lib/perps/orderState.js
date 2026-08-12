@@ -27,6 +27,7 @@
  * change must not be able to move an order between states.
  */
 import { PERP_VENUES } from '../../config/perps'
+import { PERPS_GAINS_TIMEOUT_OBSERVATION } from './perpsCopy'
 import {
   cancelReasonText,
   decodeMarketExecuted,
@@ -508,6 +509,29 @@ function pickHash(value) {
   return typeof value === 'string' && HEX32.test(value.trim()) ? value.trim() : null
 }
 
+/**
+ * Whether these WORDS came from the venue itself — a decoded Gains `CancelReason`, GMX's own error
+ * name — rather than being a sentence we wrote about what we observed.
+ *
+ * ONLY a `true` here may ever render as "<venue> said:". The case this exists for is the TIMEOUT:
+ * the venue emitted nothing at all, the state is our inference from block height, and attributing
+ * that inference to the venue is exactly the dishonesty this spec exists to prevent — worse here
+ * than anywhere else, because it is the surface a member reads when their collateral is stuck. Our
+ * own observations are stated unattributed, in our own voice, in normal type.
+ *
+ * `source` values in this module: `'gains'` / `'gmx'` are the VENUE's words; `'wallet'`, `'chain'`
+ * and `'app'` are ours (or another actor's) and are never attributed to a venue.
+ *
+ * Total: junk in yields `false`, so a render branches instead of throwing.
+ */
+export function isVenueStatedReason(reason, venue) {
+  const text = typeof reason?.text === 'string' ? reason.text.trim() : ''
+  const source = typeof reason?.source === 'string' ? reason.source.trim() : ''
+  const venueId = typeof venue === 'string' ? venue.trim() : ''
+  if (text === '' || source === '' || venueId === '') return false
+  return source === venueId
+}
+
 function reasonOf(text, source, code = null) {
   const t = typeof text === 'string' && text.trim() !== '' ? text.trim() : null
   if (t === null && code == null) return null
@@ -583,9 +607,12 @@ export function gainsEventSignal(event, context = {}) {
         : {
             ...base,
             type: SIGNAL.VENUE_REJECTED,
+            // OUR SENTENCE about the venue's event, not the venue's own words. Gains emitted an
+            // event, not this text, so the source is `'app'` — see `isVenueStatedReason` for why
+            // that distinction is load-bearing rather than cosmetic.
             reason: reasonOf(
               'Gains did not execute this order in time and returned your collateral.',
-              'gains',
+              'app',
             ),
           }
     default:
@@ -627,6 +654,12 @@ function matchesGainsOrder(decoded, context) {
  * It returns `null` unless the timeout can be PROVEN from the three block numbers: claiming a
  * timeout we cannot demonstrate would offer a recovery control that reverts `WaitTimeout()`. The
  * timeout window is venue configuration read from the chain — never a constant from a comment.
+ *
+ * THE REASON IT CARRIES IS OURS, NOT THE VENUE'S. This is the one venue signal produced with no
+ * venue message behind it at all: Gains emitted nothing, and we derived the timeout from block
+ * height against the window the diamond itself reports. Its `source` is therefore `'app'`, which is
+ * what keeps the stuck-order surface from rendering "Gains said:" over a sentence Gains never
+ * produced — on the one surface a member reads when their collateral is stuck.
  */
 export function gainsTimeoutSignal(input) {
   // Destructured INSIDE the body, from `?? {}`. A parameter-list default only covers `undefined`, and
@@ -648,7 +681,7 @@ export function gainsTimeoutSignal(input) {
     type: SIGNAL.VENUE_TIMED_OUT,
     ...identity({ ...context, venue: 'gains' }),
     venueRef: refFrom({ pendingOrderIndex }),
-    reason: reasonOf('Gains did not execute this order within its timeout window.', 'gains'),
+    reason: reasonOf(PERPS_GAINS_TIMEOUT_OBSERVATION, 'app'),
   }
 }
 

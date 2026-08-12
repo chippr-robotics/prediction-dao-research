@@ -49,8 +49,13 @@ import { ORDER_STATE } from '../../lib/perps/orderState'
 import { suggestProtection } from '../../lib/perps/defaults'
 import { feeUsdFromNotional } from '../../lib/perps/feeUnits'
 import { bpsToPct, formatLeverage, formatPairPrice, formatSignedUsd, formatUsd } from '../../lib/perps/format'
+import { GMX_DERIVED_FIELDS, isDerivedFigure } from '../../lib/perps/gmxDerived'
 import { tradeLinkFor } from '../../lib/perps/linkouts'
-import { PERPS_TIPS } from '../../lib/perps/perpsCopy'
+import {
+  PERPS_CALCULATED_LABEL,
+  PERPS_GMX_NO_LIQUIDATION_PRICE,
+  PERPS_TIPS,
+} from '../../lib/perps/perpsCopy'
 import { validateProtection } from '../../lib/perps/validation'
 import { exitAvailability } from '../../lib/perps/venueStatus'
 import {
@@ -75,7 +80,9 @@ const DASH = '—'
  * The shares a member can close in one tap. 100 is the common case and the default, so the
  * ordinary exit is a single tap rather than a number to type (SC-001).
  */
-export const CLOSE_PRESETS = Object.freeze([25, 50, 75, 100])
+// Module-local: nothing outside this sheet consumes it, and a component file that also exports
+// a constant breaks React Fast Refresh (react-refresh/only-export-components).
+const CLOSE_PRESETS = Object.freeze([25, 50, 75, 100])
 
 /* ------------------------------------------------------------------------------------------- *
  * The sheet
@@ -309,8 +316,19 @@ export default function PositionSheet({
   useEffect(() => {
     // Never overwrite what the member has typed. Once they edit, the fields are theirs.
     if (editedRef.current) return
-    setStopText(numberToText(storedStop ?? suggested.stopLoss))
-    setTakeText(numberToText(storedTake ?? suggested.takeProfit))
+    // A level the VENUE stores is shown exactly as the venue stores it; only OUR suggestion is
+    // rounded to something a member would type (and only when the rounding stays valid).
+    const levelOpts = { isLong, entryPrice: position?.entryPrice ?? null, markPrice, liquidationPrice }
+    setStopText(
+      storedStop !== null
+        ? numberToText(storedStop)
+        : suggestionToText(suggested.stopLoss, { ...levelOpts, kind: 'stop' }),
+    )
+    setTakeText(
+      storedTake !== null
+        ? numberToText(storedTake)
+        : suggestionToText(suggested.takeProfit, { ...levelOpts, kind: 'take' }),
+    )
   }, [storedStop, storedTake, suggested.stopLoss, suggested.takeProfit])
 
   const stopLoss = textToLevel(stopText)
@@ -495,6 +513,13 @@ export default function PositionSheet({
   const feeBps = fee && !fee.failed ? Number(fee.bps) : null
   const feeApplies = feeBps !== null && feeBps > 0
   const feeUsd = feeApplies && closingNotional !== null ? feeUsdFromNotional(closingNotional, feeBps) : null
+  /* WHICH FIGURES ARE OURS. The composition point (`PerpsView`) fills a GMX position's derivable
+   * figures from the venue's raw units and names exactly which ones it filled; this sheet only ever
+   * READS that answer. Re-deriving the question here — "is this a GMX row, so it must be
+   * calculated" — would mislabel the day a venue starts reporting one of them. */
+  const derivedEntry = isDerivedFigure(position, 'entryPrice')
+  const derivedPnl = isDerivedFigure(position, 'unrealizedPnlUsd')
+  const hasDerived = GMX_DERIVED_FIELDS.some((field) => isDerivedFigure(position, field))
   const pnlShare = numberOrNull(position?.unrealizedPnlUsd)
   const collateralUsd = numberOrNull(position?.collateralUsd)
   const proceeds =
@@ -552,9 +577,17 @@ export default function PositionSheet({
 
         <dl className="pps-facts">
           <Fact label="Size" value={formatUsd(position.sizeUsd)} />
-          <Fact label="Entry price" value={formatPairPrice(position.entryPrice)} />
+          <Fact
+            label="Entry price"
+            value={formatPairPrice(position.entryPrice)}
+            derived={derivedEntry}
+          />
           <Fact label="Current price" value={formatPairPrice(markPrice)} />
-          <Fact label="Leverage" value={formatLeverage(position.leverage)} />
+          <Fact
+            label="Leverage"
+            value={formatLeverage(position.leverage)}
+            derived={isDerivedFigure(position, 'leverage')}
+          />
           <Fact
             label="Liquidation price"
             value={formatPairPrice(position.liquidationPrice)}
@@ -565,14 +598,44 @@ export default function PositionSheet({
             label="Unrealized P&L"
             value={formatSignedUsd(position.unrealizedPnlUsd)}
             valueClass={pnlClass(position.unrealizedPnlUsd)}
-            tip={PERPS_TIPS.pnl}
+            tip={derivedPnl ? PERPS_TIPS.pnlCalculated : PERPS_TIPS.pnl}
             tipLabel="About P&L"
+            derived={derivedPnl}
           />
         </dl>
+        {/* THE ATTRIBUTION SENTENCE, AND WHY IT HAS TWO FORMS.
+            It used to say "every figure above is as the venue reports it" unconditionally. That is
+            true only while every figure IS the venue's — the moment FairWins works one out (GMX
+            returns raw position units and no entry, leverage or P&L at all), the same sentence
+            turns our arithmetic into the venue's own claim. So the derived figures are tagged
+            beside the number and this paragraph says what the tag means, including the one thing a
+            member could otherwise be misled by: the calculated P&L is not the venue's settlement
+            figure. */}
         <p className="pps-attrib">
-          Every figure above is as {venueLabel} reports it. “{DASH}” means {venueLabel} did not
-          report that value — it is not zero.
+          {hasDerived ? (
+            <>
+              Figures marked “{PERPS_CALCULATED_LABEL}” are not reported by {venueLabel} — FairWins
+              works them out from the position {venueLabel} did report. A calculated profit or loss
+              leaves out {venueLabel}’s borrowing and funding charges and the price impact of
+              closing, so it is not what {venueLabel} will settle at. Everything else above is as{' '}
+              {venueLabel} reports it, and “{DASH}” means the value could not be established — it is
+              not zero.
+            </>
+          ) : (
+            <>
+              Every figure above is as {venueLabel} reports it. “{DASH}” means {venueLabel} did not
+              report that value — it is not zero.
+            </>
+          )}
         </p>
+        {/* The number a member expects most, and the one place a bare dash reads as "there isn't
+            one". GMX genuinely stores no liquidation price, so this names the reason rather than
+            leaving the gap to be guessed at. */}
+        {venue === 'gmx' && liquidationPrice === null && (
+          <p className="pps-note" role="note">
+            {PERPS_GMX_NO_LIQUIDATION_PRICE}
+          </p>
+        )}
 
         {statusText && (
           <p
@@ -660,6 +723,17 @@ export default function PositionSheet({
               </div>
             )}
           </dl>
+          {/* The dash on the venue's own fee, explained — and with it the one thing it changes
+              about the line above it. A member reading "estimated proceeds" reasonably assumes the
+              venue's fee is already out of it; here it is not, because the venue does not publish
+              the figure to this app before the order is placed. */}
+          {venueFeeUsd == null && (
+            <p className="pps-note" role="note">
+              {venueLabel}’s own fee for this exit is not published to this app before the order is
+              placed, so it shows “{DASH}” and the estimated proceeds above do not have it taken
+              out. {venueLabel} deducts it from what you receive when the order executes.
+            </p>
+          )}
           {keeperFeeText !== null && (
             <p className="pps-note">
               {venueLabel} pays a keeper to execute this order, and this deposit is what pays them.
@@ -783,8 +857,14 @@ export default function PositionSheet({
 
           {storedStop === null && storedTake === null && (suggested.stopLoss !== null || suggested.takeProfit !== null) && (
             <p className="pps-note">
-              These are suggestions worked out from this position’s own liquidation price — change
-              them to whatever you want, or clear them.
+              {/* Name the basis actually used. `suggestProtection` works from the liquidation price
+                  when the venue reports one and falls back to the position's leverage when it does
+                  not — and this sheet renders a "could not be read" line directly below in exactly
+                  that second case, so claiming the liquidation price unconditionally contradicted
+                  the very next sentence. */}
+              {liquidationPrice !== null
+                ? 'These are suggestions worked out from this position’s own liquidation price — change them to whatever you want, or clear them.'
+                : 'These are suggestions worked out from this position’s leverage, because the venue did not report a liquidation price — change them to whatever you want, or clear them.'}
             </p>
           )}
 
@@ -848,7 +928,15 @@ export default function PositionSheet({
  * Rendering helpers
  * ------------------------------------------------------------------------------------------- */
 
-function Fact({ label, value, valueClass, tip, tipLabel }) {
+/**
+ * One figure, with the source of the number attached to the number itself.
+ *
+ * `derived` marks a value FairWins worked out rather than read from the venue. The tag sits in the
+ * VALUE cell rather than the label because that is what it qualifies — the label names the concept,
+ * which is the venue's either way — and it is never rendered on a '—': there is nothing to
+ * attribute when there is no number.
+ */
+function Fact({ label, value, valueClass, tip, tipLabel, derived = false }) {
   return (
     <div className="pps-fact">
       <dt>
@@ -859,7 +947,10 @@ function Fact({ label, value, valueClass, tip, tipLabel }) {
           </InfoTip>
         )}
       </dt>
-      <dd className={valueClass ?? undefined}>{value}</dd>
+      <dd className={valueClass ?? undefined}>
+        {value}
+        {derived && value !== DASH && <span className="pps-derived"> {PERPS_CALCULATED_LABEL}</span>}
+      </dd>
     </div>
   )
 }
@@ -929,9 +1020,46 @@ function textToLevel(text) {
   return n
 }
 
+/**
+ * Decimals a member would actually type for a price of this magnitude. A flat precision cannot
+ * serve both ETH at 4,011 and EUR/USD at 1.0841: eight decimals on the former prints float noise
+ * into the field (`4011.69153226`) and reads as broken, while one decimal on the latter erases the
+ * quote. Mirrors the bands in lib/perps/format.js, one step finer because this is an input a
+ * member edits rather than a figure they read.
+ */
+function inputDecimalsFor(n) {
+  if (n >= 1000) return 2
+  if (n >= 100) return 3
+  if (n >= 1) return 4
+  return 6
+}
+
 function numberToText(value) {
   const n = positiveNumber(value)
   if (n === null) return ''
-  // Enough precision for a forex quote without printing float noise into a member's input field.
-  return String(Number(n.toFixed(8)))
+  return String(Number(n.toFixed(inputDecimalsFor(n))))
+}
+
+/**
+ * Round a SUGGESTED protection level for display in the input, without breaking the guarantee that
+ * `suggestProtection` only returns levels `validateProtection` accepts.
+ *
+ * Rounding a stop-loss can move it TOWARD the liquidation price, which is the one direction that
+ * turns a valid pre-fill into one the app then refuses — so the rounded value is re-checked and the
+ * exact value is kept when the rounded one would not survive. The member sees a tidy number
+ * whenever a tidy number is safe, and never a pre-filled level the sheet immediately rejects.
+ */
+function suggestionToText(value, { isLong, kind, entryPrice, markPrice, liquidationPrice }) {
+  const n = positiveNumber(value)
+  if (n === null) return ''
+  const rounded = Number(n.toFixed(inputDecimalsFor(n)))
+  if (!(rounded > 0) || rounded === n) return numberToText(n)
+  const check = validateProtection({
+    position: { markPrice, entryPrice, isLong, liquidationPrice },
+    stopLoss: kind === 'stop' ? rounded : null,
+    takeProfit: kind === 'take' ? rounded : null,
+    liquidationPrice,
+    isLong,
+  })
+  return check?.ok === false ? String(n) : String(rounded)
 }

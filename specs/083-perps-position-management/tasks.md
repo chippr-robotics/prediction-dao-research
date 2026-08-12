@@ -112,8 +112,8 @@
       wiring and survived its own mutation).
 - [ ] T071 [P] `frontend/src/legal/` — name leveraged derivatives / perpetual futures (FR-025 gate)
 - [ ] T072 [P] Docs: `docs/developer-guide/perps.md` update + `docs/runbooks/perps-operations.md`
-- [ ] T073 [P] Cypress: close path against a stubbed venue + honest absence when flag off
-- [ ] T074 Actor-critic visual pass on the new sheets → `specs/083-.../screenshots/`
+- [x] T073 [P] Cypress: close path against a stubbed venue + honest absence when flag off
+- [x] T074 Actor-critic visual pass on the new sheets → `specs/083-.../screenshots/`
 - [ ] T075 Full verification: scoped vitest, gateway tests, lint, `check:deps`; PR
 
 ## Dependencies

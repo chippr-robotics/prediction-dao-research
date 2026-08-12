@@ -14,6 +14,7 @@ import { WalletContext } from '../../contexts/WalletContext.js'
 import { GAINS_PENDING_ORDER_TYPE } from '../../abis/perps/gainsDiamond'
 import { GMX_ORDER_TYPE } from '../../abis/perps/gmxExchangeRouter'
 import { pendingOrderIndex } from '../../lib/perps/venues/gains'
+import { PERPS_GAINS_TIMEOUT_OBSERVATION } from '../../lib/perps/perpsCopy'
 
 const ARBITRUM = 42161
 const MEMBER = '0xd504dC1ac094F45272f46b25A2874bDab45132Da'
@@ -30,7 +31,8 @@ const ORDERS = [
     orderState: { state: 'timed_out', venue: 'gains', chainId: ARBITRUM, action: 'open' },
     pending: false,
     statusText: 'Gains did not execute this in time.',
-    reason: { code: null, text: 'Gains did not execute this order within its timeout window.', source: 'gains' },
+    // OUR observation, unattributed — the venue emitted nothing for a timeout (source `'app'`).
+    reason: { code: null, text: PERPS_GAINS_TIMEOUT_OBSERVATION, source: 'app' },
     orderType: GAINS_PENDING_ORDER_TYPE.MARKET_OPEN,
     orderTypeName: 'MARKET_OPEN',
     returnsCollateral: true,

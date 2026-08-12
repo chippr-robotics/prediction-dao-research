@@ -162,13 +162,19 @@ export default function PerpsPositions({
         FairWins never holds your positions.
       </p>
 
-      {/* GMX reports a position's size and side to this app and nothing else its Reader can price,
-          so entry, leverage and P&L render “—”. Saying so is the difference between a dash a member
-          reads as "not reported" and one they read as "nothing there" (honest numbers). */}
+      {/* GMX reports a position's size and side and nothing else its Reader prices — entry price,
+          leverage and P&L are FairWins' own arithmetic over the raw position (`lib/perps/
+          gmxDerived.js`), so this says so rather than letting them read as GMX's figures. The
+          P&L in particular is not GMX's settlement number: it excludes the borrowing and funding
+          charges accrued on the position and the price impact of closing. A dash still means the
+          value could not be established — never that it is zero. */}
       {rows.some((p) => p.venue === 'gmx') && (
         <p className="perps-positions-note">
-          GMX reports each position’s size and side here; “—” means GMX did not report that value —
-          it is not zero. Its full figures are on{' '}
+          GMX reports each position’s size and side here. Entry price, leverage and P&L are
+          calculated by FairWins from that position — the P&L leaves out GMX’s borrowing and funding
+          charges and the price impact of closing, so it is not what GMX will settle at, and “—”
+          means a value could not be established rather than that it is zero. GMX’s own figures are
+          on{' '}
           <a href="https://app.gmx.io" target="_blank" rel="noopener noreferrer">
             GMX ↗
           </a>

@@ -76,7 +76,9 @@ const DASH = '—'
  * purpose — a preset is a suggestion, and 150× is not one FairWins is willing to make. Anything
  * above the top preset is still reachable by typing, bounded by the venue's own published maximum.
  */
-export const LEVERAGE_PRESETS = Object.freeze([2, 3, 5, 10])
+// Module-local: see the note on CLOSE_PRESETS in PositionSheet.jsx — exporting a constant from a
+// component file breaks Fast Refresh, and nothing outside this sheet reads it.
+const LEVERAGE_PRESETS = Object.freeze([2, 3, 5, 10])
 
 /* ------------------------------------------------------------------------------------------- *
  * The sheet

@@ -279,7 +279,7 @@ async function runEntryGates(spec, deps) {
       'Your account could not be checked just now, so a new position cannot be opened. You can still manage what you already hold.',
     )
   }
-  let status = null
+  let status
   try {
     status = await deps.screenAccount(spec.account, spec.chainId)
   } catch {
@@ -868,7 +868,7 @@ async function watchToTerminal({ spec, identity, io, live, step, current, fromBl
 
   for (;;) {
     if (!live()) return
-    let head = null
+    let head
     try {
       head = toBlockNumber(await provider.getBlockNumber())
     } catch {

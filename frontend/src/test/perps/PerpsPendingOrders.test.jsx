@@ -24,10 +24,11 @@ import PerpsPendingOrders from '../../components/perps/PerpsPendingOrders'
 import { recoveryDescriptor } from '../../components/perps/pendingOrderRecovery'
 import { WalletContext } from '../../contexts/WalletContext.js'
 import { usePerpsOrders } from '../../hooks/usePerpsOrders'
-import { GAINS_DIAMOND_ABI, GAINS_PENDING_ORDER_TYPE } from '../../abis/perps/gainsDiamond'
+import { GAINS_CANCEL_REASON, GAINS_DIAMOND_ABI, GAINS_PENDING_ORDER_TYPE } from '../../abis/perps/gainsDiamond'
 import { GMX_EXCHANGE_ROUTER_ABI, GMX_ORDER_TYPE } from '../../abis/perps/gmxExchangeRouter'
 import { GMX_ADDRESSES_BY_CHAIN } from '../../config/perps'
-import { pendingOrderIndex, tradeIndex } from '../../lib/perps/venues/gains'
+import { cancelReasonText, pendingOrderIndex, tradeIndex } from '../../lib/perps/venues/gains'
+import { PERPS_GAINS_TIMEOUT_OBSERVATION } from '../../lib/perps/perpsCopy'
 
 const ARBITRUM = 42161
 const MEMBER = '0xd504dC1ac094F45272f46b25A2874bDab45132Da'
@@ -55,7 +56,9 @@ const gainsStuck = (over = {}) => ({
   orderState: { state: 'timed_out', venue: 'gains', chainId: ARBITRUM, action: 'open' },
   pending: false,
   statusText: 'Gains did not execute this in time.',
-  reason: { code: null, text: 'Gains did not execute this order within its timeout window.', source: 'gains' },
+  // OUR observation — the venue emitted nothing at all, so its source is `'app'`, exactly as
+  // `gainsTimeoutSignal` produces it.
+  reason: { code: null, text: PERPS_GAINS_TIMEOUT_OBSERVATION, source: 'app' },
   orderType: GAINS_PENDING_ORDER_TYPE.MARKET_OPEN,
   orderTypeName: 'MARKET_OPEN',
   returnsCollateral: true,
@@ -365,6 +368,92 @@ describe('PerpsPendingOrders — a frozen GMX order', () => {
         },
       },
     })
+    expect(screen.getByText(/read from recent chain history/i)).toBeInTheDocument()
+  })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * Rule 4 — honest attribution: whose words are these?
+ *
+ * The defect this pins: a timeout is OUR inference from block height — the venue emitted nothing at
+ * all — and it was rendered as `Gains said: Gains did not execute this order…`. That is an
+ * invention put in the venue's mouth, on the one surface a member reads when their collateral is
+ * stuck. A venue-stated reason and an inference of ours must NEVER collapse into one treatment.
+ * --------------------------------------------------------------------------------------------- */
+
+describe('PerpsPendingOrders — whose words are these', () => {
+  it('states a TIMEOUT in our own voice: no venue attribution, and not the verbatim treatment', () => {
+    const { container } = renderList({ orders: [gainsStuck()] })
+
+    // Our observation is shown, and it names how we know rather than who told us.
+    const observation = screen.getByText(PERPS_GAINS_TIMEOUT_OBSERVATION)
+    expect(observation).toBeInTheDocument()
+    expect(observation).toHaveAttribute('data-said-by', 'us')
+
+    // NOTHING is attributed to the venue on this row — not "Gains said:", not any other "said:".
+    expect(screen.queryByText('Gains said:')).toBeNull()
+    expect(screen.queryByText(/\bsaid:/)).toBeNull()
+    expect(container.querySelector('[data-said-by="venue"]')).toBeNull()
+
+    // And it is NOT set as a quotation: the monospace span is what says "someone else's exact
+    // words", so our own prose must not carry it.
+    expect(container.querySelector('.perps-orders-reason-text')).toBeNull()
+    expect(observation).not.toHaveClass('perps-orders-reason-text')
+
+    // The stutter is gone with it: our sentence never repeats the status line back at the member.
+    expect(observation.textContent).not.toBe('Gains did not execute this in time.')
+  })
+
+  it('keeps a real decoded CancelReason attributed to the venue, verbatim and quoted', () => {
+    // What the venue ACTUALLY produced: a `CancelReason` off `MarketOpenCanceled`, decoded through
+    // GAINS_CANCEL_REASON. This one has a venue behind it, so it keeps the attribution.
+    const text = cancelReasonText(GAINS_CANCEL_REASON.SLIPPAGE)
+    const { container } = renderList({
+      orders: [
+        gainsStuck({
+          reason: { code: GAINS_CANCEL_REASON.SLIPPAGE, text, source: 'gains' },
+        }),
+      ],
+    })
+
+    expect(screen.getByText('Gains said:')).toBeInTheDocument()
+    const quoted = screen.getByText(text)
+    expect(quoted).toHaveClass('perps-orders-reason-text')
+    expect(container.querySelector('[data-said-by="venue"]')).not.toBeNull()
+    expect(container.querySelector('[data-said-by="us"]')).toBeNull()
+  })
+
+  it('does not attribute to the venue merely because the venue is named in our sentence', () => {
+    // The two treatments are chosen by SOURCE, never by what the words happen to mention — this is
+    // the case that would let the defect back in through the copy rather than through the code.
+    renderList({
+      orders: [
+        gainsStuck({
+          reason: { code: null, text: 'Gains did not execute this order within its timeout window.', source: 'app' },
+        }),
+      ],
+    })
+    expect(screen.queryByText('Gains said:')).toBeNull()
+    expect(screen.getByText('Gains did not execute this order within its timeout window.')).toHaveAttribute(
+      'data-said-by',
+      'us',
+    )
+  })
+
+  it('keeps the strengths of this surface while it does it', () => {
+    renderList({
+      orders: [gainsStuck()],
+      sources: {
+        gmx: {
+          status: 'read',
+          windowed: true,
+          detail: 'GMX orders are read from recent chain history, so an order frozen further back is not listed here.',
+        },
+      },
+    })
+    expect(screen.getByText('Needs your attention')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Recover your collateral' })).toBeEnabled()
+    expect(screen.getByText('This returns your collateral to your wallet.')).toBeInTheDocument()
     expect(screen.getByText(/read from recent chain history/i)).toBeInTheDocument()
   })
 })

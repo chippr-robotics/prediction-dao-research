@@ -34,7 +34,39 @@ export const PERPS_TIPS = {
     'FairWins earns a small referral share from Gains Network on trades attributed to FairWins. ' +
     'It is paid by the venue and costs you nothing extra.',
   pnl: 'Profit or loss on the position if it were closed at the current price, as the venue reports it.',
+  /**
+   * The same idea when FairWins worked it out instead of the venue. It is a SEPARATE string on
+   * purpose: the one above claims the venue reported the number, and rendering that claim over our
+   * own arithmetic is precisely the dishonesty the “calculated” label exists to prevent.
+   */
+  pnlCalculated:
+    'Profit or loss if the position were closed at the current price, worked out by FairWins from ' +
+    'the size, side and entry the venue reported. It leaves out the venue’s borrowing and funding ' +
+    'charges and the price impact of closing, so the venue will settle at a different number.',
 }
+
+/**
+ * The word beside a figure FairWins worked out rather than read from the venue.
+ *
+ * One word, used everywhere such a figure appears, so a member learns it once. It is deliberately
+ * not “estimated”: an estimate sounds like the venue's own number rounded, and these are ours.
+ */
+export const PERPS_CALCULATED_LABEL = 'calculated'
+
+/**
+ * Why a GMX position has no liquidation price here — and it is not that GMX is being coy.
+ *
+ * GMX v2 stores no liquidation price on a position at all: the level is implied by its
+ * min-collateral rule applied to collateral that shrinks as borrowing and funding accrue, so it
+ * moves without the position changing. Deriving it would need pool-side factors this app does not
+ * read, and a leveraged member acting on a made-up one is the worst outcome on this surface. A bare
+ * dash invites the reading “there isn't one”, which is the opposite of true — hence a sentence.
+ */
+export const PERPS_GMX_NO_LIQUIDATION_PRICE =
+  'GMX does not publish a liquidation price for a position, and FairWins will not work one out: it ' +
+  'depends on GMX’s minimum-collateral rule and on the borrowing and funding this position has ' +
+  'accrued, neither of which this app reads. Your position can still be liquidated — GMX’s own app ' +
+  'shows the level it will use.'
 
 export const PERPS_RISK_DISCLOSURE =
   'Perpetual futures are leveraged products traded on third-party venues, not by FairWins. ' +
@@ -52,6 +84,20 @@ export const PERPS_TESTNET_NOTE =
 export const PERPS_UNAVAILABLE_NOTE =
   'Perps market data is temporarily unavailable, so this view is paused. Nothing you hold is ' +
   'affected. Please try again shortly.'
+
+/**
+ * A Gains market order past its timeout window, said in OUR voice.
+ *
+ * This one is not a tip, it is a correction. The venue emits NOTHING when a market order simply
+ * goes unexecuted — we derive the timeout from the current block height against the window the
+ * diamond itself reports — so this sentence is our observation, and it must never be rendered under
+ * a "Gains said:" attribution (see `lib/perps/orderState.js#isVenueStatedReason`). It names how we
+ * know, because on the surface a member reads when their collateral is stuck, the difference
+ * between "the venue told us" and "we worked it out" is the difference that matters.
+ */
+export const PERPS_GAINS_TIMEOUT_OBSERVATION =
+  'Gains has reported nothing about this order — we work out that its timeout window has passed ' +
+  'from the current block height.'
 
 export const PERPS_FEE_UNCONFIRMED_NOTE =
   'The current FairWins fee rate could not be confirmed just now, so it is not shown. The venue ' +
