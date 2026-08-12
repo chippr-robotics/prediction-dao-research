@@ -496,7 +496,9 @@
   inset: 0;
   justify-content: center;
   position: fixed;
-  z-index: 40;
+  /* Modal tier — above the fixed bottom icon nav (1200) and nav drawer (1401),
+     matching the other detail sheets (AssetDetailSheet, CollectibleDetailSheet). */
+  z-index: 2000;
 }
 .miniapp-sheet {
   background: var(--surface-color, #fff);
