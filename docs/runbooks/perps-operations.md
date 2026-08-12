@@ -159,6 +159,12 @@ its own `setUiFeeFactor`, and `PERPS_UI_FEE_RECEIVER` in `frontend/src/config/pe
 that address in the same change. The EOA's already-accrued balance still has to be claimed by the
 EOA afterwards — that is the whole reason to sequence it deliberately rather than as a config bump.
 
+> **Standing decision (2026-08-11).** The admin deploy wallet
+> `0x52502d049571C7893447b86c4d8B38e6184bF6e1` is the intended receiver **for now**; a move to the
+> treasury is planned for a later date. Until then this is a deliberate position, not an oversight
+> — do not "fix" it in passing. When the move happens, follow the sequence above rather than
+> editing the config alone, or the app will attach a receiver that accrues nothing.
+
 ---
 
 ## 3. Change the Hyperliquid rate
