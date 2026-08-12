@@ -57,6 +57,7 @@ notable correction.
 | 33 | [CallsignRegistry: an in-house ENS-style naming system](33-callsign-registry/blog.md) | Standalone |
 | 34 | [TokenFactory: templated token minting](34-token-factory/blog.md) | Standalone |
 | 35 | [Cross-chain intents & pooled liquidity: the refund address and the no-custody fee rule](35-cross-chain-intents-and-lp/blog.md) | Standalone |
+| 36 | [Perps position management: why the fee contract was deleted, and how the platform is funded](36-perps-position-management/blog.md) | Standalone |
 
 ## Suggested publishing order
 

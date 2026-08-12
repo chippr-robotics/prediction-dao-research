@@ -103,7 +103,10 @@ code exists in the ERC-4626 path, Bundler3, or the API. Resolution (research.md 
 
 - The protocol-**mandated** UI attribution ("Powered by Morpho" + risk disclosure) is
   implemented in `EarnPanel`.
-- **No platform fee is charged in this release** (FR-013), and the UI says so.
+- **No platform fee was charged in this release** (FR-013), and the UI said so. **Superseded by
+  spec 060**: `earn.lend` is now a `FeeRouter` Wrapped service charged atomically through
+  `depositToVaultWithFee` — live on Polygon at 50 bps under a 250 bps cap, disclosed as its own
+  line before signature. See [`platform-fees.md`](platform-fees.md).
 - The documented path to treasury revenue is a **fee-wrapper vault** (a Vault V2 owned by the
   FairWins treasury wrapping a curated vault with a performance/management fee — see Morpho's
   ["How can distributors generate revenue"](https://docs.morpho.org/build/earn/concepts/generate-revenue/)),

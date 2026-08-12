@@ -17,7 +17,9 @@ never holds your money, and you can withdraw whenever you like.
 When you deposit into a **vault**, your money is pooled with other people's and lent to
 borrowers who put up collateral worth more than they borrow. Borrowers pay interest, and your
 share of the pool grows. A professional team — the vault's **curator** — decides where the vault
-lends and how it manages risk. FairWins does not manage vaults and charges **no fee** on Earn.
+lends and how it manages risk. FairWins does not manage vaults; where a FairWins platform fee
+applies to a deposit, you see it as its own line before you confirm (see
+[Platform Fees](platform-fees.md)).
 
 Every unfamiliar term in the app has a small ⓘ info bubble next to it — tap it for a
 plain-language explanation.
@@ -78,8 +80,11 @@ without lending), the button says why instead of doing nothing.
   by FairWins, Morpho, or the vault curator.
 - **Smart contracts carry risk.** Vaults are third-party audited contracts, but no on-chain
   system is risk-free. Only deposit what you can afford to have at risk.
-- **FairWins charges no fee on Earn** and never takes custody of your deposit. Network gas fees
-  and the vault's own performance fee (already reflected in the displayed APY) still apply.
+- **FairWins never takes custody of your deposit.** A FairWins platform fee applies to the
+  amount you deposit where one is set — **0.50%** on Polygon today, capped at 2.5%, zero on some
+  networks — always shown as its own line before you confirm, and never charged on withdrawals.
+  See [Platform Fees](platform-fees.md). Network gas fees and the vault's own performance fee
+  (already reflected in the displayed APY) still apply.
 - The vault list shows only vaults curated and listed by the Morpho protocol itself.
 
 ## FAQ

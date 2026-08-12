@@ -9,7 +9,9 @@ Before you agree, understand the following in plain language. The full terms bel
 
 - **FairWins is software, not a bookmaker.** You wager directly against other people. FairWins is never the other side of your bet, never sets odds, never holds your money, and never takes a cut of any wager.
 - **Your membership fee buys access only.** It is not a bet, not a deposit, and not refundable.
+- **Some things you do here carry a fee, and you always see it before you sign.** Wagers, pools, and sending money carry no FairWins fee. Certain other services do, and some outside venues pay us out of the fee they already charge, at no extra cost to you. Section 4.3 lists every way we earn, in full.
 - **You can lose everything you wager.** There is no insurance and no regulator you can appeal to.
+- **Perpetual futures and other leveraged products trade on someone else's venue.** They can be liquidated and lose your entire stake during ordinary market movement. Your own wallet owns the position — FairWins does not execute, hold, or guarantee anything, and cannot reverse or recover a trade.
 - **You must qualify to use FairWins.** You must be at least 21, not located in a restricted jurisdiction, and not subject to sanctions.
 - **You control your own wallet.** If you lose your keys, no one — including FairWins — can recover your funds or your account.
 - **Disputes with FairWins go to arbitration, individually.** You give up the right to a court trial and to class actions against us.
@@ -41,6 +43,11 @@ If any provision of a more specific step (membership attestation, signed message
 - **"Wager"** — a peer-to-peer agreement between Users on the outcome of a specified event, settled by Smart Contract.
 - **"Private Wager"** — a Wager offered to and accepted by a specific counterparty.
 - **"Public Wager"** — a Wager broadcast for acceptance by any address.
+- **"Trading Venue"** — any third-party protocol, exchange, or platform that FairWins does not operate and which you may reach through the Service, including perpetual-futures venues, prediction markets, marketplaces, bridges, and lending or staking protocols.
+- **"Perpetual Future"** (a "**perp**") — a leveraged derivative contract with no fixed expiry, offered by a Trading Venue, in which you post collateral ("**margin**") to hold exposure larger than that collateral, and which the venue may forcibly close ("**liquidate**") when your collateral no longer supports it.
+- **"Leveraged Derivative"** — a Perpetual Future or any other product in which your exposure exceeds the collateral you post.
+- **"Notional"** — the full size of a leveraged position: your margin multiplied by your leverage. A fee charged on Notional is therefore larger, relative to the money you actually put in, than a fee charged on that money.
+- **"Position"** — your open exposure at a Trading Venue, owned by the account that opened it.
 - **"Smart Contract"** — the FairWins protocol contracts deployed on the Polygon network.
 - **"Resolution Mechanism"** — the on-chain process, including any oracle and dispute procedure, by which the outcome of a Wager is determined and settled, as described in the Service documentation.
 - **"Restricted Jurisdiction"** — any jurisdiction listed in **Schedule A**, as amended from time to time.
@@ -52,11 +59,25 @@ If any provision of a more specific step (membership attestation, signed message
 
 **4.2 What FairWins is not.** FairWins is not, and does not act as, a counterparty, bookmaker, sportsbook, casino, exchange, broker-dealer, swap execution facility, designated contract market, futures commission merchant, money transmitter, money services business, custodian, or fiduciary. FairWins does not set odds or prices, does not take the other side of any Wager, does not hold or control User funds, and **takes no rake, vigorish, commission, or share of any Wager.**
 
-**4.3 Membership-funded.** The Service is funded by membership fees, which are consideration for access only (Section 8) and bear no relationship to the size, frequency, or outcome of any Wager.
+**4.3 How the Service is funded.** The Service is funded in the ways set out below, and in no others. Rates and caps are published in the Service and recorded on-chain, and may change; **the rate that applies to you is the one shown to you at the time you act.** Where a rate is set to zero there is no fee and no fee line at all. A fee described here arises only where the service it relates to is available to you and you choose to use it.
 
-**4.4 Information purpose.** FairWins is designed to support information discovery through peer-to-peer markets. Nothing on the Service is an offer, solicitation, or recommendation to enter any Wager or transaction.
+*Amounts you pay:*
 
-**4.5 Automated and AI components.** Portions of the Service are developed, maintained, and operated with the assistance of automated systems and AI agents. You acknowledge this and accept the associated risks described in the Risk Disclosure.
+1. **Membership fees** — consideration for access only (Section 8). They bear no relationship to the size, frequency, or outcome of any Wager.
+2. **Platform fees on wrapped services** — a percentage of the **capital you commit** when you use certain services through the Service, currently lending, staking, bridging, and supplying liquidity. This fee is charged **on entry only and never on withdrawal**, at **0.50% (50 basis points)** where it is switched on today, under a hard cap of **2.50% (250 basis points)**. On some networks these services are configured at **0%**.
+3. **Builder and interface fees on third-party venues** — where you trade on a Trading Venue through the Service, the venue may calculate a fee on the **Notional size of your trade** and credit it to FairWins. On prediction markets this is currently **0.50% (50 basis points) from takers and 0% from makers**, capped at 1.00% (100 basis points). On perpetual-futures venues, where this fee is switched on, it is **0.05% (5 basis points) of Notional, charged both when a position is opened and when it is closed**, capped at 0.10% (10 basis points) by the venue itself and calculated by the venue at the moment it executes your order — so an order that is cancelled or never filled carries no FairWins fee. **A fee on Notional is not a fee on the money you put in: at 10× leverage, 5 basis points of Notional is about 50 basis points — 0.50% — of your own margin.** This fee is an additional cost to you, and is disclosed as its own line before you are asked to sign.
+
+*Amounts a venue pays us, which cost you nothing:*
+
+4. **Referral rebates paid by a venue out of its own fee** — some Trading Venues share part of the fee they already charge with the interface that referred you. **This does not change your price and adds nothing to what you pay**, and on at least one venue being referred also gives you a **discount** on that venue's own fee. Where such an arrangement has not been activated by the venue, FairWins earns nothing from it.
+
+*And nothing else:* **FairWins takes no fee of any kind on Wagers, on pools, or on sending money.** For those you pay network gas and nothing more.
+
+**4.4 Access to third-party venues, including leveraged derivatives.** The Service also provides a non-custodial **interface** to Trading Venues operated by third parties, including venues offering **Perpetual Futures and other Leveraged Derivatives**. In that role FairWins prepares a transaction and nothing else: **your wallet signs it and your wallet is the sender.** FairWins is not a broker, dealer, exchange, trading facility, clearing house, or counterparty; it does not execute, match, clear, settle, custody, or guarantee any transaction; it does not operate, control, or supervise any Trading Venue; and it never owns or controls a Position. Section 10 governs your use of Trading Venues.
+
+**4.5 Information purpose.** FairWins is designed to support information discovery through peer-to-peer markets. Nothing on the Service is an offer, solicitation, or recommendation to enter any Wager or transaction.
+
+**4.6 Automated and AI components.** Portions of the Service are developed, maintained, and operated with the assistance of automated systems and AI agents. You acknowledge this and accept the associated risks described in the Risk Disclosure.
 
 ## 5. Eligibility
 
@@ -65,7 +86,7 @@ You may use the Service only if you meet **all** of the following at all times. 
 - (a) you are at least **21 years of age** and of legal capacity to enter a binding contract;
 - (b) you are not located, resident, incorporated, or established in any **Restricted Jurisdiction**;
 - (c) you are **not a Restricted Party** and do not act on behalf of any Restricted Party;
-- (d) your access to and use of peer-to-peer wagering software is **lawful in the jurisdiction from which you access it**, and you bear sole responsibility for that determination; and
+- (d) your access to and use of peer-to-peer wagering software — and of any other service you reach through the Service, **including Leveraged Derivatives** — is **lawful in the jurisdiction from which you access it**, and you bear sole responsibility for that determination; and
 - (e) you have **sole and exclusive control** of the wallet and private keys you use with the Service.
 
 These representations are renewed each time you access the Service, purchase or renew a Membership Pass, sign a Service message, or enter a Wager.
@@ -82,7 +103,7 @@ You agree **not** to use a VPN, proxy, Tor, false residence or identity informat
 
 **8.1 Access only.** A Membership Pass grants you access to the Service for its stated period. **A Membership Pass is a fee for access only. It is not a Wager, a stake, a deposit, an investment, a security, or a balance held on your behalf, and it confers no ownership interest, profit expectation, or claim on any pool of funds.**
 
-**8.2 Use of fees.** Membership fees fund Service infrastructure, storage, hosting, and development. Fees are not pooled, staked, wagered, or returned to Members as winnings.
+**8.2 Use of fees.** Membership fees fund Service infrastructure, storage, hosting, and development, together with the other funding sources described in Section 4.3. Fees are not pooled, staked, wagered, or returned to Members as winnings, and a Membership Pass gives you no claim on, or share of, any fee or rebate FairWins receives from any source.
 
 **8.3 Non-refundable.** **MEMBERSHIP FEES ARE NON-REFUNDABLE, INCLUDING IF YOU ARE LATER RESTRICTED, SUSPENDED, OR UNABLE TO ACCESS THE SERVICE FOR ANY REASON, AND INCLUDING IF THE SERVICE IS MODIFIED OR DISCONTINUED.**
 
@@ -114,55 +135,75 @@ You agree **not** to use a VPN, proxy, Tor, false residence or identity informat
 
 **9.5 Your responsibility.** You are solely responsible for understanding each Wager you enter, including its terms, counterparty, resolution source, and risk.
 
-## 10. Disputes Between Users
+## 10. Third-Party Trading Venues and Leveraged Products
 
-Disputes about a Wager's outcome are resolved **exclusively** through the Resolution Mechanism described in the Service documentation. FairWins does not adjudicate Wager outcomes between Users and is not liable for them. This Section is separate from, and does not limit, the arbitration provision in Section 22, which governs disputes *with FairWins*.
+**10.1 What this Section covers.** The Service can prepare transactions for Trading Venues operated by third parties, including venues offering **Perpetual Futures and other Leveraged Derivatives**. This Section governs everything you do at a Trading Venue through the Service.
 
-## 11. Sanctions and Compliance Screening
+**10.2 You contract with the venue, not with us.** Your transaction is with the Trading Venue, on **that venue's own terms, and subject to that venue's own risks**. You are responsible for reading and complying with them. FairWins is not a party to that relationship, makes no representation about any venue's solvency, integrity, code, or continued operation, and does not endorse any venue by making it reachable.
+
+**10.3 The venue sets the rules.** The Trading Venue — not FairWins — determines its own fees, spreads, funding and borrowing charges, price and oracle sources, leverage limits, margin requirements, liquidation rules, order execution and cancellation, and any restriction, downtime, or close-only period. **The venue's own charges are separate from, and in addition to, any FairWins fee described in Section 4.3.**
+
+**10.4 We cannot execute, reverse, or recover.** FairWins builds a transaction; **your wallet signs it, and your wallet is the sender.** Once it is submitted, FairWins cannot execute, match, modify, cancel, reverse, or recover it. FairWins cannot guarantee that an order is filled, or filled at any particular price, or filled at all; cannot prevent, delay, or undo a liquidation; and cannot restore a Position or collateral lost at a venue. Information about a venue shown in the Service comes from that venue or from public chain data, and may be delayed, incomplete, or unavailable.
+
+**10.5 Your wallet owns the Position.** FairWins never holds your funds at a Trading Venue, never owns or controls a Position, and holds no approval, authority, or standing instruction over your Positions. **The account you trade from is the owner of every Position it opens, and you can always act on it directly at the venue** — including if the Service is unavailable, restricted to you, or discontinued altogether. This follows from how the Service is built; it is a structural property, not a promise about our conduct.
+
+**10.6 Some venues are display-only.** For some venues the Service can show a Position but cannot act on it. Where that is so, the Service says so plainly, and you manage that Position at the venue itself.
+
+**10.7 Leverage risk.** **PERPETUAL FUTURES AND OTHER LEVERAGED DERIVATIVES ARE HIGH-RISK PRODUCTS. A LEVERAGED POSITION CAN BE LIQUIDATED DURING ORDINARY MARKET MOVEMENT, AT ANY TIME AND WITHOUT NOTICE, AND YOU CAN LOSE THE ENTIRE AMOUNT OF COLLATERAL YOU POSTED.** Leverage multiplies losses as well as gains, and fees charged on Notional are charged on your whole position size, not on the money you put in. There is no insurance, no deposit protection, and no regulator or authority to which you may appeal a venue's execution, liquidation, or outcome.
+
+**10.8 Eligibility for leveraged derivatives.** Access to Leveraged Derivatives is restricted or prohibited for many persons and in many jurisdictions, and those restrictions are **broader than the general Restricted Jurisdiction list in Schedule A**. By opening a Position you represent and warrant, in addition to Section 5 and each time you do so, that **you are legally permitted to trade Leveraged Derivatives in the jurisdiction from which you access the Service**, that you are not a Restricted Party, and that you understand the product. **Section 7 (No Circumvention) applies to this Section with full force**: disguising your location or misrepresenting your eligibility in order to reach a leveraged product is a material breach of these Terms.
+
+**10.9 Availability may change.** Any Trading Venue, and any capability at it, may be limited, suspended, withdrawn, or never enabled for you, by the venue or by us, at any time and without notice. We are not obliged to make any venue or product available to you.
+
+## 11. Disputes Between Users
+
+Disputes about a Wager's outcome are resolved **exclusively** through the Resolution Mechanism described in the Service documentation. FairWins does not adjudicate Wager outcomes between Users and is not liable for them. This Section is separate from, and does not limit, the arbitration provision in Section 23, which governs disputes *with FairWins*.
+
+## 12. Sanctions and Compliance Screening
 
 You represent that you are not a Restricted Party. We may screen wallet addresses and may decline, block, or refuse to facilitate interaction with any address that we or our screening providers associate with a Restricted Party, sanctioned activity, or illicit finance, in each case in our discretion and without liability to you.
 
-## 12. Prohibited Uses
+## 13. Prohibited Uses
 
 You agree not to use the Service to: violate any law or regulation applicable to you; launder money or finance illicit activity; manipulate a market or resolution source; trade on material non-public information where prohibited; access the Service while ineligible; interfere with, attack, or reverse-engineer the Service except as permitted by its open-source license; or harm other Users.
 
-## 13. No Professional Advice
+## 14. No Professional Advice
 
 The Service and its contents do not constitute investment, financial, legal, accounting, or tax advice. **You are solely responsible for your own decisions.** Consult your own professional advisors.
 
-## 14. Assumption of Risk
+## 15. Assumption of Risk
 
 **YOU ACKNOWLEDGE THAT YOU HAVE READ AND UNDERSTAND THE FAIRWINS RISK DISCLOSURE AND THAT YOU KNOWINGLY AND VOLUNTARILY ASSUME ALL RISKS DESCRIBED IN IT, INCLUDING THE RISK OF TOTAL LOSS, SMART-CONTRACT AND ORACLE RISK, ABSENCE OF REGULATORY PROTECTION, AND LOSS OF ACCESS DUE TO LOSS OF YOUR KEYS.**
 
-## 15. Intellectual Property and Open Source
+## 16. Intellectual Property and Open Source
 
 The FairWins protocol and certain components are released under their applicable open-source license(s), and your use of those components is governed by those licenses. The FairWins name, marks, and interface content not so licensed remain our property. Nothing here grants you rights beyond those expressly stated or granted by an applicable open-source license.
 
-## 16. Privacy
+## 17. Privacy
 
 Your use of the Service is subject to the FairWins Privacy Policy. You acknowledge that blockchain transactions are public, permanent, and pseudonymous rather than anonymous, and that on-chain activity may be analyzed and attributed by third parties beyond our control.
 
-## 17. Taxes
+## 18. Taxes
 
 **You are solely responsible for determining, reporting, and paying any taxes** arising from your use of the Service, including from Wagers and winnings. FairWins does not withhold or report on your behalf.
 
-## 18. Disclaimers
+## 19. Disclaimers
 
 **THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.** We do not warrant that the Service will be uninterrupted, secure, error-free, or free of harmful components, or that any Smart Contract, oracle, or Resolution Mechanism will function without fault. You use the Service at your own risk.
 
-## 19. Limitation of Liability
+## 20. Limitation of Liability
 
 **TO THE MAXIMUM EXTENT PERMITTED BY LAW, FAIRWINS AND CHIPPR ROBOTICS LLC, AND THEIR MEMBERS, OFFICERS, CONTRIBUTORS, AND AGENTS, WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY LOST PROFITS, LOST WAGERS, LOST FUNDS, OR LOSS OF DATA, ARISING FROM OR RELATING TO THE SERVICE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.**
 
 **TO THE MAXIMUM EXTENT PERMITTED BY LAW, OUR TOTAL AGGREGATE LIABILITY ARISING FROM OR RELATING TO THE SERVICE WILL NOT EXCEED THE GREATER OF (A) THE TOTAL MEMBERSHIP FEES YOU PAID TO US IN THE [SIX (6)] MONTHS BEFORE THE EVENT GIVING RISE TO THE CLAIM, OR (B) [USD 100].**
 
-Because FairWins is non-custodial and is not a party to any Wager, we are not liable for the conduct of any counterparty or for any Wager outcome.
+Because FairWins is non-custodial and is not a party to any Wager, we are not liable for the conduct of any counterparty or for any Wager outcome. For the same reason, we are not liable for the acts, omissions, fees, pricing, execution, liquidation, downtime, restriction, or insolvency of any Trading Venue, or for any loss on a Position.
 
-## 20. Indemnification
+## 21. Indemnification
 
 You will indemnify and hold harmless FairWins and Chippr Robotics LLC and their members, officers, contributors, and agents from any claim, loss, or expense (including reasonable legal fees) arising from your breach of these Terms, your misuse of the Service, your violation of law, or your false eligibility representations.
 
-## 21. Suspension and Termination
+## 22. Suspension and Termination
 
 We may restrict, suspend, or terminate your access to the Service at any time, including for suspected ineligibility, circumvention, sanctions concerns, or breach, **without notice and without refund**. Settled on-chain Wagers are unaffected by termination.
 
@@ -172,47 +213,49 @@ An **Account Moderator** is a protocol role that can freeze — and later unfree
 
 Separately, a **Guardian-Role** holder may pause the protocol in response to a security incident, which temporarily blocks all wager creation, acceptance, and settlement for everyone until the protocol is unpaused.
 
-## 22. Governing Law; Arbitration; Class Action Waiver
+## 23. Governing Law; Arbitration; Class Action Waiver
 
-**22.1 Governing law.** These Terms are governed by the laws of `[GOVERNING LAW JURISDICTION]`, without regard to conflict-of-laws rules.
+**23.1 Governing law.** These Terms are governed by the laws of `[GOVERNING LAW JURISDICTION]`, without regard to conflict-of-laws rules.
 
-**22.2 Binding arbitration.** **ANY DISPUTE BETWEEN YOU AND FAIRWINS ARISING FROM OR RELATING TO THESE TERMS OR THE SERVICE WILL BE RESOLVED BY FINAL AND BINDING INDIVIDUAL ARBITRATION ADMINISTERED BY `[ARBITRAL INSTITUTION]` UNDER ITS RULES, SEATED IN `[SEAT]`, IN THE ENGLISH LANGUAGE. YOU AND FAIRWINS WAIVE THE RIGHT TO A TRIAL BY JURY OR IN COURT**, except that either party may bring an individual claim in small-claims court where eligible.
+**23.2 Binding arbitration.** **ANY DISPUTE BETWEEN YOU AND FAIRWINS ARISING FROM OR RELATING TO THESE TERMS OR THE SERVICE WILL BE RESOLVED BY FINAL AND BINDING INDIVIDUAL ARBITRATION ADMINISTERED BY `[ARBITRAL INSTITUTION]` UNDER ITS RULES, SEATED IN `[SEAT]`, IN THE ENGLISH LANGUAGE. YOU AND FAIRWINS WAIVE THE RIGHT TO A TRIAL BY JURY OR IN COURT**, except that either party may bring an individual claim in small-claims court where eligible.
 
-**22.3 Class action waiver.** **YOU AND FAIRWINS AGREE THAT CLAIMS MAY BE BROUGHT ONLY IN AN INDIVIDUAL CAPACITY AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY CLASS, COLLECTIVE, OR REPRESENTATIVE PROCEEDING.**
+**23.3 Class action waiver.** **YOU AND FAIRWINS AGREE THAT CLAIMS MAY BE BROUGHT ONLY IN AN INDIVIDUAL CAPACITY AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY CLASS, COLLECTIVE, OR REPRESENTATIVE PROCEEDING.**
 
-**22.4 Opt-out.** You may opt out of this arbitration provision by sending written notice to `[CONTACT]` within thirty (30) days of first accepting these Terms.
+**23.4 Opt-out.** You may opt out of this arbitration provision by sending written notice to `[CONTACT]` within thirty (30) days of first accepting these Terms.
 
-## 23. Force Majeure
+## 24. Force Majeure
 
 We are not liable for any failure or delay caused by events beyond our reasonable control, including network failures, blockchain congestion or reorganization, oracle failure, third-party service outages, regulatory action, or acts of god.
 
-## 24. Changes to These Terms
+## 25. Changes to These Terms
 
 We may update these Terms. Material changes will be indicated by an updated "Last updated" date and version, and where practical by notice through the Service. Your continued use after changes take effect constitutes acceptance. If you do not agree, you must stop using the Service.
 
-## 25. General
+## 26. General
 
-**25.1 Severability.** If any provision is held unenforceable, the remainder remains in effect, and the unenforceable provision is modified to the minimum extent necessary to make it enforceable.
+**26.1 Severability.** If any provision is held unenforceable, the remainder remains in effect, and the unenforceable provision is modified to the minimum extent necessary to make it enforceable.
 
-**25.2 No waiver.** Our failure to enforce any provision is not a waiver.
+**26.2 No waiver.** Our failure to enforce any provision is not a waiver.
 
-**25.3 Assignment.** You may not assign these Terms. We may assign them in connection with a reorganization or transfer of the Service.
+**26.3 Assignment.** You may not assign these Terms. We may assign them in connection with a reorganization or transfer of the Service.
 
-**25.4 Entire agreement.** These Terms, with the Risk Disclosure and Privacy Policy, are the entire agreement between you and us regarding the Service.
+**26.4 Entire agreement.** These Terms, with the Risk Disclosure and Privacy Policy, are the entire agreement between you and us regarding the Service.
 
-**25.5 Language.** The English version of these Terms controls.
+**26.5 Language.** The English version of these Terms controls.
 
-## 26. Contact
+## 27. Contact
 
 Questions about these Terms: Howdy@fairwins.app.
 
-## 27. Acknowledgement
+## 28. Acknowledgement
 
 **BY ENTERING THE SITE, PURCHASING OR UPGRADING A MEMBERSHIP PASS, OR SIGNING THE ACCOUNT KEY-GENERATION MESSAGE, YOU CONFIRM THAT YOU HAVE READ AND UNDERSTOOD THESE TERMS AND THE RISK DISCLOSURE, THAT YOU ARE ELIGIBLE, AND THAT YOU KNOWINGLY AGREE TO BE BOUND BY THEM.**
 
 ---
 
 ## Schedule A — Restricted Jurisdictions
+
+**This list is not the limit of every restriction.** Restrictions on **Leveraged Derivatives**, including Perpetual Futures, are broader than this list in many jurisdictions: a jurisdiction that is not a Restricted Jurisdiction for wagering may still prohibit or restrict leveraged products, and **Section 10.8 applies to you independently of this Schedule**.
 
 The Service is not available to persons located, resident, incorporated, or established in:
 

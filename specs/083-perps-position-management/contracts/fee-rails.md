@@ -49,7 +49,13 @@ GMX's own formula, for cross-checking the disclosure:
 
 ## Operations
 
-Two one-shot transactions, no deployment:
+Two one-shot transactions, no deployment. **Both were executed on 2026-08-11** — Polygon
+`0x2ecf8d5f512fb9d43584366da22da1d9027c871d65e9453ad45fbb1c9c6eb747` (HL service, cap 10 bps,
+rate 0) and Arbitrum `0x2034f95a10e5ab040bc38f38d9bd393f85f00547ff9b5430b21955d264d772f0`
+(`setUiFeeFactor(5e26)` = 5 bps, receiver `0x52502d049571C7893447b86c4d8B38e6184bF6e1`). The GMX
+rate is therefore configured and **charged to nobody**: in-app perps trading is behind
+`VITE_PERPS_MANAGE_ENABLED`, default off. Operational record:
+[`docs/runbooks/perps-operations.md`](../../../docs/runbooks/perps-operations.md).
 
 1. **Register `perps.hyperliquid.builder`** on the Polygon FeeRouter (cap 10, ConfigOnly). Already
    in `scripts/deploy/lib/feeServices.js`; measured `kind = 0` (unregistered) on Polygon, Arbitrum

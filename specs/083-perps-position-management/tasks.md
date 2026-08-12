@@ -62,11 +62,17 @@
       `scripts/ops/register-fee-service.js` already covers it and `perps.hyperliquid.builder` is in
       the catalog. Verified report-only against Polygon: the service reads
       `NOT REGISTERED (quoteFee reverts ServiceUnknown) — expected cap 10 bps, ConfigOnly`, with
-      every other service live at 50 bps. Registration is an operator action awaiting approval.
+      every other service live at 50 bps. **Registered on Polygon 137 on 2026-08-11**, cap 10 bps /
+      ConfigOnly / **rate 0** (tx `0x2ecf8d5f512fb9d43584366da22da1d9027c871d65e9453ad45fbb1c9c6eb747`).
+      Nothing is charged on it — Hyperliquid trading is not enabled.
 - [x] T062 `scripts/ops/set-gmx-ui-fee-factor.js` — GMX self-registration on Arbitrum. Verified live:
       reads `MAX_UI_FEE_FACTOR = 1e27` (10 bps) from GMX's DataStore, current factor 0, `BPS=5`
       dry-runs to `setUiFeeFactor(5e26)`, and `BPS=11` is refused against the live cap. Refuses to
       send when the signer is not the intended receiver (setUiFeeFactor credits `msg.sender`).
+      **Sent on Arbitrum on 2026-08-11**: factor `5e26` = 5 bps of notional, receiver
+      `0x52502d049571C7893447b86c4d8B38e6184bF6e1`
+      (tx `0x2034f95a10e5ab040bc38f38d9bd393f85f00547ff9b5430b21955d264d772f0`). Configured, and
+      **charged to nobody** until `VITE_PERPS_MANAGE_ENABLED` is on.
 - [ ] T063 [P] Tests for the ops script's unit conversion and cap enforcement
 
 ## Phase 7 — Reporting, docs, polish
