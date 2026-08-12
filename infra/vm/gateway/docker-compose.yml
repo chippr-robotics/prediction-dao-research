@@ -50,6 +50,27 @@ services:
       POLYMARKET_BUILDER_CODE: "0x6e0316783960e149b53466f0f2c5fdbaf5ce11ba15669491de980f6dedc493a3"
       POLYMARKET_BUILDER_TAKER_FEE_BPS: "50"
       POLYMARKET_BUILDER_MAKER_FEE_BPS: "0"
+      # ---- Perps read proxy (specs 082 + 083) ----
+      # READ-ONLY BY CONSTRUCTION: this module has no write route at all. It proxies three PUBLIC
+      # venue APIs (Gains, GMX, Hyperliquid) for market data and a member's own positions, and holds
+      # no credential of any kind. Enabling it does NOT enable trading — that is a separate
+      # build-time SPA flag (VITE_PERPS_MANAGE_ENABLED, see the root Dockerfile), deliberately absent
+      # from every cloudbuild so it can only be turned on on purpose.
+      #
+      # Until this is "true" the routes answer 503 perps_unconfigured and the SPA hides the view,
+      # which is why the Perps surface has been invisible in production since spec 082 shipped.
+      # REQUIRES an image containing the perps module: predict-058 PREDATES it (its /status has no
+      # `perps` block), so this flag does nothing until the image tag above is bumped.
+      PERPS_ENABLED: "true"
+      # Hyperliquid builder-fee FALLBACK. The live source is the FeeRouter service
+      # perps.hyperliquid.builder on Polygon (registered 2026-08-11, cap 10 bps, rate 0), which this
+      # gateway already reads. Nothing is charged: Hyperliquid trading is not enabled.
+      PERPS_HL_BUILDER_FEE_BPS: "0"
+      # Attribution ids are PUBLIC config, never secrets, and are deliberately UNSET: no GMX referral
+      # code is registered and Gains has not whitelisted a referrer, so link-outs go unattributed
+      # rather than carrying a code that earns nothing. GMX's UI fee is NOT here — it rides on-chain
+      # calldata from the SPA (uiFeeReceiver), never a gateway request.
+      # PERPS_GAINS_REFERRER / PERPS_GMX_REF_CODE / PERPS_HL_BUILDER_ADDRESS: unset on purpose.
     cpus: 0.5
     mem_limit: 320m
     healthcheck:

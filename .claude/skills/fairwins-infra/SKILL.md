@@ -11,10 +11,21 @@ part — each runs `min-instances=1` with `cpu-throttling=false`, i.e. a **full 
 allocated 24/7**. When we aren't actively testing or serving gasless traffic, scale
 them to zero; bring them back up on demand.
 
-| Alias     | Cloud Run service        | Role |
-|-----------|--------------------------|------|
-| `bundler` | `fairwins-alto-bundler`  | ERC-4337 bundler (alto) — submits UserOperations |
-| `gateway` | `fairwins-relay-gateway` | ERC-7677 paymaster (sponsorship signer) + EIP-3009 relay |
+> **BOTH SERVICES HAVE MIGRATED OFF CLOUD RUN (verified 2026-08-12).** They now run as
+> `fairwins-bundler` and `fairwins-gateway`, two `e2-small` GCE VMs in `us-central1-a`
+> (`docs/runbooks/vm-migration.md`). The Cloud Run services no longer exist — `gcloud run services
+> describe fairwins-relay-gateway` returns *Cannot find service*.
+>
+> This matters for cost, which is what the skill is for: **`up`/`down` no longer control anything.**
+> The VMs bill continuously and cannot be scaled to zero; `down` is refused rather than silently
+> doing nothing. Until this was fixed, `status` reported the gateway as "DOWN (scale-to-zero)" —
+> reading as *off and cheap* while an e2-small ran 24/7 — because it inferred health from the public
+> URL while its service lookup failed. Use `status` to see the VM state; start/stop on the VM itself.
+
+| Alias     | Was (Cloud Run)          | Now (GCE VM, us-central1-a) | Role |
+|-----------|--------------------------|------------------------------|------|
+| `bundler` | `fairwins-alto-bundler`  | `fairwins-bundler`           | ERC-4337 bundler (alto) — submits UserOperations |
+| `gateway` | `fairwins-relay-gateway` | `fairwins-gateway`           | ERC-7677 paymaster + EIP-3009 relay, **and** the read-only proxies (collectibles, Predict, Bitcoin, bridge, perps) |
 
 Both are in project `chippr-bots-site-wp`, region `us-central1`.
 
