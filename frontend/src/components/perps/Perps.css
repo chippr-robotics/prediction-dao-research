@@ -190,7 +190,29 @@
   color: var(--semantic-loss, #dc2626);
 }
 .perps-trade-cell {
+  /* Two actions now (spec 083): the in-app open, where this build can build the order, and the
+     venue link-out, which is on every row always. Right-aligned as one group so the link keeps the
+     position it had in phase 0 on rows that have no open control. */
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
   text-align: right;
+}
+.perps-open-btn {
+  background: var(--brand-primary, #36b37e);
+  border: 1px solid var(--brand-primary, #36b37e);
+  border-radius: 999px;
+  color: var(--text-on-brand, #ffffff);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  white-space: nowrap;
+}
+.perps-open-btn:hover,
+.perps-open-btn:focus-visible {
+  filter: brightness(0.95);
 }
 .perps-trade-link {
   color: var(--brand-primary, #36b37e);
@@ -273,6 +295,12 @@
 }
 .perps-position-symbol {
   font-weight: 600;
+}
+/* The venue's market variant (GMX: "WBTC.b-USDC"), secondary to the pair it qualifies. */
+.perps-position-variant {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.72rem;
+  font-weight: 400;
 }
 .perps-direction {
   border-radius: 6px;

@@ -29,11 +29,15 @@
  *
  * Builders THROW on malformed input rather than returning a sentinel: they run when a member is
  * about to sign, never during render, and a silently-wrong call object would reach the wallet with
- * the member's collateral attached. The decoders and the fee estimate are the opposite — they run
- * over venue data inside effects and render, so they are total and return null / [].
+ * the member's collateral attached. The decoders, the execution-fee estimate and its live read are
+ * the opposite — they run over venue data inside effects and render, so they are total and return
+ * null / []. `readExecutionFee` is the one asynchronous thing here and it is total too: no GMX on
+ * this chain, no provider, a reverting call and a suspicious zero all resolve to `null`, and the
+ * surface says the fee could not be read rather than guessing at money the member will pay.
  */
 import {
   AbiCoder,
+  Contract,
   Interface,
   ZeroAddress,
   ZeroHash,
@@ -46,6 +50,7 @@ import {
   parseUnits,
   zeroPadValue,
 } from 'ethers'
+import { GMX_DATA_STORE_ABI } from '../../../abis/perps/gmxDataStore'
 import {
   GMX_DECREASE_POSITION_SWAP_TYPE,
   GMX_EVENT_EMITTER_ABI,
@@ -55,6 +60,7 @@ import {
 } from '../../../abis/perps/gmxExchangeRouter'
 import { GMX_READER_ABI } from '../../../abis/perps/gmxReader'
 import { gmxAddressesFor } from '../../../config/perps'
+import { getReadProvider } from '../../../utils/rpcProvider'
 
 const EXCHANGE_ROUTER = new Interface(GMX_EXCHANGE_ROUTER_ABI)
 const EVENT_EMITTER = new Interface(GMX_EVENT_EMITTER_ABI)
@@ -82,11 +88,26 @@ export const GMX_FLOAT_PRECISION = 10n ** 30n
 export const GMX_ORACLE_PRICE_COUNT_BASE = 3
 
 /**
- * How far above the computed execution fee to bid, in bps of the fee.
+ * How far above the computed execution fee to bid, in bps of the fee. 1000 bps = 10%.
  *
- * Biased HIGH deliberately: GMX's `payExecutionFee` refunds the unused remainder to the member and
- * emits `ExecutionFeeRefund`, so overpaying costs nothing but a moment of float, while underpaying
- * gets the order cancelled for `InsufficientExecutionFee` after the member has already signed.
+ * BIASED HIGH DELIBERATELY, AND THE ASYMMETRY IS THE WHOLE ARGUMENT.
+ *
+ *  - Overpaying: `GasUtils.payExecutionFee` pays the keeper only what it actually spent
+ *    (`executionFeeForKeeper`, capped at the declared fee) and sends `executionFee - that` straight
+ *    back to the member, emitting `ExecutionFeeRefund`. The surplus is a few seconds of float, and
+ *    no cap eats it: `validateAndCapExecutionFee` only caps when `shouldCapMaxExecutionFee` is set
+ *    (subaccount orders with a callback contract — this app has neither), and that cap is
+ *    `MAX_EXECUTION_FEE_MULTIPLIER_FACTOR`, read live as 1e32 = **100×**, three orders of magnitude
+ *    above this buffer.
+ *  - Underpaying: `createOrder` reverts `InsufficientExecutionFee` — after the member signed and
+ *    paid gas — because the minimum is computed against the CREATING transaction's own
+ *    `tx.gasprice`, which is not the gas price we quoted at, only what the wallet ends up sending
+ *    at. A member who raises the gas price in their wallet, or a base fee that ticks up between
+ *    the quote and the signature, is the ordinary case this covers.
+ *
+ * So the buffer is insurance against gas moving between the read and the signature, paid for with
+ * money that comes back. It is disclosed to the member as an estimate with the refund named — see
+ * `PositionSheet`'s keeper-fee line.
  */
 export const GMX_EXECUTION_FEE_BUFFER_BPS = 1000
 
@@ -589,8 +610,76 @@ export function buildUpdateOrderCall({
 }
 
 /* ------------------------------------------------------------------------------------------- *
- * Execution fee estimate
+ * Execution fee — GMX's DataStore keys, the estimate, and the live read
+ *
+ * EVERY GMX ORDER IS SETTLED BY A KEEPER THE MEMBER PAYS FOR. `createOrder` validates the declared
+ * `executionFee` against GMX's own arithmetic at creation time
+ * (`OrderUtils.createOrder` → `GasUtils.validateAndCapExecutionFee` → `validateExecutionFee`, which
+ * reverts `InsufficientExecutionFee(minExecutionFee, executionFee)`), so a fee this app invents is
+ * not a cosmetic number: too low and the member's signed close REVERTS or never runs; too high and
+ * — see the buffer below — the surplus comes back.
+ *
+ * THE KEYS ARE READ FROM THE CHAIN, NOT TRANSCRIBED FROM A GUIDE. GMX's DataStore is a flat
+ * `bytes32 → uint256` map, so the name is the only thing standing between a read and the wrong
+ * number. Each constant below was derived as `keccak256(abi.encode("<NAME>"))` and `eth_call`ed
+ * against the deployed Arbitrum DataStore 0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8 on
+ * **2026-08-12** (block 493,775,585). What it answered:
+ *
+ *   ESTIMATED_GAS_FEE_BASE_AMOUNT_V2_1   0x39288f22…  →             207,024
+ *   ESTIMATED_GAS_FEE_PER_ORACLE_PRICE   0xf9591537…  →             525,368
+ *   ESTIMATED_GAS_FEE_MULTIPLIER_FACTOR  0xce135f2a…  → 1.584563439287042e30  (≈ ×1.5846)
+ *   INCREASE_ORDER_GAS_LIMIT             0x983e0a7f…  →           3,000,000
+ *   DECREASE_ORDER_GAS_LIMIT             0xfce7a344…  →           3,000,000
+ *   SINGLE_SWAP_GAS_LIMIT                0x3be28fb3…  →           1,000,000
+ *
+ * > **THE TRAP THAT "A WRONG KEY RETURNS 0" DOES NOT CATCH.** `keccak256(abi.encode(
+ * > INCREASE_ORDER_GAS_LIMIT))` — the DOUBLE hash, which older GMX releases' getters used — is
+ * > `0x05f62d77…` and the live DataStore answers **4,000,000** for it, not zero. Two plausible
+ * > keys, two different non-zero answers, and the usual "a mis-derived key reads as 0" heuristic
+ * > discriminates neither. The flat constant is the right one:
+ * > `Keys.increaseOrderGasLimitKey()` returns `INCREASE_ORDER_GAS_LIMIT` directly
+ * > (gmx-synthetics `contracts/data/Keys.sol` L246/L655), so the value GMX itself validates
+ * > against is 3,000,000. Re-check the SOURCE, not just the store, before changing a key here.
+ *
+ * The formula is GMX's own (`GasUtils.adjustGasLimitForEstimate` + `estimateExecuteOrderGasLimit` +
+ * `estimateOrderOraclePriceCount`), reproduced in `estimateExecutionFee` below.
  * ------------------------------------------------------------------------------------------- */
+
+/** A DataStore key: `keccak256(abi.encode("<NAME>"))`, the derivation `feeUnits.js` uses for the UI fee. */
+function dataStoreKey(name) {
+  return keccak256(ABI_CODER.encode(['string'], [name]))
+}
+
+/** `Keys.ESTIMATED_GAS_FEE_BASE_AMOUNT_V2_1` — the flat base, before the per-oracle term. */
+export const GMX_ESTIMATED_GAS_FEE_BASE_AMOUNT_KEY = dataStoreKey('ESTIMATED_GAS_FEE_BASE_AMOUNT_V2_1')
+/** `Keys.ESTIMATED_GAS_FEE_PER_ORACLE_PRICE` — charged once per oracle price the keeper must post. */
+export const GMX_ESTIMATED_GAS_FEE_PER_ORACLE_PRICE_KEY = dataStoreKey('ESTIMATED_GAS_FEE_PER_ORACLE_PRICE')
+/** `Keys.ESTIMATED_GAS_FEE_MULTIPLIER_FACTOR` — 1e30 fixed point, applied to the order's own limit. */
+export const GMX_ESTIMATED_GAS_FEE_MULTIPLIER_FACTOR_KEY = dataStoreKey('ESTIMATED_GAS_FEE_MULTIPLIER_FACTOR')
+/** `Keys.increaseOrderGasLimitKey()` — opening or adding. THE FLAT CONSTANT; see the trap above. */
+export const GMX_INCREASE_ORDER_GAS_LIMIT_KEY = dataStoreKey('INCREASE_ORDER_GAS_LIMIT')
+/** `Keys.decreaseOrderGasLimitKey()` — closing, reducing, AND both protection legs. */
+export const GMX_DECREASE_ORDER_GAS_LIMIT_KEY = dataStoreKey('DECREASE_ORDER_GAS_LIMIT')
+/** `Keys.singleSwapGasLimitKey()` — per swap hop. This feature never swaps, so it is read only if asked. */
+export const GMX_SINGLE_SWAP_GAS_LIMIT_KEY = dataStoreKey('SINGLE_SWAP_GAS_LIMIT')
+
+/**
+ * Which per-order-type gas limit an order draws on.
+ *
+ * Every EXIT is a decrease — `MarketDecrease` for a close or reduce, `StopLossDecrease` /
+ * `LimitDecrease` for protection — so one read serves the whole exit path.
+ */
+export const GMX_ORDER_KIND = Object.freeze({ INCREASE: 'increase', DECREASE: 'decrease' })
+
+const ORDER_GAS_LIMIT_KEY_BY_KIND = Object.freeze({
+  [GMX_ORDER_KIND.INCREASE]: GMX_INCREASE_ORDER_GAS_LIMIT_KEY,
+  [GMX_ORDER_KIND.DECREASE]: GMX_DECREASE_ORDER_GAS_LIMIT_KEY,
+})
+
+/** The order-gas-limit key for a kind, or null for a word this module does not know. */
+export function orderGasLimitKeyFor(kind) {
+  return ORDER_GAS_LIMIT_KEY_BY_KIND[kind] ?? null
+}
 
 /** GMX's `Precision.applyFactor` — `value × factor / 1e30`. Total: junk in → null out. */
 export function applyFactor(value, factor) {
@@ -601,21 +690,25 @@ export function applyFactor(value, factor) {
 }
 
 /**
- * The keeper execution fee for one order, per venue-calldata.md:
+ * The keeper execution fee for one order, per venue-calldata.md and GMX's `GasUtils`:
  *
- *   gasLimit = baseGasLimit + gasPerOraclePrice × (3 + swapPath.length)
- *              + applyFactor(orderGasLimit, multiplierFactor)
- *   fee      = gasLimit × gasPrice, plus `bufferBps`
+ *   estimatedGasLimit = orderGasLimit + singleSwapGasLimit × swapPath.length   (callbackGasLimit is 0)
+ *   gasLimit          = baseGasLimit + gasPerOraclePrice × (3 + swapPath.length)
+ *                       + applyFactor(estimatedGasLimit, multiplierFactor)
+ *   fee               = gasLimit × gasPrice, plus `bufferBps`
  *
  * Every GMX-sourced input is REQUIRED and none is defaulted: `baseGasLimit`, `gasPerOraclePrice`,
  * `orderGasLimit` and `multiplierFactor` all live in GMX's DataStore and change with the venue's
  * own configuration. Inventing a fallback for one would put a fabricated number in front of a
- * member, so a missing input returns null and the caller discloses that the fee is unknown.
+ * member, so a missing input returns null and the caller discloses that the fee is unknown. A
+ * `swapPathLength` above zero without a `singleSwapGasLimit` is the same kind of hole — the swap
+ * hops would raise the oracle-price count while contributing no gas — so it returns null too,
+ * rather than an estimate that is quietly short by a hop.
  *
  * The result is biased HIGH by `bufferBps` on purpose — see `GMX_EXECUTION_FEE_BUFFER_BPS`:
  * overpaying is refunded, underpaying cancels the order after the member has signed.
  *
- * → `{ gasLimit, oraclePriceCount, baseFee, fee, bufferBps }` or null.
+ * → `{ gasLimit, oraclePriceCount, gasPrice, baseFee, fee, bufferBps }` or null.
  */
 export function estimateExecutionFee(input) {
   // Destructured INSIDE the body, from `?? {}`: a parameter-list default only covers `undefined`, and
@@ -627,6 +720,7 @@ export function estimateExecutionFee(input) {
     gasPerOraclePrice,
     orderGasLimit,
     multiplierFactor,
+    singleSwapGasLimit = null,
     swapPathLength = 0,
     bufferBps = GMX_EXECUTION_FEE_BUFFER_BPS,
   } = input ?? {}
@@ -639,16 +733,111 @@ export function estimateExecutionFee(input) {
   if (price === null || base === null || perOracle === null || orderGas === null || factor === null) return null
   if (buffer === null) return null
   if (!Number.isInteger(swapPathLength) || swapPathLength < 0) return null
+  const swapGas = swapPathLength === 0 ? 0n : toUnsigned(singleSwapGasLimit)
+  if (swapGas === null) return null
 
   const oraclePriceCount = GMX_ORACLE_PRICE_COUNT_BASE + swapPathLength
-  const gasLimit = base + perOracle * BigInt(oraclePriceCount) + (orderGas * factor) / GMX_FLOAT_PRECISION
+  const estimatedGasLimit = orderGas + swapGas * BigInt(swapPathLength)
+  const gasLimit = base + perOracle * BigInt(oraclePriceCount) + (estimatedGasLimit * factor) / GMX_FLOAT_PRECISION
   const baseFee = gasLimit * price
   return {
     gasLimit,
     oraclePriceCount,
+    gasPrice: price,
     baseFee,
     fee: baseFee + (baseFee * buffer) / BPS_DENOMINATOR,
     bufferBps: Number(buffer),
+  }
+}
+
+/** The provider's current gas price, or null. `getFeeData` is ethers v6's only total answer for it. */
+async function defaultGasPrice(provider) {
+  const feeData = await provider.getFeeData()
+  // `gasPrice` is what `tx.gasprice` will be on Arbitrum, which is the number GMX validates
+  // against. `maxFeePerGas` is the EIP-1559 ceiling and is only a fallback — never below it.
+  return toUnsigned(feeData?.gasPrice) ?? toUnsigned(feeData?.maxFeePerGas)
+}
+
+function defaultMakeDataStore(address, abi, provider) {
+  return new Contract(address, abi, provider)
+}
+
+/**
+ * THE PRODUCER. Reads GMX's own gas configuration plus the network's gas price and returns the
+ * execution fee to attach to one order, in WEI.
+ *
+ * Everything is injectable (`getProvider` / `makeContract` / `getGasPrice`), so the estimate is
+ * exercised with no network — the `venueStatus.js` convention. The provider comes from
+ * `utils/rpcProvider` so the member's own endpoint, headers and failover apply (spec 069); never
+ * hand-build one from `NETWORKS[chainId].rpcUrl`.
+ *
+ * **A ZERO FROM ANY OF THE FOUR CONSTANTS IS TREATED AS AN UNREADABLE VENUE, NOT AS ZERO GAS.**
+ * GMX has never configured one of these at zero, and a zero `multiplierFactor` or `orderGasLimit`
+ * deletes the dominant term of the fee — which is precisely the shape a mis-derived key or a wrong
+ * DataStore address produces. Refusing here means the sheet says the fee could not be read and
+ * points at GMX's own app, instead of asking a member to sign an order that cannot execute.
+ *
+ * TOTAL: it runs inside an effect, so every failure — no GMX on this chain, no provider, a
+ * reverting call, a dropped connection — is `null`, never a throw and never a guess.
+ *
+ * → `{ chainId, orderKind, fee, baseFee, gasLimit, gasPrice, oraclePriceCount, bufferBps }` or null.
+ */
+export async function readExecutionFee(input) {
+  const {
+    chainId = GMX_CHAIN_ID,
+    orderKind = GMX_ORDER_KIND.DECREASE,
+    swapPathLength = 0,
+    bufferBps = GMX_EXECUTION_FEE_BUFFER_BPS,
+    addressesFor = gmxAddressesFor,
+    getProvider = getReadProvider,
+    makeContract = defaultMakeDataStore,
+    getGasPrice = defaultGasPrice,
+  } = input ?? {}
+
+  const orderKey = orderGasLimitKeyFor(orderKind)
+  if (!orderKey) return null
+  if (!Number.isInteger(swapPathLength) || swapPathLength < 0) return null
+
+  try {
+    const addresses = addressesFor(chainId)
+    if (!addresses?.dataStore) return null // GMX is not deployed here — absence, not a failed read
+    const provider = getProvider(chainId)
+    if (!provider) return null
+
+    const store = makeContract(addresses.dataStore, GMX_DATA_STORE_ABI, provider)
+    const [baseGasLimit, gasPerOraclePrice, multiplierFactor, orderGasLimit, singleSwapGasLimit, gasPrice] =
+      await Promise.all([
+        store.getUint(GMX_ESTIMATED_GAS_FEE_BASE_AMOUNT_KEY),
+        store.getUint(GMX_ESTIMATED_GAS_FEE_PER_ORACLE_PRICE_KEY),
+        store.getUint(GMX_ESTIMATED_GAS_FEE_MULTIPLIER_FACTOR_KEY),
+        store.getUint(orderKey),
+        // Not read at all when nothing swaps — this feature's swapPath is always empty, and an
+        // extra call is an extra way for the read to fail for no gain.
+        swapPathLength > 0 ? store.getUint(GMX_SINGLE_SWAP_GAS_LIMIT_KEY) : 0n,
+        getGasPrice(provider),
+      ])
+
+    const required = [baseGasLimit, gasPerOraclePrice, multiplierFactor, orderGasLimit, gasPrice]
+    if (swapPathLength > 0) required.push(singleSwapGasLimit)
+    for (const value of required) {
+      const n = toUnsigned(value)
+      if (n === null || n === 0n) return null // see the zero rule above
+    }
+
+    const estimate = estimateExecutionFee({
+      gasPrice,
+      baseGasLimit,
+      gasPerOraclePrice,
+      orderGasLimit,
+      multiplierFactor,
+      singleSwapGasLimit,
+      swapPathLength,
+      bufferBps,
+    })
+    if (!estimate || estimate.fee <= 0n) return null
+    return { chainId: Number(chainId), orderKind, ...estimate }
+  } catch {
+    return null
   }
 }
 

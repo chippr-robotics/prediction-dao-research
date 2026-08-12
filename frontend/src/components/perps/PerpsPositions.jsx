@@ -83,6 +83,11 @@ export default function PerpsPositions({
                     {p.direction === 'long' ? 'Long' : 'Short'}
                   </span>
                   <span className="perps-position-symbol">{p.symbol}</span>
+                  {/* GMX lists several markets on one base pair ("BTC/USD [WBTC.b-USDC]" vs
+                      "BTC/USD [BTC-USDC]"), so the venue's own variant rides beside the symbol —
+                      two positions on the same pair must never render identically. Absent for
+                      venues that have no such thing, which is most rows. */}
+                  {p.variant && <span className="perps-position-variant">{p.variant}</span>}
                   <PerpsVenueBadge venue={p.venue} chainId={p.chainId} />
                 </div>
                 <dl className="perps-position-stats">
@@ -187,8 +192,13 @@ function venueList(venues) {
   return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
 }
 
-/** "Long BTC/USD" for a screen reader, degrading to whatever the venue actually reported. */
+/**
+ * "Long BTC/USD (WBTC.b-USDC)" for a screen reader, degrading to whatever the venue actually
+ * reported. The variant is spoken too: two GMX markets on one base pair would otherwise give two
+ * buttons the same accessible name, and picking between them is what the member is doing.
+ */
 function describe(p) {
   const side = p.direction === 'long' ? 'Long' : p.direction === 'short' ? 'Short' : ''
-  return [side, p.symbol].filter(Boolean).join(' ') || 'open'
+  const pair = [p.symbol, p.variant ? `(${p.variant})` : null].filter(Boolean).join(' ')
+  return [side, pair].filter(Boolean).join(' ') || 'open'
 }

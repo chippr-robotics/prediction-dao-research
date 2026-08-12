@@ -110,12 +110,17 @@ const GAINS_USER_TV = {
 }
 
 // GMX /markets/info + /prices/tickers + /tokens: 1e30 USD floats, prices at 10^(30-decimals).
+const WBTC_B = '0x3f770Ac673856F105b586bb393d122721265aD46'
+const USDC_ARB = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'
 const GMX_MARKETS = {
   markets: [
     {
       name: 'BTC/USD [WBTC.b-USDC]',
       marketToken: '0x47c031236e19d024b42f8AE6780E44A573170703',
       indexToken: BTC_INDEX_TOKEN,
+      // The market's accepted collateral (spec 083 US3) — the only two tokens GMX takes here.
+      longToken: WBTC_B,
+      shortToken: USDC_ARB,
       isListed: true,
       openInterestLong: '5000000000000000000000000000000000000', // $5M
       openInterestShort: '3000000000000000000000000000000000000', // $3M
@@ -131,8 +136,16 @@ const GMX_MARKETS = {
 const GMX_TICKERS = [
   // 63000 * 10^(30-8) = 6.3e26
   { tokenAddress: BTC_INDEX_TOKEN, tokenSymbol: 'BTC', minPrice: '629000000000000000000000000', maxPrice: '631000000000000000000000000' },
+  // 1 USDC = 10^(30-6) = 1e24. GMX prices its own collateral; nothing assumes a $1 peg.
+  { tokenAddress: USDC_ARB, tokenSymbol: 'USDC', minPrice: '1000000000000000000000000', maxPrice: '1000000000000000000000000' },
 ]
-const GMX_TOKENS = { tokens: [{ symbol: 'BTC', address: BTC_INDEX_TOKEN, decimals: 8 }] }
+const GMX_TOKENS = {
+  tokens: [
+    { symbol: 'BTC', address: BTC_INDEX_TOKEN, decimals: 8 },
+    { symbol: 'WBTC.b', address: WBTC_B, decimals: 8 },
+    { symbol: 'USDC', address: USDC_ARB, decimals: 6 },
+  ],
+}
 
 // Hyperliquid metaAndAssetCtxs: decimal strings; funding already hourly; OI in base units.
 const HL_META = [
@@ -376,6 +389,96 @@ describe('perps normalize', () => {
     expect(pair.openInterestUsd).toBeCloseTo(8_000_000, 0) // (5e36 + 3e36) / 1e30
     expect(pair.fundingRate).toBeCloseTo(0.0438 / 8760, 12) // annualized 1e30 -> hourly
     expect(pair.maxLeverage).toBeNull() // not exposed by the REST API -> null
+  })
+
+  /* ------------------------------------------------------------------------------------------ *
+   * Spec 083 US3 — the handles the OPEN path needs.
+   *
+   * These are not display fields, and the failure they prevent is not a cosmetic one: without a
+   * pair index and a collateral list the open sheet has nothing to build calldata from, so the
+   * whole surface would be a control that cannot submit. Each assertion below pins the exact value
+   * a wrong one would substitute — a 0 index (someone else's market), a symbol instead of an index,
+   * a collateral with unknown decimals (an order for the wrong size).
+   * ------------------------------------------------------------------------------------------ */
+
+  it('publishes the gains pair index — the venue’s own handle, not a name', () => {
+    const [pair] = normalizeGainsPairs({ tradingVariables: GAINS_TV, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    // The FIRST pair is index 0, which is a real market on this venue — so the field must be
+    // present and 0, never absent, and never coerced to null by an "is it truthy" test.
+    expect(pair.pairIndex).toBe(0)
+    expect(Object.prototype.hasOwnProperty.call(pair, 'pairIndex')).toBe(true)
+  })
+
+  it('publishes the gains collateral set with the venue’s own 1-based index and decimals', () => {
+    const [pair] = normalizeGainsPairs({ tradingVariables: GAINS_TV, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    expect(pair.collaterals).toEqual([
+      {
+        symbol: 'USDC',
+        address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+        decimals: 6,
+        collateralIndex: 3,
+        usdPrice: 1,
+      },
+    ])
+    // The index is the venue's, not the array position: reading it off the array would name
+    // collateral #0, which is not a collateral at all on a 1-based venue.
+    expect(pair.collaterals[0].collateralIndex).not.toBe(0)
+  })
+
+  it('publishes the gains leverage FLOOR as well as the ceiling', () => {
+    const [pair] = normalizeGainsPairs({ tradingVariables: GAINS_TV, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    expect(pair.minLeverage).toBe(1.1) // group minLeverage 1100 at the 1e3 scale
+    expect(pair.maxLeverage).toBe(200) // unchanged
+  })
+
+  it('omits a gains collateral the venue has deactivated or described only partly', () => {
+    const tv = {
+      ...GAINS_TV,
+      collaterals: [
+        { ...GAINS_TV.collaterals[0], isActive: false },
+        // Active, but no address — a collateral we cannot name is not one we may offer.
+        { collateralIndex: '4', isActive: true, symbol: 'DAI', collateralConfig: { decimals: 18 } },
+        // Active with an address, but no decimals — an amount in unknown units is not an amount.
+        { collateralIndex: '5', isActive: true, symbol: 'WETH', collateral: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', collateralConfig: {} },
+        // Index 0 does not exist on a 1-based venue.
+        { collateralIndex: '0', isActive: true, symbol: 'X', collateral: '0x1111111111111111111111111111111111111111', collateralConfig: { decimals: 6 } },
+      ],
+    }
+    const [pair] = normalizeGainsPairs({ tradingVariables: tv, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    expect(pair.collaterals).toEqual([])
+  })
+
+  it('publishes the gmx market token and its two collateral tokens', () => {
+    const [pair] = normalizeGmxPairs({ marketsInfo: GMX_MARKETS, tickers: GMX_TICKERS, tokens: GMX_TOKENS, chainId: 42161 })
+    expect(pair.market).toBe('0x47c031236e19d024b42f8AE6780E44A573170703')
+    // The field and the id must agree — they come from one value, and this is what says so.
+    expect(pair.id.endsWith(pair.market)).toBe(true)
+    expect(pair.collaterals).toEqual([
+      // WBTC.b has no ticker in this payload — priced null, never assumed, never 0.
+      { symbol: 'WBTC.b', address: WBTC_B, decimals: 8, collateralIndex: null, usdPrice: null },
+      { symbol: 'USDC', address: USDC_ARB, decimals: 6, collateralIndex: null, usdPrice: 1 },
+    ])
+  })
+
+  it('omits a gmx collateral whose decimals the token list does not resolve', () => {
+    // A token GMX names but does not describe. Offering it would size the order in unknown units.
+    const [pair] = normalizeGmxPairs({
+      marketsInfo: GMX_MARKETS,
+      tickers: GMX_TICKERS,
+      tokens: { tokens: [{ symbol: 'BTC', address: BTC_INDEX_TOKEN, decimals: 8 }] },
+      chainId: 42161,
+    })
+    expect(pair.collaterals).toEqual([])
+    // …and the market handle survives, because it is a different fact from the collateral list.
+    expect(pair.market).toBe('0x47c031236e19d024b42f8AE6780E44A573170703')
+  })
+
+  it('does not list a single-collateral gmx market twice', () => {
+    const markets = {
+      markets: [{ ...GMX_MARKETS.markets[0], longToken: USDC_ARB, shortToken: USDC_ARB }],
+    }
+    const [pair] = normalizeGmxPairs({ marketsInfo: markets, tickers: GMX_TICKERS, tokens: GMX_TOKENS, chainId: 42161 })
+    expect(pair.collaterals).toHaveLength(1)
   })
 
   it('normalizes hyperliquid pairs and skips delisted assets', () => {

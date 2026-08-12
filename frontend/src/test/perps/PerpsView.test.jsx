@@ -17,11 +17,19 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WalletContext } from '../../contexts/WalletContext.js'
 import PerpsView from '../../components/perps/PerpsView'
-import { perpsManageEnabled } from '../../config/perps'
+import { defaultReadVenueQuote } from '../../components/perps/positionSheetActions'
+import { GMX_ADDRESSES_BY_CHAIN, perpsManageEnabled } from '../../config/perps'
+import {
+  GMX_DECREASE_ORDER_GAS_LIMIT_KEY,
+  GMX_ESTIMATED_GAS_FEE_BASE_AMOUNT_KEY,
+  GMX_ESTIMATED_GAS_FEE_MULTIPLIER_FACTOR_KEY,
+  GMX_ESTIMATED_GAS_FEE_PER_ORACLE_PRICE_KEY,
+} from '../../lib/perps/venues/gmx'
 
 const TRADER = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 const OTHER_TRADER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 const USDC_POLYGON = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+const USDC_ARB = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'
 
 // Cohort + management-flag control: mocked per-test via these switches. Both default to the state
 // a CI build actually has — mainnet cohort, management OFF.
@@ -77,6 +85,39 @@ const marketsDeps = (over = {}) => ({
   })),
   ...over,
 })
+/**
+ * The pairs feed WITH the GMX market the fixture position holds.
+ *
+ * A GMX exit needs a price as well as a keeper fee — `acceptablePrice` is the slippage bound the
+ * order carries — and GMX rows are priced by matching the position's MARKET ADDRESS against the
+ * feed (`lib/perps/gmxMarkets.js`), which is why the pair id carries it.
+ */
+const gmxMarketsDeps = (over = {}) =>
+  marketsDeps({
+    fetchPairs: vi.fn(async () => ({
+      pairs: [
+        ...PAIRS,
+        {
+          id: `gmx:42161:BTC/USD:${GMX_POSITION.venueRef.market}`,
+          venue: 'gmx',
+          chainId: 42161,
+          symbol: 'BTC/USD',
+          base: 'BTC',
+          variant: 'WBTC.b-USDC',
+          price: 64_000,
+          fundingRate: 0.00001,
+          fundingIntervalHours: 1,
+          openInterestUsd: 1_000_000,
+          maxLeverage: null,
+          volume24hUsd: null,
+        },
+      ],
+      sources: { gains: { status: 'read', chains: [137] }, gmx: { status: 'read', chains: [42161] } },
+      asOf: 'now',
+    })),
+    ...over,
+  })
+
 const positionsDeps = (over = {}) => ({
   available: () => true,
   fetchPositions: vi.fn(async () => ({ positions: [], sources: {} })),
@@ -203,7 +244,70 @@ const tradeDeps = () => ({
   now: () => 0,
 })
 
-const sheetDeps = () => ({ readFee: async () => ({ bps: 0 }), trade: tradeDeps() })
+/**
+ * GMX's DataStore and the network gas price, answering exactly what the deployed Arbitrum ones
+ * answered on 2026-08-12 (see `gmxExecutionFee.test.js` for the read and the key derivation).
+ *
+ * The sheet's keeper-fee quote runs through the REAL producer over these — `defaultReadVenueQuote`
+ * → `readExecutionFee` → `estimateExecutionFee` — rather than a hand-written `{ executionFee }`,
+ * because the thing this file is for is the WIRING: a stub would keep passing if the sheet stopped
+ * calling the producer at all.
+ */
+const GMX_GAS_CONFIG = {
+  [GMX_ESTIMATED_GAS_FEE_BASE_AMOUNT_KEY]: 207_024n,
+  [GMX_ESTIMATED_GAS_FEE_PER_ORACLE_PRICE_KEY]: 525_368n,
+  [GMX_ESTIMATED_GAS_FEE_MULTIPLIER_FACTOR_KEY]: 1_584_563_439_287_042_000_000_000_000_000n,
+  [GMX_DECREASE_ORDER_GAS_LIMIT_KEY]: 3_000_000n,
+}
+const gmxQuoteDeps = (over = {}) => ({
+  getProvider: () => ({ getFeeData: async () => ({ gasPrice: 20_000_000n }) }),
+  makeContract: () => ({ getUint: async (key) => GMX_GAS_CONFIG[key] ?? 0n }),
+  ...over,
+})
+
+const sheetDeps = (over = {}) => ({
+  readFee: async () => ({ bps: 0 }),
+  // Every sheet render in this file goes through the real quote producer over a stubbed DataStore,
+  // so no test reaches a network and none of them silently stops exercising it.
+  readQuote: (args) => defaultReadVenueQuote({ ...args, deps: gmxQuoteDeps(over.quote) }),
+  trade: tradeDeps(),
+  ...over.sheet,
+})
+
+/**
+ * The ENTRY sheet's two live reads, stubbed. Both are real reads in production — the venues' own
+ * `getTradingActivated()` and an ERC-20 `balanceOf` per accepted collateral — and both run ONLY
+ * while a pair is open, which is what keeps the flag-off view free of new network activity.
+ *
+ * `readVenueStatuses` answers OPEN by default so the sheet's happy path is reachable; the tests
+ * that care about a refusal pass their own.
+ */
+const openDeps = (over = {}) => ({
+  readVenueStatuses: vi.fn(async (chainId) => ({
+    gains: { venue: 'gains', chainId, status: 'open', manageable: true },
+    gmx: { venue: 'gmx', chainId, status: 'open', manageable: true },
+  })),
+  readCollateralBalances: vi.fn(async () => [
+    { symbol: 'USDC', address: USDC_POLYGON, decimals: 6, balance: 1_000_000_000n, usdValue: 1000 },
+  ]),
+  ...over,
+})
+
+/** The entry sheet's own injected effects (fee rate, keeper-fee quote, allowance, attestation). */
+const openSheetDeps = (over = {}) => ({
+  readFee: async () => ({ bps: 5 }),
+  readQuote: async () => null, // Gains has no keeper fee
+  readAllowance: async () => 10n ** 30n,
+  hasAttested: () => over.attested ?? true,
+  subscribeAttestation: () => () => {},
+  attestation: {
+    state: () => ({ attested: over.attested ?? true, record: null, version: 1, superseded: false, reason: null }),
+    record: () => ({ version: 1, items: [], at: '2026-08-12T00:00:00.000Z' }),
+    subscribe: () => () => {},
+  },
+  trade: tradeDeps(),
+  ...over.sheet,
+})
 
 function renderView({
   markets = marketsDeps(),
@@ -212,13 +316,15 @@ function renderView({
   orders = ordersDeps(),
   trade = tradeDeps(),
   sheet = sheetDeps(),
+  open = openDeps(),
+  openSheet = openSheetDeps(),
   wallet = {},
 } = {}) {
   return render(
     <WalletContext.Provider
       value={{ address: TRADER, isConnected: false, chainId: 137, loginMethod: 'injected', signer: {}, ...wallet }}
     >
-      <PerpsView deps={{ markets, positions, config, orders, trade, sheet }} />
+      <PerpsView deps={{ markets, positions, config, orders, trade, sheet, open, openSheet }} />
     </WalletContext.Provider>,
   )
 }
@@ -460,33 +566,75 @@ describe('PerpsView prices the exit from the venue’s own feed', () => {
   })
 
   /**
-   * KNOWN GAP, PINNED HONESTLY — GMX in-app management cannot complete this release.
+   * THE FORMER KNOWN GAP, NOW CLOSED — GMX's keeper fee has a producer.
    *
-   * `createOrder` is settled by keepers the member pays for, so every GMX order needs an
-   * `executionFee` in wei. Nothing in this app produces one: `venueQuote` has no producer, and
-   * `positionSheetActions` deliberately refuses rather than guessing, because a guessed fee either
-   * strands the order unexecuted or overcharges (contracts/venue-calldata.md). The estimator —
-   * GMX's `ESTIMATED_GAS_FEE_*` DataStore keys and its own formula — is not built.
+   * Every GMX order is settled by keepers the member pays, so `createOrder` refuses one whose
+   * `executionFee` is short. For a release this app had no producer for that number, `venueQuote`
+   * was never supplied, and every GMX close, reduce and protect refused — a control that was
+   * offered and could not act, which is what FR-021 forbids. The estimator (GMX's own
+   * `ESTIMATED_GAS_FEE_*` DataStore keys and `GasUtils` formula) and its live read now exist in
+   * `lib/perps/venues/gmx.js`, and the sheet reads it itself.
    *
-   * Until it is, a GMX row offers a control whose every action refuses. That refusal is honest and
-   * the venue link-out beside it always works, so nothing is stranded and the flag is off by
-   * default — but it IS a dead control, which is what FR-021 forbids. This test exists so the gap
-   * is visible in the suite instead of silent; DELETE IT when the execution-fee read lands, and
-   * replace it with the send assertion its Gains sibling above already makes.
+   * These two tests are what stops that regressing: the first is the send assertion the Gains
+   * sibling above already made, and the second is the honest half — a fee that genuinely cannot be
+   * read still refuses BEFORE any wallet prompt and still names GMX as the way through.
    */
-  it('KNOWN GAP: a GMX exit refuses — the keeper fee has no producer in this build', async () => {
+  it('a GMX exit produces a usable keeper fee and reaches the send rail', async () => {
     manageFlag = true
     const sheet = sheetDeps()
-    renderView({ positions: withPositions([GMX_POSITION]), sheet, wallet: { isConnected: true } })
+    renderView({
+      markets: gmxMarketsDeps(),
+      positions: withPositions([GMX_POSITION]),
+      sheet,
+      wallet: { isConnected: true },
+    })
     await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
     await screen.findByRole('dialog')
+
+    // The fee is disclosed BEFORE the member acts: an estimate, in the network's own coin, with
+    // the refund of the unspent part named. 6,536,818 gas × 0.02 gwei × 1.10 = 0.0001438 ETH.
+    const keeperFee = await screen.findByText('GMX keeper fee (estimated)', { selector: 'dt' })
+    expect(keeperFee.parentElement.querySelector('dd')).toHaveTextContent('0.0001438 ETH')
+    expect(screen.getByText(/returns whatever the keeper does not spend/i)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close this position' }))
+    await waitFor(() => expect(sheet.trade.sendOnChain).toHaveBeenCalled())
+    // GMX's own chain, and a call to the venue — not a refusal.
+    expect(sheet.trade.sendOnChain.mock.calls[0][0]).toBe(42161)
+    expect(document.querySelector('.pps-error')).toBeNull()
+    // The member is msg.sender and the fee rides as the transaction's value, both of which the
+    // calldata suites assert in detail; here it is enough that a real call object was produced.
+    const [, calls] = sheet.trade.sendOnChain.mock.calls[0]
+    expect(calls[0].value).toBe(143_809_996_000_000n)
+    expect(calls[0].target).toBe(GMX_ADDRESSES_BY_CHAIN[42161].exchangeRouter)
+  })
+
+  it('still refuses honestly — and never silently — when GMX’s fee cannot be read', async () => {
+    manageFlag = true
+    // The DataStore answers nothing. A zero there is a mis-derived key or the wrong contract, and
+    // treating it as "zero gas" would have the member sign an order no keeper will ever execute.
+    const sheet = sheetDeps({ quote: { makeContract: () => ({ getUint: async () => 0n }) } })
+    renderView({
+      markets: gmxMarketsDeps(),
+      positions: withPositions([GMX_POSITION]),
+      sheet,
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await screen.findByRole('dialog')
+
+    // Said up front, not only after a tap — and no fee line is invented in its place.
+    await waitFor(() =>
+      expect(screen.getByText(/keeper fee could not be read just now/i)).toBeInTheDocument(),
+    )
+    expect(screen.queryByText('GMX keeper fee (estimated)', { selector: 'dt' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Close this position' }))
     await waitFor(() => expect(screen.getByText(/keeper fee for this order could not be read/i)).toBeInTheDocument())
     // Refused BEFORE a wallet prompt, and the venue's own surface is named as the way through.
     expect(sheet.trade.sendOnChain).not.toHaveBeenCalled()
-    // Two of them — the row's and the sheet's own footer. Either is a way out.
     expect(screen.getAllByRole('link', { name: /Manage this position on GMX/i }).length).toBeGreaterThan(0)
   })
 
@@ -505,6 +653,152 @@ describe('PerpsView prices the exit from the venue’s own feed', () => {
     const current = screen.getByText('Current price', { selector: 'dt' }).parentElement.querySelector('dd')
     expect(current).toHaveTextContent('63,000.0')
   })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * Spec 083 US3/US5 — a GMX market becomes a pair, or stays honestly unnamed
+ *
+ * GMX's Reader names a MARKET ADDRESS and nothing else, so its rows arrive with `symbol: null` and
+ * read "Current price —" forever — the sheet then refuses every close for want of a price. The
+ * mapping is composed here from the pairs feed the view already fetched (each GMX pair carries its
+ * market token inside its id). These tests are the ones that would catch a resolution that GUESSES:
+ * two GMX markets on one base pair are on screen at once, at different prices.
+ * --------------------------------------------------------------------------------------------- */
+
+describe('PerpsView resolves a GMX market address to its pair', () => {
+  const BTC_WBTC = GMX_POSITION.venueRef.market
+  const BTC_SYNTH = '0x7C11F78Ce78768518D743E81Fdfa2F860C6b9A77'
+  /** A market the member holds and the feed does not list. */
+  const UNLISTED = '0x0418643F94Ef14917f1345cE5C460C37dE463ef7'
+
+  // Two REAL-shaped GMX pairs on one base pair — this is how GMX actually lists BTC.
+  const GMX_PAIRS = [
+    {
+      id: `gmx:42161:BTC/USD:${BTC_WBTC}`,
+      venue: 'gmx',
+      chainId: 42161,
+      symbol: 'BTC/USD',
+      base: 'BTC',
+      variant: 'WBTC.b-USDC',
+      price: 64_000,
+      fundingRate: 0.00001,
+      fundingIntervalHours: 1,
+      openInterestUsd: 1_000_000,
+      maxLeverage: null,
+      volume24hUsd: null,
+    },
+    {
+      id: `gmx:42161:BTC/USD:${BTC_SYNTH}`,
+      venue: 'gmx',
+      chainId: 42161,
+      symbol: 'BTC/USD',
+      base: 'BTC',
+      variant: 'BTC-USDC',
+      price: 64_010,
+      fundingRate: 0.00002,
+      fundingIntervalHours: 1,
+      openInterestUsd: 2_000_000,
+      maxLeverage: null,
+      volume24hUsd: null,
+    },
+  ]
+
+  const withGmxPairs = () =>
+    marketsDeps({
+      fetchPairs: vi.fn(async () => ({
+        pairs: [...PAIRS, ...GMX_PAIRS],
+        sources: { gains: { status: 'read', chains: [137] }, gmx: { status: 'read', chains: [42161] } },
+        asOf: 'now',
+      })),
+    })
+
+  const currentPrice = () =>
+    screen.getByText('Current price', { selector: 'dt' }).parentElement.querySelector('dd')
+
+  it('names the position’s market and prices it from THAT market, not its sibling', async () => {
+    manageFlag = true
+    renderView({
+      markets: withGmxPairs(),
+      positions: withPositions([GMX_POSITION]),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+
+    const row = document.querySelector('.perps-position-row')
+    expect(row.querySelector('.perps-position-symbol')).toHaveTextContent('BTC/USD')
+    // The variant is what keeps two markets on one base pair apart.
+    expect(row.querySelector('.perps-position-variant')).toHaveTextContent('WBTC.b-USDC')
+
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await screen.findByRole('dialog')
+    // Its own market's price — the other BTC market is 64,010.0 and must not be borrowed.
+    expect(currentPrice()).toHaveTextContent('64,000.0')
+    expect(currentPrice()).not.toHaveTextContent('64,010.0')
+  })
+
+  it('keeps two positions on the same base pair distinguishable', async () => {
+    manageFlag = true
+    renderView({
+      markets: withGmxPairs(),
+      positions: withPositions([
+        { ...GMX_POSITION, id: 'gmx:42161:0xone' },
+        {
+          ...GMX_POSITION,
+          id: 'gmx:42161:0xtwo',
+          venueRef: { ...GMX_POSITION.venueRef, market: BTC_SYNTH },
+        },
+      ]),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+
+    const variants = [...document.querySelectorAll('.perps-position-variant')].map((n) => n.textContent)
+    expect(variants).toEqual(['WBTC.b-USDC', 'BTC-USDC'])
+  })
+
+  it('leaves a market the feed does not list unnamed and unpriced — never the nearest BTC market', async () => {
+    manageFlag = true
+    renderView({
+      markets: withGmxPairs(),
+      positions: withPositions([
+        { ...GMX_POSITION, venueRef: { ...GMX_POSITION.venueRef, market: UNLISTED } },
+      ]),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+
+    const row = document.querySelector('.perps-position-row')
+    expect(row.querySelector('.perps-position-symbol')).toHaveTextContent('')
+    expect(row.querySelector('.perps-position-variant')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await screen.findByRole('dialog')
+    expect(currentPrice()).toHaveTextContent('—')
+  })
+
+  it('still names the market when the member has filtered the pairs table down to nothing', async () => {
+    // The search box shapes the TABLE. It must never decide whether a member's own position can be
+    // named or priced — that is the `allPairs` rule, and GMX resolution rides it too.
+    manageFlag = true
+    renderView({
+      markets: withGmxPairs(),
+      positions: withPositions([GMX_POSITION]),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+    await userEvent.type(screen.getByLabelText('Search pairs'), 'ZZZZ')
+    await waitFor(() => expect(screen.getByText(/No pairs match/i)).toBeInTheDocument())
+
+    expect(document.querySelector('.perps-position-symbol')).toHaveTextContent('BTC/USD')
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await screen.findByRole('dialog')
+    expect(currentPrice()).toHaveTextContent('64,000.0')
+  })
+
+  /* A feed that could not be read resolves nothing — but this view hides the whole positions list
+   * behind the market-data outage (the pre-existing `markets.status === 'unavailable'` branch), so
+   * there is no row to assert on here. The empty-index case is covered directly in
+   * `gmxMarkets.test.js`, where the answer is null and the row renders '—'. */
 })
 
 /* --------------------------------------------------------------------------------------------- *
@@ -557,5 +851,377 @@ describe('PerpsView stuck orders', () => {
     })
     await waitFor(() => expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument())
     await waitFor(() => expect(screen.getByRole('button', { name: 'Recover your collateral' })).toBeEnabled())
+  })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * Spec 083 US3 — THE ENTRY SURFACE, wired
+ *
+ * `OpenPositionSheet` is tested exhaustively against US3 in its own file, driven directly with
+ * props. What CANNOT be tested there, and what is asserted here, is the composition: that a pair
+ * row actually reaches it, that the two gates the view owns decide whether the control exists at
+ * all, and — the one most easily broken — that with the flag OFF this view is byte-for-byte the
+ * phase-0 read-only surface it shipped as, with no new controls, no new markup and no new reads.
+ * --------------------------------------------------------------------------------------------- */
+
+/** A Gains BTC/USD row carrying the venue's own open handles (gateway spec 083 US3). */
+const OPENABLE_GAINS_PAIR = {
+  ...PAIRS[0],
+  pairIndex: 4,
+  minLeverage: 1.1,
+  collaterals: [
+    { symbol: 'USDC', address: USDC_POLYGON, decimals: 6, collateralIndex: 3, usdPrice: 1 },
+  ],
+}
+
+const openableMarketsDeps = (pairs = [OPENABLE_GAINS_PAIR, PAIRS[1]]) =>
+  marketsDeps({
+    fetchPairs: vi.fn(async () => ({
+      pairs,
+      sources: { gains: { status: 'read', chains: [137] }, hyperliquid: { status: 'read', chains: [] } },
+      asOf: 'now',
+    })),
+  })
+
+const openBtn = () => screen.getByRole('button', { name: /Open a position on BTC\/USD at Gains Network/i })
+
+describe('PerpsView entry surface', () => {
+  it('opens the OpenPositionSheet from a pair row when the flag is ON', async () => {
+    manageFlag = true
+    renderView({ markets: openableMarketsDeps(), wallet: { isConnected: true } })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+
+    await userEvent.click(openBtn())
+    const sheet = await screen.findByRole('dialog')
+    expect(sheet).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByRole('heading', { name: /Open a long on BTC\/USD/i })).toBeInTheDocument()
+
+    // The venue's own handles reached the sheet: the collateral it published is offered, and the
+    // leverage default is derived from the limits on the row rather than invented.
+    await waitFor(() => expect(screen.getByLabelText(/Amount \(USDC\)/i)).toBeInTheDocument())
+    expect(screen.getByText(/You hold 1000 USDC/i)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('offers NO in-app open on Hyperliquid even with the flag ON (FR-021)', async () => {
+    // The venue this build has no calldata path for must never grow a control. This is the
+    // per-venue capability doing the work — `perpsManageEnabled` is deliberately NOT stubbed.
+    manageFlag = true
+    renderView({ markets: openableMarketsDeps(), wallet: { isConnected: true } })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(openBtn()).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open a position on ETH\/USD/i })).not.toBeInTheDocument()
+    // …and its link-out is untouched, which is the never-stranded path.
+    expect(screen.getByRole('link', { name: /Trade ETH\/USD on hyperliquid/i })).toBeInTheDocument()
+  })
+
+  it('THE ATTESTATION GATES THE OPEN — and only the open', async () => {
+    manageFlag = true
+    renderView({
+      markets: openableMarketsDeps(),
+      positions: withPositions([GAINS_POSITION]),
+      openSheet: openSheetDeps({ attested: false }),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    await userEvent.click(openBtn())
+    await screen.findByRole('dialog')
+
+    // The acknowledgement is asked for in place, nothing is pre-ticked, and the open is refused
+    // until it is given.
+    expect(screen.getByRole('heading', { name: 'Before you open a position' })).toBeInTheDocument()
+    for (const box of screen.getAllByRole('checkbox')) expect(box).not.toBeChecked()
+    expect(screen.getByRole('button', { name: /Open this long/i })).toBeDisabled()
+    // Said plainly: it is not needed for anything a member already holds.
+    expect(screen.getByText(/not needed to close, reduce or recover anything you already hold/i)).toBeInTheDocument()
+
+    // …and the EXIT beneath it is untouched by the missing acknowledgement.
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await screen.findByRole('dialog')
+    expect(screen.getByRole('button', { name: 'Close this position' })).toBeEnabled()
+    expect(screen.queryByRole('heading', { name: 'Before you open a position' })).not.toBeInTheDocument()
+  })
+
+  it('refuses the open with the VENUE named when the venue is not taking new positions', async () => {
+    manageFlag = true
+    renderView({
+      markets: openableMarketsDeps(),
+      open: openDeps({
+        readVenueStatuses: vi.fn(async (chainId) => ({
+          gains: { venue: 'gains', chainId, status: 'close-only', manageable: true },
+        })),
+      }),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    await userEvent.click(openBtn())
+    await screen.findByRole('dialog')
+
+    await waitFor(() =>
+      expect(screen.getByText(/Gains is in close-only mode right now/i)).toBeInTheDocument(),
+    )
+    expect(screen.getByText(/No venue is taking new positions on BTC\/USD/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open this long/i })).not.toBeInTheDocument()
+  })
+
+  it('fails CLOSED while the venue status is unknown — silence is not permission', async () => {
+    manageFlag = true
+    renderView({
+      markets: openableMarketsDeps(),
+      // The read never resolves: this is the window between the tap and the answer.
+      open: openDeps({ readVenueStatuses: vi.fn(() => new Promise(() => {})) }),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    await userEvent.click(openBtn())
+    await screen.findByRole('dialog')
+    expect(screen.getByText(/trading status could not be confirmed/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open this long/i })).not.toBeInTheDocument()
+  })
+
+  it('closes the entry sheet the moment the account changes', async () => {
+    manageFlag = true
+    const markets = openableMarketsDeps()
+    const { rerender } = renderView({ markets, wallet: { isConnected: true } })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    await userEvent.click(openBtn())
+    await screen.findByRole('dialog')
+
+    rerender(
+      <WalletContext.Provider
+        value={{ address: OTHER_TRADER, isConnected: true, chainId: 137, loginMethod: 'injected', signer: {} }}
+      >
+        <PerpsView
+          deps={{
+            markets,
+            positions: positionsDeps(),
+            config: configDeps(),
+            orders: ordersDeps(),
+            trade: tradeDeps(),
+            sheet: sheetDeps(),
+            open: openDeps(),
+            openSheet: openSheetDeps(),
+          }}
+        />
+      </WalletContext.Provider>,
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  /**
+   * Both venues on ARBITRUM, where `perpsManageEnabled` really does answer true for each. Doing
+   * this on Polygon would prove nothing: GMX has no calldata path there at all, so the venue would
+   * be absent for a reason that has nothing to do with the composition under test.
+   */
+  const ARB_GAINS = {
+    ...OPENABLE_GAINS_PAIR,
+    id: 'gains:42161:BTC/USD',
+    chainId: 42161,
+    collaterals: [{ symbol: 'USDC', address: USDC_ARB, decimals: 6, collateralIndex: 3, usdPrice: 1 }],
+  }
+  const arbGmx = (marketToken, variant) => ({
+    id: `gmx:42161:BTC/USD:${marketToken}`,
+    venue: 'gmx',
+    chainId: 42161,
+    symbol: 'BTC/USD',
+    base: 'BTC',
+    variant,
+    price: 63_100,
+    maxLeverage: 50,
+    market: marketToken,
+    collaterals: [{ symbol: 'USDC', address: USDC_ARB, decimals: 6, collateralIndex: null, usdPrice: 1 }],
+  })
+  const arbBalances = () =>
+    openDeps({
+      readCollateralBalances: vi.fn(async () => [
+        { symbol: 'USDC', address: USDC_ARB, decimals: 6, balance: 1_000_000_000n, usdValue: 1000 },
+      ]),
+    })
+
+  it('offers BOTH venues that list the market on that chain, with the reason for the pick', async () => {
+    manageFlag = true
+    expect(perpsManageEnabled('gmx', 42161)).toBe(true) // else the case below proves nothing
+    renderView({
+      markets: openableMarketsDeps([ARB_GAINS, arbGmx(`0x${'aa'.repeat(20)}`, 'WBTC.b-USDC')]),
+      open: arbBalances(),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    await userEvent.click(openBtn())
+    await screen.findByRole('dialog')
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Gains/i })).toBeInTheDocument())
+    expect(screen.getByRole('radio', { name: /GMX/i })).toBeInTheDocument()
+    // US3 acceptance 1: the choice is made FOR the member, and the reason NAMES the venue it was
+    // weighed against — `pickVenue`'s own comparison, not a generic "we picked one for you".
+    expect(screen.getByText(/Gains is chosen for you:/i)).toHaveTextContent(/GMX/)
+  })
+
+  it('does not offer another venue’s market as if it were this one', async () => {
+    // The SAME setup, plus a second GMX market on the same base pair and chain. Neither is "the"
+    // BTC market, so GMX drops out — the member reaches it by tapping its own row. The test above
+    // is what proves this exclusion is the ambiguity and not the capability.
+    manageFlag = true
+    renderView({
+      markets: openableMarketsDeps([
+        ARB_GAINS,
+        arbGmx(`0x${'aa'.repeat(20)}`, 'WBTC.b-USDC'),
+        arbGmx(`0x${'bb'.repeat(20)}`, 'BTC-USDC'),
+      ]),
+      open: arbBalances(),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    await userEvent.click(openBtn())
+    await screen.findByRole('dialog')
+
+    // One venue, stated as such — never a picker offering an arbitrary one of the two GMX markets.
+    await waitFor(() =>
+      expect(screen.getByText(/Gains is the only venue trading this pair here/i)).toBeInTheDocument(),
+    )
+    expect(screen.queryByRole('radio', { name: /GMX/i })).not.toBeInTheDocument()
+  })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * THE FLAG-OFF STATE, asserted as an absence of everything
+ *
+ * This is the state CI runs in and the state every member sees until the terms gate clears
+ * (FR-025). "No dead control" is easy to satisfy by disabling one; the requirement is stronger —
+ * with the flag off this view must be indistinguishable from the read-only surface phase 0
+ * shipped, in markup AND in network behaviour.
+ * --------------------------------------------------------------------------------------------- */
+
+describe('PerpsView with the management flag OFF is exactly the phase-0 view', () => {
+  it('renders no entry control, on any row, even where the feed publishes every open handle', async () => {
+    manageFlag = false
+    renderView({ markets: openableMarketsDeps(), wallet: { isConnected: true } })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+
+    // The capability is present — this is the FLAG withholding it, not a missing calldata path.
+    // Without this line the case would pass for the wrong reason.
+    expect(perpsManageEnabled('gains', 137)).toBe(true)
+    expect(screen.queryByRole('button', { name: /Open a position/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // Every row still links out, exactly as it always did.
+    expect(screen.getByRole('link', { name: /Trade BTC\/USD on gains/i })).toBeInTheDocument()
+  })
+
+  it('adds NO markup to the trade cell — the link is still the only thing in it', async () => {
+    manageFlag = false
+    renderView({ markets: openableMarketsDeps(), wallet: { isConnected: true } })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    const cells = [...document.querySelectorAll('.perps-trade-cell')]
+    expect(cells.length).toBeGreaterThan(0)
+    for (const cell of cells) {
+      expect(cell.querySelectorAll('button')).toHaveLength(0)
+      expect(cell.children).toHaveLength(1) // the link-out, and nothing else
+    }
+  })
+
+  it('performs NONE of the entry surface’s reads — no venue status, no balances', async () => {
+    // The strongest form of "the flag off is phase 0": not just that nothing renders, but that
+    // nothing is asked of any chain on the member's behalf. Both reads are started by a tap, and
+    // with the flag off there is nothing to tap.
+    manageFlag = false
+    const open = openDeps()
+    renderView({ markets: openableMarketsDeps(), open, wallet: { isConnected: true } })
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(open.readVenueStatuses).not.toHaveBeenCalled()
+    expect(open.readCollateralBalances).not.toHaveBeenCalled()
+  })
+
+  it('still shows the read-only positions statement and the venue link-out', async () => {
+    manageFlag = false
+    renderView({
+      markets: openableMarketsDeps(),
+      positions: withPositions([GAINS_POSITION]),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+    expect(screen.getByRole('link', { name: /Manage this position on Gains Network/i })).toBeInTheDocument()
+    expect(screen.getByText(/positions are read-only in FairWins this release/i)).toBeInTheDocument()
+  })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * THE TWO SHEETS ARE MUTUALLY EXCLUSIVE
+ *
+ * Both take the body scroll lock on mount and restore what they FOUND on unmount. Two of them open
+ * at once means the second captures `overflow: hidden` as the previous value, and the page is left
+ * unscrollable after both are dismissed — with no control anywhere to undo it. They also both bind
+ * a capture-phase Escape handler. The positions list stays in the DOM behind the entry sheet and is
+ * reachable by keyboard, so this is a state a member can get into, not a theoretical one.
+ * --------------------------------------------------------------------------------------------- */
+
+describe('PerpsView never has two sheets open at once', () => {
+  const openablePairs = () =>
+    marketsDeps({
+      fetchPairs: vi.fn(async () => ({
+        pairs: [
+          {
+            ...PAIRS[0],
+            pairIndex: 4,
+            collaterals: [{ symbol: 'USDC', address: USDC_POLYGON, decimals: 6, collateralIndex: 3, usdPrice: 1 }],
+          },
+          PAIRS[1],
+        ],
+        sources: { gains: { status: 'read', chains: [137] }, hyperliquid: { status: 'read', chains: [] } },
+        asOf: 'now',
+      })),
+    })
+
+  it('opening the entry sheet closes the exit sheet, and the body scroll lock is released once', async () => {
+    manageFlag = true
+    renderView({
+      markets: openablePairs(),
+      positions: withPositions([GAINS_POSITION]),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await screen.findByRole('dialog')
+    expect(document.body.style.overflow).toBe('hidden')
+
+    // Now the entry sheet, reached from the pairs table behind it.
+    await userEvent.click(screen.getByRole('button', { name: /Open a position on BTC\/USD/i }))
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /Open a long on BTC\/USD/i })).toBeInTheDocument(),
+    )
+    // ONE dialog, not two.
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Close this position' })).not.toBeInTheDocument()
+
+    // …and dismissing the survivor gives the page back. If both had mounted, the second would have
+    // captured 'hidden' as the previous value and this would still be locked.
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(document.body.style.overflow).not.toBe('hidden')
+  })
+
+  it('and the other way round — opening a position sheet closes the entry sheet', async () => {
+    manageFlag = true
+    renderView({
+      markets: openablePairs(),
+      positions: withPositions([GAINS_POSITION]),
+      wallet: { isConnected: true },
+    })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('button', { name: /Open a position on BTC\/USD/i }))
+    await screen.findByRole('dialog')
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close this position' })).toBeInTheDocument())
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.queryByRole('heading', { name: /Open a long on BTC\/USD/i })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(document.body.style.overflow).not.toBe('hidden')
   })
 })

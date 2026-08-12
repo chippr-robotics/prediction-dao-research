@@ -419,7 +419,12 @@ describe('execution fee estimate', () => {
     expect(estimate.oraclePriceCount).toBe(GMX_ORACLE_PRICE_COUNT_BASE)
     expect(estimate.gasLimit).toBe(600_000n + 250_000n * 3n + 3_600_000n)
     expect(estimate.fee).toBe(estimate.gasLimit * inputs.gasPrice)
-    expect(estimateExecutionFee({ ...inputs, swapPathLength: 2 }).oraclePriceCount).toBe(5)
+    // A swap hop raises the oracle-price count AND adds `singleSwapGasLimit` of gas, so the two
+    // travel together — an estimate given hops but no swap limit is short and comes back null
+    // instead (asserted in `gmxExecutionFee.test.js`, where the live constants live).
+    const swapped = estimateExecutionFee({ ...inputs, swapPathLength: 2, singleSwapGasLimit: 1_000_000n })
+    expect(swapped.oraclePriceCount).toBe(5)
+    expect(estimateExecutionFee({ ...inputs, swapPathLength: 2 })).toBeNull()
   })
 
   it('biases HIGH by default — GMX refunds the remainder, underpaying cancels the order', () => {

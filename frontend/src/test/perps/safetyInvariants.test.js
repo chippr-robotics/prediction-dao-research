@@ -30,6 +30,18 @@ import {
 } from '../../hooks/usePerpsTrade'
 import { recoveryDescriptor } from '../../components/perps/pendingOrderRecovery'
 import { buildExitDescriptor, buildProtectDescriptor } from '../../components/perps/positionSheetActions'
+import {
+  buildOpenDescriptor,
+  openEligibility,
+  openVenueOptionsFor,
+} from '../../components/perps/openPositionActions'
+import {
+  PERPS_ATTESTATION_ITEMS,
+  attestationState,
+  clearAttestation,
+  hasAttested,
+  recordAttestation,
+} from '../../lib/perps/attestation'
 
 import { GMX_EXCHANGE_ROUTER_ABI } from '../../abis/perps/gmxExchangeRouter'
 import { GAINS_DIAMOND_ABI } from '../../abis/perps/gainsDiamond'
@@ -336,6 +348,200 @@ describe('(a2) nothing the SHEET builds can put a FairWins address on a position
     })
     const spec = normalizeDescriptor(built.descriptor, { account: FAIRWINS })
     expect(() => defaultBuildCalls(spec)).toThrow(/FairWins UI-fee receiver/)
+  })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * (a3) Ownership, through the OPENING composition
+ *
+ * (a) proves the venue builders are safe; (a2) proves the EXIT surface calls them correctly. This
+ * proves the same of the ENTRY surface, and it is the one that matters most: every position this
+ * app will ever create is created here, so an ownership field written wrongly on this path is not
+ * a position a member cannot close — it is a position they never owned.
+ *
+ * The chain driven is the real one, end to end and with nothing hand-written in the middle: the
+ * pairs FEED → `openVenueOptionsFor` → `openEligibility` → `buildOpenDescriptor` →
+ * `normalizeDescriptor` → `defaultBuildCalls`. A descriptor that grew an owner field, an
+ * eligibility check that let a FairWins-owned option through, or a builder table wired to the
+ * wrong venue key all land here and nowhere else.
+ * --------------------------------------------------------------------------------------------- */
+
+const USDC_COLLATERAL = Object.freeze({
+  symbol: 'USDC',
+  address: USDC,
+  decimals: 6,
+  collateralIndex: 3,
+  usdPrice: 1,
+})
+
+/** The feed rows a gateway serves for one market on one chain, carrying the open handles. */
+const OPEN_FEED = Object.freeze([
+  Object.freeze({
+    id: `gains:${ARBITRUM}:BTC/USD`,
+    venue: 'gains',
+    chainId: ARBITRUM,
+    symbol: 'BTC/USD',
+    price: 60_000,
+    maxLeverage: 150,
+    pairIndex: 4,
+    collaterals: [USDC_COLLATERAL],
+  }),
+  Object.freeze({
+    id: `gmx:${ARBITRUM}:BTC/USD:${MARKET}`,
+    venue: 'gmx',
+    chainId: ARBITRUM,
+    symbol: 'BTC/USD',
+    price: 60_000,
+    maxLeverage: 50,
+    market: MARKET,
+    collaterals: [USDC_COLLATERAL],
+  }),
+])
+
+const OPEN_STATUSES = Object.freeze({ gains: { status: 'open' }, gmx: { status: 'open' } })
+
+/** Every OPEN the entry surface can compose, on both venues, with the FairWins receiver supplied. */
+function everyOpenAction(uiFeeReceiver = FAIRWINS) {
+  const out = []
+  for (const row of OPEN_FEED) {
+    for (const isLong of [true, false]) {
+      const [option] = openVenueOptionsFor(row, OPEN_FEED, { statuses: OPEN_STATUSES })
+      const verdict = openEligibility(option)
+      expect(verdict.ok, `${row.venue} was not offered: ${verdict.reason}`).toBe(true)
+      out.push([
+        `${row.venue} open ${isLong ? 'long' : 'short'}`,
+        buildOpenDescriptor({
+          venue: option.venue,
+          chainId: option.chainId,
+          handle: verdict.handle,
+          isLong,
+          collateral: { ...USDC_COLLATERAL, balance: 10n ** 12n },
+          collateralAmount: 100_000_000n,
+          leverage: 5,
+          entryPrice: 60_000,
+          notionalUsd: 500,
+          venueLimits: option.limits,
+          quote: { executionFee: EXECUTION_FEE },
+          uiFeeReceiver,
+          // No allowance read ⇒ an approval leg rides in front, which is part of what is checked.
+          allowance: null,
+        }),
+      ])
+    }
+  }
+  return out
+}
+
+describe('(a3) nothing the OPENING surface builds can put a FairWins address on a position', () => {
+  it('EXHAUSTIVE: across every open the sheet can compose, the member owns every order', () => {
+    const actions = everyOpenAction()
+    expect(actions).toHaveLength(4) // both venues × both directions — nothing silently skipped
+    for (const [name, built] of actions) {
+      for (const call of callsFor(built)) {
+        if (call.target !== GMX.exchangeRouter) continue
+        const addresses = gmxOrderAddresses(call)
+        expect(addresses.receiver, `${name} receiver`).toBe(getAddress(MEMBER))
+        expect(addresses.cancellationReceiver, `${name} cancellationReceiver`).toBe(getAddress(MEMBER))
+        expect(addresses.callbackContract, `${name} callbackContract`).toBe(ZeroAddress)
+        expect(addresses.uiFeeReceiver, `${name} uiFeeReceiver`).toBe(getAddress(FAIRWINS))
+      }
+    }
+  })
+
+  it('EXHAUSTIVE: Gains gets NO FairWins address at all, in any field, on an open', () => {
+    // Gains' `openTrade` takes a REFERRER one field from `Trade.user`, and the venue has not
+    // whitelisted FairWins — so an address there would earn nothing while sitting next to the
+    // ownership field. The descriptor sends null, which encodes as the zero address.
+    for (const [name, built] of everyOpenAction()) {
+      if (built.descriptor.venue !== 'gains') continue
+      const hex = callsFor(built)
+        .map((call) => String(call.data).toLowerCase())
+        .join('')
+      expect(hex.split(FAIRWINS.slice(2).toLowerCase()).length - 1, `${name}`).toBe(0)
+      const open = callsFor(built).find((c) => c.target === GAINS_DIAMOND_BY_CHAIN[ARBITRUM])
+      const [trade, , referrer] = diamond.decodeFunctionData('openTrade', open.data)
+      expect(trade.user).toBe(getAddress(MEMBER))
+      expect(BigInt(referrer)).toBe(0n)
+    }
+  })
+
+  it('the APPROVAL leg an open carries spends to the venue’s puller, never to FairWins', () => {
+    // An open is the only action that prepends an approval, so it is the only place an allowance
+    // could be granted to the wrong address — and the wrong address here is a signed permission
+    // over the member's collateral.
+    for (const [name, built] of everyOpenAction()) {
+      const calls = callsFor(built)
+      expect(calls.length, `${name} lost its approval leg`).toBe(2)
+      const [spender] = erc20.decodeFunctionData('approve', calls[0].data)
+      expect(spender.toLowerCase(), `${name}`).not.toBe(FAIRWINS.toLowerCase())
+      expect(spender).toBe(built.descriptor.venue === 'gmx' ? GMX.router : GAINS_DIAMOND_BY_CHAIN[ARBITRUM])
+    }
+  })
+
+  /**
+   * THE "CONNECTED ACCOUNT IS THE FAIRWINS ADDRESS" CASE, and why the two venues answer it
+   * differently. This asymmetry is real and deliberate, and writing it down is the point: a test
+   * that forced both venues to throw would be asserting a guard Gains does not need and cannot
+   * reach, and the next person would "fix" it by adding a referrer.
+   *
+   *   GMX  — the FairWins address IS in the calldata, as `uiFeeReceiver`. An order where the fee
+   *          receiver is also the owner is the exact confusion `venue-calldata.md` forbids, so the
+   *          builder refuses it.
+   *   Gains— the descriptor deliberately sends NO referrer (the venue has not whitelisted
+   *          FairWins), so there is no FairWins address in the payload for the owner to collide
+   *          with. FairWins' own wallet opening its own position is not the forbidden state —
+   *          FairWins holding a MEMBER's position is, and that is impossible here because
+   *          `Trade.user` is overwritten with `_msgSender()`.
+   */
+  it('GMX REFUSES an open the FairWins receiver would own, reached through the composition', () => {
+    const gmxOpens = everyOpenAction().filter(([, built]) => built.descriptor.venue === 'gmx')
+    expect(gmxOpens).toHaveLength(2)
+    for (const [name, built] of gmxOpens) {
+      const spec = normalizeDescriptor(built.descriptor, { account: FAIRWINS })
+      expect(() => defaultBuildCalls(spec), name).toThrow(/FairWins UI-fee receiver/)
+    }
+  })
+
+  it('Gains carries no FairWins address to collide with — and its guard still fires if one returns', () => {
+    for (const [name, built] of everyOpenAction()) {
+      if (built.descriptor.venue !== 'gains') continue
+      // The descriptor's own choice, asserted structurally: `null`, not "some address".
+      expect(built.descriptor.params.referrer, name).toBeNull()
+      const spec = normalizeDescriptor(built.descriptor, { account: FAIRWINS })
+      const calls = defaultBuildCalls(spec)
+      const open = calls.find((c) => c.target === GAINS_DIAMOND_BY_CHAIN[ARBITRUM])
+      const [trade, , referrer] = diamond.decodeFunctionData('openTrade', open.data)
+      // Whoever signs owns it — that is the invariant, and it holds for this signer too.
+      expect(trade.user).toBe(getAddress(FAIRWINS))
+      expect(BigInt(referrer)).toBe(0n)
+    }
+    // …and the guard that WOULD catch a reintroduced referrer is still live, so a future edit that
+    // starts sending one cannot quietly recreate the forbidden pattern.
+    expect(() =>
+      gains.buildOpenTradeCall({
+        chainId: ARBITRUM,
+        trader: FAIRWINS,
+        pairIndex: 4,
+        collateralIndex: 3,
+        collateralAmount: 100_000_000n,
+        leverage: 5,
+        long: true,
+        openPrice: 60_000,
+        maxSlippageP: 1,
+        referrer: FAIRWINS,
+      }),
+    ).toThrow(/FairWins referrer/)
+  })
+
+  it('the descriptor has NOWHERE to put an owner, on either venue', () => {
+    // Structural, not behavioural: a field that does not exist cannot be filled in by a future
+    // edit, however the call site is written.
+    for (const [name, built] of everyOpenAction()) {
+      for (const field of ['trader', 'account', 'user', 'receiver', 'owner', 'cancellationReceiver', 'from']) {
+        expect(built.descriptor, `${name} descriptor.${field}`).not.toHaveProperty(field)
+        expect(built.descriptor.params, `${name} params.${field}`).not.toHaveProperty(field)
+      }
+    }
   })
 })
 
@@ -810,39 +1016,48 @@ describe('(f) venue status fails CLOSED for opening and never withdraws an exit'
  * (g) Nothing gates an exit
  * --------------------------------------------------------------------------------------------- */
 
-describe('(g) the attestation, the flag and venue status cannot gate an exit', () => {
-  /**
-   * The modules an exit (close / reduce / protect / cancel / recover) actually runs through.
-   *
-   * PHASES 3 AND 4 ADDED SIX OF THESE, and adding them is the whole point: this suite asserts a
-   * property of a PATH, so a path that grows a module the map does not list keeps passing while
-   * covering less and less. `(h)` below now makes that impossible — every perps component and
-   * every perps hook must be classified, so a new file fails the run until someone says which of
-   * these four things it is.
-   *
-   * `hooks/usePerpsTrade.js` is deliberately NOT here: it is the shared write path and therefore
-   * the one module that legitimately NAMES the gates, for the one entry action. It gets its own
-   * (stricter, structural) assertions below.
-   */
-  const EXIT_PATH = {
-    'lib/perps/venues/gains.js': '../../lib/perps/venues/gains.js',
-    'lib/perps/venues/gmx.js': '../../lib/perps/venues/gmx.js',
-    'lib/perps/validation.js': '../../lib/perps/validation.js',
-    'lib/perps/orderState.js': '../../lib/perps/orderState.js',
-    // Phase 3: the reads a member exits FROM, and the write path's stuck-order half.
-    'hooks/usePerpsOrders.js': '../../hooks/usePerpsOrders.js',
-    'hooks/usePerpsPositions.js': '../../hooks/usePerpsPositions.js',
-    // Phase 4: the two surfaces an exit is actually performed on, and their venue-work modules.
-    'components/perps/PositionSheet.jsx': '../../components/perps/PositionSheet.jsx',
-    'components/perps/positionSheetActions.js': '../../components/perps/positionSheetActions.js',
-    'components/perps/PerpsPendingOrders.jsx': '../../components/perps/PerpsPendingOrders.jsx',
-    'components/perps/pendingOrderRecovery.js': '../../components/perps/pendingOrderRecovery.js',
-    // The list the exit is reached from. Its `canManage` prop is the composition's answer arriving
-    // as DATA — which is the design (one file answers it) — and it never withholds the venue
-    // link-out, so nothing here may import a gate either.
-    'components/perps/PerpsPositions.jsx': '../../components/perps/PerpsPositions.jsx',
-  }
+/**
+ * The modules an exit (close / reduce / protect / cancel / recover) actually runs through.
+ *
+ * PHASES 3 AND 4 ADDED SIX OF THESE, and adding them is the whole point: this suite asserts a
+ * property of a PATH, so a path that grows a module the map does not list keeps passing while
+ * covering less and less. `(h)` below now makes that impossible — every perps component, every
+ * perps hook AND every `lib/perps` module must be classified, so a new file fails the run until
+ * someone says which of these kinds it is. It lives at module scope so `(h)` can check that its
+ * own classification and this map still name the same files.
+ *
+ * `hooks/usePerpsTrade.js` is deliberately NOT here: it is the shared write path and therefore
+ * the one module that legitimately NAMES the gates, for the one entry action. It gets its own
+ * (stricter, structural) assertions below.
+ */
+const EXIT_PATH = {
+  'lib/perps/venues/gains.js': '../../lib/perps/venues/gains.js',
+  'lib/perps/venues/gmx.js': '../../lib/perps/venues/gmx.js',
+  'lib/perps/validation.js': '../../lib/perps/validation.js',
+  // Naming a GMX market is what gives a GMX close a price to bound itself with, so the resolver
+  // is on the exit path too: a gate reachable from here could withhold one.
+  'lib/perps/gmxMarkets.js': '../../lib/perps/gmxMarkets.js',
+  'lib/perps/orderState.js': '../../lib/perps/orderState.js',
+  // Phase 7: an exit REPORTS itself by queueing here (T070), so the buffer is on the exit path
+  // even though it moves no money. A gate reachable from it would be a gate an exit runs
+  // through — and the queue happens after the member has already committed, which is the worst
+  // possible place to discover a refusal.
+  'lib/perps/perpsActivityBuffer.js': '../../lib/perps/perpsActivityBuffer.js',
+  // Phase 3: the reads a member exits FROM, and the write path's stuck-order half.
+  'hooks/usePerpsOrders.js': '../../hooks/usePerpsOrders.js',
+  'hooks/usePerpsPositions.js': '../../hooks/usePerpsPositions.js',
+  // Phase 4: the two surfaces an exit is actually performed on, and their venue-work modules.
+  'components/perps/PositionSheet.jsx': '../../components/perps/PositionSheet.jsx',
+  'components/perps/positionSheetActions.js': '../../components/perps/positionSheetActions.js',
+  'components/perps/PerpsPendingOrders.jsx': '../../components/perps/PerpsPendingOrders.jsx',
+  'components/perps/pendingOrderRecovery.js': '../../components/perps/pendingOrderRecovery.js',
+  // The list the exit is reached from. Its `canManage` prop is the composition's answer arriving
+  // as DATA — which is the design (one file answers it) — and it never withholds the venue
+  // link-out, so nothing here may import a gate either.
+  'components/perps/PerpsPositions.jsx': '../../components/perps/PerpsPositions.jsx',
+}
 
+describe('(g) the attestation, the flag and venue status cannot gate an exit', () => {
   it('no exit-path module imports the attestation at all', () => {
     for (const [name, path] of Object.entries(EXIT_PATH)) {
       expect(src(path), `${name} imports the attestation`).not.toMatch(/from\s+['"].*perps\/attestation['"]/)
@@ -868,6 +1083,75 @@ describe('(g) the attestation, the flag and venue status cannot gate an exit', (
     const source = src('../../lib/perps/attestation.js')
     const exported = [...source.matchAll(/export (?:function|const) (\w+)/g)].map((m) => m[1])
     expect(exported.filter((name) => /close|reduce|cancel|exit|recover|manage|trade|open/i.test(name))).toEqual([])
+  })
+
+  /**
+   * A SUPERSEDED RECORD RE-ASKS FOR THE OPEN AND CHANGES NOTHING ABOUT AN EXIT — asserted through
+   * the REAL store, not a stub, because the two halves are what the property actually is:
+   *
+   *   - a member who acknowledged v1 must be asked again for v2 (they never saw those words), and
+   *   - the same member must still be able to close, reduce, protect and recover, because a
+   *     wording change is a FairWins event and cannot be allowed to strand a live position.
+   *
+   * The structural assertions above prove no exit module can REACH the attestation. This proves
+   * the state that would matter if one ever did.
+   */
+  it('a superseded acknowledgement re-asks for the open and withholds no exit', () => {
+    clearAttestation()
+    recordAttestation(Object.fromEntries(PERPS_ATTESTATION_ITEMS.map((i) => [i.id, true])), 1)
+    expect(hasAttested(1)).toBe(true)
+    expect(hasAttested(2)).toBe(false)
+    expect(attestationState(2).superseded).toBe(true)
+
+    // Every exit the sheet can compose still builds, with the stale record in the store.
+    for (const [name, built] of everySheetAction()) {
+      expect(built.ok, `${name} was refused while the attestation was superseded`).toBe(true)
+      expect(() => callsFor(built), name).not.toThrow()
+    }
+    // …and the recovery, which is the one a member most needs while we are changing our own terms.
+    const stuck = {
+      venue: 'gains',
+      chainId: ARBITRUM,
+      recoverable: true,
+      recovery: {
+        venue: 'gains',
+        chainId: ARBITRUM,
+        action: 'cancelOrderAfterTimeout',
+        pendingOrderIndex: gains.pendingOrderIndex(4),
+      },
+    }
+    expect(() => defaultBuildCalls(normalizeDescriptor(recoveryDescriptor(stuck), { account: MEMBER }))).not.toThrow()
+    clearAttestation()
+  })
+
+  /**
+   * THE ENTRY PATH MUST NOT BE REACHABLE FROM THE EXIT PATH.
+   *
+   * Phase 5 added the opening surface, and it legitimately names both gates — it is the one place
+   * they belong. That creates a NEW way to break SC-004 that no assertion above covers: an exit
+   * module importing an entry module inherits the gate transitively, and none of the greps above
+   * would see it, because the gate's name never appears in the exit module's own source.
+   *
+   * `PerpsAttestation.jsx` in particular is a rendering of the jurisdiction gate. A close sheet
+   * that imported it would be putting jurisdiction in front of an exit while passing every other
+   * check in this file.
+   */
+  const ENTRY_ONLY = [
+    'components/perps/OpenPositionSheet.jsx',
+    'components/perps/openPositionActions.js',
+    'components/perps/PerpsAttestation.jsx',
+  ]
+
+  it('no exit-path module imports an entry-path module', () => {
+    for (const [name, path] of Object.entries(EXIT_PATH)) {
+      const source = src(path)
+      for (const entry of ENTRY_ONLY) {
+        const basename = entry.slice(entry.lastIndexOf('/') + 1).replace(/\.jsx?$/, '')
+        expect(source, `${name} imports ${entry}`).not.toMatch(
+          new RegExp(`from\\s+['"][^'"]*${basename}['"]`),
+        )
+      }
+    }
   })
 
   it('the exit validators have no parameter a gate could be wired into', () => {
@@ -955,6 +1239,19 @@ describe('(h) every perps module is classified, so the exit-path map cannot go s
     'hooks/usePerpsOrders.js',
     'hooks/usePerpsPositions.js',
   ]
+  /**
+   * ENTRY path — the opening surface, and the ONLY components that may name a gate.
+   *
+   * Opening is the one action FairWins gates (FR-014/FR-015), so these files reach the attestation
+   * and the screening client on purpose. What makes that safe is the direction of the dependency:
+   * nothing on the exit path may import them (asserted in `(g)`), so the gates they carry cannot
+   * travel to a close, a reduce or a recovery.
+   */
+  const ENTRY = [
+    'components/perps/OpenPositionSheet.jsx',
+    'components/perps/PerpsAttestation.jsx',
+    'components/perps/openPositionActions.js',
+  ]
   /** The shared write path: names the gates, reaches them only for `open`. */
   const WRITE = ['hooks/usePerpsTrade.js']
   /** The composition point — the ONE file that may read the management kill switch. */
@@ -966,7 +1263,50 @@ describe('(h) every perps module is classified, so the exit-path map cannot go s
     'hooks/usePerpsMarkets.js',
   ]
 
+  /**
+   * `lib/perps/` — enumerated for the SAME reason the components are, and it was not.
+   *
+   * (g)'s EXIT_PATH map lists four lib modules by hand, and a hand-maintained list of files in a
+   * directory nobody enumerates is exactly the staleness (h) exists to prevent: a new
+   * `lib/perps/*.js` that a close runs through could import a gate and every assertion above would
+   * keep passing, because the map it is checked against would simply not mention it.
+   *
+   * LIB_EXIT is the set an exit runs through — nothing in it may name a gate. LIB_ENTRY is the
+   * gate's own home. LIB_NEUTRAL is pure presentation and transport, which an exit also touches but
+   * which cannot express a decision about one.
+   */
+  const LIB_EXIT = [
+    'lib/perps/gmxMarkets.js',
+    'lib/perps/orderState.js',
+    'lib/perps/perpsActivityBuffer.js',
+    'lib/perps/validation.js',
+    'lib/perps/venues/gains.js',
+    'lib/perps/venues/gmx.js',
+  ]
+  /** The gate itself, and the module whose whole job is answering "may this venue be opened on". */
+  const LIB_ENTRY = ['lib/perps/attestation.js', 'lib/perps/venueStatus.js']
+  /** Formatting, copy, transport, unit maths, and the defaults an OPEN form is pre-filled with. */
+  const LIB_NEUTRAL = [
+    'lib/perps/defaults.js',
+    'lib/perps/feeUnits.js',
+    'lib/perps/format.js',
+    'lib/perps/linkouts.js',
+    'lib/perps/perpsClient.js',
+    'lib/perps/perpsCopy.js',
+  ]
+
   const dir = (relative) => fileURLToPath(new URL(relative, import.meta.url))
+
+  function libModules() {
+    const root = dir('../../lib/perps')
+    const top = readdirSync(root)
+      .filter((f) => /\.jsx?$/.test(f))
+      .map((f) => `lib/perps/${f}`)
+    const venues = readdirSync(dir('../../lib/perps/venues'))
+      .filter((f) => /\.jsx?$/.test(f))
+      .map((f) => `lib/perps/venues/${f}`)
+    return [...top, ...venues].sort()
+  }
 
   function modules() {
     const components = readdirSync(dir('../../components/perps'))
@@ -979,8 +1319,46 @@ describe('(h) every perps module is classified, so the exit-path map cannot go s
   }
 
   it('leaves nothing unclassified — a new perps module fails this until it is placed', () => {
-    const classified = [...EXIT, ...WRITE, ...COMPOSITION, ...READ_ONLY].sort()
+    const classified = [...EXIT, ...ENTRY, ...WRITE, ...COMPOSITION, ...READ_ONLY].sort()
     expect(modules()).toEqual(classified)
+  })
+
+  it('leaves no lib/perps module unclassified either — the (g) map is over files, not guesses', () => {
+    expect(libModules()).toEqual([...LIB_EXIT, ...LIB_ENTRY, ...LIB_NEUTRAL].sort())
+  })
+
+  it('every lib module an exit runs through is in (g)’s own EXIT_PATH map', () => {
+    // The two lists are maintained separately and MUST agree: (g) asserts the property, (h)
+    // asserts the list is complete. Either one drifting silently is the failure being prevented.
+    for (const module of LIB_EXIT) {
+      expect(Object.keys(EXIT_PATH), `${module} is classified as an exit module but (g) never checks it`)
+        .toContain(module)
+    }
+  })
+
+  it('no lib module on the exit path names a gate — the whole directory, not a chosen four', () => {
+    for (const module of [...LIB_EXIT, ...LIB_NEUTRAL]) {
+      const source = src(`../../${module}`)
+      expect(source, `${module} imports the attestation`).not.toMatch(/from\s+['"].*perps\/attestation['"]/)
+      expect(source, `${module} imports sanctions screening`).not.toMatch(/^import .*sanctions/m)
+      expect(source, `${module} reads the kill switch`).not.toMatch(
+        /perpsManageFeatureEnabled|VITE_PERPS_MANAGE_ENABLED/,
+      )
+    }
+    // `canOpen` is exempted for the NEUTRAL set only where the module is the one that DEFINES the
+    // vocabulary — and that module is in LIB_ENTRY, not here — so the exit set is checked strictly.
+    for (const module of LIB_EXIT) {
+      expect(src(`../../${module}`), `${module} consults canOpen`).not.toMatch(/\bcanOpen\b|openBlockedNote/)
+    }
+  })
+
+  it('the attestation is reachable from the ENTRY path and from nowhere else', () => {
+    const readers = modules().filter((m) => /perps\/attestation['"]|PerpsAttestation/.test(src(`../../${m}`)))
+    // `usePerpsTrade` is absent on purpose: it NAMES `deps.hasAttested` but cannot import the real
+    // one, which is what keeps a gate off every exit however badly a future edit is written.
+    expect(readers.sort()).toEqual(
+      ['components/perps/OpenPositionSheet.jsx', 'components/perps/PerpsAttestation.jsx'].sort(),
+    )
   })
 
   it('the kill switch is read in exactly one file, and it is the composition point', () => {
@@ -991,12 +1369,37 @@ describe('(h) every perps module is classified, so the exit-path map cannot go s
   })
 
   it('no exit-path or read-only module imports the attestation, screening, or venue status', () => {
+    // ENTRY is deliberately absent: those files are the gate's home. WRITE is absent because it is
+    // asserted structurally above (it names the gates and cannot import them).
     for (const module of [...EXIT, ...READ_ONLY]) {
       const source = src(`../../${module}`)
       expect(source, `${module} imports the attestation`).not.toMatch(/from\s+['"].*perps\/attestation['"]/)
       expect(source, `${module} imports sanctions screening`).not.toMatch(/^import .*sanctions/m)
       expect(source, `${module} consults canOpen`).not.toMatch(/\bcanOpen\b|openBlockedNote/)
     }
+  })
+
+  /**
+   * THE ENTRY MODULES ARE REACHABLE FROM EXACTLY ONE PLACE — the composition point.
+   *
+   * (g) asserts no EXIT module imports one. This closes the other half: no READ-ONLY module may
+   * either. `PerpsPairTable` is the case that makes it matter — it now renders the control that
+   * OPENS the entry sheet, and the tempting shortcut is for it to import and render the sheet
+   * itself. That would put the jurisdiction gate inside the pairs table, one component away from
+   * every read-only surface, and every other assertion in this file would still pass.
+   */
+  it('only the composition point may import an entry module — not the table that opens it', () => {
+    for (const module of [...EXIT, ...READ_ONLY, ...WRITE]) {
+      const source = src(`../../${module}`)
+      for (const entry of ENTRY) {
+        const basename = entry.slice(entry.lastIndexOf('/') + 1).replace(/\.jsx?$/, '')
+        expect(source, `${module} imports ${entry}`).not.toMatch(
+          new RegExp(`from\\s+['"][^'"]*${basename}['"]`),
+        )
+      }
+    }
+    // …and the composition point genuinely does import one, so the rule above is not vacuous.
+    expect(src(`../../${COMPOSITION[0]}`)).toMatch(/from\s+['"]\.\/OpenPositionSheet['"]/)
   })
 
   /**
@@ -1030,6 +1433,47 @@ describe('(h) every perps module is classified, so the exit-path map cannot go s
       const code = stripComments(src(`../../${module}`))
       expect([...code.matchAll(pattern)].map((m) => m[1]), `${module} hardcodes an order state`).toEqual([])
     }
+  })
+
+  /**
+   * The same rule over the two places phase 7 put the machine's vocabulary, and neither of them is
+   * a perps component or hook, so the sweep above never looked at either.
+   *
+   * `perpsSource.js` picks the WORDING for a state — it is the file that decides whether a member
+   * reads "sent" or "closed" — so a copied state list there is how an order the venue merely
+   * ACKNOWLEDGED gets reported as executed. `perpsActivityBuffer.js` decides which states are
+   * reportable at all. Both are required to ask the machine.
+   */
+  it('the activity buffer and the activity source spell no state either', () => {
+    const pattern = new RegExp(`['"](${MACHINE_ONLY_STATES.join('|')})['"]`, 'g')
+    for (const module of ['lib/perps/perpsActivityBuffer.js', 'data/notifications/sources/perpsSource.js']) {
+      const code = stripComments(src(`../../${module}`))
+      expect([...code.matchAll(pattern)].map((m) => m[1]), `${module} hardcodes an order state`).toEqual([])
+      // …and each one genuinely reaches the machine, so the absence above is delegation and not
+      // simply a file that never mentions a state.
+      expect(code, `${module} never consults ORDER_STATE`).toMatch(/\bORDER_STATE\b/)
+    }
+  })
+
+  /**
+   * NOTHING OUTSIDE THE MACHINE MAY MINT AN EXECUTION SIGNAL.
+   *
+   * `(d)` proves no state × signal combination reaches `executed` without `VENUE_EXECUTED`. This
+   * proves the complement: that no module outside `orderState.js` can construct that signal in the
+   * first place. `usePerpsTrade` is the one exception and it is deliberate — `confirmFromVenue`
+   * emits it for a DIRECT-settlement action, from the venue's own re-read, and is fenced to that
+   * settlement kind (asserted in `protectionConfirmation.test.js`).
+   */
+  it('only the write path can construct a VENUE_EXECUTED signal, and only for a direct settlement', () => {
+    const emitters = [...modules(), 'lib/perps/perpsActivityBuffer.js', 'data/notifications/sources/perpsSource.js']
+      .filter((m) => /SIGNAL\.VENUE_EXECUTED/.test(stripComments(src(`../../${m}`))))
+    expect(emitters).toEqual(['hooks/usePerpsTrade.js'])
+    const trade = stripComments(src('../../hooks/usePerpsTrade.js'))
+    const sites = [...trade.matchAll(/SIGNAL\.VENUE_EXECUTED/g)]
+    expect(sites).toHaveLength(1)
+    // The guard immediately above it is the direct-settlement fence.
+    const before = trade.slice(0, sites[0].index)
+    expect(before.slice(before.lastIndexOf('if ('))).toMatch(/settlementFor\(/)
   })
 })
 

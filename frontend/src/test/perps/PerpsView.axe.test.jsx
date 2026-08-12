@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, waitFor, screen } from '@testing-library/react'
 import { axe } from 'vitest-axe'
+import userEvent from '@testing-library/user-event'
 import { WalletContext } from '../../contexts/WalletContext.js'
 import PerpsView from '../../components/perps/PerpsView'
 
@@ -138,6 +139,26 @@ describe('PerpsView accessibility', () => {
     for (const theme of ['theme-light platform-fairwins', 'theme-dark platform-fairwins']) {
       const { container, unmount } = await renderReady(theme)
       await waitFor(() => expect(screen.getByRole('button', { name: /close or protect/i })).toBeInTheDocument())
+      // The ENTRY control is in this audit too (spec 083 US3) — asserted rather than assumed,
+      // because a table cell that stopped rendering it would leave this pass reporting a clean
+      // result about markup that is no longer there.
+      expect(screen.getByRole('button', { name: /Open a position on BTC\/USD/i })).toBeInTheDocument()
+      // Hyperliquid keeps no in-app control at all, so the audit also covers the mixed row set.
+      expect(screen.queryByRole('button', { name: /Open a position on ETH\/USD/i })).not.toBeInTheDocument()
+      expect(await axe(container)).toHaveNoViolations()
+      unmount()
+    }
+  }, 30000)
+
+  it('has no WCAG violations with the ENTRY SHEET open, in both themes', async () => {
+    // The sheet has its own audit driven directly with props; this one audits it AS COMPOSED —
+    // over the live pairs table, with the venue-status and balance reads the view supplies.
+    manageFlag = true
+    for (const theme of ['theme-light platform-fairwins', 'theme-dark platform-fairwins']) {
+      const { container, unmount } = await renderReady(theme)
+      const open = screen.getByRole('button', { name: /Open a position on BTC\/USD/i })
+      await userEvent.click(open)
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
       expect(await axe(container)).toHaveNoViolations()
       unmount()
     }

@@ -55,6 +55,7 @@ import {
   reduceOrderState,
   submissionSignal,
 } from '../lib/perps/orderState'
+import { recordPerpsOrder } from '../lib/perps/perpsActivityBuffer'
 import { validateClose, validateOpen, validateProtection } from '../lib/perps/validation'
 
 /* ------------------------------------------------------------------------------------------- *
@@ -116,7 +117,9 @@ export function isEntryAction(action) {
  *                       no order event at all (Gains `updateTp`/`updateSl`). There is nothing to
  *                       watch, so the hook does NOT start a watcher and does not invent an
  *                       execution: the confirmation is the caller re-reading the venue's stored
- *                       values (US2 acceptance 3) and calling `confirmFromVenue` with them.
+ *                       values (US2 acceptance 3) and calling `confirmFromVenue` with them —
+ *                       `components/perps/positionSheetActions.js#confirmStoredProtection` is that
+ *                       read, and its bound ends at `reportUnconfirmed`, never at a spinner.
  */
 export const SETTLEMENT = Object.freeze({
   EXECUTION: 'execution',
@@ -140,6 +143,17 @@ const SETTLEMENT_BY_VENUE_ACTION = Object.freeze({
     protect: SETTLEMENT.ACKNOWLEDGEMENT,
   }),
 })
+
+/**
+ * How a venue's action settles. ONE lookup, exported, so the surface that has to CONFIRM a direct
+ * settlement asks the same table the hook does rather than re-stating "a Gains protect is direct"
+ * somewhere a future venue change would not reach. Total — an unknown pair is keeper-settled, which
+ * is the reading that waits for a venue event rather than one that invents a confirmation.
+ */
+export function settlementFor(venue, action) {
+  const key = typeof venue === 'string' ? venue.trim().toLowerCase() : null
+  return SETTLEMENT_BY_VENUE_ACTION[key]?.[normalizeAction(action)] ?? SETTLEMENT.EXECUTION
+}
 
 /* ------------------------------------------------------------------------------------------- *
  * Refusals
@@ -369,6 +383,8 @@ export function usePerpsTrade(options = {}) {
       hasAttested: null,
       screenAccount: null,
       buildCalls: defaultBuildCalls,
+      // FR-023: how an action REPORTS itself. See the reporting effect below.
+      recordAction: recordPerpsOrder,
       now: () => Date.now(),
       sleep: defaultSleep,
       ...optionDeps,
@@ -593,8 +609,7 @@ export function usePerpsTrade(options = {}) {
    */
   const confirmFromVenue = useCallback((execution) => {
     setOrder((current) => {
-      const settlement = SETTLEMENT_BY_VENUE_ACTION[current.venue]?.[current.action] ?? null
-      if (settlement !== SETTLEMENT.DIRECT) return current
+      if (settlementFor(current.venue, current.action) !== SETTLEMENT.DIRECT) return current
       return reduceOrderState(current, {
         type: SIGNAL.VENUE_EXECUTED,
         venue: current.venue,
@@ -604,6 +619,68 @@ export function usePerpsTrade(options = {}) {
       })
     })
   }, [])
+
+  /**
+   * The other end of `confirmFromVenue`: the re-read is BOUNDED, and this is where it lands when
+   * the bound is spent.
+   *
+   * It reports `unknown` — "we can't confirm this, check on the venue" — which is neither a success
+   * nor a failure, because both would be claims we cannot support: the transaction was included, so
+   * the venue very likely did store the levels, but we did not see it and will not say we did. The
+   * machine keeps its edge out of `unknown`, so a later confirmation can still correct the record.
+   *
+   * Restricted to DIRECT settlement for the same reason `confirmFromVenue` is: a keeper-settled
+   * order has its own watcher, and that watcher owns when to give up on it.
+   */
+  const reportUnconfirmed = useCallback((text) => {
+    setOrder((current) => {
+      if (settlementFor(current.venue, current.action) !== SETTLEMENT.DIRECT) return current
+      const said = typeof text === 'string' && text.trim() !== '' ? text.trim() : null
+      return reduceOrderState(current, {
+        type: SIGNAL.LOST,
+        venue: current.venue,
+        chainId: current.chainId,
+        action: current.action,
+        reason: {
+          code: null,
+          text: said ?? 'We could not read this back from the venue in time.',
+          source: 'app',
+        },
+      })
+    })
+  }, [])
+
+  /* ------------------------------------------------------------------------------------------- *
+   * REPORTING (T070 / FR-023) — one producer, here, for the same reason there is one write path.
+   *
+   * Every perps action a member takes runs through this hook, so queueing the machine's own state
+   * here is what makes the activity feed complete: no surface has to remember to report, and none
+   * of them CAN report something the machine did not say. `recordPerpsOrder` takes the state from
+   * the order object and refuses to be overridden, so a caller cannot queue "position closed" for
+   * an order the venue has not executed.
+   *
+   * It is deliberately an EFFECT over `order` rather than a call inside `submit`: the terminal
+   * outcome arrives from the venue watcher long after `submit` resolved, and that outcome is the
+   * one a member actually wants in their feed. The buffer keys records by the order, so the
+   * pending state and the terminal one collapse onto one entry until the source drains them.
+   *
+   * It reports for the ACCOUNT the machine ran under — read from the same `wallet.address` the run
+   * was keyed on — so a record can never be filed under an account that did not take the action.
+   * Failures are swallowed inside the buffer: a full localStorage must never break a close.
+   * ------------------------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!account) return
+    try {
+      depsRef.current.recordAction?.(account, order)
+    } catch {
+      // BOOKKEEPING NEVER OUTRANKS THE ACTION. `recordPerpsOrder` already swallows its own storage
+      // failures, but the reporter is injectable and this effect runs on the same render as a
+      // member's close: a throw here would unmount the sheet mid-exit. A record we could not write
+      // is a missing feed line; a sheet that crashed is a member who cannot get out.
+    }
+    // `order` is a frozen new object per transition, so this fires once per state the machine
+    // reaches — which is exactly the reporting granularity FR-023 asks for.
+  }, [account, order])
 
   const networkName = NETWORKS[order.chainId]?.name ?? null
   const statusText = orderStatusText(order, { networkName })
@@ -617,9 +694,12 @@ export function usePerpsTrade(options = {}) {
     terminal: order.terminal,
     /** `{ code, reason }` for the refusal that produced a `rejected` state, or null. */
     refusal,
+    /** The member this hook signs for — the address a venue re-read has to be about. */
+    account,
     submit,
     reset,
     confirmFromVenue,
+    reportUnconfirmed,
     /** Whether this session has a transaction rail on a chain at all (passkey needs ERC-4337). */
     canTransactOn,
     cannotTransactReason,
@@ -675,7 +755,7 @@ export function normalizeDescriptor(descriptor, context = {}) {
     // An approval is only ever a leading leg of an OPEN. An exit returns collateral; it never needs
     // spending permission, and prepending one there would be a signature for nothing.
     approval: action === 'open' ? (input.approval ?? null) : null,
-    settlement: SETTLEMENT_BY_VENUE_ACTION[venue]?.[action] ?? SETTLEMENT.EXECUTION,
+    settlement: settlementFor(venue, action),
     venueLabel: PERP_VENUES[venue]?.shortLabel ?? PERP_VENUES[venue]?.label ?? venue,
     venueUrl: input.venueUrl ?? PERP_VENUES[venue]?.homepage ?? null,
     /** Gains only: the venue's own `getMarketOrdersTimeoutBlocks()`, read by the caller. */

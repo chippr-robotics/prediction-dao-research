@@ -117,12 +117,51 @@ function gainsPairAggregates(tv, pairIndex, price) {
 }
 
 /**
+ * The collateral tokens Gains accepts on a chain, as the OPEN path needs them (spec 083 US3).
+ *
+ * WHY IT IS ON THE PAIR FEED. `openTrade` takes a 1-BASED `collateralIndex` and the token's own
+ * decimals decide what a member's typed amount means. Neither is derivable from anything else the
+ * client holds — a symbol is not an index, and a wrong index opens the position in a different
+ * collateral. Without this the open sheet has no collateral it can name, so it would render a
+ * control that cannot submit; publishing the venue's own list is what makes the control real.
+ *
+ * INACTIVE COLLATERALS ARE OMITTED, not marked: the venue refuses a trade in one, so offering it
+ * would be a dead choice. An entry missing its address, index or decimals is omitted for the same
+ * reason — a partial collateral is not a collateral, and inventing the missing half is exactly the
+ * fabrication the DTO rules forbid.
+ */
+function gainsCollateralOptions(tv) {
+  const out = []
+  for (const col of tv?.collaterals ?? []) {
+    if (col?.isActive === false) continue
+    const address = isAddress(col?.collateral) ? col.collateral : null
+    const collateralIndex = uint(col?.collateralIndex)
+    const decimals = uint(col?.collateralConfig?.decimals)
+    // 0 is not a collateral index on this venue — the space is 1-based, so a 0 here is an absent
+    // value that `uint` legitimately kept, and using it would name the wrong collateral.
+    if (!address || collateralIndex == null || collateralIndex <= 0 || decimals == null) continue
+    out.push({
+      symbol: typeof col.symbol === 'string' && col.symbol !== '' ? col.symbol : null,
+      address,
+      decimals,
+      collateralIndex,
+      // The venue's own USD price for it. Never assumed to be 1: the sheet sizes the position from
+      // this, and a de-pegged stable priced at par would misstate the notional a member signs for.
+      usdPrice: pos(col?.prices?.collateralPriceUsd),
+    })
+  }
+  return out
+}
+
+/**
  * @param {{tradingVariables: object, chartPrices?: object|null, chainId: number}} input
  * @returns {object[]} PerpPair[]
  */
 export function normalizeGainsPairs({ tradingVariables: tv, chartPrices, chainId }) {
   if (!tv || !Array.isArray(tv.pairs)) return []
   const opens = Array.isArray(chartPrices?.opens) ? chartPrices.opens : null
+  // Chain-wide on this venue, so it is built once and shared by reference across the pair rows.
+  const collaterals = gainsCollateralOptions(tv)
   const out = []
   for (let i = 0; i < tv.pairs.length; i += 1) {
     const pair = tv.pairs[i]
@@ -141,6 +180,10 @@ export function normalizeGainsPairs({ tradingVariables: tv, chartPrices, chainId
           : null
     const price = opens ? pos(opens[i]) : null
     const { openInterestUsd, fundingRate } = gainsPairAggregates(tv, i, price)
+    // Group minimums are 1e3-scaled like the maximum. Gains' forex groups start above 1x, and a
+    // default below the floor is refused at signing — so the client needs the floor, not just the
+    // ceiling. A group that does not publish one leaves it null (no floor asserted).
+    const groupMin = num(group?.minLeverage)
     out.push({
       id: `gains:${chainId}:${pair.from}/${pair.to}`,
       venue: 'gains',
@@ -155,6 +198,13 @@ export function normalizeGainsPairs({ tradingVariables: tv, chartPrices, chainId
       openInterestUsd,
       maxLeverage,
       volume24hUsd: null, // not exposed by the gains backend
+      /* Spec 083 US3 — the venue's OWN handles for opening on this pair. Display fields above are
+       * exactly as spec 082 shipped them. `pairIndex` is the loop index by construction: it is the
+       * position in `tv.pairs`, which is the same index `openTrade` consumes and the same one
+       * `gainsPairAggregates` reads OI and funding at, so it cannot drift from the row it describes. */
+      pairIndex: i,
+      minLeverage: groupMin != null && groupMin > 0 ? groupMin / GAINS_LEVERAGE_SCALE : null,
+      collaterals,
     })
   }
   return out
@@ -426,6 +476,7 @@ export function normalizeGmxPairs({ marketsInfo, tickers, tokens, chainId }) {
   const markets = Array.isArray(marketsInfo?.markets) ? marketsInfo.markets : []
   const tokenList = Array.isArray(tokens?.tokens) ? tokens.tokens : Array.isArray(tokens) ? tokens : []
   const decimalsByAddress = new Map(tokenList.map((t) => [String(t.address).toLowerCase(), num(t.decimals)]))
+  const tokenByAddress = new Map(tokenList.map((t) => [String(t.address).toLowerCase(), t]))
   const tickerByAddress = new Map(
     (Array.isArray(tickers) ? tickers : []).map((t) => [String(t.tokenAddress).toLowerCase(), t]),
   )
@@ -469,9 +520,64 @@ export function normalizeGmxPairs({ marketsInfo, tickers, tokens, chainId }) {
       openInterestUsd,
       maxLeverage: null, // not exposed by the GMX REST API
       volume24hUsd: null,
+      /* Spec 083 US3 — the venue's OWN handles for opening on this market.
+       *
+       * `market` is the market TOKEN, which is what `CreateOrderParams.addresses.market` takes. It
+       * is already inside the row's id, and the client can parse it back out; publishing it as a
+       * field means nothing downstream has to parse an id to act, and the two can never disagree
+       * because both come from this one value.
+       *
+       * `collaterals` are the market's own long and short tokens — the only two GMX accepts here.
+       * They are emitted ONLY when the payload names them and the token list resolves their
+       * decimals: a collateral whose decimals we do not know cannot turn a member's typed amount
+       * into base units, so offering it would produce an order for the wrong size. An empty list
+       * therefore means "GMX did not tell us", and the sheet declines to offer this venue rather
+       * than guessing a token. */
+      market: isAddress(m.marketToken) ? m.marketToken : null,
+      collaterals: gmxCollateralOptions(m, tokenByAddress, tickerByAddress),
     })
   }
   return out
+}
+
+/**
+ * A GMX market's accepted collateral, from the market's own long/short tokens.
+ *
+ * De-duplicated: a single-token market names the same address twice, and two identical choices in
+ * a picker is a defect the member has to reason about.
+ */
+function gmxCollateralOptions(market, tokenByAddress, tickerByAddress) {
+  const out = []
+  const seen = new Set()
+  for (const address of [market?.longToken, market?.shortToken]) {
+    if (!isAddress(address)) continue
+    const key = address.toLowerCase()
+    if (seen.has(key)) continue
+    const token = tokenByAddress.get(key)
+    const decimals = uint(token?.decimals)
+    if (decimals == null) continue
+    seen.add(key)
+    out.push({
+      symbol: typeof token?.symbol === 'string' && token.symbol !== '' ? token.symbol : null,
+      address,
+      decimals,
+      // GMX has no per-collateral index — the token address IS the handle. Null rather than absent
+      // so the shape matches Gains' and a consumer never has to know which venue it came from.
+      collateralIndex: null,
+      // GMX's OWN price for the collateral, so the notional a member is shown is measured in the
+      // venue's units and not against an assumed $1 peg. Null where the venue did not price it.
+      usdPrice: gmxTokenPriceUsd(tickerByAddress.get(key), decimals),
+    })
+  }
+  return out
+}
+
+/** A GMX ticker → USD, at the venue's own 10^(30 - decimals) scale. Null when it did not report. */
+function gmxTokenPriceUsd(ticker, decimals) {
+  const min = num(ticker?.minPrice)
+  const max = num(ticker?.maxPrice)
+  if (min == null || max == null) return null
+  return pos((min + max) / 2 / 10 ** (30 - decimals))
 }
 
 // ---------------------------------------------------------------------------------------------

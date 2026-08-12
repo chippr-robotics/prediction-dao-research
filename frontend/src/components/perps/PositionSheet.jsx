@@ -15,7 +15,10 @@
  *    so "Sent to Gains" on inclusion and "Position closed." only on the venue's own execution event
  *    are properties of the machine, not of this sheet. There is deliberately no local `done` flag —
  *    that is exactly the shape (`VaultSheet.jsx`'s `txState.step === 'done'`) that turns a stalled
- *    submission into a claim of success.
+ *    submission into a claim of success. A Gains protection change settles inside the member's own
+ *    transaction and emits no order event, so it is the one action with nothing to watch — and it
+ *    is confirmed by RE-READING the venue (`confirmStoredProtection`), never by inclusion. That
+ *    read is bounded, and when the bound is spent the machine is told the thread was lost.
  *
  * 3. **EXITS ARE NEVER GATED.** Nothing here imports the attestation, the management kill switch,
  *    or the venue's open-permission check — a sibling test greps this file for each of those names,
@@ -41,7 +44,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import InfoTip from '../ui/InfoTip'
 import { NETWORKS } from '../../config/networks'
 import { PERP_VENUES, perpsUiFeeReceiver } from '../../config/perps'
-import { usePerpsTrade } from '../../hooks/usePerpsTrade'
+import { SETTLEMENT, settlementFor, usePerpsTrade } from '../../hooks/usePerpsTrade'
 import { ORDER_STATE } from '../../lib/perps/orderState'
 import { suggestProtection } from '../../lib/perps/defaults'
 import { feeUsdFromNotional } from '../../lib/perps/feeUnits'
@@ -54,10 +57,15 @@ import {
   bigintOrNull,
   buildExitDescriptor,
   buildProtectDescriptor,
+  confirmStoredProtection,
   defaultReadFeeBps,
+  defaultReadVenueQuote,
   directionOf,
+  formatWeiAmount,
+  gainsTradeIndexOf,
   numberOrNull,
   positiveNumber,
+  readStoredProtection,
 } from './positionSheetActions'
 import './PositionSheet.css'
 
@@ -83,7 +91,13 @@ export default function PositionSheet({
   venueStatus = null,
   /** The venue's own fee for this exit, where the caller knows it. Absent renders '—', never 0. */
   venueFeeUsd = null,
-  /** GMX only: `{ executionFee, acceptablePrice? }` — the keeper fee the member pays. */
+  /**
+   * GMX only: `{ executionFee, acceptablePrice? }` — the keeper fee the member pays.
+   *
+   * OPTIONAL, and normally absent: the sheet reads it itself (`deps.readQuote`, defaulting to
+   * `defaultReadVenueQuote`) so no caller has to know that GMX charges one. A caller that already
+   * holds a quote may still supply it, and it wins over the read.
+   */
   venueQuote = null,
   /** Public venue attribution, for the link-out. */
   attribution = null,
@@ -112,9 +126,23 @@ export default function PositionSheet({
   const [percent, setPercent] = useState(100)
   const [refusal, setRefusal] = useState(null)
   const [fee, setFee] = useState(null) // null = still reading
+  const [readQuoteResult, setReadQuoteResult] = useState(null) // null = still reading, or none needed
+  /** The venue's OWN stored protection, as re-read from it. null = never read, not "none set". */
+  const [venueProtection, setVenueProtection] = useState(null)
+  /** What the venue did with the last protection write, in its own words. */
+  const [protectionNote, setProtectionNote] = useState(null)
   const [stopText, setStopText] = useState('')
   const [takeText, setTakeText] = useState('')
   const editedRef = useRef(false)
+
+  /** False once the sheet is gone, so a bounded re-read abandons instead of publishing into it. */
+  const aliveRef = useRef(true)
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+    }
+  }, [])
 
   /* Sheet shell: focus save/restore, Escape, and the body scroll lock with its cleanup.
    *
@@ -183,6 +211,75 @@ export default function PositionSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venue, chainId])
 
+  /* THE VENUE'S OWN QUOTE — on GMX, the keeper fee without which `createOrder` reverts.
+   *
+   * Read HERE rather than passed in, for the same reason the rate above is: the venue is the
+   * authority for it, it changes with GMX's configuration and the live gas price, and a member
+   * must not have to hold a position on a particular screen for their exit to be buildable. It is
+   * read ONCE per open (venue + chain), not polled: the buffer in the estimate exists precisely so
+   * a quote does not go stale between reading it and signing.
+   *
+   * A failure is NOT a gate. It means this app cannot assemble valid calldata for GMX right now,
+   * which is disclosed below with GMX's own app named — the exit itself is never withheld. */
+  const readQuote = deps?.readQuote ?? defaultReadVenueQuote
+  useEffect(() => {
+    if (!venue) return undefined
+    let alive = true
+    setReadQuoteResult(null)
+    Promise.resolve()
+      .then(() => readQuote({ venue, chainId }))
+      .then((result) => {
+        if (alive) setReadQuoteResult(result ?? null)
+      })
+      .catch(() => {
+        if (alive) setReadQuoteResult({ failed: true })
+      })
+    return () => {
+      alive = false
+    }
+    // Same ownership as `readFee` above: re-reading on a new venue/chain is the intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venue, chainId])
+
+  /* A quote the CALLER supplied wins; otherwise the sheet's own read. Both may legitimately be
+   * absent — a Gains exit has no keeper fee at all, and rendering a fee line there would invent
+   * a cost the member does not pay. */
+  const quote = venueQuote ?? readQuoteResult
+
+  /* THE VENUE'S STORED PROTECTION — read from the venue, because that is the only thing US2
+   * acceptance 3 accepts as "what is saved".
+   *
+   * It matters TWICE. Before a write it is what the fields are pre-filled from, so a member sees
+   * their real stop rather than a suggestion. After a write it is the BASELINE the confirmation
+   * proves a change against: an endpoint a block behind still answers the old levels, and without
+   * something to compare to, that stale answer would be reported as the new one.
+   *
+   * Only for a venue that settles protection DIRECTLY (Gains). GMX keeps protection as separate
+   * trigger orders, which are read — and cancelled — as orders, never from the position. */
+  const readProtection = deps?.readProtection ?? readStoredProtection
+  const memberAddress = trade.account ?? null
+  const gainsIndexValue = numberOrNull(position?.venueRef?.tradeIndex?.value ?? position?.venueRef?.tradeIndex)
+  useEffect(() => {
+    if (settlementFor(venue, 'protect') !== SETTLEMENT.DIRECT) return undefined
+    const index = gainsTradeIndexOf(position)
+    if (!index || !memberAddress) return undefined
+    let alive = true
+    Promise.resolve()
+      .then(() => readProtection({ venue, chainId, account: memberAddress, tradeIndex: index }))
+      .then((result) => {
+        // A FAILED read leaves the previous answer alone. "We could not ask" is not "there is
+        // none", and blanking a stop the member can see would be a fabricated fact.
+        if (alive && result?.ok) setVenueProtection(result.stored)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+    // Keyed on the position's own identity, not on the object: the parent re-creates positions on
+    // every poll, and re-reading the venue on each one would be a request loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venue, chainId, gainsIndexValue, memberAddress])
+
   const isLong = directionOf(position)
   const markPrice = positiveNumber(markPriceProp) ?? positiveNumber(position?.markPrice) ?? positiveNumber(position?.currentPrice) ?? positiveNumber(position?.price)
   const sizeUsd = positiveNumber(position?.sizeUsd) ?? positiveNumber(position?.sizeInUsdDisplay)
@@ -202,8 +299,12 @@ export default function PositionSheet({
       }),
     [position?.entryPrice, position?.leverage, markPrice, isLong, liquidationPrice],
   )
-  const storedStop = positiveNumber(protection?.stopLoss)
-  const storedTake = positiveNumber(protection?.takeProfit)
+  /* A caller that already holds the venue's levels wins; otherwise the sheet's own read of them.
+   * `null` on this object means "the venue has no level", and the object being absent altogether
+   * means "nobody has asked the venue yet" — two different things the confirmation depends on. */
+  const storedLevels = protection ?? venueProtection
+  const storedStop = positiveNumber(storedLevels?.stopLoss)
+  const storedTake = positiveNumber(storedLevels?.takeProfit)
 
   useEffect(() => {
     // Never overwrite what the member has typed. Once they edit, the fields are theirs.
@@ -257,7 +358,7 @@ export default function PositionSheet({
     async (built) => {
       if (!built.ok) {
         setRefusal(built.reason)
-        return
+        return null
       }
       setRefusal(null)
       // A session with no rail on this chain is not a restriction — it is the absence of a way to
@@ -267,11 +368,68 @@ export default function PositionSheet({
         setRefusal(
           `${trade.cannotTransactReason?.(built.descriptor.chainId) ?? 'This session cannot send transactions on that network.'} You can still close this position on ${venueLabel}.`,
         )
-        return
+        return null
       }
-      await trade.submit(built.descriptor)
+      return trade.submit(built.descriptor)
     },
     [trade, venueLabel],
+  )
+
+  /**
+   * CONFIRM A DIRECT SETTLEMENT (US2 acceptance 3).
+   *
+   * `updateSl` / `updateTp` change the diamond's own state inside the member's transaction and
+   * announce it with no order event, so there is nothing for the machine's watcher to see: without
+   * this the sheet would rest at "Sent to Gains" for good. The confirmation is the venue's own
+   * `getTrade`, re-read until it proves the change, and what it returns is what the sheet shows —
+   * the requested level never becomes the displayed one.
+   *
+   * It is BOUNDED. On exhaustion the machine is told the read was lost, which reports "we can't
+   * confirm this — check on the venue" and leaves the venue's own surface a tap away. That is the
+   * honest end of a read we could not complete; a spinner and a claim of success are both lies.
+   */
+  const confirmProtection = deps?.confirmProtection ?? confirmStoredProtection
+  const confirmDirectSettlement = useCallback(
+    async (descriptor, previous) => {
+      const params = descriptor?.params ?? {}
+      // Only the legs that were actually written. An untouched leg proves nothing either way.
+      const requested = {}
+      if ('sl' in params) requested.sl = params.sl
+      if ('tp' in params) requested.tp = params.tp
+
+      const outcome = await confirmProtection({
+        venue: descriptor.venue,
+        chainId: descriptor.chainId,
+        account: memberAddress,
+        tradeIndex: params.tradeIndex,
+        requested,
+        previous,
+        deps: { readStored: readProtection, sleep: deps?.sleep, alive: () => aliveRef.current },
+      })
+      if (!aliveRef.current) return
+
+      if (!outcome?.ok) {
+        trade.reportUnconfirmed?.(`${venueLabel} did not report these levels back in time.`)
+        setProtectionNote(
+          `We could not confirm what ${venueLabel} stored. The levels above are the last ones ${venueLabel} reported — check them on ${venueLabel}.`,
+        )
+        return
+      }
+
+      // What the venue HOLDS, everywhere: the fields, the note, and the machine's payload.
+      //
+      // The fields are written DIRECTLY rather than left to the pre-fill effect, because a member
+      // who typed a level has `editedRef` set and that effect deliberately never overrules them —
+      // which is right while they are editing and wrong the moment the venue has answered. The
+      // flag stays set so nothing else overwrites the venue's own numbers afterwards.
+      setVenueProtection(outcome.stored)
+      editedRef.current = true
+      setStopText(numberToText(outcome.stored.stopLoss))
+      setTakeText(numberToText(outcome.stored.takeProfit))
+      setProtectionNote(storedProtectionNote(outcome, requested, venueLabel))
+      trade.confirmFromVenue?.(outcome.stored)
+    },
+    [confirmProtection, readProtection, deps?.sleep, memberAddress, trade, venueLabel],
   )
 
   const onExit = useCallback(() => {
@@ -280,31 +438,54 @@ export default function PositionSheet({
         position,
         percent,
         markPrice,
-        quote: venueQuote,
+        quote,
         uiFeeReceiver: perpsUiFeeReceiver(),
       }),
     )
-  }, [send, position, percent, markPrice, venueQuote])
+  }, [send, position, percent, markPrice, quote])
 
-  const onProtect = useCallback(() => {
+  const onProtect = useCallback(async () => {
     if (!protectionCheck.ok) {
       // The refusal is already on screen beside the field; repeating it here keeps a member who
       // reached the button by keyboard from being met with silence.
       setRefusal(protectionCheck.reason)
       return
     }
-    send(
-      buildProtectDescriptor({
-        position,
-        stopLoss: stopLoss === 'invalid' ? null : stopLoss,
-        takeProfit: takeProfit === 'invalid' ? null : takeProfit,
-        stored: { stopLoss: storedStop, takeProfit: storedTake },
-        markPrice,
-        quote: venueQuote,
-        uiFeeReceiver: perpsUiFeeReceiver(),
-      }),
-    )
-  }, [send, position, stopLoss, takeProfit, storedStop, storedTake, markPrice, venueQuote, protectionCheck])
+    const built = buildProtectDescriptor({
+      position,
+      stopLoss: stopLoss === 'invalid' ? null : stopLoss,
+      takeProfit: takeProfit === 'invalid' ? null : takeProfit,
+      stored: { stopLoss: storedStop, takeProfit: storedTake },
+      markPrice,
+      quote,
+      uiFeeReceiver: perpsUiFeeReceiver(),
+    })
+    // The baseline the confirmation proves a change against, captured BEFORE the write. An absent
+    // object says the venue was never read — a distinction the confirmation depends on, so it is
+    // not flattened into a pair of nulls.
+    const previous = storedLevels
+      ? { stopLoss: storedLevels.stopLoss ?? null, takeProfit: storedLevels.takeProfit ?? null }
+      : null
+    setProtectionNote(null)
+
+    const outcome = await send(built)
+    // `ok` here is the SUBMISSION, never the venue — the whole point of what follows.
+    if (!outcome?.ok) return
+    if (settlementFor(built.descriptor.venue, built.descriptor.action) !== SETTLEMENT.DIRECT) return
+    await confirmDirectSettlement(built.descriptor, previous)
+  }, [
+    send,
+    confirmDirectSettlement,
+    position,
+    stopLoss,
+    takeProfit,
+    storedStop,
+    storedTake,
+    storedLevels,
+    markPrice,
+    quote,
+    protectionCheck,
+  ])
 
   if (!position) return null
 
@@ -320,6 +501,14 @@ export default function PositionSheet({
     collateralUsd === null || pnlShare === null ? null : (collateralUsd + pnlShare) * fraction
   const statusText = trade.statusText
   const executed = trade.status === ORDER_STATE.EXECUTED
+
+  /* The keeper fee, and the two things a member must be told about it: it is an ESTIMATE bid a
+   * little high on purpose, and the unspent part comes back. Rendered only where the venue
+   * actually charges one — an absent quote is Gains having no such fee, not a missing number. */
+  const keeperFeeWei = bigintOrNull(quote?.executionFee)
+  const keeperFeeText = keeperFeeWei === null ? null : formatWeiAmount(keeperFeeWei)
+  const nativeSymbol = NETWORKS[chainId]?.nativeCurrency?.symbol ?? null
+  const keeperFeeUnreadable = Boolean(quote?.failed)
 
   return (
     <div className="asset-sheet-backdrop">
@@ -344,6 +533,10 @@ export default function PositionSheet({
             <h3 id={titleId}>
               {isLong === null ? '' : isLong ? 'Long ' : 'Short '}
               {position.symbol || 'this position'}
+              {/* The venue's market variant, where it has one (GMX runs several markets on one
+                  base pair). It is inside the title so the sheet a member is about to act in
+                  names exactly which market that is — and so the dialog's accessible name does. */}
+              {position.variant ? <span className="pps-variant"> {position.variant}</span> : null}
             </h3>
             <p className="pps-venue">
               On {venueMeta?.label ?? venueLabel}
@@ -454,7 +647,33 @@ export default function PositionSheet({
                 <dd>{feeUsd === null ? DASH : formatUsd(feeUsd)}</dd>
               </div>
             )}
+            {/* GMX settles orders through keepers the member pays. It is a real cost, in the
+                network's own coin rather than USD, so it gets its own line — never folded into
+                "the venue's own fees", which is the trading fee. */}
+            {keeperFeeText !== null && (
+              <div>
+                <dt>{venueLabel} keeper fee (estimated)</dt>
+                <dd>
+                  {keeperFeeText}
+                  {nativeSymbol ? ` ${nativeSymbol}` : ''}
+                </dd>
+              </div>
+            )}
           </dl>
+          {keeperFeeText !== null && (
+            <p className="pps-note">
+              {venueLabel} pays a keeper to execute this order, and this deposit is what pays them.
+              It is set a little above the current estimate so the order cannot stall if gas moves
+              before you sign — {venueLabel} returns whatever the keeper does not spend to your
+              wallet.
+            </p>
+          )}
+          {keeperFeeUnreadable && (
+            <p className="pps-note" role="note">
+              {venueLabel}’s keeper fee could not be read just now, so an order cannot be prepared
+              here until it can be. Your position is unaffected and you can close it on {venueLabel}.
+            </p>
+          )}
           {feeApplies && (
             <p className="pps-note">
               The FairWins fee is charged on the position’s size ({formatUsd(closingNotional)}), not
@@ -590,6 +809,16 @@ export default function PositionSheet({
           >
             Save protection
           </button>
+          {/* WHAT THE VENUE STORED — read back from it, not echoed from the request. It is the
+              only thing on this sheet allowed to describe a saved level, and it says so plainly
+              when the venue kept something other than what was asked for. */}
+          {/* `role="note"`, not `status`: the machine's own line above is this sheet's ONE live
+              region, and a second one would announce the same event twice. */}
+          {protectionNote && (
+            <p className="pps-note pps-stored-note" role="note">
+              {protectionNote}
+            </p>
+          )}
           <p className="pps-note">
             Saved levels are shown as {venueLabel} stores them, once {venueLabel} has recorded them.
           </p>
@@ -654,6 +883,36 @@ function impactText({ level, sizeUsd, entryPrice, isLong, venueLabel }) {
   }
   const move = ((level - entry) / entry) * (isLong ? 1 : -1)
   return `At ${formatPairPrice(level)}, about ${formatSignedUsd(sizeUsd * move)} — estimated, before ${venueLabel}’s fees.`
+}
+
+/**
+ * What the venue stored, said in the venue's own numbers.
+ *
+ * The clamped case is the one this exists for: a venue may round to its price grid or pull a level
+ * inside its own limits, and a sheet that kept showing the requested number would be telling the
+ * member they hold protection they do not have. Both levels are named as the VENUE's.
+ */
+function storedProtectionNote(outcome, requested, venueLabel) {
+  const stored = outcome?.stored ?? null
+  if (!stored) return null
+  const legs = [
+    { key: 'sl', label: 'stop-loss', value: stored.stopLoss },
+    { key: 'tp', label: 'take-profit', value: stored.takeProfit },
+  ].filter((leg) => leg.key in (requested ?? {}))
+  if (legs.length === 0) return null
+
+  const said = legs
+    .map((leg) => (leg.value === null ? `no ${leg.label}` : `a ${leg.label} of ${formatPairPrice(leg.value)}`))
+    .join(' and ')
+  if (outcome.matchesRequest) return `${venueLabel} has stored ${said}.`
+
+  const asked = legs
+    .map((leg) => {
+      const level = positiveNumber(requested?.[leg.key])
+      return level === null ? `no ${leg.label}` : `${formatPairPrice(level)}`
+    })
+    .join(' and ')
+  return `${venueLabel} stored ${said} — not the ${asked} you asked for. Venues round levels to their own price steps and limits, and the levels above are the ones ${venueLabel} holds.`
 }
 
 function hasRawCollateral(position) {

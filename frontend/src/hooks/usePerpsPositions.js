@@ -329,8 +329,11 @@ function toGmxPosition(p, chainId) {
     id: `gmx:${chainId}:${p.key ?? `${p.market}:${p.collateralToken}:${p.isLong ? 'long' : 'short'}`}`,
     venue: 'gmx',
     chainId,
-    // The Reader names a MARKET ADDRESS, not a pair. Naming the pair needs market metadata this
-    // hook does not read, so it stays null rather than being guessed from an address.
+    // The Reader names a MARKET ADDRESS, not a pair. Naming the pair needs the venue's market
+    // list, which this hook does not fetch — so it stays null here rather than being guessed from
+    // an address. The composition point resolves it against the pairs feed it already has
+    // (`lib/perps/gmxMarkets.js`, keyed on `venueRef.market`); a market that feed does not list
+    // stays null all the way to the screen and renders '—'.
     symbol: null,
     direction: p.isLong ? 'long' : 'short',
     sizeUsd: usdNumber(p.sizeInUsd),

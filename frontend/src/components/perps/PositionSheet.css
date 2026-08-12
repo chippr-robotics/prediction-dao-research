@@ -18,6 +18,12 @@
 
 /* Header ------------------------------------------------------------------------------------ */
 
+/* The venue's market variant beside the pair in the sheet title (GMX: "WBTC.b-USDC"). */
+.pps-variant {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
 .pps-venue {
   color: var(--text-secondary, #6b7280);
   font-size: 0.8rem;
@@ -102,6 +108,11 @@
   color: var(--semantic-loss, #dc2626);
   font-size: 0.8rem;
   margin: 0;
+}
+/* What the venue stored, read back from it. Carries more weight than an ordinary note because it
+   is the one line that can differ from what the member typed. */
+.pps-stored-note {
+  color: var(--text-primary, #111827);
 }
 
 /* How much to close -------------------------------------------------------------------------- */

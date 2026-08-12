@@ -138,10 +138,23 @@ const idleChain = { getLogs: async () => [], getBlockNumber: async () => 100 }
  * Render the sheet with every side effect injected. `deps` is created once per call because it
  * selects which trade hook runs — a changing identity would reorder hooks.
  */
-function renderSheet({ position = gainsPosition(), sendOnChain, readFee, tradeDeps, ...props } = {}) {
+function renderSheet({
+  position = gainsPosition(),
+  sendOnChain,
+  readFee,
+  readProtection,
+  sleep,
+  tradeDeps,
+  ...props
+} = {}) {
   const send = sendOnChain ?? vi.fn(async () => receipt())
   const deps = {
     readFee: readFee ?? (async () => ({ bps: 5 })),
+    // The venue re-read that confirms a DIRECT settlement. Unreadable by default, and the
+    // confirmation's own clock parks — so a test that is not about the confirmation sees exactly
+    // the state a member sees while it is still in flight, and touches no network to do it.
+    readProtection: readProtection ?? (async () => ({ ok: false, reason: 'unreadable' })),
+    sleep: sleep ?? parked,
     trade: {
       sendOnChain: send,
       getProvider: () => idleChain,
@@ -505,9 +518,124 @@ describe('protection (US2)', () => {
     })
 
     // Gains applies tp/sl inside the member's own transaction and emits no order event, so the
-    // machine stops at "sent" — the confirmation is the caller re-reading the venue's stored values.
+    // machine stops at "sent" while the venue is re-read — inclusion alone never claims success.
     expect(screen.getByRole('status')).toHaveTextContent('Sent to Gains.')
     expect(screen.queryByText('Protection updated.')).not.toBeInTheDocument()
+  })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * US2 acceptance 3 — the sheet reflects the VENUE's stored values, not the requested ones
+ *
+ * A Gains protect settles inside the member's own transaction and emits no order event, so there is
+ * nothing to watch: the confirmation is a re-read of the diamond. Before it existed the machine
+ * rested at "Sent to Gains" for ever, `onActionComplete` never fired, and the fields kept showing
+ * the number the member typed as though the venue had agreed to it.
+ * --------------------------------------------------------------------------------------------- */
+
+describe('confirming a Gains protection change from the venue (US2 acceptance 3)', () => {
+  /** The venue's stored levels, in the shape `readStoredProtection` publishes. */
+  const storedLevels = (stopLoss, takeProfit) => ({
+    ok: true,
+    stored: {
+      stopLoss,
+      takeProfit,
+      sl: stopLoss === null ? 0n : BigInt(stopLoss) * 10n ** 10n,
+      tp: takeProfit === null ? 0n : BigInt(takeProfit) * 10n ** 10n,
+    },
+  })
+
+  /** Answers each read from a script, then repeats the last answer for ever. */
+  function venueReads(...answers) {
+    const readProtection = vi.fn(async () => answers[Math.min(readProtection.mock.calls.length - 1, answers.length - 1)])
+    return readProtection
+  }
+
+  it('pre-fills from what the venue HOLDS, ahead of any suggestion', async () => {
+    renderSheet({ readProtection: venueReads(storedLevels(57_000, 70_000)) })
+    await settle()
+    // Not 58,500 / 72,000, which is what `suggestProtection` would have offered.
+    expect(screen.getByLabelText('Stop-loss price')).toHaveValue('57000')
+    expect(screen.getByLabelText('Take-profit price')).toHaveValue('70000')
+  })
+
+  it('shows the level GAINS STORED when it differs from the one requested, and says so', async () => {
+    // The venue rounded 59,000 to its own price step. The member asked for one number and holds
+    // another: showing the requested one would tell them they have protection they do not have.
+    const readProtection = venueReads(storedLevels(57_000, 70_000), storedLevels(59_050, 70_000))
+    const onActionComplete = vi.fn()
+    renderSheet({ readProtection, sleep: async () => {}, onActionComplete })
+    await settle()
+
+    fireEvent.change(screen.getByLabelText('Stop-loss price'), { target: { value: '59000' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save protection' }))
+    })
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Protection updated.'))
+
+    // The field carries the VENUE's number, not the member's.
+    expect(screen.getByLabelText('Stop-loss price')).toHaveValue('59050')
+    const note = screen.getByText(/Gains stored a stop-loss of 59,050/)
+    expect(note).toHaveTextContent('not the 59,000.0 you asked for')
+    // …and the position is re-read once, off the venue's own confirmation.
+    expect(onActionComplete).toHaveBeenCalledTimes(1)
+  })
+
+  it('confirms a level the venue stored exactly as asked, without inventing a discrepancy', async () => {
+    const readProtection = venueReads(storedLevels(57_000, 70_000), storedLevels(59_000, 70_000))
+    renderSheet({ readProtection, sleep: async () => {} })
+    await settle()
+
+    fireEvent.change(screen.getByLabelText('Stop-loss price'), { target: { value: '59000' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save protection' }))
+    })
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Protection updated.'))
+
+    expect(screen.getByText('Gains has stored a stop-loss of 59,000.0.')).toBeInTheDocument()
+    expect(screen.queryByText(/you asked for/)).not.toBeInTheDocument()
+  })
+
+  it('a venue that never reports the change ends in "we can’t confirm", never in success', async () => {
+    // The read is bounded. When the bound is spent the machine lands in `unknown` — not a claim
+    // that it worked, not a claim that it failed, and never a spinner with no end.
+    const readProtection = venueReads(storedLevels(57_000, 70_000))
+    const onActionComplete = vi.fn()
+    renderSheet({ readProtection, sleep: async () => {}, onActionComplete })
+    await settle()
+
+    fireEvent.change(screen.getByLabelText('Stop-loss price'), { target: { value: '59000' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save protection' }))
+    })
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('We can’t confirm this — check on Gains.'),
+    )
+    expect(screen.queryByText('Protection updated.')).not.toBeInTheDocument()
+    expect(onActionComplete).not.toHaveBeenCalled()
+    // The way through is named, and it is the venue's own surface.
+    expect(screen.getByText(/could not confirm what Gains stored/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Manage this position on Gains Network/ })).toBeInTheDocument()
+    // The controls come back — a confirmation we lost must not leave the sheet frozen.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save protection' })).toBeEnabled())
+  })
+
+  it('does not re-read the venue for a CLOSE — only a direct settlement is confirmed this way', async () => {
+    // A close is keeper-settled: the venue's own execution event is the only thing that may report
+    // it, and a re-read minting an execution there is exactly what rule 2 forbids.
+    const readProtection = venueReads(storedLevels(57_000, 70_000))
+    renderSheet({ readProtection, sleep: async () => {} })
+    await settle()
+    const before = readProtection.mock.calls.length
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Close this position' }))
+    })
+    await settle()
+
+    expect(readProtection.mock.calls.length).toBe(before)
+    expect(screen.getByRole('status')).toHaveTextContent('Sent to Gains.')
   })
 })
 

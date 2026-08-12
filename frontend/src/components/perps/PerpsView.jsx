@@ -36,10 +36,12 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { WalletContext } from '../../contexts/WalletContext.js'
 import InfoTip from '../ui/InfoTip'
+import OpenPositionSheet from './OpenPositionSheet'
 import PerpsPairTable from './PerpsPairTable'
 import PerpsPendingOrders from './PerpsPendingOrders'
 import PerpsPositions from './PerpsPositions'
 import PositionSheet from './PositionSheet'
+import { defaultReadCollateralBalances, openVenueOptionsFor } from './openPositionActions'
 import { usePerpsMarkets } from '../../hooks/usePerpsMarkets'
 import { usePerpsOrders } from '../../hooks/usePerpsOrders'
 import { usePerpsPositions } from '../../hooks/usePerpsPositions'
@@ -53,6 +55,8 @@ import {
   perpsManageFeatureEnabled,
 } from '../../config/perps'
 import { bpsToPct } from '../../lib/perps/format'
+import { buildGmxMarketIndex, gmxMarketPrice, withGmxMarketSymbols } from '../../lib/perps/gmxMarkets'
+import { readVenueStatuses } from '../../lib/perps/venueStatus'
 import {
   PERPS_TIPS,
   PERPS_RISK_DISCLOSURE,
@@ -122,6 +126,38 @@ export default function PerpsView({ deps }) {
   const [managed, setManaged] = useState(null)
   const dismissSheet = useCallback(() => setManaged(null), [])
 
+  /* THE ENTRY SURFACE (US3). `opening` is the pair row the member tapped; null is the phase-0
+   * state and is where this view stays for every build with the flag off.
+   *
+   * The control is offered on exactly the rows this build can build an order for — the same two
+   * halves `canManage` uses above, so Hyperliquid never grows a dead in-app control (FR-021) and
+   * neither does a Gains chain with no calldata path. Everything else the member needs to know —
+   * whether the venue is taking new positions, whether its own handle for the pair resolves,
+   * whether they hold collateral it accepts — is stated INSIDE the sheet with the venue named as
+   * the source, because those are facts about the venue that deserve a sentence rather than a
+   * control that silently is not there. */
+  const [opening, setOpening] = useState(null)
+  const dismissOpen = useCallback(() => setOpening(null), [])
+  const offerOpen = useCallback(
+    (pair) => manageEnabled && Boolean(pair) && perpsManageEnabled(pair.venue, pair.chainId),
+    [manageEnabled],
+  )
+
+  /* ONE SHEET AT A TIME, and this is not cosmetic. Both sheets take the body scroll lock on mount
+   * and restore what they found on unmount, so a second one mounting while the first is open
+   * captures `overflow: hidden` as the "previous" value and leaves the page unscrollable after
+   * both have gone. They also both bind a capture-phase Escape handler, so one dismissal would
+   * close the wrong one. The positions list stays in the DOM behind the entry sheet and is
+   * reachable by keyboard, so this is a state a member can actually get into. */
+  const openManageSheet = useCallback((position) => {
+    setOpening(null)
+    setManaged(position)
+  }, [])
+  const openEntrySheet = useCallback((pair) => {
+    setManaged(null)
+    setOpening(pair)
+  }, [])
+
   // Account change closes the sheet DURING RENDER, not in an effect: an open sheet aimed at the
   // previous account's position — and the venue handles inside it — must never be painted for
   // another account (spec 083 edge case). This is React's documented adjust-state-on-prop-change
@@ -130,6 +166,9 @@ export default function PerpsView({ deps }) {
   if (sheetAccount !== account) {
     setSheetAccount(account)
     setManaged(null)
+    // The entry sheet holds the previous account's balances and an in-flight confirmation of
+    // theirs; it goes for the same reason, and before anything is painted for the new account.
+    setOpening(null)
   }
 
   /* The sheet shows the venue's LATEST read of the position while the venue still reports it, and
@@ -137,10 +176,29 @@ export default function PerpsView({ deps }) {
    * executes the row leaves the list, and re-resolving to `null` there would yank the venue's own
    * "Position closed." off screen before the member had read it. The figures are then the last ones
    * the venue reported, which is what they always were. */
+  /* NAMING A GMX MARKET, from the feed that is already on screen.
+   *
+   * GMX's Reader names a MARKET ADDRESS and nothing else, so `usePerpsPositions` publishes those
+   * rows with `symbol: null` — honestly, because a hook that reads one venue's Reader has no pair
+   * table to consult. The gateway's GMX pairs carry the market token inside their id, so the
+   * mapping is composed HERE, where both feeds meet, rather than by adding a second Arbitrum read
+   * or by teaching the positions hook about markets it does not fetch (its shape and its per-venue
+   * isolation are unchanged).
+   *
+   * `allPairs` again, for the same reason the price uses it: the member's search box shapes the
+   * table, and must never decide whether their own position can be named. A market the feed does
+   * not list stays `symbol: null` and renders '—' — `withGmxMarketSymbols` matches the market
+   * address EXACTLY and never guesses a pair from a partial one. */
+  const gmxMarkets = useMemo(() => buildGmxMarketIndex(markets.allPairs), [markets.allPairs])
+  const positionRows = useMemo(
+    () => withGmxMarketSymbols(positions.positions, gmxMarkets),
+    [positions.positions, gmxMarkets],
+  )
+
   const managedPosition = useMemo(() => {
     if (!managed) return null
-    return positions.positions.find((p) => p.id === managed.id) ?? managed
-  }, [managed, positions.positions])
+    return positionRows.find((p) => p.id === managed.id) ?? managed
+  }, [managed, positionRows])
 
   /* THE CURRENT PRICE, AND WHY IT IS COMPOSED HERE.
    *
@@ -154,9 +212,16 @@ export default function PerpsView({ deps }) {
    * renders — so it is passed down rather than read again. Matched on VENUE FIRST: one venue's
    * price may never stand in for another's, and a pair only one venue lists must not silently
    * borrow the other's number. `allPairs`, not `pairs`, because the latter is filtered by the
-   * member's own search box. No match (a GMX row, whose Reader reports no symbol) leaves it null,
-   * and null renders '—' and refuses the close — the honest outcome, never a guessed price. */
+   * member's own search box. No match leaves it null, and null renders '—' and refuses the close —
+   * the honest outcome, never a guessed price.
+   *
+   * GMX IS MATCHED ON THE MARKET ADDRESS, NOT THE SYMBOL, and that is not a shortcut around the
+   * resolution above — it is stricter than it. GMX lists several markets on one base pair
+   * ("BTC/USD [WBTC.b-USDC]" and "BTC/USD [BTC-USDC]" are different markets), so a symbol match
+   * would have two candidates on the position's own chain and would take whichever came first.
+   * The position names its market exactly, so the price comes from THAT market's record. */
   const markPrice = useMemo(() => {
+    if (managedPosition?.venue === 'gmx') return gmxMarketPrice(managedPosition, gmxMarkets)
     const symbol = managedPosition?.symbol
     if (!symbol || !managedPosition?.venue) return null
     const sameVenue = markets.allPairs.filter((p) => p.venue === managedPosition.venue && p.symbol === symbol)
@@ -166,7 +231,87 @@ export default function PerpsView({ deps }) {
       sameVenue.find((p) => p.chainId != null && p.chainId === managedPosition.chainId) ?? sameVenue[0] ?? null
     const price = Number(pair?.price)
     return Number.isFinite(price) && price > 0 ? price : null
-  }, [managedPosition, markets.allPairs])
+  }, [managedPosition, markets.allPairs, gmxMarkets])
+
+  /* ------------------------------------------------------------------------------------------- *
+   * The entry sheet's two live reads
+   *
+   * BOTH RUN ONLY WHILE A PAIR IS OPEN, and therefore never at all with the flag off — the tapped
+   * pair is the only thing that starts them. That is what keeps "flag off ⇒ exactly the phase-0
+   * view" true of network behaviour and not merely of pixels.
+   * ------------------------------------------------------------------------------------------- */
+
+  /* WHAT THE VENUES CURRENTLY PERMIT, read from the contracts that enforce it (FR-017). Absent is
+   * NOT permission: `openEligibility` fails closed on a missing status, so the window between the
+   * tap and the answer refuses the open rather than offering it. */
+  const [venueStatuses, setVenueStatuses] = useState(null)
+  const openChainId = opening?.chainId ?? null
+  const readStatuses = deps?.open?.readVenueStatuses ?? readVenueStatuses
+  useEffect(() => {
+    if (openChainId == null) return undefined
+    let alive = true
+    setVenueStatuses(null)
+    Promise.resolve()
+      .then(() => readStatuses(openChainId))
+      .then((result) => {
+        if (alive) setVenueStatuses(result ?? null)
+      })
+      .catch(() => {
+        // A failed read is not a status. Leaving it null keeps every venue refused-with-a-reason
+        // rather than silently opening one we could not check.
+        if (alive) setVenueStatuses(null)
+      })
+    return () => {
+      alive = false
+    }
+    // `readStatuses` is caller-owned; re-reading on a new chain is the intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openChainId])
+
+  /* The venues that list the tapped market on the tapped row's own chain, with each venue's live
+   * status attached. `allPairs`, never `pairs`: the member's search box shapes the table and must
+   * not decide which venues they may open on. */
+  const openVenueOptions = useMemo(
+    () => (opening ? openVenueOptionsFor(opening, markets.allPairs, { statuses: venueStatuses }) : []),
+    [opening, markets.allPairs, venueStatuses],
+  )
+
+  /* WHAT THE MEMBER ACTUALLY HOLDS of the collateral those venues accept. A balance that could not
+   * be read is omitted rather than reported as zero — the sheet then says the member holds none of
+   * the accepted collateral, which is the honest consequence of not knowing. */
+  const openVenueOptionsRef = useRef(openVenueOptions)
+  useEffect(() => {
+    openVenueOptionsRef.current = openVenueOptions
+  })
+  const [holdings, setHoldings] = useState([])
+  const readBalances = deps?.open?.readCollateralBalances ?? defaultReadCollateralBalances
+  const collateralKey = openVenueOptions
+    .flatMap((option) => (option.collaterals ?? []).map((c) => c?.address))
+    .filter(Boolean)
+    .join(',')
+  useEffect(() => {
+    if (openChainId == null || !account || collateralKey === '') {
+      setHoldings([])
+      return undefined
+    }
+    let alive = true
+    setHoldings([])
+    Promise.resolve()
+      .then(() => readBalances({ chainId: openChainId, account, venueOptions: openVenueOptionsRef.current }))
+      .then((result) => {
+        if (alive) setHoldings(Array.isArray(result) ? result : [])
+      })
+      .catch(() => {
+        if (alive) setHoldings([])
+      })
+    return () => {
+      alive = false
+    }
+    // Keyed on the token SET rather than on the options object, which is a fresh array on every
+    // market poll — an effect keyed on that would re-read balances every 30 seconds and reset the
+    // member's collateral choice underneath them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openChainId, account, collateralKey])
 
   // Both refreshes ride a ref: `usePerpsPositions`/`usePerpsOrders` hand back a fresh `refresh`
   // closure every render, so putting either in a dependency array would make this callback's
@@ -295,7 +440,12 @@ export default function PerpsView({ deps }) {
           <p className="sr-only" role="status">
             Showing {markets.pairs.length} of {markets.totalCount} pairs
           </p>
-          <PerpsPairTable pairs={markets.pairs} attribution={attribution} />
+          <PerpsPairTable
+            pairs={markets.pairs}
+            attribution={attribution}
+            offerOpen={offerOpen}
+            onOpen={manageEnabled ? openEntrySheet : null}
+          />
         </>
       )}
 
@@ -305,11 +455,11 @@ export default function PerpsView({ deps }) {
 
       <PerpsPositions
         status={positions.status}
-        positions={positions.positions}
+        positions={positionRows}
         unreadableVenues={positions.unreadableVenues}
         attribution={attribution}
         canManage={canManage}
-        onManage={manageEnabled ? setManaged : null}
+        onManage={manageEnabled ? openManageSheet : null}
       />
 
       {managedPosition && (
@@ -320,6 +470,23 @@ export default function PerpsView({ deps }) {
           onClose={dismissSheet}
           onActionComplete={handleActionComplete}
           deps={deps?.sheet}
+        />
+      )}
+
+      {/* THE ENTRY SHEET. It is the only surface in this feature that carries a gate — the
+          jurisdiction attestation and sanctions screening stand in front of OPENING and nothing
+          else, and the sheet renders the acknowledgement immediately above the control it gates.
+          Nothing above can reach it: the exit sheet, the recovery list and the positions list
+          cannot even import it (asserted in test/perps/safetyInvariants.test.js). */}
+      {opening && (
+        <OpenPositionSheet
+          pair={opening}
+          venueOptions={openVenueOptions}
+          holdings={holdings}
+          attribution={attribution}
+          onClose={dismissOpen}
+          onActionComplete={handleActionComplete}
+          deps={deps?.openSheet}
         />
       )}
 

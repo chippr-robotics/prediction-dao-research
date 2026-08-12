@@ -877,3 +877,88 @@ describe('honest numbers', () => {
     expect(src).not.toMatch(/perpsUiFeeReceiver|PERPS_UI_FEE_RECEIVER/)
   })
 })
+
+/* --------------------------------------------------------------------------------------------- *
+ * REPORTING (T070 / FR-023) — the producer half of the activity feed
+ *
+ * `perpsActivityBuffer` had a CONSUMER (`data/notifications/sources/perpsSource.js` drains it every
+ * cycle) and NO PRODUCER: nothing in the app ever queued a record, so the whole action half of the
+ * feed silently reported nothing while every one of its own tests passed. That is the same defect
+ * class as the phase-4 `markPrice` one — a well-tested consumer of a value nobody emits — and the
+ * only thing that catches it is an assertion that the two ends are connected.
+ *
+ * The producer is HERE because this is the one write path: an action that ran cannot fail to report
+ * itself, and no surface can report an action that did not run.
+ * --------------------------------------------------------------------------------------------- */
+
+describe('every action reports itself to the activity buffer', () => {
+  const reporter = () => vi.fn(() => null)
+
+  it('queues the machine’s state — a submission as SENT, and never as done', async () => {
+    const recordAction = reporter()
+    const deps = makeDeps({ recordAction, sleep: parked })
+    const { result } = renderHook(() => usePerpsTrade({ deps }), { wrapper })
+    await run(result, CLOSE)
+
+    expect(recordAction).toHaveBeenCalled()
+    const [account, order] = recordAction.mock.calls.at(-1)
+    expect(account).toBe(MEMBER)
+    expect(order.venue).toBe('gains')
+    expect(order.action).toBe('close')
+    // Inclusion is not execution: the state queued after a successful receipt is the machine's
+    // pre-execution one, whatever it is called — asked of the machine, never spelled here.
+    expect(order.state).toBe(result.current.status)
+    expect(result.current.terminal).toBe(false)
+    expect(order.txHash).toBe(TX)
+  })
+
+  it('queues the TERMINAL state too, once the venue has spoken', async () => {
+    const recordAction = reporter()
+    const deps = makeDeps({
+      recordAction,
+      sendOnChain: vi.fn(async () => receipt([MARKET_ORDER_INITIATED(4), MARKET_EXECUTED(4, 7)])),
+    })
+    const { result } = renderHook(() => usePerpsTrade({ deps }), { wrapper })
+    await run(result, CLOSE)
+
+    const states = recordAction.mock.calls.map(([, order]) => order.state)
+    // The terminal state the machine reached is the LAST thing reported — that is the line a member
+    // actually wants in their feed, and it arrives after `submit` already resolved.
+    expect(states.at(-1)).toBe(result.current.status)
+    expect(result.current.terminal).toBe(true)
+  })
+
+  it('reports a RECOVERY, which is the action a member most needs a record of', async () => {
+    const recordAction = reporter()
+    const deps = makeDeps({ recordAction, sleep: parked, ...forbiddenGates() })
+    const { result } = renderHook(() => usePerpsTrade({ deps }), { wrapper })
+    await run(result, {
+      action: 'recover',
+      venue: 'gains',
+      chainId: ARBITRUM,
+      params: { pendingOrderIndex: gains.pendingOrderIndex(4) },
+    })
+    expect(recordAction.mock.calls.at(-1)[1].action).toBe('cancel')
+  })
+
+  it('files the record under the account that ACTED, never a bare truthy check', async () => {
+    const recordAction = reporter()
+    const deps = makeDeps({ recordAction, sleep: parked })
+    renderHook(() => usePerpsTrade({ deps }), { wrapper })
+    // Idle mount with a connected wallet: the machine has a state, and it is not a reportable one,
+    // so the buffer's own filter drops it. What must NOT happen is a call with no account.
+    for (const [account] of recordAction.mock.calls) expect(account).toBe(MEMBER)
+  })
+
+  it('a reporter that throws never breaks the action — an exit outranks its own bookkeeping', async () => {
+    const recordAction = vi.fn(() => {
+      throw new Error('storage full')
+    })
+    const deps = makeDeps({ recordAction, sleep: parked })
+    const { result } = renderHook(() => usePerpsTrade({ deps }), { wrapper })
+    // The real `recordPerpsOrder` swallows its own failures; this asserts the hook does not depend
+    // on that, because a full localStorage must never be able to fail a close.
+    await expect(run(result, CLOSE)).resolves.not.toThrow?.()
+    expect(deps.sendOnChain).toHaveBeenCalled()
+  })
+})
