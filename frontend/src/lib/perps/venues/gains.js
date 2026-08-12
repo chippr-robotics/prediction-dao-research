@@ -417,6 +417,42 @@ export const CANCEL_REASON_TEXT = Object.freeze({
 })
 
 /**
+ * The four events that can terminate an order this module builds. `MarketOrderInitiated` is the
+ * venue taking it, the next two are the two ways a market order ends, and the last is a recovery
+ * executing.
+ */
+export const GAINS_ORDER_EVENT_NAMES = Object.freeze([
+  'MarketOrderInitiated',
+  'MarketExecuted',
+  'MarketOpenCanceled',
+  'CollateralReturnedAfterTimeout',
+])
+
+/**
+ * The `getLogs` filter for the order events above, or null where Gains is not deployed.
+ *
+ * > **IT CANNOT FILTER BY MEMBER, and that is a property of the events, not an oversight.** The
+ * > trader sits at a DIFFERENT indexed position in each event — `topic1` in `MarketOrderInitiated` /
+ * > `MarketExecuted` / `MarketOpenCanceled`, but `topic2` in `CollateralReturnedAfterTimeout`
+ * > (whose `topic1` is the collateral index). A single positional topic filter would therefore
+ * > either drop one event or match on the wrong field. The member match happens after decoding
+ * > instead — `orderState.js`'s `gainsEventSignal` refuses an event belonging to another trader or
+ * > another order — so callers MUST pass their `account` in that context rather than assuming the
+ * > node narrowed anything.
+ *
+ * Total: junk chain id → null, so an effect branches instead of throwing.
+ */
+export function orderEventFilter(chainId) {
+  const diamond = gainsDiamondFor(chainId)
+  if (!diamond) return null
+  return {
+    address: diamond,
+    // A nested array is an OR over topic0 — any one of the four events.
+    topics: [GAINS_ORDER_EVENT_NAMES.map((name) => DIAMOND.getEvent(name).topicHash)],
+  }
+}
+
+/**
  * Total: the mapped sentence, or the bare code named as the venue's own. The fallback deliberately
  * makes no claim about WHY — it reports the number Gains gave us.
  */
@@ -492,6 +528,28 @@ export function decodeMarketExecuted(log) {
     percentProfit: a.percentProfit,
     amountSentToTrader: a.amountSentToTrader,
     collateralPriceUsd: a.collateralPriceUsd,
+  }
+}
+
+/**
+ * `CollateralReturnedAfterTimeout` → the recovery `cancelOrderAfterTimeout` actually ran, and the
+ * member's collateral is back. It carries the PENDING-ORDER index (the space the recovery call
+ * consumes), never a trade index — the order it refers to never became a trade.
+ *
+ * The same event means OPPOSITE things to two different orders, which is why `orderState.js` reads
+ * the tracked action rather than the event alone: to the recovery call it is that call executing; to
+ * the original order it is the confirmation that the order never ran.
+ */
+export function decodeCollateralReturnedAfterTimeout(log) {
+  const parsed = parse(log, 'CollateralReturnedAfterTimeout')
+  if (!parsed) return null
+  const { pendingOrderId, collateralIndex, trader, collateralAmount } = parsed.args
+  return {
+    orderId: { user: pendingOrderId.user, index: Number(pendingOrderId.index) },
+    pendingOrderIndex: pendingOrderIndex(pendingOrderId.index),
+    trader,
+    collateralIndex: Number(collateralIndex),
+    collateralAmount,
   }
 }
 

@@ -309,6 +309,31 @@
 .perps-pnl-down {
   color: var(--semantic-loss, #dc2626);
 }
+/* Row actions (spec 083): the in-app sheet first, the venue link-out beside it. The link-out is
+   never removed — it is the never-stranded path — so the two always share a row and wrap together
+   rather than the button pushing the link out of reach on a narrow screen. */
+.perps-position-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+}
+.perps-position-manage {
+  background: var(--brand-primary, #36b37e);
+  border: 1px solid var(--brand-primary, #36b37e);
+  border-radius: 999px;
+  color: var(--text-on-brand, #ffffff);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  white-space: nowrap;
+}
+.perps-position-manage:hover,
+.perps-position-manage:focus-visible {
+  filter: brightness(0.95);
+}
+
 .perps-positions-note {
   color: var(--text-secondary, #6b7280);
   font-size: 0.78rem;

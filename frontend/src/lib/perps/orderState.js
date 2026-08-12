@@ -693,6 +693,20 @@ export function gmxEventSignal(event, context = {}) {
   if (context?.account && account && !sameAddress(context.account, account)) return null
 
   const reasonText = typeof event?.reason === 'string' ? event.reason : null
+
+  // The same event means OPPOSITE things to two different orders — the mirror of the
+  // `CollateralReturnedAfterTimeout` case above. `OrderCancelled` is a REJECTION of the order that
+  // was waiting, but when the tracked action IS the cancel the member just made, that same event is
+  // that call EXECUTING. Reading the tracked action is the only way to tell; the event alone cannot.
+  if (type === SIGNAL.VENUE_REJECTED && name === 'OrderCancelled' && context?.action === 'cancel') {
+    return {
+      ...identity({ ...context, venue: 'gmx' }),
+      type: SIGNAL.VENUE_EXECUTED,
+      venueRef: refFrom({ orderKey: key }),
+      execution: event,
+    }
+  }
+
   return {
     type,
     ...identity({ ...context, venue: 'gmx' }),

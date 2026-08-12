@@ -1,13 +1,23 @@
-/** Perps view WCAG 2.1 AA audits (spec 082, FR-015 / SC-007) — ready state, light and dark themes. */
-import { describe, it, expect, vi } from 'vitest'
+/**
+ * Perps view WCAG 2.1 AA audits (spec 082 FR-015 / SC-007, spec 083 SC-008) — the ready state in
+ * the light and dark themes, with the management surface both OFF (the phase-0 surface, the state
+ * CI and most members are in) and ON (the row's manage control audited too).
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, waitFor, screen } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import { WalletContext } from '../../contexts/WalletContext.js'
 import PerpsView from '../../components/perps/PerpsView'
 
+let manageFlag = false
 vi.mock('../../config/perps', async (importOriginal) => {
   const real = await importOriginal()
-  return { ...real, perpsCohortSupported: () => true, perpsGatewayUrl: () => 'https://gateway.test' }
+  return {
+    ...real,
+    perpsCohortSupported: () => true,
+    perpsGatewayUrl: () => 'https://gateway.test',
+    perpsManageFeatureEnabled: () => manageFlag,
+  }
 })
 
 const PAIRS = [
@@ -50,12 +60,42 @@ const deps = {
   },
   positions: {
     available: () => true,
+    // GMX positions are read client-side (spec 083 T032); stubbed so this a11y pass never reaches a
+    // live endpoint.
+    getProvider: () => ({}),
+    makeContract: () => ({ getAccountPositions: async () => [] }),
     fetchPositions: async () => ({
       positions: [
         { id: 'hyperliquid:ETH:long', venue: 'hyperliquid', chainId: null, symbol: 'ETH/USD', direction: 'long', sizeUsd: 4500, entryPrice: 3000, leverage: 10, unrealizedPnlUsd: -50 },
+        {
+          id: 'gains:137:7',
+          venue: 'gains',
+          chainId: 137,
+          symbol: 'BTC/USD',
+          direction: 'long',
+          sizeUsd: 1000,
+          collateralUsd: 100,
+          entryPrice: 60_000,
+          markPrice: 63_000,
+          leverage: 10,
+          liquidationPrice: 54_000,
+          unrealizedPnlUsd: 50,
+        },
       ],
-      sources: { hyperliquid: { status: 'read' } },
+      sources: { hyperliquid: { status: 'read' }, gains: { status: 'read' } },
     }),
+  },
+  // The stuck-order read (spec 083) is stubbed the same way: GMX resolves to "not deployed" so the
+  // Arbitrum log read never runs, and the gateway reports no pending orders.
+  orders: {
+    fetchPositions: async () => ({ positions: [], pendingOrders: [], sources: { gains: { status: 'read' } } }),
+    getProvider: () => ({ getBlockNumber: async () => 1000, getLogs: async () => [] }),
+    addressesFor: () => null,
+  },
+  trade: {
+    sendOnChain: async () => ({ receipts: [] }),
+    getProvider: () => ({ getBlockNumber: async () => 1000, getLogs: async () => [] }),
+    sleep: () => new Promise(() => {}),
   },
   config: {
     fetchConfig: async () => ({
@@ -78,6 +118,10 @@ async function renderReady(themeClass) {
   return view
 }
 
+beforeEach(() => {
+  manageFlag = false
+})
+
 describe('PerpsView accessibility', () => {
   it('has no WCAG violations in the light theme', async () => {
     const { container } = await renderReady('theme-light platform-fairwins')
@@ -88,4 +132,14 @@ describe('PerpsView accessibility', () => {
     const { container } = await renderReady('theme-dark platform-fairwins')
     expect(await axe(container)).toHaveNoViolations()
   }, 20000)
+
+  it('has no WCAG violations with the management controls on, in both themes', async () => {
+    manageFlag = true
+    for (const theme of ['theme-light platform-fairwins', 'theme-dark platform-fairwins']) {
+      const { container, unmount } = await renderReady(theme)
+      await waitFor(() => expect(screen.getByRole('button', { name: /close or protect/i })).toBeInTheDocument())
+      expect(await axe(container)).toHaveNoViolations()
+      unmount()
+    }
+  }, 30000)
 })

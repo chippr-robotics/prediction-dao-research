@@ -11,6 +11,7 @@ import { createKillSwitch } from '../src/policy/killswitch.js'
 import {
   isAddress,
   normalizeGainsPairs,
+  normalizeGainsPendingOrders,
   normalizeGainsPositions,
   normalizeGmxPairs,
   normalizeHyperliquidPairs,
@@ -28,9 +29,12 @@ const GAINS_TV = {
   pairs: [{ from: 'BTC', to: 'USD', spreadP: '100000000', groupIndex: '0', feeIndex: '13' }],
   groups: [{ name: 'crypto', minLeverage: '1100', maxLeverage: '200000' }],
   pairInfos: { maxLeverages: [0] },
+  // Blocks a pending market order must age before cancelOrderAfterTimeout stops reverting.
+  marketOrdersTimeoutBlocks: 200,
   collaterals: [
     {
       collateralIndex: '3',
+      collateral: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', // USDC on Arbitrum
       symbol: 'USDC',
       isActive: true,
       prices: { collateralPriceUsd: 1.0 },
@@ -69,6 +73,41 @@ const GAINS_OPEN_TRADES = [
   },
   { trade: { user: TRADER, index: '8', pairIndex: '0', leverage: '5000', long: false, isOpen: true, collateralIndex: '3', tradeType: '1', collateralAmount: '50000000', openPrice: '650000000000000' } },
 ]
+
+// Gains /user-trading-variables/<addr> (spec 083): the member's pending market orders. Shape
+// verified live against backend-arbitrum.gains.trade — entries are ITradingStorage.PendingOrder.
+// THE INDEX TRAP: the entry's `index` is the PENDING-ORDER index (the only value
+// cancelOrderAfterTimeout accepts); `trade.index` inside it is the TRADE index.
+const gainsPendingTrade = (over = {}) => ({
+  user: TRADER,
+  index: '0',
+  pairIndex: '0',
+  leverage: '10000',
+  long: true,
+  isOpen: true,
+  collateralIndex: '3',
+  tradeType: '0',
+  collateralAmount: '250000000', // 250 USDC
+  openPrice: '630000000000000',
+  ...over,
+})
+const GAINS_USER_TV = {
+  pendingMarketOrdersIds: [
+    { user: TRADER, index: '4' },
+    { user: TRADER, index: '5' },
+    { user: TRADER, index: '9' }, // an id the backend reported with no detail entry
+  ],
+  pendingMarketOrders: [
+    // MARKET_OPEN: no trade exists yet, so trade.index is the venue's placeholder 0.
+    { trade: gainsPendingTrade(), user: TRADER, index: '4', isOpen: true, orderType: 0, createdBlock: '493752800', maxSlippageP: '1000' },
+    // MARKET_CLOSE of trade #7: this one DOES reference a stored trade.
+    { trade: gainsPendingTrade({ index: '7', collateralAmount: '100000000' }), user: TRADER, index: '5', isOpen: true, orderType: 1, createdBlock: '493752810', maxSlippageP: '1000' },
+    // Already resolved by the venue -> nothing to recover, dropped.
+    { trade: gainsPendingTrade({ index: '3' }), user: TRADER, index: '6', isOpen: false, orderType: 0, createdBlock: '493752700', maxSlippageP: '1000' },
+  ],
+  collaterals: [{ balance: '1000000', allowance: '0', decimals: 6 }],
+  referrer: '0x0000000000000000000000000000000000000000',
+}
 
 // GMX /markets/info + /prices/tickers + /tokens: 1e30 USD floats, prices at 10^(30-decimals).
 const GMX_MARKETS = {
@@ -126,8 +165,9 @@ const ok = (body) => ({ ok: true, status: 200, json: async () => body, text: asy
 const fail = () => ({ ok: false, status: 500, json: async () => ({}), text: async () => 'boom' })
 
 /**
- * Dispatches on URL/body like the real venues. `down` lists venue keys to fail:
- * 'gains' | 'gainsPricing' | 'gmx' | 'hyperliquid'.
+ * Dispatches on URL/body like the real venues. `down` lists read keys to fail:
+ * 'gains' (the whole venue) | 'gainsOpenTrades' | 'gainsUserTv' | 'gainsPricing' | 'gmx' |
+ * 'hyperliquid'.
  */
 function mockPerpsFetch({ down = [] } = {}) {
   const calls = []
@@ -136,8 +176,10 @@ function mockPerpsFetch({ down = [] } = {}) {
     if (url.includes('gains.trade')) {
       if (url.includes('backend-pricing')) return down.includes('gainsPricing') ? fail() : ok(GAINS_CHARTS)
       if (down.includes('gains')) return fail()
+      // Ordering matters: '/user-trading-variables/' also contains '/trading-variables'.
+      if (url.includes('/user-trading-variables/')) return down.includes('gainsUserTv') ? fail() : ok(GAINS_USER_TV)
       if (url.includes('/trading-variables')) return ok(GAINS_TV)
-      if (url.includes('/open-trades/')) return ok(GAINS_OPEN_TRADES)
+      if (url.includes('/open-trades/')) return down.includes('gainsOpenTrades') ? fail() : ok(GAINS_OPEN_TRADES)
     }
     if (url.includes('gmxinfra')) {
       if (down.includes('gmx')) return fail()
@@ -224,6 +266,104 @@ describe('perps normalize', () => {
     expect(p.sizeUsd).toBeCloseTo(1000, 6)
     expect(p.entryPrice).toBe(63000)
     expect(p.unrealizedPnlUsd).toBeNull()
+  })
+
+  it('carries a venue ref on gains positions: the TRADE index plus the collateral scale', () => {
+    const [p] = normalizeGainsPositions({ openTrades: GAINS_OPEN_TRADES, tradingVariables: GAINS_TV, chainId: 42161 })
+    expect(p.venueRef).toEqual({
+      venue: 'gains',
+      chainId: 42161,
+      tradeIndex: 7,
+      pairIndex: 0,
+      collateralIndex: 3,
+      collateralToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+      collateralDecimals: 6,
+      // Exact decimal string: 10**18 collaterals exceed the float range where a JSON round-trip is
+      // guaranteed exact, and collateralAmount is in the token's own decimals, never 1e18.
+      collateralPrecision: '1000000',
+    })
+    // The two index spaces can never be confused because neither is a bare `index`.
+    expect(Object.keys(p.venueRef)).not.toContain('index')
+    expect(p.venueRef.pendingOrderIndex).toBeUndefined()
+  })
+
+  it('normalizes gains pending orders and keeps the two index spaces distinct', () => {
+    const orders = normalizeGainsPendingOrders({
+      userTradingVariables: GAINS_USER_TV,
+      tradingVariables: GAINS_TV,
+      chainId: 42161,
+    })
+    const byIndex = new Map(orders.map((o) => [o.venueRef.pendingOrderIndex, o]))
+    expect([...byIndex.keys()].sort()).toEqual([4, 5, 9]) // #6 already resolved -> dropped
+
+    const open = byIndex.get(4)
+    expect(open.orderType).toBe(0)
+    expect(open.orderTypeName).toBe('MARKET_OPEN')
+    expect(open.symbol).toBe('BTC/USD')
+    expect(open.direction).toBe('long')
+    expect(open.createdBlock).toBe(493752800)
+    expect(open.timeoutBlocks).toBe(200) // venue-reported, never a hardcoded per-chain constant
+    // Pre-execution values are labelled requested, never presented as the position's actual state.
+    expect(open.requestedCollateralUsd).toBeCloseTo(250, 6)
+    expect(open.requestedLeverage).toBe(10)
+    expect(open.requestedSizeUsd).toBeCloseTo(2500, 6)
+    expect(open.requestedPrice).toBe(63000)
+    expect(open.sizeUsd).toBeUndefined() // nothing here may read as executed state
+    // THE TRAP: a MARKET_OPEN order has no trade yet — trade.index is the venue's placeholder 0,
+    // and publishing it would hand the client a live handle to the member's trade #0.
+    expect(open.venueRef.tradeIndex).toBeNull()
+    expect(open.venueRef.pendingOrderIndex).toBe(4)
+    expect(open.venueRef.collateralDecimals).toBe(6)
+    expect(Object.keys(open.venueRef)).not.toContain('index')
+
+    // A MARKET_CLOSE acts on a stored trade, so both handles are present and distinctly named.
+    const close = byIndex.get(5)
+    expect(close.orderTypeName).toBe('MARKET_CLOSE')
+    expect(close.venueRef.pendingOrderIndex).toBe(5)
+    expect(close.venueRef.tradeIndex).toBe(7)
+    expect(close.venueRef.pendingOrderIndex).not.toBe(close.venueRef.tradeIndex)
+  })
+
+  it('still exposes an id-only pending order — a recovery handle is never invisible', () => {
+    const [bare] = normalizeGainsPendingOrders({
+      userTradingVariables: GAINS_USER_TV,
+      tradingVariables: GAINS_TV,
+      chainId: 42161,
+    }).filter((o) => o.venueRef.pendingOrderIndex === 9)
+    expect(bare.venueRef.pendingOrderIndex).toBe(9)
+    expect(bare.venueRef.tradeIndex).toBeNull()
+    // Everything the backend did not report stays null — never 0, which is a real index here.
+    expect(bare.orderType).toBeNull()
+    expect(bare.orderTypeName).toBeNull()
+    expect(bare.createdBlock).toBeNull()
+    expect(bare.requestedSizeUsd).toBeNull()
+    expect(bare.symbol).toBeNull()
+  })
+
+  it('normalizes pending orders without trading variables (recovery is never gated on a second read)', () => {
+    const orders = normalizeGainsPendingOrders({
+      userTradingVariables: GAINS_USER_TV,
+      tradingVariables: null,
+      chainId: 42161,
+    })
+    expect(orders).toHaveLength(3)
+    const open = orders.find((o) => o.venueRef.pendingOrderIndex === 4)
+    expect(open.venueRef.pendingOrderIndex).toBe(4) // the handle survives
+    expect(open.symbol).toBe('pair #0') // no pair table -> named by index, not invented
+    expect(open.timeoutBlocks).toBeNull()
+    expect(open.requestedCollateralUsd).toBeNull() // no collateral scale -> null, never 0
+    expect(open.venueRef.collateralDecimals).toBeNull()
+    expect(open.venueRef.collateralIndex).toBe(3) // straight off the order, no lookup needed
+  })
+
+  it('returns no pending orders for a member with none', () => {
+    expect(
+      normalizeGainsPendingOrders({
+        userTradingVariables: { pendingMarketOrdersIds: [], pendingMarketOrders: [] },
+        tradingVariables: GAINS_TV,
+        chainId: 42161,
+      }),
+    ).toEqual([])
   })
 
   it('normalizes gmx pairs, dropping swap-only and unlisted markets', () => {
@@ -343,6 +483,45 @@ describe('GET /v1/perps/positions', () => {
     expect(res.body.sources.gmx).toBeUndefined()
     expect(res.body.sources.gains.status).toBe('read')
     expect(res.body.sources.hyperliquid.status).toBe('read')
+  })
+
+  it('carries venue refs through the route so the client can act on a position', async () => {
+    const { app } = build()
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    const gains = res.body.positions.find((p) => p.venue === 'gains')
+    expect(gains.venueRef).toMatchObject({ venue: 'gains', chainId: 42161, tradeIndex: 7, collateralDecimals: 6 })
+    // Display fields the phase-0 UI depends on are untouched.
+    expect(gains).toMatchObject({ symbol: 'BTC/USD', direction: 'long', leverage: 10, entryPrice: 63000 })
+  })
+
+  it('serves the member pending orders alongside positions, per gains chain', async () => {
+    const { app } = build()
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    expect(res.status).toBe(200)
+    expect(res.body.pendingOrders.map((o) => o.venueRef.pendingOrderIndex).sort()).toEqual([4, 5, 9])
+    expect(res.body.pendingOrders.every((o) => o.venue === 'gains' && o.chainId === 42161)).toBe(true)
+    // The recovery facet reports its own chain list: absent here would mean "unknown", not "none".
+    expect(res.body.sources.gains.pendingOrderChains).toEqual([42161])
+  })
+
+  it('serves pending orders even when the positions read is down — exits are never gated', async () => {
+    const { app } = build({ perpsFetch: mockPerpsFetch({ down: ['gainsOpenTrades', 'hyperliquid'] }) })
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    // Every venue's POSITION read failed, yet a stuck order must never be buried behind a 502.
+    expect(res.status).toBe(200)
+    expect(res.body.positions).toEqual([])
+    expect(res.body.sources.gains).toMatchObject({ status: 'degraded', chains: [], pendingOrderChains: [42161] })
+    expect(res.body.pendingOrders.length).toBeGreaterThan(0)
+  })
+
+  it('reports pending orders as unknown (not empty) when only that read fails', async () => {
+    const { app } = build({ perpsFetch: mockPerpsFetch({ down: ['gainsUserTv'] }) })
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    expect(res.status).toBe(200)
+    expect(res.body.positions.some((p) => p.venue === 'gains')).toBe(true)
+    expect(res.body.pendingOrders).toEqual([])
+    // 42161 read positions but NOT pending orders — the empty array is not a claim about that chain.
+    expect(res.body.sources.gains).toMatchObject({ status: 'read', chains: [42161], pendingOrderChains: [] })
   })
 
   it('rejects a malformed address', async () => {

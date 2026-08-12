@@ -803,6 +803,61 @@ export function eventTopicsForAccount(account, options) {
   }
 }
 
+/**
+ * One raw `EventLog2` log → the flat order event `orderState.js`'s `gmxEventSignal` consumes:
+ * `{ eventName, key, account, reason, msgSender }`.
+ *
+ * GMX emits EVERY order event through the single EventEmitter as an `EventLog2` whose real payload
+ * is nested inside the `EventLogData` key/value bag, so "which event is this" is not the log's topic0
+ * — topic0 is `EventLog2` for all of them. The discriminator is the `eventName` STRING in the data
+ * (`eventNameHash` is its indexed twin and comes back as a hash, not the name).
+ *
+ * `reason` is pulled out of `stringItems` because that is where GMX puts its own words for a
+ * cancellation or a freeze ("OrderNotFulfillableAtAcceptablePrice"). It is passed through verbatim —
+ * translating it would mean inventing a cause we have not confirmed (FR-008).
+ *
+ * `account` is returned as the raw bytes32 topic (`Cast.toBytes32(account)`), NOT narrowed to an
+ * address: `gmxEventSignal` compares the trailing 20 bytes itself, and re-formatting it here would
+ * be a second place to get that padding wrong.
+ *
+ * TOTAL: it runs over arbitrary logs inside an effect, so a log from another contract, a non-order
+ * event, or malformed data returns null rather than taking the sheet down.
+ */
+export function decodeOrderEvent(log) {
+  const topics = Array.isArray(log?.topics) ? log.topics : null
+  if (!topics?.length) return null
+  if (String(topics[0]).toLowerCase() !== GMX_EVENT_LOG2_TOPIC.toLowerCase()) return null
+  let parsed
+  try {
+    parsed = EVENT_EMITTER.parseLog({ topics: [...topics], data: log.data ?? '0x' })
+  } catch {
+    return null
+  }
+  if (parsed?.name !== 'EventLog2') return null
+  const eventName = typeof parsed.args?.eventName === 'string' ? parsed.args.eventName : null
+  // Not one of ours — a position/market event sharing the emitter, not an order event.
+  if (!eventName || !GMX_ORDER_EVENT_NAMES.includes(eventName)) return null
+  return {
+    eventName,
+    key: parsed.args.topic1,
+    account: parsed.args.topic2,
+    reason: stringEventItem(parsed.args.eventData, 'reason'),
+    msgSender: parsed.args.msgSender,
+  }
+}
+
+/** One `stringItems` entry out of an `EventLogData` bag, or null. Never throws on a shape change. */
+function stringEventItem(eventData, key) {
+  try {
+    for (const item of eventData?.stringItems?.items ?? []) {
+      if (item?.key === key && typeof item.value === 'string' && item.value !== '') return item.value
+    }
+  } catch {
+    /* an unexpected bag shape is "no reason", never a crash */
+  }
+  return null
+}
+
 /* ------------------------------------------------------------------------------------------- *
  * Total coercions (decoder side)
  * ------------------------------------------------------------------------------------------- */

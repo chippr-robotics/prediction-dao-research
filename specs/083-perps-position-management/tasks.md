@@ -32,20 +32,20 @@
 
 ## Phase 3 — US1/US4 Exit first (P1)
 
-- [ ] T030 `hooks/usePerpsTrade.js` — submit → pending → terminal, injectable deps
-- [ ] T031 `hooks/usePerpsOrders.js` — pending + stuck orders per venue
-- [ ] T032 `usePerpsPositions.js` [MODIFY] — carry venue refs; add GMX Reader reads on Arbitrum
-- [ ] T033 gateway `perps/normalize.js` + `routes.js` [MODIFY] — carry Gains trade/pending indices
-- [ ] T034 `components/perps/PositionSheet.jsx` — bottom sheet: close / reduce, cost breakdown,
+- [x] T030 `hooks/usePerpsTrade.js` — submit → pending → terminal, injectable deps
+- [x] T031 `hooks/usePerpsOrders.js` — pending + stuck orders per venue
+- [x] T032 `usePerpsPositions.js` [MODIFY] — carry venue refs; add GMX Reader reads on Arbitrum
+- [x] T033 gateway `perps/normalize.js` + `routes.js` [MODIFY] — carry Gains trade/pending indices
+- [x] T034 `components/perps/PositionSheet.jsx` — bottom sheet: close / reduce, cost breakdown,
       async state, venue reasons
-- [ ] T035 `components/perps/PerpsPendingOrders.jsx` — stuck-order recovery, never gated
-- [ ] T036 [P] Tests: sheet states, close/reduce calldata, recovery, exits-never-gated
+- [x] T035 `components/perps/PerpsPendingOrders.jsx` — stuck-order recovery, never gated
+- [x] T036 [P] Tests: sheet states, close/reduce calldata, recovery, exits-never-gated
 
 ## Phase 4 — US2 Protection (P1)
 
-- [ ] T040 Stop-loss / take-profit within PositionSheet (Gains updateTp/updateSl; GMX
+- [x] T040 Stop-loss / take-profit within PositionSheet (Gains updateTp/updateSl; GMX
       StopLossDecrease/LimitDecrease with `autoCancel`)
-- [ ] T041 [P] Tests: defaults, liquidation-bound refusal, venue-stored values reflected
+- [x] T041 [P] Tests: defaults, liquidation-bound refusal, venue-stored values reflected
 
 ## Phase 5 — US3 Entry (P2)
 

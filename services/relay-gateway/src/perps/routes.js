@@ -16,6 +16,7 @@ import { GatewayError } from '../errors.js'
 import {
   isAddress,
   normalizeGainsPairs,
+  normalizeGainsPendingOrders,
   normalizeGainsPositions,
   normalizeGmxPairs,
   normalizeHyperliquidPairs,
@@ -107,6 +108,15 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
   const gainsTvRead = (chainId) =>
     venueRead(`gains-tv:${chainId}`, () => clients.gains[chainId].get('/trading-variables'))
 
+  /**
+   * Gains per-member state: `pendingMarketOrders` / `pendingMarketOrdersIds` (spec 083) — the
+   * stuck-order recovery surface. Cached per (chain, address) like the open-trades read.
+   */
+  const gainsUserTvRead = (chainId, address) =>
+    venueRead(`gains-utv:${chainId}:${address.toLowerCase()}`, () =>
+      clients.gains[chainId].get(`/user-trading-variables/${address}`),
+    )
+
   /** The gains pricing feed is one global snapshot (pair universe is shared across chains). */
   const gainsPricesRead = () =>
     clients.gainsPricing ? venueRead('gains-prices', () => clients.gainsPricing.get('/charts')) : Promise.resolve(null)
@@ -182,9 +192,15 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
   })
 
   // ---- GET /v1/perps/positions?address=0x… --------------------------------------------------
-  // Read-only, per-venue isolated. GMX positions are NOT served this release: the GMX REST API
-  // does not expose them and an on-chain Reader decode is deferred with the execution spec —
-  // the venue is honestly ABSENT from `sources` (the SPA discloses "view on GMX"), never faked.
+  // Read-only, per-venue isolated. GMX positions are NOT served here: the GMX REST API does not
+  // expose them and they are read client-side from GMX's Reader contract (spec 083 T032) — the
+  // venue stays honestly ABSENT from `sources` rather than being invented in the gateway.
+  //
+  // Spec 083 adds `pendingOrders` to THIS response rather than a sibling route, deliberately:
+  // positions and pending orders are one screen and one member fact. Two routes would mean two
+  // quota hits, two independent staleness windows, and two `sources` maps that can disagree — the
+  // UI could then show "gains: read" positions while the member's stuck order silently 502'd, which
+  // is exactly the invisibility this surface exists to prevent. Older clients ignore the new array.
   router.get('/v1/perps/positions', async (req, res) => {
     try {
       const address = typeof req.query.address === 'string' ? req.query.address : ''
@@ -197,11 +213,23 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
       const gainsChainIds = Object.keys(clients.gains)
       const gainsReads = await Promise.all(
         gainsChainIds.map(async (chainId) => {
-          const [tv, open] = await Promise.all([
+          const [tv, open, userTv] = await Promise.all([
             gainsTvRead(chainId),
             venueRead(`gains-open:${chainId}:${addr}`, () => clients.gains[chainId].get(`/open-trades/${address}`)),
+            gainsUserTvRead(chainId, address),
           ])
-          return tv && open ? { chainId: Number(chainId), tv: tv.value, open: open.value } : null
+          return {
+            chainId: Number(chainId),
+            tv: tv?.value ?? null,
+            open: open?.value ?? null,
+            userTv: userTv?.value ?? null,
+            // The two facets resolve INDEPENDENTLY. Positions need the trading variables for their
+            // scales; pending orders do not (an order with a null symbol is still recoverable), so
+            // a trading-variables outage must never withhold a recovery handle (exits are never
+            // gated — not by a flag, not by an outage).
+            positionsOk: Boolean(tv && open),
+            pendingOk: Boolean(userTv),
+          }
         }),
       )
 
@@ -212,18 +240,37 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
         : null
 
       const positions = []
+      // Gains is the only venue contributing pending orders: GMX orders are read client-side with
+      // its Reader, and Hyperliquid's resting orders are out of scope for this release.
+      const pendingOrders = []
       const sources = {}
 
       if (gainsChainIds.length > 0) {
         const okChains = []
+        const pendingOrderChains = []
         for (const read of gainsReads) {
-          if (!read) continue
-          okChains.push(read.chainId)
-          positions.push(
-            ...normalizeGainsPositions({ openTrades: read.open, tradingVariables: read.tv, chainId: read.chainId }),
-          )
+          if (read.positionsOk) {
+            okChains.push(read.chainId)
+            positions.push(
+              ...normalizeGainsPositions({ openTrades: read.open, tradingVariables: read.tv, chainId: read.chainId }),
+            )
+          }
+          if (read.pendingOk) {
+            pendingOrderChains.push(read.chainId)
+            pendingOrders.push(
+              ...normalizeGainsPendingOrders({
+                userTradingVariables: read.userTv,
+                tradingVariables: read.tv,
+                chainId: read.chainId,
+              }),
+            )
+          }
         }
-        sources.gains = { status: okChains.length > 0 ? 'read' : 'degraded', chains: okChains }
+        // `chains` is the POSITION facet (unchanged for spec-082 clients); `pendingOrderChains` is
+        // the recovery facet. A chain present in one and missing from the other says "this fact is
+        // unknown here" — an empty `pendingOrders` for a chain that never answered must not read as
+        // "you have no stuck orders".
+        sources.gains = { status: okChains.length > 0 ? 'read' : 'degraded', chains: okChains, pendingOrderChains }
       }
 
       if (clients.hyperliquid) {
@@ -235,8 +282,12 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
         }
       }
 
-      requireAnyRead(sources)
-      res.json({ positions, sources, asOf: new Date(now()).toISOString() })
+      // The total-outage 502 stands — with one exception: if we DID reach a member's pending
+      // orders, a 502 would bury a recovery handle behind an error screen. Exits are never gated,
+      // and an outage is not an exception to that; the honest answer is the orders plus a `sources`
+      // map that says which reads failed.
+      if (pendingOrders.length === 0) requireAnyRead(sources)
+      res.json({ positions, pendingOrders, sources, asOf: new Date(now()).toISOString() })
     } catch (err) {
       handleError(res, err)
     }

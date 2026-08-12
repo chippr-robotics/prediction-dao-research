@@ -1,11 +1,27 @@
 /**
- * PerpsPositions (spec 082 US2) — the connected account's open positions per venue, read-only.
+ * PerpsPositions (spec 082 US2, extended by spec 083 US1/US2) — the connected account's open
+ * positions per venue.
  *
  * Self-hides when there is nothing to say (disconnected / unsupported / idle) — the Predict
- * PositionsList convention. Per-venue honesty: an unreadable venue is disclosed by name while
- * the others render; GMX is disclosed as view-on-venue (its positions are not readable in-app
- * this release); an account with no positions gets a quiet empty state, not an error.
- * Managing a position ALWAYS happens on the venue — there are no in-app controls (FR-018).
+ * PositionsList convention. Per-venue honesty: an unreadable venue is disclosed by name while the
+ * others render; an account with no positions gets a quiet empty state, not an error.
+ *
+ * MANAGEMENT IS PER-VENUE NOW, AND THAT IS THE POINT OF THIS FILE'S CHANGE. Phase 0 stated
+ * globally that "positions are managed on the venue — there are no in-app controls". That sentence
+ * was true then and is false now for **Gains and GMX** (FR-002/FR-003): a row on those venues opens
+ * the PositionSheet, where a member closes, reduces and protects the position with their own
+ * wallet. It remains true for **Hyperliquid**, which stays read-only this release (FR-021) — its L1
+ * actions need a browser-held agent key even to close, so there is no in-app control to offer and a
+ * disabled one would be the dishonest outcome. The statement is therefore rendered per venue, from
+ * the venues actually on screen, rather than asserted once over all of them.
+ *
+ * THE VENUE LINK-OUT STAYS ON EVERY ROW, always, as the secondary action. It is the never-stranded
+ * path: it is present when the management feature is off, when a venue is one this build cannot
+ * manage, and when the app cannot transact at all. Nothing here may ever be the only way out.
+ *
+ * The management gate lives in ONE place — the caller (`PerpsView`) — and arrives as
+ * `canManage(position)`. This component asks the question and never answers it: a second copy of
+ * that predicate is how a control ends up offered where the calldata path does not exist.
  */
 import InfoTip from '../ui/InfoTip'
 import PerpsVenueBadge from './PerpsVenueBadge'
@@ -14,8 +30,25 @@ import { formatUsd, formatSignedUsd, formatPairPrice, formatLeverage } from '../
 import { PERPS_TIPS } from '../../lib/perps/perpsCopy'
 import { PERP_VENUES } from '../../config/perps'
 
-export default function PerpsPositions({ status, positions, unreadableVenues, attribution }) {
+export default function PerpsPositions({
+  status,
+  positions,
+  unreadableVenues,
+  attribution,
+  /** `(position) => boolean` — whether this build offers in-app management for that row. */
+  canManage,
+  /** `(position) => void` — opens the PositionSheet. Absent ⇒ no in-app control renders at all. */
+  onManage,
+}) {
   if (status === 'idle') return null
+
+  // Both halves must be true: a handler to call, and a venue/chain this build can actually build
+  // calldata for. Either one missing means the row is link-out only — never a dead button.
+  const manageable = (p) => typeof onManage === 'function' && Boolean(canManage?.(p))
+
+  const rows = positions ?? []
+  const managedVenues = distinctVenues(rows.filter(manageable))
+  const readOnlyVenues = distinctVenues(rows.filter((p) => !manageable(p)))
 
   return (
     <section className="perps-positions" aria-label="Your perp positions">
@@ -28,7 +61,7 @@ export default function PerpsPositions({ status, positions, unreadableVenues, at
         </p>
       )}
 
-      {status === 'loading' && positions.length === 0 ? (
+      {status === 'loading' && rows.length === 0 ? (
         <p className="perps-loading" role="status">
           Checking venues for open positions…
         </p>
@@ -36,12 +69,13 @@ export default function PerpsPositions({ status, positions, unreadableVenues, at
         <p className="perps-positions-unreadable" role="status">
           Positions could not be read just now. Your positions themselves are untouched — try again shortly.
         </p>
-      ) : positions.length === 0 ? (
+      ) : rows.length === 0 ? (
         <p className="perps-positions-empty">No open perp positions found for this account.</p>
       ) : (
         <ul className="perps-positions-list">
-          {positions.map((p) => {
+          {rows.map((p) => {
             const href = tradeLinkFor(p, attribution)
+            const venueLabel = PERP_VENUES[p.venue]?.label ?? p.venue
             return (
               <li key={`${p.venue}:${p.id}`} className="perps-position-row">
                 <div className="perps-position-main">
@@ -73,17 +107,31 @@ export default function PerpsPositions({ status, positions, unreadableVenues, at
                     </dd>
                   </div>
                 </dl>
-                {href && (
-                  <a
-                    className="perps-trade-link"
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Manage this position on ${PERP_VENUES[p.venue]?.label ?? p.venue} (opens in a new tab)`}
-                  >
-                    Manage on venue ↗
-                  </a>
-                )}
+                <div className="perps-position-actions">
+                  {/* Named for what the sheet actually does. "Manage" beside "Manage on venue" is
+                      the kind of a tap-apart ambiguity that costs money on a leveraged position. */}
+                  {manageable(p) && (
+                    <button
+                      type="button"
+                      className="perps-position-manage"
+                      onClick={() => onManage(p)}
+                      aria-label={`Close or protect your ${describe(p)} position on ${venueLabel}`}
+                    >
+                      Close or protect
+                    </button>
+                  )}
+                  {href && (
+                    <a
+                      className="perps-trade-link"
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Manage this position on ${venueLabel} (opens in a new tab)`}
+                    >
+                      Manage on venue ↗
+                    </a>
+                  )}
+                </div>
               </li>
             )
           })}
@@ -91,12 +139,56 @@ export default function PerpsPositions({ status, positions, unreadableVenues, at
       )}
 
       <p className="perps-positions-note">
-        GMX positions are not readable in-app yet — view them on{' '}
-        <a href="https://app.gmx.io" target="_blank" rel="noopener noreferrer">
-          GMX ↗
-        </a>
-        . Positions are managed on their venue; FairWins never holds them.
+        {managedVenues.length > 0 && (
+          <>
+            You can close, reduce and protect your {venueList(managedVenues)} positions here — each
+            order is sent from your own wallet.{' '}
+          </>
+        )}
+        {readOnlyVenues.length > 0 && (
+          <>
+            {venueList(readOnlyVenues)} positions are read-only in FairWins this release — manage
+            those on the venue.{' '}
+          </>
+        )}
+        {managedVenues.length === 0 && readOnlyVenues.length === 0 && (
+          <>Positions are managed on their venue. </>
+        )}
+        FairWins never holds your positions.
       </p>
+
+      {/* GMX reports a position's size and side to this app and nothing else its Reader can price,
+          so entry, leverage and P&L render “—”. Saying so is the difference between a dash a member
+          reads as "not reported" and one they read as "nothing there" (honest numbers). */}
+      {rows.some((p) => p.venue === 'gmx') && (
+        <p className="perps-positions-note">
+          GMX reports each position’s size and side here; “—” means GMX did not report that value —
+          it is not zero. Its full figures are on{' '}
+          <a href="https://app.gmx.io" target="_blank" rel="noopener noreferrer">
+            GMX ↗
+          </a>
+          .
+        </p>
+      )}
     </section>
   )
+}
+
+/** The venues present in a set of rows, in first-seen order. Display only. */
+function distinctVenues(rows) {
+  return [...new Set(rows.map((p) => p.venue).filter(Boolean))]
+}
+
+/** "Gains Network and GMX" — an Oxford-less list of venue labels. */
+function venueList(venues) {
+  const labels = venues.map((v) => PERP_VENUES[v]?.label ?? v)
+  if (labels.length <= 1) return labels[0] ?? ''
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+}
+
+/** "Long BTC/USD" for a screen reader, degrading to whatever the venue actually reported. */
+function describe(p) {
+  const side = p.direction === 'long' ? 'Long' : p.direction === 'short' ? 'Short' : ''
+  return [side, p.symbol].filter(Boolean).join(' ') || 'open'
 }
