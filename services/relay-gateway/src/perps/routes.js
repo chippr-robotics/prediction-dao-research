@@ -40,11 +40,27 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
   const router = express.Router()
 
   function requireLive() {
+    // Module killswitch first (the bitcoin/bridge convention), then the global one.
+    if (perps.killSwitch) {
+      throw new GatewayError(503, 'perps_killed', 'perps market data is temporarily disabled; try again later')
+    }
     if (killSwitch.isActive()) {
       throw new GatewayError(503, 'killswitch_active', 'the gateway is temporarily disabled; try again later')
     }
     if (!perps.enabled) {
       throw new GatewayError(503, 'perps_unconfigured', 'perps market data is not configured on this gateway')
+    }
+  }
+
+  /**
+   * Total-outage honesty (contract: 502 upstream_failed only when EVERY venue fails): a 200 with
+   * empty rows must always mean "the venues answered and this is what exists", never "nothing was
+   * reachable" — the SPA maps the 502 to its honest unavailable state instead of an empty table.
+   */
+  function requireAnyRead(sources) {
+    const entries = Object.values(sources)
+    if (entries.length > 0 && !entries.some((s) => s?.status === 'read')) {
+      throw new GatewayError(502, 'upstream_failed', 'no perps venue is reachable right now; try again later')
     }
   }
 
@@ -158,6 +174,7 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
         }
       }
 
+      requireAnyRead(sources)
       res.json({ pairs, sources, asOf: new Date(now()).toISOString() })
     } catch (err) {
       handleError(res, err)
@@ -218,6 +235,7 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
         }
       }
 
+      requireAnyRead(sources)
       res.json({ positions, sources, asOf: new Date(now()).toISOString() })
     } catch (err) {
       handleError(res, err)
@@ -256,7 +274,9 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
 export function perpsStatus(config, { killSwitch }) {
   const perps = config.perps
   return {
-    enabled: Boolean(perps.enabled) && !killSwitch.isActive(),
+    // Honest liveness: the module is "enabled" only if a request right now would be served —
+    // the module killswitch counts as much as the global one.
+    enabled: Boolean(perps.enabled) && !perps.killSwitch && !killSwitch.isActive(),
     venues: {
       gains: Object.entries(perps.gainsUrls)
         .filter(([, url]) => Boolean(url))

@@ -300,6 +300,20 @@ describe('GET /v1/perps/pairs', () => {
     expect(res.body.error.code).toBe('killswitch_active')
   })
 
+  it('answers 503 perps_killed under the MODULE killswitch (PERPS_KILLSWITCH)', async () => {
+    const { app } = build({ env: { PERPS_KILLSWITCH: 'true' } })
+    const res = await get(app, '/v1/perps/pairs')
+    expect(res.status).toBe(503)
+    expect(res.body.error.code).toBe('perps_killed')
+  })
+
+  it('answers 502 upstream_failed when EVERY venue fails — never 200 with empty rows', async () => {
+    const { app } = build({ perpsFetch: mockPerpsFetch({ down: ['gains', 'gainsPricing', 'gmx', 'hyperliquid'] }) })
+    const res = await get(app, '/v1/perps/pairs')
+    expect(res.status).toBe(502)
+    expect(res.body.error.code).toBe('upstream_failed')
+  })
+
   it('enforces the read quota with Retry-After', async () => {
     const { app } = build({ env: { PERPS_QUOTA_PER_IP: '1' } })
     expect((await get(app, '/v1/perps/pairs')).status).toBe(200)
@@ -346,6 +360,13 @@ describe('GET /v1/perps/positions', () => {
     expect(res.body.positions.some((p) => p.venue === 'gains')).toBe(false)
     expect(res.body.positions.some((p) => p.venue === 'hyperliquid')).toBe(true)
   })
+
+  it('answers 502 upstream_failed when every venue read fails — empty positions must mean "none exist"', async () => {
+    const { app } = build({ perpsFetch: mockPerpsFetch({ down: ['gains', 'gainsPricing', 'hyperliquid'] }) })
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    expect(res.status).toBe(502)
+    expect(res.body.error.code).toBe('upstream_failed')
+  })
 })
 
 describe('GET /v1/perps/config', () => {
@@ -388,5 +409,12 @@ describe('/status perps block', () => {
       venues: { gains: [42161], gmx: true, hyperliquid: true },
       attribution: { gains: true, gmx: true, hyperliquid: true },
     })
+  })
+
+  it('reports enabled:false under the module killswitch (honest liveness)', async () => {
+    const { app } = build({ env: { PERPS_KILLSWITCH: 'true' } })
+    const res = await request(app).get('/status')
+    expect(res.status).toBe(200)
+    expect(res.body.perps.enabled).toBe(false)
   })
 })

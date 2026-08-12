@@ -2,9 +2,11 @@
 
 Mirrors the Polymarket proxy's cross-cutting behavior: mounted unconditionally;
 killswitch → config check → param validation → quota → cached fetch; reads may retry,
-there are no writes; errors are `{ error: { code, message } }` with honest codes
-(`503 perps_unconfigured`, `503 killswitch_active`, `429 quota_exceeded`,
-`400 bad_address`, `502 upstream_failed` only when *every* venue fails).
+there are no writes; errors are `{ error: { code, reason } }` (the gateway-wide shape,
+`src/errors.js`) with honest codes (`503 perps_killed` for the module killswitch,
+`503 killswitch_active` for the global one, `503 perps_unconfigured`,
+`429 quota_exceeded`, `400 invalid_address`, and `502 upstream_failed` only when
+*every* venue fails — a `200` with empty rows always means the venues answered).
 
 Per-venue isolation is the core rule: each venue resolves independently to
 `read | degraded`; a degraded venue contributes no rows and is reported in `sources`.
@@ -24,7 +26,7 @@ venues currently failing, up to 10× TTL, else the venue is `degraded`.
     "gmx":         { "status": "read" | "degraded", "chains": [42161] },
     "hyperliquid": { "status": "read" | "degraded", "chains": [] }   // non-EVM venue
   },
-  "asOf": 1765432100000
+  "asOf": "2026-08-11T23:35:00.000Z"   // ISO-8601 server time of the response
 }
 ```
 
