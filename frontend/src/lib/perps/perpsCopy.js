@@ -23,10 +23,29 @@ export const PERPS_TIPS = {
   venue:
     'The external trading platform this pair trades on. FairWins shows the market data; trading ' +
     'happens on the venue with your own wallet.',
+  /**
+   * FOR A WORLD THAT DOES NOT EXIST YET — and the view must keep it that way.
+   *
+   * This tip is only true where FairWins can actually place a Hyperliquid order for you, and it
+   * cannot: Hyperliquid is read-only here. `PerpsView` therefore renders this (and the rate line it
+   * annotates) only when Hyperliquid management is AVAILABLE, never merely when the configured rate
+   * is above zero — the rate is admin-settable while the capability is not. If you are changing
+   * this string, `PERPS_HYPERLIQUID_NO_FEE_NOTE` below is the one members read today.
+   */
   builderFee:
-    'A fee FairWins charges on Hyperliquid orders placed through FairWins, as a percentage of the ' +
-    'trade, on top of Hyperliquid’s own fees. You approve it once on Hyperliquid before it can ' +
-    'ever be charged, and the current rate is always shown here first.',
+    'A fee FairWins charges on Hyperliquid orders it places for you, as a percentage of the trade, ' +
+    'on top of Hyperliquid’s own fees. It rides only orders placed through FairWins — never a trade ' +
+    'you make on Hyperliquid’s own app. You approve it once on Hyperliquid before it can ever be ' +
+    'charged, and the current rate is always shown here first.',
+  /**
+   * The Hyperliquid economics line members read TODAY, and it stays true whatever the configured
+   * rate is: a builder fee can only ride an order FairWins sends, and FairWins sends none.
+   */
+  hyperliquidNoFee:
+    'FairWins sends Hyperliquid no orders — your Hyperliquid positions are shown here and managed on ' +
+    'Hyperliquid’s own app — so there is no FairWins fee on a Hyperliquid trade, whatever rate is ' +
+    'configured. If FairWins ever places Hyperliquid orders for you, the rate would be shown here ' +
+    'first and you would approve it on Hyperliquid before it could be charged.',
   gmxDiscount:
     'Trading on GMX through FairWins’ referral link gives you a discount on GMX’s trading ' +
     'fees. FairWins receives a share of the remaining fee from GMX. It costs you nothing extra.',
@@ -98,6 +117,21 @@ export const PERPS_UNAVAILABLE_NOTE =
 export const PERPS_GAINS_TIMEOUT_OBSERVATION =
   'Gains has reported nothing about this order — we work out that its timeout window has passed ' +
   'from the current block height.'
+
+/**
+ * What FairWins earns on Hyperliquid: nothing — said plainly, beside the GMX and Gains lines that
+ * say what FairWins earns there.
+ *
+ * This replaces a sentence that described FairWins charging a fee on "Hyperliquid orders placed
+ * through FairWins". No such order exists: Hyperliquid's L1 actions need a browser-held agent key
+ * even to CLOSE a position, so FairWins ships the venue read-only and sends it nothing
+ * (`specs/083-perps-position-management/hyperliquid-decision.md`). The sentence below is true at
+ * every configured rate, which is the property that matters: the builder rate is admin-settable
+ * from the Fees tab today, and a fee that can only ride an order FairWins never sends stays zero to
+ * the member no matter what it is set to.
+ */
+export const PERPS_HYPERLIQUID_NO_FEE_NOTE =
+  'Hyperliquid trades cost you nothing extra — FairWins earns nothing on them'
 
 export const PERPS_FEE_UNCONFIRMED_NOTE =
   'The current FairWins fee rate could not be confirmed just now, so it is not shown. The venue ' +

@@ -18,6 +18,7 @@ import {
   perpsManageVenues,
   perpsManageFeatureEnabled,
   perpsUiFeeReceiver,
+  perpsVenueManageableAnywhere,
 } from '../../config/perps'
 
 const GAINS_CHAINS = [42161, 8453, 137]
@@ -128,6 +129,21 @@ describe('management capabilities', () => {
     expect(perpsManageEnabled('nope', 42161)).toBe(false)
     expect(perpsManageVenues(999)).toEqual([])
     expect(perpsManageVenues(undefined)).toEqual([])
+  })
+
+  /**
+   * The venue-wide question, which the Hyperliquid fee footnote is conditioned on. Asking it per
+   * chain is not enough there: Hyperliquid has no chain id at all (non-EVM), so a footnote that
+   * asked `perpsManageEnabled('hyperliquid', chainId)` would need a chain to name and there is
+   * none. This must answer false for Hyperliquid on the same evidence — the venue is in no chain's
+   * list — and true for a venue that is manageable somewhere.
+   */
+  it('perpsVenueManageableAnywhere answers the venue-wide question, and answers NO for Hyperliquid', () => {
+    expect(perpsVenueManageableAnywhere('gains')).toBe(true)
+    expect(perpsVenueManageableAnywhere('gmx')).toBe(true)
+    expect(perpsVenueManageableAnywhere('hyperliquid')).toBe(false)
+    expect(perpsVenueManageableAnywhere('nope')).toBe(false)
+    expect(perpsVenueManageableAnywhere(undefined)).toBe(false)
   })
 })
 

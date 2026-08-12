@@ -51,7 +51,7 @@ import {
   perpsManageEnabled,
 } from '../../config/perps'
 import { defaultCollateral, defaultSlippage } from '../../lib/perps/defaults'
-import { feeUsdFromNotional } from '../../lib/perps/feeUnits'
+import { feeUsdFromNotional, venueFeeFromNotional } from '../../lib/perps/feeUnits'
 import { parseGmxPairId } from '../../lib/perps/gmxMarkets'
 import { GMX_ORDER_KIND, readExecutionFee } from '../../lib/perps/venues/gmx'
 import { canOpen } from '../../lib/perps/venueStatus'
@@ -184,7 +184,11 @@ export function normalizeVenueOptions(pair, venueOptions) {
       collaterals: Array.isArray(raw.collaterals) ? raw.collaterals : [],
       limits: raw.limits ?? null,
       minNotional: raw.minNotional ?? null,
-      venueFeeUsd: raw.venueFeeUsd ?? null,
+      minCollateralUsd: raw.minCollateralUsd ?? null,
+      /* The venue's own PUBLISHED RATE, not a dollar figure: the fee is a fraction of position size,
+       * so a per-venue amount would be the fee for one size and wrong for every other. `previewOpen`
+       * turns it into money for the size actually on screen. */
+      venueFee: raw.venueFee ?? null,
     })
   }
   return out
@@ -360,8 +364,13 @@ export function openVenueOptionsFor(pair, allPairs, options) {
         maxLeverage: numberOrNull(row.maxLeverage),
         minLeverage: numberOrNull(row.minLeverage),
       },
-      minNotional: null,
-      venueFeeUsd: null,
+      /* Straight off the feed row, never invented here (rule 3). The gateway publishes
+       * `minNotional: null` for Gains because since v9 the venue HAS no minimum notional — its
+       * `minPositionSizeUsd` is a fee floor, and refusing a position the venue would fill is a dead
+       * control. The bound that does exist is on collateral, in USD, and is the next field. */
+      minNotional: row.minNotional ?? null,
+      minCollateralUsd: numberOrNull(row.minCollateralUsd),
+      venueFee: row.venueFee ?? null,
     })
   }
   return out
@@ -480,6 +489,13 @@ export function estimateLiquidationPrice(input) {
  * Every field is null where it could not be derived; the sheet renders '—'. `feeUsd` is null both
  * when the rate is zero (there is no fee, so there is no line) and when the notional is unknown
  * (we cannot state the money impact, and FR-013 requires us to state it before a signature).
+ *
+ * THE VENUE'S FEE IS COMPUTED HERE, from the rate the venue published, for exactly the size shown.
+ * It used to be a per-venue dollar figure nobody produced, so it was always '—' — and a dash beside
+ * FairWins' fee in money reads as "FairWins is what this costs", which is the opposite of what this
+ * disclosure is for. It is an ESTIMATE from a published rate, never a quote: `venueFeeAtFloor` says
+ * when the venue's minimum-fee floor is what is being charged rather than the rate on this size,
+ * and the sheet says so beside it.
  */
 export function previewOpen(input) {
   const {
@@ -490,7 +506,7 @@ export function previewOpen(input) {
     entryPrice,
     isLong,
     feeBps,
-    venueFeeUsd = null,
+    venueFee = null,
   } = input ?? {}
 
   const human = toHumanAmount(collateralAmount, collateralDecimals)
@@ -503,10 +519,10 @@ export function previewOpen(input) {
   const feeApplies = bps !== null && bps > 0
   const feeUsd = feeApplies && notionalUsd !== null ? feeUsdFromNotional(notionalUsd, bps) : null
 
-  const venueFee = numberOrNull(venueFeeUsd)
+  const venue = notionalUsd !== null ? venueFeeFromNotional(notionalUsd, venueFee, 'open') : null
   const costParts = [collateralUsd]
   if (feeApplies) costParts.push(feeUsd)
-  if (venueFee !== null) costParts.push(venueFee)
+  if (venue !== null) costParts.push(venue.usd)
   const totalCostUsd = costParts.every((part) => part !== null)
     ? costParts.reduce((sum, part) => sum + part, 0)
     : null
@@ -519,7 +535,12 @@ export function previewOpen(input) {
     feeBps: bps,
     feeApplies,
     feeUsd,
-    venueFeeUsd: venueFee,
+    venueFeeUsd: venue?.usd ?? null,
+    venueFeeRate: venue?.rate ?? null,
+    // The size the venue's fee is actually charged on. Equal to `notionalUsd` in the ordinary case,
+    // and the venue's floor when the position is under it — which is the whole reason it is named.
+    venueFeeChargedOnUsd: venue?.chargedOnUsd ?? null,
+    venueFeeAtFloor: venue?.atFloor ?? false,
     totalCostUsd,
   }
 }
@@ -563,7 +584,9 @@ export function buildOpenDescriptor(input) {
     leverage,
     entryPrice,
     notionalUsd = null,
+    collateralUsd = null,
     minNotional = null,
+    minCollateralUsd = null,
     venueLimits = null,
     slippagePct = defaultSlippage(),
     stopLoss = null,
@@ -608,6 +631,11 @@ export function buildOpenDescriptor(input) {
     venueLimits: venueLimits ?? {},
     notional: notionalUsd,
     minNotional,
+    // The USD pair travels together: `minCollateralUsd` is the venue's bound and `collateralUsd` is
+    // the only value in the same unit. Sending one without the other would leave the validator
+    // holding a bound it cannot check, which it correctly treats as a refusal.
+    collateralUsd,
+    minCollateralUsd,
   }
 
   // A spending allowance is a leading leg only when the member does not already have one. An

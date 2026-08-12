@@ -99,6 +99,10 @@
  *   PERPS_GMX_URL              GMX v2 REST host (default arbitrum-api.gmxinfra.io); PERPS_GMX_CHAIN_ID
  *   PERPS_HL_URL               Hyperliquid public info API host
  *   PERPS_TIMEOUT_MS / PERPS_RETRIES / PERPS_CACHE_TTL_MS   read plumbing (defaults 8000/1/15000)
+ *   PERPS_HL_DEX_LIST_TTL_MS / PERPS_HL_DEX_MAX   Hyperliquid perp-dex (HIP-3) fan-out: how long
+ *                              the discovered dex list is cached (default 1h) and how many dexes
+ *                              one read may fan out to (default 24). Dexes past the cap are NAMED
+ *                              in sources.hyperliquid.unreadDexes, never silently dropped.
  *   PERPS_QUOTA_PER_IP/_GLOBAL/_WINDOW_MS   read quotas (defaults 60/300/60000)
  *   PERPS_KILLSWITCH           'true' => all /v1/perps/* routes answer 503 (ops kill)
  *   PERPS_GAINS_REFERRER       PUBLIC attribution: FairWins gains referrer address
@@ -608,6 +612,20 @@ export function loadConfig(env = process.env, opts = {}) {
         timeoutMs: int(env, 'PERPS_TIMEOUT_MS', 8000),
         retries: int(env, 'PERPS_RETRIES', 1),
         cacheTtlMs: int(env, 'PERPS_CACHE_TTL_MS', 15_000),
+        /**
+         * Hyperliquid perp dexes (HIP-3), spec 083 / hyperliquid-decision.md §5.2.
+         *
+         * `hlDexListTtlMs` — how long the DISCOVERED dex list is cached. It is global (not
+         * per-member) and changes only when Hyperliquid onboards a deployer, so an hour is
+         * generous; re-reading it per request would spend weight-20 calls on a constant.
+         *
+         * `hlDexMax` — the most dexes one fan-out will read. Hyperliquid served 10 on 2026-08-12
+         * and the list only grows, so this bounds the venue's per-IP weight budget against a list
+         * we do not control. It NEVER silences anything: dexes past the cap are named in
+         * `sources.hyperliquid.unreadDexes`, so the absence stays qualified.
+         */
+        hlDexListTtlMs: int(env, 'PERPS_HL_DEX_LIST_TTL_MS', 3_600_000),
+        hlDexMax: int(env, 'PERPS_HL_DEX_MAX', 24),
         quotaPerIp: int(env, 'PERPS_QUOTA_PER_IP', 60),
         quotaGlobal: int(env, 'PERPS_QUOTA_GLOBAL', 300),
         quotaWindowMs: int(env, 'PERPS_QUOTA_WINDOW_MS', 60_000),

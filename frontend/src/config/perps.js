@@ -178,6 +178,26 @@ export function perpsManageEnabled(venueId, chainId) {
 }
 
 /**
+ * The same capability question asked of a venue rather than of one position: can this build manage
+ * that venue's positions on ANY chain it knows about?
+ *
+ * It exists for surfaces that are not about a single position on a single chain — chiefly the
+ * footnote that discloses what FairWins earns on a venue. Such a footnote must be conditioned on
+ * the CAPABILITY, never on the fee rate: the Hyperliquid builder rate is admin-settable today
+ * (`perps.hyperliquid.builder`, ConfigOnly, cap 10 bps) while FairWins sends Hyperliquid no orders
+ * at all, so a rate-conditioned disclosure would let one admin edit turn on a member-facing claim
+ * that FairWins places Hyperliquid orders — which it cannot do (see
+ * `specs/083-perps-position-management/hyperliquid-decision.md` §5.2). Ask this instead, and the
+ * copy cannot come back because someone changed a number.
+ *
+ * Like `perpsManageEnabled` it is the capability half only — compose it with
+ * `perpsManageFeatureEnabled()` at the call site, exactly as the per-position gate does.
+ */
+export function perpsVenueManageableAnywhere(venueId) {
+  return Object.keys(PERPS_MANAGE_VENUES_BY_CHAIN).some((chainId) => perpsManageEnabled(venueId, chainId))
+}
+
+/**
  * The kill switch for the entire management surface, DEFAULT OFF.
  *
  * It stays off until the terms and risk disclosures name leveraged derivatives / perpetual futures

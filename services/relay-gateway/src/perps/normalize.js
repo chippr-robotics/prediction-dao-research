@@ -22,6 +22,21 @@
 const GAINS_P = 1e10 // gains 1e10 fixed-point (prices, percents)
 const GAINS_LEVERAGE_SCALE = 1e3
 const GAINS_FUNDING_RATE_PER_SECOND_P = 1e18 // percent/second
+/**
+ * `Fee.totalPositionSizeFeeP` → a FRACTION of position size. 1e12, not 1e10: the stored value is a
+ * PERCENT at 1e10, and the extra /100 turns it into the fraction the fee is actually multiplied by
+ * (@gainsnetwork/sdk lib/backend/tradingVariables/converter.js#convertFee). BTC's 350000000 is
+ * 0.00035 = 0.035%, which is the rate gTrade publishes for it.
+ */
+const GAINS_FEE_RATE_P = 1e12
+/** `Fee.minPositionSizeUsd` → USD (same converter). BTC's 285715 is $285.715. */
+const GAINS_MIN_POSITION_SIZE_USD_P = 1e3
+/**
+ * `openTrade` reverts `InsufficientCollateral` below 5 × the pair's minimum fee — the check that
+ * REPLACED the old `BelowMinPositionSizeUsd` in gTrade v9 (docs.gains.trade changelog v9-update,
+ * unchanged by v10, which only relaxed the partial-close/leverage bound to 1 × min fee).
+ */
+const GAINS_MIN_COLLATERAL_MIN_FEE_MULTIPLE = 5
 const GMX_FLOAT = 1e30
 const HOURS_PER_YEAR = 8760
 const SECONDS_PER_HOUR = 3600
@@ -154,6 +169,61 @@ function gainsCollateralOptions(tv) {
 }
 
 /**
+ * THE VENUE'S OWN TRADING FEE for a pair, and the minimum its own contract enforces (spec 083).
+ *
+ * WHY THIS IS A RATE AND NOT AN AMOUNT. A perps fee is a fraction of POSITION SIZE, and the size is
+ * whatever the member types. A per-pair dollar figure could only be a fee for one particular size,
+ * so it would be wrong for every other one — the feed publishes the rate and the client multiplies
+ * it by the size it is showing, which is the only way the number on screen can match the order.
+ *
+ * SCALES, from `@gainsnetwork/sdk` and re-verified against the LIVE Arbitrum payload + diamond
+ * (2026-08-12, `0xFF162c694eAA571f685030649814282eA457f169`):
+ *   fees[feeIndex].totalPositionSizeFeeP  350000000 / 1e12 = 0.00035  (BTC, 0.035%)
+ *   fees[feeIndex].minPositionSizeUsd     285715    / 1e3  = $285.715
+ *   pairMinFeeUsd(0) on chain             100000250000000000 / 1e18 = $0.10000025
+ *                                       = 0.00035 × 285.715 exactly — checked on 5 pairs.
+ *
+ * THE FLOOR IS NOT A MINIMUM SIZE. `getTotalTradeFeesCollateral` charges the rate on
+ * `max(positionSize, minPositionSizeUsd)`, so a position SMALLER than the floor is accepted and
+ * pays the fee of a floor-sized one. That is why `minNotional` below is null and not this number:
+ * publishing it as a minimum would refuse orders the venue would happily fill, which is a dead
+ * control, and the harm it would hide (a $50 BTC position paying $0.10 — 0.2%, nearly six times the
+ * headline rate) is disclosed by charging the floor rather than by forbidding the trade.
+ *
+ * WHAT THE RATE EXCLUDES, and why it is labelled an estimate rather than a quote: spread and price
+ * impact, borrowing and funding (charged over time, not at open), the counter-trade discount (a
+ * property of the order book at execution, unknowable here) and the member's own fee-tier/staking
+ * multiplier — which only ever REDUCES it, so the published rate is an honest upper bound.
+ *
+ * → `{ openRate, closeRate, feeFloorNotionalUsd, minFeeUsd, basis }` or null where the payload does
+ * not describe the pair's fee. Null means "not published", never "no fee".
+ */
+function gainsPairFee(tv, pair) {
+  const feeIndex = uint(pair?.feeIndex)
+  const fee = feeIndex == null ? null : (tv?.fees?.[feeIndex] ?? null)
+  if (!fee) return null
+  const rawRate = num(fee.totalPositionSizeFeeP)
+  // A zero rate is a real, publishable fact ("this pair costs nothing to open"), so it is kept and
+  // only a MISSING rate yields null — the two must not collapse into one answer.
+  if (rawRate == null || rawRate < 0) return null
+  const openRate = rawRate / GAINS_FEE_RATE_P
+  const rawFloor = num(fee.minPositionSizeUsd)
+  const feeFloorNotionalUsd = rawFloor != null && rawFloor > 0 ? rawFloor / GAINS_MIN_POSITION_SIZE_USD_P : null
+  return {
+    openRate,
+    // The same rate on the way out: `getClosingFee` delegates to the very same
+    // `getTotalTradeFeesCollateral`. Emitted as its own field rather than left implied, so a venue
+    // that ever splits the two does not need a consumer change to be told apart.
+    closeRate: openRate,
+    feeFloorNotionalUsd,
+    // The venue's own `pairMinFeeUsd` — the fee a below-floor position pays.
+    minFeeUsd: feeFloorNotionalUsd != null ? openRate * feeFloorNotionalUsd : null,
+    // A RATE THE VENUE PUBLISHES, not a quote it gave for this order. Consumers must say so.
+    basis: 'published-rate',
+  }
+}
+
+/**
  * @param {{tradingVariables: object, chartPrices?: object|null, chainId: number}} input
  * @returns {object[]} PerpPair[]
  */
@@ -184,6 +254,7 @@ export function normalizeGainsPairs({ tradingVariables: tv, chartPrices, chainId
     // default below the floor is refused at signing — so the client needs the floor, not just the
     // ceiling. A group that does not publish one leaves it null (no floor asserted).
     const groupMin = num(group?.minLeverage)
+    const venueFee = gainsPairFee(tv, pair)
     out.push({
       id: `gains:${chainId}:${pair.from}/${pair.to}`,
       venue: 'gains',
@@ -205,6 +276,22 @@ export function normalizeGainsPairs({ tradingVariables: tv, chartPrices, chainId
       pairIndex: i,
       minLeverage: groupMin != null && groupMin > 0 ? groupMin / GAINS_LEVERAGE_SCALE : null,
       collaterals,
+      /* Spec 083 — THE VENUE'S OWN COST, so the confirm step does not show FairWins' fee in money
+       * beside the venue's as a dash. A dash there reads as "FairWins is what this costs", which is
+       * the opposite of the disclosure this feature exists for. See `gainsPairFee`. */
+      venueFee,
+      /* DELIBERATELY NULL, and this is the fix for the gap tasks.md recorded as "gains does not
+       * publish a minimum". It does not publish one because since v9 it does not HAVE one: the
+       * `BelowMinPositionSizeUsd` check was removed and `minPositionSizeUsd` became the fee floor
+       * above. Emitting that number here would refuse a $100 BTC position as "below the venue's
+       * $285.72 minimum" while the venue would fill it. The bound that DOES exist is on collateral,
+       * and it is the next field. */
+      minNotional: null,
+      /* The `InsufficientCollateral` bound: `openTrade` requires collateral ≥ 5 × the pair's own
+       * minimum fee. Small ($0.50 on every pair measured) but real, and refusing it before the
+       * wallet prompt is strictly better than the member paying gas to read a revert selector. */
+      minCollateralUsd:
+        venueFee?.minFeeUsd != null ? venueFee.minFeeUsd * GAINS_MIN_COLLATERAL_MIN_FEE_MULTIPLE : null,
     })
   }
   return out
@@ -535,6 +622,24 @@ export function normalizeGmxPairs({ marketsInfo, tickers, tokens, chainId }) {
        * than guessing a token. */
       market: isAddress(m.marketToken) ? m.marketToken : null,
       collaterals: gmxCollateralOptions(m, tokenByAddress, tickerByAddress),
+      /* PRESENT-AND-NULL, NOT ABSENT (spec 083). GMX's position fee is
+       * `positionFeeFactorForPositiveImpact` / `…ForNegativeImpact` in its DataStore, and the
+       * minimums are `MIN_COLLATERAL_USD` / `MIN_POSITION_SIZE_USD` there too. NONE of them appear
+       * in `/markets/info`, `/markets` or any other REST path this proxy can reach — verified
+       * against the live arbitrum-api.gmxinfra.io response on 2026-08-12, whose market objects
+       * carry name/tokens/liquidity/OI/rates and nothing else.
+       *
+       * So the honest answer is a dash and this null, not a rate borrowed from GMX's docs: a
+       * published number that the deployed DataStore has since moved is a wrong fee, and a wrong
+       * fee is worse than an admitted unknown. The fields are EMITTED rather than omitted so a
+       * consumer can tell "this producer knows about venue fees and GMX does not publish one" from
+       * "this gateway predates the field" — absence would read as the second.
+       *
+       * The fix, if it is ever wanted, is a DataStore read; it belongs on the client next to
+       * `readExecutionFee`, which already reads that contract, not in this HTTP-only proxy. */
+      venueFee: null,
+      minNotional: null,
+      minCollateralUsd: null,
     })
   }
   return out
@@ -582,14 +687,95 @@ function gmxTokenPriceUsd(ticker, decimals) {
 
 // ---------------------------------------------------------------------------------------------
 // Hyperliquid
+//
+// PERP DEXES (HIP-3). Hyperliquid is not one order book: alongside its own book it hosts
+// validator-operated ("builder-deployed") perp dexes, each with its own asset universe and its own
+// per-member clearinghouse state. Every `/info` read that touches either takes a `dex` field, and
+// the venue's docs are explicit that it *"Defaults to the empty string which represents the first
+// perp dex."* A read that omits it therefore answers ONLY for the first dex — which is how spec 082
+// came to tell a member holding 35 positions across `xyz`/`hyna`/`mkts` that they held none
+// (`specs/083-perps-position-management/hyperliquid-decision.md` §5.2, defect 1). A fabricated
+// absence is the one thing this feature's rules forbid most clearly, so every Hyperliquid DTO below
+// is SCOPED TO THE DEX IT CAME FROM and the routes fan the read out across the discovered list.
 // ---------------------------------------------------------------------------------------------
 
 /**
- * @param {{metaAndAssetCtxs: [object, object[]]}} input  the raw `metaAndAssetCtxs` response
+ * Hyperliquid's own name for the first/default perp dex is the EMPTY STRING — not "hyperliquid",
+ * not null. It is a real value in the venue's vocabulary and is sent verbatim on every read.
+ */
+export const HL_DEFAULT_DEX = ''
+
+/** A dex name we can put in an id and a request body, or the default dex. Never undefined. */
+function hlDex(value) {
+  return typeof value === 'string' ? value : HL_DEFAULT_DEX
+}
+
+/**
+ * The asset's own name, with a redundant `dex:` prefix stripped.
+ *
+ * Some Hyperliquid surfaces qualify a HIP-3 asset as `"<dex>:<COIN>"` while the dex's own universe
+ * lists it bare. Both reach here, and `"xyz:BTC/USD"` in a symbol column is the venue's plumbing
+ * leaking onto a member's screen — the dex belongs beside the symbol (`variant`), not inside it.
+ */
+function hlBase(name, dex) {
+  const text = String(name)
+  return dex && text.startsWith(`${dex}:`) ? text.slice(dex.length + 1) : text
+}
+
+/**
+ * Ids must be unique ACROSS dexes: two dexes listing BTC produce two real markets, and two real
+ * positions, and an id that omits the dex merges them into one row (the collision recorded in
+ * hyperliquid-decision.md §5.2).
+ *
+ * The DEFAULT dex keeps the exact id spec 082 shipped. That is deliberate rather than tidy: the
+ * SPA's activity source fingerprints these ids to notice a position changing, so re-keying the
+ * default dex's rows would emit a "your perp positions changed on Hyperliquid" entry to every
+ * existing holder on the first poll after deploy — a fabricated event, which is the same class of
+ * lie in the other direction. Non-default dexes are new here, so they carry the dex segment and
+ * cannot collide with a 3-segment default id.
+ */
+function hlId(dex, ...parts) {
+  return ['hyperliquid', ...(dex ? [dex] : []), ...parts].join(':')
+}
+
+/**
+ * The venue's perp-dex list → the dex names to read, default dex first.
+ *
+ * The response is an array whose FIRST element is a bare `null` standing for the first/default dex
+ * (whose name is `''`); every other element is an object with a `name`. A `null` here is the
+ * venue's encoding, not a missing value, so it must not be filtered out.
+ *
+ * @param {unknown} perpDexs the raw `{"type":"perpDexs"}` response
+ * @returns {string[]} dex names, deduped, default (`''`) first
+ */
+export function normalizeHyperliquidDexes(perpDexs) {
+  const out = []
+  const seen = new Set()
+  const add = (name) => {
+    if (typeof name !== 'string' || seen.has(name)) return
+    seen.add(name)
+    out.push(name)
+  }
+  if (Array.isArray(perpDexs)) {
+    for (const entry of perpDexs) {
+      if (entry == null) add(HL_DEFAULT_DEX)
+      else if (typeof entry?.name === 'string') add(entry.name.trim())
+    }
+  }
+  // The default dex is what every un-scoped read already answered for. If the venue's list omits
+  // it (or the list is unusable), read it anyway rather than losing the positions we serve today.
+  if (!seen.has(HL_DEFAULT_DEX)) out.unshift(HL_DEFAULT_DEX)
+  return out
+}
+
+/**
+ * @param {{metaAndAssetCtxs: [object, object[]], dex?: string}} input  the raw `metaAndAssetCtxs`
+ *   response, and the perp dex it was read from (`''` = the first/default dex)
  * @returns {object[]} PerpPair[]
  */
-export function normalizeHyperliquidPairs({ metaAndAssetCtxs }) {
+export function normalizeHyperliquidPairs({ metaAndAssetCtxs, dex }) {
   if (!Array.isArray(metaAndAssetCtxs) || metaAndAssetCtxs.length < 2) return []
+  const d = hlDex(dex)
   const universe = Array.isArray(metaAndAssetCtxs[0]?.universe) ? metaAndAssetCtxs[0].universe : []
   const ctxs = Array.isArray(metaAndAssetCtxs[1]) ? metaAndAssetCtxs[1] : []
   const out = []
@@ -599,13 +785,22 @@ export function normalizeHyperliquidPairs({ metaAndAssetCtxs }) {
     const ctx = ctxs[i] ?? {}
     const markPx = pos(ctx.markPx)
     const oiBase = num(ctx.openInterest)
+    const base = hlBase(asset.name, d)
     out.push({
-      id: `hyperliquid:${asset.name}`,
+      id: hlId(d, base),
       venue: 'hyperliquid',
       chainId: null, // non-EVM venue (FR-012) — never a numeric chain id
-      symbol: `${asset.name}/USD`,
-      base: asset.name,
+      symbol: `${base}/USD`,
+      base,
       quote: 'USD',
+      // Which of Hyperliquid's perp dexes lists this market. `''` is the venue's own name for the
+      // first/default one, so absence is never implied by an empty string here.
+      dex: d,
+      // Rides the SAME field GMX's market variant uses, so two same-symbol markets are already
+      // distinguishable on every surface that renders a row (`PerpsPairTable`, `PerpsPositions`,
+      // `PositionSheet`) without any of them learning what a perp dex is. Null on the default dex,
+      // where there is no variant to state.
+      variant: d || null,
       price: pos(ctx.midPx) ?? markPx,
       fundingRate: num(ctx.funding), // already hourly, already a fraction
       fundingIntervalHours: 1,
@@ -618,10 +813,12 @@ export function normalizeHyperliquidPairs({ metaAndAssetCtxs }) {
 }
 
 /**
- * @param {{clearinghouseState: object}} input  the raw `clearinghouseState` response
+ * @param {{clearinghouseState: object, dex?: string}} input  the raw `clearinghouseState` response,
+ *   and the perp dex it was read from (`''` = the first/default dex)
  * @returns {object[]} PerpPosition[]
  */
-export function normalizeHyperliquidPositions({ clearinghouseState }) {
+export function normalizeHyperliquidPositions({ clearinghouseState, dex }) {
+  const d = hlDex(dex)
   const assetPositions = Array.isArray(clearinghouseState?.assetPositions)
     ? clearinghouseState.assetPositions
     : []
@@ -630,17 +827,26 @@ export function normalizeHyperliquidPositions({ clearinghouseState }) {
     const p = ap?.position
     const szi = num(p?.szi)
     if (p?.coin == null || szi == null || szi === 0) continue
+    const base = hlBase(p.coin, d)
+    const direction = szi > 0 ? 'long' : 'short'
     out.push({
-      id: `hyperliquid:${p.coin}:${szi > 0 ? 'long' : 'short'}`,
+      id: hlId(d, base, direction),
       venue: 'hyperliquid',
       chainId: null,
-      symbol: `${p.coin}/USD`,
-      direction: szi > 0 ? 'long' : 'short',
+      symbol: `${base}/USD`,
+      dex: d,
+      variant: d || null,
+      direction,
       sizeUsd: num(p.positionValue),
       collateralUsd: num(p.marginUsed),
       entryPrice: num(p.entryPx),
       leverage: num(p.leverage?.value),
       unrealizedPnlUsd: num(p.unrealizedPnl),
+      // Hyperliquid is READ-ONLY here (FR-021) so this is an identity, never a handle to act
+      // through: it names which book the row came from so a client can tell two same-symbol
+      // positions apart and link out to the right one. Nothing downstream turns a ref into a
+      // control — `canManage` asks `perpsManageEnabled(venue, chainId)`, which is config.
+      venueRef: { venue: 'hyperliquid', dex: d },
     })
   }
   return out

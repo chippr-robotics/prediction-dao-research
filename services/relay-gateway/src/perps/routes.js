@@ -14,16 +14,82 @@
 import express from 'express'
 import { GatewayError } from '../errors.js'
 import {
+  HL_DEFAULT_DEX,
   isAddress,
   normalizeGainsPairs,
   normalizeGainsPendingOrders,
   normalizeGainsPositions,
   normalizeGmxPairs,
+  normalizeHyperliquidDexes,
   normalizeHyperliquidPairs,
   normalizeHyperliquidPositions,
 } from './normalize.js'
 
 const STALE_FACTOR = 10 // a cached value older than 10x TTL is treated as gone, not served
+
+/* ------------------------------------------------------------------------------------------- *
+ * Hyperliquid perp dexes (HIP-3) — the fan-out, and the budget that shapes it
+ *
+ * Hyperliquid hosts validator-operated perp dexes beside its own book, and every `/info` read
+ * defaults to the FIRST one. Reading only that one is how spec 082 reported "no open perp
+ * positions" to a member holding 35 of them (hyperliquid-decision.md §5.2). So both reads fan out
+ * across the discovered dex list.
+ *
+ * THE BINDING CONSTRAINT IS THE VENUE'S PER-IP RATE LIMIT, and the gateway is ONE IP for every
+ * member (§2.5): 1200 request-weight per minute. The published weights make the arithmetic:
+ *
+ *   - `clearinghouseState` weighs 2. A 10-dex position fan-out is 20 weight per refresh, and the
+ *     15s cache bounds one member to 4 refreshes/min => ~80 weight/min per actively-viewing
+ *     member. That is the cost of telling the truth about a member's own positions and it is paid.
+ *   - `metaAndAssetCtxs` weighs 20. A 10-dex PAIRS fan-out is 200 weight per refresh, which at the
+ *     15s cache would be 800/min — two thirds of the entire budget for a market table nobody is
+ *     necessarily looking at. The pairs feed is GLOBAL and single-flight cached, so its cost is
+ *     fixed rather than per-member, and it is the one read that can honestly be slowed down: the
+ *     non-default dexes get their own longer floor below (~40 weight/min at 10 dexes).
+ *
+ * Neither knob may ever silence a dex: a dex that was not read is NAMED in `sources.hyperliquid`,
+ * because an unqualified absence is precisely the defect being fixed.
+ * ------------------------------------------------------------------------------------------- */
+
+/** How many dex reads may be in flight at once — bounds the burst, not the total weight. */
+const HL_DEX_CONCURRENCY = 4
+
+/**
+ * Floor on the cache TTL for a NON-DEFAULT dex's pair read (5 min). Deliberately not lowerable by
+ * env: it exists to hold a venue-side rate limit we do not control, and the direction an operator
+ * would want to move it (down) is the direction that breaks the whole venue for every member.
+ * `PERPS_CACHE_TTL_MS` still raises it. The default dex — the one carrying essentially all the
+ * volume — keeps the normal TTL and is unaffected.
+ */
+const HL_DEX_PAIRS_MIN_TTL_MS = 300_000
+
+/** Last-resort values, matching `config/index.js`, if the config block predates these knobs. */
+const HL_DEX_LIST_TTL_FALLBACK_MS = 3_600_000
+const HL_DEX_MAX_FALLBACK = 24
+
+/** A usable positive integer, or the fallback. Never NaN — a NaN cap reads zero dexes. */
+function positiveInt(value, fallback) {
+  return Number.isInteger(value) && value > 0 ? value : fallback
+}
+
+/**
+ * Runs `fn` over `items` with at most `limit` in flight, preserving order. `fn` must be total —
+ * every caller here goes through `venueRead`, which maps failure to null rather than throwing.
+ */
+async function mapLimited(items, limit, fn) {
+  const out = new Array(items.length)
+  let next = 0
+  const worker = async () => {
+    for (;;) {
+      const i = next
+      next += 1
+      if (i >= items.length) return
+      out[i] = await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker))
+  return out
+}
 
 /**
  * @param {object} config full gateway config (only .perps and .feeRouter are read)
@@ -94,13 +160,73 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
    * never fails the merged response. Bounded staleness: a stale cache hit past STALE_FACTOR x TTL
    * counts as an outage (stale-as-live would be dishonest, FR-004).
    */
-  async function venueRead(key, loader) {
+  async function venueRead(key, loader, ttlMs = perps.cacheTtlMs) {
     try {
-      const result = await cache.fetchThrough(key, perps.cacheTtlMs, loader)
-      if (result.stale && now() - result.fetchedAt > perps.cacheTtlMs * STALE_FACTOR) return null
+      const result = await cache.fetchThrough(key, ttlMs, loader)
+      if (result.stale && now() - result.fetchedAt > ttlMs * STALE_FACTOR) return null
       return result
     } catch {
       return null
+    }
+  }
+
+  /* ---- Hyperliquid perp dexes -------------------------------------------------------------- *
+   *
+   * The dex list is GLOBAL, not per-member, so it is discovered once and cached far longer than a
+   * member read: re-fetching it per request would spend `perpDexs` (weight 20) on a fact that
+   * changes when Hyperliquid onboards a deployer, i.e. rarely. It grew to 10 while spec 083 was
+   * being written and will grow again, which is exactly why it is discovered rather than pinned.
+   * ------------------------------------------------------------------------------------------ */
+
+  /**
+   * @returns {Promise<{dexes: string[], skipped: string[]|null, discovered: boolean}>}
+   *   `dexes` are the ones this request will read; `skipped` names the ones it will not, or is
+   *   NULL when discovery itself failed and we cannot name what we are missing. `[]` means nothing
+   *   was left out — the two must never be confused, which is why an unknown is not an empty list.
+   */
+  async function hlDexesToRead() {
+    const read = await venueRead(
+      'hl-perp-dexs',
+      () => clients.hyperliquid.postRead('/info', { type: 'perpDexs' }),
+      positiveInt(perps.hlDexListTtlMs, HL_DEX_LIST_TTL_FALLBACK_MS),
+    )
+    if (!read) {
+      // Discovery is down. Read the first dex — which is exactly what spec 082 did — but say so,
+      // so the caller can qualify the absence instead of implying the venue was fully searched.
+      return { dexes: [HL_DEFAULT_DEX], skipped: null, discovered: false }
+    }
+    const all = normalizeHyperliquidDexes(read.value)
+    // A missing/garbled cap must never resolve to "read nothing": an empty fan-out would report a
+    // member's whole Hyperliquid position set as absent, which is the defect, not a safe default.
+    const max = positiveInt(perps.hlDexMax, HL_DEX_MAX_FALLBACK)
+    // Default dex first (normalizeHyperliquidDexes guarantees it), so a cap can never cost us the
+    // book that carries essentially all the volume.
+    return { dexes: all.slice(0, max), skipped: all.slice(max), discovered: true }
+  }
+
+  /**
+   * One `sources.hyperliquid` entry from a fan-out.
+   *
+   * `partial` is the whole point: a `read` status whose dex list is incomplete would let an empty
+   * position list read as "you hold nothing on Hyperliquid" when the honest answer is "nothing on
+   * the books we could reach". `status` stays `read` while ANY dex answered — degrading the venue
+   * outright would throw away positions we genuinely read (and, on a Hyperliquid-only gateway,
+   * turn a good answer into the total-outage 502).
+   */
+  function hlSource({ dexList, readDexes, anyStale }) {
+    const unread = dexList.discovered
+      ? [...dexList.dexes.filter((d) => !readDexes.includes(d)), ...dexList.skipped]
+      : null
+    return {
+      status: readDexes.length > 0 ? 'read' : 'degraded',
+      chains: [], // non-EVM venue — never a numeric chain id (FR-012)
+      stale: anyStale,
+      // The venue's own dex names. `''` is the first/default dex, not a missing value.
+      dexes: readDexes,
+      // Named where we know them; null when dex discovery itself failed, which is "we do not know
+      // what we missed" and must not be flattened into "we missed nothing".
+      unreadDexes: unread,
+      partial: unread == null || unread.length > 0,
     }
   }
 
@@ -140,8 +266,19 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
           })
         : null
 
-      const hlResult = clients.hyperliquid
-        ? await venueRead('hl-pairs', () => clients.hyperliquid.postRead('/info', { type: 'metaAndAssetCtxs' }))
+      // Hyperliquid: one read per perp dex, so HIP-3 markets are listed instead of silently
+      // missing. The default dex keeps the normal TTL; the rest sit behind the longer floor that
+      // keeps a 10x weight-20 fan-out inside the venue's per-IP budget (see the header).
+      const hlDexList = clients.hyperliquid ? await hlDexesToRead() : null
+      const hlPairReads = hlDexList
+        ? await mapLimited(hlDexList.dexes, HL_DEX_CONCURRENCY, async (dex) => ({
+            dex,
+            read: await venueRead(
+              `hl-pairs:${dex}`,
+              () => clients.hyperliquid.postRead('/info', { type: 'metaAndAssetCtxs', dex }),
+              dex === HL_DEFAULT_DEX ? perps.cacheTtlMs : Math.max(perps.cacheTtlMs, HL_DEX_PAIRS_MIN_TTL_MS),
+            ),
+          }))
         : null
 
       const pairs = []
@@ -176,12 +313,15 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
       }
 
       if (clients.hyperliquid) {
-        if (hlResult) {
-          pairs.push(...normalizeHyperliquidPairs({ metaAndAssetCtxs: hlResult.value }))
-          sources.hyperliquid = { status: 'read', chains: [], stale: Boolean(hlResult.stale) }
-        } else {
-          sources.hyperliquid = { status: 'degraded', chains: [], stale: false }
+        const readDexes = []
+        let anyStale = false
+        for (const { dex, read } of hlPairReads) {
+          if (!read) continue // this dex did not answer — reported below, never rendered as empty
+          readDexes.push(dex)
+          if (read.stale) anyStale = true
+          pairs.push(...normalizeHyperliquidPairs({ metaAndAssetCtxs: read.value, dex }))
         }
+        sources.hyperliquid = hlSource({ dexList: hlDexList, readDexes, anyStale })
       }
 
       requireAnyRead(sources)
@@ -233,10 +373,18 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
         }),
       )
 
-      const hlResult = clients.hyperliquid
-        ? await venueRead(`hl-positions:${addr}`, () =>
-            clients.hyperliquid.postRead('/info', { type: 'clearinghouseState', user: address }),
-          )
+      // THE FAN-OUT THAT FIXES THE FABRICATED ABSENCE. `clearinghouseState` answers for ONE perp
+      // dex, so a member whose positions all live on a HIP-3 book was told they had none. Each dex
+      // is cached and isolated exactly like a venue: one that did not answer contributes no rows
+      // and is NAMED, never rendered as "nothing here".
+      const hlDexList = clients.hyperliquid ? await hlDexesToRead() : null
+      const hlReads = hlDexList
+        ? await mapLimited(hlDexList.dexes, HL_DEX_CONCURRENCY, async (dex) => ({
+            dex,
+            read: await venueRead(`hl-positions:${addr}:${dex}`, () =>
+              clients.hyperliquid.postRead('/info', { type: 'clearinghouseState', user: address, dex }),
+            ),
+          }))
         : null
 
       const positions = []
@@ -274,12 +422,15 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
       }
 
       if (clients.hyperliquid) {
-        if (hlResult) {
-          positions.push(...normalizeHyperliquidPositions({ clearinghouseState: hlResult.value }))
-          sources.hyperliquid = { status: 'read', chains: [], stale: Boolean(hlResult.stale) }
-        } else {
-          sources.hyperliquid = { status: 'degraded', chains: [], stale: false }
+        const readDexes = []
+        let anyStale = false
+        for (const { dex, read } of hlReads) {
+          if (!read) continue
+          readDexes.push(dex)
+          if (read.stale) anyStale = true
+          positions.push(...normalizeHyperliquidPositions({ clearinghouseState: read.value, dex }))
         }
+        sources.hyperliquid = hlSource({ dexList: hlDexList, readDexes, anyStale })
       }
 
       // The total-outage 502 stands — with one exception: if we DID reach a member's pending

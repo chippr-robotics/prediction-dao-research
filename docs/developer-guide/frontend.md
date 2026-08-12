@@ -217,6 +217,9 @@ Permissions-Policy `camera=(self)` required by the QR scanner.
 
 ## Next steps
 
+- [Dialog and bottom-sheet focus management](dialog-focus-management.md) — read before adding a
+  `role="dialog"` surface: an open, measured, repo-wide finding about focus containment, and the
+  two half-implementations currently in the tree.
 - [Architecture overview](architecture.md)
 - [Smart contracts](smart-contracts.md)
 - [Testing](testing.md)
