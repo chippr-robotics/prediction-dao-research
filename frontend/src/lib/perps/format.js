@@ -11,7 +11,9 @@ export function formatPairPrice(price) {
   if (price == null || !Number.isFinite(Number(price)) || Number(price) <= 0) return DASH
   const n = Number(price)
   if (n >= 1000) return n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-  if (n >= 1) return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (n >= 100) return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // Forex/mid-priced pairs live in the 4th decimal (EUR/USD 1.0841) — 2dp would erase the quote.
+  if (n >= 1) return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
   return n.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 5 })
 }
 
@@ -21,9 +23,16 @@ export function formatPairPrice(price) {
  */
 export function formatFundingRate(rate, intervalHours = 1) {
   if (rate == null || !Number.isFinite(Number(rate))) return DASH
+  const pct = formatFundingPct(rate)
+  return pct === DASH ? DASH : `${pct}/${intervalHours}h`
+}
+
+/** The bare signed funding percentage ('+0.0013%') — for table cells whose HEADER names the interval. */
+export function formatFundingPct(rate) {
+  if (rate == null || !Number.isFinite(Number(rate))) return DASH
   const pct = Number(rate) * 100
   const sign = pct > 0 ? '+' : ''
-  return `${sign}${pct.toFixed(4)}%/${intervalHours}h`
+  return `${sign}${pct.toFixed(4)}%`
 }
 
 /** Annualized view of an hourly funding rate for the detail tooltip — e.g. '+11.4%/yr'. */

@@ -30,7 +30,9 @@ describe('perps format', () => {
 
   it('formats prices across magnitudes', () => {
     expect(formatPairPrice(63412.53)).toBe('63,412.5')
-    expect(formatPairPrice(3.14159)).toBe('3.14')
+    expect(formatPairPrice(212.4)).toBe('212.40')
+    expect(formatPairPrice(1.0841)).toBe('1.0841') // forex lives in the 4th decimal
+    expect(formatPairPrice(3.14159)).toBe('3.1416')
     expect(formatPairPrice(0.069419)).toBe('0.06942')
     expect(formatPairPrice(0)).toBe('—') // zero price is not a price
     expect(formatPairPrice(-5)).toBe('—')

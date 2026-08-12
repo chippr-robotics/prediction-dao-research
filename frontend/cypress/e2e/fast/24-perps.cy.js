@@ -75,13 +75,15 @@ describe('Perps view (Trade section)', () => {
   // PERPS-01: honest absence without a gateway — the CI-default world.
   // ---------------------------------------------------------------------------
   ;(GATEWAY_CONFIGURED ? it.skip : it)('[PERPS-01] no gateway: no Perps tab, deep link falls back to Swap', () => {
-    cy.mockWeb3Provider({ account: TEST_ACCOUNT })
+    // Pre-authorized: the Trade tab's content only renders for a connected wallet, and this spec
+    // is about the tab content, not the connect flow.
+    cy.mockWeb3Provider({ account: TEST_ACCOUNT, preAuthorized: true })
     // A saved perps deep link must land somewhere useful, never a dead panel (FR-013).
     cy.visit('/wallet?tab=trade&view=perps')
     cy.get('body', { timeout: 10000 }).should('be.visible')
 
     // The Trade section renders its pre-082 content (the swap panel)…
-    cy.get('.trade-section', { timeout: 10000 }).should('exist')
+    cy.get('.trade-panel', { timeout: 15000 }).should('exist')
     // …and offers no Perps control at all — absence, not a dead button.
     cy.contains('button', /^Perps$/).should('not.exist')
     cy.get('.perps-view').should('not.exist')
@@ -98,7 +100,7 @@ describe('Perps view (Trade section)', () => {
         statusCode: 200,
         body: { positions: [], sources: {} },
       }).as('positions')
-      cy.mockWeb3Provider({ account: TEST_ACCOUNT })
+      cy.mockWeb3Provider({ account: TEST_ACCOUNT, preAuthorized: true })
       cy.visit('/wallet?tab=trade&view=perps')
       cy.wait('@pairs')
     })

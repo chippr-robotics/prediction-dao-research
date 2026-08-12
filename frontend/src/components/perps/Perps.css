@@ -110,6 +110,24 @@
 }
 
 /* ---- pairs table ---- */
+.perps-table-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.perps-table-legend {
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
+  gap: 0.35rem 1.1rem;
+  margin: 0;
+}
+.perps-table-legend span {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.25rem;
+}
 .perps-table-scroll {
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 12px;
@@ -117,16 +135,24 @@
 }
 .perps-table {
   border-collapse: collapse;
-  font-size: 0.88rem;
-  min-width: 44rem;
+  font-size: 0.83rem;
+  min-width: 40rem;
   width: 100%;
 }
 .perps-table th,
 .perps-table td {
   border-bottom: 1px solid var(--border-color, #e5e7eb);
-  padding: 0.55rem 0.7rem;
+  padding: 0.5rem 0.4rem;
   text-align: left;
   white-space: nowrap;
+}
+.perps-table th:first-child,
+.perps-table td:first-child {
+  padding-left: 0.75rem;
+}
+.perps-table th:last-child,
+.perps-table td:last-child {
+  padding-right: 0.75rem;
 }
 .perps-table thead th {
   background: var(--bg-secondary, #f9fafb);
@@ -181,15 +207,19 @@
 .perps-venue-badge {
   align-items: baseline;
   display: inline-flex;
-  gap: 0.35rem;
+  gap: 0.28rem;
 }
 .perps-venue-name {
-  background: var(--bg-tertiary, #f3f4f6);
+  /* Border + inherited text, NOT a bg-tertiary pill: the tertiary surface is light in the dark
+     theme, which rendered light-on-light badge text (caught by the actor-critic screenshot loop). */
+  background: transparent;
+  border: 1px solid var(--border-color, #d1d5db);
   border-radius: 6px;
   color: var(--text-primary, #111827);
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 0.1rem 0.4rem;
+  letter-spacing: 0.02em;
+  padding: 0.08rem 0.38rem;
 }
 .perps-venue-chain {
   color: var(--text-secondary, #6b7280);

@@ -70,11 +70,11 @@
       tests
 - [x] T061 [P] Cypress `frontend/cypress/e2e/fast/23-perps.cy.js` (stubbed gateway:
       deep link, pairs, search, degraded, link-out attribution, a11y)
-- [ ] T062 `scripts/ui/capture-perps.mjs` + actor-critic loop; screenshots into
+- [x] T062 `scripts/ui/capture-perps.mjs` + actor-critic loop; screenshots into
       `specs/082-perps-trade-view/screenshots/` + README
-- [ ] T063 [P] Docs: `docs/developer-guide/perps.md`, mkdocs nav, runbook note,
+- [x] T063 [P] Docs: `docs/developer-guide/perps.md`, mkdocs nav, runbook note,
       CLAUDE.md guardrail entry
-- [ ] T064 Full verification: scoped vitest suites, gateway tests, lint; PR
+- [x] T064 Full verification: scoped vitest suites, gateway tests, lint; PR
 
 ## Dependencies
 

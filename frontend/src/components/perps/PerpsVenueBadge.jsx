@@ -7,10 +7,16 @@
 import { PERP_VENUES, isEvmPerpVenue } from '../../config/perps'
 import { NETWORKS } from '../../config/networks'
 
+/** Compact display form of a network name for dense table rows ("Arbitrum One" → "Arbitrum"). */
+function shortNetworkName(name) {
+  return typeof name === 'string' ? name.replace(/\s+One$/, '') : name
+}
+
 export default function PerpsVenueBadge({ venue, chainId }) {
   const meta = PERP_VENUES[venue]
   if (!meta) return null
-  const networkName = isEvmPerpVenue(venue) && chainId != null ? NETWORKS[chainId]?.name : null
+  const networkName =
+    isEvmPerpVenue(venue) && chainId != null ? shortNetworkName(NETWORKS[chainId]?.name) : null
   return (
     <span className={`perps-venue-badge perps-venue-${venue}`}>
       <span className="perps-venue-name">{meta.shortLabel}</span>

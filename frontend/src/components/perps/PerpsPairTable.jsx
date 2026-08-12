@@ -9,7 +9,13 @@
 import InfoTip from '../ui/InfoTip'
 import PerpsVenueBadge from './PerpsVenueBadge'
 import { tradeLinkFor } from '../../lib/perps/linkouts'
-import { formatPairPrice, formatFundingRate, formatUsdCompact, formatLeverage } from '../../lib/perps/format'
+import {
+  formatPairPrice,
+  formatFundingPct,
+  formatFundingAnnualized,
+  formatUsdCompact,
+  formatLeverage,
+} from '../../lib/perps/format'
 import { PERPS_TIPS } from '../../lib/perps/perpsCopy'
 
 function fundingClass(rate) {
@@ -19,29 +25,30 @@ function fundingClass(rate) {
 
 export default function PerpsPairTable({ pairs, attribution }) {
   return (
-    <div className="perps-table-scroll">
-      <table className="perps-table">
-        <thead>
-          <tr>
-            <th scope="col">Pair</th>
-            <th scope="col">Venue</th>
-            <th scope="col" className="perps-num">
-              Price
-            </th>
-            <th scope="col" className="perps-num">
-              Funding <InfoTip label="About funding">{PERPS_TIPS.fundingRate}</InfoTip>
-            </th>
-            <th scope="col" className="perps-num">
-              Open interest <InfoTip label="About open interest">{PERPS_TIPS.openInterest}</InfoTip>
-            </th>
-            <th scope="col" className="perps-num">
-              Max leverage <InfoTip label="About leverage">{PERPS_TIPS.maxLeverage}</InfoTip>
-            </th>
-            <th scope="col">
-              <span className="sr-only">Trade</span>
-            </th>
-          </tr>
-        </thead>
+    <div className="perps-table-block">
+      <div className="perps-table-scroll">
+        <table className="perps-table">
+          <thead>
+            <tr>
+              <th scope="col">Pair</th>
+              <th scope="col">Venue</th>
+              <th scope="col" className="perps-num">
+                Price
+              </th>
+              <th scope="col" className="perps-num">
+                Funding&nbsp;/&nbsp;1h
+              </th>
+              <th scope="col" className="perps-num">
+                Open interest
+              </th>
+              <th scope="col" className="perps-num">
+                Max leverage
+              </th>
+              <th scope="col">
+                <span className="sr-only">Trade</span>
+              </th>
+            </tr>
+          </thead>
         <tbody>
           {pairs.map((pair) => {
             const href = tradeLinkFor(pair, attribution)
@@ -55,8 +62,15 @@ export default function PerpsPairTable({ pairs, attribution }) {
                   <PerpsVenueBadge venue={pair.venue} chainId={pair.chainId} />
                 </td>
                 <td className="perps-num">{formatPairPrice(pair.price)}</td>
-                <td className={`perps-num ${fundingClass(pair.fundingRate)}`}>
-                  {formatFundingRate(pair.fundingRate, pair.fundingIntervalHours)}
+                <td
+                  className={`perps-num ${fundingClass(pair.fundingRate)}`}
+                  title={
+                    pair.fundingRate != null
+                      ? `≈ ${formatFundingAnnualized(pair.fundingRate, pair.fundingIntervalHours)} annualized`
+                      : undefined
+                  }
+                >
+                  {formatFundingPct(pair.fundingRate)}
                 </td>
                 <td className="perps-num">{formatUsdCompact(pair.openInterestUsd)}</td>
                 <td className="perps-num">{formatLeverage(pair.maxLeverage)}</td>
@@ -78,6 +92,20 @@ export default function PerpsPairTable({ pairs, attribution }) {
           })}
         </tbody>
       </table>
+      </div>
+      {/* Term legend below the table (the Earn convention) — keeps the dense header row narrow
+          while every specialist term keeps its InfoTip (FR-015). */}
+      <p className="perps-table-legend">
+        <span>
+          Funding / 1h <InfoTip label="About funding">{PERPS_TIPS.fundingRate}</InfoTip>
+        </span>
+        <span>
+          Open interest <InfoTip label="About open interest">{PERPS_TIPS.openInterest}</InfoTip>
+        </span>
+        <span>
+          Max leverage <InfoTip label="About leverage">{PERPS_TIPS.maxLeverage}</InfoTip>
+        </span>
+      </p>
     </div>
   )
 }

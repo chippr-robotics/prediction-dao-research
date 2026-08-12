@@ -107,6 +107,7 @@ nav:
     - ClearPath Multi-Network DAOs: developer-guide/clearpath-multi-network.md
     - Earn Integration: developer-guide/earn-integration.md
     - Staking Integration: developer-guide/staking-integration.md
+    - Perps (spec 082): developer-guide/perps.md
     - Platform Fees (FeeRouter): developer-guide/platform-fees.md
     - Mini-Apps (spec 073): developer-guide/miniapps.md
     - Account Statements: developer-guide/account-statements.md

@@ -93,7 +93,7 @@ describe('PerpsView', () => {
     expect(screen.getByText('BTC/USD')).toBeInTheDocument()
     expect(screen.getByText('ETH/USD')).toBeInTheDocument()
     expect(screen.getByText('63,000.0')).toBeInTheDocument()
-    expect(screen.getByText('+0.0013%/1h')).toBeInTheDocument()
+    expect(screen.getByText('+0.0013%')).toBeInTheDocument()
     expect(screen.getByText('$90.0M')).toBeInTheDocument()
     expect(screen.getByText('200×')).toBeInTheDocument()
     // Venue badges: gains carries its network name; hyperliquid never does (non-EVM, FR-012).
