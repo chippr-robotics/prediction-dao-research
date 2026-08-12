@@ -24,6 +24,12 @@ const LAUNCH_FEE_SERVICES = [
   // staking is fee-free in v1, so it has no service. Rate ships at 0, set later from the Fees tab.
   { label: "stake.lido", capBps: 250, kind: ServiceKind.ConfigOnly }, // Lido ETH→wstETH liquid staking
   { label: "stake.polygon", capBps: 250, kind: ServiceKind.ConfigOnly }, // sPOL POL→sPOL liquid staking
+  // Perps (spec 082): the Hyperliquid builder fee — the one platform-priced perps rate. The cap is
+  // Hyperliquid's OWN 10 bps limit on perps builder fees, not our 250 bps wrapped ceiling: the
+  // venue rejects any order above it, so a higher stored rate could only ever be a lie. ConfigOnly —
+  // the fee is charged by Hyperliquid per order (execution spec); the gateway/frontend only READ it.
+  // Gains/GMX referral economics are venue-paid shares with no rate of ours, hence no service.
+  { label: "perps.hyperliquid.builder", capBps: 10, kind: ServiceKind.ConfigOnly },
 ];
 
 module.exports = { SERVICE_KIND_LABELS, LAUNCH_FEE_SERVICES, ServiceKind };

@@ -36,6 +36,8 @@ import { createPolymarketClient } from './polymarket/client.js'
 import { createPolymarketRouter } from './polymarket/routes.js'
 import { createEsploraClient, createStampsClient } from './bitcoin/client.js'
 import { createBitcoinRouter } from './bitcoin/routes.js'
+import { createPerpsClients } from './perps/client.js'
+import { createPerpsRouter, perpsStatus } from './perps/routes.js'
 import { createAcrossClient } from './bridge/quotes.js'
 import { createBridgeRouter } from './bridge/routes.js'
 import { createAuditLogger } from './audit/log.js'
@@ -321,7 +323,10 @@ export function createApp(config, deps = {}) {
         beneficiary: config.opensea.referralAddress ?? null,
       },
     }
-    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees })
+    // Perps read-proxy visibility (spec 082, FR-014): venue/attribution config state only —
+    // no member data, and the live HL builder bps already surfaces via /v1/perps/config.
+    const perps = perpsStatus(config, { killSwitch })
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps })
   }
   app.get('/healthz', healthHandler)
   app.get('/status', healthHandler)
@@ -715,6 +720,32 @@ export function createApp(config, deps = {}) {
       cache: deps.bridgeCache ?? createTtlCache({ now: nowMs }),
       quotas: bridgeQuotas,
       killSwitch,
+    })
+  )
+
+  // ---- GET /v1/perps/* (spec 082 perps read proxy; origin-locked via middleware) ---------------
+  // Read-only market data + positions from Gains Network / GMX / Hyperliquid, plus the public
+  // attribution config and the live Hyperliquid builder-fee bps. Quotas are keyed per caller IP
+  // (nothing to sign on a GET); there are NO write routes — no execution ships this release
+  // (FR-018), so a total perps outage leaves every value path intact (FR-016). Mounting is
+  // unconditional so a disabled module answers 503 perps_unconfigured, never a bare 404.
+  const perpsQuotas = createQuotas({
+    signerPerWindow: config.perps.quotaPerIp,
+    globalPerWindow: config.perps.quotaGlobal,
+    windowMs: config.perps.quotaWindowMs,
+    now: nowMs,
+  })
+  const perpsClients =
+    deps.perpsClients ??
+    createPerpsClients(config.perps, deps.perpsFetch ? { fetchImpl: deps.perpsFetch } : {})
+  app.use(
+    createPerpsRouter(config, {
+      clients: perpsClients,
+      cache: deps.perpsCache ?? createTtlCache({ now: nowMs }),
+      quotas: perpsQuotas,
+      killSwitch,
+      feeRates,
+      now: nowMs,
     })
   )
 

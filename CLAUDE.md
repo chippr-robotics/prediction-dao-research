@@ -144,6 +144,24 @@ artifacts live under `specs/<feature>/`.
   never hidden, never "free". Resolve nothing through `wagerRegistry`. Builder code + fee are public
   config; the CLOB API key + L2 creds are gateway-only secrets. Boot fails loudly if the fee exceeds the
   caps. See `docs/developer-guide/predict-polymarket.md` + `specs/057-predict-polymarket/`.
+- **Perps (spec 082) is a READ-ONLY market-data surface — a view inside Trade, not a nav item.**
+  `TradeSection` switches Swap (default, untouched) | Perps (`/wallet?tab=trade&view=perps`). The
+  relay-gateway `perps/` module proxies three PUBLIC venue APIs — Gains Network (Arbitrum/Base/
+  Polygon), GMX v2 (Arbitrum), Hyperliquid — with per-venue failure isolation: each venue resolves
+  `read | degraded` independently; a degraded venue is NAMED and its pairs omitted, never rendered
+  as zeros or stale-as-live, and missing metrics stay `null` → "—" (normalizer scale provenance is
+  documented in `services/relay-gateway/src/perps/normalize.js`; don't "fix" scales without
+  re-verifying against the venue SDK). **Hyperliquid is a non-EVM venue** (spec-061 precedent):
+  string id, `chainId: null`, never passed to EVM seams (`isEvmPerpVenue` guards). **No in-app
+  execution ships** (FR-018 — no order controls, positions read-only, "Manage on venue ↗"); an
+  execution wrapper is a follow-up spec with its own security lifecycle. Revenue: Gains referral +
+  GMX ref code are venue-paid shares (GMX even discounts the trader); ONLY the **Hyperliquid
+  builder fee** is platform-priced — FeeRouter `ConfigOnly` service `perps.hyperliquid.builder`
+  hard-capped at **10 bps (Hyperliquid's own limit, NOT our 250)**, env fallback boot-fails above
+  it, zero ⇒ no fee line, unreadable ⇒ "could not be confirmed". Link-outs carry attribution with
+  a plain-link fallback (never blocked). Module optional (`PERPS_ENABLED`) — off ⇒ 503
+  `perps_unconfigured`, SPA hides the tab; testnet cohort ⇒ honest mainnet-only notice, never
+  cross-cohort data. See `docs/developer-guide/perps.md` + `specs/082-perps-trade-view/`.
 - **Platform fees (spec 060) have ONE source of truth: the `FeeRouter`** (UUPS proxy, deployment keys
   `feeRouter` / `feeRouterImpl`, `contracts/fees/`). Every configurable fee lives there as a
   `bytes32 serviceId` (keccak of e.g. `earn.lend`, `polymarket.taker`) with a per-service hard cap

@@ -9,7 +9,7 @@ import { useChainTokens } from '../hooks/useChainTokens'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey } from '../utils/keyRegistryService'
-import TradePanel from '../components/fairwins/TradePanel'
+import TradeSection from '../components/fairwins/TradeSection'
 import EarnPanel from '../components/earn/EarnPanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
 import CollectiblesPanel from '../components/collectibles/CollectiblesPanel'
@@ -751,7 +751,7 @@ function WalletPage() {
                 )}
                 {activeTab === 'trade' && (
                   <div className="trade-section" role="tabpanel">
-                    <TradePanel />
+                    <TradeSection />
                   </div>
                 )}
                 {activeTab === 'earn' && (
