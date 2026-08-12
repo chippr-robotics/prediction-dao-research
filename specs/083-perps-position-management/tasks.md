@@ -58,9 +58,16 @@
 
 - [ ] T060 `components/admin/PerpsFeesPanel.jsx` — both rails, authority named, GMX rate read from
       DataStore with a `setUiFeeFactor` control; HL from FeeRouter
-- [ ] T061 `scripts/ops/register-perps-fee-service.js` — one-shot Polygon registration (DRY_RUN)
-- [ ] T062 `scripts/ops/set-gmx-ui-fee-factor.js` — GMX self-registration on Arbitrum (DRY_RUN)
-- [ ] T063 [P] Tests for the ops scripts' dry-run output and cap enforcement
+- [x] T061 ~~new registration script~~ — **not needed**: the existing generic
+      `scripts/ops/register-fee-service.js` already covers it and `perps.hyperliquid.builder` is in
+      the catalog. Verified report-only against Polygon: the service reads
+      `NOT REGISTERED (quoteFee reverts ServiceUnknown) — expected cap 10 bps, ConfigOnly`, with
+      every other service live at 50 bps. Registration is an operator action awaiting approval.
+- [x] T062 `scripts/ops/set-gmx-ui-fee-factor.js` — GMX self-registration on Arbitrum. Verified live:
+      reads `MAX_UI_FEE_FACTOR = 1e27` (10 bps) from GMX's DataStore, current factor 0, `BPS=5`
+      dry-runs to `setUiFeeFactor(5e26)`, and `BPS=11` is refused against the live cap. Refuses to
+      send when the signer is not the intended receiver (setUiFeeFactor credits `msg.sender`).
+- [ ] T063 [P] Tests for the ops script's unit conversion and cap enforcement
 
 ## Phase 7 — Reporting, docs, polish
 
