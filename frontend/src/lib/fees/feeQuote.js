@@ -55,6 +55,10 @@ export const FEE_SERVICES = {
   // that silently does nothing — worse than no control (research R3).
   BRIDGE_TRANSFER: keccakId('bridge.transfer'),
   LIQUIDITY_DEPOSIT: keccakId('liquidity.deposit'),
+  // Perps (spec 082): the Hyperliquid builder fee — the one platform-priced perps rate, capped at
+  // Hyperliquid's own 10 bps perps limit. ConfigOnly: Hyperliquid charges it per order; FairWins
+  // surfaces only READ it for disclosure. Gains/GMX referral shares are venue-paid (no service).
+  PERPS_HL_BUILDER: keccakId('perps.hyperliquid.builder'),
 }
 
 const BPS_DENOMINATOR = 10_000n
