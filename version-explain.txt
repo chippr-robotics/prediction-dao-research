@@ -1,41 +1,28 @@
-previous: v1.5.7
-commits:  36
-  [unclassified] Merge pull request #1147 from chippr-robotics/staging
-  [unclassified] Merge pull request #1148 from chippr-robotics/claude/quick-access-sidebar-improvements-vwplt4
-  [feat -> minor] bound the drawer's height — accordions, capped pin strip, filter, compact density (spec 081)
-  [unclassified] Merge pull request #1145 from chippr-robotics/claude/account-statement-design-o501h5
-  [docs -> patch] trigger substitutions are not a place for build config
-  [unclassified] Merge pull request #1146 from chippr-robotics/claude/pwa-settings-expandable-cards-o2w3cu
-  [build -> patch] state the build timeout instead of inheriting 600s
-  [refactor -> patch] give the renamed-tab alias map one home
-  [feat -> minor] make Preferences the app's Settings, as expandable cards
-  [docs -> patch] name the Cloud Build trigger that builds staging, and the trap that emptied it
-  [unclassified] Merge pull request #1144 from chippr-robotics/claude/account-statement-design-o501h5
-  [ci -> patch] stop CI pretending to deploy staging
-  [unclassified] Merge pull request #1143 from chippr-robotics/claude/account-statement-design-o501h5
-  [skipped] fix(ci): stop the release train releasing its own CHANGELOG commits
-  [unclassified] Merge pull request #1140 from chippr-robotics/claude/account-statement-design-o501h5
-  [feat -> minor] statement centre with a bottom-sheet generator (#1026)
-  [unclassified] Merge pull request #1138 from chippr-robotics/claude/notification-icon-visibility-evh881
-  [unclassified] Merge pull request #1137 from chippr-robotics/claude/account-statement-design-o501h5
-  [docs -> patch] consolidate stale has-unread comment in NotificationBell.css
-  [unclassified] Fix notification bell icon disappearing when unread
-  [unclassified] Merge pull request #1136 from chippr-robotics/claude/chore-prs-sprint-y45jut
-  [fix -> patch] statement corrections from design and audit review (#1026)
-  [feat -> minor] branded account statement PDF with charts and report types (#1026)
-  [fix -> patch] re-record token-mint mini-app byte baseline, bump its version
-  [chore -> patch] land eslint 9 -> 10 + plugins, fix the new rules it enables
-  [unclassified] Merge pull request #1133 from chippr-robotics/claude/chore-prs-sprint-y45jut
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/chore-prs-sprint-y45jut
-  [unclassified] Merge pull request #1129 from chippr-robotics/dependabot/github_actions/staging/actions/deploy-pages-5
-  [unclassified] Merge pull request #1126 from chippr-robotics/dependabot/github_actions/staging/actions/checkout-7
-  [unclassified] Merge pull request #1127 from chippr-robotics/dependabot/npm_and_yarn/staging/scure/base-2.2.0
-  [unclassified] Merge pull request #1125 from chippr-robotics/dependabot/github_actions/staging/dorny/paths-filter-4
-  [chore -> patch] land this sprint's safe dependency and CI action bumps
-  [chore -> patch] Bump actions/deploy-pages from 4 to 5
-  [chore -> patch] Bump actions/checkout from 4 to 7
-  [chore -> patch] Bump @scure/base from 1.2.6 to 2.2.0
-  [chore -> patch] Bump dorny/paths-filter from 3 to 4
+previous: v1.6.0
+commits:  23
+  [unclassified] Merge pull request #1159 from chippr-robotics/staging
+  [fix -> patch] enable the perps read proxy, and stop the ops skill reporting a migrated gateway as scaled-to-zero (#1158)
+  [unclassified] Merge pull request #1153 from chippr-robotics/claude/perps-position-management-phase1
+  [unclassified] Merge pull request #1152 from chippr-robotics/claude/dark-theme-rendering-cj4ieb
+  [test -> patch] e2e coverage + actor-critic visual review, and the four defects it found
+  [feat -> minor] perps entry, admin fees, activity — and three more dead paths closed
+  [feat -> minor] perps exits — position sheet, stuck-order recovery, protection (phases 3+4)
+  [docs -> patch] record the standing decision to keep the deploy wallet as UI-fee receiver
+  [feat -> minor] perps foundations — venue calldata, order state machine, fee units, guards
+  [docs -> patch] disclose how the platform is actually funded, and name leveraged derivatives
+  [fix -> patch] define missing dark-mode tokens breaking Predict/Perps unavailable banners
+  [unclassified] Merge pull request #1151 from chippr-robotics/claude/miniapp-notification-ui-bugs-u2y395
+  [feat -> minor] GMX UI-fee-factor script — the perps fee rail GMX itself enforces (spec 083)
+  [spec -> patch] perps position management — spec, plan, research, calldata/state/fee contracts, tasks
+  [unclassified] Fix mini-app info sheet rendering below the bottom nav
+  [unclassified] Merge pull request #1150 from chippr-robotics/claude/perpetual-futures-integration-texoyy
+  [fix -> patch] enforce module killswitch, 502 on total venue outage, contract-doc alignment
+  [feat -> minor] visual polish via actor-critic loop, e2e, docs, capture harness (spec 082)
+  [feat -> minor] Perps view inside Trade — cross-venue pairs, positions, fees, link-outs (spec 082)
+  [feat -> minor] /v1/perps/* read proxy — Gains, GMX, Hyperliquid market data (spec 082)
+  [spec -> patch] perps trade view — spec, plan, research, gateway API contract, tasks
+  [unclassified] Merge pull request #1149 from chippr-robotics/release/v1.6.0-changelog
+  [skipped] chore(release): v1.6.0 [skip release]
 bump:     minor
 reason:   computed
-next:     v1.6.0
+next:     v1.7.0

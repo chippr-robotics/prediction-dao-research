@@ -14,6 +14,50 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.7.0 — 2026-08-12
+
+Promoted from: v1.7.0-rc.5
+Previous release: v1.6.0 · Range: `v1.6.0..v1.7.0` (23 commits)
+
+### 🚀 Features
+
+- feat(083): perps entry, admin fees, activity — and three more dead paths closed
+- feat(083): perps exits — position sheet, stuck-order recovery, protection (phases 3+4)
+- feat(083): perps foundations — venue calldata, order state machine, fee units, guards
+- feat(ops): GMX UI-fee-factor script — the perps fee rail GMX itself enforces (spec 083)
+- feat(perps): visual polish via actor-critic loop, e2e, docs, capture harness (spec 082)
+- feat(frontend): Perps view inside Trade — cross-venue pairs, positions, fees, link-outs (spec 082)
+- feat(gateway): /v1/perps/* read proxy — Gains, GMX, Hyperliquid market data (spec 082)
+
+### 🐛 Bug Fixes
+
+- fix(infra): enable the perps read proxy, and stop the ops skill reporting a migrated gateway as scaled-to-zero (#1158)
+- fix(theme): define missing dark-mode tokens breaking Predict/Perps unavailable banners
+- fix(perps): enforce module killswitch, 502 on total venue outage, contract-doc alignment
+
+### 📚 Documentation
+
+- docs(083): record the standing decision to keep the deploy wallet as UI-fee receiver
+- docs(083): disclose how the platform is actually funded, and name leveraged derivatives
+- spec(083): perps position management — spec, plan, research, calldata/state/fee contracts, tasks
+- spec(082): perps trade view — spec, plan, research, gateway API contract, tasks
+
+### 🧪 Tests
+
+- test(083): e2e coverage + actor-critic visual review, and the four defects it found
+
+### Artifacts
+
+Range: `v1.6.0..v1.7.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.2.0` |
+
 ## v1.6.0 — 2026-08-11
 
 Promoted from: v1.6.0-rc.8

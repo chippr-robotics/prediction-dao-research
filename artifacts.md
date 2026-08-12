@@ -1,11 +1,11 @@
 ### Artifacts
 
-Range: `v1.5.7..v1.6.0`
+Range: `v1.6.0..v1.7.0`
 
 | Artifact | Status | Identity |
 |---|---|---|
 | SPA image | moved | — |
-| Relay gateway image | unchanged | — |
+| Relay gateway image | moved | — |
 | Contract implementations | unchanged | — |
-| Mini-app packages | moved | `clearpath` v1.0.1<br>`token-mint` v1.0.2 |
+| Mini-app packages | unchanged | — |
 | Subgraph endpoint | moved | `v0.2.0` |
