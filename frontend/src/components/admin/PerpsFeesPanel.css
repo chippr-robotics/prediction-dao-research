@@ -1,0 +1,45 @@
+/*
+ * PerpsFeesPanel (spec 083 US5) — scoped styles layered on the shared admin card classes.
+ *
+ * Deliberately small. Everything structural (admin-card / status-row / admin-form / card-info)
+ * comes from the operations console's own stylesheet so this panel reads as part of it; the rules
+ * here only do the two things the shared classes cannot: make an unreadable rate visually
+ * DIFFERENT from a zero one, and make the one dangerous refusal impossible to skim past.
+ */
+
+/* A rate that could not be read must not look like a rate. */
+.perps-fees .perps-fees__unreadable {
+  font-style: italic;
+}
+
+/* The raw uiFeeFactor sits under its bps reading — the bps is the number, this is the receipt. */
+.perps-fees .perps-fees__factor {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  opacity: 0.75;
+  word-break: break-all;
+}
+
+/*
+ * The `setUiFeeFactor` refusal. This is the one place on the screen where an operator proceeding
+ * anyway would re-point revenue at their own wallet, so it gets a left rule and real padding
+ * rather than the ordinary inline error treatment.
+ */
+.perps-fees .perps-fees__refusal {
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid #ef4444;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.08);
+  line-height: 1.5;
+}
+
+.perps-fees .perps-fees__refusal strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+/* Addresses wrap rather than overflow on a narrow console. */
+.perps-fees .status-value code {
+  word-break: break-all;
+}

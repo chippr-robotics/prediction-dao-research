@@ -93,6 +93,19 @@
  *   BRIDGE_QUOTA_GLOBAL        reads/min across all callers (default 300)
  *   BRIDGE_QUOTA_WINDOW_MS     quota window (default 60000)
  *   BRIDGE_KILLSWITCH          'true' => all /v1/bridge/* routes answer 503 bridge_killed (ops kill)
+ *   PERPS_ENABLED              'true' enables the /v1/perps/* read proxy (spec 082; default false)
+ *   PERPS_GAINS_URL_*          Gains Network per-chain backends (ARBITRUM/BASE/POLYGON; '' disables one)
+ *   PERPS_GAINS_PRICING_URL    Gains global pair-price snapshot host
+ *   PERPS_GMX_URL              GMX v2 REST host (default arbitrum-api.gmxinfra.io); PERPS_GMX_CHAIN_ID
+ *   PERPS_HL_URL               Hyperliquid public info API host
+ *   PERPS_TIMEOUT_MS / PERPS_RETRIES / PERPS_CACHE_TTL_MS   read plumbing (defaults 8000/1/15000)
+ *   PERPS_QUOTA_PER_IP/_GLOBAL/_WINDOW_MS   read quotas (defaults 60/300/60000)
+ *   PERPS_KILLSWITCH           'true' => all /v1/perps/* routes answer 503 (ops kill)
+ *   PERPS_GAINS_REFERRER       PUBLIC attribution: FairWins gains referrer address
+ *   PERPS_GMX_REF_CODE         PUBLIC attribution: GMX referral code (1-20 [A-Za-z0-9_])
+ *   PERPS_HL_BUILDER_ADDRESS   PUBLIC attribution: FairWins Hyperliquid builder wallet
+ *   PERPS_HL_BUILDER_FEE_BPS   HL builder fee FALLBACK bps (live source: FeeRouter
+ *                              perps.hyperliquid.builder). Boot fails above the 10 bps HL perps cap.
  *   FEE_ROUTER_ADDRESS         FeeRouter proxy (spec 060) serving the LIVE polymarket.taker/.maker bps.
  *                              Defaults to the deployment record's feeRouter for FEE_ROUTER_CHAIN_ID;
  *                              a set value that CONTRADICTS the record fails boot loudly. Unset and not
@@ -516,6 +529,89 @@ export function loadConfig(env = process.env, opts = {}) {
         quotaGlobal: int(env, 'BRIDGE_QUOTA_GLOBAL', 300),
         quotaWindowMs: int(env, 'BRIDGE_QUOTA_WINDOW_MS', 60_000),
         killSwitch: opt(env, 'BRIDGE_KILLSWITCH', 'false').toLowerCase() === 'true',
+      }
+    })(),
+    // Perps read proxy (spec 082): optional like the Bitcoin/Bridge proxies — disabled means the
+    // /v1/perps/* routes 503 fail-closed (perps_unconfigured) and the SPA hides the Perps view for
+    // a stated reason; boot is unaffected (perps must never couple to the value paths, FR-016).
+    // READ-ONLY: three public venue APIs, no credentials anywhere. Attribution identifiers are
+    // PUBLIC config. Fail-loud validation applies only when the module is ENABLED (same philosophy
+    // as the bitcoin/bridge blocks). The Hyperliquid builder fee is hard-capped at Hyperliquid's
+    // own 10 bps perps limit — an out-of-range fallback value fails boot loudly (FR-008), exactly
+    // like the Polymarket builder-fee caps above.
+    perps: (() => {
+      const enabled = opt(env, 'PERPS_ENABLED', 'false').toLowerCase() === 'true'
+      const HL_BUILDER_FEE_CAP_BPS = 10
+      // An explicitly EMPTY env var disables one gains chain without disabling the venue —
+      // so the unset check is `undefined`, not the falsy `opt()` treatment (which would silently
+      // re-enable a chain an operator turned off).
+      const gainsUrl = (name, fallback) => (env[name] === undefined ? fallback : String(env[name]).trim())
+      const gainsUrls = {
+        42161: gainsUrl('PERPS_GAINS_URL_ARBITRUM', 'https://backend-arbitrum.gains.trade'),
+        8453: gainsUrl('PERPS_GAINS_URL_BASE', 'https://backend-base.gains.trade'),
+        137: gainsUrl('PERPS_GAINS_URL_POLYGON', 'https://backend-polygon.gains.trade'),
+      }
+      for (const key of Object.keys(gainsUrls)) if (!gainsUrls[key]) delete gainsUrls[key]
+      const gainsPricingUrl = opt(env, 'PERPS_GAINS_PRICING_URL', 'https://backend-pricing.eu.gains.trade')
+      const gmxUrl = opt(env, 'PERPS_GMX_URL', 'https://arbitrum-api.gmxinfra.io')
+      const hlUrl = opt(env, 'PERPS_HL_URL', 'https://api.hyperliquid.xyz')
+      const gainsReferrer = opt(env, 'PERPS_GAINS_REFERRER', null)
+      const hlBuilderAddress = opt(env, 'PERPS_HL_BUILDER_ADDRESS', null)
+      const gmxRefCode = opt(env, 'PERPS_GMX_REF_CODE', null)
+      const hlBuilderFeeBps = int(env, 'PERPS_HL_BUILDER_FEE_BPS', 0)
+      if (enabled) {
+        for (const [name, url] of [
+          ...Object.entries(gainsUrls).map(([id, u]) => [`PERPS_GAINS_URL(chain ${id})`, u]),
+          ...(gainsPricingUrl ? [['PERPS_GAINS_PRICING_URL', gainsPricingUrl]] : []),
+          ...(gmxUrl ? [['PERPS_GMX_URL', gmxUrl]] : []),
+          ...(hlUrl ? [['PERPS_HL_URL', hlUrl]] : []),
+        ]) {
+          let ok = false
+          try {
+            ok = new URL(url).protocol === 'https:'
+          } catch {
+            ok = false
+          }
+          if (!ok) throw new Error(`[relay-gateway] ${name}=${url} is not a valid https URL`)
+        }
+        if (Object.keys(gainsUrls).length === 0 && !gmxUrl && !hlUrl) {
+          throw new Error('[relay-gateway] PERPS_ENABLED=true but every venue URL is unset')
+        }
+        if (gainsReferrer && !ADDRESS_RE.test(gainsReferrer)) {
+          throw new Error('[relay-gateway] PERPS_GAINS_REFERRER is not an address')
+        }
+        if (hlBuilderAddress && !ADDRESS_RE.test(hlBuilderAddress)) {
+          throw new Error('[relay-gateway] PERPS_HL_BUILDER_ADDRESS is not an address')
+        }
+        // GMX referral codes: <= 20 chars of [A-Za-z0-9_] (stored on-chain as bytes32).
+        if (gmxRefCode && !/^[A-Za-z0-9_]{1,20}$/.test(gmxRefCode)) {
+          throw new Error('[relay-gateway] PERPS_GMX_REF_CODE must be 1-20 chars of [A-Za-z0-9_]')
+        }
+        if (hlBuilderFeeBps < 0 || hlBuilderFeeBps > HL_BUILDER_FEE_CAP_BPS) {
+          throw new Error(
+            `[relay-gateway] PERPS_HL_BUILDER_FEE_BPS=${hlBuilderFeeBps} exceeds Hyperliquid's ${HL_BUILDER_FEE_CAP_BPS} bps perps cap`
+          )
+        }
+      }
+      return {
+        enabled,
+        gainsUrls,
+        gainsPricingUrl,
+        gmxUrl,
+        gmxChainId: int(env, 'PERPS_GMX_CHAIN_ID', 42161),
+        hlUrl,
+        gainsReferrer,
+        gmxRefCode,
+        hlBuilderAddress,
+        hlBuilderFeeBps,
+        hlBuilderFeeCapBps: HL_BUILDER_FEE_CAP_BPS,
+        timeoutMs: int(env, 'PERPS_TIMEOUT_MS', 8000),
+        retries: int(env, 'PERPS_RETRIES', 1),
+        cacheTtlMs: int(env, 'PERPS_CACHE_TTL_MS', 15_000),
+        quotaPerIp: int(env, 'PERPS_QUOTA_PER_IP', 60),
+        quotaGlobal: int(env, 'PERPS_QUOTA_GLOBAL', 300),
+        quotaWindowMs: int(env, 'PERPS_QUOTA_WINDOW_MS', 60_000),
+        killSwitch: opt(env, 'PERPS_KILLSWITCH', 'false').toLowerCase() === 'true',
       }
     })(),
     // FeeRouter (spec 060): the on-chain source of truth for the Polymarket builder bps. The env

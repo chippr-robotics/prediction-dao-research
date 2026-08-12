@@ -14,6 +14,7 @@
   --bg-primary: #F7F9FA;        /* Porcelain - Background */
   --bg-secondary: #FFFFFF;      /* White Sand - Surface/Card */
   --surface-color: #FFFFFF;     /* Surface/Card - Same as bg-secondary */
+  --bg-tertiary: #F3F4F6;       /* Tertiary surface - inline panels/degraded-state banners */
   --text-primary: #1F2933;      /* Deep Slate - Primary text */
   --text-secondary: #5A6772;    /* Steel Gray - Secondary text */
   --text-muted: #8A959E;        /* Muted text - lighter than secondary */
@@ -25,6 +26,7 @@
   --bg-primary: #0E141B;        /* Midnight Slate - Background */
   --bg-secondary: #141C24;      /* Charcoal - Surface/Card */
   --surface-color: #1F2933;     /* Surface/Card - Slightly lighter than bg-secondary */
+  --bg-tertiary: #26323D;       /* Tertiary surface - raised panel, distinct from surface-color */
   --text-primary: #E6EDF3;      /* Cloud White - Primary text */
   --text-secondary: #AAB6C2;    /* Cool Gray - Secondary text */
   --text-muted: #7A8590;        /* Muted text - darker than secondary */
@@ -85,6 +87,8 @@
   --warning-color: #f59e0b;
   --danger-color: #dc2626;
   --info-color: #3b82f6;
+  --warning-bg: #FEF3C7;        /* Warning banner surface (stale-data/degraded notices) */
+  --warning-text: #78350F;      /* Text on --warning-bg */
 }
 
 /* Adjust semantic colors for dark mode if needed */
@@ -93,6 +97,8 @@
   --warning-color: #F5A623;
   --danger-color: #E5533D;
   --info-color: #4C9AFF;
+  --warning-bg: rgba(245, 166, 35, 0.16);  /* Warning tint over dark surfaces */
+  --warning-text: #F5C77E;                 /* Legible amber against --warning-bg */
 }
 
 /* ===================================

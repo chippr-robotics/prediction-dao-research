@@ -1,0 +1,123 @@
+/*
+ * PerpsAttestation (spec 083, T051) — the opening acknowledgement's own styles.
+ *
+ * It renders INSIDE the open sheet rather than as a second dialog, so there is no shell here: the
+ * `.asset-sheet-*` family already owns the backdrop, the scrim and the focus trap, and a nested
+ * dialog would give one sheet two modal layers and two focus owners.
+ *
+ * Namespaced `perps-attest-` so it cannot collide with the sheet it sits in. Every colour is a
+ * theme token with a light fallback, so the panel follows the viewer's theme rather than committing
+ * to one. Nothing here uses --semantic-win/--semantic-loss: an acknowledgement is not a financial
+ * direction, and colouring it like one would make a risk warning read as a loss.
+ */
+
+.perps-attest {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem;
+}
+
+.perps-attest-title {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* The plain risk sentence. It carries body weight on purpose — a leveraged-loss warning set as
+   fine print is a warning nobody reads. */
+.perps-attest-risk {
+  color: var(--text-primary, #111827);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.perps-attest-superseded {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #111827);
+  font-size: 0.8rem;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+}
+
+/* The items ---------------------------------------------------------------------------------- */
+
+.perps-attest-items {
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+}
+.perps-attest-items legend {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  padding: 0;
+}
+
+/* One row per statement: the box stays its own hit target beside the text it belongs to, so a
+   member can see which of the four they have and have not confirmed. */
+.perps-attest-item {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.55rem;
+}
+.perps-attest-item input {
+  accent-color: var(--brand-primary, #36b37e);
+  flex: 0 0 auto;
+  height: 1rem;
+  margin: 0.15rem 0 0;
+  width: 1rem;
+}
+.perps-attest-item input:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+.perps-attest-item label {
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  min-width: 0;
+  /* A long statement wraps inside its own row — the sheet never scrolls sideways. */
+  overflow-wrap: anywhere;
+}
+
+/* Notes and refusals -------------------------------------------------------------------------- */
+
+.perps-attest-note {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.76rem;
+  margin: 0;
+}
+.perps-attest-error {
+  color: var(--semantic-loss, #dc2626);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* The confirmation ---------------------------------------------------------------------------- */
+
+.perps-attest-confirm {
+  appearance: none;
+  background: var(--brand-primary, #36b37e);
+  border: 1px solid var(--brand-primary, #36b37e);
+  border-radius: 10px;
+  color: var(--text-on-brand, #fff);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  width: 100%;
+}
+.perps-attest-confirm:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.perps-attest-confirm:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}

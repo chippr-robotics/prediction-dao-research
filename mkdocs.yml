@@ -93,6 +93,7 @@ nav:
     - Membership Vouchers: user-guide/membership-vouchers.md
     - Earn (Lending & Rewards): user-guide/earn.md
     - Staking (Liquid & Delegated): user-guide/staking.md
+    - Perps (Perpetual Futures): user-guide/perps.md
     - Platform Fees: user-guide/platform-fees.md
     - Resolving a Wager: user-guide/resolve-wager.md
     - Private Wager Encryption: user-guide/private-market-encryption.md
@@ -107,6 +108,7 @@ nav:
     - ClearPath Multi-Network DAOs: developer-guide/clearpath-multi-network.md
     - Earn Integration: developer-guide/earn-integration.md
     - Staking Integration: developer-guide/staking-integration.md
+    - Perps (specs 082 + 083): developer-guide/perps.md
     - Platform Fees (FeeRouter): developer-guide/platform-fees.md
     - Mini-Apps (spec 073): developer-guide/miniapps.md
     - Account Statements: developer-guide/account-statements.md
@@ -144,6 +146,7 @@ nav:
     - Paymaster Operations: runbooks/paymaster-operations.md
     - Callsign Operations: runbooks/callsigns-operations.md
     - Fee Operations: runbooks/fee-operations.md
+    - Perps Operations: runbooks/perps-operations.md
     - Mini-App Registry Operations: runbooks/miniapp-registry-operations.md
     - Staking Operations: runbooks/staking-operations.md
     - Contract Upgrades: runbooks/contract-upgrades.md
@@ -243,6 +246,8 @@ nav:
     - Standalone:
       - CallsignRegistry (ENS-Style Naming): blog/posts/33-callsign-registry/blog.md
       - TokenFactory (Templated Minting): blog/posts/34-token-factory/blog.md
+      - Cross-Chain Intents & Pooled Liquidity: blog/posts/35-cross-chain-intents-and-lp/blog.md
+      - Perps Position Management (No-Contract Fee Rails): blog/posts/36-perps-position-management/blog.md
   - Finance Professional Series:
     - Overview: blog/finance/README.md
     - Series Inventory: blog/finance-professional-inventory.md

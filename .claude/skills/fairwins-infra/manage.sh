@@ -24,6 +24,8 @@ set -euo pipefail
 
 PROJECT="chippr-bots-site-wp"
 REGION="us-central1"
+# The zone both migrated VMs live in (docs/runbooks/vm-migration.md).
+VM_ZONE="us-central1-a"
 
 BUNDLER_SVC="fairwins-alto-bundler"
 GATEWAY_SVC="fairwins-relay-gateway"
@@ -70,16 +72,50 @@ get_ready() {  # Ready condition for a service name
 #
 # This is a hard refusal rather than a warning: the skill's own description tells the operator to run
 # `up` before testing gasless transactions, so it is the lever most likely to be pulled by reflex.
-MIGRATED_TO_VM="fairwins-alto-bundler"
+#
+# 2026-08-12: the GATEWAY has migrated too, and the guard had not followed it. Measured:
+# `gcloud run services describe fairwins-relay-gateway` reports "Cannot find service" while
+# `fairwins-gateway` (e2-small, us-central1-a) is RUNNING and serving relay.fairwins.app. `status`
+# was therefore printing "DOWN (scale-to-zero)" for a service that does not exist, next to a health
+# line that passes because it pings the public URL — so the output read as "the gateway is off and
+# cheap" while a VM billed 24/7. A stale monitor that answers confidently is worse than one that
+# errors, which is why both names are listed here now.
+MIGRATED_TO_VM="fairwins-alto-bundler fairwins-relay-gateway"
+
+is_migrated() {  # service-name
+  case " $MIGRATED_TO_VM " in *" $1 "*) return 0 ;; *) return 1 ;; esac
+}
+
+vm_for() {  # Cloud Run service name -> the GCE VM that replaced it
+  case "$1" in
+    fairwins-alto-bundler) echo "fairwins-bundler" ;;
+    fairwins-relay-gateway) echo "fairwins-gateway" ;;
+    *) echo "" ;;
+  esac
+}
+
+role_for() {  # Cloud Run service name -> the systemd instance name on the VM (fairwins-stack@<role>)
+  case "$1" in
+    fairwins-alto-bundler) echo "bundler" ;;
+    fairwins-relay-gateway) echo "gateway" ;;
+    *) echo "" ;;
+  esac
+}
+
+vm_state() {  # VM name -> RUNNING|TERMINATED|? (never fails the caller)
+  gcloud compute instances describe "$1" --project="$PROJECT" --zone="$VM_ZONE" \
+    --format='value(status)' 2>/dev/null || echo "?"
+}
 
 set_min() {  # service-name min-instances
-  if [ "$1" = "$MIGRATED_TO_VM" ]; then
+  if is_migrated "$1"; then
     cat >&2 <<EOF
-REFUSING: $1 has been migrated to a GCE VM (fairwins-bundler, us-central1-a).
-  Setting min-instances on it would start a second executor against the SAME key as the VM's alto,
-  colliding nonces with no in-band signal. Manage the bundler on the VM instead:
-    gcloud compute ssh fairwins-bundler --zone us-central1-a --tunnel-through-iap \\
-      --command 'sudo systemctl {start,stop,status} fairwins-stack@bundler'
+REFUSING: $1 has been migrated to a GCE VM ($(vm_for "$1"), $VM_ZONE).
+  Starting a Cloud Run instance alongside the VM runs a SECOND copy of this service against the same
+  secrets. For the bundler that means two executors on one key, colliding nonces with no in-band
+  signal — both instances look healthy. Manage it on the VM instead:
+    gcloud compute ssh $(vm_for "$1") --zone $VM_ZONE --tunnel-through-iap \\
+      --command 'sudo systemctl {start,stop,status} fairwins-stack@$(role_for "$1")'
   To genuinely roll back to Cloud Run, follow the rollback in docs/runbooks/vm-migration.md --
   it is a THREE-part action, and restoring the cloudbuild step is one of them.
 EOF
@@ -102,6 +138,21 @@ health() {  # alias -> prints a health line
 }
 
 bundler_config() {  # warn if the critical env vars have been clobbered (see the auto-deploy gotcha)
+  # This guard reads CLOUD RUN, and the bundler no longer lives there — so it now reads nothing.
+  # It used to print "(config read failed)", which looks like a transient glitch rather than a
+  # safety check that has stopped running. Say what is actually true, and where the config now is.
+  if is_migrated "$BUNDLER_SVC"; then
+    cat <<EOF
+     config drift guard: NOT RUNNING — it reads Cloud Run, and the bundler is on GCE now.
+       The live config is the VM's compose env: infra/vm/bundler/docker-compose.yml, applied by
+       'sudo systemctl restart fairwins-stack@bundler'. To check it for real:
+         gcloud compute ssh fairwins-bundler --zone $VM_ZONE --tunnel-through-iap \\
+           --command 'sudo docker inspect fairwins-bundler-alto --format "{{json .Config.Env}}"'
+       Watch for: ALTO_RPC_URL must NOT be publicnode (archive-403 breaks receipts),
+       ALTO_DEPLOY_SIMULATIONS_CONTRACT=true, and ALTO_GAS_PRICE_MULTIPLIERS set.
+EOF
+    return 0
+  fi
   gcloud run services describe "$BUNDLER_SVC" --project="$PROJECT" --region="$REGION" --format=json 2>/dev/null \
   | python3 -c '
 import sys,json
@@ -130,6 +181,16 @@ cmd_status() {
   for a in $(targets "${1:-all}"); do
     local n; n=$(svc_name "$a")
     local min ready
+    if is_migrated "$n"; then
+      # Do NOT fall through to get_min here: it swallows "Cannot find service" and returns 0, which
+      # printed "DOWN (scale-to-zero)" for a service that does not exist — beside a health line that
+      # passes because it pings the public URL. That reads as "off and cheap" while a VM bills 24/7.
+      local vm; vm=$(vm_for "$n")
+      printf '%-8s %-24s  ON GCE VM %s (%s)  health=%s\n' \
+        "$a" "$n" "$vm" "$(vm_state "$vm")" "$(health "$a")"
+      if [ "$a" = "bundler" ]; then bundler_config; fi
+      continue
+    fi
     min=$(get_min "$n"); ready=$(get_ready "$n")
     local state="DOWN (scale-to-zero)"; [ "$min" != "0" ] && state="UP (warm, min=$min)"
     printf '%-8s %-24s  %s  ready=%s  health=%s\n' "$a" "$n" "$state" "$ready" "$(health "$a")"

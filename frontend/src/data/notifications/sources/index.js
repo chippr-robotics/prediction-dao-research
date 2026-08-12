@@ -18,6 +18,8 @@ import { stakingSource } from './stakingSource'
 // nothing else (FR-039).
 import { bridgeSource } from './bridgeSource'
 import { liquiditySource } from './liquiditySource'
+// Spec 082: read-only snapshot-diff of the member's open perp positions per venue.
+import { perpsSource } from './perpsSource'
 
 export const activitySources = [
   wagerSource,
@@ -30,6 +32,7 @@ export const activitySources = [
   stakingSource,
   bridgeSource,
   liquiditySource,
+  perpsSource,
 ]
 
 export default activitySources

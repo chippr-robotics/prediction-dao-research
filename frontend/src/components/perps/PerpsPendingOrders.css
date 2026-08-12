@@ -1,0 +1,228 @@
+/* PerpsPendingOrders (spec 083 US4) — stuck-order recovery.
+
+   Its own file, the `components/predict/*` convention: sibling perps components are being written
+   in parallel and a shared stylesheet is a merge collision waiting to happen.
+
+   Theme tokens with fallbacks throughout, and the attention treatment uses explicit warning
+   colours in BOTH halves (background AND text) rather than a token pair that only resolves in one
+   theme — a light amber panel with inherited text is unreadable in the dark theme. */
+
+.perps-orders {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.9rem;
+  text-align: left;
+}
+
+.perps-orders-header {
+  align-items: baseline;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: space-between;
+}
+.perps-orders-title {
+  margin: 0;
+}
+.perps-orders-refresh {
+  background: transparent;
+  border: 0;
+  color: var(--brand-primary, #36b37e);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0;
+}
+.perps-orders-refresh:hover,
+.perps-orders-refresh:focus-visible {
+  text-decoration: underline;
+}
+
+.perps-orders-unreadable {
+  background: var(--warning-bg, #fef3c7);
+  border-radius: 8px;
+  color: var(--warning-text, #78350f);
+  font-size: 0.82rem;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+}
+
+.perps-orders-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.perps-orders-group-title {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.perps-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.perps-orders-row {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.7rem 0.9rem;
+}
+/* A stuck order is not a loss — it is something the member has to act on. Warning, not error. */
+.perps-orders-row-attention {
+  border-color: var(--semantic-warning, #f5a623);
+  box-shadow: inset 3px 0 0 0 var(--semantic-warning, #f5a623);
+}
+
+.perps-orders-row-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.perps-orders-symbol {
+  font-weight: 600;
+}
+.perps-orders-direction {
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  text-transform: uppercase;
+}
+.perps-orders-direction-long {
+  background: color-mix(in srgb, var(--semantic-win, #16a34a) 15%, transparent);
+  color: var(--semantic-win, #16a34a);
+}
+.perps-orders-direction-short {
+  background: color-mix(in srgb, var(--semantic-loss, #dc2626) 15%, transparent);
+  color: var(--semantic-loss, #dc2626);
+}
+.perps-orders-flag {
+  background: var(--warning-bg, #fef3c7);
+  border-radius: 999px;
+  color: var(--warning-text, #78350f);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-left: auto;
+  padding: 0.12rem 0.5rem;
+  white-space: nowrap;
+}
+
+.perps-orders-what {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.82rem;
+  margin: 0;
+}
+.perps-orders-status {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin: 0;
+}
+.perps-orders-reason {
+  font-size: 0.82rem;
+  margin: 0;
+}
+.perps-orders-reason-label {
+  color: var(--text-secondary, #6b7280);
+}
+/* The venue's own words, verbatim — set apart so it reads as a quotation, not as our sentence.
+   It can be a long unbroken error name, so it wraps rather than widening the page. */
+.perps-orders-reason-text {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  overflow-wrap: anywhere;
+}
+/* OUR OWN observation about the order — a timeout the venue never announced, which we derived from
+   block height. Deliberately NOT the quotation treatment above: no attribution label and no
+   monospace, because the monospace is what says "these are someone else's exact words". */
+.perps-orders-observation {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.perps-orders-stats {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  margin: 0;
+}
+.perps-orders-stats dt {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.72rem;
+}
+.perps-orders-stats dd {
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.perps-orders-countdown,
+.perps-orders-recover-note,
+.perps-orders-rail-note,
+.perps-orders-no-handle,
+.perps-orders-note {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.perps-orders-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+/* The primary action on this surface: the member should never have to hunt for it. */
+.perps-orders-recover {
+  background: var(--brand-primary, #36b37e);
+  border: 1px solid var(--brand-primary, #36b37e);
+  border-radius: 10px;
+  color: var(--text-on-brand, #ffffff);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.45rem 0.95rem;
+  white-space: nowrap;
+}
+.perps-orders-recover:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+.perps-orders-recover:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.perps-orders-recover-note {
+  flex: 1 1 12rem;
+}
+
+.perps-orders-progress {
+  font-size: 0.82rem;
+  margin: 0;
+}
+/* A refusal is the one thing here that is an error; every other state is progress or a wait. */
+.perps-orders-progress[data-state='rejected'] {
+  color: var(--semantic-loss, #dc2626);
+}
+
+.perps-orders-venue-link {
+  color: var(--brand-primary, #36b37e);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.perps-orders-venue-link:hover,
+.perps-orders-venue-link:focus-visible {
+  text-decoration: underline;
+}

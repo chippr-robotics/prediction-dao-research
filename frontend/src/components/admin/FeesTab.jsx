@@ -34,6 +34,12 @@ const KNOWN_SERVICES = {
   [ethers.id('stake.lido')]: { label: 'Stake — Lido', surface: 'Staking (future)' },
   [ethers.id('stake.polygon')]: { label: 'Stake — Polygon liquid staking', surface: 'Staking (future)' },
   [ethers.id('swap.uniswap')]: { label: 'Swap — Uniswap', surface: 'Swaps (future)' },
+  [ethers.id('bridge.transfer')]: { label: 'Bridge — Across transfer', surface: 'Bridge (Transfer)' },
+  [ethers.id('liquidity.deposit')]: { label: 'Supply — Uniswap liquidity', surface: 'Earn supplies' },
+  [ethers.id('perps.hyperliquid.builder')]: {
+    label: 'Perps — Hyperliquid builder fee',
+    surface: 'Perps link-outs (Trade)',
+  },
 }
 
 const KIND_NAMES = { 1: 'Charged on-chain (wrapper)', 2: 'Read by the gateway (config-only)' }

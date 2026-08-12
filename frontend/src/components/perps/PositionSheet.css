@@ -1,0 +1,278 @@
+/*
+ * PositionSheet (spec 083, T034 + T040) — the exit sheet's own styles.
+ *
+ * The shell (backdrop, scrim, grabber, header, close button) is the canonical `.asset-sheet-*`
+ * family from `components/wallet/AssetDetailSheet.css`; everything here is the sheet's own content
+ * and is namespaced `pps-` so sibling perps components cannot collide with it.
+ *
+ * Every colour is a theme token with a light fallback, so the sheet follows the viewer's theme
+ * rather than committing to one. Financial semantics use --semantic-win / --semantic-loss and
+ * nothing else — a P&L that is green in one place and blue in another is a number a member cannot
+ * read at a glance.
+ */
+
+.perps-position-sheet {
+  /* The sheet can grow tall (facts + close + protect); the shell already caps and scrolls it. */
+  gap: 1rem;
+}
+
+/* Header ------------------------------------------------------------------------------------ */
+
+/* The venue's market variant beside the pair in the sheet title (GMX: "WBTC.b-USDC"). */
+.pps-variant {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+.pps-venue {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  margin: 0.15rem 0 0;
+}
+
+/* The position's facts ----------------------------------------------------------------------- */
+
+.pps-facts {
+  display: grid;
+  gap: 0.55rem 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  margin: 0;
+}
+.pps-fact dt {
+  align-items: center;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  font-size: 0.75rem;
+  gap: 0.25rem;
+}
+.pps-fact dd {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0.1rem 0 0;
+  /* A long value wraps inside its own cell — the sheet itself never scrolls sideways. */
+  overflow-wrap: anywhere;
+}
+.pps-pnl-up {
+  color: var(--semantic-win, #16a34a);
+}
+.pps-pnl-down {
+  color: var(--semantic-loss, #dc2626);
+}
+.pps-attrib {
+  color: var(--text-muted, #9ca3af);
+  font-size: 0.72rem;
+  margin: 0;
+}
+/* "calculated" — the tag on a figure FairWins worked out rather than read from the venue. Quiet
+   next to the number it qualifies, and never bolder than it: the number is what a member reads. */
+.pps-derived {
+  color: var(--text-muted, #9ca3af);
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* Lifecycle status --------------------------------------------------------------------------- */
+
+.pps-status {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+}
+.pps-status-pending {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--text-primary, #111827);
+}
+.pps-status-done {
+  border-color: var(--semantic-win, #16a34a);
+  color: var(--semantic-win, #16a34a);
+}
+.pps-status-attention {
+  border-color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss, #dc2626);
+}
+
+/* Sections ----------------------------------------------------------------------------------- */
+
+.pps-section {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.85rem;
+}
+.pps-section-title {
+  font-size: 0.95rem;
+  margin: 0;
+}
+.pps-note {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  margin: 0;
+}
+.pps-error {
+  color: var(--semantic-loss, #dc2626);
+  font-size: 0.8rem;
+  margin: 0;
+}
+/* What the venue stored, read back from it. Carries more weight than an ordinary note because it
+   is the one line that can differ from what the member typed. */
+.pps-stored-note {
+  color: var(--text-primary, #111827);
+}
+
+/* How much to close -------------------------------------------------------------------------- */
+
+.pps-presets-fieldset {
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+}
+.pps-presets-fieldset legend {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  padding: 0;
+}
+.pps-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.pps-preset {
+  align-items: center;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.85rem;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+}
+.pps-preset.selected {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
+  font-weight: 600;
+}
+/* The radio stays in the accessibility tree and keeps its own focus ring — it is only shrunk. */
+.pps-preset input {
+  accent-color: var(--brand-primary, #36b37e);
+  margin: 0;
+}
+
+/* Cost breakdown ----------------------------------------------------------------------------- */
+
+.pps-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+}
+.pps-breakdown > div {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+.pps-breakdown dt {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+}
+.pps-breakdown dd {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0;
+  text-align: right;
+}
+
+/* Protection --------------------------------------------------------------------------------- */
+
+.pps-protect-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+.pps-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.pps-field label {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+}
+.pps-field input {
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #111827);
+  font-size: 0.95rem;
+  padding: 0.45rem 0.6rem;
+  width: 100%;
+}
+.pps-field input:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 1px;
+}
+.pps-impact {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.74rem;
+  margin: 0;
+}
+
+/* Actions ------------------------------------------------------------------------------------ */
+
+.pps-primary {
+  appearance: none;
+  background: var(--brand-primary, #36b37e);
+  border: 1px solid var(--brand-primary, #36b37e);
+  border-radius: 10px;
+  color: var(--text-on-brand, #fff);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.6rem 1rem;
+  width: 100%;
+}
+.pps-primary-secondary {
+  background: transparent;
+  color: var(--brand-primary, #36b37e);
+}
+.pps-secondary {
+  appearance: none;
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+}
+.pps-primary:disabled,
+.pps-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.pps-primary:focus-visible,
+.pps-secondary:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+
+/* Footer ------------------------------------------------------------------------------------- */
+
+.pps-footer {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  margin: 0;
+}
+.pps-venue-link {
+  color: var(--brand-primary, #36b37e);
+  white-space: nowrap;
+}

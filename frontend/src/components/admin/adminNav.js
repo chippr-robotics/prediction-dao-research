@@ -19,6 +19,7 @@ export const ADMIN_TAB_ICONS = {
   members: 'users',
   treasury: 'bank',
   fees: 'coin',
+  'perps-fees': 'percent',
   staking: 'trending',
   bridge: 'transfer',
   supply: 'sprout',
@@ -82,6 +83,12 @@ export function buildAdminNavGroups({
         isAdmin && item('treasury', 'Treasury'),
         // Unified platform-fee management (spec 060): FEE_ADMIN edits rates; ADMIN also enters.
         (isAdmin || isFeeAdmin) && item('fees', 'Fees'),
+        // Perps fee rails (spec 083 US5). A SEPARATE view rather than a section of Fees, because
+        // one of the two rails is not a FeeRouter service at all: the GMX UI fee lives in GMX's
+        // own DataStore on Arbitrum and is set by a `msg.sender`-keyed venue call. Same gate as
+        // Fees — it is fee administration — but it is not the same contract, and pretending
+        // otherwise is what a second config store would look like.
+        (isAdmin || isFeeAdmin) && item('perps-fees', 'Perps Fees'),
       ].filter(Boolean),
     },
     {
