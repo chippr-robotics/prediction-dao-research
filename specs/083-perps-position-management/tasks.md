@@ -9,26 +9,26 @@
 
 ## Phase 2 — Foundations (blocking, pure logic, no UI)
 
-- [ ] T010 [P] `abis/perps/{gainsDiamond,gmxExchangeRouter,gmxReader,gmxDataStore}.js` — hand-maintained
+- [x] T010 [P] `abis/perps/{gainsDiamond,gmxExchangeRouter,gmxReader,gmxDataStore}.js` — hand-maintained
       fragments only, exactly the functions/events in contracts/venue-calldata.md
-- [ ] T011 [P] `config/perps.js` — venue addresses per chain (Gains diamond, GMX ExchangeRouter /
+- [x] T011 [P] `config/perps.js` — venue addresses per chain (Gains diamond, GMX ExchangeRouter /
       **Router approval target** / Reader / DataStore / OrderVault / EventEmitter), `PERPS_MANAGE_*`
       capability flags (HL management OFF), attestation version
-- [ ] T012 `lib/perps/feeUnits.js` — bps ↔ GMX factor ↔ HL f ↔ HL maxFeeRate string + notional money
-- [ ] T013 `lib/perps/venues/gains.js` — Trade struct encode (collateral-precision + 1e10 + 1e3
+- [x] T012 `lib/perps/feeUnits.js` — bps ↔ GMX factor ↔ HL f ↔ HL maxFeeRate string + notional money
+- [x] T013 `lib/perps/venues/gains.js` — Trade struct encode (collateral-precision + 1e10 + 1e3
       scales), open/close/reduce/updateTp/updateSl/multicall-with-slippage/cancelOrderAfterTimeout;
       **branded PendingOrderIndex vs TradeIndex types**; event decoders + CancelReason map
-- [ ] T014 `lib/perps/venues/gmx.js` — CreateOrderParams encode for MarketIncrease/MarketDecrease/
+- [x] T014 `lib/perps/venues/gmx.js` — CreateOrderParams encode for MarketIncrease/MarketDecrease/
       LimitDecrease/StopLossDecrease, sendWnt+sendTokens+createOrder multicall, cancelOrder/
       updateOrder, Reader position decode, EventLog2 topic filtering, execution-fee estimate
-- [ ] T015 `lib/perps/orderState.js` — the state machine per contracts/order-state-machine.md
-- [ ] T016 [P] `lib/perps/validation.js` — refuse-before-prompt validators (balance, venue limits,
+- [x] T015 `lib/perps/orderState.js` — the state machine per contracts/order-state-machine.md
+- [x] T016 [P] `lib/perps/validation.js` — refuse-before-prompt validators (balance, venue limits,
       leverage bounds, stop beyond liquidation, min size)
-- [ ] T017 [P] `lib/perps/defaults.js` — smart defaults (venue choice + reason, leverage, collateral
+- [x] T017 [P] `lib/perps/defaults.js` — smart defaults (venue choice + reason, leverage, collateral
       from holdings, direction, slippage, suggested SL/TP)
-- [ ] T018 [P] `lib/perps/venueStatus.js` — live `getTradingActivated()` + GMX availability
-- [ ] T019 [P] `lib/perps/attestation.js` — versioned jurisdiction + leverage-risk record
-- [ ] T020 [P] Tests for T012–T019 incl. **calldata ownership assertions** and index-space rejection
+- [x] T018 [P] `lib/perps/venueStatus.js` — live `getTradingActivated()` + GMX availability
+- [x] T019 [P] `lib/perps/attestation.js` — versioned jurisdiction + leverage-risk record
+- [x] T020 [P] Tests for T012–T019 incl. **calldata ownership assertions** and index-space rejection
 
 ## Phase 3 — US1/US4 Exit first (P1)
 
