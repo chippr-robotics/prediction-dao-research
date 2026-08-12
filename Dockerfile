@@ -55,6 +55,13 @@ ARG VITE_BUNDLER_URLS_POLYGON
 # Sponsored-paymaster endpoint (spec 050): the relay-gateway's /v1/paymaster. Set => passkey UserOps
 # are gasless (FairWins sponsors gas); unset => the account self-funds and the UI discloses honestly.
 ARG VITE_SPONSOR_PAYMASTER_POLYGON
+# Perps position management (spec 083). Read-only perps market data needs only VITE_RELAYER_URL;
+# this flag is what lets a member OPEN, CLOSE, REDUCE or PROTECT a leveraged position from the app.
+# Unset (the default) => the Perps view renders exactly as spec 082 shipped it: pairs, insights and
+# read-only positions, with management on the venue. Setting it to 'true' makes real leveraged
+# trading reachable, so it is deliberately absent from every cloudbuild until that is a decision
+# someone has made on purpose.
+ARG VITE_PERPS_MANAGE_ENABLED
 # Release identity (spec 076, FR-029/FR-032). Baked in at build so the running app can name the
 # release it came from. VITE_APP_VERSION is the tag at the built commit, or empty when the commit
 # is not a published release — in which case the app reports `unreleased+<sha>` rather than the
@@ -75,6 +82,7 @@ ENV VITE_WAGER_SOURCE=${VITE_WAGER_SOURCE}
 ENV VITE_RELAYER_URL=${VITE_RELAYER_URL}
 ENV VITE_BUNDLER_URLS_POLYGON=${VITE_BUNDLER_URLS_POLYGON}
 ENV VITE_SPONSOR_PAYMASTER_POLYGON=${VITE_SPONSOR_PAYMASTER_POLYGON}
+ENV VITE_PERPS_MANAGE_ENABLED=${VITE_PERPS_MANAGE_ENABLED}
 ENV VITE_APP_VERSION=${VITE_APP_VERSION}
 ENV VITE_GIT_SHA=${VITE_GIT_SHA}
 
