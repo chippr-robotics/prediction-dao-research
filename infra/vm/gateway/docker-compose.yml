@@ -26,7 +26,11 @@ services:
   # ---- namespace owner: the policy gateway (the only public surface) ----
   gateway:
     container_name: fairwins-gateway-gateway
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:predict-058
+    # perps-083 (staging efcfef33, PRs #1150 + #1153): the first image carrying the perps read proxy
+    # — and, because predict-058 predates them, also the first carrying spec 060's FeeRouter reader
+    # and spec 076's build identity. Verified before push: /status returns the `perps`, `fees` and
+    # `build` blocks that the live predict-058 does not. Digest sha256:c34df81637673702bbb91cd32a95…
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:perps-083
     restart: unless-stopped
     pull_policy: missing
     ports:
