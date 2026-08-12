@@ -10,6 +10,7 @@ This directory contains step-by-step operational guides, integration procedures,
 - **[relayer-operations.md](./relayer-operations.md)** - Gasless intent relayer (spec 036): gateway/engine components, hot-key management, killswitch, OpenSea/Polymarket proxy ops, incident table
 - **[paymaster-operations.md](./paymaster-operations.md)** - Sponsored-gas paymaster (spec 050): deposit funding and runway, monitoring, killswitch, signer rotation, compromise response
 - **[callsigns-operations.md](./callsigns-operations.md)** - Deploy the `%callsign` naming registry, wire the frontend, grant operator roles, and moderate / tune / monitor it from the control plane (spec 054)
+- **[perps-operations.md](./perps-operations.md)** - Perps fee rails (spec 083): the GMX UI fee on Arbitrum and the Hyperliquid builder fee on the Polygon FeeRouter, the Gains referral, the management feature flag and its legal prerequisite, venue/stuck-order incident playbook
 - **[miniapp-registry-operations.md](./miniapp-registry-operations.md)** - Mini-app catalog curation (spec 073): verifying a submitted package before approval, the content-committed `approveApp`, suspend/reinstate/deprecate, gateway config, curator-role handoff, diagnostics
 - **[contract-upgrades.md](./contract-upgrades.md)** - UUPS proxy upgrade procedure: storage-layout gate, in-place upgrades, rollback
 

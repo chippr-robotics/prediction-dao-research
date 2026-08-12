@@ -49,9 +49,13 @@ funds are ready to withdraw.
 
 - **Rewards** — liquid staking has no separate claim (rewards build into the
   token's value). Some delegated positions have a **Claim** action.
-- **Fees** — FairWins charges **no** platform fee on staking. Providers take their
-  own protocol fee (for example Lido and sPOL take a cut of rewards); that's the
-  provider's fee, shown as such.
+- **Fees** — on **liquid** staking a FairWins platform fee applies to the amount you
+  stake where one is set (**0.50%** on Polygon today, capped at 2.5%, zero on some
+  networks), shown as its own line before you confirm and never charged on unstaking
+  or on rewards. **Delegated** staking carries **no FairWins fee** — it is a direct
+  call from your own wallet to the validator. See [Platform Fees](platform-fees.md).
+  Providers take their own protocol fee on top (for example Lido and sPOL take a cut
+  of rewards); that's the provider's fee, shown as such.
 - **Risks** — rewards vary and are not guaranteed; staked funds are not instantly
   spendable; and with delegated staking, a validator penalty (**slashing**) can
   reduce your staked amount. Staking runs through third-party protocols.

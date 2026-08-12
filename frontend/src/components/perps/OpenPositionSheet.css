@@ -1,0 +1,250 @@
+/*
+ * OpenPositionSheet (spec 083, T050) — the opening sheet's own styles.
+ *
+ * The shell (backdrop, scrim, grabber, header, close button) is the canonical `.asset-sheet-*`
+ * family from `components/wallet/AssetDetailSheet.css`; everything here is the sheet's own content
+ * and is namespaced `pos-` so `PositionSheet`'s `pps-` rules and the shared `perps-` rules cannot
+ * collide with it.
+ *
+ * Every colour is a theme token with a light fallback, so the sheet follows the viewer's theme
+ * rather than committing to one. --semantic-win / --semantic-loss are reserved for financial
+ * DIRECTION and appear here only on the lifecycle line: nothing on this sheet is a profit or a loss
+ * yet, and colouring an estimate as one would state something the venue has not.
+ */
+
+.perps-open-sheet {
+  /* The sheet is long (venue, direction, amount, leverage, preview, attestation); the shell already
+     caps its height and scrolls it. */
+  gap: 0.9rem;
+}
+
+/* Header ------------------------------------------------------------------------------------- */
+
+.pos-variant {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+.pos-venue {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  margin: 0.15rem 0 0;
+}
+
+/* Venues that cannot be offered, and why ------------------------------------------------------ */
+
+.pos-blocked {
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  gap: 0.3rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Lifecycle status ---------------------------------------------------------------------------- */
+
+.pos-status {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+}
+.pos-status-pending {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--text-primary, #111827);
+}
+.pos-status-done {
+  border-color: var(--semantic-win, #16a34a);
+  color: var(--semantic-win, #16a34a);
+}
+.pos-status-attention {
+  border-color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss, #dc2626);
+}
+
+/* Sections ------------------------------------------------------------------------------------ */
+
+.pos-section {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-top: 0.8rem;
+}
+.pos-section-title {
+  align-items: center;
+  display: flex;
+  font-size: 0.95rem;
+  gap: 0.3rem;
+  margin: 0;
+}
+.pos-note {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  margin: 0;
+}
+/* A choice that was made FOR the member, with its reason. It reads a shade stronger than an
+   ordinary note because it is the sentence that makes a pre-filled field legible rather than
+   arbitrary. */
+.pos-reason {
+  color: var(--text-primary, #111827);
+  font-size: 0.78rem;
+  margin: 0;
+}
+.pos-error {
+  color: var(--semantic-loss, #dc2626);
+  font-size: 0.8rem;
+  margin: 0;
+}
+/* The passkey ownership disclosure. Boxed rather than set as a note: it is a fact about who will
+   own the position, which a member must not be able to skim past. */
+.pos-disclosure {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #111827);
+  font-size: 0.8rem;
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+}
+
+/* Choices (venue, direction, leverage presets) ------------------------------------------------- */
+
+.pos-choice-fieldset {
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+}
+.pos-choice-fieldset legend {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  padding: 0;
+}
+.pos-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.pos-choice {
+  align-items: center;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.85rem;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+}
+.pos-choice.selected {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
+  font-weight: 600;
+}
+/* The radio stays in the accessibility tree and keeps its own focus ring — it is only shrunk. */
+.pos-choice input {
+  accent-color: var(--brand-primary, #36b37e);
+  margin: 0;
+}
+
+/* Fields --------------------------------------------------------------------------------------- */
+
+.pos-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.pos-field label {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+}
+.pos-field input,
+.pos-field select {
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #111827);
+  font-size: 0.95rem;
+  padding: 0.45rem 0.6rem;
+  width: 100%;
+}
+.pos-field input:focus-visible,
+.pos-field select:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 1px;
+}
+.pos-impact {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.74rem;
+  margin: 0;
+}
+
+/* The preview ---------------------------------------------------------------------------------- */
+
+.pos-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+}
+.pos-breakdown > div {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+.pos-breakdown dt {
+  align-items: center;
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  font-size: 0.8rem;
+  gap: 0.25rem;
+}
+.pos-breakdown dd {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0;
+  text-align: right;
+  /* A long figure wraps inside its own cell — the sheet itself never scrolls sideways. */
+  overflow-wrap: anywhere;
+}
+
+/* Actions -------------------------------------------------------------------------------------- */
+
+.pos-primary {
+  appearance: none;
+  background: var(--brand-primary, #36b37e);
+  border: 1px solid var(--brand-primary, #36b37e);
+  border-radius: 10px;
+  color: var(--text-on-brand, #fff);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.6rem 1rem;
+  width: 100%;
+}
+.pos-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.pos-primary:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+
+/* Footer --------------------------------------------------------------------------------------- */
+
+.pos-footer {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.78rem;
+  margin: 0;
+}
+.pos-venue-link {
+  color: var(--brand-primary, #36b37e);
+  white-space: nowrap;
+}

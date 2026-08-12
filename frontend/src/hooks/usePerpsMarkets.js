@@ -92,6 +92,15 @@ export function usePerpsMarkets({ deps } = {}) {
     status, // 'loading' | 'ready' | 'unavailable'
     supported,
     pairs: visible,
+    /**
+     * The venue feed BEFORE the member's search/filter/sort (spec 083).
+     *
+     * `pairs` above is a view of the table and is the wrong thing to price a position from: it
+     * shrinks when a member types in the search box, so a close built off it would stop being
+     * priceable because of a UI control that has nothing to do with the position. Anything asking
+     * "what does the venue say this pair costs right now" reads this instead.
+     */
+    allPairs: pairs,
     totalCount: pairs.length,
     sources,
     degradedVenues,

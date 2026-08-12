@@ -24,6 +24,9 @@ export const DOMAIN_META = {
   bridge: { label: 'Bridge' },
   // Spec 067 Earn → Supply liquidity events (supply, withdraw, fee claim, pool closed).
   liquidity: { label: 'Liquidity' },
+  // Spec 082/083 perpetual-futures events: orders the venue executed, rejected, froze or timed
+  // out, plus position changes made on the venue's own app.
+  perps: { label: 'Perps' },
 }
 
 /** Display label for a domain key (falls back to the key itself for an unknown/future domain). */

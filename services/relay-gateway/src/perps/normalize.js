@@ -44,6 +44,34 @@ function pos(value) {
   return n != null && n > 0 ? n : null
 }
 
+/**
+ * Non-negative integer or null — used for indices and block numbers. A missing index must never
+ * arrive as 0: index 0 is a REAL trade/order on Gains, so a fabricated 0 is a handle to someone
+ * else's object rather than an honest "unknown" (FR-005, and the index trap below).
+ */
+function uint(value) {
+  if (value == null || value === '') return null
+  const n = Number(value)
+  return Number.isInteger(n) && n >= 0 ? n : null
+}
+
+/**
+ * Exact non-negative integer as a decimal STRING, or null. Collateral `precision` is 10**decimals
+ * and reaches 1e18 for DAI/WETH markets — past the float range where JSON round-trips are
+ * guaranteed exact — so scales cross the wire as strings and are never re-derived from a float.
+ */
+function digits(value) {
+  if (value == null || value === '') return null
+  const s = typeof value === 'string' ? value.trim() : String(value)
+  if (/^\d+$/.test(s)) return s
+  try {
+    const b = BigInt(value)
+    return b >= 0n ? b.toString() : null
+  } catch {
+    return null
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Gains Network (gTrade)
 // ---------------------------------------------------------------------------------------------
@@ -89,12 +117,51 @@ function gainsPairAggregates(tv, pairIndex, price) {
 }
 
 /**
+ * The collateral tokens Gains accepts on a chain, as the OPEN path needs them (spec 083 US3).
+ *
+ * WHY IT IS ON THE PAIR FEED. `openTrade` takes a 1-BASED `collateralIndex` and the token's own
+ * decimals decide what a member's typed amount means. Neither is derivable from anything else the
+ * client holds — a symbol is not an index, and a wrong index opens the position in a different
+ * collateral. Without this the open sheet has no collateral it can name, so it would render a
+ * control that cannot submit; publishing the venue's own list is what makes the control real.
+ *
+ * INACTIVE COLLATERALS ARE OMITTED, not marked: the venue refuses a trade in one, so offering it
+ * would be a dead choice. An entry missing its address, index or decimals is omitted for the same
+ * reason — a partial collateral is not a collateral, and inventing the missing half is exactly the
+ * fabrication the DTO rules forbid.
+ */
+function gainsCollateralOptions(tv) {
+  const out = []
+  for (const col of tv?.collaterals ?? []) {
+    if (col?.isActive === false) continue
+    const address = isAddress(col?.collateral) ? col.collateral : null
+    const collateralIndex = uint(col?.collateralIndex)
+    const decimals = uint(col?.collateralConfig?.decimals)
+    // 0 is not a collateral index on this venue — the space is 1-based, so a 0 here is an absent
+    // value that `uint` legitimately kept, and using it would name the wrong collateral.
+    if (!address || collateralIndex == null || collateralIndex <= 0 || decimals == null) continue
+    out.push({
+      symbol: typeof col.symbol === 'string' && col.symbol !== '' ? col.symbol : null,
+      address,
+      decimals,
+      collateralIndex,
+      // The venue's own USD price for it. Never assumed to be 1: the sheet sizes the position from
+      // this, and a de-pegged stable priced at par would misstate the notional a member signs for.
+      usdPrice: pos(col?.prices?.collateralPriceUsd),
+    })
+  }
+  return out
+}
+
+/**
  * @param {{tradingVariables: object, chartPrices?: object|null, chainId: number}} input
  * @returns {object[]} PerpPair[]
  */
 export function normalizeGainsPairs({ tradingVariables: tv, chartPrices, chainId }) {
   if (!tv || !Array.isArray(tv.pairs)) return []
   const opens = Array.isArray(chartPrices?.opens) ? chartPrices.opens : null
+  // Chain-wide on this venue, so it is built once and shared by reference across the pair rows.
+  const collaterals = gainsCollateralOptions(tv)
   const out = []
   for (let i = 0; i < tv.pairs.length; i += 1) {
     const pair = tv.pairs[i]
@@ -113,6 +180,10 @@ export function normalizeGainsPairs({ tradingVariables: tv, chartPrices, chainId
           : null
     const price = opens ? pos(opens[i]) : null
     const { openInterestUsd, fundingRate } = gainsPairAggregates(tv, i, price)
+    // Group minimums are 1e3-scaled like the maximum. Gains' forex groups start above 1x, and a
+    // default below the floor is refused at signing — so the client needs the floor, not just the
+    // ceiling. A group that does not publish one leaves it null (no floor asserted).
+    const groupMin = num(group?.minLeverage)
     out.push({
       id: `gains:${chainId}:${pair.from}/${pair.to}`,
       venue: 'gains',
@@ -127,8 +198,227 @@ export function normalizeGainsPairs({ tradingVariables: tv, chartPrices, chainId
       openInterestUsd,
       maxLeverage,
       volume24hUsd: null, // not exposed by the gains backend
+      /* Spec 083 US3 — the venue's OWN handles for opening on this pair. Display fields above are
+       * exactly as spec 082 shipped them. `pairIndex` is the loop index by construction: it is the
+       * position in `tv.pairs`, which is the same index `openTrade` consumes and the same one
+       * `gainsPairAggregates` reads OI and funding at, so it cannot drift from the row it describes. */
+      pairIndex: i,
+      minLeverage: groupMin != null && groupMin > 0 ? groupMin / GAINS_LEVERAGE_SCALE : null,
+      collaterals,
     })
   }
+  return out
+}
+
+/* ------------------------------------------------------------------------------------------- *
+ * Gains venue references (spec 083) — what the client needs to ACT on a position or an order.
+ *
+ * THE INDEX TRAP (specs/083-.../contracts/venue-calldata.md). Gains has TWO disjoint uint32 index
+ * spaces: a TRADE index (`getTrades[].index` / `MarketExecuted.index`, consumed by
+ * closeTradeMarket / updateTp / updateSl / updateLeverage / de-increasePositionSize) and a
+ * PENDING-ORDER index (`getPendingOrders[].index` / `MarketOrderInitiated.orderId.index`, consumed
+ * ONLY by cancelOrderAfterTimeout). Passing one where the other belongs does not revert — it acts
+ * on a DIFFERENT OBJECT. The client keeps them in branded types that a raw number cannot enter, and
+ * a JSON wire has no brands, so the defence here is the FIELD NAME: this module emits `tradeIndex`
+ * and `pendingOrderIndex` and never a bare `index`. Nothing downstream can mix them up by accident
+ * because neither name is guessable from the other.
+ *
+ * The refs carry IDENTIFIERS and static scales only — never mutable position state (collateral
+ * amount, leverage, prices). Those are re-read from the venue at signing time: a cached amount is
+ * already stale by the time the member signs, and a close/reduce built from it would be wrong in
+ * exactly the moments that matter (rule: honest numbers).
+ * ------------------------------------------------------------------------------------------- */
+
+/**
+ * `ITradingStorage.PendingOrderType`. The numeric `orderType` is authoritative; this table only
+ * NAMES it. It mirrors `frontend/src/abis/perps/gainsDiamond.js#GAINS_PENDING_ORDER_TYPE` — the
+ * gateway is plain Node ESM and cannot import the SPA tree, so the duplication is deliberate. An
+ * unmapped value stays `null` rather than being invented (FR-008).
+ */
+const GAINS_PENDING_ORDER_TYPE_NAMES = Object.freeze({
+  0: 'MARKET_OPEN',
+  1: 'MARKET_CLOSE',
+  2: 'LIMIT_OPEN',
+  3: 'STOP_OPEN',
+  4: 'TP_CLOSE',
+  5: 'SL_CLOSE',
+  6: 'LIQ_CLOSE',
+  7: 'UPDATE_LEVERAGE',
+  8: 'MARKET_PARTIAL_OPEN',
+  9: 'MARKET_PARTIAL_CLOSE',
+  10: 'PARAM_UPDATE',
+  11: 'PNL_WITHDRAWAL',
+  12: 'MANUAL_HOLDING_FEES_REALIZATION',
+  13: 'MANUAL_NEGATIVE_PNL_REALIZATION',
+})
+
+/** MARKET_OPEN is the one pending-order type with no trade behind it yet (see gainsPendingRef). */
+const GAINS_MARKET_OPEN = 0
+
+/** The tv entry for a 1-based collateralIndex, or null when the payload does not describe it. */
+function gainsCollateral(tv, collateralIndex) {
+  if (collateralIndex == null) return null
+  return (tv?.collaterals ?? []).find((c) => String(c?.collateralIndex) === String(collateralIndex)) ?? null
+}
+
+/**
+ * The collateral half of a venue ref: token address + the scale its amounts are denominated in.
+ * `collateralAmount` on this venue is in the COLLATERAL TOKEN'S OWN decimals (USDC = 1e6), never
+ * 1e18 — the single most common mis-scaling in a Gains integration — so the ref carries both the
+ * decimals and the exact `precision` (10**decimals) the payload reports, and null when it does not
+ * report them (the client then resolves `getCollateral(index)` on chain rather than assuming).
+ */
+function gainsCollateralRef(col) {
+  return {
+    collateralToken: isAddress(col?.collateral) ? col.collateral : null,
+    collateralDecimals: uint(col?.collateralConfig?.decimals),
+    collateralPrecision: digits(col?.collateralConfig?.precision),
+  }
+}
+
+/**
+ * Venue ref for an OPEN TRADE — the TRADE index space. `closeTradeMarket`, `updateTp`, `updateSl`,
+ * `updateLeverage` and `de/increasePositionSize` all take this index; `cancelOrderAfterTimeout`
+ * never does.
+ */
+function gainsTradeRef({ trade, tv, chainId, pairIndex }) {
+  const collateralIndex = uint(trade?.collateralIndex)
+  return {
+    venue: 'gains',
+    chainId,
+    tradeIndex: uint(trade?.index),
+    pairIndex,
+    collateralIndex,
+    ...gainsCollateralRef(gainsCollateral(tv, collateralIndex)),
+  }
+}
+
+/**
+ * Venue ref for a PENDING ORDER — the PENDING-ORDER index space, plus the trade the order acts on
+ * where one exists.
+ *
+ * TRAP ENCODED HERE: a MARKET_OPEN pending order has no trade yet, and the venue overwrites
+ * `Trade.index` to 0 on the way in. Publishing that 0 as `tradeIndex` would hand the client a live
+ * handle to the member's trade #0 — a different position entirely. So `tradeIndex` is null for
+ * MARKET_OPEN and only present for the order types that reference a stored trade (limit/stop
+ * orders included: those ARE stored trade records with a real index).
+ */
+function gainsPendingRef({ order, tv, chainId, pendingOrderIndex, orderType }) {
+  const trade = order?.trade ?? null
+  const collateralIndex = uint(trade?.collateralIndex)
+  const tradeIndex = orderType === GAINS_MARKET_OPEN ? null : uint(trade?.index)
+  return {
+    venue: 'gains',
+    chainId,
+    pendingOrderIndex,
+    tradeIndex,
+    pairIndex: uint(trade?.pairIndex),
+    collateralIndex,
+    ...gainsCollateralRef(gainsCollateral(tv, collateralIndex)),
+  }
+}
+
+/**
+ * Pending (not-yet-executed) Gains market orders for one member — the recovery surface. A member
+ * cannot recover a stuck order the client cannot see, so this read is served alongside positions
+ * and every value it cannot establish is null rather than absent-shaped-as-zero.
+ *
+ * Source: `GET /user-trading-variables/<address>` → `{ pendingMarketOrdersIds, pendingMarketOrders }`
+ * (verified live against backend-arbitrum.gains.trade, 2026-08-12). Entries are the venue's
+ * `PendingOrder`: `{ trade, user, index, isOpen, orderType, createdBlock, maxSlippageP }` — note
+ * `index` there is the PENDING-ORDER index while `trade.index` is the TRADE index.
+ *
+ * Everything here is REQUESTED, not executed: inclusion is not execution, so the size/price/
+ * leverage fields are named `requested*` and no component can mistake them for what the position
+ * actually became.
+ *
+ * @param {{userTradingVariables: object, tradingVariables?: object|null, chainId: number}} input
+ * @returns {object[]} PerpPendingOrder[]
+ */
+export function normalizeGainsPendingOrders({ userTradingVariables: utv, tradingVariables: tv = null, chainId }) {
+  const entries = Array.isArray(utv?.pendingMarketOrders) ? utv.pendingMarketOrders : []
+  const ids = Array.isArray(utv?.pendingMarketOrdersIds) ? utv.pendingMarketOrdersIds : []
+  // The timeout the venue itself reports; cancelOrderAfterTimeout reverts WaitTimeout() until
+  // createdBlock + this many blocks. Passing it through stops the client hardcoding a per-chain
+  // constant (measured 200 Arbitrum / 30 Base / 30 Polygon) that the venue can change.
+  const timeoutBlocks = uint(tv?.marketOrdersTimeoutBlocks)
+  const out = []
+  const seen = new Set()
+
+  for (const order of entries) {
+    const pendingOrderIndex = uint(order?.index)
+    if (pendingOrderIndex == null) continue
+    if (order?.isOpen === false) continue // the venue already resolved it — nothing to recover
+    seen.add(pendingOrderIndex)
+
+    const trade = order?.trade ?? null
+    const orderTypeRaw = uint(order?.orderType)
+    const pairIndex = uint(trade?.pairIndex)
+    const pair = pairIndex != null ? tv?.pairs?.[pairIndex] : null
+    const col = gainsCollateral(tv, uint(trade?.collateralIndex))
+    const precision = num(col?.collateralConfig?.precision)
+    const colPriceUsd = num(col?.prices?.collateralPriceUsd)
+    const leverage = num(trade?.leverage) != null ? Number(trade.leverage) / GAINS_LEVERAGE_SCALE : null
+    const collateralUsd =
+      precision != null && colPriceUsd != null && num(trade?.collateralAmount) != null
+        ? (Number(trade.collateralAmount) / precision) * colPriceUsd
+        : null
+
+    out.push({
+      id: `gains:${chainId}:pending:${pendingOrderIndex}`,
+      venue: 'gains',
+      chainId,
+      symbol: pair ? `${pair.from}/${pair.to}` : pairIndex != null ? `pair #${pairIndex}` : null,
+      direction: trade?.long == null ? null : trade.long ? 'long' : 'short',
+      orderType: orderTypeRaw,
+      orderTypeName: orderTypeRaw != null ? (GAINS_PENDING_ORDER_TYPE_NAMES[orderTypeRaw] ?? null) : null,
+      createdBlock: uint(order?.createdBlock),
+      timeoutBlocks,
+      // Pre-execution values: what the member ASKED for, never what exists on the venue.
+      requestedCollateralUsd: collateralUsd,
+      requestedLeverage: leverage,
+      requestedSizeUsd: collateralUsd != null && leverage != null ? collateralUsd * leverage : null,
+      requestedPrice: num(trade?.openPrice) != null ? pos(Number(trade.openPrice) / GAINS_P) : null,
+      venueRef: gainsPendingRef({ order, tv, chainId, pendingOrderIndex, orderType: orderTypeRaw }),
+    })
+  }
+
+  // `pendingMarketOrdersIds` carries the same orders as bare {user, index} ids. When the backend
+  // reports an id with no matching detail entry we still emit the ref: a recovery handle the member
+  // cannot see is the failure this whole surface exists to prevent. Everything unknown stays null,
+  // so the client offers cancellation without claiming a countdown it cannot compute.
+  for (const id of ids) {
+    const pendingOrderIndex = uint(id?.index ?? id)
+    if (pendingOrderIndex == null || seen.has(pendingOrderIndex)) continue
+    seen.add(pendingOrderIndex)
+    out.push({
+      id: `gains:${chainId}:pending:${pendingOrderIndex}`,
+      venue: 'gains',
+      chainId,
+      symbol: null,
+      direction: null,
+      orderType: null,
+      orderTypeName: null,
+      createdBlock: null,
+      timeoutBlocks,
+      requestedCollateralUsd: null,
+      requestedLeverage: null,
+      requestedSizeUsd: null,
+      requestedPrice: null,
+      venueRef: {
+        venue: 'gains',
+        chainId,
+        pendingOrderIndex,
+        tradeIndex: null,
+        pairIndex: null,
+        collateralIndex: null,
+        collateralToken: null,
+        collateralDecimals: null,
+        collateralPrecision: null,
+      },
+    })
+  }
+
   return out
 }
 
@@ -164,6 +454,9 @@ export function normalizeGainsPositions({ openTrades, tradingVariables: tv, chai
       entryPrice: num(t.openPrice) != null ? Number(t.openPrice) / GAINS_P : null,
       leverage,
       unrealizedPnlUsd: null, // gains' backend does not report PnL on this read
+      // Spec 083: the handles the calldata builders need. Display fields above stay exactly as
+      // spec 082 shipped them — the phase-0 UI reads them.
+      venueRef: gainsTradeRef({ trade: t, tv, chainId, pairIndex }),
     })
   }
   return out
@@ -183,6 +476,7 @@ export function normalizeGmxPairs({ marketsInfo, tickers, tokens, chainId }) {
   const markets = Array.isArray(marketsInfo?.markets) ? marketsInfo.markets : []
   const tokenList = Array.isArray(tokens?.tokens) ? tokens.tokens : Array.isArray(tokens) ? tokens : []
   const decimalsByAddress = new Map(tokenList.map((t) => [String(t.address).toLowerCase(), num(t.decimals)]))
+  const tokenByAddress = new Map(tokenList.map((t) => [String(t.address).toLowerCase(), t]))
   const tickerByAddress = new Map(
     (Array.isArray(tickers) ? tickers : []).map((t) => [String(t.tokenAddress).toLowerCase(), t]),
   )
@@ -226,9 +520,64 @@ export function normalizeGmxPairs({ marketsInfo, tickers, tokens, chainId }) {
       openInterestUsd,
       maxLeverage: null, // not exposed by the GMX REST API
       volume24hUsd: null,
+      /* Spec 083 US3 — the venue's OWN handles for opening on this market.
+       *
+       * `market` is the market TOKEN, which is what `CreateOrderParams.addresses.market` takes. It
+       * is already inside the row's id, and the client can parse it back out; publishing it as a
+       * field means nothing downstream has to parse an id to act, and the two can never disagree
+       * because both come from this one value.
+       *
+       * `collaterals` are the market's own long and short tokens — the only two GMX accepts here.
+       * They are emitted ONLY when the payload names them and the token list resolves their
+       * decimals: a collateral whose decimals we do not know cannot turn a member's typed amount
+       * into base units, so offering it would produce an order for the wrong size. An empty list
+       * therefore means "GMX did not tell us", and the sheet declines to offer this venue rather
+       * than guessing a token. */
+      market: isAddress(m.marketToken) ? m.marketToken : null,
+      collaterals: gmxCollateralOptions(m, tokenByAddress, tickerByAddress),
     })
   }
   return out
+}
+
+/**
+ * A GMX market's accepted collateral, from the market's own long/short tokens.
+ *
+ * De-duplicated: a single-token market names the same address twice, and two identical choices in
+ * a picker is a defect the member has to reason about.
+ */
+function gmxCollateralOptions(market, tokenByAddress, tickerByAddress) {
+  const out = []
+  const seen = new Set()
+  for (const address of [market?.longToken, market?.shortToken]) {
+    if (!isAddress(address)) continue
+    const key = address.toLowerCase()
+    if (seen.has(key)) continue
+    const token = tokenByAddress.get(key)
+    const decimals = uint(token?.decimals)
+    if (decimals == null) continue
+    seen.add(key)
+    out.push({
+      symbol: typeof token?.symbol === 'string' && token.symbol !== '' ? token.symbol : null,
+      address,
+      decimals,
+      // GMX has no per-collateral index — the token address IS the handle. Null rather than absent
+      // so the shape matches Gains' and a consumer never has to know which venue it came from.
+      collateralIndex: null,
+      // GMX's OWN price for the collateral, so the notional a member is shown is measured in the
+      // venue's units and not against an assumed $1 peg. Null where the venue did not price it.
+      usdPrice: gmxTokenPriceUsd(tickerByAddress.get(key), decimals),
+    })
+  }
+  return out
+}
+
+/** A GMX ticker → USD, at the venue's own 10^(30 - decimals) scale. Null when it did not report. */
+function gmxTokenPriceUsd(ticker, decimals) {
+  const min = num(ticker?.minPrice)
+  const max = num(ticker?.maxPrice)
+  if (min == null || max == null) return null
+  return pos((min + max) / 2 / 10 ** (30 - decimals))
 }
 
 // ---------------------------------------------------------------------------------------------

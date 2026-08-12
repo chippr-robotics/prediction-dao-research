@@ -19,6 +19,7 @@ import CallsignRegistryAdmin from './admin/CallsignRegistryAdmin'
 import MembershipTreasuryOverview from './admin/MembershipTreasuryOverview'
 import ProtocolConfigTab from './admin/ProtocolConfigTab'
 import FeesTab from './admin/FeesTab'
+import PerpsFeesPanel from './admin/PerpsFeesPanel'
 import StakingTab from './admin/StakingTab'
 import BridgeTab from './admin/BridgeTab'
 import SupplyTab from './admin/SupplyTab'
@@ -1233,6 +1234,24 @@ function AdminPanel() {
             pendingTx={pendingTx}
             isAdmin={isAdmin}
             isFeeAdmin={isFeeAdmin}
+          />
+        )}
+
+        {/*
+          Perps fee rails (spec 083 US5). Same gate as Fees — a hand-typed tab id must not be a way
+          in for anyone the nav would not offer it to. The panel drives GMX's OWN DataStore on
+          Arbitrum for one rail and the FeeRouter for the other, so it takes the wallet's chain and
+          provider and resolves its own read connections per rail.
+        */}
+        {activeTab === 'perps-fees' && (isAdmin || isFeeAdmin) && (
+          <PerpsFeesPanel
+            signer={signer}
+            account={account}
+            chainId={chainId}
+            provider={provider || getProvider(chainId)}
+            runTx={runTx}
+            pendingTx={pendingTx}
+            onOpenFees={canOpenFees ? () => setActiveTab('fees') : null}
           />
         )}
 

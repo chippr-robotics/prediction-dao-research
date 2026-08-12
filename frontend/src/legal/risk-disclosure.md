@@ -12,6 +12,7 @@ Capitalized terms have the meanings given in the Terms & Conditions.
 ## The Most Important Risks, in Plain Language
 
 - **You can lose 100% of what you wager.** Every Wager can go to zero.
+- **Leverage can lose your entire stake, automatically.** A leveraged position — a perpetual future held on a third-party venue — can be liquidated and closed by that venue during ordinary market moves, not only in a crash. It happens without warning, without your action, and cannot be appealed.
 - **No one is protecting you.** There is no regulator, no deposit insurance, and no authority that can reverse a loss or order a refund.
 - **The code is final.** Smart contracts settle automatically and cannot be undone, even if something goes wrong.
 - **If you lose your keys, you lose everything.** No one can recover your wallet, your account, or your funds.
@@ -42,51 +43,73 @@ The outcome of a Wager depends on the Resolution Mechanism, which may rely on ex
 
 Each Wager is between you and another User, not with FairWins. You rely on the Smart Contract — not on FairWins — to escrow and settle stakes. FairWins does not vet, guarantee, or stand behind any counterparty, and is not responsible for a counterparty's conduct, identity, or solvency.
 
-## 6. Blockchain and Network Risk
+## 6. Leveraged-Derivatives (Perpetual Futures) Risk
 
-The Service runs on the Polygon network. You accept the risks of public blockchains, including **network congestion, downtime, delays, fee (gas) volatility, chain reorganizations, changes to finality, validator or consensus failures, hard forks, and bridge failures.** Transactions may fail, be delayed, or settle at unexpected cost. FairWins does not control the network and is not responsible for its behavior.
+Where the Service offers access to perpetual futures, you are trading a **leveraged derivative on a third-party venue.** These are among the highest-risk products available anywhere in the Service, and the risks in this section are in addition to every other risk in this document.
 
-## 7. Wallet and Private-Key Risk
+**Leverage multiplies both gains and losses.** Your position size — its notional — is your margin multiplied by your leverage. A small adverse price move against a large notional can consume your entire margin. **You can lose the whole amount you commit, and you can lose it quickly.**
+
+**A leveraged position can be closed automatically, with your stake lost.** If your margin falls below the venue's maintenance requirement, the venue liquidates the position. **Liquidation is automatic, requires no notice, and occurs during ordinary market volatility — not only in a crash.** A stop-loss is not protection against this and is not a guaranteed price.
+
+**Holding a position costs money over time.** Funding payments accrue continuously between long and short holders, and the venue charges its own spread, opening and closing fees, and borrowing costs. **A position can lose value simply by being held**, even where the price has not moved against you.
+
+**FairWins' fee, where one applies, is charged on notional — not on the amount you put in.** It is collected by the venue at execution, on both opening and closing, and it therefore **scales with your leverage**: at 10× leverage, a fee of 5 bps of notional is about 50 bps of your own margin. It is separate from, and on top of, the venue's own fees. You will always see the fee before you sign; a zero rate means no fee at all.
+
+**Prices come from the venue's oracles, and execution can differ from what you see.** Entry, liquidation, stop-loss, and take-profit levels are determined by the venue's own price feeds, which may be delayed, unavailable, inaccurate, or in dispute. Orders may fill at a worse price than quoted (slippage) or fill only partially.
+
+**Orders are executed asynchronously by third-party keepers, and submission is not execution.** After you sign, your instruction may be executed later and at a different price, **or it may be rejected, frozen, or time out and never execute at all.** Until the venue executes it, nothing has changed.
+
+**The venue — not FairWins — controls execution, and FairWins cannot reverse or recover anything.** FairWins prepares an instruction; the venue decides whether, when, and at what price to act on it, and may change its parameters, restrict, pause, or discontinue trading. **FairWins cannot cancel, reverse, accelerate, refund, or recover a position, an order, or a loss at any venue, and does not compensate you for the venue's conduct, outages, or contract failures.**
+
+**Your own wallet owns the position.** Every perpetual-futures action is sent from your wallet, which is the position's owner on the venue. **FairWins never holds your collateral, never owns your position, and holds no approval over it.** You can always manage or close your position directly on the venue's own interface, including if the Service is unavailable or discontinued. This is a property of how the integration is built, not a promise of performance — you remain responsible for your own gas and for acting in time.
+
+**Some venues are read-only in the Service.** Hyperliquid positions are displayed for viewing only; opening, changing, and closing them happens on that venue's own interface.
+
+## 7. Blockchain and Network Risk
+
+The FairWins Smart Contracts run on the Polygon network, and any Trading Venue you reach through the Service runs on that venue's own network. You accept the risks of public blockchains, including **network congestion, downtime, delays, fee (gas) volatility, chain reorganizations, changes to finality, validator or consensus failures, hard forks, and bridge failures.** Transactions may fail, be delayed, or settle at unexpected cost. FairWins does not control the network and is not responsible for its behavior.
+
+## 8. Wallet and Private-Key Risk
 
 You are solely responsible for the security and control of your wallet and private keys. **If you lose your keys or recovery information, you will permanently lose access to your account, any account encryption key derived from your signature, and any associated funds. No one — including FairWins — can recover them.** If your keys are compromised, an attacker may take irreversible actions you cannot undo. FairWins never holds your keys and cannot reset, restore, or recover them.
 
-## 8. Asset and Value Risk
+## 9. Asset and Value Risk
 
 The value of the assets you wager may be volatile. If you wager stablecoins, you accept the risk that a stablecoin may lose its peg, be frozen by its issuer, or become illiquid or unredeemable. Token values may fall to zero.
 
-## 9. Legal and Regulatory-Change Risk
+## 10. Legal and Regulatory-Change Risk
 
 The legal treatment of prediction markets, peer-to-peer wagering, and digital assets is **uncertain and changing.** Laws or regulators in your jurisdiction or elsewhere may at any time prohibit, restrict, or change the treatment of the Service. As a result, **your access may be cut off without notice, including mid-Wager where the protocol permits, and your Membership Pass may become unusable, in each case without refund.** You are solely responsible for determining the legality of your use where you are located.
 
-## 10. Tax Risk
+## 11. Tax Risk
 
 Tax treatment of wagering and digital-asset activity is complex and varies by jurisdiction. **You are solely responsible for determining, reporting, and paying any taxes** arising from your use of the Service. FairWins does not provide tax advice, withholding, or reporting.
 
-## 11. Market Integrity and Information Risk
+## 12. Market Integrity and Information Risk
 
 Other participants may have more or better information than you, including non-public information. Markets may be thin, illiquid, or subject to attempted manipulation. You accept the risk of trading against better-informed counterparties and of information asymmetry, and you are responsible for complying with any laws applicable to you regarding trading on non-public information.
 
-## 12. Automation and AI-Agent Risk
+## 13. Automation and AI-Agent Risk
 
 Portions of the Service are developed, maintained, and operated with the assistance of automated systems and AI agents. **These systems may behave unexpectedly, contain errors, or produce unintended results.** You accept the risks arising from the use of automated and AI components in the development and operation of the Service.
 
-## 13. Membership-Fee Risk
+## 14. Membership-Fee Risk
 
 A Membership Pass is a non-refundable fee for access only. Its practical value depends on the continued availability of the Service, which is not guaranteed. **If the Service is restricted, suspended, modified, or discontinued, you will not be refunded.**
 
-## 14. Privacy and Pseudonymity Risk
+## 15. Privacy and Pseudonymity Risk
 
 Blockchain transactions are **public and permanent.** Your on-chain activity is pseudonymous, not anonymous, and may be analyzed, linked, and attributed to you by third parties using tools and data outside our control. Do not assume your activity is private.
 
-## 15. Availability and Discontinuation Risk
+## 16. Availability and Discontinuation Risk
 
 We do not guarantee that the Service, any interface, any market, or any counterparty will be available at any time. The Service, or any part of it, may be changed, suspended, or discontinued at any time without notice.
 
-## 16. Responsible Participation
+## 17. Responsible Participation
 
 Wagering can be habit-forming and can cause financial and personal harm. Wager only what you can afford to lose. Set limits for yourself. If you believe your participation may be becoming harmful, stop and seek help.  Where the Service offers self-limitation or self-exclusion tools, you are encouraged to use them.
 
-## 17. Acknowledgement
+## 18. Acknowledgement
 
 **BY USING THE SERVICE, PURCHASING OR UPGRADING A MEMBERSHIP PASS, SIGNING THE ACCOUNT KEY-GENERATION MESSAGE, OR ENTERING A WAGER, YOU CONFIRM THAT YOU HAVE READ AND UNDERSTOOD THIS RISK DISCLOSURE AND THAT YOU KNOWINGLY AND VOLUNTARILY ACCEPT ALL OF THE RISKS DESCRIBED ABOVE.**
 
