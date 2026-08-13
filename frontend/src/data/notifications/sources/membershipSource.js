@@ -9,6 +9,7 @@ import { getProvider } from '../../../utils/blockchainService'
 import { getContractAddressForChain, getDeploymentBlockForChain } from '../../../config/contracts'
 import { MEMBERSHIP_MANAGER_ABI } from '../../../abis/MembershipManager'
 import { MEMBERSHIP_VOUCHER_ABI } from '../../../abis/MembershipVoucher'
+import { scanLogs } from '../../../lib/chain/logScan'
 
 const ROLE = ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE'))
 const TIER = ['None', 'Bronze', 'Silver', 'Gold', 'Platinum']
@@ -17,18 +18,48 @@ const EXPIRING_WINDOW_S = 7 * DAY_S
 
 const tierName = (t) => TIER[t] || `Tier ${t}`
 
+/**
+ * Log-scan chunks the voucher backfill may spend per poll. The voucher contract is ~2.1M blocks old
+ * on Polygon and the app's default RPC caps one `eth_getLogs` at 10,000 blocks, so this read was a
+ * guaranteed error on every 30s cycle before it was chunked — and chunking without a budget would
+ * have replaced one doomed request with 216 live ones. Bounded and resumable instead: the scan
+ * converges over a few minutes and every later poll costs one chunk.
+ */
+const VOUCHER_CHUNK_BUDGET_PER_POLL = 12
+
+/**
+ * How many vouchers this account still holds (and therefore can redeem).
+ *
+ * `complete` is false while the history backfill is still short of the chain head. A count taken
+ * mid-backfill is not a smaller count, it is an UNKNOWN one — announcing "you have N vouchers to
+ * redeem" off it, and then again at N+1 as the scan catches up, would be inventing arrivals that
+ * never happened. `held` is null when the scan could not start at all.
+ *
+ * @returns {Promise<{held: number|null, complete: boolean}>}
+ */
 async function countRedeemableVouchers(voucherAddr, account, chainId, provider) {
+  // Never scan from genesis: without a recorded deploy block there is no honest starting point.
+  const fromBlock = getDeploymentBlockForChain('membershipVoucher', chainId)
+  if (!fromBlock) return { held: null, complete: false }
+
   const voucher = new ethers.Contract(voucherAddr, MEMBERSHIP_VOUCHER_ABI, provider)
-  const fromBlock = getDeploymentBlockForChain('membershipVoucher', chainId) || 0
-  const incoming = await voucher.queryFilter(voucher.filters.Transfer(null, account), fromBlock)
-  const ids = [...new Set(incoming.map((e) => e.args.tokenId.toString()))]
+  const { logs, complete } = await scanLogs({
+    contract: voucher,
+    filters: [voucher.filters.Transfer(null, account)],
+    fromBlock,
+    chainId,
+    maxChunks: VOUCHER_CHUNK_BUDGET_PER_POLL,
+  })
+  if (!complete) return { held: null, complete: false }
+
+  const ids = [...new Set(logs.map((e) => e.args.tokenId.toString()))]
   let held = 0
   for (const id of ids) {
     try {
       if (String(await voucher.ownerOf(id)).toLowerCase() === String(account).toLowerCase()) held += 1
     } catch { /* burned / redeemed / transferred away */ }
   }
-  return held
+  return { held, complete: true }
 }
 
 export const membershipSource = {
@@ -88,24 +119,41 @@ export const membershipSource = {
       }
     }
 
-    // Voucher redeemable (action: redeem) — best-effort bounded scan; degrades silently on failure.
+    // Voucher redeemable (action: redeem) — best-effort bounded scan; degrades honestly.
+    //
+    // A failed or still-catching-up scan keeps the PRIOR slice and marks the cycle partial. It is
+    // deliberately not `ok:false`: the membership read above succeeded, and downgrading the whole
+    // source would discard a good tier/expiry answer and raise the member-facing "couldn't refresh"
+    // notice over a best-effort extra.
+    let partial = false
     const voucherAddr = getContractAddressForChain('membershipVoucher', chainId)
     if (voucherAddr && ethers.isAddress(voucherAddr)) {
       currentIds.push('voucher')
+      const keepPrior = () => {
+        partial = true
+        if (prior.snapshots?.voucher) {
+          nextSnapshots.voucher = prior.snapshots.voucher
+          if ((prior.snapshots.voucher.count ?? 0) > 0) actionNeededById.voucher = 'redeemVoucher'
+        }
+      }
       try {
-        const held = await countRedeemableVouchers(voucherAddr, account, chainId, provider)
-        nextSnapshots.voucher = { count: held, snappedAt: nowMs }
-        if (held > 0) actionNeededById.voucher = 'redeemVoucher'
-        const prevCount = prior.snapshots?.voucher?.count ?? 0
-        if (prior.snapshots?.voucher && prevCount === 0 && held > 0) {
-          entries.push(mk('voucher-redeemable', `You have ${held} membership voucher${held === 1 ? '' : 's'} to redeem`, 'info', true, { to: '/vouchers' }))
+        const { held, complete } = await countRedeemableVouchers(voucherAddr, account, chainId, provider)
+        if (!complete || held == null) {
+          keepPrior()
+        } else {
+          nextSnapshots.voucher = { count: held, snappedAt: nowMs }
+          if (held > 0) actionNeededById.voucher = 'redeemVoucher'
+          const prevCount = prior.snapshots?.voucher?.count ?? 0
+          if (prior.snapshots?.voucher && prevCount === 0 && held > 0) {
+            entries.push(mk('voucher-redeemable', `You have ${held} membership voucher${held === 1 ? '' : 's'} to redeem`, 'info', true, { to: '/vouchers' }))
+          }
         }
       } catch {
-        if (prior.snapshots?.voucher) nextSnapshots.voucher = prior.snapshots.voucher // degrade: keep prior
+        keepPrior()
       }
     }
 
-    return { ok: true, entries, nextSnapshots, currentIds, actionNeededById, nextAux }
+    return { ok: true, entries, nextSnapshots, currentIds, actionNeededById, nextAux, partial }
   },
 }
 

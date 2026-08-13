@@ -8,6 +8,12 @@
  * previous state is kept and detection resumes next cycle. All persisted state is per (account, chainId) and
  * never mixed across scopes. The machinery (poll loop, scope swap + in-flight guard, concurrent-read-survives,
  * toast cap, catch-up feed-only) is ported verbatim from the wager watcher.
+ *
+ * Failure disclosure is deliberately slower and more specific than it used to be. It waits for
+ * FAILURE_NOTICE_AFTER_CYCLES consecutive failing cycles (so a cold start on the first cycle is not
+ * announced as a broken app), it NAMES the domains that could not be read, and it clears itself on a
+ * clean cycle. A source that is merely still backfilling history reports `partial`, not `ok:false`,
+ * and so reaches none of this — "still reading" is not "could not read".
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityContext, POLL_INTERVAL_MS } from './ActivityContext.js'
@@ -21,6 +27,30 @@ import { showSystemNotification } from '../lib/notifications/pushDelivery'
 
 const MAX_TOASTS_PER_CYCLE = 3
 const TOAST_DURATION_MS = 6000
+
+/**
+ * Consecutive failed cycles before the member is told anything.
+ *
+ * The first cycle runs at mount, while the wallet, the RPC route and (on a cold gateway) a Cloud Run
+ * container are all still coming up — so a single blip there used to paint a red error banner across
+ * a perfectly working app before it had finished loading, which reads as "this thing is broken".
+ * Entries already get this courtesy: the catch-up cycle is feed-only so a returning member is not
+ * toast-stormed. Failures get the same one. A read that is genuinely down is still disclosed ~30s
+ * later, and a transient one costs a silent retry instead of a false alarm.
+ */
+const FAILURE_NOTICE_AFTER_CYCLES = 2
+
+/**
+ * Name what is stale. "Some activity" told a member nothing they could act on and told us nothing we
+ * could debug — a bug report against it could not even say which domain had failed.
+ */
+function failureNotice(failed) {
+  const labels = failed.map((f) => f.label).filter(Boolean)
+  if (labels.length === 0) return "Couldn't refresh some activity — will keep retrying"
+  if (labels.length === 1) return `Couldn't refresh ${labels[0]} activity — will keep retrying`
+  if (labels.length === 2) return `Couldn't refresh ${labels[0]} and ${labels[1]} activity — will keep retrying`
+  return `Couldn't refresh ${labels[0]}, ${labels[1]} and ${labels.length - 2} more — will keep retrying`
+}
 
 export function ActivityProvider({ children, sources = activitySources }) {
   const { account: rawAccount, chainId } = useWallet()
@@ -39,6 +69,9 @@ export function ActivityProvider({ children, sources = activitySources }) {
   const pollingRef = useRef(false)
   const firstPollRef = useRef(true)
   const failureNoticedRef = useRef(false)
+  // Consecutive failing cycles. Reset by any clean cycle, so the notice tracks reality in BOTH
+  // directions: it can fire again after a recovery instead of latching for the whole session.
+  const failureStreakRef = useRef(0)
 
   const scopeKey = account && chainId ? `${account}|${chainId}` : null
 
@@ -47,6 +80,8 @@ export function ActivityProvider({ children, sources = activitySources }) {
     scopeRef.current = scopeKey
     firstPollRef.current = true
     pollingRef.current = false
+    failureStreakRef.current = 0
+    failureNoticedRef.current = false
     if (!scopeKey) {
       storeRef.current = defaultStore()
       setStore(storeRef.current)
@@ -70,7 +105,7 @@ export function ActivityProvider({ children, sources = activitySources }) {
     setIsPolling(true)
     try {
       const nowMs = Date.now()
-      const { sliceUpdates, fresh, actionNeededByDomain: nextAction, anyFailure } = await detectAll({
+      const { sliceUpdates, fresh, actionNeededByDomain: nextAction, anyFailure, failed } = await detectAll({
         sources,
         account,
         chainId,
@@ -123,13 +158,22 @@ export function ActivityProvider({ children, sources = activitySources }) {
           showSystemNotification(entry)
         }
       }
-      if (anyFailure && !failureNoticedRef.current) {
-        failureNoticedRef.current = true
-        showNotification("Couldn't refresh some activity — will keep retrying", 'error', TOAST_DURATION_MS)
+      if (anyFailure) {
+        failureStreakRef.current += 1
+        if (failureStreakRef.current >= FAILURE_NOTICE_AFTER_CYCLES && !failureNoticedRef.current) {
+          failureNoticedRef.current = true
+          showNotification(failureNotice(failed || []), 'error', TOAST_DURATION_MS)
+        }
+      } else {
+        // Everything read. Forget the streak AND the fact we had complained, so a later outage is
+        // disclosed on its own merits rather than being swallowed as already-mentioned.
+        failureStreakRef.current = 0
+        failureNoticedRef.current = false
       }
     } catch (err) {
       console.warn('[ActivityProvider] poll failed:', err?.message || err)
-      if (!failureNoticedRef.current) {
+      failureStreakRef.current += 1
+      if (failureStreakRef.current >= FAILURE_NOTICE_AFTER_CYCLES && !failureNoticedRef.current) {
         failureNoticedRef.current = true
         showNotification("Couldn't refresh activity — will keep retrying", 'error', TOAST_DURATION_MS)
       }

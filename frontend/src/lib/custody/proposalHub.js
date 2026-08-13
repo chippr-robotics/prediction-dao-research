@@ -5,6 +5,7 @@
 
 import { Contract, Interface, getAddress, toBeHex } from 'ethers'
 import { SAFE_PROPOSAL_HUB_ABI } from '../../abis/SafeProposalHub'
+import { scanLogs } from '../chain/logScan'
 import { buildSafeTx, computeSafeTxHash } from './vaultTransaction'
 
 const hubIface = new Interface(SAFE_PROPOSAL_HUB_ABI)
@@ -92,17 +93,31 @@ export function verifyProposal(proposal, chainId) {
 /**
  * Read all VERIFIED proposals for a vault from the hub. Decodes `Proposed` logs, reconstructs each, and keeps
  * only those whose recomputed hash matches. Also returns the set of cancelled hashes.
- * @returns {Promise<{proposals: object[], cancelled: Set<string>}>}
+ *
+ * The two events are scanned as ONE bounded, resumable pass (`lib/chain/logScan`): the hub is ~1.8M blocks
+ * old on Polygon and the app's default RPC caps a single `eth_getLogs` at 10,000 blocks, so the previous
+ * one-shot `queryFilter` from the deploy block could only ever fail there. `complete` is false while a
+ * budgeted backfill is still catching up — a caller MUST NOT read that as "this vault has no proposals".
+ *
+ * @returns {Promise<{proposals: object[], cancelled: Set<string>, complete: boolean}>}
  */
-export async function readVerifiedProposals({ hubAddress, safeAddress, chainId, provider, fromBlock = 0 }) {
+export async function readVerifiedProposals({ hubAddress, safeAddress, chainId, provider, fromBlock = 0, maxChunks }) {
   const hub = new Contract(getAddress(hubAddress), SAFE_PROPOSAL_HUB_ABI, provider)
   const safeTopic = getAddress(safeAddress)
-  const proposedLogs = await hub.queryFilter(hub.filters.Proposed(safeTopic), fromBlock)
-  const cancelledLogs = await hub.queryFilter(hub.filters.Cancelled(safeTopic), fromBlock)
+  const { logs, complete } = await scanLogs({
+    contract: hub,
+    filters: [hub.filters.Proposed(safeTopic), hub.filters.Cancelled(safeTopic)],
+    fromBlock,
+    chainId,
+    maxChunks,
+  })
 
-  const cancelled = new Set(cancelledLogs.map((l) => String(l.args.safeTxHash).toLowerCase()))
+  const cancelled = new Set(
+    logs.filter((l) => l.eventName === 'Cancelled').map((l) => String(l.args.safeTxHash).toLowerCase()),
+  )
   const proposals = []
-  for (const log of proposedLogs) {
+  for (const log of logs) {
+    if (log.eventName !== 'Proposed') continue
     try {
       const p = reconstructProposal(log.args)
       if (verifyProposal(p, chainId)) {
@@ -112,7 +127,7 @@ export async function readVerifiedProposals({ hubAddress, safeAddress, chainId, 
       /* malformed log — skip */
     }
   }
-  return { proposals, cancelled }
+  return { proposals, cancelled, complete }
 }
 
 // --- Never-stranded fallback: shareable EIP-712 payload link/QR (no hub required) ---

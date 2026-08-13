@@ -21,6 +21,7 @@ import {
   cancelProposalCall,
   readVerifiedProposals,
 } from '../lib/custody/proposalHub'
+import { readExecutionOutcomes } from '../lib/custody/vaultProposalReads'
 import { deriveProposalStatus, isQueued, STATUS } from '../lib/custody/proposalStatus'
 
 const safeIface = new Interface(SAFE_ABI)
@@ -31,6 +32,9 @@ export function useVaultProposals(vault) {
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  // True while a bounded history backfill has not yet reached the chain head — the queue shown is
+  // real but not yet known to be all of it.
+  const [partial, setPartial] = useState(false)
   const reqId = useRef(0)
 
   const vaultAddress = vault?.isSafe ? vault.address : null
@@ -44,6 +48,7 @@ export function useVaultProposals(vault) {
     const myReq = ++reqId.current
     if (!vaultAddress || !hubAddress || !provider || !onVaultChain) {
       setProposals([])
+      setPartial(false)
       setLoading(false)
       return
     }
@@ -55,6 +60,7 @@ export function useVaultProposals(vault) {
       if (!fromBlock) {
         if (myReq === reqId.current) {
           setProposals([])
+          setPartial(false)
           setError('Custody proposal history is not configured for this network yet.')
         }
         return
@@ -65,7 +71,11 @@ export function useVaultProposals(vault) {
         safe.getThreshold(),
         safe.nonce(),
       ])
-      const { proposals: verified } = await readVerifiedProposals({
+      // History is scanned in bounded, resumable chunks (lib/chain/logScan) — the hub is over a
+      // million blocks old on the live networks and public RPCs cap one getLogs at 10,000 blocks.
+      // This is the surface a member is waiting on, so it is given no chunk budget: it backfills
+      // fully, and the session cache means later refreshes only read the new blocks.
+      const { proposals: verified, complete: hubComplete } = await readVerifiedProposals({
         hubAddress,
         safeAddress: vaultAddress,
         chainId,
@@ -74,12 +84,9 @@ export function useVaultProposals(vault) {
       })
 
       // Execution outcomes from the Safe itself.
-      const [successes, failures] = await Promise.all([
-        safe.queryFilter(safe.filters.ExecutionSuccess(), fromBlock),
-        safe.queryFilter(safe.filters.ExecutionFailure(), fromBlock),
-      ])
-      const executedHashes = new Set(successes.map((l) => String(l.args.txHash).toLowerCase()))
-      const failedHashes = new Set(failures.map((l) => String(l.args.txHash).toLowerCase()))
+      const { executed: executedHashes, failed: failedHashes, complete: execComplete } =
+        await readExecutionOutcomes({ safe, chainId, fromBlock })
+      const historyComplete = hubComplete && execComplete
 
       // Approvals per proposal (one on-chain read per owner per proposal).
       const enriched = await Promise.all(
@@ -101,7 +108,12 @@ export function useVaultProposals(vault) {
           return { ...p, approvers, approvals: approvers.length, threshold: Number(threshold), status }
         }),
       )
-      if (myReq === reqId.current) setProposals(enriched)
+      if (myReq === reqId.current) {
+        setProposals(enriched)
+        // An unfinished scan is disclosed, never rendered as the whole queue: "no pending
+        // proposals" from a scan that has not reached them yet is the one wrong answer here.
+        setPartial(!historyComplete)
+      }
     } catch (e) {
       if (myReq === reqId.current) setError(e?.message || 'Failed to read proposals')
     } finally {
@@ -202,7 +214,7 @@ export function useVaultProposals(vault) {
   const queue = proposals.filter((p) => isQueued(p.status))
   const history = proposals.filter((p) => !isQueued(p.status))
 
-  return { proposals, queue, history, loading, error, refresh, propose, approve, execute, cancel }
+  return { proposals, queue, history, loading, error, partial, refresh, propose, approve, execute, cancel }
 }
 
 export default useVaultProposals

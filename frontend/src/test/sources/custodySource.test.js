@@ -2,6 +2,10 @@
 // (actionable) when a pending proposal newly needs the member, "executed" and "governance-changed" on diff,
 // and a no-op until the hub is configured. The chain reads (readVaultProposalState) are mocked — the source's
 // diff logic is the unit under test.
+//
+// Both mocked reads now report whether their bounded history scan reached the chain head. A stub MUST say
+// which it is: an incomplete scan is a live case with its own behaviour (partial, diff nothing), and letting
+// it default would let a real caller that forgot to report completeness pass silently.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -26,7 +30,7 @@ vi.mock('../../lib/custody/policyEvents', () => ({ readPolicyEventCount: (...a) 
 import { custodySource } from '../../data/notifications/sources/custodySource'
 
 const NOW = 1_700_000_000_000
-const base = { owners: [OWNER], threshold: 1, nonce: 5, proposals: [] }
+const base = { owners: [OWNER], threshold: 1, nonce: 5, proposals: [], complete: true }
 const pendingNeedingMe = {
   ...base,
   proposals: [{ safeTxHash: H1, status: 'pending', approvers: [], nonce: 5 }],
@@ -36,7 +40,7 @@ beforeEach(() => {
   refs.mockReturnValue([{ chainId: 63, address: VAULT, label: 'Coop', role: 'owner' }])
   readState.mockReset()
   policyCount.mockReset()
-  policyCount.mockResolvedValue(0)
+  policyCount.mockResolvedValue({ count: 0, complete: true })
 })
 
 const sid = `custody:${VAULT}`
@@ -73,6 +77,7 @@ describe('custodySource', () => {
       threshold: 2,
       nonce: 6,
       proposals: [{ safeTxHash: H1, status: 'executed', approvers: [OWNER], nonce: 5 }],
+      complete: true,
     })
     const prior = { snapshots: { [sid]: { needMe: [], executedCount: 0, govKey: '1:1' } } }
     const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior })
@@ -88,7 +93,7 @@ describe('custodySource', () => {
   // Spec 049 (FR-016) — guard rule events join the same snapshot-diff.
   it('baselines the policy event count on first sight without emitting', async () => {
     readState.mockResolvedValue(base)
-    policyCount.mockResolvedValue(3)
+    policyCount.mockResolvedValue({ count: 3, complete: true })
     const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior: {} })
     expect(out.entries).toEqual([])
     expect(out.nextSnapshots[sid].policyEventCount).toBe(3)
@@ -96,7 +101,7 @@ describe('custodySource', () => {
 
   it('emits policy-changed when new guard events appear for a member vault', async () => {
     readState.mockResolvedValue(base)
-    policyCount.mockResolvedValue(4)
+    policyCount.mockResolvedValue({ count: 4, complete: true })
     const prior = { snapshots: { [sid]: { needMe: [], executedCount: 0, govKey: '1:1', policyEventCount: 2 } } }
     const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior })
     const e = out.entries.find((x) => x.type === 'policy-changed')
@@ -104,6 +109,35 @@ describe('custodySource', () => {
     expect(e.domain).toBe('custody')
     expect(e.message).toMatch(/policy rules on “Coop” changed/i)
     expect(out.nextSnapshots[sid].policyEventCount).toBe(4)
+  })
+
+  // The regression this whole change exists for: a bounded history scan that has not finished is NOT a
+  // failed read. Reporting ok:false here is what put "Couldn't refresh some activity" in front of every
+  // Polygon member with a vault, on every session.
+  it('reports partial (not ok:false) while a vault history backfill is still catching up', async () => {
+    readState.mockResolvedValue({ ...base, complete: false })
+    const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior: {} })
+    expect(out.ok).toBe(true)
+    expect(out.partial).toBe(true)
+  })
+
+  it('diffs nothing off an incomplete scan, and keeps the prior snapshot + action flag', async () => {
+    readState.mockResolvedValue({ ...base, complete: false })
+    const prior = { snapshots: { [sid]: { needMe: [H1.toLowerCase()], executedCount: 3, govKey: '1:1' } } }
+    const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior })
+    expect(out.entries).toEqual([]) // a half-read history must not look like proposals disappearing
+    expect(out.nextSnapshots[sid]).toEqual(prior.snapshots[sid])
+    expect(out.actionNeededById[sid]).toBe('approve') // the badge keeps what it knew
+  })
+
+  it('keeps the prior policy count while the guard scan is incomplete (no phantom policy-changed)', async () => {
+    readState.mockResolvedValue(base)
+    policyCount.mockResolvedValue({ count: 4, complete: false })
+    const prior = { snapshots: { [sid]: { needMe: [], executedCount: 0, govKey: '1:1', policyEventCount: 2 } } }
+    const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior })
+    expect(out.entries.find((x) => x.type === 'policy-changed')).toBeFalsy()
+    expect(out.nextSnapshots[sid].policyEventCount).toBe(2)
+    expect(out.partial).toBe(true)
   })
 
   it('keeps the prior policy baseline when the guard read fails (no false diff later)', async () => {
