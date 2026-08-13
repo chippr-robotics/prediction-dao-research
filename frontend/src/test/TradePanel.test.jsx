@@ -9,15 +9,16 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 //    elsewhere, then require the network switch BEFORE the order can be placed;
 //  - offer a search filter in both pair selectors — ~35 legs across six networks
 //    is not a scrollable list;
-//  - carry each leg's balance on its own pay/receive card and NO balance rows on
-//    the account card;
+//  - carry each leg's balance on its own pay/receive card;
 //  - name/link the DEX provider for the PAIR's network (ETCswap on the ETC
 //    family, Uniswap elsewhere) while subtly attributing the Uniswap V3 protocol
 //    that powers routing (Spec 033 provider-awareness, preserved);
 //  - present a professional trade read-out (rate, price impact, minimum
 //    received, route);
-//  - let the member trade as their personal wallet or as a saved multisig
-//    vault (Spec 043);
+//  - trade as whichever account the member is ACTING AS (personal wallet,
+//    multisig vault, recovered legacy account) without offering its own account
+//    picker — that choice is made app-wide from the wallet menu's acting-account
+//    switcher, and the ticket only reads it (Spec 043/062);
 //  - offer the price types Uniswap V3 actually supports (Market, and Limit as
 //    immediate-or-cancel via amountOutMinimum) and gate perpetuals order types
 //    (Sell Short / Buy to Cover) on a per-network perps venue — hidden where
@@ -31,7 +32,6 @@ const {
   mockUseWallet,
   mockUseChainTokens,
   mockUseActiveAccount,
-  mockUseCustodyVaults,
   mockUseSwapBalances,
   switchChainAsync,
 } = vi.hoisted(() => ({
@@ -39,7 +39,6 @@ const {
   mockUseWallet: vi.fn(),
   mockUseChainTokens: vi.fn(),
   mockUseActiveAccount: vi.fn(),
-  mockUseCustodyVaults: vi.fn(),
   mockUseSwapBalances: vi.fn(),
   switchChainAsync: vi.fn().mockResolvedValue({}),
 }))
@@ -48,10 +47,7 @@ vi.mock('../hooks/useDex', () => ({ useDex: mockUseDex }))
 vi.mock('../hooks', () => ({ useWallet: mockUseWallet }))
 vi.mock('../hooks/useChainTokens', () => ({ useChainTokens: mockUseChainTokens }))
 vi.mock('../hooks/useActiveAccount', () => ({ useActiveAccount: mockUseActiveAccount }))
-vi.mock('../hooks/useCustodyVaults', () => ({ useCustodyVaults: mockUseCustodyVaults }))
-vi.mock('../hooks/useLegacyAccounts', () => ({ useLegacyAccounts: () => [] }))
 vi.mock('../hooks/useSwapBalances', () => ({ useSwapBalances: mockUseSwapBalances }))
-vi.mock('../components/account/LegacyUnlockDialog', () => ({ default: () => null }))
 vi.mock('wagmi', () => ({
   useSwitchChain: () => ({ switchChainAsync, isPending: false }),
 }))
@@ -118,6 +114,7 @@ function personalAccount(overrides = {}) {
   return {
     identity: { mode: 'personal' },
     isVault: false,
+    isLegacy: false,
     canActAsVault: false,
     submit: vi.fn(),
     operateAsPersonal: vi.fn(),
@@ -126,6 +123,14 @@ function personalAccount(overrides = {}) {
   }
 }
 
+/** The acting account is a multisig vault on `chainId` — the app-wide selection. */
+const vaultAccount = (chainId = 137) =>
+  personalAccount({
+    identity: { mode: 'vault', vaultAddress: '0xVaultAAA', chainId, label: 'Ops Treasury' },
+    isVault: true,
+    canActAsVault: true,
+  })
+
 /** Balances keyed by lower-cased address, the shape useSwapBalances returns. */
 const balancesFor = (entries) =>
   Object.fromEntries(Object.entries(entries).map(([addr, v]) => [addr.toLowerCase(), v]))
@@ -133,7 +138,6 @@ const balancesFor = (entries) =>
 beforeEach(() => {
   vi.clearAllMocks()
   mockUseActiveAccount.mockReturnValue(personalAccount())
-  mockUseCustodyVaults.mockReturnValue({ vaults: [], supported: false })
   mockUseSwapBalances.mockReturnValue({
     balances: balancesFor({
       [POLYGON.WMATIC]: '5',
@@ -355,7 +359,7 @@ describe('TradePanel — balances live on the pair cards', () => {
     mockUseDex.mockReturnValue(polygonDex())
   })
 
-  it('shows each leg’s balance on its own card and none on the account card', () => {
+  it('shows each leg’s balance on its own card and nowhere else', () => {
     render(<TradePanel />)
 
     const balances = screen.getAllByText(/^Balance:/)
@@ -462,7 +466,7 @@ describe('TradePanel — SDK-driven trade read-out', () => {
   })
 })
 
-describe('TradePanel — account selection (spec 043)', () => {
+describe('TradePanel — acting account (spec 043/062)', () => {
   beforeEach(() => {
     mockUseWallet.mockReturnValue({
       isConnected: true,
@@ -473,69 +477,65 @@ describe('TradePanel — account selection (spec 043)', () => {
     mockUseDex.mockReturnValue(polygonDex())
   })
 
-  it('lists the personal wallet and every saved multisig', () => {
-    mockUseCustodyVaults.mockReturnValue({
-      supported: true,
-      vaults: [
-        { address: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' },
-        { address: '0xVaultBBB', chainId: 137, label: '' },
-      ],
-    })
+  // The ticket must not carry its own account picker: switching accounts is one
+  // app-wide control (the wallet menu's acting-account switcher), so Trade behaves
+  // like Pay/Transfer and a second, ticket-local selector can never disagree with it.
+  it('offers no account picker of its own', () => {
     render(<TradePanel />)
 
-    const picker = screen.getByLabelText('Account')
-    expect(picker).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Personal wallet · 0x1111…0000/ })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Ops Treasury · Multisig/ })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Account')).toBeNull()
+    expect(document.querySelector('#trade-account-select')).toBeNull()
+    expect(screen.queryByRole('option', { name: /Personal wallet/ })).toBeNull()
+    expect(screen.queryByRole('option', { name: /Multisig$/ })).toBeNull()
+    expect(screen.queryByRole('option', { name: /Recovered$/ })).toBeNull()
   })
 
-  it('switches the active identity when a multisig is selected', () => {
+  it('never switches the acting identity from the ticket', () => {
+    const operateAsPersonal = vi.fn()
     const operateAsVault = vi.fn()
-    const vault = { address: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' }
-    mockUseActiveAccount.mockReturnValue(personalAccount({ operateAsVault }))
-    mockUseCustodyVaults.mockReturnValue({ supported: true, vaults: [vault] })
+    mockUseActiveAccount.mockReturnValue(personalAccount({ operateAsPersonal, operateAsVault }))
     render(<TradePanel />)
 
-    fireEvent.change(screen.getByLabelText('Account'), { target: { value: '0xVaultAAA' } })
-    expect(operateAsVault).toHaveBeenCalledWith(vault)
+    // Exercise the whole ticket — order type, pair, direction, amount.
+    fireEvent.change(screen.getByLabelText(/Order Type/), { target: { value: 'buy' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Switch direction' }))
+    fireEvent.change(screen.getByLabelText('You pay'), { target: { value: '1' } })
+
+    expect(operateAsPersonal).not.toHaveBeenCalled()
+    expect(operateAsVault).not.toHaveBeenCalled()
   })
 
-  it('discloses the proposal flow while operating as a multisig', () => {
-    mockUseActiveAccount.mockReturnValue(
-      personalAccount({
-        identity: { mode: 'vault', vaultAddress: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' },
-        isVault: true,
-        canActAsVault: true,
-      }),
-    )
-    mockUseCustodyVaults.mockReturnValue({
-      supported: true,
-      vaults: [{ address: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' }],
-    })
+  it('reads the acting account from the app-wide identity: multisig proposal flow', () => {
+    mockUseActiveAccount.mockReturnValue(vaultAccount(137))
     render(<TradePanel />)
 
     expect(screen.getByText('Multisig proposal')).toBeInTheDocument()
     expect(screen.getByText(/proposed to the multisig/)).toBeInTheDocument()
   })
 
-  it('says plainly that a multisig cannot trade a pair on another network', async () => {
+  it('reads the acting account from the app-wide identity: recovered account', () => {
     mockUseActiveAccount.mockReturnValue(
       personalAccount({
-        identity: { mode: 'vault', vaultAddress: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' },
-        isVault: true,
-        canActAsVault: true,
+        identity: { mode: 'legacy', address: '0xLegacyAAA', label: '0xLega…yAAA' },
+        isLegacy: true,
       }),
     )
-    mockUseCustodyVaults.mockReturnValue({
-      supported: true,
-      vaults: [{ address: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' }],
-    })
+    render(<TradePanel />)
+
+    expect(screen.getByText(/Orders sign with your recovered account/)).toBeInTheDocument()
+    expect(screen.getByText('Network fee applies')).toBeInTheDocument()
+  })
+
+  it('says plainly that a multisig cannot trade a pair on another network', async () => {
+    mockUseActiveAccount.mockReturnValue(vaultAccount(137))
     render(<TradePanel />)
 
     const sellList = openSelector('Token to sell')
     fireEvent.click(within(sellList).getByRole('option', { name: 'WETH on Base' }))
 
     expect(screen.getByText(/This multisig lives on Polygon/)).toBeInTheDocument()
+    // …and points at the one place accounts are switched, not a picker on the ticket.
+    expect(screen.getByText(/switch accounts from your wallet menu/)).toBeInTheDocument()
   })
 })
 

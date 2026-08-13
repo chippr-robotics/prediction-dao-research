@@ -89,8 +89,15 @@ export function createPerpsSource({ deps } = {}) {
       for (const [venue, source] of Object.entries(sources)) {
         const sid = `perps:${venue}`
         currentIds.push(sid)
-        if (source?.status !== 'read') {
+        if (source?.status !== 'read' || source?.partial === true) {
           // Venue unreadable this cycle: keep the baseline — an outage is not a position change.
+          //
+          // `partial` counts as unreadable HERE and nowhere else. Hyperliquid is read per perp dex
+          // (HIP-3), so a dex that drops out removes its positions from the list without any of
+          // them closing: diffing that fingerprint would tell a member "a perp position was closed
+          // on Hyperliquid" because a book went quiet, and tell them again when it came back. The
+          // rows still RENDER (the gateway read them, or read around them) — this only refuses to
+          // narrate a change we cannot attribute.
           if (priorSnapshots[sid]) nextSnapshots[sid] = priorSnapshots[sid]
           continue
         }

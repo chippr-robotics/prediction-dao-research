@@ -20,7 +20,7 @@
  * limiting the downside of a position they already hold. The gates live on the OPENING path only,
  * and `validateOpen` is the only function here that could ever grow one.
  */
-import { formatPairPrice } from './format'
+import { formatPairPrice, formatUsd } from './format'
 
 /** Stable codes for tests and for UI that wants to style a specific refusal. Text may be reworded. */
 export const VALIDATION_CODE = Object.freeze({
@@ -30,6 +30,8 @@ export const VALIDATION_CODE = Object.freeze({
   BALANCE_UNKNOWN: 'balance_unknown',
   INSUFFICIENT_BALANCE: 'insufficient_balance',
   BELOW_VENUE_MINIMUM: 'below_venue_minimum',
+  BELOW_MIN_COLLATERAL_USD: 'below_min_collateral_usd',
+  COLLATERAL_USD_UNKNOWN: 'collateral_usd_unknown',
   ABOVE_VENUE_MAXIMUM: 'above_venue_maximum',
   LIMITS_UNKNOWN: 'limits_unknown',
   LEVERAGE_MISSING: 'leverage_missing',
@@ -134,12 +136,26 @@ function positiveNumber(value) {
  *                          publishes none. ABSENT is not the same as UNKNOWN: a venue with no
  *                          published minimum is a fact, and skipping a check nobody imposes is not
  *                          a silent pass.
+ * @param collateralUsd     what `collateralAmount` is worth in USD, at the VENUE's own price for
+ *                          the token — the unit `minCollateralUsd` is quoted in
+ * @param minCollateralUsd  the venue's own minimum collateral, in USD, or null where it publishes
+ *                          none. On Gains this is the `InsufficientCollateral` bound (5× the pair's
+ *                          minimum fee); on GMX it is not published and stays null.
  */
 export function validateOpen(input) {
   return total(() => {
     // Destructured INSIDE the guard: `validateOpen(null)` throws in a parameter-list destructure,
     // and a validator that crashes on a null argument is not total.
-    const { collateralAmount, balance, leverage, venueLimits, notional, minNotional } = input ?? {}
+    const {
+      collateralAmount,
+      balance,
+      leverage,
+      venueLimits,
+      notional,
+      minNotional,
+      collateralUsd,
+      minCollateralUsd,
+    } = input ?? {}
     const collateral = amount(collateralAmount)
     if (!isPositive(collateral)) {
       return refuse(VALIDATION_CODE.AMOUNT_MISSING, 'Enter how much you want to put into this position.')
@@ -186,6 +202,37 @@ export function validateOpen(input) {
         return refuse(VALIDATION_CODE.LIMITS_UNKNOWN, 'The venue’s maximum could not be checked against this amount.')
       }
       if (vs > 0) return refuse(VALIDATION_CODE.ABOVE_VENUE_MAXIMUM, 'That is above the venue’s maximum for this market.')
+    }
+
+    /* THE VENUE'S MINIMUM, IN THE VENUE'S OWN CURRENCY (spec 083).
+     *
+     * A separate bound from `venueLimits.minCollateral` above, and deliberately so: that one is in
+     * the collateral TOKEN's units, this one is in USD, and the amount rules at the top of this file
+     * exist precisely because comparing across those two units silently passes a member holding
+     * 0.0001 USDC as having enough for a $100 position. Two bounds in two units are two checks.
+     *
+     * Gains reverts `InsufficientCollateral` here, which tells a member nothing and costs them gas
+     * to read. `minCollateralUsd` absent means the venue publishes no such bound (GMX does not on
+     * the REST feed), and skipping a check nobody imposes is not a silent pass.
+     */
+    const minUsd = positiveNumber(minCollateralUsd)
+    if (minUsd !== null) {
+      const heldUsd = positiveNumber(collateralUsd)
+      if (heldUsd === null) {
+        // A bound the venue DOES impose and a value we cannot compute is the unknown case, and it
+        // refuses — the same way the notional bounds below do. "We could not check this" must never
+        // become "this is fine".
+        return refuse(
+          VALIDATION_CODE.COLLATERAL_USD_UNKNOWN,
+          'What this amount is worth could not be worked out, so it cannot be checked against the venue’s minimum.',
+        )
+      }
+      if (heldUsd < minUsd) {
+        return refuse(
+          VALIDATION_CODE.BELOW_MIN_COLLATERAL_USD,
+          `The venue needs at least ${formatUsd(minUsd)} in a position here, and this is ${formatUsd(heldUsd)}.`,
+        )
+      }
     }
 
     const lev = positiveNumber(leverage)

@@ -96,7 +96,28 @@
       `0x52502d049571C7893447b86c4d8B38e6184bF6e1`
       (tx `0x2034f95a10e5ab040bc38f38d9bd393f85f00547ff9b5430b21955d264d772f0`). Configured, and
       **charged to nobody** until `VITE_PERPS_MANAGE_ENABLED` is on.
-- [ ] T063 [P] Tests for the ops script's unit conversion and cap enforcement
+- [x] T063 [P] Tests for the ops script's unit conversion and cap enforcement —
+      `test/perps/gmxUiFee.test.js` (29 cases, mocha/chai like the other script tests, discovered by
+      plain `npm test`). The script's decision logic moved to `scripts/ops/lib/gmxUiFee.js` so it can
+      be tested with no network, following the `scripts/deploy/lib/*` convention that
+      `test/staking/feeServices.test.js` and `test/tenants/tenantDeployHelpers.test.js` already use.
+      **The live reads deliberately stay in the script**: it reads `MAX_UI_FEE_FACTOR` from GMX
+      rather than assuming 10 bps, and a test must not make that assumption on GMX's behalf — so
+      what is tested is what the script DOES with whatever cap GMX reports, including a tightened
+      cap (5 bps starts failing) and a loosened one (11 bps starts passing).
+      Covered: the 1e30/1e26 conversion (round-trip, and the order-of-magnitude slip that would
+      charge 10× too much or too little while sending successfully); the DataStore keys, pinned to
+      their digests and asserted to be `abi.encode` not `encodePacked` (a wrong key reads 0, which
+      looks exactly like "no fee configured"); Arbitrum-only chain scope (43114 Avalanche, where GMX
+      also runs, is refused); BPS parsing; cap refusal that **never clamps**; the receiver check; and
+      the post-send verification. Mutation-checked — a 1e25 precision fails 7, disabling the cap
+      check fails 4, disabling the receiver check fails 1.
+      **One behaviour change, deliberate**: a BLANK `BPS=` used to mean zero (`Number("")` is 0 in
+      JavaScript), so a stale empty env var would have turned the fee OFF with no error. It is now
+      refused with the same message any other non-integer gets. Every documented invocation is
+      unchanged. Re-verified live against Arbitrum after the restructure: report-only prints
+      `MAX_UI_FEE_FACTOR = 1e27` (10 bps) and the live factor `5e26` (5 bps) and sends nothing;
+      `BPS=5 DRY_RUN=true` prints the same call as before; `BPS=11` is refused against the live cap.
 
 ## Phase 7 — Reporting, docs, polish
 
@@ -110,11 +131,31 @@
       never be able to fail a close. `perpsActivity.test.js` asserts the producer EXISTS (comments
       stripped first — an earlier version of that assertion matched the paragraph explaining the
       wiring and survived its own mutation).
-- [ ] T071 [P] `frontend/src/legal/` — name leveraged derivatives / perpetual futures (FR-025 gate)
-- [ ] T072 [P] Docs: `docs/developer-guide/perps.md` update + `docs/runbooks/perps-operations.md`
+- [x] T071 [P] `frontend/src/legal/` — name leveraged derivatives / perpetual futures (FR-025 gate).
+      Landed in `risk-disclosure.md` (§6 "Leveraged-Derivatives (Perpetual Futures) Risk", plus the
+      summary bullet) and `terms.md` (defined terms for *Perpetual Future* / *Leveraged Derivative* /
+      *Notional*; §4.3 fee disclosure; §4.4 and §10 on third-party venues; §10.7 leverage risk;
+      §10.8 eligibility; the Schedule A caveat). Verified 2026-08-12: 21 lines across the two
+      documents name leverage / derivatives / perpetual futures. The fee is described in the same
+      units the code sets it in — 5 bps of **notional**, both on open and on close, "about 50 basis
+      points of your own margin at 10× leverage" — which is the number `set-gmx-ui-fee-factor.js`
+      writes on-chain, and is why T063 asserts that conversion.
+- [x] T072 [P] Docs: `docs/developer-guide/perps.md` update + `docs/runbooks/perps-operations.md`.
+      Verified 2026-08-12 — both exist and cover 083, not just 082: the developer guide carries the
+      member-direct calldata rule, the two venue modules, "sent is never executed", the two Gains
+      index spaces, the GMX approval trap, exits-never-gated, and the four suites that are security
+      tests; the runbook carries the live rail table, the `set-gmx-ui-fee-factor.js` procedure and
+      its signer-is-the-receiver warning, GMX revenue claiming, the Hyperliquid rate, the Gains
+      referral, and enabling/disabling the surface. Member guide `docs/user-guide/perps.md` and the
+      release note `docs/blog/posts/36-perps-position-management/` shipped alongside.
 - [x] T073 [P] Cypress: close path against a stubbed venue + honest absence when flag off
 - [x] T074 Actor-critic visual pass on the new sheets → `specs/083-.../screenshots/`
-- [ ] T075 Full verification: scoped vitest, gateway tests, lint, `check:deps`; PR
+- [x] T075 Full verification: scoped vitest, gateway tests, lint, `check:deps`; PR — **merged
+      2026-08-12 as PR #1153** (merge commit `efcfef33`), 940 frontend perps tests and 275 gateway
+      tests green. T063 was completed after the merge, on `claude/perps-083-completion`; its suite
+      runs under plain `npm test` (hardhat discovers `test/perps/`). Note for anyone re-running the
+      frontend suite later: `scripts/` and `test/` have **no eslint config** — only `frontend/` is
+      linted — so an ops-script change has no lint gate of its own and its tests are the gate.
 
 ## Dependencies
 
@@ -128,16 +169,49 @@ T071 gates enabling the feature flag, not the merge.
 
 ## Known gaps, named rather than left silent
 
-- **GMX collateral depends on `longToken`/`shortToken` being present in `/markets/info`.** The
-  normalizer emits a collateral only when the payload names the token AND the token list resolves
-  its decimals; anything else yields `collaterals: []`, which makes GMX un-openable and is the
-  honest outcome (an amount in unknown units is not an amount). This was NOT verified against the
-  live GMX API — the fixture supplies the fields. If the live response omits them, GMX opening will
-  be withheld with the venue named, exits are unaffected, and the fix is a normalizer change only.
-- **`minNotional` and `venueFeeUsd` are always null in the composed options.** Neither venue
-  publishes them on the pairs feed, so the preview shows '—' for the venue's own fee rather than a
-  number, and the minimum-size check is not applied client-side (the venue still enforces it, and
-  the refusal surfaces through the order state machine with the venue's own reason).
+- **GMX collateral depends on `longToken`/`shortToken` being present in `/markets/info` — VERIFIED
+  LIVE 2026-08-12.** `https://arbitrum-api.gmxinfra.io/markets/info` returned **132 markets, and all
+  132 carry both `longToken` and `shortToken`** (0 missing either). The fixture matches the live
+  shape, and the dependency this note previously flagged as unverified is now measured.
+  The fallback is unchanged and remains the safety net, not a formality: the normalizer emits a
+  collateral only when the payload names the token AND the token list resolves its decimals;
+  anything else yields `collaterals: []`, which withholds GMX **opening** with the venue named, and
+  is the honest outcome — an amount in unknown units is not an amount. **Exits are unaffected in
+  every case** (closing needs no collateral list), and if GMX ever changes the payload the fix is a
+  normalizer change only. Re-measure if GMX versions the endpoint; one API response is a fact about
+  one day, not a guarantee.
+- ~~**`minNotional` and `venueFeeUsd` are always null in the composed options.**~~ **CLOSED.** The
+  pairs feed now publishes `venueFee` (a RATE, not an amount — the fee is a fraction of position
+  size, so a per-pair dollar figure would be right for one size and wrong for every other) plus
+  `minCollateralUsd`, and both sheets render the venue's own fee in money beside FairWins'.
+  Two things the investigation changed about the gap as it was written:
+  - **Gains has no minimum notional to publish.** `minPositionSizeUsd` is a **fee floor**, not a
+    minimum size — gTrade v9 removed `BelowMinPositionSizeUsd` and replaced it with
+    `InsufficientCollateral` (collateral ≥ 5× the pair's minimum fee). Emitting $285.72 as
+    `minNotional` would have refused a $100 BTC position the venue fills happily. `minNotional`
+    stays `null`; the bound that exists is `minCollateralUsd`, and it is what the sheet refuses on
+    before the wallet prompt. The floor is *disclosed* instead: under it the member pays the fee of
+    a floor-sized position (0.2% effective against a headline 0.035%), and the sheet says so.
+  - **GMX still shows '—', and that is the honest answer.** Its position-fee factors and minimums
+    are in the DataStore, not in `/markets/info` (verified live). The fields are emitted as `null`
+    with the venue named, rather than filled from documentation the deployed contract may have
+    moved. Closing it would take a client-side DataStore read beside `readExecutionFee`.
 - **9 eslint `react-hooks/set-state-in-effect` warnings** across `components/admin` and the perps
   hooks. Eight pre-date this feature; the ninth is `PerpsFeesPanel.jsx`, which follows the same
   established pattern. Zero errors.
+- **The perps sheets do not contain keyboard focus — and neither do eight other dialogs. This
+  PREDATES the feature and is deliberately NOT fixed here.** `PositionSheet` and
+  `OpenPositionSheet` render `role="dialog" aria-modal="true"` and let Tab walk out of the sheet
+  into the page behind it. They were built to match the repo's detail-sheet family
+  (`AssetDetailSheet`, `VaultSheet`, `SupplySheet`, `StakeSheet`, `StatementSheet`,
+  `CollectibleDetailSheet`, `AppSheet`, `MarketDetailSheet`), which all behave the same way, so
+  spec 083 inherited the gap rather than creating it. Note the repo is **not** uniform on this:
+  `components/account/ActionSheet.jsx` — also a bottom sheet — does trap Tab, as do `EntryGate`,
+  `ConnectModal`, `RequestQRModal` and `SetTimeModal`; those five contain focus but do not restore
+  it on close, while the sheet family restores it but does not contain it. Fixing only the two
+  perps sheets would deepen that split, and an inconsistency is not an improvement. The full
+  survey, the success criteria it engages (**WCAG 2.4.3**, **4.1.2**, and **2.4.11** — not 2.1.2,
+  which forbids the opposite), why the `*.axe.test.jsx` suites cannot catch it, and the shape of a
+  single repo-wide fix are written up in
+  [`docs/developer-guide/dialog-focus-management.md`](../../docs/developer-guide/dialog-focus-management.md).
+  That document is the issue-ready version; it is linked from `docs/developer-guide/frontend.md`.

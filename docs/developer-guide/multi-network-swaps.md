@@ -45,11 +45,18 @@ wallet's chain. Only the swap itself needs the wallet to be on the pair's networ
 5. **An unread balance is `null`, never `0`.** The ticket renders "…" and disables
    MAX rather than implying the member holds nothing because a read failed. A
    later failed read keeps the last known figure instead of zeroing it.
-6. **Balances belong on the pair cards.** The account card carries no balance
-   rows — each leg shows its own balance next to the amount it applies to, on the
-   pair's network, for the acting account (`tradingAddress`, so vault/recovered
-   accounts read correctly).
-7. **Venue identity follows the pair, not the wallet.** An ETC pair routes through
+6. **Balances belong on the pair cards.** Each leg shows its own balance next to
+   the amount it applies to, on the pair's network, for the acting account
+   (`tradingAddress`, so vault/recovered accounts read correctly).
+7. **The ticket does not pick the account.** Which account a member acts as —
+   personal wallet, multisig vault, recovered legacy account — is chosen once,
+   app-wide, from the wallet menu's acting-account switcher
+   (`hooks/useAccountSwitcher.js`), the same control Pay/Transfer and every other
+   surface rely on. `TradePanel` only READS that identity (`useActiveAccount`) to
+   price, fund, and disclose the order: the multisig-proposal note, the
+   recovered-key note, and the session-rail badge. A second, ticket-local picker
+   is a switcher that can disagree with the app-wide one — don't reintroduce it.
+8. **Venue identity follows the pair, not the wallet.** An ETC pair routes through
    ETCswap and must be labelled as such even while the wallet is on Polygon
    (`getSwapVenue(pairChainId)`); the same applies to the perps-venue gate, the
    passkey/sponsorship disclosure, and the router explorer link.

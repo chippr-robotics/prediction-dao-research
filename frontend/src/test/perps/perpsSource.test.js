@@ -42,6 +42,25 @@ describe('perpsSource', () => {
     expect(result.nextSnapshots['perps:gains']).toEqual(first.nextSnapshots['perps:gains'])
   })
 
+  /**
+   * A PARTIAL venue read is an outage of part of a venue (spec 083 — Hyperliquid is read per perp
+   * dex, hyperliquid-decision.md §5.2). A dex dropping out removes its rows without any of them
+   * closing, so diffing that fingerprint would narrate "a perp position was closed on Hyperliquid"
+   * for a book going quiet — and again when it came back.
+   */
+  it('a PARTIALLY read venue keeps the baseline — a skipped perp dex is not a closed position', async () => {
+    const baseline = make({
+      positions: [POS('hyperliquid:xyz:BTC:long')],
+      sources: { hyperliquid: { status: 'read', partial: false } },
+    })
+    const first = await baseline.detect({ account: ACCOUNT, nowMs: NOW, prior: {} })
+
+    const partial = make({ positions: [], sources: { hyperliquid: { status: 'read', partial: true } } })
+    const result = await partial.detect({ account: ACCOUNT, nowMs: NOW + 1, prior: { snapshots: first.nextSnapshots } })
+    expect(result.entries).toEqual([])
+    expect(result.nextSnapshots['perps:hyperliquid']).toEqual(first.nextSnapshots['perps:hyperliquid'])
+  })
+
   it('total read failure returns ok:false so the engine keeps the prior slice', async () => {
     const source = createPerpsSource({
       deps: { available: () => true, fetchPositions: vi.fn(async () => Promise.reject(new Error('down'))) },

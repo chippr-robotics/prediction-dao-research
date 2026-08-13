@@ -96,7 +96,8 @@ specs/083-perps-position-management/
 ├── contracts/
 │   ├── venue-calldata.md        # exact calls, ownership fields, approval targets, index spaces
 │   ├── order-state-machine.md   # states, events, terminal transitions, what must never be claimed
-│   └── fee-rails.md             # units, ceilings, authorities, disclosure rules
+│   ├── fee-rails.md             # units, ceilings, authorities, disclosure rules
+│   └── gateway-perps-api.md     # /v1/perps/* routes + DTOs (supersedes 082's for the response shape)
 └── screenshots/                 # actor-critic visual record
 ```
 

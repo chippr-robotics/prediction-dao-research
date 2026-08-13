@@ -218,8 +218,25 @@ an exit. With `VITE_PERPS_MANAGE_ENABLED` off, the configured GMX rate is live o
 member is being charged it**.
 
 Both venues also charge their **own** fees — spread, opening/closing fees, funding and borrowing.
-The FairWins fee is on top of, and separate from, those; never present one as the other. The rails,
-the live values, the caps and the disclosure rules are in
+The FairWins fee is on top of, and separate from, those; never present one as the other.
+
+**The venue's own fee is shown in money too, wherever it can be.** Showing ours as a number and the
+venue's as `—` does not read as "one is unknown" — it reads as though ours were the cost of trading.
+The pairs feed carries `venueFee` as a **rate** (`gainsPairFee` in the gateway's `normalize.js`);
+`lib/perps/feeUnits.js#venueFeeFromNotional` turns it into money for the size on screen, and both
+sheets label it as the venue's **estimate from a published rate**, never a quote. Three rules:
+
+- **Apply the venue's floor.** Gains charges its rate on `max(size, feeFloorNotionalUsd)`, so a $50
+  BTC position pays $0.10 — 0.2% against a headline 0.035%. Reporting `rate × size` there would
+  understate the real cost nearly sixfold on exactly the orders where it hurts proportionally most.
+- **Do not mistake the floor for a minimum size.** Gains has had **no minimum notional** since v9;
+  its bound is on collateral (`minCollateralUsd`, 5× the pair's minimum fee) and that is what the
+  open sheet refuses on before the wallet prompt. `minNotional` is `null` for Gains on purpose.
+- **GMX shows `—`, honestly.** Its fee factors are in the DataStore, not in `/markets/info`. A rate
+  copied from documentation the deployed contract may have moved is a *wrong* fee, and a wrong fee
+  is worse than an admitted unknown.
+
+The rails, the live values, the caps and the disclosure rules are in
 [`platform-fees.md`](platform-fees.md#perps-when-the-rate-is-not-ours-to-set) and
 [`contracts/fee-rails.md`](../../specs/083-perps-position-management/contracts/fee-rails.md).
 

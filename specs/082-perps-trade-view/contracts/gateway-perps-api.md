@@ -1,5 +1,31 @@
 # Gateway contract: Perps read proxy (`/v1/perps/*`)
 
+> ## ⚠️ SUPERSEDED for the response shape — this is the record of what 082 shipped
+>
+> The current contract is
+> [`specs/083-perps-position-management/contracts/gateway-perps-api.md`](../../083-perps-position-management/contracts/gateway-perps-api.md).
+> **Read that one when writing or reviewing a consumer.** This document is kept as the historical
+> record of the phase-0 (read-only trade view) API and is not maintained.
+>
+> Everything below still describes real behaviour that spec 083 did not remove, but it is
+> **incomplete and wrong in places**. Known divergences from the live producer:
+>
+> - **No `venueRef`** — Gains positions and pending orders now carry the venue's own handles, with
+>   the two Gains index spaces named `tradeIndex` and `pendingOrderIndex` (never a bare `index`), and
+>   `tradeIndex` deliberately `null` on a `MARKET_OPEN`.
+> - **No `pendingOrders`** — `/v1/perps/positions` now returns the member's stuck Gains market orders
+>   alongside positions, plus `asOf`.
+> - **No `sources.gains.pendingOrderChains`** — the recovery facet resolves independently of the
+>   position facet, and an empty `pendingOrders` for a chain that did not answer means *unknown*, not
+>   "you have no stuck orders".
+> - **No `pairIndex` / `minLeverage` / `collaterals` (Gains) or `market` / `collaterals` (GMX)** — the
+>   handles the open path builds calldata from.
+> - **The 502 rule has an exception** that is not recorded here: when every position read fails but
+>   the pending-order read succeeded, the route answers `200` with those orders, because an outage is
+>   not a licence to bury a recovery handle behind an error screen.
+> - **Quotas are per-IP and global only** — the "per address" quota described below never existed in
+>   the shipped code.
+
 Mirrors the Polymarket proxy's cross-cutting behavior: mounted unconditionally;
 killswitch → config check → param validation → quota → cached fetch; reads may retry,
 there are no writes; errors are `{ error: { code, reason } }` (the gateway-wide shape,

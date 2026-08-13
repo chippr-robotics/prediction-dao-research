@@ -90,6 +90,33 @@ const hexToBytes = (hex) => Uint8Array.from(hex.slice(2).match(/.{2}/g), (b) => 
  *   deps               injectable getAssertion / publicClient for tests
  */
 export function passkeyIntentSigner({ chainId, address, credentialId, ownerIndex = 0, deps = {} }) {
+  /**
+   * The one ceremony, shared by every digest shape this adapter signs (EIP-712 today,
+   * EIP-191 personal messages since the Verify surface). Keeping it single means a
+   * change to the envelope — owner index, wrapper encoding, challenge derivation —
+   * can never apply to one caller and miss the other.
+   */
+  async function signDigest(digest) {
+    // Account-bound challenge: the deployed account's replaySafeHash. The
+    // account exists for every signer-attributed action (those act on prior
+    // on-chain state), so a plain read is the honest path here.
+    const client = deps.publicClient ?? defaultPublicClient(chainId)
+    const replaySafe = await client.readContract({
+      address,
+      abi: ACCOUNT_ABI,
+      functionName: 'replaySafeHash',
+      args: [digest],
+    })
+
+    // ONE ceremony per intent (FR-008); the platform prompt shows the rpId.
+    const assertion = await (deps.getAssertion ?? getAssertion)({
+      challenge: hexToBytes(replaySafe),
+      credentialId,
+      deps,
+    })
+    return encodeWebAuthnSignature({ assertion, ownerIndex })
+  }
+
   return {
     async getAddress() {
       return address
@@ -97,26 +124,19 @@ export function passkeyIntentSigner({ chainId, address, credentialId, ownerIndex
 
     /** ethers-Signer-compatible signTypedData — returns the ERC-1271 envelope bytes. */
     async signTypedData(domain, types, message) {
-      const digest = ethers.TypedDataEncoder.hash(domain, types, message)
+      return signDigest(ethers.TypedDataEncoder.hash(domain, types, message))
+    },
 
-      // Account-bound challenge: the deployed account's replaySafeHash. The
-      // account exists for every signer-attributed action (those act on prior
-      // on-chain state), so a plain read is the honest path here.
-      const client = deps.publicClient ?? defaultPublicClient(chainId)
-      const replaySafe = await client.readContract({
-        address,
-        abi: ACCOUNT_ABI,
-        functionName: 'replaySafeHash',
-        args: [digest],
-      })
-
-      // ONE ceremony per intent (FR-008); the platform prompt shows the rpId.
-      const assertion = await (deps.getAssertion ?? getAssertion)({
-        challenge: hexToBytes(replaySafe),
-        credentialId,
-        deps,
-      })
-      return encodeWebAuthnSignature({ assertion, ownerIndex })
+    /**
+     * ethers-Signer-compatible signMessage (EIP-191 digest, ERC-1271 envelope).
+     *
+     * The bytes are NOT an ECDSA signature and never recover to an address: a verifier
+     * must ask the account itself (`isValidSignature`) on `chainId`. That is why the
+     * Verify surface records the chain alongside the signature — see
+     * `lib/verify/verifyMessage.js`.
+     */
+    async signMessage(message) {
+      return signDigest(ethers.hashMessage(message))
     },
   }
 }

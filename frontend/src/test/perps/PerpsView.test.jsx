@@ -1,7 +1,8 @@
 /**
  * PerpsView (spec 082, extended by spec 083) — view states: ready (merged table + badges),
- * per-venue degraded banner, unavailable, testnet cohort, fee disclosure (zero ⇒ absent; non-zero ⇒
- * named line; unreadable ⇒ honest note), external marking + risk disclosure on link-outs.
+ * per-venue degraded banner, unavailable, testnet cohort, fee disclosure (gated on Hyperliquid
+ * management being AVAILABLE, which it is not — so absent at every rate, zero or not, with the
+ * true economics stated instead), external marking + risk disclosure on link-outs.
  *
  * Spec 083 adds the COMPOSITION assertions, which are the ones a reviewer cannot make by eye:
  *
@@ -410,14 +411,52 @@ describe('PerpsView', () => {
     expect(screen.queryByText(/fairwins charges/i)).not.toBeInTheDocument()
   })
 
-  it('discloses a non-zero builder fee as a named percentage line', async () => {
-    renderView({ config: configDeps({ bps: 5, capBps: 10, source: 'chain' }) })
-    await waitFor(() => expect(screen.getByText(/fairwins charges a 0\.05% fee on hyperliquid orders/i)).toBeInTheDocument())
-  })
+  /**
+   * THE TRAP, AND THE WHOLE POINT OF THIS BLOCK.
+   *
+   * `perps.hyperliquid.builder` is admin-settable TODAY from the Fees tab (Polygon, ConfigOnly,
+   * cap 10 bps), while FairWins sends Hyperliquid no orders at all and — per
+   * `specs/083-perps-position-management/hyperliquid-decision.md` — is not going to: HL's L1
+   * actions need a browser-held agent key even to CLOSE, so management does not ship. A footnote
+   * conditioned on the rate therefore let ONE admin edit publish a member-facing claim that orders
+   * are placed through FairWins. Conditioning it on the capability is what these assertions pin,
+   * and a non-zero rate is the input that proves it: a rate-conditioned render fails here.
+   *
+   * `perpsManageEnabled` is deliberately NOT stubbed in this file, so "unavailable" here is the
+   * real shipped capability answer rather than a test's opinion of it.
+   */
+  describe('the Hyperliquid fee footnote is gated on the CAPABILITY, never on the rate', () => {
+    it('discloses nothing at a NON-ZERO rate while Hyperliquid management is unavailable', async () => {
+      renderView({ config: configDeps({ bps: 5, capBps: 10, source: 'chain' }) })
+      await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+      expect(screen.queryByText(/fairwins charges/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/orders placed through fairwins/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/0\.05%/)).not.toBeInTheDocument()
+    })
 
-  it('says the fee could not be confirmed when the config read fails — never a silent substitute', async () => {
-    renderView({ config: { fetchConfig: vi.fn(async () => Promise.reject(new Error('down'))) } })
-    await waitFor(() => expect(screen.getByText(/could not be confirmed/i)).toBeInTheDocument())
+    it('stays absent at a non-zero rate even with the management flag ON — HL is still not manageable', async () => {
+      manageFlag = true
+      renderView({ config: configDeps({ bps: 5, capBps: 10, source: 'chain' }) })
+      await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+      expect(screen.queryByText(/fairwins charges/i)).not.toBeInTheDocument()
+    })
+
+    it('states the true economics instead — FairWins earns nothing on Hyperliquid', async () => {
+      renderView({ config: configDeps({ bps: 5, capBps: 10, source: 'chain' }) })
+      await waitFor(() =>
+        expect(screen.getByText(/hyperliquid trades cost you nothing extra/i)).toBeInTheDocument(),
+      )
+    })
+
+    it('has nothing to fail to confirm either — a dead config read shows no fee note at all', async () => {
+      // The "could not be confirmed" note promises the venue will not charge above the rate you
+      // approved on it. With no order ever placed there is no rate and no approval, so the note
+      // would describe the same absent capability the rate line does.
+      renderView({ config: { fetchConfig: vi.fn(async () => Promise.reject(new Error('down'))) } })
+      await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+      expect(screen.queryByText(/could not be confirmed/i)).not.toBeInTheDocument()
+      expect(screen.getByText(/hyperliquid trades cost you nothing extra/i)).toBeInTheDocument()
+    })
   })
 
   it('shows positions for a connected wallet', async () => {
@@ -543,6 +582,50 @@ describe('PerpsView prices the exit from the venue’s own feed', () => {
     // The venue's chain, and a call to the venue — not a refusal.
     expect(sheet.trade.sendOnChain.mock.calls[0][0]).toBe(137)
     expect(document.querySelector('.pps-error')).toBeNull()
+  })
+
+  /* THE VENUE'S OWN FEE reaches the exit sheet from the same seam, and for the same reason: a
+   * position read carries no fee schedule, so without this composition the sheet showed FairWins'
+   * fee in money beside the venue's as a dash — which reads as though ours were the cost of
+   * closing. */
+  it('hands the exit sheet the venue’s own closing rate, off the pair row it already resolved', async () => {
+    manageFlag = true
+    const markets = marketsDeps({
+      fetchPairs: vi.fn(async () => ({
+        pairs: [
+          {
+            ...PAIRS[0],
+            venueFee: { openRate: 0.00035, closeRate: 0.00035, feeFloorNotionalUsd: 285.715, minFeeUsd: 0.10000025 },
+          },
+          PAIRS[1],
+        ],
+        sources: { gains: { status: 'read', chains: [137] } },
+        asOf: 'now',
+      })),
+    })
+    renderView({ markets, positions: withPositions([GAINS_POSITION]), wallet: { isConnected: true } })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await screen.findByRole('dialog')
+
+    // 0.035% of the whole $1,000 position.
+    const feeRow = screen.getByText('Gains’s own fee (0.035% of size), estimated', { selector: 'dt' })
+    expect(feeRow.parentElement.querySelector('dd')).toHaveTextContent('$0.35')
+  })
+
+  it('leaves the venue’s fee a dash when the feed does not list the position’s pair', async () => {
+    // Same rule as the price: a rate is never borrowed from another venue's row, and an absent one
+    // is disclosed rather than filled in. It can never withhold the exit.
+    manageFlag = true
+    const sheet = sheetDeps()
+    renderView({ positions: withPositions([GAINS_POSITION]), sheet, wallet: { isConnected: true } })
+    await waitFor(() => expect(screen.getByText('Your positions')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /close or protect/i }))
+    await screen.findByRole('dialog')
+
+    expect(screen.getByText('Gains’s own fee', { selector: 'dt' }).parentElement.querySelector('dd')).toHaveTextContent('—')
+    await userEvent.click(screen.getByRole('button', { name: 'Close this position' }))
+    await waitFor(() => expect(sheet.trade.sendOnChain).toHaveBeenCalled())
   })
 
   it('takes the price from the venue that holds the position, never from another venue’s pair', async () => {

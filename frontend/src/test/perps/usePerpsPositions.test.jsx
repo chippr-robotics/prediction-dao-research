@@ -377,6 +377,45 @@ describe('usePerpsPositions — one venue never blanks another', () => {
     expect(result.current.sources.gmx.status).toBe('read')
   })
 
+  /* ---- a PARTIALLY read venue (spec 083, hyperliquid-decision.md §5.2 defect 1) ------------- *
+   *
+   * Hyperliquid is not one order book: the gateway reads the default perp dex plus each
+   * validator-operated (HIP-3) one, and reports `partial: true` when a dex did not answer. The
+   * positions it DID read still render — but an unqualified empty list beside a skipped dex is the
+   * fabricated absence this whole fix exists to remove, so the venue is named.
+   * ------------------------------------------------------------------------------------------ */
+
+  it('names a partially-read venue, so its short list is never read as proven absence', async () => {
+    const { result } = render({
+      fetchPositions: vi.fn(async () => ({
+        positions: [gainsPosition(), hlPosition()],
+        sources: {
+          gains: { status: 'read', chains: [ARBITRUM] },
+          hyperliquid: { status: 'read', chains: [], dexes: [''], unreadDexes: ['xyz'], partial: true },
+        },
+      })),
+    })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    // The rows it did read are on screen — a partial read never withholds what was read.
+    expect(result.current.positions.some((p) => p.venue === 'hyperliquid')).toBe(true)
+    expect(result.current.unreadableVenues).toContain('hyperliquid')
+  })
+
+  it('says nothing when the venue read every dex — a complete read has nothing to qualify', async () => {
+    const { result } = render({
+      fetchPositions: vi.fn(async () => ({
+        positions: [gainsPosition(), hlPosition()],
+        sources: {
+          gains: { status: 'read', chains: [ARBITRUM] },
+          hyperliquid: { status: 'read', chains: [], dexes: ['', 'xyz'], unreadDexes: [], partial: false },
+        },
+      })),
+    })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.unreadableVenues).toEqual([])
+  })
+
   it('survives a dependency that throws synchronously', async () => {
     const { result } = render({
       getProvider: () => {

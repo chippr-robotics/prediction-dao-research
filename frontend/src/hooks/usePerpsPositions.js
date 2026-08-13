@@ -170,10 +170,24 @@ export function usePerpsPositions(account, { deps } = {}) {
     return () => clearInterval(timer)
   }, [supported, account, load])
 
+  /**
+   * The venues whose absence from this list must be QUALIFIED on screen.
+   *
+   * Two facts land here, and they are the same fact to a member. A venue that did not answer at
+   * all is `degraded`/`unreadable`. A venue that answered INCOMPLETELY is `read` with
+   * `partial: true` — Hyperliquid's case: it is not one order book but a default one plus
+   * validator-operated perp dexes (HIP-3), each read separately, so a dex that did not answer is a
+   * part of the member's own position set we did not see. An empty Hyperliquid list rendered
+   * beside a silently-skipped dex is the fabricated absence spec 083 went and fixed in the gateway
+   * (hyperliquid-decision.md §5.2); dropping the disclosure here would put it straight back.
+   *
+   * Naming a partially-read venue here over-discloses slightly — some of it WAS read — and that is
+   * the direction this file already chooses to be wrong in, for the reason above the constant.
+   */
   const unreadableVenues = useMemo(
     () =>
       Object.entries(sources)
-        .filter(([, s]) => UNREADABLE_STATUSES.has(s?.status))
+        .filter(([, s]) => UNREADABLE_STATUSES.has(s?.status) || s?.partial === true)
         .map(([venue]) => venue),
     [sources],
   )
