@@ -21,12 +21,22 @@ import { getSubgraphUrl, getCurrentChainId } from '../../config/networks'
 // Legacy single-endpoint override. Honored only for the build-time active
 // chain so it can never leak to a different network at runtime; per-chain
 // `subgraphUrl` in networks.js is the preferred configuration.
-const LEGACY_SUBGRAPH_URL = import.meta.env?.VITE_SUBGRAPH_URL || ''
-
-function resolveSubgraphUrl(chainId) {
+//
+// This is the ONLY place in the app that reads VITE_SUBGRAPH_URL directly
+// (issue #1172) — every other reader that wants an endpoint, including
+// outside this module, calls `resolveSubgraphUrl(chainId)` so a stale/global
+// override can never silently diverge from networks.js's per-chain config.
+// Read inside the function rather than cached at module-eval time: Vite bakes
+// `import.meta.env` at build time in production, but a cached module-scope
+// constant would stop reflecting `vi.stubEnv` in tests that import this
+// module indirectly (e.g. via drawProposalScan/useSiteStats) without also
+// calling `vi.resetModules()`.
+export function resolveSubgraphUrl(chainId) {
   const perChain = getSubgraphUrl(chainId)
   if (perChain) return perChain
-  if (chainId == null || chainId === getCurrentChainId()) return LEGACY_SUBGRAPH_URL
+  if (chainId == null || chainId === getCurrentChainId()) {
+    return import.meta.env?.VITE_SUBGRAPH_URL || ''
+  }
   return ''
 }
 

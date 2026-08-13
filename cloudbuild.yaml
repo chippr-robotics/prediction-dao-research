@@ -33,8 +33,16 @@ steps:
       # (137 = Polygon -> fairwins-polygon). Studio dev query endpoint (rate-limited);
       # for production traffic, publish to the decentralized net + proxy the keyed
       # gateway URL via nginx (see the VITE_PINATA_JWT pattern).
+      #
+      # This is now only a legacy fallback (resolveSubgraphUrl in
+      # frontend/src/data/wagers/SubgraphSource.js) — networks.js's per-chain
+      # `subgraphUrl` for 137 is the value every reader actually resolves.
+      # Kept pointed at the live version anyway so the fallback can never
+      # silently diverge from it again (issue #1172: this was stuck on the
+      # abandoned v0.2.0 while networks.js had already moved to v0.3.0).
+      # Pin the exact version — never `/version/latest` (see networks.js).
       - '--build-arg'
-      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.2.0'
+      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.3.0'
       - '--build-arg'
       - 'VITE_WAGER_SOURCE=subgraph'
       # Passkey smart accounts (spec 041): self-hosted alto ERC-4337 bundler, colocated with the
