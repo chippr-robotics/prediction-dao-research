@@ -1,28 +1,23 @@
-previous: v1.6.0
-commits:  23
-  [unclassified] Merge pull request #1159 from chippr-robotics/staging
-  [fix -> patch] enable the perps read proxy, and stop the ops skill reporting a migrated gateway as scaled-to-zero (#1158)
-  [unclassified] Merge pull request #1153 from chippr-robotics/claude/perps-position-management-phase1
-  [unclassified] Merge pull request #1152 from chippr-robotics/claude/dark-theme-rendering-cj4ieb
-  [test -> patch] e2e coverage + actor-critic visual review, and the four defects it found
-  [feat -> minor] perps entry, admin fees, activity — and three more dead paths closed
-  [feat -> minor] perps exits — position sheet, stuck-order recovery, protection (phases 3+4)
-  [docs -> patch] record the standing decision to keep the deploy wallet as UI-fee receiver
-  [feat -> minor] perps foundations — venue calldata, order state machine, fee units, guards
-  [docs -> patch] disclose how the platform is actually funded, and name leveraged derivatives
-  [fix -> patch] define missing dark-mode tokens breaking Predict/Perps unavailable banners
-  [unclassified] Merge pull request #1151 from chippr-robotics/claude/miniapp-notification-ui-bugs-u2y395
-  [feat -> minor] GMX UI-fee-factor script — the perps fee rail GMX itself enforces (spec 083)
-  [spec -> patch] perps position management — spec, plan, research, calldata/state/fee contracts, tasks
-  [unclassified] Fix mini-app info sheet rendering below the bottom nav
-  [unclassified] Merge pull request #1150 from chippr-robotics/claude/perpetual-futures-integration-texoyy
-  [fix -> patch] enforce module killswitch, 502 on total venue outage, contract-doc alignment
-  [feat -> minor] visual polish via actor-critic loop, e2e, docs, capture harness (spec 082)
-  [feat -> minor] Perps view inside Trade — cross-venue pairs, positions, fees, link-outs (spec 082)
-  [feat -> minor] /v1/perps/* read proxy — Gains, GMX, Hyperliquid market data (spec 082)
-  [spec -> patch] perps trade view — spec, plan, research, gateway API contract, tasks
-  [unclassified] Merge pull request #1149 from chippr-robotics/release/v1.6.0-changelog
-  [skipped] chore(release): v1.6.0 [skip release]
+previous: v1.7.0
+commits:  18
+  [unclassified] Merge pull request #1165 from chippr-robotics/staging
+  [unclassified] Merge pull request #1164 from chippr-robotics/claude/message-signing-verification-ax4xbc
+  [docs -> patch] add the Spec Kit artifacts for message signing and verify
+  [unclassified] Merge pull request #1155 from chippr-robotics/dependabot/npm_and_yarn/staging/scure/base-2.3.0
+  [unclassified] Merge pull request #1163 from chippr-robotics/claude/message-signing-verification-ax4xbc
+  [fix -> patch] make the verify seam fail loudly instead of silently
+  [fix -> patch] reject odd-length signature hex and gate Check on parse errors
+  [feat -> minor] add message signing and verification
+  [unclassified] Merge pull request #1160 from chippr-robotics/release/v1.7.0-changelog
+  [chore -> patch] Bump @scure/base from 2.2.0 to 2.3.0
+  [unclassified] Merge pull request #1154 from chippr-robotics/dependabot/npm_and_yarn/staging/scure/bip32-2.3.0
+  [unclassified] Merge pull request #1161 from chippr-robotics/claude/perps-083-finish
+  [unclassified] Merge pull request #1162 from chippr-robotics/claude/remove-trade-account-selector-9pt1yp
+  [fix -> patch] pin the activity-feed clock — it was red for ~2 minutes every midnight
+  [refactor -> patch] remove the Trade ticket's account selector
+  [feat -> minor] venue fees, HIP-3 dex coverage, and the Hyperliquid go/no-go
+  [skipped] chore(release): v1.7.0 [skip release]
+  [chore -> patch] Bump @scure/bip32 from 2.2.0 to 2.3.0
 bump:     minor
 reason:   computed
-next:     v1.7.0
+next:     v1.8.0
