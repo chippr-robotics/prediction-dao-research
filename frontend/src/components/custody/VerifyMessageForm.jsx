@@ -34,6 +34,19 @@ const VERDICT = {
 }
 
 /**
+ * The headline for an unsettled result.
+ *
+ * "Could not be checked" is right when we genuinely could not look, and wrong when we looked
+ * offline and learned something definite — which is now the common unsettled case. Leading with
+ * the established fact means the member reads the answer they actually have, and the body explains
+ * the narrower thing that is still open.
+ */
+function unsettledTitle(verdict) {
+  if (!verdict.canCheckOnChain) return 'Could not be checked'
+  return verdict.signer ? 'Signed by a different address' : 'Only that account can answer'
+}
+
+/**
  * The document's `signedAt` is an ISO instant — correct to store, unreadable to show. Rendered in
  * the member's own locale and time zone, since "when did they sign this" is the question being
  * asked. An unparseable value is shown as-is rather than dropped: it is what the document says.
@@ -231,7 +244,7 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onChec
             <span className="verify-result-icon" aria-hidden="true">
               {shown.icon}
             </span>
-            {shown.title}
+            {verdict.status === VERIFY_STATUS.UNVERIFIABLE ? unsettledTitle(verdict) : shown.title}
           </h4>
           {verdict.status === VERIFY_STATUS.VALID && (
             <p>
@@ -241,6 +254,11 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onChec
             </p>
           )}
           {verdict.reason && <p>{verdict.reason}</p>}
+          {verdict.status === VERIFY_STATUS.UNVERIFIABLE && (
+            <p className="verify-hint">
+              This is not a failed check — nothing here says the signature is bad.
+            </p>
+          )}
 
           {/* The escalation, and the ONLY place a network appears in this form. It is offered on
               the one outcome the offline check cannot settle, and it is a decision the member
@@ -296,11 +314,6 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onChec
               to learn that the address holds no contract. */}
           {verdict.status === VERIFY_STATUS.VALID && METHOD_NOTE[verdict.method] && (
             <p className="verify-hint">{METHOD_NOTE[verdict.method]}</p>
-          )}
-          {verdict.status === VERIFY_STATUS.UNVERIFIABLE && (
-            <p className="verify-hint">
-              This is not a failed check — nothing here says the signature is bad.
-            </p>
           )}
         </section>
       )}

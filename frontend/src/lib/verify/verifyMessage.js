@@ -229,8 +229,8 @@ export function verifyMessage({ message, signature, address = null }) {
     signer: recovered,
     canCheckOnChain: true,
     reason: recovered
-      ? `These bytes were produced by ${recovered}, not by the address you entered. That is certain. What is not certain is whether the address you entered is a smart contract account that accepts a signature from ${recovered} — only that account can answer, on its own network.`
-      : 'These bytes are not a wallet signature, so no address can be recovered from them offline. If the address you entered is a smart contract account, it can be asked directly on its own network.',
+      ? `These bytes were produced by ${recovered} — that is certain, and it was established without a network. What is not certain is whether the address you entered is a smart contract account that accepts signatures from it; only that account can answer.`
+      : 'These bytes are not a wallet signature, so no address can be recovered from them offline. If the address you entered is a smart contract account, it can be asked directly.',
   }
 }
 
