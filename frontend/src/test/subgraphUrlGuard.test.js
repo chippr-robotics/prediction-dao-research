@@ -22,9 +22,17 @@ import { fileURLToPath } from 'node:url'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-// Matches `import.meta.env.VITE_SUBGRAPH_URL` / `import.meta.env?.VITE_SUBGRAPH_URL`,
-// but not the per-chain `VITE_SUBGRAPH_URL_POLYGON` etc. (word boundary after the name).
-const RE_DIRECT_READ = /import\.meta\.env\??\.VITE_SUBGRAPH_URL\b(?!_)/g
+// Every accepted way to pull VITE_SUBGRAPH_URL off import.meta.env. All three
+// exclude the per-chain `VITE_SUBGRAPH_URL_POLYGON` etc. (word boundary / no
+// trailing `_` after the name) so those legitimate reads never trip the guard.
+const DIRECT_READ_PATTERNS = [
+  // import.meta.env.VITE_SUBGRAPH_URL / import.meta.env?.VITE_SUBGRAPH_URL
+  /import\.meta\.env\??\.VITE_SUBGRAPH_URL\b(?!_)/,
+  // import.meta.env['VITE_SUBGRAPH_URL'] / import.meta.env?.['VITE_SUBGRAPH_URL']
+  /import\.meta\.env\??\.?\[\s*['"`]VITE_SUBGRAPH_URL['"`]\s*\]/,
+  // const { VITE_SUBGRAPH_URL } = import.meta.env
+  /\{[^}]*\bVITE_SUBGRAPH_URL\b(?!_)[^}]*\}\s*=\s*import\.meta\.env\b/,
+]
 
 const ALLOWED_FILE = 'data/wagers/SubgraphSource.js'
 
@@ -56,8 +64,7 @@ describe('subgraph URL resolution guard (issue #1172)', () => {
       const rel = file.slice(SRC.length + 1).split('\\').join('/')
       if (rel === ALLOWED_FILE) continue
       const code = readFileSync(file, 'utf8')
-      if (RE_DIRECT_READ.test(code)) offenders.push(rel)
-      RE_DIRECT_READ.lastIndex = 0
+      if (DIRECT_READ_PATTERNS.some((re) => re.test(code))) offenders.push(rel)
     }
     expect(
       offenders,
