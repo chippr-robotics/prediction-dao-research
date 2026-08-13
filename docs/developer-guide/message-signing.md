@@ -58,6 +58,18 @@ The corollary that is easy to get wrong: a mismatching ECDSA recovery is **not**
 negative when the on-chain leg could not run. A smart-account owner key recovering instead of the
 account it controls is exactly what a legitimate ERC-1271 signature looks like from the outside.
 
+### The verify seam never rejects
+
+`useMessageSigning.verify` catches everything and turns a throw into an `unverifiable` verdict.
+This is a contract, not a convenience. It used to be `try/finally` with no `catch`, and the form
+does not await it — so anything that threw beneath it produced no verdict, no error, and no
+change on screen. The member pressed Check and nothing happened, which is the one outcome this
+surface must never produce.
+
+Review #1163 found two separate malformed inputs that reached that path. Two in one review is the
+signal that guarding inputs one at a time is the wrong shape of fix: the seam has to be safe by
+construction so the third input nobody thought of degrades honestly instead of silently.
+
 ## Rule 2 — the message is carried and signed verbatim
 
 No trimming, no template, no appended nonce, no domain wrapper. A member proving control of a key

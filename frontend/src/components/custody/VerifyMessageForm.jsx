@@ -68,11 +68,20 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
 
   const chains = cohortChainIds()
 
+  /**
+   * Retire what the last input produced: the import notice and any verdict on screen.
+   *
+   * Deliberately does NOT clear `parseError`. That error belongs to the TEXT SITTING IN ONE FIELD,
+   * not to the form as a whole — clearing it here meant editing the message box re-enabled Check
+   * while the signature box still held unreadable JSON. Each field clears its own error.
+   */
   const reset = () => {
     setImported(null)
-    setParseError(null)
     onClear()
   }
+
+  /** Drop a parse error only when the field that produced it is the one being edited. */
+  const clearErrorFor = (field) => setParseError((prev) => (prev?.field === field ? null : prev))
 
   /**
    * Accept a pasted document anywhere the member happens to drop it. Text that is not a document
@@ -81,6 +90,7 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
   const absorb = (text, field) => {
     if (!looksLikeSignedMessage(text)) {
       set({ [field]: text })
+      clearErrorFor(field)
       reset()
       return
     }
@@ -88,7 +98,7 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
     if (!ok) {
       set({ [field]: text })
       setImported(null)
-      setParseError(error)
+      setParseError({ field, message: error })
       onClear()
       return
     }
@@ -143,7 +153,7 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
       )}
       {parseError && (
         <p className="verify-error" role="alert">
-          {parseError}
+          {parseError.message}
         </p>
       )}
 

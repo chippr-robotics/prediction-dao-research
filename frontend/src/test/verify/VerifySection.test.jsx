@@ -179,6 +179,62 @@ describe('VerifySection — checking a signature', () => {
     expect(screen.getByRole('button', { name: /check signature/i })).toBeDisabled()
     expect(screen.queryByTestId('verify-result')).not.toBeInTheDocument()
   })
+
+  // THE CLASS, not the two inputs that exposed it (#1163). The verify seam had `try/finally` with
+  // no `catch`, so anything that threw beneath it vanished: no verdict, no error, nothing. Two
+  // separate malformed inputs reached that path in one review, which is the signal that guarding
+  // inputs one at a time is the wrong fix. A throw must surface as the honest third state.
+  it('turns an unexpected failure into an honest unverifiable verdict, never silence', async () => {
+    const user = userEvent.setup()
+    render(
+      <CustodyContext.Provider value={{ active: { mode: 'personal' }, legacySigner: null }}>
+        <VerifySection
+          deps={{
+            verifyMessage: () => {
+              throw new Error('something nobody anticipated')
+            },
+          }}
+        />
+      </CustodyContext.Provider>,
+    )
+    await openSheet(user, 'Check a signature')
+
+    await user.click(screen.getByLabelText(/^Message$/i))
+    await user.paste(MESSAGE)
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(SIGNATURE)
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+
+    const result = await screen.findByTestId('verify-result')
+    expect(result).toHaveAttribute('data-status', 'unverifiable')
+    expect(within(result).getByText(/something went wrong/i)).toBeInTheDocument()
+    // …and specifically NOT a claim about the signature.
+    expect(within(result).queryByText(/does not match/i)).not.toBeInTheDocument()
+  })
+
+  // A parse error belongs to the text in ONE field. Clearing it form-wide meant editing an
+  // unrelated field re-enabled Check over signature text that still could not be read.
+  it('keeps Check disabled when an unrelated field is edited after a bad paste', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(JSON.stringify({ format: 'fairwins-signed-message/1', message: 'x' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no signature/i)
+
+    await user.click(screen.getByLabelText(/^Message$/i))
+    await user.paste(MESSAGE)
+
+    expect(screen.getByRole('button', { name: /check signature/i })).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/no signature/i)
+
+    // Editing the field that actually holds the bad text clears it.
+    await user.clear(screen.getByLabelText(/^Signature$/i))
+    await user.paste(SIGNATURE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /check signature/i })).toBeEnabled()
+  })
 })
 
 describe('VerifySection — signing', () => {

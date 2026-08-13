@@ -15,7 +15,7 @@ import { useWallet } from './useWalletManagement'
 import { CustodyContext } from '../contexts/CustodyContext'
 import { readSession } from '../connectors/passkey'
 import { resolveMessageSigner, signMessageAsAccount, SignatureDeclined } from '../lib/verify/signMessage'
-import { verifyMessage } from '../lib/verify/verifyMessage'
+import { verifyMessage, VERIFY_STATUS } from '../lib/verify/verifyMessage'
 
 const PERSONAL = { mode: 'personal' }
 
@@ -100,11 +100,36 @@ export function useMessageSigning({ deps = {} } = {}) {
     setSignError(null)
   }, [])
 
+  /**
+   * Verify a claim. **This never rejects**, and that is a contract, not a convenience.
+   *
+   * It used to be `try/finally` with no `catch`, so a throw anywhere beneath it — an input shape
+   * nobody anticipated, a provider that raises instead of resolving — escaped as a rejected
+   * promise. The form does not await it either, so the result was: `verifying` resets, no verdict
+   * renders, no error renders. The member presses Check and NOTHING HAPPENS. Silence is the one
+   * outcome this surface must never produce, and one review (#1163) surfaced two separate inputs
+   * that reached it; patching those two inputs would have left the next one to be found the same
+   * way.
+   *
+   * So a throw becomes the honest third state instead. "We could not complete the check" is
+   * literally true of an internal failure, and `unverifiable` is precisely the state that says so
+   * without claiming anything about the signature.
+   */
   const verify = useCallback(
     async (claim) => {
       setVerifying(true)
       try {
         const result = await (deps.verifyMessage ?? verifyMessage)(claim)
+        setVerdict(result)
+        return result
+      } catch (error) {
+        console.error('Signature check failed unexpectedly:', error)
+        const result = {
+          status: VERIFY_STATUS.UNVERIFIABLE,
+          method: null,
+          signer: null,
+          reason: 'Something went wrong while checking this signature, so nothing could be established about it. Try again.',
+        }
         setVerdict(result)
         return result
       } finally {
