@@ -171,18 +171,24 @@ checking surface, and confirming every field populates and the outcome is correc
 - **FR-018**: The record's own claim about what kind of signature it carries MUST NOT determine the
   outcome; the system MUST reach its own conclusion from the signature.
 - **FR-019**: Text pasted that is not a record MUST be treated as ordinary input.
+- **FR-020**: The system MUST NOT assume a network the member has not stated. Where a network is
+  needed and none was given, the outcome is **not determinable** with that reason — never a
+  contradiction reached against an assumed network.
+- **FR-021**: Where a record names a network this build does not serve, the system MUST say so and
+  name it, rather than reporting that the record was silent about its network. It MUST NOT adopt
+  that network.
 
 **Surface**
 
-- **FR-020**: Adding this area MUST NOT materially lengthen the Protect page. Entry to each task
+- **FR-022**: Adding this area MUST NOT materially lengthen the Protect page. Entry to each task
   MUST be a short summary the member can scan, with the form itself on a focused surface.
-- **FR-021**: Each entry MUST show its current state — the last outcome, or the reason the task is
+- **FR-023**: Each entry MUST show its current state — the last outcome, or the reason the task is
   unavailable — without the member opening it.
-- **FR-022**: Work in progress and completed results MUST survive the focused surface being closed
+- **FR-024**: Work in progress and completed results MUST survive the focused surface being closed
   and reopened.
-- **FR-023**: The result of an action MUST be brought into view when it arrives.
-- **FR-024**: This feature MUST NOT move funds, and MUST NOT write anything to a chain.
-- **FR-025**: The surface MUST meet WCAG 2.1 AA.
+- **FR-025**: The result of an action MUST be brought into view when it arrives.
+- **FR-026**: This feature MUST NOT move funds, and MUST NOT write anything to a chain.
+- **FR-027**: The surface MUST meet WCAG 2.1 AA.
 
 ### Key Entities
 

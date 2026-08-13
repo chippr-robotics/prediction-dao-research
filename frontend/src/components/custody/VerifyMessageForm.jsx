@@ -50,6 +50,7 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
   // come back to an empty form sitting beneath a verdict about text that is no longer there.
   const { message, signature, address, chainId } = draft
   const set = (patch) => onDraftChange({ ...draft, ...patch })
+  const chains = cohortChainIds()
   const [imported, setImported] = useState(null)
   const [parseError, setParseError] = useState(null)
   const messageRef = useRef(null)
@@ -65,8 +66,6 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
       resultRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
   }, [verdict])
-
-  const chains = cohortChainIds()
 
   /**
    * Retire what the last input produced: the import notice and any verdict on screen.
@@ -102,14 +101,24 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
       onClear()
       return
     }
+    // A record may name a chain this build does not serve — a mainnet record opened in a testnet
+    // build, or vice versa. Constitution III forbids reading across that boundary, so the chain is
+    // NOT adopted. But saying nothing would leave the check reporting "the document does not say
+    // which network", which is false: it does say, and we are the ones who cannot go there. Name
+    // it instead.
+    const servedHere = doc.chainId == null || chains.includes(doc.chainId)
     set({
       message: doc.message,
       signature: doc.signature,
       ...(doc.address ? { address: doc.address } : {}),
-      ...(doc.chainId != null ? { chainId: String(doc.chainId) } : {}),
+      ...(doc.chainId != null && servedHere ? { chainId: String(doc.chainId) } : {}),
     })
     setParseError(null)
-    setImported({ address: doc.address, signedAt: readableTime(doc.signedAt) })
+    setImported({
+      address: doc.address,
+      signedAt: readableTime(doc.signedAt),
+      foreignChainId: servedHere ? null : doc.chainId,
+    })
     // A paste leaves the caret — and so the scroll — at the END of the box. After importing a
     // document that is exactly wrong: the member is being asked to confirm the message is the one
     // they expected, and what they need to read is its first line.
@@ -149,6 +158,13 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
           Read a signed-message document{imported.address ? ` from ${imported.address}` : ''}
           {imported.signedAt ? `, signed ${imported.signedAt}` : ''}. Check the message below is the one
           you expected before trusting it.
+          {imported.foreignChainId != null && (
+            <>
+              {' '}
+              It names chain {imported.foreignChainId}, which this build does not serve — a wallet
+              signature can still be checked here, but one made by an account contract cannot.
+            </>
+          )}
         </p>
       )}
       {parseError && (
