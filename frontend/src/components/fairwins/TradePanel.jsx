@@ -25,10 +25,7 @@ import {
 import { PIN_MODE, createPin, samePair } from '../../lib/assets/networkPin'
 import { useWallet } from '../../hooks'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
-import { useCustodyVaults } from '../../hooks/useCustodyVaults'
-import { useLegacyAccounts } from '../../hooks/useLegacyAccounts'
 import { useSwapBalances } from '../../hooks/useSwapBalances'
-import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
 import SensitiveValue from '../common/SensitiveValue'
 import InfoTip from '../ui/InfoTip'
 import TradeTokenSelect from './TradeTokenSelect'
@@ -45,9 +42,6 @@ function impactSeverity(pct) {
   if (pct >= IMPACT_WARN) return 'warn'
   return 'low'
 }
-
-const shortAddress = (addr) =>
-  addr && addr.length > 10 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr || ''
 
 const fmtBalance = (value) =>
   Number(value || 0).toLocaleString(undefined, { maximumSignificantDigits: 8 })
@@ -71,8 +65,14 @@ const fmtBalance = (value) =>
  *      so a mis-wired UI cannot approve a foreign address either).
  *
  * Balances follow the PAIR's network, not the wallet's (`useSwapBalances`), and
- * live on the pay/receive cards where the amount is actually entered — the
- * account card carries no balance rows.
+ * live on the pay/receive cards where the amount is actually entered.
+ *
+ * The ticket does NOT pick the account. Which account a member acts as —
+ * personal wallet, a multisig vault, or a recovered legacy account — is chosen
+ * once, app-wide, from the wallet menu's acting-account switcher
+ * (`hooks/useAccountSwitcher.js`), exactly as Pay/Transfer and every other
+ * surface do it. Trade only READS that identity (`useActiveAccount`) so it can
+ * price, fund, and disclose the order honestly.
  */
 function TradePanel() {
   const {
@@ -87,18 +87,14 @@ function TradePanel() {
     tradingAddress,
   } = useDex()
 
-  const { isConnected, chainId, address, loginMethod } = useWallet()
+  const { isConnected, chainId, loginMethod } = useWallet()
   const { switchChainAsync, isPending: switching } = useSwitchChain()
 
-  // Account selection (spec 043 + 062): trade as the personal wallet, one of the
-  // member's saved multisig vaults, or a recovered legacy account. A vault turns
-  // every order into a threshold-gated proposal; a recovered account signs each
-  // order with its unlocked in-memory key. Balances always follow the selection.
-  const { identity, isVault, isLegacy, operateAsVault, operateAsPersonal, operateAsLegacy } =
-    useActiveAccount()
-  const { vaults } = useCustodyVaults()
-  const legacyAccounts = useLegacyAccounts()
-  const [unlockEntry, setUnlockEntry] = useState(null)
+  // The acting account (spec 043 + 062), read-only here: the personal wallet, one
+  // of the member's saved multisig vaults, or a recovered legacy account. A vault
+  // turns every order into a threshold-gated proposal; a recovered account signs
+  // each order with its unlocked in-memory key. Balances always follow it.
+  const { identity, isVault, isLegacy } = useActiveAccount()
 
   // Every pair leg on every swap-capable network, connected network first.
   const options = useMemo(() => buildSwapOptions({ connectedChainId: chainId }), [chainId])
@@ -321,36 +317,6 @@ function TradePanel() {
     }
   }
 
-  const handleAccountChange = (value) => {
-    setSuccess('')
-    setError('')
-    if (value === 'personal') {
-      operateAsPersonal()
-      return
-    }
-    if (value.startsWith('legacy:')) {
-      // Unlock (biometric/passphrase) before acting; operateAsLegacy on success.
-      const acct = legacyAccounts.find((a) => a.id === value)
-      if (acct) setUnlockEntry(acct.entry)
-      return
-    }
-    const vault = vaults.find((v) => v.address === value)
-    if (vault) operateAsVault(vault)
-  }
-
-  const handleLegacyUnlocked = (signer) => {
-    if (unlockEntry) {
-      operateAsLegacy({
-        address: unlockEntry.address,
-        chainId,
-        kind: unlockEntry.kind,
-        label: shortAddress(unlockEntry.address),
-        signer,
-      })
-    }
-    setUnlockEntry(null)
-  }
-
   // A Limit order's floor: limit price (output per 1 unit paid) × quantity,
   // enforced on-chain as the swap's minimum received.
   const outDecimals = toToken?.decimals ?? 18
@@ -472,11 +438,6 @@ function TradePanel() {
         ? `1 ${quote.tokenOutSymbol} = ${quote.executionPriceInverted} ${quote.tokenInSymbol}`
         : null
 
-  const accountValue = isVault
-    ? identity.vaultAddress
-    : identity.mode === 'legacy' && identity.address
-      ? `legacy:${String(identity.address).toLowerCase()}`
-      : 'personal'
   const feeBadge = isVault
     ? { className: 'trade-badge-proposal', text: 'Multisig proposal' }
     : isLegacy
@@ -490,9 +451,14 @@ function TradePanel() {
       <div className="trade-header">
         <div className="trade-title-row">
           <h2>Trade</h2>
-          <span className="trade-venue" title={`Routing via ${providerName} on ${pairNetworkName}`}>
-            {providerName}
-          </span>
+          <div className="trade-title-tags">
+            {/* The rail this order takes — sponsored, member-paid, or a multisig
+                proposal. Stated up front, before any amount is entered. */}
+            <span className={`trade-badge ${feeBadge.className}`}>{feeBadge.text}</span>
+            <span className="trade-venue" title={`Routing via ${providerName} on ${pairNetworkName}`}>
+              {providerName}
+            </span>
+          </div>
         </div>
         <p className="trade-subtitle">
           Best-execution swaps routed across {providerName} liquidity
@@ -502,77 +468,46 @@ function TradePanel() {
         </p>
       </div>
 
-      {/* Account — the personal wallet or a saved multisig. Balances live on the
-          pay/receive cards below, next to the amount they apply to. */}
-      <section className="trade-account" aria-label="Trading account">
-        <div className="trade-account-top">
-          <label className="trade-field-label" htmlFor="trade-account-select">
-            Account
-          </label>
-          <span className={`trade-badge ${feeBadge.className}`}>{feeBadge.text}</span>
-        </div>
-        <select
-          id="trade-account-select"
-          className="trade-account-select"
-          value={accountValue}
-          onChange={(e) => handleAccountChange(e.target.value)}
-        >
-          <option value="personal">
-            Personal wallet{address ? ` · ${shortAddress(address)}` : ''}
-          </option>
-          {vaults.map((v) => (
-            <option key={v.address} value={v.address}>
-              {(v.label || shortAddress(v.address)) + ' · Multisig'}
-            </option>
-          ))}
-          {legacyAccounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {(a.label || shortAddress(a.address)) + ' · Recovered'}
-            </option>
-          ))}
-        </select>
-        <LegacyUnlockDialog
-          open={Boolean(unlockEntry)}
-          entry={unlockEntry}
-          onClose={() => setUnlockEntry(null)}
-          onUnlocked={handleLegacyUnlocked}
-        />
-        {isLegacy && (
-          <p className="trade-account-note" role="note">
-            Orders sign with your recovered account&apos;s key on {pairNetworkName}. You pay the
-            network fee — recovered accounts aren&apos;t gasless.
-          </p>
-        )}
-        {isVault && (
-          <p className="trade-account-note">
-            Orders from this account are proposed to the multisig and execute once enough
-            owners approve.
-          </p>
-        )}
-        {vaultOffNetwork && (
-          <p className="trade-account-note" role="note">
-            This multisig lives on {NETWORKS[vaultChainId]?.name || 'another network'}, so it
-            can&apos;t trade the {pairNetworkName} pair you picked. Choose a pair on{' '}
-            {NETWORKS[vaultChainId]?.name || 'its network'}, or switch to your personal wallet.
-          </p>
-        )}
-        {!passkeyReady && !isLegacy && (
-          <p className="trade-account-note" role="note">
-            Passkey accounts can’t send transactions on {pairNetworkName} yet — connect a
-            browser wallet to trade this pair.
-          </p>
-        )}
-        {/* A fact about the member's OWN network, stated whether or not a switch
-            is also pending — "your network can't trade" and "this pair is
-            elsewhere" are two different things to know. `isSwapChain` is the same
-            gate the option list is built from, so the note can never contradict it. */}
-        {!isSwapChain(chainId) && (
-          <p className="trade-account-note" role="note">
-            {walletNetworkName} has no DEX deployment, so its own pairs aren’t tradeable —
-            the pairs listed below are on other networks.
-          </p>
-        )}
-      </section>
+      {/* What the member needs to know about THIS order before placing it. The
+          account itself is switched app-wide from the wallet menu, so the ticket
+          states the consequences of the current one rather than re-offering the
+          choice. */}
+      {isLegacy && (
+        <p className="trade-note" role="note">
+          Orders sign with your recovered account&apos;s key on {pairNetworkName}. You pay the
+          network fee — recovered accounts aren&apos;t gasless.
+        </p>
+      )}
+      {isVault && (
+        <p className="trade-note">
+          Orders from this account are proposed to the multisig and execute once enough
+          owners approve.
+        </p>
+      )}
+      {vaultOffNetwork && (
+        <p className="trade-note" role="note">
+          This multisig lives on {NETWORKS[vaultChainId]?.name || 'another network'}, so it
+          can&apos;t trade the {pairNetworkName} pair you picked. Choose a pair on{' '}
+          {NETWORKS[vaultChainId]?.name || 'its network'}, or switch accounts from your
+          wallet menu.
+        </p>
+      )}
+      {!passkeyReady && !isLegacy && (
+        <p className="trade-note" role="note">
+          Passkey accounts can’t send transactions on {pairNetworkName} yet — connect a
+          browser wallet to trade this pair.
+        </p>
+      )}
+      {/* A fact about the member's OWN network, stated whether or not a switch
+          is also pending — "your network can't trade" and "this pair is
+          elsewhere" are two different things to know. `isSwapChain` is the same
+          gate the option list is built from, so the note can never contradict it. */}
+      {!isSwapChain(chainId) && (
+        <p className="trade-note" role="note">
+          {walletNetworkName} has no DEX deployment, so its own pairs aren’t tradeable —
+          the pairs listed below are on other networks.
+        </p>
+      )}
 
       {/* Order ticket controls — order type + price type share a row, with the
           limit price / term beneath (brokerage-style). */}
