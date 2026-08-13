@@ -14,6 +14,47 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.8.0 — 2026-08-12
+
+Promoted from: v1.8.0-rc.5
+Previous release: v1.7.0 · Range: `v1.7.0..v1.8.0` (18 commits)
+
+### 🚀 Features
+
+- feat(protect): add message signing and verification
+- feat(perps): venue fees, HIP-3 dex coverage, and the Hyperliquid go/no-go
+
+### 🐛 Bug Fixes
+
+- fix(protect): make the verify seam fail loudly instead of silently
+- fix(protect): reject odd-length signature hex and gate Check on parse errors
+- fix(test): pin the activity-feed clock — it was red for ~2 minutes every midnight
+
+### ♻️ Refactoring
+
+- refactor(frontend): remove the Trade ticket's account selector
+
+### 📚 Documentation
+
+- docs(protect): add the Spec Kit artifacts for message signing and verify
+
+### 🧹 Maintenance
+
+- chore(deps): Bump @scure/base from 2.2.0 to 2.3.0
+- chore(deps): Bump @scure/bip32 from 2.2.0 to 2.3.0
+
+### Artifacts
+
+Range: `v1.7.0..v1.8.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.2.0` |
+
 ## v1.7.0 — 2026-08-12
 
 Promoted from: v1.7.0-rc.5
