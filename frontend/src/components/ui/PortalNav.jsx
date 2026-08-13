@@ -26,6 +26,12 @@
  * fallback the collapsed rail always shows — for entries whose glyph IS their
  * name, like a favorited mini-app's Quick Access shortcut.
  *
+ * An item may also carry `matches` — sub-surfaces inside it that a search matched (see
+ * lib/nav/filterNav.js). They render as indented shortcut rows beneath their section, so a query
+ * that hit a protocol name reaches the actual screen rather than only the section that contains
+ * it. Like `collapsibleGroups` this is opt-in by data: an item without `matches` renders exactly
+ * as it always has, which is every item on every other surface this component serves.
+ *
  * `collapsibleGroups` (spec 081) turns the group headings into accordion toggles.
  * It is OPT-IN and absent by default, because this component is also the Admin
  * Panel's and My Account's rail: when it is not passed, the render path below is
@@ -56,7 +62,7 @@ export default function PortalNav({
   // Collapse is a property of the EXPANDED panel only (see the header comment).
   const accordion = collapsed ? null : collapsibleGroups
 
-  const renderItem = (item) => (
+  const renderItemButton = (item) => (
     <button
       key={item.id}
       type="button"
@@ -81,6 +87,41 @@ export default function PortalNav({
       <span className="portal-nav-item-label">{item.label}</span>
     </button>
   )
+
+  // Search shortcuts into a section's sub-surfaces. Never rendered in the collapsed gutter — 64px
+  // has no room for them, and nothing filters there anyway. The count of anything left out is
+  // stated rather than swallowed: a member who typed a broad term should be told the section holds
+  // more of them, not shown a truncated list that reads as complete.
+  const renderItemMatches = (item) => (
+    <div className="portal-nav-matches" role="group" aria-label={`Inside ${item.label}`}>
+      {item.matches.map((match) => (
+        <button
+          key={match.id}
+          type="button"
+          className="portal-nav-subitem"
+          onClick={() => onSelect(match.id)}
+        >
+          <span className="portal-nav-subitem-label">{match.label}</span>
+          {match.summary && <span className="portal-nav-subitem-summary">{match.summary}</span>}
+        </button>
+      ))}
+      {item.matchOverflow > 0 && (
+        <span className="portal-nav-matches-more">
+          +{item.matchOverflow} more in {item.label}
+        </span>
+      )}
+    </div>
+  )
+
+  const renderItem = (item) => {
+    if (collapsed || !item.matches?.length) return renderItemButton(item)
+    return (
+      <Fragment key={item.id}>
+        {renderItemButton(item)}
+        {renderItemMatches(item)}
+      </Fragment>
+    )
+  }
 
   // Accordion form: the heading becomes the control, and the items it governs live in a
   // labelled group that is UNMOUNTED when collapsed. Not `display: none` — a heading claiming

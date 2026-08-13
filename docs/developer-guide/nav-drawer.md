@@ -82,13 +82,17 @@ whole point; do not reintroduce pins as full-width rows.
 
 ## Filter
 
-`lib/nav/filterNav.js` — `filterNavGroups` / `filterNavItems`, pure, case-insensitive, trimmed,
-substring. A group left with no matches is dropped **with its heading**. Filter state lives in the
-drawer (it must reset on every open) and is never persisted. No matches renders an explicit message
-via `emptyMessage`, not a blank panel.
+`lib/nav/filterNav.js` — `filterNavGroups` / `filterNavItems`, pure, case-insensitive, trimmed.
+A group left with no matches is dropped **with its heading**. Filter state lives in the drawer (it
+must reset on every open) and is never persisted. No matches renders an explicit message via
+`emptyMessage`, not a blank panel.
 
 The helpers live in their own module rather than in `AppNavDrawer.jsx` because react-refresh
 requires a component module to export only components.
+
+The field searches the **app**, not the twelve words printed on the menu: it reads the nav search
+index, so "morpho" reaches Earn ▸ Lend and "rpc" reaches Network. See
+[`nav-search.md`](./nav-search.md).
 
 ## Density
 

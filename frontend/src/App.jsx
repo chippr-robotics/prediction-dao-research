@@ -31,6 +31,7 @@ import { NavDrawerProvider } from './contexts/NavDrawerContext.jsx'
 import ActivityNotificationBridge from './components/notifications/ActivityNotificationBridge'
 import OperateAsIndicator from './components/custody/OperateAsIndicator'
 import AppNavDrawer from './components/nav/AppNavDrawer'
+import AttentionFocus from './components/nav/AttentionFocus'
 
 //admin
 import AdminPanel from './components/AdminPanel'
@@ -66,6 +67,10 @@ function AppLayout() {
         <div className="app-shell">
           <Header appMode />
           <AppNavDrawer />
+          {/* A menu-search result deep-links with `?focus=<id>`; this briefly highlights whatever
+              carries the matching `data-attention` marker, so the member can see the thing they
+              searched for on a screen they may never have opened before. */}
+          <AttentionFocus />
           {/* Spec 043 (US3): persistent banner while operating as a vault, with switch-back. */}
           <OperateAsIndicator />
           {/* Spec 041: route a tapped push notification into in-app navigation. */}

@@ -34,7 +34,7 @@ export default function StakeView({ tokenFilter: initialTokenFilter = null }) {
   const stakingNetworkNames = getStakingNetworks().map((n) => n.name).join(' and ')
 
   return (
-    <div className="earn-lend">
+    <div className="earn-lend" data-attention="earn-stake">
       <StakingPositionsList
         positions={positionsApi.positions}
         status={positionsApi.status}

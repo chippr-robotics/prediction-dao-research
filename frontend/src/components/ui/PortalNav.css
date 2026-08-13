@@ -152,6 +152,64 @@
   gap: 2px;
 }
 
+/* Search shortcuts into a section's sub-surfaces (an item's `matches`). Indented under the
+   section that owns them and drawn against a rule, so the hierarchy reads at a glance: these are
+   places INSIDE the row above, not siblings of it. */
+.portal-nav-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 6px 21px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-color, #E3E7EB);
+}
+
+.portal-nav-subitem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  /* The spec 081 floor for an interactive target, restated here because these rows are shorter
+     than a section row and would otherwise be the first thing a density change pushes under it. */
+  min-height: 36px;
+  /* Explicit: `index.css` sets a global `button { padding: 0.6em 1.2em }` that would otherwise
+     decide the height of every one of these. */
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-secondary, #5A6772);
+}
+
+.portal-nav-subitem:hover,
+.portal-nav-subitem:focus-visible {
+  background: var(--bg-primary, rgba(0, 0, 0, 0.04));
+  color: var(--text-primary, #1F2933);
+}
+
+.portal-nav-subitem-label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.portal-nav-subitem-summary {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--text-muted, #8A959E);
+}
+
+.portal-nav-matches-more {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  color: var(--text-muted, #8A959E);
+}
+
 /* A rail filtered down to nothing. */
 .portal-nav-empty {
   margin: 0;

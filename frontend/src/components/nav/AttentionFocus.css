@@ -1,0 +1,44 @@
+/*
+ * The attention flash (lib/nav/attention.js). Applied to whatever carries the matching
+ * `data-attention` marker, so it has to sit on top of card, tile, and section styles alike
+ * without assuming any of them: an outline and a glow, drawn OUTSIDE the box, so nothing reflows
+ * and no layout shifts under the member mid-scroll.
+ */
+
+.attention-flash {
+  animation: attention-flash-pulse 900ms ease-out 2;
+  border-radius: inherit;
+  /* Above sibling cards so the ring is never clipped by the next one, but far below modals. */
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes attention-flash-pulse {
+  0% {
+    outline: 2px solid rgba(var(--brand-primary-rgb), 0);
+    outline-offset: 6px;
+    box-shadow: 0 0 0 0 rgba(var(--brand-primary-rgb), 0);
+  }
+  35% {
+    outline: 2px solid rgba(var(--brand-primary-rgb), 0.9);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px rgba(var(--brand-primary-rgb), 0.18);
+  }
+  100% {
+    outline: 2px solid rgba(var(--brand-primary-rgb), 0);
+    outline-offset: 6px;
+    box-shadow: 0 0 0 10px rgba(var(--brand-primary-rgb), 0);
+  }
+}
+
+/*
+ * Reduced motion still gets the answer to "which one?" — it is the pulsing that is dropped, not
+ * the pointing. A steady ring for the same duration says the same thing without animating.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .attention-flash {
+    animation: none;
+    outline: 2px solid rgba(var(--brand-primary-rgb), 0.9);
+    outline-offset: 3px;
+  }
+}

@@ -50,6 +50,11 @@ export default function AccordionSection({
     <section
       className={`acc ${className}`.trim()}
       data-open={open ? 'true' : 'false'}
+      // Every settings / recovery card is addressable by the menu search: arriving with
+      // `?focus=<id>` flashes the card so it is findable in a stack of collapsed headings
+      // (lib/nav/attention.js). One attribute here covers every card there is, present and
+      // future — no per-panel wiring, and no second list of ids to keep in step.
+      data-attention={sectionId}
       data-testid={dataTestId}
     >
       <h3 className="acc__heading">

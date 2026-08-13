@@ -119,6 +119,10 @@ export default function EarnPanel() {
         </button>
       )}
 
+      {/* Each area's own root carries a `data-attention` marker for the menu search's arrival
+          highlight — a member who typed "morpho" or "lido" lands here having never seen this
+          screen, so the area they asked for flashes once (components/nav/AttentionFocus.jsx).
+          The ids are the destination ids in config/navSearchIndex.js. */}
       {view === 'lend' && <EarnLendView tokenFilter={tokenFilter} />}
       {view === 'rewards' && <EarnRewardsView />}
       {view === 'stake' && <StakeView tokenFilter={tokenFilter} />}

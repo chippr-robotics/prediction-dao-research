@@ -397,6 +397,23 @@ artifacts live under `specs/<feature>/`.
   group is GONE — the catalog entry lives in **Tools** (tab id `apps` and `/apps/<slug>`
   unchanged). The desktop 64px gutter renders none of this. See
   `docs/developer-guide/nav-drawer.md` + `specs/081-nav-drawer-density/`.
+- **The drawer's search field searches the APP, and `config/navSearchIndex.js` is what makes that
+  true.** Members type protocol names, not menu labels: "morpho" is Earn ▸ Lend, "opensea" is
+  Collect, "bip39" is a card inside Recovery, "rpc" is a tab that is deliberately not in this menu
+  at all. The index tags each nav item with synonyms and names the destinations inside it; matching
+  (`lib/nav/navSearch.js`) ANDs the terms and matches each as a TOKEN PREFIX, so never hand-write
+  stems. Four rules: (1) the index is **descriptive, never authoritative** — the drawer filters
+  items for tenant/chain FIRST and consults the index per surviving item, so an entry can never
+  resurrect a surface the app has hidden; (2) Settings/Network/Membership/Account join results
+  **only while a filter is active** and leave with it — the resting drawer's bounded height (spec
+  081) is unchanged; (3) a destination's `id` IS its `data-attention` marker, and a shortcut
+  deep-links with `focus=<id>` so the surface flashes on arrival (`lib/nav/attention.js`, mounted
+  once as `AttentionFocus` in App.jsx) — a marker is optional and its absence degrades to a plain
+  navigation, never to a broken link; (4) `navId` must be a real nav item / WalletPage tab id, which
+  `src/test/nav/navSearchIndex.test.jsx` enforces. Accordion cards additionally carry `hash`, and
+  `accordionSectionForHash` is the ONE place a `#card` deep link resolves to an OPEN card — for
+  Settings and Recovery alike; do not add a second hash→section map. See
+  `docs/developer-guide/nav-search.md`.
 - **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
   The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
   `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE
