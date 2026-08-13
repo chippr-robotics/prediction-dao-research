@@ -216,8 +216,13 @@ artifacts live under `specs/<feature>/`.
 - **Protect ▸ Verify (message signing) is FRONTEND-ONLY and has THREE verdicts, never two.**
   Members sign an arbitrary message to prove control of an account and check other people's proofs
   (`frontend/src/lib/verify/`, surfaced by `components/custody/VerifySection.jsx`). Verification
-  returns `valid` / `invalid` / **`unverifiable`** — the ERC-1271 leg is a network read, so an RPC
-  timeout is NOT a forged signature and must never render as one; a negative is reported only when
+  returns `valid` / `invalid` / **`unverifiable`**. **`verifyMessage` is OFFLINE and SYNCHRONOUS —
+  never give it a chain or a provider and never make it async**: checking a signature against a
+  public key is arithmetic, and the type is what enforces it. The network lives in the separate
+  `verifyOnChain`, offered to the member as an explicit escalation only where it could settle
+  something, and it exists for one reason — a CONTRACT account has no public key, so only the
+  account itself can say whether it stands behind the bytes. The ERC-1271 leg is a network read, so
+  an RPC timeout is NOT a forged signature and must never render as one; a negative is reported only when
   it is knowable (ECDSA recovered someone else AND the chain says the claimed address holds no
   code, or the account contract itself said no). A mismatching ECDSA recovery is NOT promoted to a
   negative when the on-chain leg could not run — that is exactly what a legitimate smart-account

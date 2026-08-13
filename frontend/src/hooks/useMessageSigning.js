@@ -15,7 +15,7 @@ import { useWallet } from './useWalletManagement'
 import { CustodyContext } from '../contexts/CustodyContext'
 import { readSession } from '../connectors/passkey'
 import { resolveMessageSigner, signMessageAsAccount, SignatureDeclined } from '../lib/verify/signMessage'
-import { verifyMessage, VERIFY_STATUS } from '../lib/verify/verifyMessage'
+import { verifyMessage, verifyOnChain, VERIFY_STATUS } from '../lib/verify/verifyMessage'
 
 const PERSONAL = { mode: 'personal' }
 
@@ -114,6 +114,10 @@ export function useMessageSigning({ deps = {} } = {}) {
    * So a throw becomes the honest third state instead. "We could not complete the check" is
    * literally true of an internal failure, and `unverifiable` is precisely the state that says so
    * without claiming anything about the signature.
+   *
+   * This is the OFFLINE check: `verifyMessage` cannot reach a network. It stays async and guarded
+   * anyway, because it can still be handed something unexpected, and the never-reject contract is
+   * what the surface depends on.
    */
   const verify = useCallback(
     async (claim) => {
@@ -139,6 +143,35 @@ export function useMessageSigning({ deps = {} } = {}) {
     [deps],
   )
 
+  /**
+   * The explicit escalation, for the one outcome the offline check cannot settle: ask the claimed
+   * account itself, on a network the member names. Same never-reject contract as `verify`.
+   */
+  const checkOnChain = useCallback(
+    async (claim) => {
+      setVerifying(true)
+      try {
+        const result = await (deps.verifyOnChain ?? verifyOnChain)(claim)
+        setVerdict(result)
+        return result
+      } catch (error) {
+        console.error('On-chain signature check failed unexpectedly:', error)
+        const result = {
+          status: VERIFY_STATUS.UNVERIFIABLE,
+          method: null,
+          signer: null,
+          canCheckOnChain: true,
+          reason: 'Something went wrong while asking that account, so nothing could be established. Try again.',
+        }
+        setVerdict(result)
+        return result
+      } finally {
+        setVerifying(false)
+      }
+    },
+    [deps],
+  )
+
   const clearVerdict = useCallback(() => setVerdict(null), [])
 
   return {
@@ -154,6 +187,7 @@ export function useMessageSigning({ deps = {} } = {}) {
     verifying,
     verdict,
     verify,
+    checkOnChain,
     clearVerdict,
   }
 }

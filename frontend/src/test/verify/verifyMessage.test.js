@@ -1,15 +1,22 @@
 /**
  * Protect ▸ Verify — verification semantics.
  *
- * The suite is organised around the THREE outcomes, because the bug this feature can actually ship
- * is collapsing them into two: an unreachable node reported as a forged signature. Every
- * network-failure path below asserts `unverifiable`, never `invalid`.
+ * Organised around the THREE outcomes, because the bug this feature can actually ship is collapsing
+ * them into two: an unreachable node reported as a forged signature. Every network-failure path
+ * below asserts `unverifiable`, never `invalid`.
+ *
+ * The split matters as much as the outcomes. `verifyMessage` is OFFLINE and synchronous — checking
+ * a signature against a public key is arithmetic — and `verifyOnChain` is the explicit escalation
+ * for the one thing arithmetic cannot answer: whether a CONTRACT account, which has no public key,
+ * stands behind the bytes. The first suite below asserts the offline function cannot reach a
+ * network even when handed one.
  */
 
 import { describe, it, expect, vi } from 'vitest'
 import { ethers } from 'ethers'
 import {
   verifyMessage,
+  verifyOnChain,
   verifySignedMessage,
   checkErc1271,
   recoverPersonalSigner,
@@ -39,6 +46,21 @@ vi.mock('../../utils/rpcProvider', () => ({
   },
 }))
 
+describe('verifyMessage is offline', () => {
+  it('is synchronous — a function that returns no promise cannot await a network', () => {
+    const out = verifyMessage({ message: MESSAGE, signature: SIGNATURE, address: SIGNER_ADDRESS })
+    expect(out).not.toBeInstanceOf(Promise)
+    expect(out.status).toBe(VERIFY_STATUS.VALID)
+  })
+
+  it('ignores a provider even if one is passed — there is no parameter for it', () => {
+    const provider = { getCode: vi.fn(), call: vi.fn() }
+    verifyMessage({ message: MESSAGE, signature: ERC1271_SIGNATURE, address: CONTRACT_ACCOUNT, chainId: 137, provider })
+    expect(provider.getCode).not.toHaveBeenCalled()
+    expect(provider.call).not.toHaveBeenCalled()
+  })
+})
+
 describe('verifyMessage — valid', () => {
   it('confirms a wallet signature against the claimed address, with no network at all', async () => {
     const out = await verifyMessage({ message: MESSAGE, signature: SIGNATURE, address: SIGNER_ADDRESS })
@@ -63,15 +85,16 @@ describe('verifyMessage — valid', () => {
       address: SIGNER_ADDRESS,
     })
     expect(out.status).toBe(VERIFY_STATUS.VALID)
-    // …and the trimmed variant must NOT verify, which is what makes the above meaningful.
-    const trimmed = await verifyMessage({
+    // …and the trimmed variant must NOT verify, which is what makes the above meaningful. Offline
+    // that shows up as "unsettled, and here is who actually signed" rather than a verdict: the
+    // claimed address could be a contract that accepts the real signer.
+    const trimmed = verifyMessage({
       message: AWKWARD_MESSAGE.trim(),
       signature: AWKWARD_SIGNATURE,
       address: SIGNER_ADDRESS,
-      chainId: 137,
-      provider: stubProvider({ code: '0x' }),
     })
-    expect(trimmed.status).toBe(VERIFY_STATUS.INVALID)
+    expect(trimmed.status).not.toBe(VERIFY_STATUS.VALID)
+    expect(trimmed.canCheckOnChain).toBe(true)
   })
 
   it('names the signer when no address is claimed', async () => {
@@ -81,7 +104,7 @@ describe('verifyMessage — valid', () => {
   })
 
   it('accepts a contract account whose isValidSignature returns the magic value', async () => {
-    const out = await verifyMessage({
+    const out = await verifyOnChain({
       message: MESSAGE,
       signature: ERC1271_SIGNATURE,
       address: CONTRACT_ACCOUNT,
@@ -92,8 +115,8 @@ describe('verifyMessage — valid', () => {
     expect(out.method).toBe('erc1271')
   })
 
-  it('falls through to the contract when ECDSA recovers a DIFFERENT address (an owner is not the account)', async () => {
-    const out = await verifyMessage({
+  it('accepts an owner signature the account itself vouches for (an owner is not the account)', async () => {
+    const out = await verifyOnChain({
       message: MESSAGE,
       signature: SIGNATURE, // recovers to SIGNER_ADDRESS…
       address: CONTRACT_ACCOUNT, // …but the claim is the account it controls
@@ -105,9 +128,12 @@ describe('verifyMessage — valid', () => {
   })
 })
 
-describe('verifyMessage — definite negatives', () => {
+// A definite negative requires an answer from the account. Offline, a recovery that names somebody
+// else is a FACT about the bytes, not a verdict on the claim — the claimed address may be a
+// contract whose owner is that somebody. So these live under the escalation.
+describe('verifyOnChain — definite negatives', () => {
   it('rejects a signature by somebody else and names who actually signed', async () => {
-    const out = await verifyMessage({
+    const out = await verifyOnChain({
       message: MESSAGE,
       signature: SIGNATURE,
       address: OTHER_ADDRESS,
@@ -120,7 +146,7 @@ describe('verifyMessage — definite negatives', () => {
   })
 
   it('rejects a tampered message', async () => {
-    const out = await verifyMessage({
+    const out = await verifyOnChain({
       message: `${MESSAGE} (edited)`,
       signature: SIGNATURE,
       address: SIGNER_ADDRESS,
@@ -131,7 +157,7 @@ describe('verifyMessage — definite negatives', () => {
   })
 
   it('rejects when the account contract itself says no', async () => {
-    const out = await verifyMessage({
+    const out = await verifyOnChain({
       message: MESSAGE,
       signature: ERC1271_SIGNATURE,
       address: CONTRACT_ACCOUNT,
@@ -143,7 +169,7 @@ describe('verifyMessage — definite negatives', () => {
   })
 
   it('rejects non-ECDSA bytes against an address holding no code on the named chain', async () => {
-    const out = await verifyMessage({
+    const out = await verifyOnChain({
       message: MESSAGE,
       signature: ERC1271_SIGNATURE,
       address: OTHER_ADDRESS,
@@ -164,14 +190,8 @@ describe('verifyMessage — definite negatives', () => {
   // `encodeFunctionData` unguarded — which threw OUT of verifyMessage as a rejected promise, so the
   // member pressed Check and nothing happened at all. It must be a verdict, not a crash. (Note
   // ethers' own `isHexString(value)` would not have caught this: it accepts '0x123'.)
-  it('rejects odd-length hex as a verdict rather than throwing', async () => {
-    const out = await verifyMessage({
-      message: MESSAGE,
-      signature: '0x123',
-      address: CONTRACT_ACCOUNT,
-      chainId: CONTRACT_ACCOUNT_CHAIN_ID,
-      provider: stubProvider({ answer: 'magic' }),
-    })
+  it('rejects odd-length hex as a verdict rather than throwing', () => {
+    const out = verifyMessage({ message: MESSAGE, signature: '0x123', address: CONTRACT_ACCOUNT })
     expect(out.status).toBe(VERIFY_STATUS.INVALID)
     expect(out.reason).toMatch(/even number of digits/i)
   })
@@ -184,18 +204,15 @@ describe('verifyMessage — definite negatives', () => {
 })
 
 describe('verifyMessage — unverifiable is not invalid', () => {
-  it('reports unverifiable when the chain is unknown and the bytes are not ECDSA', async () => {
-    const out = await verifyMessage({
-      message: MESSAGE,
-      signature: ERC1271_SIGNATURE,
-      address: CONTRACT_ACCOUNT,
-    })
+  it('offers the on-chain route rather than guessing, when the bytes are not ECDSA', () => {
+    const out = verifyMessage({ message: MESSAGE, signature: ERC1271_SIGNATURE, address: CONTRACT_ACCOUNT })
     expect(out.status).toBe(VERIFY_STATUS.UNVERIFIABLE)
-    expect(out.reason).toMatch(/which network/i)
+    expect(out.canCheckOnChain).toBe(true)
+    expect(out.reason).toMatch(/not a wallet signature/i)
   })
 
   it('reports unverifiable when the node cannot be reached', async () => {
-    const out = await verifyMessage({
+    const out = await verifyOnChain({
       message: MESSAGE,
       signature: ERC1271_SIGNATURE,
       address: CONTRACT_ACCOUNT,
@@ -207,7 +224,7 @@ describe('verifyMessage — unverifiable is not invalid', () => {
   })
 
   it('reports unverifiable when isValidSignature reverts — a broken account is not a forgery', async () => {
-    const out = await verifyMessage({
+    const out = await verifyOnChain({
       message: MESSAGE,
       signature: ERC1271_SIGNATURE,
       address: CONTRACT_ACCOUNT,
@@ -218,7 +235,7 @@ describe('verifyMessage — unverifiable is not invalid', () => {
   })
 
   it('a mismatching recovery with an unreachable node stays unverifiable, and still names the recovered signer', async () => {
-    const out = await verifyMessage({
+    const out = await verifyOnChain({
       message: MESSAGE,
       signature: SIGNATURE,
       address: CONTRACT_ACCOUNT,
@@ -230,12 +247,14 @@ describe('verifyMessage — unverifiable is not invalid', () => {
     expect(out.reason).toContain(SIGNER_ADDRESS)
   })
 
-  // The same shape without a chain at all: an owner key recovering instead of the account it
-  // controls is NOT evidence of forgery, so this must not be promoted to a negative.
-  it('does not promote a mismatching recovery to a negative when no chain was given', async () => {
-    const out = await verifyMessage({ message: MESSAGE, signature: SIGNATURE, address: CONTRACT_ACCOUNT })
+  // Offline, an owner key recovering instead of the account it controls is NOT evidence of forgery.
+  // The fact is reported; the verdict is not.
+  it('states who signed without promoting a mismatch to a negative', () => {
+    const out = verifyMessage({ message: MESSAGE, signature: SIGNATURE, address: CONTRACT_ACCOUNT })
     expect(out.status).toBe(VERIFY_STATUS.UNVERIFIABLE)
     expect(out.signer).toBe(SIGNER_ADDRESS)
+    expect(out.canCheckOnChain).toBe(true)
+    expect(out.reason).toMatch(/That is certain/i)
   })
 
   it('cannot name a signer for contract-account bytes when no address is claimed', async () => {
@@ -294,13 +313,28 @@ describe('recoverPersonalSigner', () => {
 })
 
 describe('verifySignedMessage', () => {
-  it('verifies straight from a parsed document', async () => {
-    const out = await verifySignedMessage(EIP191_DOCUMENT)
+  it('verifies a wallet signature straight from a parsed document, offline', () => {
+    const out = verifySignedMessage(EIP191_DOCUMENT)
     expect(out.status).toBe(VERIFY_STATUS.VALID)
+    expect(out.method).toBe('eip191')
   })
 
-  it('carries the document chain into the on-chain leg', async () => {
-    const out = await verifySignedMessage(ERC1271_DOCUMENT, { provider: stubProvider({ answer: 'magic' }) })
+  // A contract-account record cannot be settled offline — and the document's own chain does NOT
+  // make it so. The caller escalates deliberately.
+  it('leaves a contract-account document unsettled, and says the account can be asked', () => {
+    const out = verifySignedMessage(ERC1271_DOCUMENT)
+    expect(out.status).toBe(VERIFY_STATUS.UNVERIFIABLE)
+    expect(out.canCheckOnChain).toBe(true)
+  })
+
+  it('settles it once the caller asks the account, using the chain the document named', async () => {
+    const out = await verifyOnChain({
+      message: ERC1271_DOCUMENT.message,
+      signature: ERC1271_DOCUMENT.signature,
+      address: ERC1271_DOCUMENT.address,
+      chainId: ERC1271_DOCUMENT.chainId,
+      provider: stubProvider({ answer: 'magic' }),
+    })
     expect(out.status).toBe(VERIFY_STATUS.VALID)
     expect(out.method).toBe('erc1271')
   })
