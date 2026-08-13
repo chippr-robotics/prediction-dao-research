@@ -21,6 +21,8 @@
  * `{ proposals: [], ok: false }` and never throws into the poll loop (FR-015).
  */
 
+import { resolveSubgraphUrl } from '../wagers/SubgraphSource'
+
 // One bounded query — current draw-proposed wagers among the caller's ids.
 // `id_in` scopes to the user's wagers; `status` filters to open proposals.
 const QUERY = `
@@ -36,18 +38,19 @@ const QUERY = `
  * Fetch the current open draw proposals for the given wagers from the subgraph.
  *
  * @param {object} params
+ * @param {number} [params.chainId] - Chain to resolve the subgraph endpoint for
  * @param {string[]} params.wagerIds - Wager ids the user participates in
  * @returns {Promise<{proposals: {wagerId: string, proposer: string}[], ok: boolean}>}
  *   `proposals` lists every wager currently in `draw_proposed` with its
  *   (lowercased) proposer. `ok` is true only when the read succeeded — the
  *   caller retains prior draw state when `ok` is false. Resolves; never rejects.
  */
-export async function fetchDrawProposals({ wagerIds }) {
+export async function fetchDrawProposals({ chainId, wagerIds }) {
   const ids = (wagerIds || []).map(String)
   // Nothing to ask about — a successful empty answer (lets the caller clear any
   // stale proposals without a network round-trip).
   if (ids.length === 0) return { proposals: [], ok: true }
-  const subgraphUrl = import.meta.env?.VITE_SUBGRAPH_URL || ''
+  const subgraphUrl = resolveSubgraphUrl(chainId)
   if (!subgraphUrl) return { proposals: [], ok: false }
 
   try {
