@@ -65,6 +65,17 @@ describe('flashAttention', () => {
     expect(late.classList.contains(ATTENTION_CLASS)).toBe(false)
   })
 
+  it('treats a junk id as "no target" rather than throwing', () => {
+    // The id comes off a URL parameter, so it is arbitrary text. Interpolating it into a selector
+    // would turn a quote or a newline into an exception on a page that is otherwise fine.
+    const el = marked('earn-lend')
+    for (const junk of ['"] , *', 'a\nb', '::before', '[', 'earn-lend"]']) {
+      expect(() => flashAttention(junk)).not.toThrow()
+    }
+    act(() => vi.advanceTimersByTime(WAIT_MS * 2))
+    expect(el.classList.contains(ATTENTION_CLASS)).toBe(false)
+  })
+
   it('drops the highlight when cancelled mid-flash', () => {
     const el = marked('trade-perps')
     const cancel = flashAttention('trade-perps')

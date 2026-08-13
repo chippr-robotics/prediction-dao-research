@@ -20,16 +20,16 @@ const KEYWORD_EXACT = 55
 const KEYWORD_TOKEN = 45
 const SUMMARY_TOKEN = 20
 
-/** Split a raw query into lowercase terms. Empty/whitespace-only yields an empty list. */
-export function queryTerms(query) {
-  return String(query ?? '')
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-}
-
+// ONE splitter for both sides of the comparison. Splitting the query on whitespace while the
+// index is tokenized on punctuation is a silent asymmetry: "bip-39" and "erc-4626" would arrive
+// as single terms that no token could ever prefix, so a member typing the hyphenated spelling of
+// a keyword the index literally contains would be told there were no matches.
 const tokens = (text) => String(text ?? '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+
+/** Split a raw query into lowercase terms. Empty or punctuation-only yields an empty list. */
+export function queryTerms(query) {
+  return tokens(query)
+}
 
 const someTokenStartsWith = (text, term) => tokens(text).some((token) => token.startsWith(term))
 

@@ -33,11 +33,21 @@ function prefersReducedMotion() {
   return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)
 }
 
-/** The element a destination id marks, or null. */
+/**
+ * The element a destination id marks, or null.
+ *
+ * The id arrives from a URL parameter, so it is arbitrary text. It is compared as a VALUE rather
+ * than interpolated into a selector: an id carrying a quote, a bracket or a newline would build a
+ * selector `querySelector` throws on, which would turn a junk parameter into a broken page rather
+ * than into "no target". There is nothing to escape here because nothing is parsed.
+ */
 export function findAttentionTarget(id, root = document) {
   if (!id) return null
-  const selector = `[${ATTENTION_ATTR}="${String(id).replace(/["\\]/g, '\\$&')}"]`
-  return root.querySelector(selector)
+  const wanted = String(id)
+  for (const element of root.querySelectorAll(`[${ATTENTION_ATTR}]`)) {
+    if (element.getAttribute(ATTENTION_ATTR) === wanted) return element
+  }
+  return null
 }
 
 /**

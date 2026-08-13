@@ -119,6 +119,23 @@ describe('nav search matching', () => {
     expect(scoreEntry(entry, queryTerms('orpho'))).toBe(0)
   })
 
+  it('tokenizes the query the same way it tokenizes the index', () => {
+    // Whitespace-splitting the query while the index splits on punctuation is a silent asymmetry:
+    // the hyphenated spelling would arrive as one term no token could prefix.
+    expect(queryTerms('bip-39')).toEqual(['bip', '39'])
+    expect(queryTerms('  ERC-4626 ')).toEqual(['erc', '4626'])
+    expect(queryTerms('---')).toEqual([])
+  })
+
+  it('finds a hyphenated keyword whichever way the member spells it', () => {
+    const recovery = destinationById('legacy-recovery')
+    for (const term of ['bip39', 'bip-39', 'BIP 39']) {
+      expect(scoreEntry(recovery, queryTerms(term)), term).toBeGreaterThan(0)
+    }
+    const lend = destinationById('earn-lend')
+    expect(scoreEntry(lend, queryTerms('erc-4626'))).toBeGreaterThan(0)
+  })
+
   it('keeps mid-token label matching, which the menu filter always had', () => {
     expect(scoreEntry({ label: 'Recovery' }, queryTerms('cover'))).toBeGreaterThan(0)
   })
