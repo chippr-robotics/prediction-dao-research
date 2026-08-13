@@ -7,6 +7,15 @@
  * Spec 049 (FR-016): the SafePolicyGuard's rule events (RulesConfigured, CooldownSet, AllowlistEnabled,
  * AllowlistChanged) join the same snapshot-diff — a per-vault event count is snapped, and any increase emits a
  * "policy-changed" entry in the custody domain. No-ops until the guard is deployed + its block recorded.
+ *
+ * CATCHING UP IS NOT FAILING. Both reads scan event history, and on a live network that history starts over a
+ * million blocks back while the RPC caps one request at 10,000 blocks — so the first pass is a bounded,
+ * resumable backfill (`lib/chain/logScan`) that spends CHUNK_BUDGET_PER_POLL requests per cycle and resumes on
+ * the next. While it is still short of the chain head this source reports `partial`, NOT `ok:false`: the
+ * distinction is the whole point, because `ok:false` is what raises the member-facing "couldn't refresh"
+ * notice, and "still reading" is not "could not read". Nothing is diffed off an incomplete scan either — a
+ * baseline taken half-way through would emit invented "a transaction was executed" entries as the scan caught
+ * up with history the member has already seen.
  */
 import { ethers } from 'ethers'
 import { getProvider } from '../../../utils/blockchainService'
@@ -18,6 +27,14 @@ import { readPolicyEventCount } from '../../../lib/custody/policyEvents'
 import { STATUS } from '../../../lib/custody/proposalStatus'
 
 const EMPTY = { ok: true, entries: [], nextSnapshots: {}, currentIds: [], actionNeededById: {} }
+
+/**
+ * Log-scan chunks this source may spend per vault, per poll. A 30s cadence must never turn a
+ * backfill into a request storm; at 10,000 blocks a chunk this walks ~120k blocks per cycle and
+ * converges on a million-block history in a few minutes, after which the session cache makes each
+ * later poll a single chunk.
+ */
+const CHUNK_BUDGET_PER_POLL = 12
 
 export const custodySource = {
   key: 'custody',
@@ -50,6 +67,7 @@ export const custodySource = {
     const nextSnapshots = { ...(prior.snapshots || {}) }
     const accountLc = String(account).toLowerCase()
     let anyOk = false
+    let partial = false
 
     const mk = (vaultAddr, type, message, severity, actionable) => ({
       id: `custody:${vaultAddr}:${type}:${nowMs}`,
@@ -70,11 +88,27 @@ export const custodySource = {
       currentIds.push(sid)
       let state
       try {
-        state = await readVaultProposalState({ safeAddress: vaultAddr, hubAddress, chainId, provider, fromBlock })
+        state = await readVaultProposalState({
+          safeAddress: vaultAddr,
+          hubAddress,
+          chainId,
+          provider,
+          fromBlock,
+          maxChunks: CHUNK_BUDGET_PER_POLL,
+        })
         anyOk = true
       } catch {
         // Can't read this vault — keep its prior snapshot so we don't lose the baseline.
         if (prior.snapshots?.[sid]) nextSnapshots[sid] = prior.snapshots[sid]
+        continue
+      }
+
+      // Still backfilling: the vault answered, so this is not a failure — but its proposal set is
+      // not yet known to be complete, so keep the prior snapshot and diff nothing this cycle.
+      if (!state.complete) {
+        partial = true
+        if (prior.snapshots?.[sid]) nextSnapshots[sid] = prior.snapshots[sid]
+        if (prior.snapshots?.[sid]?.needMe?.length) actionNeededById[sid] = 'approve'
         continue
       }
 
@@ -95,12 +129,19 @@ export const custodySource = {
       let policyEventCount = prev?.policyEventCount
       if (policyEnabled) {
         try {
-          policyEventCount = await readPolicyEventCount({
+          const res = await readPolicyEventCount({
             guardAddress,
             safeAddress: vaultAddr,
+            chainId,
             provider,
             fromBlock: guardFromBlock,
+            maxChunks: CHUNK_BUDGET_PER_POLL,
           })
+          // A count from an unfinished scan only rises because the scan is catching up, which would
+          // read as "the policy on this vault changed" over and over. Keep the prior count until the
+          // scan is whole.
+          if (res.complete) policyEventCount = res.count
+          else partial = true
         } catch {
           // keep prior count
         }
@@ -133,7 +174,7 @@ export const custodySource = {
 
     // If every vault read failed, report not-ok so the engine retains the prior slice.
     if (!anyOk && refs.length > 0) return { ok: false }
-    return { ok: true, entries, nextSnapshots, currentIds, actionNeededById }
+    return { ok: true, entries, nextSnapshots, currentIds, actionNeededById, partial }
   },
 }
 

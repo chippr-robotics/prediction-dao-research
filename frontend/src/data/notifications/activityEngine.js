@@ -21,13 +21,16 @@ import { getSourceSlice } from './activityStore'
  * @param {number} args.nowMs
  * @param {object} args.priorStore - the store as known at the start of the cycle (for each source's `prior`)
  * @param {object} [args.prevActionByDomain] - last cycle's action maps (retained for a failing source)
- * @returns {Promise<{sliceUpdates:object, fresh:object[], actionNeededByDomain:object, anyFailure:boolean, partialByDomain:object}>}
+ * @returns {Promise<{sliceUpdates:object, fresh:object[], actionNeededByDomain:object, anyFailure:boolean, failed:object[], partialByDomain:object}>}
+ *   `failed` lists `{ key, label }` for every source that could not read this cycle, so the notice a
+ *   member sees can NAME what is stale instead of gesturing at "some activity".
  */
 export async function detectAll({ sources, account, chainId, nowMs, priorStore, prevActionByDomain = {} }) {
   const sliceUpdates = {}
   const fresh = []
   const actionNeededByDomain = {}
   const partialByDomain = {}
+  const failed = []
   let anyFailure = false
 
   // Sequential in registry order so `fresh` (and thus the toast cap) is deterministic; per-source network
@@ -37,11 +40,16 @@ export async function detectAll({ sources, account, chainId, nowMs, priorStore, 
     let res
     try {
       res = await source.detect({ account, chainId, nowMs, prior })
-    } catch {
+    } catch (err) {
+      // The engine swallowed this entirely for a long time, which left the member's "couldn't
+      // refresh" notice as the only evidence a read had failed — and it named neither the source
+      // nor the reason. Log the cause; the notice is the member's half of the same fact.
+      console.warn(`[activity] source "${source.key}" threw:`, err?.message || err)
       res = { ok: false }
     }
     if (!res || res.ok === false) {
       anyFailure = true
+      failed.push({ key: source.key, label: source.label || source.key })
       actionNeededByDomain[source.key] = prevActionByDomain[source.key] || {}
       continue // retain prior slice (no sliceUpdate)
     }
@@ -51,7 +59,7 @@ export async function detectAll({ sources, account, chainId, nowMs, priorStore, 
     if (res.partial) partialByDomain[source.key] = true
   }
 
-  return { sliceUpdates, fresh, actionNeededByDomain, anyFailure, partialByDomain }
+  return { sliceUpdates, fresh, actionNeededByDomain, anyFailure, failed, partialByDomain }
 }
 
 /** Total truthy action-needed count across all domains' maps. */

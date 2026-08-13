@@ -108,9 +108,68 @@ describe('ActivityProvider (spec 031)', () => {
     })
     render(<ActivityProvider sources={[src]}><Probe /></ActivityProvider>)
     await tick(0)
-    await tick(30_000) // failure
+    await tick(30_000) // failure 1 — held back
+    await tick(30_000) // failure 2 — disclosed
     expect(captured.entries.map((e) => e.id)).toEqual(['e1']) // retained, nothing fabricated/removed
     expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining("Couldn't refresh"), 'error', 6000)
+    expect(h.showNotification).toHaveBeenCalledTimes(1) // once, not once per failing cycle
+  })
+
+  // The bug this guards: the first cycle runs at mount, alongside wallet connect, RPC warm-up and a
+  // possibly-cold gateway. Announcing a blip there painted a red banner over an app that was fine.
+  it('does NOT announce a single failing cycle', async () => {
+    let call = 0
+    const src = mockSource(async () => {
+      call += 1
+      return call === 1 ? { ok: false } : { ok: true, entries: [], nextSnapshots: {}, nextAux: {}, currentIds: [], actionNeededById: {} }
+    })
+    render(<ActivityProvider sources={[src]}><Probe /></ActivityProvider>)
+    await tick(0) // fails
+    await tick(30_000) // recovers
+    expect(h.showNotification).not.toHaveBeenCalled()
+  })
+
+  it('names the domains that could not be read', async () => {
+    const bad = { key: 'custody', label: 'Custody', detect: vi.fn(async () => ({ ok: false })) }
+    render(<ActivityProvider sources={[bad]}><Probe /></ActivityProvider>)
+    await tick(0)
+    await tick(30_000)
+    expect(h.showNotification).toHaveBeenCalledWith(
+      "Couldn't refresh Custody activity — will keep retrying",
+      'error',
+      6000,
+    )
+  })
+
+  it('clears the notice on recovery so a later outage is disclosed again', async () => {
+    let ok = false
+    const src = mockSource(async () =>
+      ok
+        ? { ok: true, entries: [], nextSnapshots: {}, nextAux: {}, currentIds: [], actionNeededById: {} }
+        : { ok: false },
+    )
+    render(<ActivityProvider sources={[src]}><Probe /></ActivityProvider>)
+    await tick(0)
+    await tick(30_000) // second failure → first notice
+    expect(h.showNotification).toHaveBeenCalledTimes(1)
+    ok = true
+    await tick(30_000) // clean cycle clears the streak and the "already said" flag
+    ok = false
+    await tick(30_000) // failure 1 again — still held back
+    expect(h.showNotification).toHaveBeenCalledTimes(1)
+    await tick(30_000) // failure 2 — disclosed a second time
+    expect(h.showNotification).toHaveBeenCalledTimes(2)
+  })
+
+  // `partial` means a source read successfully but has not finished backfilling history. That is not
+  // a failure and must never reach the member as one.
+  it('never announces a partial (still-catching-up) source', async () => {
+    const src = mockSource(async () => ({ ok: true, partial: true, entries: [], nextSnapshots: {}, nextAux: {}, currentIds: [], actionNeededById: {} }))
+    render(<ActivityProvider sources={[src]}><Probe /></ActivityProvider>)
+    await tick(0)
+    await tick(30_000)
+    await tick(30_000)
+    expect(h.showNotification).not.toHaveBeenCalled()
   })
 
   it('exposes action-needed count distinct from unread', async () => {
