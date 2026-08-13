@@ -33,7 +33,7 @@
     "@polymarket/clob-client": "^5.8.1",
     "@scure/base": "2.3.0",
     "@scure/bip32": "2.3.0",
-    "@scure/bip39": "2.2.0",
+    "@scure/bip39": "2.3.0",
     "@scure/btc-signer": "2.2.0",
     "@solana-program/system": "^0.13.0",
     "@solana/kit": "^7.0.0",
