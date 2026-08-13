@@ -9,11 +9,13 @@ import request from 'supertest'
 import { createApp } from '../src/server.js'
 import { createKillSwitch } from '../src/policy/killswitch.js'
 import {
+  HL_DEFAULT_DEX,
   isAddress,
   normalizeGainsPairs,
   normalizeGainsPendingOrders,
   normalizeGainsPositions,
   normalizeGmxPairs,
+  normalizeHyperliquidDexes,
   normalizeHyperliquidPairs,
   normalizeHyperliquidPositions,
 } from '../src/perps/normalize.js'
@@ -29,6 +31,23 @@ const GAINS_TV = {
   pairs: [{ from: 'BTC', to: 'USD', spreadP: '100000000', groupIndex: '0', feeIndex: '13' }],
   groups: [{ name: 'crypto', minLeverage: '1100', maxLeverage: '200000' }],
   pairInfos: { maxLeverages: [0] },
+  /**
+   * The venue's own fee table, indexed by `pairs[].feeIndex`. CAPTURED VERBATIM from the live
+   * https://backend-arbitrum.gains.trade/trading-variables payload on 2026-08-12 — entries 0, 1 and
+   * 13, at the raw scales the backend serves (never pre-divided, which is the point of the test).
+   *
+   * The relation between the two numbers is the venue's own and was checked on chain the same day:
+   * `totalPositionSizeFeeP / 1e12 × minPositionSizeUsd / 1e3` equals `pairMinFeeUsd(pairIndex)` on
+   * the Arbitrum diamond exactly — 0.00035 × 285.715 = $0.10000025 = 100000250000000000 / 1e18.
+   */
+  fees: [
+    { totalPositionSizeFeeP: '600000000', totalLiqCollateralFeeP: '100000000000', oraclePositionSizeFeeP: '0', minPositionSizeUsd: '166667' },
+    { totalPositionSizeFeeP: '120000000', totalLiqCollateralFeeP: '100000000000', oraclePositionSizeFeeP: '0', minPositionSizeUsd: '833334' },
+    ...Array.from({ length: 11 }, () => null), // indices 2–12, unused by this fixture's one pair
+    // BTC/USD's own entry — feeIndex 13, the 0.035% gTrade publishes for it.
+    { totalPositionSizeFeeP: '350000000', totalLiqCollateralFeeP: '100000000000', oraclePositionSizeFeeP: '0', minPositionSizeUsd: '285715' },
+  ],
+  globalTradeFeeParams: { referralFeeP: '5000', govFeeP: '84999', triggerOrderFeeP: '0', gnsOtcFeeP: '1', gTokenFeeP: '15000' },
   // Blocks a pending market order must age before cancelOrderAfterTimeout stops reverting.
   marketOrdersTimeoutBlocks: 200,
   collaterals: [
@@ -172,6 +191,68 @@ const HL_CLEARINGHOUSE = {
   ],
 }
 
+/**
+ * HIP-3 perp dexes. The FIRST element is a bare `null` — Hyperliquid's own encoding for the
+ * first/default dex, whose name is the empty string — and every other element names a
+ * validator-operated book. Shape captured from the venue's documented `perpDexs` response; the
+ * live list held 10 entries on 2026-08-12 (hyperliquid-decision.md §5.2).
+ */
+const HL_PERP_DEXS = [
+  null,
+  { name: 'xyz', fullName: 'xyz dex', deployer: '0x5e89b26d8d66da9888c835c9bfcc2aa51813e152' },
+  { name: 'hyna', fullName: 'hyna dex', deployer: '0x5e89b26d8d66da9888c835c9bfcc2aa51813e152' },
+]
+
+/** The `xyz` dex lists its own BTC market — the same symbol the default dex lists. */
+const HL_META_XYZ = [
+  { universe: [{ name: 'BTC', szDecimals: 5, maxLeverage: 20 }] },
+  [{ funding: '0.00002', openInterest: '10', markPx: '62900', midPx: '62950', dayNtlVlm: '10000' }],
+]
+
+/**
+ * A member with a BTC LONG on `xyz` and nothing on the default dex — the measured case that made
+ * FairWins render "No open perp positions found for this account." The direction matches the
+ * default dex's ETH long only in side, not in coin; the collision fixture below is the same coin.
+ */
+const HL_CLEARINGHOUSE_XYZ = {
+  assetPositions: [
+    {
+      position: {
+        coin: 'BTC',
+        szi: '0.5',
+        entryPx: '62000',
+        positionValue: '31000',
+        unrealizedPnl: '450',
+        marginUsed: '3100',
+        leverage: { type: 'cross', value: 10 },
+      },
+    },
+  ],
+}
+
+/** `hyna` holds the SAME coin and side as the default dex's row — the id-collision case. */
+const HL_CLEARINGHOUSE_HYNA = {
+  assetPositions: [
+    {
+      position: {
+        coin: 'ETH',
+        szi: '2',
+        entryPx: '3100',
+        positionValue: '6200',
+        unrealizedPnl: '25',
+        marginUsed: '620',
+        leverage: { type: 'cross', value: 10 },
+      },
+    },
+  ],
+}
+
+const HL_BY_DEX = {
+  '': { meta: HL_META, clearinghouse: HL_CLEARINGHOUSE },
+  xyz: { meta: HL_META_XYZ, clearinghouse: HL_CLEARINGHOUSE_XYZ },
+  hyna: { meta: HL_META, clearinghouse: HL_CLEARINGHOUSE_HYNA },
+}
+
 // ---- injected fetch -----------------------------------------------------------------------------
 
 const ok = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => '' })
@@ -180,7 +261,11 @@ const fail = () => ({ ok: false, status: 500, json: async () => ({}), text: asyn
 /**
  * Dispatches on URL/body like the real venues. `down` lists read keys to fail:
  * 'gains' (the whole venue) | 'gainsOpenTrades' | 'gainsUserTv' | 'gainsPricing' | 'gmx' |
- * 'hyperliquid'.
+ * 'hyperliquid' | 'hlPerpDexs' (discovery only) | 'hlDex:<name>' (one perp dex only).
+ *
+ * The Hyperliquid branch dispatches on the request's `dex` field the way the venue does — a read
+ * with no `dex` answers for the FIRST dex, which is the behaviour that produced the fabricated
+ * absence this fixture set exists to prove is gone.
  */
 function mockPerpsFetch({ down = [] } = {}) {
   const calls = []
@@ -203,13 +288,26 @@ function mockPerpsFetch({ down = [] } = {}) {
     if (url.includes('hyperliquid')) {
       if (down.includes('hyperliquid')) return fail()
       const body = JSON.parse(init.body ?? '{}')
-      if (body.type === 'metaAndAssetCtxs') return ok(HL_META)
-      if (body.type === 'clearinghouseState') return ok(HL_CLEARINGHOUSE)
+      if (body.type === 'perpDexs') return down.includes('hlPerpDexs') ? fail() : ok(HL_PERP_DEXS)
+      // The venue's own default: an omitted `dex` is the first perp dex.
+      const dex = typeof body.dex === 'string' ? body.dex : ''
+      if (down.includes(`hlDex:${dex}`)) return fail()
+      const book = HL_BY_DEX[dex]
+      if (!book) return fail()
+      if (body.type === 'metaAndAssetCtxs') return ok(book.meta)
+      if (body.type === 'clearinghouseState') return ok(book.clearinghouse)
     }
     return fail()
   }
   impl.calls = calls
   return impl
+}
+
+/** Every Hyperliquid `/info` body this run sent, in order — for the "did we scope the read" checks. */
+function hlBodies(perpsFetch) {
+  return perpsFetch.calls
+    .filter((c) => c.url.includes('hyperliquid'))
+    .map((c) => JSON.parse(c.init.body ?? '{}'))
 }
 
 const PERPS_ENV = {
@@ -425,6 +523,120 @@ describe('perps normalize', () => {
     expect(pair.collaterals[0].collateralIndex).not.toBe(0)
   })
 
+  /* ------------------------------------------------------------------------------------------ *
+   * The venue's OWN fee, and the minimum it actually enforces (spec 083)
+   *
+   * Until this shipped the confirm step showed FairWins' fee in money and the venue's as '—', which
+   * reads as "FairWins is what this costs". These tests pin the two scales that make the number
+   * real, the floor that makes it honest on small positions, and the one field that is deliberately
+   * NULL because publishing it would refuse orders the venue would fill.
+   * ------------------------------------------------------------------------------------------ */
+
+  it('publishes the gains trading fee as a RATE, at the two scales the venue serves', () => {
+    const [pair] = normalizeGainsPairs({ tradingVariables: GAINS_TV, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    // 350000000 / 1e12 — a FRACTION of position size, i.e. gTrade's published 0.035% for BTC. The
+    // /1e12 is 1e10 (the venue's percent scale) × 100 (percent → fraction); using 1e10 alone would
+    // publish a rate 100× too large and every disclosure built on it would be wrong by that much.
+    expect(pair.venueFee.openRate).toBeCloseTo(0.00035, 12)
+    // Gains charges the same rate on the way out (`getClosingFee` delegates to the same function).
+    expect(pair.venueFee.closeRate).toBe(pair.venueFee.openRate)
+    // 285715 / 1e3 — dollars, not the 1e10 the prices on this payload use.
+    expect(pair.venueFee.feeFloorNotionalUsd).toBeCloseTo(285.715, 9)
+    // The venue's own pairMinFeeUsd: 0.00035 × 285.715, which the Arbitrum diamond returns as
+    // 100000250000000000 (1e18) for pair 0.
+    expect(pair.venueFee.minFeeUsd).toBeCloseTo(0.10000025, 12)
+    // A published rate is not a quote, and the DTO says which it is so a consumer cannot present
+    // one as the other.
+    expect(pair.venueFee.basis).toBe('published-rate')
+  })
+
+  it('resolves the fee through the pair’s OWN feeIndex, not its position in the list', () => {
+    // The fixture's single pair is at index 0 and carries feeIndex 13. A normalizer that read
+    // `fees[0]` would publish 0.06% / $166.67 — a different market's fee, silently.
+    const [pair] = normalizeGainsPairs({ tradingVariables: GAINS_TV, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    expect(pair.venueFee.openRate).not.toBeCloseTo(0.0006, 12)
+    const eur = normalizeGainsPairs({
+      tradingVariables: { ...GAINS_TV, pairs: [{ from: 'EUR', to: 'USD', groupIndex: '1', feeIndex: '1' }] },
+      chartPrices: null,
+      chainId: 42161,
+    })[0]
+    expect(eur.venueFee.openRate).toBeCloseTo(0.00012, 12)
+    expect(eur.venueFee.feeFloorNotionalUsd).toBeCloseTo(833.334, 9)
+  })
+
+  it('publishes the collateral minimum gains actually enforces — 5× the pair’s minimum fee', () => {
+    const [pair] = normalizeGainsPairs({ tradingVariables: GAINS_TV, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    // `openTrade` reverts InsufficientCollateral below this (gTrade v9 changelog). Small, but it is
+    // the venue's own bound and a member should meet it before paying gas to be told.
+    expect(pair.minCollateralUsd).toBeCloseTo(0.50000125, 10)
+  })
+
+  it('publishes NO minimum notional for gains, because since v9 the venue has none', () => {
+    const [pair] = normalizeGainsPairs({ tradingVariables: GAINS_TV, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    // `minPositionSizeUsd` is the FEE FLOOR, not a minimum size: gTrade v9 removed the
+    // BelowMinPositionSizeUsd check outright. Publishing $285.72 as a minimum here would refuse a
+    // $100 BTC position the venue would happily fill — a dead control built from a real number
+    // read as the wrong fact. The field is present-and-null so a consumer can tell that apart from
+    // a gateway that predates it.
+    expect(pair.minNotional).toBeNull()
+    expect(Object.prototype.hasOwnProperty.call(pair, 'minNotional')).toBe(true)
+  })
+
+  it('leaves the fee null — never zero — when the venue does not describe the pair’s fee', () => {
+    const cases = {
+      'no fees table at all': { ...GAINS_TV, fees: undefined },
+      'a feeIndex past the end of it': { ...GAINS_TV, pairs: [{ ...GAINS_TV.pairs[0], feeIndex: '99' }] },
+      'no feeIndex on the pair': { ...GAINS_TV, pairs: [{ from: 'BTC', to: 'USD', groupIndex: '0' }] },
+      'an entry with no rate in it': { ...GAINS_TV, fees: [...GAINS_TV.fees.slice(0, 13), { minPositionSizeUsd: '285715' }] },
+    }
+    for (const [why, tradingVariables] of Object.entries(cases)) {
+      const [pair] = normalizeGainsPairs({ tradingVariables, chartPrices: GAINS_CHARTS, chainId: 42161 })
+      expect(pair.venueFee, why).toBeNull()
+      // A null fee must not leave a fabricated minimum behind it.
+      expect(pair.minCollateralUsd, why).toBeNull()
+    }
+  })
+
+  it('keeps a fee whose floor the venue omitted — a rate is still a rate without one', () => {
+    const tradingVariables = {
+      ...GAINS_TV,
+      fees: [...GAINS_TV.fees.slice(0, 13), { totalPositionSizeFeeP: '350000000', minPositionSizeUsd: '0' }],
+    }
+    const [pair] = normalizeGainsPairs({ tradingVariables, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    expect(pair.venueFee.openRate).toBeCloseTo(0.00035, 12)
+    expect(pair.venueFee.feeFloorNotionalUsd).toBeNull()
+    // No floor ⇒ no minimum fee ⇒ nothing to derive a collateral minimum from. Null, not 0.
+    expect(pair.venueFee.minFeeUsd).toBeNull()
+    expect(pair.minCollateralUsd).toBeNull()
+  })
+
+  it('keeps a ZERO rate as an answer, distinct from an absent one', () => {
+    const tradingVariables = {
+      ...GAINS_TV,
+      fees: [...GAINS_TV.fees.slice(0, 13), { totalPositionSizeFeeP: '0', minPositionSizeUsd: '285715' }],
+    }
+    const [pair] = normalizeGainsPairs({ tradingVariables, chartPrices: GAINS_CHARTS, chainId: 42161 })
+    // "This pair costs nothing to open" is a publishable fact and must not collapse into the null
+    // that means "we could not find out".
+    expect(pair.venueFee.openRate).toBe(0)
+    expect(pair.venueFee.minFeeUsd).toBe(0)
+    expect(pair.minCollateralUsd).toBe(0)
+  })
+
+  it('reports GMX’s fee and minimums as null — the REST feed does not carry them', () => {
+    const [pair] = normalizeGmxPairs({ marketsInfo: GMX_MARKETS, tickers: GMX_TICKERS, tokens: GMX_TOKENS, chainId: 42161 })
+    // GMX keeps position-fee factors and MIN_COLLATERAL_USD in its DataStore; `/markets/info`
+    // returns name/tokens/liquidity/OI/rates and nothing else. An admitted unknown beats a rate
+    // copied from documentation that the deployed contract may have moved.
+    expect(pair.venueFee).toBeNull()
+    expect(pair.minNotional).toBeNull()
+    expect(pair.minCollateralUsd).toBeNull()
+    // Present-and-null, so a consumer can distinguish it from an older gateway that never had them.
+    for (const field of ['venueFee', 'minNotional', 'minCollateralUsd']) {
+      expect(Object.prototype.hasOwnProperty.call(pair, field), field).toBe(true)
+    }
+  })
+
   it('publishes the gains leverage FLOOR as well as the ceiling', () => {
     const [pair] = normalizeGainsPairs({ tradingVariables: GAINS_TV, chartPrices: GAINS_CHARTS, chainId: 42161 })
     expect(pair.minLeverage).toBe(1.1) // group minLeverage 1100 at the 1e3 scale
@@ -503,6 +715,55 @@ describe('perps normalize', () => {
     expect(p.unrealizedPnlUsd).toBe(-50)
     expect(p.leverage).toBe(10)
   })
+
+  /* ---- HIP-3 perp dexes (spec 083, hyperliquid-decision.md §5.2 defect 1) ------------------ */
+
+  it('reads the perp-dex list, treating the leading null as the default dex', () => {
+    expect(normalizeHyperliquidDexes(HL_PERP_DEXS)).toEqual([HL_DEFAULT_DEX, 'xyz', 'hyna'])
+  })
+
+  it('always yields the default dex, even from an unusable or dex-less list', () => {
+    // A list we cannot read must not cost us the book spec 082 already served.
+    expect(normalizeHyperliquidDexes(null)).toEqual([HL_DEFAULT_DEX])
+    expect(normalizeHyperliquidDexes([{ name: 'xyz' }])).toEqual([HL_DEFAULT_DEX, 'xyz'])
+    // Deduped, and a repeated default (two nulls) is still one entry.
+    expect(normalizeHyperliquidDexes([null, null, { name: 'xyz' }, { name: 'xyz' }])).toEqual([
+      HL_DEFAULT_DEX,
+      'xyz',
+    ])
+  })
+
+  it('scopes a non-default dex into the position id, so two dexes never merge into one row', () => {
+    const [dflt] = normalizeHyperliquidPositions({ clearinghouseState: HL_CLEARINGHOUSE })
+    const [other] = normalizeHyperliquidPositions({ clearinghouseState: HL_CLEARINGHOUSE_HYNA, dex: 'hyna' })
+    // Same coin, same side, two REAL positions on two different books.
+    expect(dflt.symbol).toBe(other.symbol)
+    expect(dflt.direction).toBe(other.direction)
+    expect(other.id).not.toBe(dflt.id)
+    expect(other.id).toBe('hyperliquid:hyna:ETH:long')
+    // The default dex's id is byte-identical to what spec 082 shipped: the SPA's activity source
+    // fingerprints these, so re-keying them would narrate a position change that never happened.
+    expect(dflt.id).toBe('hyperliquid:ETH:long')
+    expect(dflt.dex).toBe(HL_DEFAULT_DEX)
+    expect(dflt.variant).toBeNull()
+    expect(other.dex).toBe('hyna')
+    expect(other.variant).toBe('hyna') // rides the same field GMX's market variant does
+    expect(other.venueRef).toEqual({ venue: 'hyperliquid', dex: 'hyna' })
+  })
+
+  it('scopes a non-default dex into the pair id too, and strips a redundant dex prefix', () => {
+    const [pair] = normalizeHyperliquidPairs({ metaAndAssetCtxs: HL_META_XYZ, dex: 'xyz' })
+    expect(pair.id).toBe('hyperliquid:xyz:BTC')
+    expect(pair.symbol).toBe('BTC/USD') // never "xyz:BTC/USD" — the dex is a variant, not a symbol
+    expect(pair.variant).toBe('xyz')
+    // Some Hyperliquid surfaces qualify the asset as "<dex>:<COIN>"; both spellings land here.
+    const prefixed = normalizeHyperliquidPairs({
+      metaAndAssetCtxs: [{ universe: [{ name: 'xyz:BTC' }] }, [{ markPx: '1' }]],
+      dex: 'xyz',
+    })
+    expect(prefixed[0].id).toBe('hyperliquid:xyz:BTC')
+    expect(prefixed[0].base).toBe('BTC')
+  })
 })
 
 // ---- routes -------------------------------------------------------------------------------------
@@ -572,6 +833,45 @@ describe('GET /v1/perps/pairs', () => {
     const callsAfterFirst = perpsFetch.calls.length
     await get(app, '/v1/perps/pairs')
     expect(perpsFetch.calls.length).toBe(callsAfterFirst) // all venue reads cached
+  })
+
+  /* ---- HIP-3 perp dexes: the pair feed ------------------------------------------------------ */
+
+  it('lists markets from every perp dex, keeping two same-symbol markets distinguishable', async () => {
+    const { app } = build()
+    const res = await get(app, '/v1/perps/pairs')
+    const hl = res.body.pairs.filter((p) => p.venue === 'hyperliquid')
+    // Default dex BTC + xyz BTC + hyna BTC — three markets, three ids, no React-key collision.
+    expect(hl.map((p) => p.id).sort()).toEqual(['hyperliquid:BTC', 'hyperliquid:hyna:BTC', 'hyperliquid:xyz:BTC'])
+    expect(new Set(hl.map((p) => p.symbol))).toEqual(new Set(['BTC/USD']))
+    expect(hl.filter((p) => p.variant === 'xyz')).toHaveLength(1)
+    expect(res.body.sources.hyperliquid).toMatchObject({
+      status: 'read',
+      dexes: [HL_DEFAULT_DEX, 'xyz', 'hyna'],
+      unreadDexes: [],
+      partial: false,
+    })
+  })
+
+  it('scopes every hyperliquid read to a dex — an un-scoped read answers for the first one only', async () => {
+    const { app, perpsFetch } = build()
+    await get(app, '/v1/perps/pairs')
+    const metaBodies = hlBodies(perpsFetch).filter((b) => b.type === 'metaAndAssetCtxs')
+    expect(metaBodies).toHaveLength(3)
+    expect(metaBodies.every((b) => typeof b.dex === 'string')).toBe(true)
+    expect(metaBodies.map((b) => b.dex).sort()).toEqual(['', 'hyna', 'xyz'])
+  })
+
+  it('caps the fan-out but NAMES what it left out — a bounded read is never a silent one', async () => {
+    const { app } = build({ env: { PERPS_HL_DEX_MAX: '2' } })
+    const res = await get(app, '/v1/perps/pairs')
+    expect(res.body.sources.hyperliquid).toMatchObject({
+      status: 'read',
+      dexes: [HL_DEFAULT_DEX, 'xyz'],
+      unreadDexes: ['hyna'], // named, so the absence is qualified rather than absolute
+      partial: true,
+    })
+    expect(res.body.pairs.some((p) => p.id === 'hyperliquid:hyna:BTC')).toBe(false)
   })
 })
 
@@ -648,6 +948,106 @@ describe('GET /v1/perps/positions', () => {
     const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
     expect(res.status).toBe(502)
     expect(res.body.error.code).toBe('upstream_failed')
+  })
+
+  /* ---- HIP-3 perp dexes: the fabricated absence (hyperliquid-decision.md §5.2 defect 1) ----- *
+   *
+   * The measured member held 35 positions across xyz/hyna/mkts and ZERO on the first perp dex, and
+   * FairWins rendered "No open perp positions found for this account." These are that member.
+   * ------------------------------------------------------------------------------------------ */
+
+  it('finds positions held on a NON-DEFAULT perp dex, with nothing on the first one', async () => {
+    // The first dex answers with an EMPTY book: only the fan-out can find this member's position.
+    const emptyFirstDex = mockPerpsFetch()
+    const inner = emptyFirstDex
+    const perpsFetch = async (url, init = {}) => {
+      const res = await inner(url, init)
+      if (url.includes('hyperliquid')) {
+        const body = JSON.parse(init.body ?? '{}')
+        if (body.type === 'clearinghouseState' && (body.dex ?? '') === '') return ok({ assetPositions: [] })
+      }
+      return res
+    }
+    perpsFetch.calls = inner.calls
+
+    const { app } = build({ perpsFetch })
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    expect(res.status).toBe(200)
+    const hl = res.body.positions.filter((p) => p.venue === 'hyperliquid')
+    expect(hl.map((p) => p.id).sort()).toEqual(['hyperliquid:hyna:ETH:long', 'hyperliquid:xyz:BTC:long'])
+    // A complete read: nothing to qualify, so the surface may state absence plainly elsewhere.
+    expect(res.body.sources.hyperliquid).toMatchObject({ status: 'read', unreadDexes: [], partial: false })
+  })
+
+  it('sends the dex on every clearinghouseState read', async () => {
+    const { app, perpsFetch } = build()
+    await get(app, `/v1/perps/positions?address=${TRADER}`)
+    const states = hlBodies(perpsFetch).filter((b) => b.type === 'clearinghouseState')
+    expect(states).toHaveLength(3)
+    expect(states.every((b) => typeof b.dex === 'string' && b.user === TRADER)).toBe(true)
+    expect(states.map((b) => b.dex).sort()).toEqual(['', 'hyna', 'xyz'])
+  })
+
+  it('keeps two same-coin positions on different dexes as two rows', async () => {
+    const { app } = build()
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    const eth = res.body.positions.filter((p) => p.venue === 'hyperliquid' && p.symbol === 'ETH/USD')
+    expect(eth).toHaveLength(2)
+    expect(new Set(eth.map((p) => p.id)).size).toBe(2)
+    expect(eth.map((p) => p.venueRef.dex).sort()).toEqual(['', 'hyna'])
+  })
+
+  it('reports a per-dex failure instead of swallowing it — a dead dex is not "no positions there"', async () => {
+    const { app } = build({ perpsFetch: mockPerpsFetch({ down: ['hlDex:xyz'] }) })
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    expect(res.status).toBe(200)
+    // The dexes that answered still render — per-dex isolation, exactly like per-venue isolation.
+    expect(res.body.positions.some((p) => p.id === 'hyperliquid:hyna:ETH:long')).toBe(true)
+    expect(res.body.positions.some((p) => p.id.startsWith('hyperliquid:xyz:'))).toBe(false)
+    expect(res.body.sources.hyperliquid).toMatchObject({
+      status: 'read',
+      dexes: [HL_DEFAULT_DEX, 'hyna'],
+      unreadDexes: ['xyz'],
+      partial: true,
+    })
+  })
+
+  it('says it does not know what it missed when dex discovery itself fails', async () => {
+    const { app } = build({ perpsFetch: mockPerpsFetch({ down: ['hlPerpDexs'] }) })
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    expect(res.status).toBe(200)
+    // Falls back to the first dex — spec 082's behaviour — but never claims it saw the rest.
+    expect(res.body.positions.some((p) => p.id === 'hyperliquid:ETH:long')).toBe(true)
+    expect(res.body.sources.hyperliquid).toMatchObject({ status: 'read', dexes: [HL_DEFAULT_DEX], partial: true })
+    // null, NOT [] — "we do not know what we missed" must never flatten into "we missed nothing".
+    expect(res.body.sources.hyperliquid.unreadDexes).toBeNull()
+  })
+
+  it('degrades hyperliquid only when NO dex answered', async () => {
+    const { app } = build({
+      perpsFetch: mockPerpsFetch({ down: ['hlDex:', 'hlDex:xyz', 'hlDex:hyna'] }),
+    })
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    expect(res.status).toBe(200)
+    expect(res.body.sources.hyperliquid).toMatchObject({ status: 'degraded', dexes: [], partial: true })
+    expect(res.body.positions.some((p) => p.venue === 'hyperliquid')).toBe(false)
+    expect(res.body.positions.some((p) => p.venue === 'gains')).toBe(true)
+  })
+
+  it('never lets a nonsense fan-out cap read zero dexes', async () => {
+    // A cap of 0 would mean "search nothing and report nothing found" — the defect, not a default.
+    const { app } = build({ env: { PERPS_HL_DEX_MAX: '0' } })
+    const res = await get(app, `/v1/perps/positions?address=${TRADER}`)
+    expect(res.status).toBe(200)
+    expect(res.body.sources.hyperliquid.dexes).toContain(HL_DEFAULT_DEX)
+    expect(res.body.positions.some((p) => p.venue === 'hyperliquid')).toBe(true)
+  })
+
+  it('caches the dex list across requests — it is global, not per-member', async () => {
+    const { app, perpsFetch } = build()
+    await get(app, `/v1/perps/positions?address=${TRADER}`)
+    await get(app, '/v1/perps/pairs')
+    expect(hlBodies(perpsFetch).filter((b) => b.type === 'perpDexs')).toHaveLength(1)
   })
 })
 

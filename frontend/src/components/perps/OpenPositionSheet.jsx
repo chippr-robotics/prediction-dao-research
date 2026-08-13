@@ -47,6 +47,7 @@ import { PERP_VENUES, perpsUiFeeReceiver } from '../../config/perps'
 import { usePerpsTrade } from '../../hooks/usePerpsTrade'
 import { hasAttested, subscribeAttestation } from '../../lib/perps/attestation'
 import { defaultCollateral, defaultLeverage, defaultSlippage, pickVenue } from '../../lib/perps/defaults'
+import { rateToPct } from '../../lib/perps/feeUnits'
 import { bpsToPct, formatLeverage, formatPairPrice, formatUsd } from '../../lib/perps/format'
 import { tradeLinkFor } from '../../lib/perps/linkouts'
 import { ORDER_STATE } from '../../lib/perps/orderState'
@@ -356,9 +357,9 @@ export default function OpenPositionSheet({
         entryPrice,
         isLong,
         feeBps,
-        venueFeeUsd: active?.venueFeeUsd ?? null,
+        venueFee: active?.venueFee ?? null,
       }),
-    [collateralAmount, decimals, usdPrice, leverage, entryPrice, isLong, feeBps, active?.venueFeeUsd],
+    [collateralAmount, decimals, usdPrice, leverage, entryPrice, isLong, feeBps, active?.venueFee],
   )
 
   /* VALIDATION BEFORE ANY WALLET PROMPT (FR-022 / US3 acceptance 3). It runs on every keystroke and
@@ -373,8 +374,22 @@ export default function OpenPositionSheet({
         venueLimits: active?.limits ?? null,
         notional: preview.notionalUsd,
         minNotional: active?.minNotional ?? null,
+        // The venue's own floor on what a position may be worth, checked BEFORE the wallet prompt.
+        // Gains answers this one with `InsufficientCollateral`, which costs gas to read and names
+        // nothing a member can act on.
+        collateralUsd: preview.collateralUsd,
+        minCollateralUsd: active?.minCollateralUsd ?? null,
       }),
-    [collateralAmount, balance, leverage, active?.limits, active?.minNotional, preview.notionalUsd],
+    [
+      collateralAmount,
+      balance,
+      leverage,
+      active?.limits,
+      active?.minNotional,
+      active?.minCollateralUsd,
+      preview.notionalUsd,
+      preview.collateralUsd,
+    ],
   )
 
   /* The allowance the venue's own collateral puller already holds. `null` is "we could not ask",
@@ -442,7 +457,9 @@ export default function OpenPositionSheet({
       leverage,
       entryPrice,
       notionalUsd: preview.notionalUsd,
+      collateralUsd: preview.collateralUsd,
       minNotional: active.minNotional ?? null,
+      minCollateralUsd: active.minCollateralUsd ?? null,
       venueLimits: active.limits ?? null,
       slippagePct: defaultSlippage(),
       quote,
@@ -475,6 +492,7 @@ export default function OpenPositionSheet({
     leverage,
     entryPrice,
     preview.notionalUsd,
+    preview.collateralUsd,
     quote,
     allowance,
     trade,
@@ -801,8 +819,16 @@ export default function OpenPositionSheet({
                   </dt>
                   <dd>{formatPairPrice(preview.liquidationPrice)}</dd>
                 </div>
+                {/* THE VENUE'S OWN FEE, in money, from the rate the venue publishes. The rate is in
+                    the label so the estimate can be checked rather than taken on trust, and the
+                    word "estimated" is load-bearing: this is a published rate applied to the size
+                    on screen, not a quote the venue gave for this order. */}
                 <div>
-                  <dt>{venueLabel}’s own fees</dt>
+                  <dt>
+                    {venueLabel}’s own fee
+                    {preview.venueFeeRate === null ? '' : ` (${rateToPct(preview.venueFeeRate)} of size)`}
+                    {preview.venueFeeUsd === null ? '' : ', estimated'}
+                  </dt>
                   <dd>{preview.venueFeeUsd === null ? DASH : formatUsd(preview.venueFeeUsd)}</dd>
                 </div>
                 {/* A ZERO RATE SHOWS NO FEE LINE AT ALL (FR-012) — not "$0.00", which reads as a
@@ -828,6 +854,38 @@ export default function OpenPositionSheet({
                 </div>
               </dl>
 
+              {/* WHAT KIND OF NUMBER THE VENUE'S FEE IS. A published rate applied to the size on
+                  screen — not a quote, and not the whole of what the venue charges. Saying which
+                  costs are still outside it is the difference between an estimate and a claim. */}
+              {preview.venueFeeUsd !== null && (
+                <p className="pos-note">
+                  {venueLabel}’s fee is worked out from the rate {venueLabel} publishes for this
+                  market, not from a quote for this order. It does not include {venueLabel}’s spread
+                  or the price impact of your order, or the borrowing and funding {venueLabel}{' '}
+                  charges while the position is open.
+                </p>
+              )}
+              {/* THE FLOOR, WHICH IS THE ONE CASE WHERE THE HEADLINE RATE IS MISLEADING. Under the
+                  venue's minimum-fee size, the rate stops being what the member pays: a $50 BTC
+                  position is charged as a $285.72 one, an effective 0.2% against a headline 0.035%.
+                  Stating the rate alone there would understate the cost nearly six times over. */}
+              {preview.venueFeeAtFloor && (
+                <p className="pos-note" role="note">
+                  This position is below {venueLabel}’s smallest fee size, so {venueLabel} charges
+                  its fee as though the position were{' '}
+                  {formatUsd(preview.venueFeeChargedOnUsd)} rather than{' '}
+                  {preview.notionalUsd === null ? DASH : formatUsd(preview.notionalUsd)}. A larger
+                  position pays the same fee.
+                </p>
+              )}
+              {/* An absent rate is disclosed rather than left as a bare dash beside a FairWins fee
+                  in money — which would read as though our fee were the cost of trading. */}
+              {preview.venueFeeUsd === null && (
+                <p className="pos-note" role="note">
+                  {venueLabel} does not publish its own trading fee to this app, so it shows “{DASH}”
+                  and the total above does not include it. {venueLabel} takes it when this executes.
+                </p>
+              )}
               {/* THE FEE'S BASE, STATED HONESTLY (FR-013). Perps fees are charged on the position's
                   SIZE, which at 10× is ten times the amount the member put in — a member who reads
                   "5 bps" as 5 bps of their stake has been misled by omission. */}

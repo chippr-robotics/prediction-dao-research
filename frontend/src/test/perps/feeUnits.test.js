@@ -20,6 +20,8 @@ import {
   bpsToHyperliquidMaxFeeRate,
   feeAmountFromNotional,
   feeUsdFromNotional,
+  rateToPct,
+  venueFeeFromNotional,
 } from '../../lib/perps/feeUnits'
 
 const JUNK = [null, undefined, NaN, Infinity, -Infinity, 'nope', '', {}, [], true, false, -1, -1n]
@@ -220,5 +222,90 @@ describe('perps feeUnits — notional × bps → money', () => {
     expect(feeUsdFromNotional(10_000, 5)).toBe(5)
     expect(feeUsdFromNotional(0, 5)).toBe(0)
     expect(feeUsdFromNotional(10_000, 0)).toBe(0) // zero rate ⇒ zero money ⇒ no fee line at all
+  })
+})
+
+/* --------------------------------------------------------------------------------------------- *
+ * The VENUE's own fee
+ *
+ * The gap this closed: FairWins' fee had a number beside it and the venue's had a dash, which does
+ * not read as "we know one and not the other" — it reads as though ours were the cost of trading.
+ * The two properties worth pinning are the ones a member's money depends on: the rate is applied to
+ * the SIZE (not to what they put in), and the venue's floor is applied where it bites.
+ * --------------------------------------------------------------------------------------------- */
+
+/** BTC/USD as the gains backend publishes it, already at the gateway's normalized scales. */
+const BTC_FEE = Object.freeze({
+  openRate: 0.00035,
+  closeRate: 0.00035,
+  feeFloorNotionalUsd: 285.715,
+  minFeeUsd: 0.10000025,
+  basis: 'published-rate',
+})
+
+describe('perps feeUnits — the venue’s own fee', () => {
+  it('junk in → null out, and an absent rate is null rather than a free trade', () => {
+    for (const junk of JUNK) {
+      expect(() => venueFeeFromNotional(junk, BTC_FEE)).not.toThrow()
+      expect(venueFeeFromNotional(junk, BTC_FEE)).toBeNull()
+      expect(venueFeeFromNotional(1000, junk)).toBeNull()
+      expect(rateToPct(junk)).toBeNull()
+    }
+    // The venue not publishing a fee is NOT the venue charging none.
+    expect(venueFeeFromNotional(1000, null)).toBeNull()
+    expect(venueFeeFromNotional(1000, {})).toBeNull()
+  })
+
+  it('charges the rate on the position’s SIZE, above the venue’s floor', () => {
+    const fee = venueFeeFromNotional(10_000, BTC_FEE)
+    expect(fee.usd).toBeCloseTo(3.5, 10) // 0.035% of $10,000
+    expect(fee.rate).toBe(0.00035)
+    expect(fee.chargedOnUsd).toBe(10_000)
+    expect(fee.atFloor).toBe(false)
+  })
+
+  it('applies the venue’s FLOOR below it, which is where the headline rate misleads', () => {
+    // A $50 position is charged as a $285.715 one: $0.10, an effective 0.2% against a headline
+    // 0.035%. Reporting 0.035% × $50 = $0.0175 would understate it nearly six times over, on
+    // exactly the orders where it hurts proportionally most.
+    const fee = venueFeeFromNotional(50, BTC_FEE)
+    expect(fee.usd).toBeCloseTo(0.10000025, 12)
+    expect(fee.chargedOnUsd).toBe(285.715)
+    expect(fee.atFloor).toBe(true)
+    // And it agrees with the venue's own pairMinFeeUsd, which is what the floor exists to produce.
+    expect(fee.usd).toBeCloseTo(BTC_FEE.minFeeUsd, 12)
+  })
+
+  it('is exactly at the floor, not over it, at the floor size', () => {
+    const fee = venueFeeFromNotional(285.715, BTC_FEE)
+    expect(fee.atFloor).toBe(false) // at the floor the rate governs; only BELOW does the floor bite
+    expect(fee.usd).toBeCloseTo(0.10000025, 12)
+  })
+
+  it('reads the CLOSING rate when asked for one, and the opening rate by default', () => {
+    const asym = { ...BTC_FEE, openRate: 0.001, closeRate: 0.002 }
+    expect(venueFeeFromNotional(10_000, asym).usd).toBeCloseTo(10, 10)
+    expect(venueFeeFromNotional(10_000, asym, 'open').usd).toBeCloseTo(10, 10)
+    expect(venueFeeFromNotional(10_000, asym, 'close').usd).toBeCloseTo(20, 10)
+  })
+
+  it('keeps a zero rate as $0.00 — an answer, not the dash that means we could not find out', () => {
+    const free = { openRate: 0, closeRate: 0, feeFloorNotionalUsd: null, minFeeUsd: null }
+    const fee = venueFeeFromNotional(10_000, free)
+    expect(fee).not.toBeNull()
+    expect(fee.usd).toBe(0)
+  })
+
+  it('works with no floor published — a rate is still a rate without one', () => {
+    const fee = venueFeeFromNotional(50, { openRate: 0.00035, feeFloorNotionalUsd: null })
+    expect(fee.usd).toBeCloseTo(0.0175, 12)
+    expect(fee.atFloor).toBe(false)
+  })
+
+  it('renders a rate as the percentage a member can check the estimate against', () => {
+    expect(rateToPct(0.00035)).toBe('0.035%')
+    expect(rateToPct(0.0006)).toBe('0.06%')
+    expect(rateToPct(0.00012)).toBe('0.012%')
+    expect(rateToPct(0)).toBe('0%')
   })
 })

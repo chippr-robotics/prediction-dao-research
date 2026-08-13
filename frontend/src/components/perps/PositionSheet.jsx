@@ -47,7 +47,7 @@ import { PERP_VENUES, perpsUiFeeReceiver } from '../../config/perps'
 import { SETTLEMENT, settlementFor, usePerpsTrade } from '../../hooks/usePerpsTrade'
 import { ORDER_STATE } from '../../lib/perps/orderState'
 import { suggestProtection } from '../../lib/perps/defaults'
-import { feeUsdFromNotional } from '../../lib/perps/feeUnits'
+import { feeUsdFromNotional, rateToPct, venueFeeFromNotional } from '../../lib/perps/feeUnits'
 import { bpsToPct, formatLeverage, formatPairPrice, formatSignedUsd, formatUsd } from '../../lib/perps/format'
 import { GMX_DERIVED_FIELDS, isDerivedFigure } from '../../lib/perps/gmxDerived'
 import { tradeLinkFor } from '../../lib/perps/linkouts'
@@ -98,6 +98,14 @@ export default function PositionSheet({
   venueStatus = null,
   /** The venue's own fee for this exit, where the caller knows it. Absent renders '—', never 0. */
   venueFeeUsd = null,
+  /**
+   * The venue's own PUBLISHED closing rate — `PerpPair.venueFee` off the pairs feed.
+   *
+   * A rate rather than an amount, because the fee scales with the share being closed and this sheet
+   * is where that share is chosen: a fixed dollar figure passed in would be right for 100% and wrong
+   * for every preset beside it. `venueFeeUsd` above still wins when a caller has a real number.
+   */
+  venueFee = null,
   /**
    * GMX only: `{ executionFee, acceptablePrice? }` — the keeper fee the member pays.
    *
@@ -513,6 +521,14 @@ export default function PositionSheet({
   const feeBps = fee && !fee.failed ? Number(fee.bps) : null
   const feeApplies = feeBps !== null && feeBps > 0
   const feeUsd = feeApplies && closingNotional !== null ? feeUsdFromNotional(closingNotional, feeBps) : null
+  /* THE VENUE'S OWN FEE FOR THIS EXIT, for the share actually selected. An explicit `venueFeeUsd`
+   * from the caller wins — it would be a real number rather than one derived from a rate. This
+   * NEVER gates the close: an absent rate changes a line in a breakdown and nothing else, which is
+   * the same rule the FairWins rate follows on this sheet (fee-rails.md rule 4). */
+  const venueFeeEstimate =
+    closingNotional === null ? null : venueFeeFromNotional(closingNotional, venueFee, 'close')
+  const venueFeeShown = venueFeeUsd == null ? (venueFeeEstimate?.usd ?? null) : Number(venueFeeUsd)
+  const venueFeeEstimated = venueFeeUsd == null && venueFeeEstimate !== null
   /* WHICH FIGURES ARE OURS. The composition point (`PerpsView`) fills a GMX position's derivable
    * figures from the venue's raw units and names exactly which ones it filled; this sheet only ever
    * READS that answer. Re-deriving the question here — "is this a GMX row, so it must be
@@ -699,8 +715,12 @@ export default function PositionSheet({
               <dd>{proceeds === null ? DASH : formatUsd(proceeds)}</dd>
             </div>
             <div>
-              <dt>{venueLabel}’s own fees</dt>
-              <dd>{venueFeeUsd == null ? DASH : formatUsd(venueFeeUsd)}</dd>
+              <dt>
+                {venueLabel}’s own fee
+                {venueFeeEstimate === null ? '' : ` (${rateToPct(venueFeeEstimate.rate)} of size)`}
+                {venueFeeEstimated ? ', estimated' : ''}
+              </dt>
+              <dd>{venueFeeShown === null ? DASH : formatUsd(venueFeeShown)}</dd>
             </div>
             {/* A ZERO RATE SHOWS NO FEE LINE AT ALL (FR-012) — not "$0.00", which reads as a fee
                 that happens to round down. The line exists only when a rate above zero applies. */}
@@ -727,7 +747,26 @@ export default function PositionSheet({
               about the line above it. A member reading "estimated proceeds" reasonably assumes the
               venue's fee is already out of it; here it is not, because the venue does not publish
               the figure to this app before the order is placed. */}
-          {venueFeeUsd == null && (
+          {/* The venue's fee is an ESTIMATE from a published rate, and the one thing it changes
+              about the line above it has to be said either way: a member reading "estimated
+              proceeds" reasonably assumes the venue's fee is already out of it, and it is not. */}
+          {venueFeeShown !== null && (
+            <p className="pps-note">
+              {venueLabel}’s fee is worked out from the rate {venueLabel} publishes for this market,
+              not from a quote for this order, and it does not include {venueLabel}’s spread, the
+              price impact of closing, or the borrowing and funding charged while the position was
+              open. The estimated proceeds above do not have it taken out — {venueLabel} deducts it
+              from what you receive when the order executes.
+            </p>
+          )}
+          {venueFeeEstimate?.atFloor && (
+            <p className="pps-note" role="note">
+              This is below {venueLabel}’s smallest fee size, so {venueLabel} charges its fee as
+              though you were closing {formatUsd(venueFeeEstimate.chargedOnUsd)} rather than{' '}
+              {formatUsd(closingNotional)}. Closing a larger share pays the same fee.
+            </p>
+          )}
+          {venueFeeShown === null && (
             <p className="pps-note" role="note">
               {venueLabel}’s own fee for this exit is not published to this app before the order is
               placed, so it shows “{DASH}” and the estimated proceeds above do not have it taken

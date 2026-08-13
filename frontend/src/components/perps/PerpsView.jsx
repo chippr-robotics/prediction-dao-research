@@ -6,8 +6,9 @@
  * account's positions, and the orders a venue is still holding. Every state is honest
  * (FR-004/FR-005/FR-013): loading, ready, per-venue degraded (named, with the healthy venues still
  * rendering), fully unavailable, and the testnet-cohort notice (FR-017). The Hyperliquid builder
- * fee is disclosed here BEFORE any link-out when configured above zero — zero means no fee line at
- * all (FR-010).
+ * fee is disclosed here BEFORE any link-out when FairWins can actually place a Hyperliquid order
+ * AND the rate is above zero — zero means no fee line at all (FR-010), and where the capability is
+ * absent (every build today) the footnote says plainly that FairWins earns nothing there instead.
  *
  * THIS FILE IS WHERE SPEC 083's COMPOSITION DECISIONS LIVE, and there are three of them:
  *
@@ -53,13 +54,15 @@ import {
   perpsGatewayUrl,
   perpsManageEnabled,
   perpsManageFeatureEnabled,
+  perpsVenueManageableAnywhere,
 } from '../../config/perps'
 import { bpsToPct } from '../../lib/perps/format'
 import { withGmxDerivedFigures } from '../../lib/perps/gmxDerived'
-import { buildGmxMarketIndex, gmxMarketPrice, withGmxMarketSymbols } from '../../lib/perps/gmxMarkets'
+import { buildGmxMarketIndex, findGmxPair, withGmxMarketSymbols } from '../../lib/perps/gmxMarkets'
 import { readVenueStatuses } from '../../lib/perps/venueStatus'
 import {
   PERPS_TIPS,
+  PERPS_HYPERLIQUID_NO_FEE_NOTE,
   PERPS_RISK_DISCLOSURE,
   PERPS_EXTERNAL_NOTE,
   PERPS_TESTNET_NOTE,
@@ -123,6 +126,17 @@ export default function PerpsView({ deps }) {
     (position) => manageEnabled && Boolean(position) && perpsManageEnabled(position.venue, position.chainId),
     [manageEnabled],
   )
+
+  /* THE SAME GATE, ASKED FOR THE FEE FOOTNOTE — and it is asked of the CAPABILITY, not of the rate.
+   *
+   * FairWins' Hyperliquid builder fee can only ride an order FairWins sends Hyperliquid, and it
+   * sends none: the venue is read-only here because its L1 actions need an agent key even to close
+   * a position (hyperliquid-decision.md). The rate, however, is admin-settable from the Fees tab
+   * (`perps.hyperliquid.builder`) — so a footnote conditioned on `fee.bps > 0`, as this one once
+   * was, would let a single admin edit publish a member-facing claim that orders are placed through
+   * FairWins. Conditioning it here means the claim can only return with the capability it
+   * describes. Until then the footnote below states the true economics instead. */
+  const hyperliquidManageable = manageEnabled && perpsVenueManageableAnywhere('hyperliquid')
 
   const [managed, setManaged] = useState(null)
   const dismissSheet = useCallback(() => setManaged(null), [])
@@ -215,13 +229,18 @@ export default function PerpsView({ deps }) {
     return positionRows.find((p) => p.id === managed.id) ?? managed
   }, [managed, positionRows])
 
-  /* THE CURRENT PRICE, AND WHY IT IS COMPOSED HERE.
+  /* THE PAIR ROW BEHIND A MANAGED POSITION, AND WHY IT IS RESOLVED HERE.
+   *
+   * ONE resolution, feeding both the mark price and the venue's own fee below it. They must agree
+   * about which market a position is: a price from one row and a fee rate from another would be two
+   * different markets' numbers in one breakdown, and nothing on screen would say so.
    *
    * A position read carries what the member is holding, not what the market is doing: neither the
-   * gateway's `normalizeGainsPositions` nor the GMX Reader returns a mark price, so a sheet handed
-   * only a position has no price at all. That is not cosmetic — `closeTradeMarket(index, price)`
-   * takes the price its slippage bound is measured from, so with no price the sheet can only refuse
-   * the close (which it did, honestly, and which made US1 unreachable in the assembled view).
+   * gateway's `normalizeGainsPositions` nor the GMX Reader returns a mark price or a fee schedule,
+   * so a sheet handed only a position has neither. That is not cosmetic — `closeTradeMarket(index,
+   * price)` takes the price its slippage bound is measured from, so with no price the sheet can
+   * only refuse the close (which it did, honestly, and which made US1 unreachable in the assembled
+   * view).
    *
    * The venue's own live price is already on screen one section up — it is what the pairs table
    * renders — so it is passed down rather than read again. Matched on VENUE FIRST: one venue's
@@ -235,18 +254,29 @@ export default function PerpsView({ deps }) {
    * ("BTC/USD [WBTC.b-USDC]" and "BTC/USD [BTC-USDC]" are different markets), so a symbol match
    * would have two candidates on the position's own chain and would take whichever came first.
    * The position names its market exactly, so the price comes from THAT market's record. */
-  const markPrice = useMemo(() => {
-    if (managedPosition?.venue === 'gmx') return gmxMarketPrice(managedPosition, gmxMarkets)
-    const symbol = managedPosition?.symbol
-    if (!symbol || !managedPosition?.venue) return null
+  const managedPair = useMemo(() => {
+    if (!managedPosition?.venue) return null
+    if (managedPosition.venue === 'gmx') return findGmxPair(managedPosition, gmxMarkets)
+    const symbol = managedPosition.symbol
+    if (!symbol) return null
     const sameVenue = markets.allPairs.filter((p) => p.venue === managedPosition.venue && p.symbol === symbol)
     // Gains lists the same pair on every chain it runs on; prefer the position's own chain, and
     // fall back to the venue's other listing only when the position did not name one.
-    const pair =
-      sameVenue.find((p) => p.chainId != null && p.chainId === managedPosition.chainId) ?? sameVenue[0] ?? null
-    const price = Number(pair?.price)
-    return Number.isFinite(price) && price > 0 ? price : null
+    return sameVenue.find((p) => p.chainId != null && p.chainId === managedPosition.chainId) ?? sameVenue[0] ?? null
   }, [managedPosition, markets.allPairs, gmxMarkets])
+
+  const markPrice = useMemo(() => {
+    const price = Number(managedPair?.price)
+    return Number.isFinite(price) && price > 0 ? price : null
+  }, [managedPair])
+
+  /* THE VENUE'S OWN CLOSING RATE, from the same row and for the same reason as the price: the exit
+   * sheet has a position, and a position read carries no fee schedule. Without it the sheet showed
+   * FairWins' fee in money beside the venue's as a dash, which reads as though ours were the cost
+   * of closing. Passed as the RATE the venue published — the sheet multiplies it by the share the
+   * member actually picks, which is chosen after this. A row the feed does not list (or a feed that
+   * is down) leaves it null and the sheet says so; it can never withhold the exit. */
+  const managedVenueFee = managedPair?.venueFee ?? null
 
   /* ------------------------------------------------------------------------------------------- *
    * The entry sheet's two live reads
@@ -481,6 +511,7 @@ export default function PerpsView({ deps }) {
         <PositionSheet
           position={managedPosition}
           markPrice={markPrice}
+          venueFee={managedVenueFee}
           attribution={attribution}
           onClose={dismissSheet}
           onActionComplete={handleActionComplete}
@@ -506,7 +537,12 @@ export default function PerpsView({ deps }) {
       )}
 
       <footer className="perps-footnotes">
-        {fee === undefined ? null : fee === null ? (
+        {/* The Hyperliquid builder fee. The rate is only ASKED ABOUT where FairWins could place a
+            Hyperliquid order — where it cannot, no rate is a member's cost, so neither the rate
+            line nor the "could not be confirmed" note has anything to be about. Zero still renders
+            nothing at all (FR-010), so a build that gains the capability at a zero rate looks
+            exactly like this one. */}
+        {!hyperliquidManageable ? null : fee === undefined ? null : fee === null ? (
           <p className="perps-fee-note" role="status">
             {PERPS_FEE_UNCONFIRMED_NOTE}
           </p>
@@ -520,6 +556,13 @@ export default function PerpsView({ deps }) {
           Trading on GMX via FairWins gives you a GMX fee discount{' '}
           <InfoTip label="About the GMX discount">{PERPS_TIPS.gmxDiscount}</InfoTip> Gains Network trades cost
           you nothing extra <InfoTip label="About Gains referral">{PERPS_TIPS.gainsReferral}</InfoTip>
+          {hyperliquidManageable ? null : (
+            <>
+              {' '}
+              {PERPS_HYPERLIQUID_NO_FEE_NOTE}{' '}
+              <InfoTip label="About Hyperliquid fees">{PERPS_TIPS.hyperliquidNoFee}</InfoTip>
+            </>
+          )}
         </p>
         <p className="perps-external-note">{PERPS_EXTERNAL_NOTE}</p>
         <p className="perps-risk-note">{PERPS_RISK_DISCLOSURE}</p>

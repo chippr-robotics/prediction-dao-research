@@ -354,7 +354,7 @@ describe('a GMX position, where some figures are FairWins’ own arithmetic', ()
 
     // $100 collateral + $260 P&L on a full close.
     expect(screen.getByText('Estimated proceeds').parentElement).toHaveTextContent('$360.00')
-    expect(screen.getByText('GMX’s own fees').parentElement).toHaveTextContent('—')
+    expect(screen.getByText('GMX’s own fee').parentElement).toHaveTextContent('—')
     expect(screen.getByText(/own fee for this exit is not published to this app/)).toBeInTheDocument()
   })
 
@@ -382,7 +382,7 @@ describe('the cost breakdown before any signature', () => {
     await settle()
 
     expect(screen.getByText('Estimated proceeds').parentElement).toHaveTextContent('$150.00')
-    expect(screen.getByText('Gains’s own fees').parentElement).toHaveTextContent('$2.50')
+    expect(screen.getByText('Gains’s own fee').parentElement).toHaveTextContent('$2.50')
     // 5 bps of the $1,000 position = $0.50 — charged on SIZE, and the copy says exactly that.
     expect(screen.getByText(/FairWins fee \(0\.05% of size\)/).parentElement).toHaveTextContent('$0.50')
     expect(screen.getByText(/charged on the position’s size .* not\s+on the amount you put in/s)).toBeInTheDocument()
@@ -400,7 +400,67 @@ describe('the cost breakdown before any signature', () => {
   it('renders the venue’s own fee as “—” rather than a fabricated zero', async () => {
     renderSheet()
     await settle()
-    expect(screen.getByText('Gains’s own fees').parentElement).toHaveTextContent('—')
+    expect(screen.getByText('Gains’s own fee').parentElement).toHaveTextContent('—')
+  })
+
+  /* ------------------------------------------------------------------------------------------- *
+   * The venue's own fee for the exit (spec 083)
+   *
+   * The rate comes from the pairs feed and the SHARE is chosen here, which is why the sheet is
+   * handed a rate rather than an amount: a dollar figure passed in would be right for "all of it"
+   * and wrong for every preset beside it.
+   * ------------------------------------------------------------------------------------------- */
+
+  const BTC_FEE = { openRate: 0.00035, closeRate: 0.00035, feeFloorNotionalUsd: 285.715, minFeeUsd: 0.10000025 }
+
+  it('estimates the venue’s own closing fee from its published rate, and labels it', async () => {
+    renderSheet({ venueFee: BTC_FEE })
+    await settle()
+    // Closing all of a $1,000 position: 0.035% = $0.35.
+    expect(screen.getByText('Gains’s own fee (0.035% of size), estimated').parentElement).toHaveTextContent('$0.35')
+    expect(screen.getByText(/rate Gains publishes for this market, not from a quote/)).toBeInTheDocument()
+    // The one thing the estimate changes about the line above it, said either way.
+    expect(screen.getByText(/estimated proceeds above do not have it taken out/)).toBeInTheDocument()
+  })
+
+  it('rescales the venue’s fee with the share the member actually picks', async () => {
+    renderSheet({ venueFee: BTC_FEE })
+    await settle()
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('50%'))
+    })
+    // Half of a $1,000 position is $500 — 0.035% of that ($0.175), not of the whole.
+    expect(screen.getByText('Gains’s own fee (0.035% of size), estimated').parentElement).toHaveTextContent('$0.18')
+    expect(screen.queryByText(/smallest fee size/)).not.toBeInTheDocument()
+  })
+
+  it('says when the venue’s fee floor is what is being charged on a small partial close', async () => {
+    renderSheet({ venueFee: BTC_FEE })
+    await settle()
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('25%'))
+    })
+    // $250 is below the $285.72 floor, so the venue charges the floor's fee — and says so.
+    expect(screen.getByText(/below Gains’s smallest fee size/)).toBeInTheDocument()
+    expect(screen.getByText(/Closing a larger share pays the same fee/)).toBeInTheDocument()
+  })
+
+  it('lets a caller’s real number win over the estimate, and drops the “estimated” label', async () => {
+    renderSheet({ venueFee: BTC_FEE, venueFeeUsd: 2.5 })
+    await settle()
+    expect(screen.getByText('Gains’s own fee (0.035% of size)').parentElement).toHaveTextContent('$2.50')
+  })
+
+  it('NEVER blocks closing when the venue’s rate is absent — an exit depends on nothing here', async () => {
+    const { sendOnChain } = renderSheet({ venueFee: null })
+    await settle()
+    expect(screen.getByText('Gains’s own fee').parentElement).toHaveTextContent('—')
+    expect(screen.getByText(/own fee for this exit is not published to this app/)).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Close/i }))
+    })
+    await settle()
+    expect(sendOnChain).toHaveBeenCalled()
   })
 
   it('NEVER blocks closing when the fee rate cannot be read', async () => {

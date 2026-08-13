@@ -234,3 +234,52 @@ export function feeUsdFromNotional(notionalUsd, bps) {
   if (n === null || b === null) return null
   return (n * b) / 10_000
 }
+
+/* ------------------------------------------------------------------------------------------- *
+ * The VENUE's own trading fee
+ *
+ * FairWins' fee and the venue's are two different costs, and until now only ours had a number
+ * beside it. That asymmetry does not read as "we know one and not the other" — it reads as though
+ * our fee were the cost of trading. This is the arithmetic that puts the venue's own figure next
+ * to it, and it lives here for the same reason every other rate conversion does: one place, so a
+ * scale can only be wrong once.
+ * ------------------------------------------------------------------------------------------- */
+
+/**
+ * The venue's own fee for a position of `notionalUsd`, from the rate the venue publishes on the
+ * pairs feed (`PerpPair.venueFee`, produced by the gateway's `gainsPairFee`).
+ *
+ * THE FLOOR IS THE POINT. Gains charges its rate on `max(size, feeFloorNotionalUsd)`, so a small
+ * position pays the fee of a floor-sized one — a $50 BTC position pays $0.10, an effective 0.2%
+ * against a headline 0.035%. Computing `rate × size` and stopping there would understate that by
+ * nearly six times on exactly the orders where the member is least able to absorb it, so the floor
+ * is applied and `atFloor` is returned for the caller to say so out loud.
+ *
+ * TOTAL, like everything else here: this runs inside disclosure rendering, so junk in → null out.
+ * Null means "the venue did not publish this" and the caller must render '—'; it never means zero.
+ *
+ * @param notionalUsd the position's size in USD
+ * @param venueFee    `{ openRate|closeRate, feeFloorNotionalUsd }` — the feed's own object
+ * @param side        'open' (default) or 'close' — which of the two published rates to use
+ * @returns `{ usd, rate, chargedOnUsd, atFloor }` or null
+ */
+export function venueFeeFromNotional(notionalUsd, venueFee, side = 'open') {
+  if (!venueFee || typeof venueFee !== 'object') return null
+  const size = toBps(notionalUsd)
+  const rate = toBps(side === 'close' ? venueFee.closeRate : venueFee.openRate)
+  // A rate of 0 IS an answer — "this venue charges nothing here" — and must survive to the caller
+  // as $0.00 rather than collapsing into the '—' that means we could not find out. (`toBps`
+  // already refuses negatives, so reaching here means both are non-negative.)
+  if (size === null || rate === null) return null
+  const floor = toBps(venueFee.feeFloorNotionalUsd)
+  const atFloor = floor !== null && floor > 0 && size < floor
+  const chargedOnUsd = atFloor ? floor : size
+  return { usd: chargedOnUsd * rate, rate, chargedOnUsd, atFloor }
+}
+
+/** A fee RATE (a fraction, e.g. 0.00035) as a percentage string for a label — '0.035%'. */
+export function rateToPct(rate) {
+  const r = toBps(rate)
+  if (r === null) return null
+  return `${trimZeros((r * 100).toFixed(4))}%`
+}

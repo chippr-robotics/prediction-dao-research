@@ -427,7 +427,66 @@ describe('the preview and the fee disclosure', () => {
 
     expect(row('Position size (estimated)')).toHaveTextContent('—')
     expect(row('Total cost')).toHaveTextContent('—')
-    expect(row('Gains’s own fees')).toHaveTextContent('—')
+    expect(row('Gains’s own fee')).toHaveTextContent('—')
+  })
+
+  /* ------------------------------------------------------------------------------------------- *
+   * The venue's own fee, in money
+   *
+   * It used to be '—' on every open, beside a FairWins fee in dollars — which reads as though ours
+   * were the cost of trading. These are the assertions that keep the venue's own cost on screen and
+   * keep it labelled as the estimate it is.
+   * ------------------------------------------------------------------------------------------- */
+
+  const BTC_FEE = { openRate: 0.00035, closeRate: 0.00035, feeFloorNotionalUsd: 285.715, minFeeUsd: 0.10000025 }
+
+  it('shows the venue’s own fee in money, with its published rate, labelled an estimate', async () => {
+    renderSheet({ venueOptions: [gainsOption({ venueFee: BTC_FEE })] })
+    await settle()
+    await act(async () => {
+      typeAmount('100')
+      fireEvent.change(screen.getByLabelText(/type a multiplier/), { target: { value: '10' } })
+    })
+    await settle()
+
+    // $100 at 10× is a $1,000 position; 0.035% of that is $0.35.
+    expect(row('Gains’s own fee (0.035% of size), estimated')).toHaveTextContent('$0.35')
+    // Both fees now carry a number, and the total is the sum of the two plus the collateral.
+    expect(row('FairWins fee (0.05% of size)')).toHaveTextContent('$0.50')
+    expect(row('Total cost')).toHaveTextContent('$100.85')
+    // A published rate is not a quote, and the copy says which it is rather than implying exactness.
+    expect(screen.getByText(/rate Gains publishes for this market, not from a quote/)).toBeInTheDocument()
+    expect(screen.getByText(/does not include Gains’s spread/)).toBeInTheDocument()
+  })
+
+  it('says when the venue’s fee FLOOR is what is being charged, not the headline rate', async () => {
+    renderSheet({ venueOptions: [gainsOption({ venueFee: BTC_FEE })] })
+    await settle()
+    await act(async () => {
+      typeAmount('5') // $5 at 10× is a $50 position — under the venue's $285.72 fee floor
+      fireEvent.change(screen.getByLabelText(/type a multiplier/), { target: { value: '10' } })
+    })
+    await settle()
+
+    // The floor, not 0.035% × $50 = $0.0175 — an effective 0.2%, and the member is told why.
+    expect(row('Gains’s own fee (0.035% of size), estimated')).toHaveTextContent('$0.10')
+    expect(screen.getByText(/below Gains’s smallest fee size/)).toBeInTheDocument()
+    expect(screen.getByText(/as though the position were \$285\.72/)).toBeInTheDocument()
+  })
+
+  it('discloses the dash rather than leaving it bare when the venue publishes no rate', async () => {
+    renderSheet({ venueOptions: [gainsOption()] })
+    await settle()
+    await act(async () => {
+      typeAmount('100')
+      fireEvent.change(screen.getByLabelText(/type a multiplier/), { target: { value: '10' } })
+    })
+    await settle()
+
+    expect(row('Gains’s own fee')).toHaveTextContent('—')
+    // The dash is explained, and so is what it means for the total beside it.
+    expect(screen.getByText(/does not publish its own trading fee to this app/)).toBeInTheDocument()
+    expect(row('Total cost')).toHaveTextContent('$100.50') // collateral + FairWins fee only
   })
 
   it('shows GMX’s keeper fee on its own line, in the network’s own coin', async () => {
@@ -487,6 +546,40 @@ describe('refusals before any wallet prompt', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent(/smaller than the venue’s minimum/)
     expect(screen.getByRole('alert')).toHaveTextContent(/Increase the amount or the leverage/)
+  })
+
+  it('refuses below the venue’s own collateral minimum BEFORE the prompt, naming the amount', async () => {
+    // Gains answers this one with `InsufficientCollateral` — a revert selector the member pays gas
+    // to read and cannot act on. The venue's own $0.50 bound, in money, before the wallet opens.
+    const { sendOnChain } = renderSheet({
+      venueOptions: [gainsOption({ minCollateralUsd: 0.50000125 })],
+    })
+    await settle()
+    await act(async () => {
+      typeAmount('0.25')
+    })
+    await settle()
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/needs at least \$0\.50 in a position here/)
+    expect(screen.getByRole('alert')).toHaveTextContent(/\$0\.25/)
+    expect(submitButton()).toBeDisabled()
+    await act(async () => {
+      fireEvent.click(submitButton())
+    })
+    expect(sendOnChain).not.toHaveBeenCalled()
+  })
+
+  it('accepts the same order once it clears the venue’s collateral minimum', async () => {
+    renderSheet({ venueOptions: [gainsOption({ minCollateralUsd: 0.50000125 })] })
+    await settle()
+    await act(async () => {
+      typeAmount('100')
+    })
+    await settle()
+
+    // The bound must not become a control that always refuses — it binds only where it binds.
+    expect(screen.queryByText(/needs at least/)).not.toBeInTheDocument()
+    expect(submitButton()).toBeEnabled()
   })
 
   it('discloses rather than pretends when the venue’s leverage limits are unreadable', async () => {

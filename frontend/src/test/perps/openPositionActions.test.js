@@ -375,6 +375,54 @@ describe('the preview', () => {
     expect(previewOpen(null).notionalUsd).toBeNull()
     expect(previewOpen({}).totalCostUsd).toBeNull()
   })
+
+  /* ------------------------------------------------------------------------------------------- *
+   * The VENUE's own fee in the preview
+   *
+   * The defect this closed: FairWins' fee was the only one with a number beside it, and the venue's
+   * showed '—'. That does not read as "one is unknown" — it reads as though our fee were the cost
+   * of trading, which is the opposite of what this disclosure exists to do.
+   * ------------------------------------------------------------------------------------------- */
+
+  /** BTC/USD's published gains fee, as the gateway normalizes it. */
+  const BTC_FEE = { openRate: 0.00035, closeRate: 0.00035, feeFloorNotionalUsd: 285.715, minFeeUsd: 0.10000025 }
+
+  it('charges the venue’s rate on SIZE and folds it into the total the member reads', () => {
+    const preview = previewOpen({ ...base, feeBps: 5, venueFee: BTC_FEE })
+    // 0.035% of the $1,000 position, not of the $100 put in.
+    expect(preview.venueFeeUsd).toBeCloseTo(0.35, 9)
+    expect(preview.venueFeeRate).toBe(0.00035)
+    expect(preview.venueFeeChargedOnUsd).toBeCloseTo(1000, 9)
+    expect(preview.venueFeeAtFloor).toBe(false)
+    // $100 collateral + $0.50 FairWins + $0.35 venue.
+    expect(preview.totalCostUsd).toBeCloseTo(100.85, 9)
+  })
+
+  it('names the venue’s fee floor when the position is under it', () => {
+    // $10 collateral at 5× is a $50 position — below the venue's $285.715 fee floor, so gains
+    // charges the fee of a floor-sized position. Reporting 0.035% × $50 would understate the real
+    // cost nearly six times over.
+    const preview = previewOpen({ ...base, collateralAmount: 10_000_000n, leverage: 5, feeBps: 0, venueFee: BTC_FEE })
+    expect(preview.notionalUsd).toBeCloseTo(50, 9)
+    expect(preview.venueFeeAtFloor).toBe(true)
+    expect(preview.venueFeeUsd).toBeCloseTo(0.10000025, 12)
+    expect(preview.venueFeeChargedOnUsd).toBeCloseTo(285.715, 9)
+  })
+
+  it('shows a dash rather than a zero when the venue publishes no rate', () => {
+    const preview = previewOpen({ ...base, feeBps: 5, venueFee: null })
+    expect(preview.venueFeeUsd).toBeNull()
+    expect(preview.venueFeeRate).toBeNull()
+    expect(preview.venueFeeAtFloor).toBe(false)
+    // …and the total says so by omitting it, exactly as it did before this existed.
+    expect(preview.totalCostUsd).toBeCloseTo(100.5, 9)
+  })
+
+  it('cannot state the venue’s fee when the size is unknown', () => {
+    const preview = previewOpen({ ...base, collateralUsdPrice: null, feeBps: 5, venueFee: BTC_FEE })
+    expect(preview.venueFeeUsd).toBeNull()
+    expect(preview.totalCostUsd).toBeNull()
+  })
 })
 
 /* --------------------------------------------------------------------------------------------- *
@@ -567,6 +615,26 @@ describe('composing the venue options for a tapped pair', () => {
     expect(option.collaterals).toBe(row.collaterals)
     // …and the option is genuinely openable, which is what makes the assertions above load-bearing.
     expect(openEligibility(option).ok).toBe(true)
+  })
+
+  it('carries the venue’s own fee and its own minimum through, straight off the feed row', () => {
+    const venueFee = { openRate: 0.00035, closeRate: 0.00035, feeFloorNotionalUsd: 285.715, minFeeUsd: 0.10000025 }
+    const row = gainsRow({ venueFee, minNotional: null, minCollateralUsd: 0.50000125 })
+    const [option] = openVenueOptionsFor(row, [row], { statuses: OPEN_STATUSES })
+    expect(option.venueFee).toBe(venueFee)
+    expect(option.minCollateralUsd).toBeCloseTo(0.50000125, 10)
+    // NULL ON PURPOSE, and this is the assertion that keeps it that way: gains' own
+    // `minPositionSizeUsd` is a FEE FLOOR, not a minimum position size (v9 removed that check), so
+    // publishing $285.72 as a minimum here would refuse a $100 position the venue would fill.
+    expect(option.minNotional).toBeNull()
+  })
+
+  it('leaves the fee and the minimums null where the feed carried none', () => {
+    const row = gainsRow()
+    const [option] = openVenueOptionsFor(row, [row], { statuses: OPEN_STATUSES })
+    expect(option.venueFee).toBeNull()
+    expect(option.minCollateralUsd).toBeNull()
+    expect(option.minNotional).toBeNull()
   })
 
   it('offers every venue that lists the market ON THE TAPPED ROW’S CHAIN, tapped venue first', () => {

@@ -159,6 +159,95 @@ describe('validateOpen', () => {
     expect(r.ok).toBe(true)
   })
 
+  /* ------------------------------------------------------------------------------------------- *
+   * The venue's minimum, in the venue's own currency (spec 083)
+   *
+   * Gains answers an undersized position with `InsufficientCollateral` — after the member has paid
+   * gas to read it. These are the checks that get them the answer before the wallet prompt, and the
+   * unit rule that keeps this bound from being compared against the base-unit one beside it.
+   * ------------------------------------------------------------------------------------------- */
+
+  it('refuses a position below the venue’s own USD minimum, and NAMES the minimum', () => {
+    const r = validateOpen({
+      collateralAmount: 100,
+      balance: 250,
+      leverage: 5,
+      venueLimits: LIMITS,
+      notional: 500,
+      collateralUsd: 0.25,
+      minCollateralUsd: 0.50000125,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.code).toBe(VALIDATION_CODE.BELOW_MIN_COLLATERAL_USD)
+    // The venue's own number, in money — not a selector, and not a bare "too small".
+    expect(r.reason).toContain('$0.50')
+    expect(r.reason).toContain('$0.25')
+  })
+
+  it('passes at or above that minimum', () => {
+    for (const usd of [0.50000125, 0.51, 1_000]) {
+      expect(
+        validateOpen({
+          collateralAmount: 100,
+          balance: 250,
+          leverage: 5,
+          venueLimits: LIMITS,
+          notional: 500,
+          collateralUsd: usd,
+          minCollateralUsd: 0.50000125,
+        }).ok,
+        String(usd),
+      ).toBe(true)
+    }
+  })
+
+  it('refuses when the venue imposes that bound and the amount’s worth is unknown', () => {
+    const r = validateOpen({
+      collateralAmount: 100,
+      balance: 250,
+      leverage: 5,
+      venueLimits: LIMITS,
+      notional: 500,
+      collateralUsd: null,
+      minCollateralUsd: 0.5,
+    })
+    expect(r.ok).toBe(false)
+    // "We could not check this" must never become "this is fine" — the same rule the notional
+    // bounds follow.
+    expect(r.code).toBe(VALIDATION_CODE.COLLATERAL_USD_UNKNOWN)
+  })
+
+  it('an ABSENT USD minimum passes, even with no USD value at all', () => {
+    // GMX publishes no such bound on its REST feed. Skipping a check nobody imposes is not a
+    // silent pass, and it must not drag the amount's USD worth in as a new requirement.
+    const r = validateOpen({
+      collateralAmount: 100,
+      balance: 250,
+      leverage: 5,
+      venueLimits: LIMITS,
+      notional: 500,
+      collateralUsd: null,
+      minCollateralUsd: null,
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('never compares the USD bound against the base-unit one beside it', () => {
+    // 100 base units of a 6-decimal token is $0.0001, nowhere near the venue's $0.50 — while the
+    // token-unit minimum of 10 is satisfied. A validator that muddled the two units would pass
+    // this, which is the exact class of defect the amount rules at the top of the module exist for.
+    const r = validateOpen({
+      collateralAmount: 100n,
+      balance: 250n,
+      leverage: 5,
+      venueLimits: { ...LIMITS, minCollateral: 10n, maxCollateral: 100_000n },
+      notional: 500,
+      collateralUsd: 0.0001,
+      minCollateralUsd: 0.5,
+    })
+    expect(r.code).toBe(VALIDATION_CODE.BELOW_MIN_COLLATERAL_USD)
+  })
+
   it('never leaks a raw venue error into a member-facing reason', () => {
     const refusals = [
       validateOpen({}),

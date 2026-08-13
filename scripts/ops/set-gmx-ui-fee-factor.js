@@ -20,6 +20,11 @@
  * Permissionless by design: GMX requires no approval to self-register a UI fee receiver. The only
  * bound is `MAX_UI_FEE_FACTOR`, read live from the DataStore rather than assumed.
  *
+ * The unit conversion, the cap comparison, the DataStore key derivations and every refusal live in
+ * `scripts/ops/lib/gmxUiFee.js` so they can be tested without a network
+ * (`test/perps/gmxUiFee.test.js`). What stays here is exactly what needs a chain: the live reads,
+ * the signer, and the send.
+ *
  * Usage
  * -----
  *   # report only — current factor, live cap, and what 5 bps would mean (sends nothing)
@@ -39,42 +44,25 @@
 const hre = require("hardhat");
 const { ethers } = hre;
 
-// Arbitrum 42161. Sourced from docs.gmx.io + @gmx-io/sdk — deliberately NOT from the
-// gmx-synthetics repo's deployments/ directory, which disagrees on exactly the churning contracts.
-const GMX = {
-  42161: {
-    exchangeRouter: "0x7dE39FF2e232A2203196788d37e234cF8F1b83f1",
-    dataStore: "0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8",
-  },
-};
-
-// GMX's factor precision. 1e30 is "1.0"; 1e27 is 0.001 = 10 bps (the live MAX_UI_FEE_FACTOR).
-const FLOAT_PRECISION = 10n ** 30n;
-const BPS_TO_FACTOR = 10n ** 26n; // 1 bp = 1e26 against 1e30
-
-const EXCHANGE_ROUTER_ABI = ["function setUiFeeFactor(uint256 uiFeeFactor) external"];
-const DATA_STORE_ABI = ["function getUint(bytes32 key) external view returns (uint256)"];
-
-/** GMX Keys.sol: keccak256(abi.encode("UI_FEE_FACTOR")) then keccak256(abi.encode(that, account)). */
-const abi = ethers.AbiCoder.defaultAbiCoder();
-const UI_FEE_FACTOR = ethers.keccak256(abi.encode(["string"], ["UI_FEE_FACTOR"]));
-const MAX_UI_FEE_FACTOR = ethers.keccak256(abi.encode(["string"], ["MAX_UI_FEE_FACTOR"]));
-const uiFeeFactorKey = (account) =>
-  ethers.keccak256(abi.encode(["bytes32", "address"], [UI_FEE_FACTOR, account]));
-
-const factorToBps = (factor) => Number((factor * 10_000n) / FLOAT_PRECISION);
-const bpsToFactor = (bps) => BigInt(bps) * BPS_TO_FACTOR;
+const {
+  EXCHANGE_ROUTER_ABI,
+  DATA_STORE_ABI,
+  MAX_UI_FEE_FACTOR,
+  uiFeeFactorKey,
+  factorToBps,
+  bpsToFactor,
+  gmxAddressesFor,
+  bpsProvided,
+  parseBps,
+  assertWithinCap,
+  assertSignerIsReceiver,
+  assertPostCheck,
+} = require("./lib/gmxUiFee");
 
 async function main() {
   const net = await ethers.provider.getNetwork();
   const chainId = Number(net.chainId);
-  const cfg = GMX[chainId];
-  if (!cfg) {
-    throw new Error(
-      `GMX v2 is not deployed on chainId ${chainId}. This script is Arbitrum (42161) only — ` +
-        `run with --network arbitrum.`
-    );
-  }
+  const cfg = gmxAddressesFor(chainId);
 
   const bpsRaw = process.env.BPS;
   const dryRun = String(process.env.DRY_RUN || "").toLowerCase() === "true";
@@ -108,39 +96,22 @@ async function main() {
   console.log("The fee is charged on NOTIONAL (size), on BOTH open and close, and is computed by");
   console.log("GMX at execution — a cancelled or frozen order pays nothing.");
 
-  if (bpsRaw === undefined) {
+  if (!bpsProvided(bpsRaw)) {
     console.log("");
     console.log("(report only — pass BPS=<n> to set the rate. Nothing was sent.)");
     return;
   }
 
-  const bps = Number(bpsRaw);
-  if (!Number.isInteger(bps) || bps < 0) {
-    throw new Error(`BPS must be a non-negative integer; got ${JSON.stringify(bpsRaw)}`);
-  }
+  const bps = parseBps(bpsRaw);
   const factor = bpsToFactor(bps);
-  if (factor > maxFactor) {
-    throw new Error(
-      `BPS=${bps} (factor ${factor}) exceeds GMX's live MAX_UI_FEE_FACTOR ${maxFactor} ` +
-        `(${maxBps} bps). GMX would revert InvalidUiFeeFactor.`
-    );
-  }
+  assertWithinCap({ bps, factor, maxFactor });
 
   console.log("");
   console.log(`Requested:      ${factor} (${bps} bps)`);
 
-  if (!signer) {
-    throw new Error("No signer available. Configure one before attempting to send.");
-  }
   // setUiFeeFactor takes account = msg.sender, so the signer IS the receiver. If the operator
   // expected a different receiver, sending would attribute fees to the wrong address silently.
-  if (expectedReceiver.toLowerCase() !== signerAddress.toLowerCase()) {
-    throw new Error(
-      `Receiver mismatch. setUiFeeFactor credits msg.sender, so the signer IS the fee receiver.\n` +
-        `  signer:   ${signerAddress}\n  expected: ${expectedReceiver}\n` +
-        `Send from the expected receiver, or unset RECEIVER to accept the signer as the receiver.`
-    );
-  }
+  assertSignerIsReceiver({ signerAddress, expectedReceiver });
 
   if (dryRun) {
     console.log("");
@@ -162,9 +133,7 @@ async function main() {
 
   const after = await dataStore.getUint(uiFeeFactorKey(signerAddress));
   console.log(`  verified factor now ${after} (${factorToBps(after)} bps)`);
-  if (after !== factor) {
-    throw new Error(`Post-check mismatch: expected ${factor}, DataStore reports ${after}.`);
-  }
+  assertPostCheck({ expected: factor, actual: after });
   console.log("");
   console.log(`Record ${signerAddress} as uiFeeReceiver in frontend/src/config/perps.js, or the`);
   console.log("app will attach a receiver that does not accrue.");

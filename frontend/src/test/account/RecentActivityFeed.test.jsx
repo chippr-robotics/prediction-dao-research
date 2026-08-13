@@ -1,11 +1,31 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import RecentActivityFeed from '../../components/account/RecentActivityFeed'
 
 const TX_A = '0x' + 'aa'.repeat(32)
 const TX_B = '0x' + 'bb'.repeat(32)
-const NOW = Date.now()
+/*
+ * The clock is PINNED to midday, not read from the wall.
+ *
+ * This file used to take `Date.now()` at module load and place entries 60s and 120s before it, then
+ * assert a "Today" bucket. Within ~2 minutes of local midnight both entries fall on the PREVIOUS
+ * day, no "Today" group renders, and the assertion fails — a real ~2-minute window every day in
+ * which CI is red for no reason. Observed failing at 00:05 UTC (job 94300335340), on a PR whose
+ * diff touched no activity-feed code.
+ *
+ * Midday is chosen so neither the -120s offsets below nor any timezone the suite runs under can
+ * push an entry across a day boundary.
+ */
+const NOW = new Date('2026-03-15T12:00:00.000Z').getTime()
+
+beforeAll(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  vi.setSystemTime(NOW)
+})
+afterAll(() => {
+  vi.useRealTimers()
+})
 
 const entries = [
   {
