@@ -213,6 +213,21 @@ artifacts live under `specs/<feature>/`.
   lives in the **Tools** nav group (tab id `custody` unchanged). See
   `docs/developer-guide/protect-policies.md` + `docs/runbooks/protect-policy-operations.md` +
   `specs/068-protect-multi-chain-policies/`.
+- **Protect ▸ Verify (message signing) is FRONTEND-ONLY and has THREE verdicts, never two.**
+  Members sign an arbitrary message to prove control of an account and check other people's proofs
+  (`frontend/src/lib/verify/`, surfaced by `components/custody/VerifySection.jsx`). Verification
+  returns `valid` / `invalid` / **`unverifiable`** — the ERC-1271 leg is a network read, so an RPC
+  timeout is NOT a forged signature and must never render as one; a negative is reported only when
+  it is knowable (ECDSA recovered someone else AND the chain says the claimed address holds no
+  code, or the account contract itself said no). A mismatching ECDSA recovery is NOT promoted to a
+  negative when the on-chain leg could not run — that is exactly what a legitimate smart-account
+  signature looks like from outside. The message is signed and carried **verbatim** (no trimming,
+  no template, no appended nonce): a member is usually answering somebody else's challenge. The
+  document's `scheme` is a HINT, never authority — verification tries both legs and decides for
+  itself. Signing is REFUSED while operating as a **vault** (spec 043): a Safe has no key, and
+  signing anyway would prove control of the member's own account under a "vault" label. Fixtures
+  live once, in `frontend/src/test/fixtures/signedMessages.js` (also imported by the capture
+  harness). See `docs/developer-guide/message-signing.md` + `specs/084-message-signing-verify/`.
 - **Legacy account recovery (spec 062) is FRONTEND-ONLY** — the **Recovery** section (renamed from
   "Backup & Security"; tab id `security` + `backup` alias unchanged). Members import an old EOA
   **private key** or **BIP-39 word list**; the secret is encrypted at rest (AES-GCM under a

@@ -15,7 +15,7 @@ import { useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import './ActionSheet.css'
 
-export default function ActionSheet({ open, onClose, title, children, closeDisabled = false }) {
+export default function ActionSheet({ open, onClose, title, children, closeDisabled = false, className = '' }) {
   const dialogRef = useRef(null)
   const onCloseRef = useRef(onClose)
   const closeDisabledRef = useRef(closeDisabled)
@@ -70,7 +70,7 @@ export default function ActionSheet({ open, onClose, title, children, closeDisab
   return (
     <div className="action-sheet__backdrop" role="presentation" onClick={handleBackdrop}>
       <div
-        className="action-sheet"
+        className={`action-sheet ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -103,4 +103,7 @@ ActionSheet.propTypes = {
   title: PropTypes.string.isRequired,
   children: PropTypes.node,
   closeDisabled: PropTypes.bool,
+  /** Extra class on the sheet, for callers whose content needs a scoped tweak (e.g. a long form
+      that wants its header pinned). Additive only — the shell's own behaviour is unchanged. */
+  className: PropTypes.string,
 }

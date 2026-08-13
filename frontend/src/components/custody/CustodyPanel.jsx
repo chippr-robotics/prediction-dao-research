@@ -17,6 +17,7 @@ import { NETWORKS } from '../../config/networks'
 import VaultList from './VaultList'
 import CreateVaultWizard from './CreateVaultWizard'
 import LoadVaultForm from './LoadVaultForm'
+import VerifySection from './VerifySection'
 import './Custody.css'
 
 /** Custody chains other than the connected one, for the "create elsewhere" affordance (FR-005). */
@@ -125,6 +126,18 @@ export default function CustodyPanel() {
         {/* Always rendered: the vault list spans chains, so it must survive an unsupported
             connected network (FR-003/FR-005). OnChainSection itself gates creation. */}
         <OnChainSection />
+      </section>
+
+      {/* Verify — sign an arbitrary message to prove control of an account, and check somebody
+          else's proof. It belongs in Protect rather than under an account surface because it is
+          the only place a member does something to establish who controls what WITHOUT moving
+          value; and unlike the vault sections it needs no deployment on any chain, so it is never
+          gated by the connected network. */}
+      <section className="custody-subsection" aria-labelledby="custody-verify-title">
+        <h3 id="custody-verify-title" className="custody-subsection-title">
+          Verify
+        </h3>
+        <VerifySection />
       </section>
 
       <section
