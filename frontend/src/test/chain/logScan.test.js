@@ -146,6 +146,33 @@ describe('scanLogs', () => {
     expect(scannedTo).toBe(5_000)
   })
 
+  // The cache is deliberately keyed WITHOUT toBlock (a moving head would fragment it), so an
+  // explicit ceiling has to bind the answer as well as the scan — otherwise a cache filled past it
+  // hands back blocks the caller excluded.
+  it('honours an explicit toBlock as a ceiling on the answer, not just on the scan', async () => {
+    const getLogs = vi.fn(async ({ fromBlock }) => [log(T0_A, fromBlock)])
+    const c = makeContract({ getLogs, getBlockNumber: async () => 100_000 })
+    const opts = { contract: c, filters: [c.filters.A()], fromBlock: 1, chainId: 137 }
+
+    const full = await scanLogs(opts)
+    expect(full.logs.map((l) => l.blockNumber)).toEqual([1, 10_001, 20_001, 30_001, 40_001, 50_001, 60_001, 70_001, 80_001, 90_001])
+
+    getLogs.mockClear()
+    const capped = await scanLogs({ ...opts, toBlock: 25_000 })
+    expect(getLogs).not.toHaveBeenCalled() // served from cache…
+    expect(capped.logs.map((l) => l.blockNumber)).toEqual([1, 10_001, 20_001]) // …but trimmed to the ceiling
+    expect(capped.scannedTo).toBe(25_000)
+    expect(capped.complete).toBe(true)
+  })
+
+  it('never scans past an explicit toBlock', async () => {
+    const getLogs = vi.fn(async () => [])
+    const c = makeContract({ getLogs, getBlockNumber: async () => 999_999 })
+    await scanLogs({ contract: c, filters: [c.filters.A()], fromBlock: 1, chainId: 137, toBlock: 15_000 })
+    expect(getLogs).toHaveBeenCalledTimes(2)
+    expect(getLogs.mock.calls.at(-1)[0].toBlock).toBe(15_000)
+  })
+
   it('keys the cache by chain, so the same address on two chains never shares history', async () => {
     const getLogs = vi.fn(async () => [])
     const c = makeContract({ getLogs, getBlockNumber: async () => 20_000 })

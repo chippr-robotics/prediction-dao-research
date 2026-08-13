@@ -115,7 +115,13 @@ export function useVaultProposals(vault) {
         setPartial(!historyComplete)
       }
     } catch (e) {
-      if (myReq === reqId.current) setError(e?.message || 'Failed to read proposals')
+      if (myReq === reqId.current) {
+        setError(e?.message || 'Failed to read proposals')
+        // Clear the catching-up notice: it belongs to a cycle that has been superseded, and leaving
+        // it up would claim a scan is progressing at the same moment we say the read failed. The
+        // error is the live truth and should be the only thing claimed.
+        setPartial(false)
+      }
     } finally {
       if (myReq === reqId.current) setLoading(false)
     }

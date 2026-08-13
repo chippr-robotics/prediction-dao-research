@@ -125,7 +125,7 @@ function decode(contract, log) {
  * @param {Array} args.filters - one or more `contract.filters.X(...)`; grouped into one request per chunk
  * @param {number} args.fromBlock - the recorded deploy block. NEVER 0 for a live contract.
  * @param {number|string} args.chainId - part of the cache key; an address alone repeats across chains
- * @param {number} [args.toBlock] - defaults to the current head
+ * @param {number} [args.toBlock] - inclusive ceiling on BOTH the scan and the answer; defaults to the head
  * @param {number} [args.maxChunks] - chunks this invocation may spend; omit for "as many as it takes"
  * @param {string} [args.cacheKey] - override the derived key (tests)
  * @returns {Promise<{logs: object[], scannedTo: number, complete: boolean}>} `logs` is every log
@@ -145,11 +145,24 @@ export async function scanLogs({ contract, filters, fromBlock, chainId, toBlock,
   const head = toBlock ?? (await provider.getBlockNumber())
   const entry = cache.get(key) || { scannedTo: Number(fromBlock) - 1, logs: [] }
 
+  // `toBlock` is a CEILING ON THE ANSWER, not just on the scan. The cache is keyed without it (one
+  // entry per contract+filter, or a moving head would fragment it into uselessness), so a cache
+  // already filled past an explicit ceiling must be trimmed back to it rather than handing the
+  // caller blocks it excluded.
+  const answer = () => {
+    if (toBlock == null) return { logs: entry.logs, scannedTo: entry.scannedTo, complete: entry.scannedTo >= head }
+    return {
+      logs: entry.logs.filter((l) => l.blockNumber <= toBlock),
+      scannedTo: Math.min(entry.scannedTo, toBlock),
+      complete: entry.scannedTo >= toBlock,
+    }
+  }
+
   // Head can move backwards across a reorg or a load-balanced endpoint; never rewind the cursor
   // (that would re-append logs already held) and never claim to have scanned past the head.
   if (entry.scannedTo >= head) {
     cache.set(key, entry)
-    return { logs: entry.logs, scannedTo: entry.scannedTo, complete: true }
+    return answer()
   }
 
   const base = { address, topics }
@@ -177,7 +190,7 @@ export async function scanLogs({ contract, filters, fromBlock, chainId, toBlock,
     cache.set(key, entry)
   }
 
-  return { logs: entry.logs, scannedTo: entry.scannedTo, complete: entry.scannedTo >= head }
+  return answer()
 }
 
 export default scanLogs
