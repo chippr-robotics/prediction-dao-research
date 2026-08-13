@@ -171,12 +171,19 @@ checking surface, and confirming every field populates and the outcome is correc
 - **FR-018**: The record's own claim about what kind of signature it carries MUST NOT determine the
   outcome; the system MUST reach its own conclusion from the signature.
 - **FR-019**: Text pasted that is not a record MUST be treated as ordinary input.
-- **FR-020**: The system MUST NOT assume a network the member has not stated. Where a network is
-  needed and none was given, the outcome is **not determinable** with that reason — never a
-  contradiction reached against an assumed network.
+- **FR-020**: Checking a signature against a stated address MUST be performed **entirely on the
+  member's device, with no network access**, whenever the signature is one a public key can be
+  recovered from. This is the default and the common case; it MUST hold with the device offline.
+- **FR-020a**: The system MUST NOT assume a network the member has not stated, and MUST NOT consult
+  one on its own initiative. Consulting a network is an action the member takes explicitly, offered
+  only where it could settle something the offline result could not.
 - **FR-021**: Where a record names a network this build does not serve, the system MUST say so and
   name it, rather than reporting that the record was silent about its network. It MUST NOT adopt
   that network.
+- **FR-021a**: Where the offline result cannot settle the claim, the system MUST state plainly what
+  IS established — which address produced the bytes, or that no address can be recovered from them —
+  before and alongside offering to consult a network. The unsettled part MUST NOT be presented as a
+  contradiction.
 
 **Surface**
 
@@ -229,6 +236,9 @@ checking surface, and confirming every field populates and the outcome is correc
   passing test.
 - **SC-008**: Verification is usable on every network the build supports, including networks where
   the product has deployed nothing.
+- **SC-009**: Checking a wallet signature succeeds with the device fully offline, and issues zero
+  network requests. Consulting a network happens only after the member asks for it, and never
+  otherwise.
 
 ## Assumptions
 
@@ -242,7 +252,11 @@ checking surface, and confirming every field populates and the outcome is correc
   freshness requirement is the asker's to impose via the challenge they supply, which is why the
   message is signed verbatim.
 - Existing accounts that prove control through a contract are checkable only on the network that
-  contract is on. This is a property of those accounts, not a choice this feature makes.
+  contract is on. This is a property of those accounts, not a choice this feature makes: **such an
+  account has no public key**. There is no key whose signature recovers to it, and what it produces
+  is an envelope only its own code can interpret, so nothing about those bytes is self-validating.
+  Asking it is the only way, and its answer can change over time as its owners change. Every other
+  case — anything a public key can be recovered from — is settled offline.
 - The feature is client-side only: no new stored data, no new service, no new deployment.
 
 ## Implementation Status

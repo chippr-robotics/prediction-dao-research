@@ -85,6 +85,7 @@ export default function VerifySection({ deps }) {
     verifying,
     verdict,
     verify,
+    checkOnChain,
     clearVerdict,
   } = useMessageSigning({ deps })
 
@@ -158,6 +159,7 @@ export default function VerifySection({ deps }) {
           verifying={verifying}
           verdict={verdict}
           onVerify={verify}
+          onCheckOnChain={checkOnChain}
           onClear={clearVerdict}
           draft={checkDraft}
           onDraftChange={setCheckDraft}

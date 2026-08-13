@@ -119,7 +119,10 @@ describe('VerifySection — checking a signature', () => {
     expect(within(result).getByText(/not a failed check/i)).toBeInTheDocument()
   })
 
-  it('reports a definite negative once the chain confirms the address holds no contract', async () => {
+  // The offline check states the fact and stops. A DEFINITE negative needs the account's own
+  // answer, so the member escalates deliberately — the network control does not even exist until
+  // there is a result that a network could settle.
+  it('reaches a definite negative only through the explicit on-chain check', async () => {
     readProvider = stubProvider({ code: '0x' }) // a plain account on the stated network
     const user = userEvent.setup()
     renderSection()
@@ -131,48 +134,90 @@ describe('VerifySection — checking a signature', () => {
     await user.paste(SIGNATURE)
     await user.click(screen.getByLabelText(/claims to have signed/i))
     await user.paste(OTHER_ADDRESS)
-    // The member states the network — which since #1165 is the only way the on-chain leg runs.
-    await user.selectOptions(screen.getByLabelText(/^Network$/i), COHORT_CHAIN)
+    // No network control on screen yet — nothing has said one could help.
+    expect(screen.queryByLabelText(/ask that account directly/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /check signature/i }))
 
-    const result = await screen.findByTestId('verify-result')
-    expect(result).toHaveAttribute('data-status', 'invalid')
-    expect(within(result).getByText(/does not match/i)).toBeInTheDocument()
-    expect(within(result).getByText(new RegExp(SIGNER_ADDRESS, 'i'))).toBeInTheDocument()
+    // Offline: the fact, not a verdict.
+    const offline = await screen.findByTestId('verify-result')
+    expect(offline).toHaveAttribute('data-status', 'unverifiable')
+    expect(within(offline).getByText(new RegExp(SIGNER_ADDRESS, 'i'))).toBeInTheDocument()
+
+    // Now the escalation appears, and only now.
+    await user.selectOptions(screen.getByLabelText(/ask that account directly/i), COHORT_CHAIN)
+    await user.click(screen.getByRole('button', { name: /check on-chain/i }))
+
+    const settled = await screen.findByTestId('verify-result')
+    expect(settled).toHaveAttribute('data-status', 'invalid')
+    expect(within(settled).getByText(new RegExp(SIGNER_ADDRESS, 'i'))).toBeInTheDocument()
   })
 
-  // Regression, review on #1165: the network used to be pre-filled from the connected chain. A
-  // contract-account signature then got checked against a chain the member never named, found no
-  // code there, and came back as a DEFINITE "does not match" — a confidently wrong accusation
-  // built on an assumption. Unspecified is the honest default.
-  it('does not assume a network the member never chose', async () => {
-    readProvider = stubProvider({ code: '0x' }) // the connected chain holds no code at that address
+  // The strongest form of "does not assume a network" (the #1165 regression, now structural):
+  // the check never touches one. A provider
+  // that would have answered `magic` is on the bench and is never called.
+  it('checks offline and touches no network at all', async () => {
+    const provider = { getCode: vi.fn(async () => '0x6000'), call: vi.fn(async () => `0x1626ba7e${'0'.repeat(56)}`) }
+    readProvider = provider
     const user = userEvent.setup()
     renderSection()
     await openSheet(user, 'Check a signature')
 
-    expect(screen.getByLabelText(/^Network$/i)).toHaveValue('')
-
     await user.click(screen.getByLabelText(/^Message$/i))
     await user.paste(MESSAGE)
     await user.click(screen.getByLabelText(/^Signature$/i))
-    await user.paste(ERC1271_SIGNATURE) // not recoverable — needs the on-chain leg
+    await user.paste(ERC1271_SIGNATURE) // not recoverable — the on-chain leg is the only settler
     await user.click(screen.getByLabelText(/claims to have signed/i))
     await user.paste(CONTRACT_ACCOUNT)
     await user.click(screen.getByRole('button', { name: /check signature/i }))
 
     const result = await screen.findByTestId('verify-result')
     expect(result).toHaveAttribute('data-status', 'unverifiable')
-    expect(within(result).getByText(/which network/i)).toBeInTheDocument()
+    expect(within(result).getByText(/not a wallet signature/i)).toBeInTheDocument()
+    expect(provider.getCode).not.toHaveBeenCalled()
+    expect(provider.call).not.toHaveBeenCalled()
   })
 
-  it('still takes the network from a record that names one this build serves', async () => {
+  it('settles a contract-account signature once the member asks the account', async () => {
+    readProvider = stubProvider({ answer: 'magic' })
     const user = userEvent.setup()
     renderSection()
     await openSheet(user, 'Check a signature')
+
+    await user.click(screen.getByLabelText(/^Message$/i))
+    await user.paste(MESSAGE)
     await user.click(screen.getByLabelText(/^Signature$/i))
-    await user.paste(JSON.stringify({ ...JSON.parse(EIP191_DOCUMENT_JSON), chainId: Number(COHORT_CHAIN) }))
-    expect(screen.getByLabelText(/^Network$/i)).toHaveValue(COHORT_CHAIN)
+    await user.paste(ERC1271_SIGNATURE)
+    await user.click(screen.getByLabelText(/claims to have signed/i))
+    await user.paste(CONTRACT_ACCOUNT)
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+    await screen.findByTestId('verify-result')
+
+    await user.selectOptions(screen.getByLabelText(/ask that account directly/i), COHORT_CHAIN)
+    await user.click(screen.getByRole('button', { name: /check on-chain/i }))
+
+    const settled = await screen.findByTestId('verify-result')
+    expect(settled).toHaveAttribute('data-status', 'valid')
+  })
+
+  it('pre-selects the escalation network from a record that names one this build serves', async () => {
+    readProvider = stubProvider({ answer: 'magic' })
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+    // A record whose signature is NOT recoverable, so the offline check leaves it open and the
+    // escalation appears carrying the chain the record named.
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(
+      JSON.stringify({
+        ...JSON.parse(EIP191_DOCUMENT_JSON),
+        signature: ERC1271_SIGNATURE,
+        address: CONTRACT_ACCOUNT,
+        chainId: Number(COHORT_CHAIN),
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+    await screen.findByTestId('verify-result')
+    expect(screen.getByLabelText(/ask that account directly/i)).toHaveValue(COHORT_CHAIN)
   })
 
   // Found while fixing the pre-filled-network bug: a record naming a chain outside this build's
@@ -186,7 +231,6 @@ describe('VerifySection — checking a signature', () => {
     await user.click(screen.getByLabelText(/^Signature$/i))
     await user.paste(EIP191_DOCUMENT_JSON) // names Polygon 137; this build is a testnet cohort
 
-    expect(screen.getByLabelText(/^Network$/i)).toHaveValue('')
     expect(await screen.findByText(/does not serve/i)).toBeInTheDocument()
     // …and the wallet signature in it is still checkable, because recovery needs no chain.
     await user.click(screen.getByRole('button', { name: /check signature/i }))

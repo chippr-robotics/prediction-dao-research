@@ -19,7 +19,7 @@ import PropTypes from 'prop-types'
 import CustodyAddressField from './CustodyAddressField'
 import { parseSignedMessage, looksLikeSignedMessage, SIGN_SCHEMES } from '../../lib/verify/signedMessage'
 import { VERIFY_STATUS } from '../../lib/verify/verifyMessage'
-import { cohortChainIds, getNetwork } from '../../config/networks'
+import { cohortChainIds, NETWORKS } from '../../config/networks'
 
 /** How the verdict was reached — a footnote, phrased as a whole sentence. */
 const METHOD_NOTE = {
@@ -44,7 +44,7 @@ function readableTime(iso) {
   return Number.isNaN(at.getTime()) ? iso : at.toLocaleString()
 }
 
-export default function VerifyMessageForm({ verifying, verdict, onVerify, onClear, draft, onDraftChange }) {
+export default function VerifyMessageForm({ verifying, verdict, onVerify, onCheckOnChain, onClear, draft, onDraftChange }) {
   // The draft lives ABOVE this component (VerifySection), because the sheet it renders in unmounts
   // when closed — a member who closes the sheet to go re-read the message they were sent must not
   // come back to an empty form sitting beneath a verdict about text that is no longer there.
@@ -141,16 +141,14 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
       onSubmit={(e) => {
         e.preventDefault()
         if (!canSubmit) return
-        onVerify({
-          message,
-          signature: signature.trim(),
-          address: address.trim() || null,
-          chainId: chainId === '' ? null : Number(chainId),
-        })
+        // The offline check. No chain is passed because none can be used: checking a signature
+        // against a public key is arithmetic, and `verifyMessage` cannot reach a network at all.
+        onVerify({ message, signature: signature.trim(), address: address.trim() || null })
       }}
     >
-      {/* No lede: the sheet's own title already says what this is, and inside a scrolling sheet
-          every line of preamble pushes the answer further out of view. */}
+      {/* One line only — the sheet's title already says what this is. It earns its place by stating
+          the guarantee: this check is arithmetic on your device, and the member can rely on that. */}
+      <p className="verify-lede">Checked on your device. No network is used unless you ask for one.</p>
       {/* Above the fields, not below them: this reports that the fields BELOW were filled in from a
           document, and an explanation that trails what it explains reads as an afterthought. */}
       {imported && (
@@ -215,32 +213,6 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
         hint="Leave empty to ask who signed it instead."
       />
 
-      <div className="verify-field">
-        <label className="verify-label" htmlFor="verify-check-chain">
-          Network
-        </label>
-        <select
-          id="verify-check-chain"
-          className="verify-select"
-          value={chainId}
-          onChange={(e) => {
-            set({ chainId: e.target.value })
-            reset()
-          }}
-          aria-describedby="verify-check-chain-hint"
-        >
-          <option value="">Not specified</option>
-          {chains.map((id) => (
-            <option key={id} value={String(id)}>
-              {getNetwork(id)?.name || `Chain ${id}`}
-            </option>
-          ))}
-        </select>
-        <p className="verify-hint" id="verify-check-chain-hint">
-          Only needed for accounts that sign through a contract — passkey accounts and vaults.
-        </p>
-      </div>
-
       <div className="verify-actions">
         <button type="submit" className="verify-primary" disabled={!canSubmit}>
           {verifying ? 'Checking…' : 'Check signature'}
@@ -269,6 +241,54 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
             </p>
           )}
           {verdict.reason && <p>{verdict.reason}</p>}
+
+          {/* The escalation, and the ONLY place a network appears in this form. It is offered on
+              the one outcome the offline check cannot settle, and it is a decision the member
+              makes — not a step the surface takes on their behalf against a chain they never
+              named. Everything above this point ran without touching the network. */}
+          {verdict.canCheckOnChain && address.trim() && (
+            <div className="verify-escalate">
+              <label className="verify-label" htmlFor="verify-check-chain">
+                Ask that account directly
+              </label>
+              <p className="verify-hint" id="verify-check-chain-hint">
+                Only smart contract accounts — passkey accounts and vaults — can answer. They have no
+                public key, so their signature can only be checked by asking the account itself, on
+                the one network it lives on.
+              </p>
+              <div className="verify-escalate__row">
+                <select
+                  id="verify-check-chain"
+                  className="verify-select"
+                  value={chainId}
+                  onChange={(e) => set({ chainId: e.target.value })}
+                  aria-describedby="verify-check-chain-hint"
+                >
+                  <option value="">Choose a network…</option>
+                  {chains.map((id) => (
+                    <option key={id} value={String(id)}>
+                      {NETWORKS[id]?.name || `Chain ${id}`}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="verify-secondary"
+                  disabled={chainId === '' || verifying}
+                  onClick={() =>
+                    onCheckOnChain({
+                      message,
+                      signature: signature.trim(),
+                      address: address.trim(),
+                      chainId: Number(chainId),
+                    })
+                  }
+                >
+                  {verifying ? 'Asking…' : 'Check on-chain'}
+                </button>
+              </div>
+            </div>
+          )}
           {/* Its own line, not a grey tail on the sentence above — mid-paragraph a colour change
               reads as a rendering fault rather than as a footnote.
               Only on a VALID verdict: `method` on a negative records which leg produced it, and
@@ -295,8 +315,11 @@ VerifyMessageForm.propTypes = {
     method: PropTypes.string,
     signer: PropTypes.string,
     reason: PropTypes.string,
+    canCheckOnChain: PropTypes.bool,
   }),
   onVerify: PropTypes.func.isRequired,
+  /** The explicit on-chain escalation — the only path in this form that uses a network. */
+  onCheckOnChain: PropTypes.func.isRequired,
   onClear: PropTypes.func.isRequired,
   /** Owned by VerifySection so it survives the sheet closing. */
   draft: PropTypes.shape({

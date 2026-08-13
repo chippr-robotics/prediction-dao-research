@@ -209,6 +209,20 @@ populates and the outcome is correct.
   — *`getNetwork()` falls back to the build default, so a member on an unsupported chain was told
   they were signing on "Polygon". CLAUDE.md line 211 requires strict lookups in custody code for
   exactly this reason. Caught in review on #1165.*
+- [X] T064 [US1] Split verification into an OFFLINE `verifyMessage` (synchronous — it cannot await
+  a network) and an explicit `verifyOnChain` escalation, in `frontend/src/lib/verify/verifyMessage.js`
+  — *FR-020/SC-009. Checking a signature against a public key is arithmetic; the network exists only
+  because a CONTRACT account has no public key. Asserted by a test that hands the offline function a
+  provider and proves it is never called, and by the function being sync — a function that returns no
+  promise cannot await I/O.*
+- [X] T065 [US1] Offer the network control only on the outcome a network could settle, in
+  `frontend/src/components/custody/VerifyMessageForm.jsx`
+  — *FR-020a. The escalation lives inside the verdict block, so the form reads as "offline by
+  default, ask a chain deliberately" rather than "fill in a network to continue".*
+- [X] T066 [US1] State what IS established before offering to escalate, in
+  `frontend/src/lib/verify/verifyMessage.js`
+  — *FR-021a. "These bytes were produced by 0xB. That is certain." The unsettled half is named
+  separately and never rendered as a contradiction; the fact survives an on-chain attempt that fails.*
 - [X] T057 Verify FR-026 structurally: no new module reaches a write path, and nothing is persisted
   — *`grep` across `lib/verify/`, `useMessageSigning.js` and both forms finds no `sendTransaction`,
   `sendCalls` or `submit(`, and no `localStorage` / `userStorage` / `saveUserPreference`. The

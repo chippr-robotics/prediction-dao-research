@@ -33,7 +33,7 @@ Three consequences to preserve when changing this:
 |---|---|
 | The portable document (build / serialize / parse) | `frontend/src/lib/verify/signedMessage.js` |
 | How the current identity signs | `frontend/src/lib/verify/signMessage.js` |
-| Whether a claim holds | `frontend/src/lib/verify/verifyMessage.js` |
+| Whether a claim holds — **offline**, plus the on-chain escalation | `frontend/src/lib/verify/verifyMessage.js` |
 | React wiring | `frontend/src/hooks/useMessageSigning.js` |
 | Surface | `frontend/src/components/custody/{VerifySection,SignMessageForm,VerifyMessageForm}.jsx` + `Verify.css` |
 | Shared fixtures | `frontend/src/test/fixtures/signedMessages.js` |
@@ -47,12 +47,12 @@ Three consequences to preserve when changing this:
 'unverifiable'  we could not complete the check
 ```
 
-The binary (valid / invalid) is dishonest here, because the ERC-1271 leg is a network read. An RPC
-timeout is not a forged signature, and rendering one as the other tells a member their counterparty
-lied when in fact nobody looked. A negative is reported **only** when it is knowable — ECDSA
-recovered someone else *and* the claimed address holds no code on the named chain, or the account
-contract itself said no. Everything else degrades to `unverifiable` with the reason named, and the
-UI gives that state its own colour, its own glyph and the sentence "this is not a failed check".
+The binary (valid / invalid) is dishonest here, because settling a contract account's signature is a
+network read. An RPC timeout is not a forged signature, and rendering one as the other tells a member
+their counterparty lied when in fact nobody looked. A negative is reported **only** once it is
+established — which in practice means the account itself answered (it declined, or it holds no code
+on the chain the member named). Everything else is `unverifiable` with the reason named, and the UI
+gives that state its own colour, its own glyph and the sentence "this is not a failed check".
 
 The corollary that is easy to get wrong: a mismatching ECDSA recovery is **not** promoted to a
 negative when the on-chain leg could not run. A smart-account owner key recovering instead of the
@@ -70,19 +70,41 @@ Review #1163 found two separate malformed inputs that reached that path. Two in 
 signal that guarding inputs one at a time is the wrong shape of fix: the seam has to be safe by
 construction so the third input nobody thought of degrades honestly instead of silently.
 
-### Never assume a network
+### Verification is offline. The network is an explicit escalation.
 
-The check's network selector starts **unspecified**, not pre-filled from the connected chain. A
-network the member did not state is not a fact, and treating it as one has teeth: a contract-account
-signature checked against an assumed chain finds no code there and comes back as a definite "does
-not match" — a confidently wrong accusation built from a convenience default. Pasting a record still
-fills the field, because a record actually states its chain.
+**`verifyMessage` is synchronous and cannot perform I/O.** That is not a comment, it is the type: a
+function that returns no promise cannot await a network. Checking a signature against a public key
+is arithmetic — recover the key, derive the address, compare — and that is the whole of what most
+callers need. No provider is built; nothing leaves the device.
 
-Where a record names a chain this build does not serve (a mainnet record opened in a testnet build,
-or the reverse), the chain is **not** adopted — constitution III forbids the cross-cohort read — but
-it is **named**. Saying nothing would leave the check reporting "the document does not say which
-network", which is false: it does say, and we are the ones who cannot go there. A wallet signature in
-such a record is still checkable, because recovery needs no chain at all.
+The on-chain leg is a separate function, `verifyOnChain`, and it exists for exactly one reason:
+**a contract account has no public key.** A passkey account or a Safe is a contract at an address;
+there is no private key whose signature recovers to it, and what it produces is an envelope its own
+code interprets. Nothing about those bytes is self-validating, so the only way to learn whether the
+account stands behind them is to ask it — on the one chain it lives on, where its owner set can also
+change over time. That is not verifying a public key over the network; it is asking an account that
+hasn't got one.
+
+They are two functions rather than one with a flag, deliberately: the offline answer is complete on
+its own, and reaching for a network is a decision the caller makes when the offline answer cannot
+settle the specific claim.
+
+Consequences to preserve:
+
+- **Never add a chain or provider parameter to `verifyMessage`**, and never make it async. A test
+  hands it a provider and asserts it is never called.
+- **The UI offers a network only on the outcome a network could settle.** The selector lives inside
+  the verdict block, not the form body, so the surface reads as "offline by default" rather than
+  "fill in a network to continue".
+- **Say what is established before offering to escalate.** "These bytes were produced by 0xB. That
+  is certain." The unsettled half — whether the claimed address is a contract that accepts 0xB — is
+  named separately, and never rendered as a contradiction. If the on-chain attempt then fails, the
+  offline fact is repeated rather than lost.
+
+Where a record names a chain this build does not serve, the chain is **not** adopted (constitution
+III forbids the cross-cohort read) but it is **named** — saying nothing would leave the check
+reporting "the document does not say which network", which is false. A wallet signature in such a
+record stays checkable, because recovery needs no chain at all.
 
 Related: use strict `NETWORKS[chainId]` for any network label here. `getNetwork()` falls back to the
 build's default network, so on an unsupported chain it will cheerfully caption an identity claim with
@@ -97,10 +119,10 @@ the document, which is why the transport is JSON rather than a hand-rolled block
 
 ## Rule 3 — `scheme` is a hint, never authority
 
-The document records how the signature was produced (`eip191` | `erc1271`) so a verifier can try
-the likely path first. `verifyMessage` still tries both and reaches its own verdict: a document
-that lies about its scheme verifies exactly as well — or as badly — as one labelled honestly.
-There is a test for that.
+The document records how the signature was produced (`eip191` | `erc1271`) as a note for the reader.
+Nothing branches on it: the offline check simply attempts recovery, and whether to escalate is
+decided by the *result*, not by the label. A document that lies about its scheme verifies exactly as
+well — or as badly — as one labelled honestly. There is a test for that.
 
 ## The document
 
