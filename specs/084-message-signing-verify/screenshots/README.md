@@ -17,7 +17,7 @@ them is posed.
 | `verify-check-valid-*` | A document pasted into the signature box auto-fills every field; the wallet signature is confirmed. |
 | `verify-check-invalid-*` | Definite negative — someone else signed it, and the chain confirms the claimed address holds no contract. |
 | `verify-check-unverifiable-*` | The third state: the node is unreachable, so nothing is claimed about the signature. |
-| `verify-check-bad-document-*` | An unreadable document: the error replaces the verdict and Check stays disabled. |
+| `verify-check-bad-document-*` | An unreadable document: the error replaces the verdict, and Check is disabled while the parse error stands. |
 
 **Not photographed, deliberately:** the withdrawn-signing state (`capability.canSign === false`).
 All three of its causes need a session the harness cannot fabricate honestly — Protect itself sits

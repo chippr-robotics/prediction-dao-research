@@ -108,7 +108,11 @@ export default function VerifyMessageForm({ verifying, verdict, onVerify, onClea
     onClear()
   }
 
-  const canSubmit = message.length > 0 && signature.trim().length > 0 && !verifying
+  // `!parseError` matters when the other fields are already filled: pasting a broken document over
+  // a good one would otherwise leave Check pressable, and submitting the raw JSON as a "signature"
+  // reports "signature does not match" for what is really "your document is unreadable" — the sort
+  // of misleading verdict this surface exists to avoid. Caught in review on #1163.
+  const canSubmit = message.length > 0 && signature.trim().length > 0 && !parseError && !verifying
   const shown = verdict ? VERDICT[verdict.status] : null
 
   return (

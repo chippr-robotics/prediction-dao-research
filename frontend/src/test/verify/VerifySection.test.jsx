@@ -155,6 +155,29 @@ describe('VerifySection — checking a signature', () => {
     await user.click(screen.getByLabelText(/^Signature$/i))
     await user.paste(JSON.stringify({ format: 'fairwins-signed-message/1', message: 'x' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/no signature/i)
+    expect(screen.getByRole('button', { name: /check signature/i })).toBeDisabled()
+  })
+
+  // Regression, review on #1163: with the other fields already filled, a broken document left Check
+  // pressable — and submitting the raw JSON as a signature reports "does not match" for what is
+  // really "your document is unreadable".
+  it('refuses to check a broken document pasted over an already-filled form', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+
+    await user.click(screen.getByLabelText(/^Message$/i))
+    await user.paste(MESSAGE)
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(SIGNATURE)
+    expect(screen.getByRole('button', { name: /check signature/i })).toBeEnabled()
+
+    await user.clear(screen.getByLabelText(/^Signature$/i))
+    await user.paste(JSON.stringify({ format: 'fairwins-signed-message/1', message: 'x' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no signature/i)
+    expect(screen.getByRole('button', { name: /check signature/i })).toBeDisabled()
+    expect(screen.queryByTestId('verify-result')).not.toBeInTheDocument()
   })
 })
 

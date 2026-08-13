@@ -40,7 +40,19 @@ export const VERIFY_STATUS = Object.freeze({
   UNVERIFIABLE: 'unverifiable',
 })
 
-const isHex = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]*$/.test(value)
+/**
+ * Valid `bytes`: 0x-prefixed hex of EVEN length.
+ *
+ * The even-length half is load-bearing, not pedantry. An odd-length string like `0x123` is not a
+ * byte sequence, and handing one to `encodeFunctionData` throws `invalid BytesLike value` — which
+ * would escape `checkErc1271` as a rejected promise and leave the member pressing Check with
+ * nothing happening at all. Caught in review on #1163.
+ *
+ * Note that ethers' own `isHexString(value)` does NOT cover this: without an explicit length
+ * argument it accepts `0x123` too. The length check has to be written out.
+ */
+const isHexBytes = (value) =>
+  typeof value === 'string' && /^0x[0-9a-fA-F]*$/.test(value) && value.length % 2 === 0
 
 const sameAddress = (a, b) => Boolean(a && b && a.toLowerCase() === b.toLowerCase())
 
@@ -78,8 +90,16 @@ export async function checkErc1271({ message, signature, address, chainId, provi
   }
   if (!node) return { answered: false, reason: 'no-provider' }
 
-  const digest = ethers.hashMessage(message)
-  const data = ERC1271_IFACE.encodeFunctionData('isValidSignature', [digest, signature])
+  // Encoding is inside the guarded region because this function is exported and can be called
+  // without going through verifyMessage's input check. A malformed signature is a verdict input,
+  // never a crash.
+  let data
+  try {
+    data = ERC1271_IFACE.encodeFunctionData('isValidSignature', [ethers.hashMessage(message), signature])
+  } catch {
+    return { answered: true, valid: false, reason: 'malformed-signature' }
+  }
+
   let code
   try {
     code = await node.getCode(address)
@@ -133,12 +153,12 @@ export async function verifyMessage({ message, signature, address = null, chainI
   if (typeof message !== 'string') {
     return { status: VERIFY_STATUS.INVALID, method: null, signer: null, reason: 'There is no message to check.' }
   }
-  if (!isHex(signature) || signature.length < 4) {
+  if (!isHexBytes(signature) || signature.length < 4) {
     return {
       status: VERIFY_STATUS.INVALID,
       method: null,
       signer: null,
-      reason: 'The signature is not valid hex — it should start with 0x.',
+      reason: 'The signature is not valid hex — it should start with 0x and have an even number of digits.',
     }
   }
 

@@ -160,6 +160,22 @@ describe('verifyMessage — definite negatives', () => {
     expect(out.reason).toMatch(/valid hex/i)
   })
 
+  // Regression, review on #1163: an odd-length hex string is not a byte sequence, and reached
+  // `encodeFunctionData` unguarded — which threw OUT of verifyMessage as a rejected promise, so the
+  // member pressed Check and nothing happened at all. It must be a verdict, not a crash. (Note
+  // ethers' own `isHexString(value)` would not have caught this: it accepts '0x123'.)
+  it('rejects odd-length hex as a verdict rather than throwing', async () => {
+    const out = await verifyMessage({
+      message: MESSAGE,
+      signature: '0x123',
+      address: CONTRACT_ACCOUNT,
+      chainId: CONTRACT_ACCOUNT_CHAIN_ID,
+      provider: stubProvider({ answer: 'magic' }),
+    })
+    expect(out.status).toBe(VERIFY_STATUS.INVALID)
+    expect(out.reason).toMatch(/even number of digits/i)
+  })
+
   it('rejects an address that is not an address', async () => {
     const out = await verifyMessage({ message: MESSAGE, signature: SIGNATURE, address: '0xnope' })
     expect(out.status).toBe(VERIFY_STATUS.INVALID)
@@ -244,6 +260,19 @@ describe('checkErc1271', () => {
     const iface = new ethers.Interface(['function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)'])
     const decoded = iface.decodeFunctionData('isValidSignature', call.mock.calls[0][0].data)
     expect(decoded[0]).toBe(ethers.hashMessage(MESSAGE))
+  })
+
+  // checkErc1271 is exported, so it can be reached without verifyMessage's input check in front of
+  // it. It must answer, never throw.
+  it('answers instead of throwing when the signature cannot be encoded', async () => {
+    const out = await checkErc1271({
+      message: MESSAGE,
+      signature: '0x123',
+      address: CONTRACT_ACCOUNT,
+      chainId: 137,
+      provider: stubProvider({ answer: 'magic' }),
+    })
+    expect(out).toMatchObject({ answered: true, valid: false, reason: 'malformed-signature' })
   })
 
   it('treats an empty return as a definite no, not an outage', async () => {
