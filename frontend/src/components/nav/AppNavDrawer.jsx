@@ -22,6 +22,14 @@ import { predictGatewayUrl } from '../../lib/predict/predictClient'
 import { loadFavoriteApps, subscribeFavoriteApps } from '../../lib/miniapps/favorites'
 import { filterNavGroups, filterNavItems } from '../../lib/nav/filterNav'
 import {
+  NAV_ITEM_TERMS,
+  OFF_MENU_ITEMS,
+  OFF_MENU_GROUP_LABEL,
+  destinationsForNavItem,
+  destinationById,
+  pathForDestination,
+} from '../../config/navSearchIndex'
+import {
   sectionKey,
   isSectionExpanded,
   toggleSection,
@@ -135,6 +143,14 @@ function resolveActiveId(location, favoriteItems) {
  * menu, and a device preference tightens the rows. The collapsed desktop gutter is untouched by
  * all of it — 64px has no room for a heading, a field, or a strip, and every section's glyph
  * must stay reachable there.
+ *
+ * That field searches the APP, not the twelve words printed on the menu. It reads the nav search
+ * index (config/navSearchIndex.js), which tags every section with the protocols and services it
+ * holds and names the sub-surfaces inside it — so "morpho" finds Earn and offers Earn ▸ Lend,
+ * "rpc" reaches Network even though Network is not in this menu, and "bip39" reaches the Legacy
+ * account recovery card inside Recovery. Selecting one of those shortcuts navigates to its own
+ * deep link carrying `focus=<id>`, and the surface it lands on flashes itself into view
+ * (components/nav/AttentionFocus.jsx) so the member can see which thing they were looking for.
  */
 export default function AppNavDrawer() {
   const { isOpen, close, toggle } = useNavDrawer()
@@ -179,7 +195,37 @@ export default function AppNavDrawer() {
   )
 
   const filtering = query.trim() !== ''
-  const drawerGroups = useMemo(() => filterNavGroups(allGroups, query), [allGroups, query])
+
+  /*
+   * What a query is allowed to reach.
+   *
+   * Resting, the menu is exactly the menu: the groups above, nothing else. While a filter is
+   * active it also spans the sections that live on the account button — Settings, Network,
+   * Membership, My Account (config/appNav.js keeps them out of this menu on purpose). Typing
+   * "rpc" or "notifications" is a question, not browsing, and answering it with "no matches"
+   * while the app plainly has that screen is the search failing at its one job. They leave again
+   * with the filter, so the resting drawer's height is unchanged (spec 081).
+   */
+  const searchableGroups = useMemo(
+    () => (filtering ? [...allGroups, { label: OFF_MENU_GROUP_LABEL, items: OFF_MENU_ITEMS }] : allGroups),
+    [allGroups, filtering],
+  )
+
+  // Cross-surface indexing: an item answers to its own synonyms, and to everything inside it. The
+  // index is looked up per item rather than searched globally, so a section hidden by the tenant
+  // or the active chain can never contribute a shortcut — it was already filtered out above.
+  const searchOptions = useMemo(
+    () => ({
+      termsFor: (item) => NAV_ITEM_TERMS[item.id],
+      destinationsFor: (item) => destinationsForNavItem(item.id),
+    }),
+    [],
+  )
+
+  const drawerGroups = useMemo(
+    () => filterNavGroups(searchableGroups, query, searchOptions),
+    [searchableGroups, query, searchOptions],
+  )
   const visibleFavorites = useMemo(() => filterNavItems(favoriteItems, query), [favoriteItems, query])
 
   // Desktop never fully closes: `collapsed` is the icon gutter, `isOpen` is the
@@ -248,7 +294,12 @@ export default function AppNavDrawer() {
   const handleSelect = useCallback(
     (id) => {
       const favorite = favoriteItems.find((item) => item.id === id)
-      navigate(favorite ? favorite.to : pathForNavItem(id))
+      // A search shortcut carries its own deep link (and the `focus=` marker that makes the
+      // surface it lands on flash), so it is resolved before the section-id route helper — which
+      // would otherwise turn `earn-lend` into a `?tab=earn-lend` that resolves to nothing.
+      const destination = destinationById(id)
+      const to = favorite ? favorite.to : destination ? pathForDestination(destination) : pathForNavItem(id)
+      navigate(to)
       setQuery('')
       close()
     },
@@ -302,7 +353,7 @@ export default function AppNavDrawer() {
                 id="app-nav-search-input"
                 type="search"
                 className="app-nav-search-input"
-                placeholder="Search menu…"
+                placeholder="Search the app — try “morpho”"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />

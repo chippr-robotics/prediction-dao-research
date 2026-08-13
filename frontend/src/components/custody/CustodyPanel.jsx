@@ -119,7 +119,7 @@ export default function CustodyPanel() {
     <div className="custody-panel">
       <h2 className="custody-heading">Protect</h2>
 
-      <section className="custody-subsection" aria-labelledby="custody-onchain-title">
+      <section className="custody-subsection" aria-labelledby="custody-onchain-title" data-attention="custody-onchain">
         <h3 id="custody-onchain-title" className="custody-subsection-title">
           On chain
         </h3>
@@ -133,7 +133,7 @@ export default function CustodyPanel() {
           the only place a member does something to establish who controls what WITHOUT moving
           value; and unlike the vault sections it needs no deployment on any chain, so it is never
           gated by the connected network. */}
-      <section className="custody-subsection" aria-labelledby="custody-verify-title">
+      <section className="custody-subsection" aria-labelledby="custody-verify-title" data-attention="custody-verify">
         <h3 id="custody-verify-title" className="custody-subsection-title">
           Verify
         </h3>

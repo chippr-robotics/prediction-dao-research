@@ -91,12 +91,12 @@ export default function PayTransferPanel() {
       </div>
 
       {tab === 'transfer' && (
-        <div role="tabpanel" aria-label="Transfer">
+        <div role="tabpanel" aria-label="Transfer" data-attention="transfer-send">
           <TransferForm onSent={() => setTab('activity')} />
         </div>
       )}
       {tab === 'bridge' && (
-        <div role="tabpanel" aria-label="Bridge">
+        <div role="tabpanel" aria-label="Bridge" data-attention="transfer-bridge">
           <BridgeTab />
         </div>
       )}
@@ -104,7 +104,7 @@ export default function PayTransferPanel() {
         /* `pt-wagers` neutralises the page-level chrome Dashboard carries for its old absolute
            route (its own padding + a full-height scroll region) — the same thing HomeScreen.css
            does for the home surface. The component itself is untouched. */
-        <div role="tabpanel" aria-label="Wagers" className="pt-wagers">
+        <div role="tabpanel" aria-label="Wagers" className="pt-wagers" data-attention="transfer-wagers">
           {/* Says the one thing that makes this different from its two neighbours. A send leaves
               the wallet and is gone; a bridge leaves and arrives elsewhere; a wager is ESCROWED and
               comes back — or doesn't — on an outcome. A member who read the Transfer blurb and
@@ -118,7 +118,7 @@ export default function PayTransferPanel() {
         </div>
       )}
       {tab === 'activity' && (
-        <div role="tabpanel" aria-label="Activity">
+        <div role="tabpanel" aria-label="Activity" data-attention="transfer-activity">
           <TransferActivityList />
         </div>
       )}

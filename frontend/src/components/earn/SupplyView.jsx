@@ -625,7 +625,7 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
   }
 
   return (
-    <div className="earn-lend supply-view">
+    <div className="earn-lend supply-view" data-attention="earn-supply">
       {/* FR-020 — open positions first, exactly like the Lend area. */}
       {positions.length > 0 && (
         <div className="earn-positions">

@@ -51,12 +51,12 @@ export default function TradeSection() {
         ))}
       </div>
       {view === 'swap' && (
-        <div role="tabpanel" aria-label="Swap">
+        <div role="tabpanel" aria-label="Swap" data-attention="trade-swap">
           <TradePanel />
         </div>
       )}
       {view === 'perps' && (
-        <div role="tabpanel" aria-label="Perps">
+        <div role="tabpanel" aria-label="Perps" data-attention="trade-perps">
           <PerpsView />
         </div>
       )}

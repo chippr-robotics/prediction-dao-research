@@ -38,7 +38,7 @@ export default function EarnLendView({ tokenFilter: initialTokenFilter = null })
     : null
 
   return (
-    <div className="earn-lend">
+    <div className="earn-lend" data-attention="earn-lend">
       <EarnPositionsList
         positions={positionsApi.positions}
         status={positionsApi.status}
