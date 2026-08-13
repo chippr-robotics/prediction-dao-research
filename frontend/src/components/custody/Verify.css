@@ -1,0 +1,393 @@
+/* Protect ▸ Verify — message signing and signature checking.
+   Uses the same tokens and spacing as the rest of Protect (Custody.css / Policy.css); the only new
+   visual language is the three-tone verdict block, which needs to be distinguishable at a glance
+   AND readable in both themes, so every tone paints its own text colour rather than inheriting one
+   that happens to work in light mode. */
+
+.verify-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ---- entry rows -----------------------------------------------------------------------------
+   The whole area is two of these; the forms live in a sheet. Each row is one line of state and
+   one control, so adding Verify to Protect costs the page a couple of hundred pixels rather than
+   two full forms. */
+
+.verify-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-left-width: 4px;
+  border-left-color: var(--border-color, #e3e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary, #fff);
+}
+
+/* The row's left edge carries the last outcome, so the answer is legible without opening the
+   sheet. Same three tones as the verdict block, for the same reason: 'unknown' is not a shade of
+   failure. */
+.verify-entry[data-tone='ok'] {
+  border-left-color: var(--brand-primary, #36b37e);
+}
+
+.verify-entry[data-tone='bad'] {
+  border-left-color: var(--semantic-loss, #e5533d);
+}
+
+.verify-entry[data-tone='unknown'] {
+  border-left-color: var(--semantic-warning, #f5a623);
+}
+
+.verify-entry__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.verify-entry__title {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.verify-entry__summary {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-muted, #6b7280);
+}
+
+.verify-entry__action {
+  flex: none;
+  padding: 0.5rem 0.875rem;
+  min-height: 40px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 30%, transparent);
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--text-primary, #1f2933);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.verify-entry__action:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
+}
+
+@media (max-width: 480px) {
+  /* At phone widths the button beside a two-line summary squeezes both; stack instead. */
+  .verify-entry {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.625rem;
+  }
+}
+
+/* Both forms are longer than the sheet, so the sheet scrolls — and `.action-sheet` scrolls as a
+   whole, taking its own header (and the close button) out of view with it. Pinning the header is
+   opt-in via the class this section passes, so no other caller of the shared sheet is touched.
+   z-index above the form's own focus rings; the background is the sheet surface, not transparent,
+   or the scrolling text shows through it. */
+.action-sheet--verify .action-sheet__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-color, #fff);
+}
+
+.verify-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.verify-lede {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #5a6772);
+}
+
+.verify-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+}
+
+/* The shared address field (CustodyAddressField) brings Protect's own `.custody-label`, which is
+   a size and a weight away from the labels around it — side by side in one form that reads as a
+   rendering bug rather than a hierarchy. Restyled HERE, scoped to this form, so the other Protect
+   surfaces that read Custody.css are untouched. */
+.verify-label,
+.verify-form .custody-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary, #1f2933);
+}
+
+/* Same reason: the field's own hint must match the hints under the other inputs. */
+.verify-form .custody-hint {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-muted, #6b7280);
+}
+
+.verify-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-muted, #6b7280);
+}
+
+.verify-textarea,
+.verify-select {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary, #fff);
+  color: var(--text-primary, #1f2933);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.verify-textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+/* Signature bytes are compared by eye far more often than they are read as prose. */
+.verify-textarea--mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+.verify-textarea:focus-visible,
+.verify-select:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 1px;
+}
+
+.verify-textarea:disabled,
+.verify-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.verify-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-tertiary, #f3f4f6);
+}
+
+.verify-meta > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  align-items: baseline;
+}
+
+.verify-meta dt {
+  flex: none;
+  min-width: 5.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #6b7280);
+}
+
+.verify-meta dd {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-primary, #1f2933);
+}
+
+.verify-mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+.verify-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.verify-primary,
+.verify-secondary {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.verify-primary {
+  border: 1px solid var(--brand-primary, #36b37e);
+  background: var(--brand-primary, #36b37e);
+  color: #fff;
+}
+
+/* Sits inside the tinted result block, where the plain `--border-color` (a near-black hairline in
+   dark theme) disappeared and left "Copy signature only" looking like a caption rather than a
+   button. Mixing the border toward the text colour keeps it visible on either ground. */
+.verify-secondary {
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 30%, transparent);
+  background: transparent;
+  color: var(--text-primary, #1f2933);
+}
+
+/* Opacity alone is not enough for the primary: a 55%-opaque brand fill over a dark surface still
+   reads as a solid, pressable green button, so "Check signature" looked available with the form
+   half-filled. A disabled control drops the fill entirely and keeps only an outline. */
+.verify-primary:disabled,
+.verify-secondary:disabled {
+  cursor: not-allowed;
+  background: transparent;
+  border-color: var(--border-color, #e3e7eb);
+  color: var(--text-muted, #6b7280);
+}
+
+.verify-secondary:disabled {
+  opacity: 0.7;
+}
+
+.verify-notice {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--bg-tertiary, #f3f4f6);
+  font-size: 0.875rem;
+  color: var(--text-secondary, #5a6772);
+  /* Addresses are the one string in here a member has to read character by character, and at 390px
+     they are wider than the column. Wrapping them is not cosmetic: a clipped address is a wrong
+     address. */
+  overflow-wrap: anywhere;
+}
+
+.verify-error {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--semantic-loss, #e5533d);
+}
+
+/* The signed document is a blob of JSON the member copies wholesale — it must scroll inside its
+   own box rather than stretching the panel (and, on mobile, the page) sideways. */
+.verify-doc {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  max-height: 15rem;
+  overflow: auto;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-tertiary, #f3f4f6);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-primary, #1f2933);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ---- verdicts -------------------------------------------------------------------------------
+   Three tones, never two. "unknown" is deliberately NOT a shade of the failure colour: an
+   unreachable node is not a bad signature, and colouring it like one is the lie this surface
+   exists to avoid. Each tone carries a glyph as well as a colour, so the verdict survives a
+   monochrome or colour-blind reading. */
+
+.verify-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-left-width: 4px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-tertiary, #f3f4f6);
+  font-size: 0.875rem;
+}
+
+.verify-result p {
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere; /* same as the notice: a clipped address is a wrong address */
+}
+
+.verify-result-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.verify-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+
+.verify-result--ok {
+  border-left-color: var(--brand-primary, #36b37e);
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 10%, transparent);
+}
+
+.verify-result--ok .verify-result-title {
+  color: color-mix(in srgb, var(--brand-primary, #36b37e) 78%, var(--text-primary, #1f2933));
+}
+
+.verify-result--ok .verify-result-icon {
+  background: var(--brand-primary, #36b37e);
+}
+
+.verify-result--bad {
+  border-left-color: var(--semantic-loss, #e5533d);
+  background: color-mix(in srgb, var(--semantic-loss, #e5533d) 10%, transparent);
+}
+
+.verify-result--bad .verify-result-title {
+  color: color-mix(in srgb, var(--semantic-loss, #e5533d) 78%, var(--text-primary, #1f2933));
+}
+
+.verify-result--bad .verify-result-icon {
+  background: var(--semantic-loss, #e5533d);
+}
+
+.verify-result--unknown {
+  border-left-color: var(--semantic-warning, #f5a623);
+  background: color-mix(in srgb, var(--semantic-warning, #f5a623) 10%, transparent);
+}
+
+.verify-result--unknown .verify-result-title {
+  color: color-mix(in srgb, var(--semantic-warning, #f5a623) 72%, var(--text-primary, #1f2933));
+}
+
+.verify-result--unknown .verify-result-icon {
+  background: var(--semantic-warning, #f5a623);
+  color: #1f2933;
+}
+
+@media (max-width: 480px) {
+  .verify-actions .verify-primary,
+  .verify-actions .verify-secondary {
+    flex: 1 1 auto;
+  }
+}
