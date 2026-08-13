@@ -70,6 +70,24 @@ Review #1163 found two separate malformed inputs that reached that path. Two in 
 signal that guarding inputs one at a time is the wrong shape of fix: the seam has to be safe by
 construction so the third input nobody thought of degrades honestly instead of silently.
 
+### Never assume a network
+
+The check's network selector starts **unspecified**, not pre-filled from the connected chain. A
+network the member did not state is not a fact, and treating it as one has teeth: a contract-account
+signature checked against an assumed chain finds no code there and comes back as a definite "does
+not match" — a confidently wrong accusation built from a convenience default. Pasting a record still
+fills the field, because a record actually states its chain.
+
+Where a record names a chain this build does not serve (a mainnet record opened in a testnet build,
+or the reverse), the chain is **not** adopted — constitution III forbids the cross-cohort read — but
+it is **named**. Saying nothing would leave the check reporting "the document does not say which
+network", which is false: it does say, and we are the ones who cannot go there. A wallet signature in
+such a record is still checkable, because recovery needs no chain at all.
+
+Related: use strict `NETWORKS[chainId]` for any network label here. `getNetwork()` falls back to the
+build's default network, so on an unsupported chain it will cheerfully caption an identity claim with
+the wrong network name.
+
 ## Rule 2 — the message is carried and signed verbatim
 
 No trimming, no template, no appended nonce, no domain wrapper. A member proving control of a key

@@ -34,6 +34,7 @@ vi.mock('../../connectors/passkey', () => ({ readSession: () => ({ credentialId:
 let readProvider = null
 vi.mock('../../utils/rpcProvider', () => ({ getReadProvider: () => readProvider }))
 
+import { cohortChainIds } from '../../config/networks'
 import VerifySection from '../../components/custody/VerifySection'
 import { CustodyContext } from '../../contexts/CustodyContext'
 import {
@@ -42,10 +43,16 @@ import {
   SIGNER_ADDRESS,
   OTHER_ADDRESS,
   EIP191_DOCUMENT_JSON,
+  ERC1271_SIGNATURE,
+  CONTRACT_ACCOUNT,
   stubProvider,
 } from '../fixtures/signedMessages'
 
 const signer = { signMessage: vi.fn(async () => SIGNATURE) }
+
+// A chain this build actually serves. Taken from the cohort rather than hardcoded, so the suite
+// does not silently depend on whether it was built as testnet or mainnet.
+const COHORT_CHAIN = String(cohortChainIds()[0])
 
 beforeEach(() => {
   signer.signMessage.mockClear()
@@ -113,7 +120,7 @@ describe('VerifySection — checking a signature', () => {
   })
 
   it('reports a definite negative once the chain confirms the address holds no contract', async () => {
-    readProvider = stubProvider({ code: '0x' }) // a plain account on the selected network
+    readProvider = stubProvider({ code: '0x' }) // a plain account on the stated network
     const user = userEvent.setup()
     renderSection()
     await openSheet(user, 'Check a signature')
@@ -124,12 +131,66 @@ describe('VerifySection — checking a signature', () => {
     await user.paste(SIGNATURE)
     await user.click(screen.getByLabelText(/claims to have signed/i))
     await user.paste(OTHER_ADDRESS)
+    // The member states the network — which since #1165 is the only way the on-chain leg runs.
+    await user.selectOptions(screen.getByLabelText(/^Network$/i), COHORT_CHAIN)
     await user.click(screen.getByRole('button', { name: /check signature/i }))
 
     const result = await screen.findByTestId('verify-result')
     expect(result).toHaveAttribute('data-status', 'invalid')
     expect(within(result).getByText(/does not match/i)).toBeInTheDocument()
     expect(within(result).getByText(new RegExp(SIGNER_ADDRESS, 'i'))).toBeInTheDocument()
+  })
+
+  // Regression, review on #1165: the network used to be pre-filled from the connected chain. A
+  // contract-account signature then got checked against a chain the member never named, found no
+  // code there, and came back as a DEFINITE "does not match" — a confidently wrong accusation
+  // built on an assumption. Unspecified is the honest default.
+  it('does not assume a network the member never chose', async () => {
+    readProvider = stubProvider({ code: '0x' }) // the connected chain holds no code at that address
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+
+    expect(screen.getByLabelText(/^Network$/i)).toHaveValue('')
+
+    await user.click(screen.getByLabelText(/^Message$/i))
+    await user.paste(MESSAGE)
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(ERC1271_SIGNATURE) // not recoverable — needs the on-chain leg
+    await user.click(screen.getByLabelText(/claims to have signed/i))
+    await user.paste(CONTRACT_ACCOUNT)
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+
+    const result = await screen.findByTestId('verify-result')
+    expect(result).toHaveAttribute('data-status', 'unverifiable')
+    expect(within(result).getByText(/which network/i)).toBeInTheDocument()
+  })
+
+  it('still takes the network from a record that names one this build serves', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(JSON.stringify({ ...JSON.parse(EIP191_DOCUMENT_JSON), chainId: Number(COHORT_CHAIN) }))
+    expect(screen.getByLabelText(/^Network$/i)).toHaveValue(COHORT_CHAIN)
+  })
+
+  // Found while fixing the pre-filled-network bug: a record naming a chain outside this build's
+  // cohort left the select blank, and the check then said "the document does not say which
+  // network" — which is false. It does say; we are the ones who cannot go there. Constitution III
+  // still forbids the cross-cohort read, so the chain is not adopted — but it is named.
+  it('names a chain it cannot serve instead of pretending the record was silent', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(EIP191_DOCUMENT_JSON) // names Polygon 137; this build is a testnet cohort
+
+    expect(screen.getByLabelText(/^Network$/i)).toHaveValue('')
+    expect(await screen.findByText(/does not serve/i)).toBeInTheDocument()
+    // …and the wallet signature in it is still checkable, because recovery needs no chain.
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+    expect(await screen.findByTestId('verify-result')).toHaveAttribute('data-status', 'valid')
   })
 
   it('fills every field from a pasted signed-message document', async () => {
@@ -238,6 +299,19 @@ describe('VerifySection — checking a signature', () => {
 })
 
 describe('VerifySection — signing', () => {
+  // Regression, review on #1165: this used `getNetwork()`, which falls back to the build's default
+  // network — so a member on an unsupported chain was told they were signing on "Polygon".
+  // CLAUDE.md requires strict NETWORKS[chainId] lookups in custody code for exactly this reason.
+  it('never names a network the member is not actually on', async () => {
+    walletCtx = { ...walletCtx, chainId: 999999 }
+    const user = userEvent.setup()
+    renderSection()
+    const sheet = await openSheet(user, 'Sign a message')
+
+    expect(within(sheet).getByText('Chain 999999')).toBeInTheDocument()
+    expect(within(sheet).queryByText(/polygon/i)).not.toBeInTheDocument()
+  })
+
   it('signs the message and shows a copyable document', async () => {
     const user = userEvent.setup()
     renderSection()

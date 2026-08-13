@@ -183,7 +183,7 @@ populates and the outcome is correct.
 ## Phase 7: Polish & cross-cutting concerns
 
 - [X] T050 [P] Two axe audits (arrival, and each sheet with a result on screen) in `frontend/src/test/verify/VerifySection.test.jsx`
-  — *3 `axe` assertions; FR-025 / SC-007.*
+  — *3 `axe` assertions; FR-027 / SC-007.*
 - [X] T051 [P] Actor-critic capture harness with loopback wallet + chain stubs in `scripts/ui/capture-verify.mjs`
   — *`personal_sign` bridged to Node and answered with a real signature, so screenshots show records that genuinely verify.*
 - [X] T052 [P] Record the visual review — 24 shots and every finding — in `specs/084-message-signing-verify/screenshots/README.md`
@@ -193,11 +193,27 @@ populates and the outcome is correct.
 - [X] T055 Full frontend suite passes — 622 files / 7052 tests
   — *run after the shared `ActionSheet` change, per the `monorepo-verify` gate for a shared component.*
 - [X] T056 Lint clean on every changed file; `npm run check:deps` clean; lockfile untouched
-- [X] T057 Verify FR-024 structurally: no new module reaches a write path, and nothing is persisted
+- [X] T061 [US1] Never assume an unstated network: the check's network starts unspecified, so the
+  on-chain leg runs only against a chain the member named, in `frontend/src/components/custody/VerifySection.jsx`
+  — *FR-020. Pre-filling it from the connected chain produced a definite "does not match" for a
+  contract account checked against a chain nobody chose. Caught in review on #1165; regression test
+  mutation-verified.*
+- [X] T062 [US3] Name a record's network when this build does not serve it, instead of reporting the
+  record as silent, in `frontend/src/components/custody/VerifyMessageForm.jsx`
+  — *FR-021. Found while fixing T061: a mainnet record in a testnet build left the selector blank and
+  the check reported "the document does not say which network", which is false. The chain is still
+  not adopted (constitution III), but it is named — and a wallet signature in that record stays
+  checkable, because recovery needs no chain.*
+- [X] T063 [US2] Use a strict `NETWORKS[chainId]` lookup for the signing network label, in
+  `frontend/src/components/custody/SignMessageForm.jsx`
+  — *`getNetwork()` falls back to the build default, so a member on an unsupported chain was told
+  they were signing on "Polygon". CLAUDE.md line 211 requires strict lookups in custody code for
+  exactly this reason. Caught in review on #1165.*
+- [X] T057 Verify FR-026 structurally: no new module reaches a write path, and nothing is persisted
   — *`grep` across `lib/verify/`, `useMessageSigning.js` and both forms finds no `sendTransaction`,
   `sendCalls` or `submit(`, and no `localStorage` / `userStorage` / `saveUserPreference`. The
   feature reads chain state and writes nothing, on-chain or off. Added after `/speckit-analyze`
-  found FR-024 was the one requirement with no task behind it.*
+  found what is now FR-026 was the one requirement with no task behind it.*
 
 ---
 

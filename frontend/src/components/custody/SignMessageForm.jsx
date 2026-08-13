@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { useClipboard } from '../../hooks/useClipboard'
 import { SIGN_SCHEMES, serializeSignedMessage } from '../../lib/verify/signedMessage'
-import { getNetwork } from '../../config/networks'
+import { NETWORKS } from '../../config/networks'
 
 const SCHEME_NOTE = {
   [SIGN_SCHEMES.EIP191]:
@@ -59,7 +59,11 @@ export default function SignMessageForm({
     }
   }, [current])
 
-  const network = chainId != null ? getNetwork(chainId) : null
+  // STRICT lookup, never `getNetwork()` — it falls back to the build's default network, so a
+  // member on an unsupported chain would be told they are signing on "Polygon". On a surface whose
+  // entire job is an identity claim, a fabricated network name is the worst possible caption.
+  // CLAUDE.md requires this of all custody code; caught in review on #1165.
+  const network = chainId != null ? NETWORKS[chainId] : null
   const canSubmit = capability.canSign && message.length > 0 && !signing
 
   const doCopy = async (what, text) => {
