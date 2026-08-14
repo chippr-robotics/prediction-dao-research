@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve, relative, join } from 'node:path'
+import { dirname, resolve, relative, join, sep } from 'node:path'
 
 // Regression guard for the global modal tier.
 //
@@ -35,13 +35,20 @@ const SRC = resolve(__dirname, '..')
 const OWNER = 'components/ui/ModalSystem.css'
 const MODAL_TIER = 2000
 
-/** Every .css file under src/, as paths relative to src/. */
+/**
+ * Every .css file under src/, as paths relative to src/.
+ *
+ * Normalised to forward slashes: `relative()` yields backslashes on Windows,
+ * which would not match `OWNER` and would fail this guard with "a second
+ * stylesheet declares .modal-backdrop" — a false report of the very bug it
+ * exists to detect, on a machine where the CSS is perfectly fine.
+ */
 function cssFiles(dir = SRC, out = []) {
   for (const entry of readdirSync(dir)) {
     if (entry === 'node_modules') continue
     const full = join(dir, entry)
     if (statSync(full).isDirectory()) cssFiles(full, out)
-    else if (entry.endsWith('.css')) out.push(relative(SRC, full))
+    else if (entry.endsWith('.css')) out.push(relative(SRC, full).split(sep).join('/'))
   }
   return out
 }
