@@ -74,8 +74,22 @@
   color: var(--hw-trezor-color, #1e9e6a);
 }
 
+/* Same light-mode-chrome rule as .custody-actions button: these sit on the card surface. */
+.hw-list__remove,
+.hw-list__confirm button,
+.hw-load-more {
+  border-color: var(--border-color, #e3e7eb);
+}
+
 .hw-list__remove {
   flex-shrink: 0;
+  font-size: 0.85rem;
+  padding: 0.4em 1em;
+}
+
+.hw-list__confirm button {
+  font-size: 0.8rem;
+  padding: 0.35em 0.9em;
 }
 
 .hw-list__confirm {
@@ -90,7 +104,7 @@
   opacity: 0.85;
 }
 
-.hw-list__confirm-yes {
+.hw-list__confirm button.hw-list__confirm-yes {
   color: var(--danger-color, #c0392b);
   border-color: currentColor;
 }
@@ -268,6 +282,7 @@
 .hw-load-more {
   align-self: center;
   font-size: 0.82rem;
+  padding: 0.45em 1.1em;
 }
 
 .hw-field {

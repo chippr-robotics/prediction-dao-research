@@ -103,8 +103,10 @@ describe('Protect — hardware wallet cold storage (spec 085)', () => {
     cy.visit('/wallet?tab=custody#custody-offchain', { onBeforeLoad: planted })
     cy.get('.hw-list__row', { timeout: 15000 }).should('have.length', 1)
 
-    // App-wide: the account switcher offers it, tagged as Hardware.
+    // App-wide: the account switcher offers it, tagged as Hardware. The switcher list sits
+    // behind the identity caret inside the wallet dropdown (the identity IS the switcher).
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]').click()
+    cy.get('.account-identity-trigger').click()
     cy.contains('.account-switch-tag', 'Hardware').should('exist')
   })
 
@@ -137,8 +139,10 @@ describe('Protect — hardware wallet cold storage (spec 085)', () => {
     cy.get('[data-testid="hw-add"]', { timeout: 15000 }).click()
     cy.get('[data-testid="hw-vendor-ledger"]').should('exist')
     cy.get('[data-testid="hw-vendor-trezor"]').should('exist')
-    // Every vendor button is either enabled or carries a stated reason.
-    cy.get('.hw-vendor-option:disabled .hw-vendor-option__hint').each(($hint) => {
+    // Every vendor option carries a stated hint — the transport it will use when available
+    // (headless Chromium has WebHID, so both are offered here), or the refusal reason when not.
+    // Either way the member is never shown a bare dead control (FR-003).
+    cy.get('.hw-vendor-option .hw-vendor-option__hint').each(($hint) => {
       expect($hint.text().trim().length).to.be.greaterThan(10)
     })
   })
