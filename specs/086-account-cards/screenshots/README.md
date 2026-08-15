@@ -18,7 +18,13 @@ to the harness fixture, not the app (the image pipeline was fine), but the lesso
 checklist's rule 2 verbatim: a shot must show the surface *working*, and a fixture that is wrong
 in the same direction as a plausible bug is worse than no shot.
 
-**Round 2.** Clean in both themes and both viewports: the custom picture reads unmistakably in
+**Round 2 → fix.** The "⋯" customize control (moved onto the card per product direction) was
+positioned by CSS center math and straddled the card edge — the first/last cards clamp against
+the track instead of centering, so the geometry has to be MEASURED from the centered card's
+rect, not derived. Repositioned via `getBoundingClientRect` against the overlay's positioned
+ancestor, recomputed on scroll and resize.
+
+**Round 3.** Clean in both themes and both viewports: the custom picture reads unmistakably in
 the header button and on the card (the identity cue that replaces the removed operating-as
 banner), tints render as soft glass washes with legible text, patterns stay subtle at card scale,
 and the sheet's swatches show their real shades/drawings with a clear selected state.

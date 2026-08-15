@@ -31,7 +31,8 @@ a wallet resolves (the header avatar's first paint).
   vault-only banner. FR-002's header identity already held for every kind.
 - **Added**: `lib/account/accountProfilesStore.js` (+ `profileImage.js`, `accountKinds.js`),
   `AccountAvatar`, `AccountCard` (+ CSS with `--glass-*`/`--card-tint-*` tokens in theme.css),
-  `AccountCustomizeSheet` (+ CSS), carousel "Customize card" entry point.
+  `AccountCustomizeSheet` (+ CSS), and the "⋯" entry point pinned to the centered card's
+  measured corner (outside the listbox DOM — an option may contain no interactive children).
 - **Standardized**: BlockiesAvatar call sites (header button, switcher rows, transfer-from
   select, vault list, recovery list, hardware list, user modals) now render `AccountAvatar`;
   hardware rows gained the avatar; `Hardware` kind label everywhere; legacy switcher labels

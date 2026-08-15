@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import NavIcon from '../nav/NavIcon'
 import LegacyUnlockDialog from './LegacyUnlockDialog'
 import HardwareConnectDialog from './HardwareConnectDialog'
 import AccountCard from './AccountCard'
@@ -50,9 +49,15 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
   const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hardwareEntry, setHardwareEntry, onHardwareConnected } = useAccountSwitcher()
   const trackRef = useRef(null)
   const [scrollIndex, setScrollIndex] = useState(0)
-  // Spec 086 — the Customize sheet edits the ACTIVE account's card (one editing surface,
-  // reachable right where the card is).
-  const [customizeOpen, setCustomizeOpen] = useState(false)
+  // Spec 086 — the Customize sheet, opened from the "⋯" ON the centered card. It edits the card
+  // the member is LOOKING AT (the snap-centered one), which need not be the active account —
+  // browsing to a card and dressing it must not require switching to it. The target is captured
+  // at open time so scrolling underneath an open sheet cannot retarget it.
+  const [customizeTarget, setCustomizeTarget] = useState(null)
+  // The "⋯" overlay is pinned to the MEASURED corner of the centered card — CSS center math
+  // cannot place it, because the first/last cards clamp against the track edge instead of
+  // centering. Recomputed with the scroll index and on resize.
+  const [menuPos, setMenuPos] = useState(null)
 
   // The card whose center is nearest the viewport center — drives the dots and
   // the arrows' disabled states. Recomputed on scroll (rAF-throttled).
@@ -71,7 +76,26 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
       }
     })
     setScrollIndex(nearest)
+    const card = track.children[nearest]
+    // Coordinates are relative to the overlay's positioned ancestor — the viewport wrapper,
+    // not the (unpositioned, scrolling) track.
+    const host = track.parentElement
+    if (card && host) {
+      const hostRect = host.getBoundingClientRect()
+      const cardRect = card.getBoundingClientRect()
+      setMenuPos({
+        left: cardRect.right - hostRect.left - 38,
+        top: cardRect.bottom - hostRect.top - 38,
+      })
+    }
   }, [])
+
+  // Place the overlay on first paint and keep it placed across viewport changes.
+  useEffect(() => {
+    measureScrollIndex()
+    window.addEventListener('resize', measureScrollIndex)
+    return () => window.removeEventListener('resize', measureScrollIndex)
+  }, [measureScrollIndex, accounts.length])
 
   const rafRef = useRef(0)
   const handleScroll = useCallback(() => {
@@ -106,7 +130,7 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
   }
 
   const showControls = accounts.length > 1
-  const activeAccount = accounts.find((acc) => acc.id === currentId) || null
+  const centeredAccount = accounts[Math.min(scrollIndex, accounts.length - 1)] || null
 
   return (
     <section className="account-cards" aria-label="Your accounts">
@@ -144,6 +168,22 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
             )
           })}
         </div>
+
+        {/* Spec 086 — "⋯" rendered ON the centered card's corner. DOM-wise it lives outside the
+            listbox (an option may contain no interactive children), positioned over the snap
+            target with the same min() math the card's own width uses. */}
+        {centeredAccount && (
+          <button
+            type="button"
+            className="account-card-menu"
+            style={menuPos ? { left: menuPos.left, top: menuPos.top } : undefined}
+            onClick={() => setCustomizeTarget(centeredAccount)}
+            aria-label={`Customize ${centeredAccount.label || shortAccountAddr(centeredAccount.address)} card`}
+            data-testid="account-customize-open"
+          >
+            ⋯
+          </button>
+        )}
 
         {showControls && (
           <>
@@ -184,22 +224,10 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
         </div>
       )}
 
-      {/* Spec 086 — customize the active account's card (picture, shade, pattern). */}
-      {activeAccount && (
-        <button
-          type="button"
-          className="account-cards-customize"
-          onClick={() => setCustomizeOpen(true)}
-          data-testid="account-customize-open"
-        >
-          <NavIcon name="sliders" size={14} /> Customize card
-        </button>
-      )}
-
       <AccountCustomizeSheet
-        open={customizeOpen}
-        onClose={() => setCustomizeOpen(false)}
-        account={activeAccount}
+        open={Boolean(customizeTarget)}
+        onClose={() => setCustomizeTarget(null)}
+        account={customizeTarget}
       />
 
       {/* Recovered accounts unlock before activating (spec 062). */}

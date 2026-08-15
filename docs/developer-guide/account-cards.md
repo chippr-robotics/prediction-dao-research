@@ -11,7 +11,7 @@ wallet lives in the account switcher, where switching always lived.
 |---|---|---|
 | `components/account/AccountAvatar.jsx` | The identity image everywhere one appears (header button, switcher rows, cards, vault/recovery/hardware lists) | Member-set picture first, Blockies fallback. Render this, never `BlockiesAvatar` directly, in account-identity positions. |
 | `components/account/AccountCard.jsx` | The account tile in card contexts (the My Account carousel today) | One layout for every kind; the kind is a tag (`lib/account/accountKinds.js`), never a different card. The card is the listbox option — a single button, no nested interactive elements. |
-| `components/account/AccountCustomizeSheet.jsx` | The ONE editing surface for card cosmetics | Live-applies to the store; opened beside the card (`Customize card` under the carousel). |
+| `components/account/AccountCustomizeSheet.jsx` | The ONE editing surface for card cosmetics | Live-applies to the store; opened from the "⋯" rendered on the centered card's corner. The control lives OUTSIDE the listbox DOM (an option may contain no interactive children) and is pinned to the measured card rect. |
 
 ## Cosmetics store
 

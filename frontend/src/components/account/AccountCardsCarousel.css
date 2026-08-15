@@ -36,15 +36,33 @@
   min-height: 150px;
 }
 
-/* Spec 086 — opens the Customize sheet for the active account's card. */
-.account-cards-customize {
+/* Spec 086 — the "⋯" customize control, rendered ON the centered card's bottom-right corner.
+   Positioned over the snap target with the same `min(78%, 320px)` math the card's width uses
+   (right edge of a centered card = 50% + half that width), so it tracks the card responsively.
+   It lives outside the listbox DOM — an option may contain no interactive children. */
+.account-cards-viewport .account-card-menu {
+  position: absolute;
+  /* left/top are set inline from the measured card rect; these are the pre-measure defaults. */
+  left: 10px;
+  top: 10px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  margin: 0.35rem auto 0;
-  font-size: 0.8rem;
-  padding: 0.4em 1em;
-  border-color: var(--border-color, #e3e7eb);
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.55));
+  color: var(--text-secondary, #5a6772);
+  z-index: 2;
+}
+
+.account-cards-viewport .account-card-menu:hover {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--text-primary, #1f2933);
 }
 
 /* Arrows — desktop/keyboard affordance; hidden on touch-first small screens
