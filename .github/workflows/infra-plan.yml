@@ -33,6 +33,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # actions/checkout persists a credential as `http.https://github.com/.extraheader` in the
+          # workspace's LOCAL git config. An explicit Authorization header OVERRIDES a URL-embedded
+          # one, so every git call made from inside the workspace — the module preflight, and
+          # `terraform init` fetching the private modules — silently authenticated as GITHUB_TOKEN,
+          # which is scoped to THIS repository alone and therefore 404s on chippr-tf-modules.
+          #
+          # That is what made a correctly-scoped token look broken: the REST API (which does not read
+          # git config) returned 200 for the same repo at the same moment git returned 404.
+          #
+          # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -145,7 +157,11 @@ jobs:
             for pair in "x-access-token|x-access-token:${token}" "oauth2|oauth2:${token}" "token-as-username|${token}"; do
               label="${pair%%|*}"
               form="${pair#*|}"
-              if err="$(git ls-remote "https://${form}@github.com/${repo_path}" HEAD 2>&1)"; then
+              # `-c http.…extraheader=` clears any inherited Authorization header for this call
+              # only. Without persist-credentials:false above this is what was overriding the
+              # URL-embedded credential; it is kept as a second layer because the failure it
+              # prevents is invisible — git succeeds at authenticating, just as the wrong identity.
+              if err="$(git -c http."https://github.com/".extraheader= ls-remote "https://${form}@github.com/${repo_path}" HEAD 2>&1)"; then
                 worked="$label"
                 break
               fi
@@ -216,6 +232,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # actions/checkout persists a credential as `http.https://github.com/.extraheader` in the
+          # workspace's LOCAL git config. An explicit Authorization header OVERRIDES a URL-embedded
+          # one, so every git call made from inside the workspace — the module preflight, and
+          # `terraform init` fetching the private modules — silently authenticated as GITHUB_TOKEN,
+          # which is scoped to THIS repository alone and therefore 404s on chippr-tf-modules.
+          #
+          # That is what made a correctly-scoped token look broken: the REST API (which does not read
+          # git config) returned 200 for the same repo at the same moment git returned 404.
+          #
+          # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -292,6 +320,18 @@ jobs:
         environment: [prod, staging]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # actions/checkout persists a credential as `http.https://github.com/.extraheader` in the
+          # workspace's LOCAL git config. An explicit Authorization header OVERRIDES a URL-embedded
+          # one, so every git call made from inside the workspace — the module preflight, and
+          # `terraform init` fetching the private modules — silently authenticated as GITHUB_TOKEN,
+          # which is scoped to THIS repository alone and therefore 404s on chippr-tf-modules.
+          #
+          # That is what made a correctly-scoped token look broken: the REST API (which does not read
+          # git config) returned 200 for the same repo at the same moment git returned 404.
+          #
+          # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
+          persist-credentials: false
 
       - id: auth
         uses: google-github-actions/auth@v2
