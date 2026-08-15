@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import TransferForm from './TransferForm'
-import TransferActivityList from './TransferActivityList'
+import WrapView from './WrapView'
 import BridgeView from './BridgeView'
 import BridgeStatusList from './BridgeStatusList'
 import BridgeUnavailableNotice from './BridgeUnavailableNotice'
@@ -14,41 +14,49 @@ import { WAGERS_VIEW, isNavItemEnabledForTenant } from '../../config/appNav'
 import './PayTransfer.css'
 
 /*
- * Wagers sits with the two other ways money leaves this section, ahead of Activity — the tabs read
- * actions-then-history, and a wager is an action.
+ * Wagers sits with the other ways money moves in this section — the tabs are all actions.
  *
- * It is TENANT-GATED, unlike its neighbours. Transfer and Bridge are core platform surfaces every
- * tenant gets; wagers is an optional manifest feature (spec 072), so on a tenant without it the tab
- * is ABSENT rather than present-and-broken — and because `?view=` only accepts ids that are in this
- * list, a saved `?view=wagers` link for that tenant falls back to Transfer on its own.
+ * It is TENANT-GATED, unlike its neighbours. Transfer, Wrap and Bridge are core platform surfaces
+ * every tenant gets; wagers is an optional manifest feature (spec 072), so on a tenant without it
+ * the tab is ABSENT rather than present-and-broken — and because `?view=` only accepts ids that are
+ * in this list, a saved `?view=wagers` link for that tenant falls back to Transfer on its own.
  */
 const WAGERS_ENABLED = isNavItemEnabledForTenant(WAGERS_VIEW.id)
 
 const TABS = [
   { id: 'transfer', label: 'Transfer' },
+  { id: 'wrap', label: 'Wrap' },
   { id: 'bridge', label: 'Bridge' },
   ...(WAGERS_ENABLED ? [{ id: WAGERS_VIEW.view, label: WAGERS_VIEW.label }] : []),
-  { id: 'activity', label: 'Activity' },
 ]
 
 const TAB_IDS = TABS.map((t) => t.id)
 
 /**
- * Transfer — wallet section for sending the active chain's stablecoin (gasless) or native token to
- * any address, plus an Activity log of transfers sent from this device. The tabs mirror the reference
- * "Transfer Money" design (Transfer / Activity).
+ * Transfer — the section where money moves. Send the active chain's stablecoin (gasless) or native
+ * coin to any address, wrap that coin into its ERC-20 form and back, move value across networks, or
+ * stake it against a counterparty.
  *
  * The section is named "Transfer" to members (spec 067 FR-001); its tab id stays `paytransfer` and the
  * component keeps its filename so existing deep links and imports resolve unchanged (FR-002).
  *
- * Spec 067 FR-004 adds a third tab, Bridge, BESIDE Send and Activity — the same-chain send flow is
- * untouched and stays the default tab. The active tab is derived from `?view=` (the EarnPanel idiom)
- * so `/wallet?tab=paytransfer&view=bridge` is a direct link and back/forward keep working.
+ * Spec 067 FR-004 added Bridge BESIDE Send — the same-chain send flow is untouched and stays the
+ * default tab. The active tab is derived from `?view=` (the EarnPanel idiom) so
+ * `/wallet?tab=paytransfer&view=bridge` is a direct link and back/forward keep working.
  *
- * Wagers joined the same row (spec 073): it was its own `/wagers` destination, and it is now the
- * third way money leaves this section — send it, move it across networks, or stake it against a
- * counterparty. `/wagers` redirects here so every saved link keeps working. Transfer is still the
- * default view, so a member who came to send money sees the send form exactly as before.
+ * Wagers joined the same row (spec 073): it was its own `/wagers` destination, and it is now another
+ * way money leaves this section. `/wagers` redirects here so every saved link keeps working.
+ *
+ * Wrap sits second, next to the send form: it is the other same-chain action, and it is what a member
+ * needs before a DEX, a pool or a contract that will only take the ERC-20 form of the coin.
+ *
+ * Activity is NOT a tab here. Transfer history is the activity ledger's (spec 051), and My Account ▸
+ * Activity renders it in full for every class of entry — a second, transfer-only copy of the same
+ * feed inside this section only made two places to look for one answer. The `?view=activity` id is
+ * gone with it, so a saved link falls back to Transfer rather than opening an empty panel.
+ *
+ * Transfer is still the default view, so a member who came to send money sees the send form exactly
+ * as before.
  */
 export default function PayTransferPanel() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -64,17 +72,10 @@ export default function PayTransferPanel() {
 
   return (
     <div className="pt-root">
-      {/* Each tab states only what applies to it — a same-chain send and a
-          cross-network bridge are different operations with different costs,
-          and folding them into one blurb either overstates or understates
-          each (mirrors TradePanel's per-context subtitle). */}
-      {tab === 'transfer' && (
-        <p className="pt-intro">
-          Send stablecoins and native tokens to any wallet or ENS name. Stablecoin transfers are gasless where
-          the rails are available.
-        </p>
-      )}
-
+      {/* The send tab carries no blurb: the form states its own asset, its own fee and its own
+          gasless badge, all of which are read from the chain and stay true when the copy would
+          not. The tabs that DO carry one say something the form cannot show — what a bridge or a
+          wager does to your money — rather than describing the controls underneath them. */}
       <div className="pt-tabs" role="tablist" aria-label="Transfer sections">
         {TABS.map((t) => (
           <button
@@ -92,7 +93,15 @@ export default function PayTransferPanel() {
 
       {tab === 'transfer' && (
         <div role="tabpanel" aria-label="Transfer" data-attention="transfer-send">
-          <TransferForm onSent={() => setTab('activity')} />
+          {/* Nothing to redirect to on success any more: the send reports its own outcome through
+              the notification, and the full history lives in My Account ▸ Activity. Staying put
+              also leaves the member where they can send again. */}
+          <TransferForm />
+        </div>
+      )}
+      {tab === 'wrap' && (
+        <div role="tabpanel" aria-label="Wrap" data-attention="transfer-wrap">
+          <WrapView />
         </div>
       )}
       {tab === 'bridge' && (
@@ -105,21 +114,16 @@ export default function PayTransferPanel() {
            route (its own padding + a full-height scroll region) — the same thing HomeScreen.css
            does for the home surface. The component itself is untouched. */
         <div role="tabpanel" aria-label="Wagers" className="pt-wagers" data-attention="transfer-wagers">
-          {/* Says the one thing that makes this different from its two neighbours. A send leaves
-              the wallet and is gone; a bridge leaves and arrives elsewhere; a wager is ESCROWED and
-              comes back — or doesn't — on an outcome. A member who read the Transfer blurb and
-              clicked across should not have to infer that. */}
+          {/* Says the one thing that makes this different from its neighbours. A send leaves the
+              wallet and is gone; a wrap changes the coin's form and nothing else; a bridge leaves and
+              arrives elsewhere; a wager is ESCROWED and comes back — or doesn't — on an outcome. A
+              member who clicked across from the send form should not have to infer that. */}
           <p className="pt-intro">
             Stake against someone on an outcome. The stake is held in escrow by the contract until the
             wager resolves — it is not sent to the other party, and an unaccepted or unresolved wager is
             refundable.
           </p>
           <Dashboard />
-        </div>
-      )}
-      {tab === 'activity' && (
-        <div role="tabpanel" aria-label="Activity" data-attention="transfer-activity">
-          <TransferActivityList />
         </div>
       )}
     </div>

@@ -162,6 +162,14 @@ export const NAV_DESTINATIONS = [
     keywords: ['send', 'pay', 'usdc', 'stablecoin', 'gasless', 'recipient', 'bitcoin', 'btc'],
   },
   {
+    id: 'transfer-wrap',
+    navId: 'paytransfer',
+    label: 'Wrap',
+    summary: 'Wrap the network coin into its ERC-20 form, or unwrap it back.',
+    path: '/wallet?tab=paytransfer&view=wrap',
+    keywords: ['wrap', 'unwrap', 'wrapped', 'weth', 'wmatic', 'wpol', 'wetc', 'deposit', 'withdraw', 'erc-20', 'erc20', 'native'],
+  },
+  {
     id: 'transfer-bridge',
     navId: 'paytransfer',
     label: 'Bridge',
@@ -176,14 +184,6 @@ export const NAV_DESTINATIONS = [
     summary: 'Create or accept a peer-to-peer wager.',
     path: '/wallet?tab=paytransfer&view=wagers',
     keywords: ['wager', 'wagers', 'bet', 'bets', 'challenge', 'p2p', 'escrow', 'stake against', 'oracle'],
-  },
-  {
-    id: 'transfer-activity',
-    navId: 'paytransfer',
-    label: 'Activity',
-    summary: 'Transfers sent from this device.',
-    path: '/wallet?tab=paytransfer&view=activity',
-    keywords: ['activity', 'history', 'sent', 'log', 'receipts'],
   },
 
   // ─── Tools ▸ Protect (specs 043 / 068 / 084 / 085) — AccordionSection cards ───────────────
