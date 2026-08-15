@@ -56,21 +56,46 @@ jobs:
       - name: terraform fmt
         run: terraform fmt -check -recursive infra/terraform
 
-      # `terraform init` must fetch modules from the PRIVATE chippr-tf-modules repository. The
-      # default GITHUB_TOKEN is scoped to this repository only and cannot read it, so a token with
-      # Contents:read on that repo is rewritten into git's config here.
+      # `terraform validate` on an environment root must FETCH the modules, which live in the
+      # private chippr-tf-modules repository. The default GITHUB_TOKEN is scoped to this repository
+      # only and cannot read it, so a token with Contents:read on that repo is required.
       #
       # A missing or wrong token surfaces as `repository not found` on the module source, NOT as a
       # permission error — GitHub returns 404 rather than 403 for a private repo the caller cannot
       # see. Read that message as authentication before you go looking for a wrong path.
-      - name: Allow Terraform to fetch private modules
+      - name: Check module repository access
+        id: modules
         run: |
-          git config --global url."https://x-access-token:${{ secrets.TF_MODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          if [ -n "${{ secrets.TF_MODULES_TOKEN }}" ]; then
+            git config --global url."https://x-access-token:${{ secrets.TF_MODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### terraform validate: NOT RUN — no access to the module repository"
+              echo ""
+              echo "\`TF_MODULES_TOKEN\` is unset, so \`terraform init\` cannot fetch the modules from"
+              echo "the private \`chippr-tf-modules\` repository and the environment roots cannot be"
+              echo "validated. **No claim is being made that this configuration is valid.**"
+              echo ""
+              echo "Fix: add a fine-grained token with Contents:read on chippr-tf-modules as the"
+              echo "\`TF_MODULES_TOKEN\` repository secret."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      - name: terraform validate
+      # Bootstrap uses no modules, so it is validated unconditionally — losing that too would mean a
+      # missing token silently drops ALL schema checking.
+      - name: terraform validate (bootstrap)
         run: |
           set -euo pipefail
-          for root in infra/terraform/bootstrap infra/terraform/environments/*; do
+          terraform -chdir=infra/terraform/bootstrap init -backend=false -input=false
+          terraform -chdir=infra/terraform/bootstrap validate
+
+      - name: terraform validate (environments)
+        if: steps.modules.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          for root in infra/terraform/environments/*; do
             echo "::group::validate $root"
             terraform -chdir="$root" init -backend=false -input=false
             terraform -chdir="$root" validate
