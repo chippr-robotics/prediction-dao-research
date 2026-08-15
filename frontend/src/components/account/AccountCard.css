@@ -1,0 +1,188 @@
+/* Spec 086 — the shared account card: a soft glass layer over the app chrome, carrying the
+   member's tint + pattern cosmetics. Tokens live in theme.css (--glass-*, --card-tint-*).
+
+   Selector note: the chrome block is written `.account-card[data-tint]` (0,2,0) deliberately —
+   the attribute is always present, and the extra specificity is what keeps App.css's mobile
+   `button:not([role="switch"])` tap-target rule (0,1,1) from re-padding the card, the same trick
+   AccountCardsCarousel.css documents. */
+
+.account-card[data-tint] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  text-align: left;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.65));
+  border-left: 4px solid var(--card-accent, var(--brand-primary, #36b37e));
+  background:
+    linear-gradient(135deg, rgba(var(--card-tint, 127, 127, 127), var(--card-tint-alpha, 0)) 0%, transparent 65%),
+    var(--card-pattern, none),
+    var(--glass-bg-solid, rgba(255, 255, 255, 0.92));
+  box-shadow: var(--glass-shadow, 0 8px 32px rgba(31, 41, 51, 0.14));
+  color: var(--text-primary, #1f2933);
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast, 0.15s ease),
+    box-shadow var(--transition-fast, 0.15s ease),
+    transform var(--transition-fast, 0.15s ease);
+}
+
+.account-card[data-tint]:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15)), var(--glass-shadow, 0 8px 32px rgba(31, 41, 51, 0.14));
+}
+
+.account-card[data-tint]:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+
+/* Real glass where the browser can composite it; the solid translucent bg above is the fallback. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .account-card[data-tint] {
+    background:
+      linear-gradient(135deg, rgba(var(--card-tint, 127, 127, 127), var(--card-tint-alpha, 0)) 0%, transparent 65%),
+      var(--card-pattern, none),
+      var(--glass-bg, rgba(255, 255, 255, 0.55));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.15);
+    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.15);
+  }
+}
+
+/* Top highlight line — the "glass edge". */
+.account-card[data-tint]::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-highlight, rgba(255, 255, 255, 0.85)), transparent);
+  pointer-events: none;
+}
+
+/* --- kind accent (left edge) --- */
+.account-card--vault[data-tint] { --card-accent: var(--brand-secondary, #4c9aff); }
+.account-card--legacy[data-tint] { --card-accent: var(--semantic-warning, #f5a623); }
+.account-card--hardware[data-tint] { --card-accent: var(--brand-accent, #7bdcb5); }
+
+.account-card[data-tint].is-active {
+  border-color: var(--brand-primary, #36b37e);
+  border-left-color: var(--brand-primary, #36b37e);
+  box-shadow: 0 0 0 2px var(--brand-primary, #36b37e), var(--glass-shadow, 0 8px 32px rgba(31, 41, 51, 0.14));
+}
+
+/* --- member tints (ids from accountProfilesStore; colors from theme.css) --- */
+.account-card[data-tint='mint'] { --card-tint: var(--card-tint-mint); --card-tint-alpha: 0.22; }
+.account-card[data-tint='sky'] { --card-tint: var(--card-tint-sky); --card-tint-alpha: 0.22; }
+.account-card[data-tint='violet'] { --card-tint: var(--card-tint-violet); --card-tint-alpha: 0.22; }
+.account-card[data-tint='amber'] { --card-tint: var(--card-tint-amber); --card-tint-alpha: 0.24; }
+.account-card[data-tint='rose'] { --card-tint: var(--card-tint-rose); --card-tint-alpha: 0.2; }
+.account-card[data-tint='slate'] { --card-tint: var(--card-tint-slate); --card-tint-alpha: 0.26; }
+
+/* --- member patterns: neutral mid-gray strokes at low alpha so one drawing reads on glass in
+       BOTH themes (a data-URI cannot consume a CSS variable). --- */
+.account-card[data-pattern='waves'] {
+  --card-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='24'%3E%3Cpath d='M0 12 Q 9 2 18 12 T 36 12 T 54 12 T 72 12' fill='none' stroke='rgba(127,127,127,0.16)' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+.account-card[data-pattern='dots'] {
+  --card-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ccircle cx='3' cy='3' r='1.4' fill='rgba(127,127,127,0.2)'/%3E%3C/svg%3E");
+}
+
+.account-card[data-pattern='grid'] {
+  --card-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cpath d='M22 0H0v22' fill='none' stroke='rgba(127,127,127,0.14)'/%3E%3C/svg%3E");
+}
+
+.account-card[data-pattern='rings'] {
+  --card-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Cg fill='none' stroke='rgba(127,127,127,0.14)'%3E%3Ccircle cx='54' cy='12' r='10'/%3E%3Ccircle cx='54' cy='12' r='20'/%3E%3Ccircle cx='54' cy='12' r='30'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* --- card internals (shared layout, moved from the carousel so every host matches) --- */
+
+.account-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.account-card-top .blockies-avatar,
+.account-card-top .account-avatar--custom {
+  border-radius: 50%;
+}
+
+.account-card-kind {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.55rem;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.55));
+  color: var(--text-secondary, #5a6772);
+}
+
+.account-card-label {
+  font-weight: 700;
+  font-size: 1.02rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-card-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.account-card-balance-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #5a6772);
+}
+
+.account-card-balance-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.account-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #5a6772);
+}
+
+.account-card-address {
+  font-family: monospace;
+}
+
+.account-card-network {
+  font-size: 0.75rem;
+  color: var(--text-muted, #8a959e);
+}
+
+.account-card-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--text-muted, #8a959e);
+}
+
+.account-card-state.is-active {
+  color: var(--brand-primary, #36b37e);
+  font-weight: 600;
+}

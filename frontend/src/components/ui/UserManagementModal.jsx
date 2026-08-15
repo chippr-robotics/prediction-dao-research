@@ -6,7 +6,7 @@ import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import TradePanel from '../fairwins/TradePanel'
 import PremiumPurchaseModal from './PremiumPurchaseModal'
-import BlockiesAvatar from './BlockiesAvatar'
+import AccountAvatar from '../account/AccountAvatar'
 import './UserManagementModal.css'
 
 // eslint-disable-next-line no-unused-vars
@@ -76,7 +76,7 @@ function UserManagementModal({ onScanMarket }) {
     <div className="user-management-modal">
       <div className="modal-header-section">
         <div className="wallet-info-header">
-          <BlockiesAvatar address={address} size={40} className="wallet-avatar" />
+          <AccountAvatar address={address} size={40} className="wallet-avatar" />
           <div className="wallet-address-stack">
             <span className="wallet-address-display">{shortenAddress(address)}</span>
             <span className="wallet-address-full">{address}</span>

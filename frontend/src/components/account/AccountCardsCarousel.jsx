@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import BlockiesAvatar from '../ui/BlockiesAvatar'
-import NavIcon from '../nav/NavIcon'
 import LegacyUnlockDialog from './LegacyUnlockDialog'
 import HardwareConnectDialog from './HardwareConnectDialog'
+import AccountCard from './AccountCard'
+import AccountCustomizeSheet from './AccountCustomizeSheet'
 import SensitiveValue from '../common/SensitiveValue'
 import { useAccountSwitcher, ACCOUNT_KIND_TAG, shortAccountAddr } from '../../hooks/useAccountSwitcher'
 import { NETWORKS } from '../../config/networks'
@@ -32,8 +32,6 @@ function chainLabel(chainId) {
   return NETWORKS[chainId]?.name || `Chain ${chainId}`
 }
 
-const KIND_LABEL = { personal: 'Personal', vault: 'Multisig', legacy: 'Recovered' }
-
 // Full-precision USD, matching the Portfolio view's own total formatting.
 function formatUsdFull(n) {
   return `$${Number(n || 0).toLocaleString('en-US', {
@@ -51,6 +49,15 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
   const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hardwareEntry, setHardwareEntry, onHardwareConnected } = useAccountSwitcher()
   const trackRef = useRef(null)
   const [scrollIndex, setScrollIndex] = useState(0)
+  // Spec 086 — the Customize sheet, opened from the "⋯" ON the centered card. It edits the card
+  // the member is LOOKING AT (the snap-centered one), which need not be the active account —
+  // browsing to a card and dressing it must not require switching to it. The target is captured
+  // at open time so scrolling underneath an open sheet cannot retarget it.
+  const [customizeTarget, setCustomizeTarget] = useState(null)
+  // The "⋯" overlay is pinned to the MEASURED corner of the centered card — CSS center math
+  // cannot place it, because the first/last cards clamp against the track edge instead of
+  // centering. Recomputed with the scroll index and on resize.
+  const [menuPos, setMenuPos] = useState(null)
 
   // The card whose center is nearest the viewport center — drives the dots and
   // the arrows' disabled states. Recomputed on scroll (rAF-throttled).
@@ -69,7 +76,26 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
       }
     })
     setScrollIndex(nearest)
+    const card = track.children[nearest]
+    // Coordinates are relative to the overlay's positioned ancestor — the viewport wrapper,
+    // not the (unpositioned, scrolling) track.
+    const host = track.parentElement
+    if (card && host) {
+      const hostRect = host.getBoundingClientRect()
+      const cardRect = card.getBoundingClientRect()
+      setMenuPos({
+        left: cardRect.right - hostRect.left - 38,
+        top: cardRect.bottom - hostRect.top - 38,
+      })
+    }
   }, [])
+
+  // Place the overlay on first paint and keep it placed across viewport changes.
+  useEffect(() => {
+    measureScrollIndex()
+    window.addEventListener('resize', measureScrollIndex)
+    return () => window.removeEventListener('resize', measureScrollIndex)
+  }, [measureScrollIndex, accounts.length])
 
   const rafRef = useRef(0)
   const handleScroll = useCallback(() => {
@@ -104,6 +130,7 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
   }
 
   const showControls = accounts.length > 1
+  const centeredAccount = accounts[Math.min(scrollIndex, accounts.length - 1)] || null
 
   return (
     <section className="account-cards" aria-label="Your accounts">
@@ -120,46 +147,43 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
         >
           {accounts.map((acc, index) => {
             const isActive = acc.id === currentId
-            const network = acc.kind === 'vault' ? chainLabel(acc.chainId) : null
             return (
-              <button
+              <AccountCard
                 key={acc.id}
-                type="button"
-                role="option"
-                aria-selected={isActive}
-                className={`account-card account-card--${acc.kind} ${isActive ? 'is-active' : ''}`}
-                onClick={() => handleSelect(acc, index)}
-              >
-                <span className="account-card-top">
-                  <BlockiesAvatar address={acc.address} size={36} />
-                  <span className="account-card-kind">{KIND_LABEL[acc.kind] || acc.kind}</span>
-                </span>
-                <span className="account-card-label">{acc.label || shortAccountAddr(acc.address)}</span>
-                {isActive && activeTotalUsd != null && (
-                  <span className="account-card-balance">
-                    <span className="account-card-balance-label">Total balance</span>
-                    <SensitiveValue className="account-card-balance-value">
-                      {formatUsdFull(activeTotalUsd)}
-                    </SensitiveValue>
-                  </span>
-                )}
-                <span className="account-card-bottom">
-                  <span className="account-card-address">{shortAccountAddr(acc.address)}</span>
-                  {network && <span className="account-card-network">{network}</span>}
-                </span>
-                <span className={`account-card-state ${isActive ? 'is-active' : ''}`}>
-                  {isActive ? (
-                    <>
-                      <NavIcon name="check" size={12} /> Active
-                    </>
-                  ) : (
-                    'Tap to use'
-                  )}
-                </span>
-              </button>
+                account={acc}
+                active={isActive}
+                network={acc.kind === 'vault' ? chainLabel(acc.chainId) : null}
+                balance={
+                  isActive && activeTotalUsd != null ? (
+                    <span className="account-card-balance">
+                      <span className="account-card-balance-label">Total balance</span>
+                      <SensitiveValue className="account-card-balance-value">
+                        {formatUsdFull(activeTotalUsd)}
+                      </SensitiveValue>
+                    </span>
+                  ) : null
+                }
+                onSelect={() => handleSelect(acc, index)}
+              />
             )
           })}
         </div>
+
+        {/* Spec 086 — "⋯" rendered ON the centered card's corner. DOM-wise it lives outside the
+            listbox (an option may contain no interactive children), positioned over the snap
+            target with the same min() math the card's own width uses. */}
+        {centeredAccount && (
+          <button
+            type="button"
+            className="account-card-menu"
+            style={menuPos ? { left: menuPos.left, top: menuPos.top } : undefined}
+            onClick={() => setCustomizeTarget(centeredAccount)}
+            aria-label={`Customize ${centeredAccount.label || shortAccountAddr(centeredAccount.address)} card`}
+            data-testid="account-customize-open"
+          >
+            ⋯
+          </button>
+        )}
 
         {showControls && (
           <>
@@ -199,6 +223,12 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
           ))}
         </div>
       )}
+
+      <AccountCustomizeSheet
+        open={Boolean(customizeTarget)}
+        onClose={() => setCustomizeTarget(null)}
+        account={customizeTarget}
+      />
 
       {/* Recovered accounts unlock before activating (spec 062). */}
       <LegacyUnlockDialog
