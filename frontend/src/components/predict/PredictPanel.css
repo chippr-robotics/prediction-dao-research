@@ -5,20 +5,16 @@
   flex-direction: column;
   gap: 0.9rem;
 }
+/* Title and refresh on one line. `center`, not `flex-start`: with the intro paragraph
+    gone there is nothing under the heading for the button to align to. */
 .predict-panel-header {
-  align-items: flex-start;
+  align-items: center;
   display: flex;
   gap: 1rem;
   justify-content: space-between;
 }
 .predict-panel-header h3 {
-  margin: 0 0 0.25rem;
-}
-.predict-panel-subtitle {
-  color: var(--text-secondary, #6b7280);
-  font-size: 0.85rem;
   margin: 0;
-  max-width: 42rem;
 }
 .predict-refresh {
   background: transparent;

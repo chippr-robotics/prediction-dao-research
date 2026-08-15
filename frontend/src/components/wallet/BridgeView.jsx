@@ -700,7 +700,9 @@ export default function BridgeView({ onRecorded } = {}) {
       )}
       {withheldNetworkNames.length > 0 && (
         <p className="bridge-note" role="note">
-          {`Assets on ${withheldNetworkNames.join(', ')} are not shown here: the bridge protocol is not deployed on ${withheldNetworkNames.length > 1 ? 'those networks' : 'that network'}, so there is no route to offer.`}
+          {/* Short, but still said: FR-066 is about a member not silently missing an asset they
+              hold, and one clause carries that as well as three did. */}
+          {`Assets on ${withheldNetworkNames.join(', ')} are not listed — the bridge protocol is not deployed there.`}
         </p>
       )}
 
@@ -715,6 +717,11 @@ export default function BridgeView({ onRecorded } = {}) {
           <div className="bridge-field">
             <span className="bridge-label" id="bridge-source-label">
               Asset to send
+              {/* "What is bridging?" used to hang off a paragraph above this tab. The paragraph
+                  went; the explainer stayed, on the first field a member touches. */}
+              <InfoTip label="What is bridging?" className="earn-info">
+                {BRIDGE_TIPS.bridge}
+              </InfoTip>
             </span>
             <UniversalAssetSelect
               label="Asset to send"

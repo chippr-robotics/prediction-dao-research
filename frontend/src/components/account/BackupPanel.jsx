@@ -56,11 +56,13 @@ function BackupPanel({ defaultOpen = false }) {
         defaultOpen={defaultOpen}
         className="backup-panel"
       >
+        {/* Two facts a member cannot see from the buttons: what the file contains, and that it is
+            unreadable to everyone else. The mechanics that were here — IPFS, the on-chain pointer,
+            which credentials restore it — are in the guide, and the controls below say when
+            anything actually leaves the device. */}
         <p className="backup-intro">
-          Back up your address book, preferences, and activity history as a single <strong>encrypted</strong> file
-          on IPFS, located by a trustless on-chain pointer. Only your account can read it — restore on any device
-          where you sign in to the same account (wallet or passkey). This is an explicit step; nothing leaves your
-          device until you back up.
+          Your address book, preferences, and activity history in one <strong>encrypted</strong> file that
+          only your account can read. Nothing leaves this device until you back up.
         </p>
 
         {!available ? (

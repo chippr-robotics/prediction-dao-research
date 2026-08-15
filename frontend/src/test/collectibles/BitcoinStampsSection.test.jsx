@@ -55,10 +55,12 @@ describe('BitcoinStampsSection', () => {
     expect(screen.getAllByText('Protected')).toHaveLength(2)
   })
 
+  // The wording is shorter than it was; the two facts it has to carry are not. Matched loosely
+  // so a future copy edit is free to rephrase, and fails only if one of them goes missing.
   it('explains that protected value cannot be spent by ordinary sends (FR-018)', () => {
     render(<BitcoinStampsSection />)
-    expect(screen.getByText(/ordinary BTC sends can\s+never spend/)).toBeInTheDocument()
-    expect(screen.getByText(/excluded from your spendable\s+balance/)).toBeInTheDocument()
+    expect(screen.getByText(/BTC send can\s+never spend/)).toBeInTheDocument()
+    expect(screen.getByText(/outside your spendable balance/)).toBeInTheDocument()
   })
 
   it('falls back to a placeholder when the image is missing or errors', () => {

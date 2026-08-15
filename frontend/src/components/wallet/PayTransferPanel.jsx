@@ -6,10 +6,8 @@ import BridgeView from './BridgeView'
 import BridgeStatusList from './BridgeStatusList'
 import BridgeUnavailableNotice from './BridgeUnavailableNotice'
 import Dashboard from '../fairwins/Dashboard'
-import InfoTip from '../ui/InfoTip'
 import { BRIDGE_UNAVAILABLE_REASON } from '../../hooks/useBridgeAvailability'
 import { bridgeGatewayUrl } from '../../lib/bridge/acrossQuotes'
-import { BRIDGE_AREA_DESC, BRIDGE_TIPS } from '../../lib/bridge/bridgeCopy'
 import { WAGERS_VIEW, isNavItemEnabledForTenant } from '../../config/appNav'
 import './PayTransfer.css'
 
@@ -114,14 +112,13 @@ export default function PayTransferPanel() {
            route (its own padding + a full-height scroll region) — the same thing HomeScreen.css
            does for the home surface. The component itself is untouched. */
         <div role="tabpanel" aria-label="Wagers" className="pt-wagers" data-attention="transfer-wagers">
-          {/* Says the one thing that makes this different from its neighbours. A send leaves the
-              wallet and is gone; a wrap changes the coin's form and nothing else; a bridge leaves and
-              arrives elsewhere; a wager is ESCROWED and comes back — or doesn't — on an outcome. A
-              member who clicked across from the send form should not have to infer that. */}
+          {/* One line, and only because it says the thing that makes this tab different from its
+              neighbours: a send leaves the wallet and is gone, a wager is ESCROWED and comes back
+              if nothing happens. The rest of what this paragraph used to explain — who settles,
+              what each wager type does — is on the cards directly below it. */}
           <p className="pt-intro">
-            Stake against someone on an outcome. The stake is held in escrow by the contract until the
-            wager resolves — it is not sent to the other party, and an unaccepted or unresolved wager is
-            refundable.
+            Your stake is escrowed by the contract, not sent to the other party, and refunded if the
+            wager is never accepted or resolved.
           </p>
           <Dashboard />
         </div>
@@ -158,12 +155,10 @@ function BridgeTab() {
 
   return (
     <div className="bridge-tab">
-      <p className="pt-intro">
-        {BRIDGE_AREA_DESC}
-        <InfoTip label="What is bridging?" className="earn-info">
-          {BRIDGE_TIPS.bridge}
-        </InfoTip>
-      </p>
+      {/* The blurb is gone; the tip that was pinned to it is not. What it described — that you see
+          the exact arriving amount and every cost before signing — the quote states as FIGURES a
+          few rows down, and a promise of a disclosure above a screen that makes it is one sentence
+          doing no work. The InfoTip rides the field where a member first needs it instead. */}
       {gatewayReady ? (
         <BridgeView onRecorded={() => setRecordedAt(Date.now())} />
       ) : (
