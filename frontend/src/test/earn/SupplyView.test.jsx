@@ -362,6 +362,12 @@ describe('SupplyView — search and filters', () => {
     expect(screen.getByText('1,000 USDC')).toBeInTheDocument()
   })
 
+  it('keeps the availability disclosure over an empty SEARCH, which says nothing about availability', () => {
+    render(<SupplyView catalog={catalog()} />)
+    fireEvent.change(search(), { target: { value: 'solana' } })
+    expect(screen.getByText('Where pools are available')).toBeInTheDocument()
+  })
+
   it('explains an empty search differently from an empty catalog, and offers a way back', () => {
     render(<SupplyView catalog={catalog()} />)
     fireEvent.change(search(), { target: { value: 'solana' } })
@@ -519,11 +525,17 @@ describe('SupplyView — empty states (FR-025)', () => {
     // No mock rows and no dead controls.
     expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /liquidity on/i })).not.toBeInTheDocument()
+    // And the folded disclosure stands down: this copy already ends with the same
+    // availability sentence, and saying it twice on one screen reads as a glitch.
+    expect(screen.queryByText('Where pools are available')).not.toBeInTheDocument()
   })
 
   it('explains an empty token filter and names where pooling is available', () => {
     render(<SupplyView tokenFilter="DAI" catalog={catalog()} />)
     expect(screen.getByText(/No pool takes DAI right now/i)).toBeInTheDocument()
+    // Same reason: this sentence already carries the availability copy.
+    expect(screen.queryByText('Where pools are available')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/Bridge pools are available on Ethereum only/i)).toHaveLength(1)
   })
 
   it('offers a retry, not a blank page, when nothing could be read at all', () => {

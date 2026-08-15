@@ -634,6 +634,16 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
 
   const positionFor = (pool) => positions.find((p) => p.pool?.key === pool.key) || null
 
+  // Two empty states carry `liquidityAvailabilityCopy()` inside their own copy —
+  // an empty catalog, and a ?token= deep link no pool takes. Where they render,
+  // the folded disclosure below would be the same sentence a second time, so it
+  // stands down. A search that found nothing says nothing about availability, so
+  // there it stays.
+  const emptyCatalog = data.status === 'ready' && pools.length === 0
+  const tokenFilterMiss =
+    data.status === 'ready' && pools.length > 0 && shownPools.length === 0 && !narrowed
+  const availabilityStatedElsewhere = emptyCatalog || tokenFilterMiss
+
   /**
    * Point 6 — ONE way in. A row is a summary, not a fork: tapping it opens the
    * pool's sheet, which holds the full disclosure and both actions behind tabs.
@@ -798,11 +808,16 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
 
           The active-network note replaces this copy rather than joining it: that
           note already ends with this sentence, and the same sentence twice on one
-          screen reads as a glitch. */}
-      <details className="supply-availability-details">
-        <summary>Where pools are available</summary>
-        <p className="supply-availability">{activeNetworkNote || liquidityAvailabilityCopy()}</p>
-      </details>
+          screen reads as a glitch — which is also why the whole disclosure stands
+          down in the two empty states that already state availability in their own
+          copy (`NO_POOLS_COPY` and the token-filter miss). A search that found
+          nothing does NOT state it, so there the disclosure stays. */}
+      {!availabilityStatedElsewhere && (
+        <details className="supply-availability-details">
+          <summary>Where pools are available</summary>
+          <p className="supply-availability">{activeNetworkNote || liquidityAvailabilityCopy()}</p>
+        </details>
+      )}
 
       {data.asOf && (
         <p className="earn-freshness">

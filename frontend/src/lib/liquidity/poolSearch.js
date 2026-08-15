@@ -31,7 +31,14 @@ import { LIQUIDITY_KIND_LABEL, LIQUIDITY_POOL_KIND, poolKindOf } from './liquidi
 /** The kind filter's "everything" value — an absence of narrowing, not a kind. */
 export const POOL_KIND_FILTER_ALL = 'all'
 
-/** The kind chips, in list order. Labels come from the shared copy table. */
+/**
+ * The kind chips, in list order.
+ *
+ * The labels are the SHORT forms, deliberately not `LIQUIDITY_KIND_LABEL`: a chip
+ * row reading "Trading liquidity / Bridge liquidity" wraps to two lines on a phone
+ * and repeats the word the whole section is about. The long labels stay on the
+ * rows, where they qualify a single pool.
+ */
 export const POOL_KIND_FILTERS = Object.freeze([
   Object.freeze({ value: POOL_KIND_FILTER_ALL, label: 'All' }),
   Object.freeze({ value: LIQUIDITY_POOL_KIND.TRADING_LP, label: 'Trading' }),
@@ -75,6 +82,25 @@ export function poolSearchTerms(query) {
 }
 
 /**
+ * A query → one predicate, with the terms parsed once rather than per pool.
+ *
+ * This is the SINGLE definition of what "matches" means: both `poolMatchesQuery`
+ * and `filterPools` are built on it, so query semantics cannot drift between the
+ * one-off check and the list filter.
+ *
+ * @param {string} query
+ * @returns {(pool: object) => boolean}
+ */
+export function makePoolQueryMatcher(query) {
+  const terms = poolSearchTerms(query)
+  if (terms.length === 0) return () => true
+  return (pool) => {
+    const haystack = poolSearchText(pool)
+    return terms.every((term) => haystack.includes(term))
+  }
+}
+
+/**
  * Does this pool answer the query? An empty query matches everything — a blank
  * search box narrows nothing.
  * @param {object} pool
@@ -82,10 +108,7 @@ export function poolSearchTerms(query) {
  * @returns {boolean}
  */
 export function poolMatchesQuery(pool, query) {
-  const terms = poolSearchTerms(query)
-  if (terms.length === 0) return true
-  const haystack = poolSearchText(pool)
-  return terms.every((term) => haystack.includes(term))
+  return makePoolQueryMatcher(query)(pool)
 }
 
 /**
@@ -114,15 +137,8 @@ export function filterPools(pools, { query = '', kind = POOL_KIND_FILTER_ALL, to
     list = list.filter((p) => poolKindOf(p?.kind) === kind)
   }
 
-  const terms = poolSearchTerms(query)
-  if (terms.length > 0) {
-    list = list.filter((p) => {
-      const haystack = poolSearchText(p)
-      return terms.every((term) => haystack.includes(term))
-    })
-  }
-
-  return list
+  const matches = makePoolQueryMatcher(query)
+  return list.filter(matches)
 }
 
 /** Which kinds are present in a list — the chip row only appears when both are. */

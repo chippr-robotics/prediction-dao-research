@@ -37,11 +37,15 @@
 /* Availability is reference material, not a headline: folded away by default so
    the pools themselves get the top of the screen, one tap from being read in
    full. Collapsed, never removed — the asymmetry still has to be findable. */
+/* `inside`, not the browser default `outside`: the marker of an `outside` summary
+   is drawn in the margin, and this panel has no left gutter at phone widths — the
+   triangle was rendering half off the screen edge. */
 .supply-availability-details > summary {
   cursor: pointer;
   color: var(--text-secondary);
   font-size: 0.85rem;
-  list-style-position: outside;
+  list-style-position: inside;
+  padding: 0.2rem 0;
 }
 
 .supply-availability-details > summary:focus-visible {
