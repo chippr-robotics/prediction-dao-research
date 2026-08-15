@@ -132,7 +132,21 @@ export const SECRETS = [
     env: ['PINATA_JWT'],
     class: CLASS.TOKEN,
     profiles: ['publish'],
-    note: 'Pinata scoped-key JWT for pinning mini-app packages and backup bundles to IPFS.',
+    // ROTATION HAZARD, and it has already fired once. The SAME credential also lives in the
+    // pre-existing `VITE_PINATA_JWT` container, which feeds the SPA build. On 2026-08-15 the key
+    // was rotated in Pinata's console and the new value was added to VITE_PINATA_JWT only; this
+    // container kept serving the revoked one, and every publish failed API_KEY_REVOKED until the
+    // two were reconciled by hand. Two containers holding one credential is the exact drift this
+    // registry's invariant 2 exists to prevent — it just spans a container the registry does not
+    // own. ROTATE BOTH, or give the two surfaces genuinely separate keys (preferred: see below).
+    //
+    // Preferred long-term shape: VITE_PINATA_JWT is compiled into the client bundle and is PUBLIC
+    // once shipped, so sharing one key makes this server-side publishing credential public too.
+    // The right split is a minimal, publicly-safe key for the SPA and a separate private key with
+    // publish scopes here — at which point they rotate independently on purpose rather than by
+    // accident.
+    note: 'Pinata scoped-key JWT for pinning mini-app packages and backup bundles to IPFS. '
+      + 'Shares its value with the SPA build\'s VITE_PINATA_JWT — rotate both together.',
   },
   {
     id: 'fairwins-graph-deploy-key',
