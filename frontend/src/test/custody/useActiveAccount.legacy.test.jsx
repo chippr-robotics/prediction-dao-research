@@ -1,6 +1,7 @@
-// Spec 062 follow-up — acting as a recovered legacy account signs with the
-// unlocked in-memory legacy signer (via the audited personal submit path), and
-// refuses to act when the signer is gone.
+// Spec 062 + 088 — acting as a recovered legacy account signs with the in-memory legacy signer
+// (via the audited personal submit path). With no signer in memory the identity still switches
+// (address-only, spec 088) and submit PARKS on the deferred ceremony broker: attaching a signer
+// resolves the send; a stale chain binding drops the signer and re-runs the ceremony.
 
 import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -20,18 +21,24 @@ vi.mock('../../lib/custody/submitAsActiveAccount', () => ({
   submitAsActiveAccount: (...args) => submitSpy(...args),
 }))
 
+import { useContext } from 'react'
 import { CustodyProvider } from '../../contexts/CustodyContext.jsx'
+import { CustodyContext } from '../../contexts/CustodyContext'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 
 function Probe({ withSigner = true }) {
   const [, force] = useState(0)
   const { identity, canActAsLegacy, submit, operateAsLegacy } = useActiveAccount()
+  const { signerRequest, attachActingSigner, cancelSignerRequest } = useContext(CustodyContext)
   return (
     <div>
       <span data-testid="mode">{identity.mode}</span>
       <span data-testid="can">{canActAsLegacy ? 'yes' : 'no'}</span>
+      <span data-testid="request">{signerRequest ? signerRequest.mode : 'none'}</span>
       <button onClick={() => operateAsLegacy({ address: '0xLegacy', chainId: 137, kind: 'privateKey', signer: withSigner ? LEGACY_SIGNER : undefined })}>as-legacy</button>
       <button onClick={() => force((n) => n + 1)}>re-render</button>
+      <button onClick={() => attachActingSigner(LEGACY_SIGNER, connectedChainId)}>attach</button>
+      <button onClick={() => cancelSignerRequest()}>cancel</button>
       <button onClick={() => submit({ to: '0xdead', value: 1n }).catch((e) => { document.title = e.message })}>submit</button>
     </div>
   )
@@ -53,27 +60,46 @@ describe('useActiveAccount — legacy acting account', () => {
     expect(ctx.signer).not.toBe(PERSONAL_SIGNER)
   })
 
-  it('refuses to send on the wrong network after unlocking (no wrong-chain send)', async () => {
+  it('drops a stale wrong-chain signer and re-runs the ceremony instead of sending (spec 088)', async () => {
     render(<CustodyProvider><Probe /></CustodyProvider>)
     fireEvent.click(screen.getByText('as-legacy')) // unlocked for chainId 137
     expect(screen.getByTestId('can')).toHaveTextContent('yes')
-    // Member switches networks after unlocking.
+    // Member switches networks after unlocking: the cached signer is bound to the old chain.
     connectedChainId = 999
     fireEvent.click(screen.getByText('re-render'))
-    expect(screen.getByTestId('can')).toHaveTextContent('no') // gated off on the wrong chain
     fireEvent.click(screen.getByText('submit'))
-    await waitFor(() => expect(document.title).toMatch(/Switch back to the network/i))
-    expect(submitSpy).not.toHaveBeenCalled() // never sent on the wrong chain
+    // NOT sent with the stale signer — a fresh ceremony is requested instead.
+    await waitFor(() => expect(screen.getByTestId('request')).toHaveTextContent('legacy'))
+    expect(submitSpy).not.toHaveBeenCalled()
+    // Completing the ceremony (rebinding to the CURRENT chain) lets the send proceed.
+    fireEvent.click(screen.getByText('attach'))
+    await waitFor(() => expect(submitSpy).toHaveBeenCalled())
+    expect(submitSpy.mock.calls[0][1].signer).toBe(LEGACY_SIGNER)
   })
 
-  it('refuses to act as a legacy account with no signer in memory', async () => {
+  it('switches address-only without a signer and parks the send on the ceremony (spec 088)', async () => {
     render(<CustodyProvider><Probe withSigner={false} /></CustodyProvider>)
     fireEvent.click(screen.getByText('as-legacy'))
-    // Descriptor without a signer is ignored → stays personal, never acts on an un-unlocked key.
-    expect(screen.getByTestId('mode')).toHaveTextContent('personal')
+    // The identity switches immediately — the public address is enough to act AS the account.
+    expect(screen.getByTestId('mode')).toHaveTextContent('legacy')
+    expect(screen.getByTestId('can')).toHaveTextContent('yes')
     fireEvent.click(screen.getByText('submit'))
+    // The send parks on the broker; nothing is signed with the personal key.
+    await waitFor(() => expect(screen.getByTestId('request')).toHaveTextContent('legacy'))
+    expect(submitSpy).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('attach'))
     await waitFor(() => expect(submitSpy).toHaveBeenCalled())
-    // Falls back to the connected (personal) signer, not a phantom legacy key.
-    expect(submitSpy.mock.calls[0][1].signer).toBe(PERSONAL_SIGNER)
+    expect(submitSpy.mock.calls[0][1].signer).toBe(LEGACY_SIGNER)
+    expect(submitSpy.mock.calls[0][1].signer).not.toBe(PERSONAL_SIGNER)
+  })
+
+  it('cancelling the ceremony rejects the parked send with a stated reason (spec 088)', async () => {
+    render(<CustodyProvider><Probe withSigner={false} /></CustodyProvider>)
+    fireEvent.click(screen.getByText('as-legacy'))
+    fireEvent.click(screen.getByText('submit'))
+    await waitFor(() => expect(screen.getByTestId('request')).toHaveTextContent('legacy'))
+    fireEvent.click(screen.getByText('cancel'))
+    await waitFor(() => expect(document.title).toMatch(/cancelled/i))
+    expect(submitSpy).not.toHaveBeenCalled()
   })
 })

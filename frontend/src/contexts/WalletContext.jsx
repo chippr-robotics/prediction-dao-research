@@ -25,7 +25,7 @@ export function WalletProvider({ children }) {
   // able to SEE in order to correct it (auto-switch below) instead of silently reading and
   // displaying a different network.
   const chainId = useWalletChainId()
-  const { switchChain } = useSwitchChain()
+  const { switchChain, switchChainAsync } = useSwitchChain()
   const { data: walletClient } = useWalletClient()
 
   // Connector-backed write transport for classic wallets only. Passkey sessions never
@@ -684,14 +684,17 @@ export function WalletProvider({ children }) {
   const switchNetwork = useCallback(async (targetChainId = PRIMARY_CHAIN_ID) => {
     const target = Number(targetChainId) || PRIMARY_CHAIN_ID
     try {
-      await switchChain({ chainId: target })
+      // The ASYNC mutate, awaited: the old `switchChain` (mutate) resolved immediately, so every
+      // `await switchNetwork(...)` in the app returned BEFORE the wallet had changed chains, a
+      // user rejection never rejected, and tx buttons raced the switch (spec 088 finding).
+      await switchChainAsync({ chainId: target })
       return true
     } catch (error) {
       console.error('Error switching network:', error)
       const targetNet = getNetwork(target)
       throw new Error(`Please manually switch to ${targetNet?.name || `chain ${target}`} in your wallet`, { cause: error })
     }
-  }, [switchChain])
+  }, [switchChainAsync])
 
   // Send transaction helper
   const sendTransaction = useCallback(async (transactionRequest) => {

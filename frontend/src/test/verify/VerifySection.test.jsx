@@ -400,13 +400,23 @@ describe('VerifySection — signing', () => {
     expect(within(sheet).getByText(/threshold of its owners/i)).toBeInTheDocument()
   })
 
-  it('tells a locked recovered account to unlock rather than failing on click', async () => {
+  it('offers signing for a locked recovered account and requests the ceremony on click (spec 088)', async () => {
     const user = userEvent.setup()
-    renderSection({ active: { mode: 'legacy', address: OTHER_ADDRESS, chainId: 137 }, legacySigner: null })
-    expect(screen.getByText(/unlock this recovered account/i)).toBeInTheDocument()
+    // No in-memory signer: the deferred broker supplies one at sign time — the surface must
+    // OFFER signing rather than telling the member to go unlock somewhere else first.
+    const requestActingSigner = vi.fn(() => new Promise(() => {})) // ceremony pending
+    renderSection({
+      active: { mode: 'legacy', address: OTHER_ADDRESS, chainId: 137 },
+      legacySigner: null,
+      requestActingSigner,
+    })
+    expect(screen.queryByText(/unlock this recovered account/i)).not.toBeInTheDocument()
 
     const sheet = await openSheet(user, 'Sign a message')
-    expect(within(sheet).queryByRole('button', { name: /^sign message$/i })).not.toBeInTheDocument()
+    await user.click(screen.getByLabelText(/message to sign/i))
+    await user.paste('hello')
+    await user.click(within(sheet).getByRole('button', { name: /^sign message$/i }))
+    expect(requestActingSigner).toHaveBeenCalledTimes(1)
   })
 
   // The sheet unmounts on close, so the draft and the document have to live above it.

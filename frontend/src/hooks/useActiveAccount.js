@@ -1,5 +1,11 @@
 // Spec 043 (US3) — expose the active identity and a single submit() that every money-moving surface can call.
 // In personal mode submit sends via the connected signer; in vault mode it creates a threshold-gated proposal.
+//
+// Spec 088 — recovered and hardware identities are ADDRESS-ONLY until value moves: submit()
+// fetches the acting signer on demand through the custody broker (the globally-mounted ceremony
+// host renders the unlock / device-connect dialog right then). A cached signer bound to a network
+// the wallet has since left is DROPPED and re-requested — the fresh ceremony binds to the current
+// chain — instead of failing the send with a "switch back" error.
 
 import { useCallback, useContext } from 'react'
 import { useWallet } from './useWalletManagement'
@@ -10,6 +16,7 @@ import { submitAsActiveAccount } from '../lib/custody/submitAsActiveAccount'
 
 const PERSONAL = { mode: 'personal' }
 const NOOP = () => {}
+const NO_BROKER = () => Promise.reject(new Error('No signing ceremony is available here.'))
 
 export function useActiveAccount() {
   // Read the context directly and degrade to personal mode when no CustodyProvider is mounted. Operate-as is
@@ -23,6 +30,8 @@ export function useActiveAccount() {
   const operateAsVault = custody?.operateAsVault ?? NOOP
   const operateAsLegacy = custody?.operateAsLegacy ?? NOOP
   const operateAsHardware = custody?.operateAsHardware ?? NOOP
+  const requestActingSigner = custody?.requestActingSigner ?? NO_BROKER
+  const dropActingSigner = custody?.dropActingSigner ?? NOOP
   const { chainId, signer, provider } = useWallet()
   const isVault = active.mode === 'vault'
   const isLegacy = active.mode === 'legacy'
@@ -41,43 +50,31 @@ export function useActiveAccount() {
           provider,
         })
       }
-      if (active.mode === 'legacy') {
-        // Sign with the unlocked legacy key held in memory by CustodyContext. If it
-        // is gone (e.g. after a reload cleared the in-memory signer), the member
-        // must re-unlock the account before acting as it.
-        if (!legacySigner) throw new Error('Unlock this recovered account again to act as it.')
-        // The unlocked signer is bound to the provider at unlock time; if the
-        // member has since switched networks, sending would land on the wrong
-        // chain. Refuse until they're back on the network they unlocked on
-        // (mirrors the vault network guard).
-        if (active.chainId != null && Number(chainId) !== Number(active.chainId)) {
-          throw new Error('Switch back to the network where you unlocked this recovered account before acting as it.')
+      if (active.mode === 'legacy' || active.mode === 'hardware') {
+        // Spec 088 — get-or-request the acting signer. A cached signer whose chain binding no
+        // longer matches the wallet's network is stale: drop it and run a fresh ceremony (which
+        // binds to the CURRENT chain) rather than telling the member to switch back.
+        let acting = active.mode === 'legacy' ? legacySigner : hardwareSigner
+        const stale = acting && active.chainId != null && Number(chainId) !== Number(active.chainId)
+        if (stale) {
+          dropActingSigner()
+          acting = null
         }
-        return submitAsActiveAccount(payload, { mode: 'personal', signer: legacySigner })
-      }
-      if (active.mode === 'hardware') {
-        // Spec 085 — sign with the device-backed signer held in memory. Every send is confirmed on
-        // the device screen. If the session is gone (reload, unplug), reconnect before acting.
-        if (!hardwareSigner) throw new Error('Reconnect your hardware wallet to act as this account.')
-        if (active.chainId != null && Number(chainId) !== Number(active.chainId)) {
-          throw new Error('Switch back to the network where you connected this hardware account before acting as it.')
-        }
-        return submitAsActiveAccount(payload, { mode: 'personal', signer: hardwareSigner })
+        if (!acting) acting = await requestActingSigner()
+        return submitAsActiveAccount(payload, { mode: 'personal', signer: acting })
       }
       return submitAsActiveAccount(payload, { mode: 'personal', signer })
     },
-    [active, chainId, signer, provider, legacySigner, hardwareSigner],
+    [active, chainId, signer, provider, legacySigner, hardwareSigner, requestActingSigner, dropActingSigner],
   )
 
   // Whether a vault action can currently be sent (connected to the vault's network).
   const canActAsVault = isVault && Number(chainId) === Number(active.chainId)
-  // A legacy account can act only while its unlocked signer is still in memory AND
-  // the wallet is on the network it was unlocked for (else a switch would send on
-  // the wrong chain).
-  const canActAsLegacy = isLegacy && Boolean(legacySigner) && (active.chainId == null || Number(chainId) === Number(active.chainId))
-  // A hardware account can act only while its device session is still in memory AND the wallet is
-  // on the network it was connected for (same guard as legacy — a switch would send on the wrong chain).
-  const canActAsHardware = isHardware && Boolean(hardwareSigner) && (active.chainId == null || Number(chainId) === Number(active.chainId))
+  // Spec 088 — a recovered/hardware acting account can always ACT: the signer is obtained on
+  // demand by the deferred ceremony, so these no longer gate on a signer already being in hand.
+  // (They remain distinct flags because consumers branch per kind.)
+  const canActAsLegacy = isLegacy
+  const canActAsHardware = isHardware
 
   return { identity: active, isVault, isLegacy, isHardware, canActAsVault, canActAsLegacy, canActAsHardware, submit, operateAsPersonal, operateAsVault, operateAsLegacy, operateAsHardware }
 }

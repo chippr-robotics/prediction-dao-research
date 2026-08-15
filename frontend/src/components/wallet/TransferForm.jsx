@@ -6,12 +6,13 @@ import QRScanner from '../ui/QRScanner'
 import SensitiveValue from '../common/SensitiveValue'
 import TransferAssetSelect from './TransferAssetSelect'
 import TransferFromSelect from './TransferFromSelect'
-import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
 import { useTransfer, TRANSFER_KIND } from '../../hooks/useTransfer'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
 import { useLegacyAccounts } from '../../hooks/useLegacyAccounts'
+import { useHardwareAccounts } from '../../hooks/useHardwareAccounts'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useAccountAssets } from '../../hooks/useAccountAssets'
 import usePortfolio from '../../hooks/usePortfolio'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
@@ -38,16 +39,17 @@ export default function TransferForm({ onSent }) {
     send, status, error, quoteGaslessForAsset, balanceOf, refreshBalances, tokens, isPasskey,
   } = useTransfer()
   const { address, chainId } = useWallet()
-  const { identity, isVault, isLegacy, operateAsPersonal, operateAsVault, operateAsLegacy } = useActiveAccount()
+  const { identity, isVault, operateAsPersonal, operateAsVault, operateAsLegacy, operateAsHardware } = useActiveAccount()
   const { vaults } = useCustodyVaults()
   const legacyAccounts = useLegacyAccounts()
-  const [unlockEntry, setUnlockEntry] = useState(null)
+  const hardwareAccounts = useHardwareAccounts()
   const portfolio = usePortfolio()
-  // Assets + balances come from whichever account we're ACTING AS — a vault or a
-  // recovered legacy account — not the connected wallet (each holds its own funds
-  // on the connected chain and isn't part of the personal portfolio scan).
-  const vaultAddress = isVault && identity?.vaultAddress ? identity.vaultAddress : null
-  const actingAddress = vaultAddress || (isLegacy && identity?.address ? identity.address : null)
+  // Assets + balances come from whichever account we're ACTING AS — not the connected wallet.
+  // Spec 088: resolved through the shared effective-account seam so EVERY acting kind (vault,
+  // recovered, hardware, derived) is covered; the inline vault/legacy-only copy this replaces
+  // silently showed the connected wallet's balances for the other kinds.
+  const { address: effectiveAddress, isActingAccount } = useEffectiveAccount()
+  const actingAddress = isActingAccount ? effectiveAddress : null
   const actingAssets = useAccountAssets(actingAddress)
   const { screenOne } = useAddressScreening()
   const { showNotification } = useNotification()
@@ -195,15 +197,17 @@ export default function TransferForm({ onSent }) {
         chainId: Number(v.chainId),
       })
     }
-    return list.concat(legacyAccounts)
-  }, [address, vaults, connectedChainId, legacyAccounts])
+    return list.concat(legacyAccounts, hardwareAccounts)
+  }, [address, vaults, connectedChainId, legacyAccounts, hardwareAccounts])
 
   const fromValue = isVault && identity?.vaultAddress
     ? `vault:${identity.vaultAddress}`
-    : identity?.mode === 'legacy' && identity.address
-      ? `legacy:${String(identity.address).toLowerCase()}`
+    : (identity?.mode === 'legacy' || identity?.mode === 'hardware') && identity.address
+      ? `${identity.mode}:${String(identity.address).toLowerCase()}`
       : 'personal'
 
+  // Spec 088 — switching the "from" account is ADDRESS-ONLY and instant for every kind. The
+  // unlock / device ceremony happens at SEND time, rendered by the global SignerRequestHost.
   const handleFromChange = useCallback(
     (account) => {
       setPreviewing(false)
@@ -211,22 +215,14 @@ export default function TransferForm({ onSent }) {
       if (account.kind === 'vault') {
         operateAsVault({ address: account.address, chainId: account.chainId, label: account.label })
       } else if (account.kind === 'legacy') {
-        setUnlockEntry(account.entry) // unlock (biometric/passphrase) → operateAsLegacy on success
+        operateAsLegacy({ address: account.address, kind: account.entry?.kind, label: account.label })
+      } else if (account.kind === 'hardware') {
+        operateAsHardware({ address: account.address, vendor: account.vendor, label: account.label })
       } else {
         operateAsPersonal()
       }
     },
-    [operateAsVault, operateAsPersonal],
-  )
-
-  const handleLegacyUnlocked = useCallback(
-    (signer) => {
-      if (unlockEntry) {
-        operateAsLegacy({ address: unlockEntry.address, chainId: connectedChainId, kind: unlockEntry.kind, label: short(unlockEntry.address), signer })
-      }
-      setUnlockEntry(null)
-    },
-    [unlockEntry, connectedChainId, operateAsLegacy],
+    [operateAsVault, operateAsPersonal, operateAsLegacy, operateAsHardware],
   )
 
   // Advisory sanctions pre-check on the resolved recipient, against the SELECTED asset's chain.
@@ -354,12 +350,6 @@ export default function TransferForm({ onSent }) {
               value={fromValue}
               onChange={handleFromChange}
               disabled={busy}
-            />
-            <LegacyUnlockDialog
-              open={Boolean(unlockEntry)}
-              entry={unlockEntry}
-              onClose={() => setUnlockEntry(null)}
-              onUnlocked={handleLegacyUnlocked}
             />
             {isVault && (
               <span className="pt-hint">

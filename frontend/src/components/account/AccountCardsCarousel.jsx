@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import LegacyUnlockDialog from './LegacyUnlockDialog'
-import HardwareConnectDialog from './HardwareConnectDialog'
 import AccountCard from './AccountCard'
 import AccountCustomizeSheet from './AccountCustomizeSheet'
 import SensitiveValue from '../common/SensitiveValue'
@@ -16,9 +14,9 @@ import './AccountCardsCarousel.css'
  * as the header dropdown's switcher (useAccountSwitcher.choose), so the two
  * surfaces can never disagree about which account is active.
  *
- * Recovered (legacy) accounts unlock first: choose() opens the unlock dialog,
- * and only a successful unlock switches (spec 062 — the encrypted key never
- * activates silently).
+ * Spec 088: selecting ANY card switches instantly, address-only — no unlock, no
+ * device ceremony. Signing ceremonies are deferred to send time (the global
+ * SignerRequestHost renders them when a transaction actually needs a signature).
  *
  * Scrolling is native horizontal scroll with CSS scroll-snap; the arrows and
  * dots are conveniences layered on top (and the arrows are the keyboard/desktop
@@ -46,7 +44,7 @@ function formatUsdFull(n) {
  * unavailable) — a card must never show a fabricated $0 while data loads.
  */
 function AccountCardsCarousel({ activeTotalUsd = null }) {
-  const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hardwareEntry, setHardwareEntry, onHardwareConnected } = useAccountSwitcher()
+  const { accounts, currentId, choose } = useAccountSwitcher()
   const trackRef = useRef(null)
   const [scrollIndex, setScrollIndex] = useState(0)
   // Spec 086 — the Customize sheet, opened from the "⋯" ON the centered card. It edits the card
@@ -230,21 +228,8 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
         account={customizeTarget}
       />
 
-      {/* Recovered accounts unlock before activating (spec 062). */}
-      <LegacyUnlockDialog
-        open={Boolean(unlockEntry)}
-        entry={unlockEntry}
-        onClose={() => setUnlockEntry(null)}
-        onUnlocked={onUnlocked}
-      />
-
-      {/* Hardware accounts reconnect their device before activating (spec 085). */}
-      <HardwareConnectDialog
-        open={Boolean(hardwareEntry)}
-        entry={hardwareEntry}
-        onClose={() => setHardwareEntry(null)}
-        onConnected={onHardwareConnected}
-      />
+      {/* Spec 088: switching is instant and address-only — ceremonies render from the
+          global SignerRequestHost at send time. */}
     </section>
   )
 }

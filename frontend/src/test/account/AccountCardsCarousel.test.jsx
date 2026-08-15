@@ -108,10 +108,10 @@ describe('AccountCardsCarousel (spec 074 US1)', () => {
     expect(chooseMock).toHaveBeenCalledWith(LEGACY)
   })
 
-  it('mounts the unlock dialog when the seam has an unlockEntry (C4)', () => {
-    switcherState.unlockEntry = LEGACY_ENTRY
+  it('mounts no ceremony dialog at switch time — switching is address-only (spec 088)', () => {
     render(<AccountCardsCarousel />)
-    expect(screen.getByTestId('unlock-dialog')).toBeInTheDocument()
+    expect(screen.queryByTestId('unlock-dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /connect your device/i })).not.toBeInTheDocument()
   })
 
   it('shows arrows and one dot per account when there is more than one (C5)', () => {
