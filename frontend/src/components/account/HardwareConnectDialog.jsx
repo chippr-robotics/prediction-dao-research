@@ -14,7 +14,7 @@ import { WalletContext } from '../../contexts/WalletContext'
 import { NETWORKS } from '../../config/networks'
 import { getReadProvider } from '../../utils/rpcProvider'
 import { connectHardwareAccount } from '../../lib/hardware/connectAccount'
-import { describeHardwareError } from '../../lib/hardware/errors'
+import { reportHardwareError } from '../../lib/hardware/errors'
 import { VENDOR_LABELS } from '../../lib/hardware/adapters'
 import ActionSheet from './ActionSheet'
 import './LegacyKeyRecoveryPanel.css'
@@ -47,7 +47,7 @@ export default function HardwareConnectDialog({ open, entry, onClose, onConnecte
       onConnected?.(signer)
     } catch (e) {
       setPhase('idle')
-      setError(describeHardwareError(e))
+      setError(reportHardwareError(e, 'hardware-connect'))
     }
   }, [entry, chainId, deps, onConnected])
 

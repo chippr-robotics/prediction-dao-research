@@ -10,6 +10,7 @@ export const HW_ERROR_CODES = Object.freeze({
   USER_CANCELLED: 'user-cancelled',
   DISCONNECTED: 'disconnected',
   TIMEOUT: 'timeout',
+  POPUP_BLOCKED: 'popup-blocked',
   UNKNOWN: 'unknown',
 })
 
@@ -38,6 +39,8 @@ const DESCRIPTIONS = {
   [HW_ERROR_CODES.USER_CANCELLED]: 'The request was cancelled on the device.',
   [HW_ERROR_CODES.DISCONNECTED]: 'The device was disconnected. Reconnect it and try again.',
   [HW_ERROR_CODES.TIMEOUT]: 'The device did not respond in time. Check the connection and try again.',
+  [HW_ERROR_CODES.POPUP_BLOCKED]:
+    'The vendor window could not open or did not respond. Allow popups for this site and try again.',
   [HW_ERROR_CODES.UNKNOWN]: 'Something went wrong talking to the device. Reconnect it and try again.',
 }
 
@@ -45,4 +48,16 @@ const DESCRIPTIONS = {
 export function describeHardwareError(err) {
   if (err instanceof HardwareWalletError) return err.message
   return DESCRIPTIONS[HW_ERROR_CODES.UNKNOWN]
+}
+
+/**
+ * The UI-boundary form: returns the human sentence AND logs the raw failure (with its cause)
+ * to the console. The member never sees SDK internals, but an operator debugging a device
+ * report must — the spec-085 staging validation found both vendors failing with "no relevant
+ * logs" precisely because every raw error was swallowed on the way to the friendly sentence.
+ */
+export function reportHardwareError(err, context = 'hardware') {
+  // Deliberate operator diagnostic (see docstring) — console.warn is allowed by this repo's lint.
+  console.warn(`[${context}]`, err, err?.cause !== undefined ? { cause: err.cause } : '')
+  return describeHardwareError(err)
 }

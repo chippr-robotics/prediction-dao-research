@@ -22,6 +22,7 @@
 // dead-code elimination removes the branch (constitution III: no mocks in shipped paths).
 
 import { HardwareWalletError, HW_ERROR_CODES } from './errors'
+import { ensureNodeGlobals } from './nodeShims'
 
 export const VENDOR_LABELS = Object.freeze({ ledger: 'Ledger', trezor: 'Trezor' })
 
@@ -67,6 +68,9 @@ export async function connectHardware(vendor) {
   if (!availability.available) {
     throw new HardwareWalletError(HW_ERROR_CODES.TRANSPORT_UNSUPPORTED, availability.reason, { vendor })
   }
+  // The vendor SDKs assume Node globals (Buffer); install the browser polyfill before any of
+  // their code loads. See nodeShims.js for why this exists and why it is lazy.
+  await ensureNodeGlobals()
   if (vendor === 'ledger') {
     const { connectLedger } = await import('./ledgerAdapter')
     return connectLedger()

@@ -18,6 +18,12 @@ after any bump of `@ledgerhq/*` or `@trezor/connect-web`.
 - Wallet connected on a **testnet** the build serves, with a little native token on one derived
   account per device for the dust send.
 - A second browser profile (clean) for the backup-restore check.
+- **DevTools console open for every check.** Every hardware failure now logs its raw cause as a
+  `[hardware-add]` / `[hardware-connect]` console line alongside the member-facing sentence —
+  copy that line into any failure report. "No relevant logs" is itself a finding: it means the
+  diagnostic seam regressed.
+- For Trezor: the site must be allowed to open popups (the Connect window). A blocked popup
+  renders as the `popup-blocked` sentence — that is the browser setting, not a device fault.
 
 ## Per-vendor checklist (run once for Ledger, once for Trezor)
 
