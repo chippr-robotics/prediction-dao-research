@@ -108,3 +108,29 @@ variable "vm_alert_policies" {
   }))
   default = {}
 }
+
+# ── operator workstation (spec 088) ───────────────────────────────────────────────────────────
+
+variable "workstation_operators" {
+  description = "IAM principals permitted to impersonate the operator workstation account. Each entry is a named human who can then read every secret in workstation_secret_ids, so this list is the access-review artifact — keep it short and remove leavers."
+  type        = list(string)
+  default     = []
+}
+
+variable "workstation_secret_ids" {
+  description = "Secret ids the operator workstation may read. Mirrors scripts/secrets/registry.js; parity is enforced by scripts/secrets/__tests__/terraform-parity.test.js rather than by discipline."
+  type        = list(string)
+  default     = []
+}
+
+variable "manage_spa" {
+  description = "Manage the SPA Cloud Run service. FALSE until phase D2 is adopted: the declaration does not yet describe the live service, and applying it would clear its runtime env, drop startup CPU boost, and change its scaling ceiling. See spec 087 T038-T040."
+  type        = bool
+  default     = false
+}
+
+variable "manage_monitoring" {
+  description = "Manage uptime checks, alert policies and the log metric. FALSE until the declared alert conditions are reconciled with the live ones — adoption found every threshold differs, two are looser, and one uptime comparison is inverted in a way that may never fire. See spec 087 T052."
+  type        = bool
+  default     = false
+}

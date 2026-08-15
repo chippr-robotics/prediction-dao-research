@@ -65,16 +65,28 @@ resource "google_storage_bucket" "tfstate" {
 # No long-lived service account key exists anywhere in this design (FR-032). GitHub's OIDC token is
 # exchanged for short-lived credentials at job runtime.
 
-resource "google_iam_workload_identity_pool" "github" {
+/**
+ * THE POOL IS SHARED, AND IS AN INPUT RATHER THAN A MANAGED RESOURCE.
+ *
+ * `github-actions` already existed when this root first ran, and it is not ours: it carries a
+ * provider named `github` whose attribute condition is
+ * `attribute.repository == 'chippr-robotics/kings_edge'`. Declaring it as a `resource` here would
+ * put another workload's federation entry point into THIS repository's state, where deleting the
+ * resource block — or a `terraform destroy` — would take out kings_edge's CI authentication
+ * entirely, with nothing in the plan naming kings_edge.
+ *
+ * This is the same principle as guardrail G-03 (no `google_project` resource): in a shared project,
+ * a thing you did not create is an input. We add OUR OWN provider inside the pool below, which is
+ * purely additive and leaves the existing provider untouched.
+ */
+data "google_iam_workload_identity_pool" "github" {
   project                   = var.project_id
   workload_identity_pool_id = var.wif_pool_id
-  display_name              = "GitHub Actions"
-  description               = "OIDC federation for chippr-robotics CI (spec 087)"
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
   project                            = var.project_id
-  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
+  workload_identity_pool_id          = data.google_iam_workload_identity_pool.github.workload_identity_pool_id
   workload_identity_pool_provider_id = "github-oidc"
   display_name                       = "GitHub OIDC"
 
@@ -118,14 +130,14 @@ resource "google_service_account" "tf_apply" {
 resource "google_service_account_iam_member" "tf_plan_wif" {
   service_account_id = google_service_account.tf_plan.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repository}"
+  member             = "principalSet://iam.googleapis.com/${data.google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repository}"
 }
 
 # Only the default branch may impersonate the APPLY identity.
 resource "google_service_account_iam_member" "tf_apply_wif" {
   service_account_id = google_service_account.tf_apply.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.ref/refs/heads/${var.default_branch}"
+  member             = "principalSet://iam.googleapis.com/${data.google_iam_workload_identity_pool.github.name}/attribute.ref/refs/heads/${var.default_branch}"
 }
 
 # ── plan identity: read-only ───────────────────────────────────────────────────────────────────

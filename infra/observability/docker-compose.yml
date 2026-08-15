@@ -1,0 +1,162 @@
+# Local observability stack (spec 088).
+#
+#   cd infra/observability && docker compose up -d
+#   Grafana http://127.0.0.1:3001   Prometheus http://127.0.0.1:9090
+#
+# EVERYTHING BINDS TO 127.0.0.1. This stack holds a Grafana session that can read Cloud Monitoring
+# and Cloud Logging for the whole project; on 0.0.0.0 it is an unauthenticated window into the
+# estate for anything on the LAN. The loopback bind is the access control — there is no other.
+#
+# THIS STACK IS READ-ONLY AGAINST PRODUCTION, and nothing here can change it. The GCP credential it
+# mounts is Application Default Credentials scoped to the operator workstation identity, whose
+# project roles are monitoring.viewer and logging.viewer and nothing else (see the ops-workstation
+# Terraform module). Create it with:
+#
+#   gcloud auth application-default login \
+#     --impersonate-service-account=fairwins-ops@chippr-bots-site-wp.iam.gserviceaccount.com
+#
+# Without the --impersonate flag the mounted ADC carries YOUR full identity into two containers,
+# which is a materially larger grant than this stack needs.
+#
+# WE MOUNT THE GCLOUD CONFIG *DIRECTORY*, NOT THE ADC FILE, AND THAT IS NOT A STYLE CHOICE.
+# A bind mount whose source path does not exist does not fail — Docker CREATES it, as a root-owned
+# DIRECTORY. Mounting the ADC file directly on a machine that has not run
+# `application_default_credentials.json` therefore produces a root-owned directory sitting exactly
+# where gcloud wants to write its credential file, and gcloud then fails with a permission error
+# that says nothing about Docker. (Observed here on first bring-up.) The config directory always
+# exists once gcloud has run, so mounting it is safe — and the credential appears inside the
+# already-mounted directory the moment you log in, with no restart needed.
+---
+name: fairwins-observability
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # 30 days: long enough to see a slow leak (the gas-wallet burn rate that matters is a
+      # multi-week trend), short enough that the volume stays small on a workstation.
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    extra_hosts:
+      # Lets Prometheus scrape node_exporter on the host network namespace from inside the bridge.
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      # Default admin/admin; Grafana forces a change at first login. Safe only because of the
+      # loopback bind above — do not expose this port without setting a real password here.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Plugin id has NO `grafana-` prefix. With the wrong id Grafana 404s at install time and
+      # CRASH-LOOPS rather than starting without the plugin — it does not degrade, it dies.
+      GF_INSTALL_PLUGINS: googlecloud-logging-datasource
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/application_default_credentials.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud}:/gcp:ro
+    depends_on:
+      - prometheus
+
+  # ── this host and its containers ───────────────────────────────────────────────────────────
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    # The host's own namespaces: without these it reports the CONTAINER's cpu, memory and
+    # filesystems, which look plausible and describe nothing anyone cares about.
+    pid: host
+    network_mode: host
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - --path.rootfs=/host
+      # Bound to the DOCKER BRIDGE address, not 127.0.0.1 and not 0.0.0.0.
+      #
+      # This service runs in the host network namespace (it must, or it reports the container's
+      # interfaces instead of the machine's). In that namespace 127.0.0.1 is unreachable from
+      # Prometheus, which connects from the bridge and arrives as 172.17.0.1 — the first bring-up
+      # here failed exactly that way. 0.0.0.0 would fix it by publishing full host metrics to the
+      # LAN, which is not a trade worth making. The docker0 gateway address is reachable from
+      # containers and from the host, and from nowhere else.
+      - --web.listen-address=${NODE_EXPORTER_BIND:-172.17.0.1}:9100
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    privileged: true
+
+  # ── production surfaces ────────────────────────────────────────────────────────────────────
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9115:9115"
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+
+  fairwins-exporter:
+    # Stock node image with the exporter mounted in: it has zero dependencies, so there is nothing
+    # to install and no image to build, rebuild or keep patched.
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "index.js"]
+    ports:
+      - "127.0.0.1:9101:9101"
+    volumes:
+      - ./fairwins-exporter:/app:ro
+    environment:
+      PORT: "9101"
+
+  # ── GCP ────────────────────────────────────────────────────────────────────────────────────
+  stackdriver-exporter:
+    image: prometheuscommunity/stackdriver-exporter:v0.18.0
+    # OPT-IN: `docker compose --profile gcp up -d`.
+    # This exporter cannot start without Application Default Credentials — it exits, and
+    # `restart: unless-stopped` turns that into a permanent crash-loop in the default stack.
+    # A red container that is red for a correct reason still trains people to ignore red, so
+    # it stays out of the default set until the credential it needs exists.
+    profiles: ["gcp"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9255:9255"
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/application_default_credentials.json
+    volumes:
+      - ${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud}:/gcp:ro
+    command:
+      - --google.project-ids=chippr-bots-site-wp
+      # An explicit prefix list, not everything. Cloud Monitoring bills per API call and an
+      # unfiltered exporter walks every metric descriptor in a SHARED project on every scrape —
+      # including the unrelated workloads', which is both expensive and none of our business.
+      - --monitoring.metrics-type-prefixes=compute.googleapis.com/instance,run.googleapis.com/request,logging.googleapis.com/log_entry_count
+      - --monitoring.metrics-interval=5m
+      - --web.listen-address=:9255
+
+volumes:
+  prometheus-data:
+  grafana-data:

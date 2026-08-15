@@ -1,0 +1,34 @@
+# blackbox_exporter modules (spec 088).
+#
+# Both modules assert on CONTENT, not just on status. The lesson is on the record: a plain 200 from
+# the bundler host stayed green through the 2026-07-12 stall because the origin-lock nginx serves
+# its own static 200 that never reaches alto. A probe that cannot fail while the service is broken
+# is worse than no probe, because it is cited as evidence that things are fine.
+modules:
+  fairwins_http_2xx:
+    prober: http
+    timeout: 15s
+    http:
+      valid_status_codes: [200]
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      method: GET
+      preferred_ip_protocol: ip4
+      # Follows Cloudflare redirects; these are the public hostnames, so TLS must genuinely verify
+      # (unlike the Google uptime checks, which hit the origin IP presenting a Cloudflare Origin CA
+      # certificate and therefore disable verification on purpose).
+      fail_if_not_ssl: true
+
+  bundler_entrypoint:
+    prober: http
+    timeout: 15s
+    http:
+      valid_status_codes: [200]
+      method: POST
+      preferred_ip_protocol: ip4
+      headers:
+        Content-Type: application/json
+      body: '{"jsonrpc":"2.0","id":1,"method":"eth_supportedEntryPoints","params":[]}'
+      # EntryPoint v0.6. Matching this proves the request reached alto and got a real answer.
+      fail_if_body_not_matches_regexp:
+        - "0x5FF137D4"
+      fail_if_not_ssl: true

@@ -1,0 +1,19 @@
+# Converge an operator workstation (spec 088).
+#
+#   cd infra/ansible && ansible-playbook -i inventory/workstation.yml playbooks/workstation.yml
+#
+# IDEMPOTENT AND NON-DESTRUCTIVE. This play configures how the machine AUTHENTICATES and what it
+# points at; it installs no credentials, writes no key material, and never edits a .env. There is
+# nothing here whose second run differs from its first.
+#
+# It deliberately does NOT run as root by default. A workstation is a general-purpose machine with
+# an owner; a playbook from a product repository that escalates by default would be reconfiguring
+# somebody's personal computer.
+---
+- name: Converge operator workstation
+  hosts: workstation
+  gather_facts: true
+  become: false
+
+  roles:
+    - ops_workstation

@@ -1,0 +1,21 @@
+# Operator workstation defaults (spec 088).
+---
+# The identity the workstation impersonates to read secrets. Created by the ops-workstation
+# Terraform module; `terraform output -raw workstation_service_account` is the authoritative value.
+ops_workstation_service_account: fairwins-ops@chippr-bots-site-wp.iam.gserviceaccount.com
+
+ops_workstation_project: chippr-bots-site-wp
+
+# Where the repository is checked out on this machine. Used only to locate the tooling that is
+# verified below; this role never modifies the checkout.
+ops_workstation_repo_dir: "{{ ansible_env.HOME }}/github/prediction-dao-research"
+
+# Shell profile fragment. A fragment in a .d directory rather than an edit to .bashrc: appending to
+# a user's shell rc is not idempotent in any way they would recognise, and it is their file.
+ops_workstation_profile_dir: "{{ ansible_env.HOME }}/.config/fairwins"
+ops_workstation_profile_file: "{{ ops_workstation_profile_dir }}/ops.env.sh"
+
+# Run the local observability stack as part of convergence. Off by default: it binds ports and
+# starts containers, which is not something a configuration run should do to a machine unasked.
+ops_workstation_observability: false
+ops_workstation_observability_dir: "{{ ops_workstation_repo_dir }}/infra/observability"

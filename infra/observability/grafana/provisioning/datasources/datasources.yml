@@ -1,0 +1,39 @@
+# Grafana datasources (spec 088).
+#
+# Provisioned as code so a rebuilt Grafana comes back identical. `deleteDatasources` is deliberately
+# absent: it removes by name on every start, which silently discards anything an operator added by
+# hand while exploring.
+#
+# The two Google datasources are what make this stack answer the "and logs" half of the question —
+# metrics from Prometheus and Cloud Monitoring, logs from Cloud Logging, in one place, without
+# opening a browser tab into the console.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    uid: fairwins-prometheus
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 15s
+
+  - name: Google Cloud Monitoring
+    type: stackdriver
+    access: proxy
+    uid: fairwins-gcm
+    jsonData:
+      # GCE/ADC auth: uses the mounted application_default_credentials.json rather than a service
+      # account key pasted into Grafana's database. Nothing secret is stored in Grafana at all,
+      # which is what makes the grafana-data volume safe to delete and recreate.
+      authenticationType: gce
+      defaultProject: chippr-bots-site-wp
+
+  - name: Google Cloud Logging
+    type: googlecloud-logging-datasource
+    access: proxy
+    uid: fairwins-gcl
+    jsonData:
+      authenticationType: gce
+      defaultProject: chippr-bots-site-wp

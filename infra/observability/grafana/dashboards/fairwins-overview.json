@@ -1,0 +1,175 @@
+{
+  "title": "FairWins — estate overview",
+  "uid": "fairwins-overview",
+  "tags": ["fairwins", "spec-088"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Is it working right now",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Gateway",
+      "description": "The relay gateway answered /status. Everything gasless depends on this.",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [{ "expr": "fairwins_gateway_up", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 }, "1": { "text": "UP", "color": "green", "index": 1 } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Bundler",
+      "description": "Answered eth_supportedEntryPoints with EntryPoint v0.6. A plain HTTP 200 does NOT imply this — the origin-lock nginx serves its own 200 that never reaches alto, which is what stayed green through the 2026-07-12 stall.",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [{ "expr": "fairwins_bundler_up", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "NOT SERVING", "color": "red", "index": 0 }, "1": { "text": "SERVING", "color": "green", "index": 1 } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Kill switch",
+      "description": "Operator-set. Not a fault — but an engaged kill switch and an outage look identical from the member's side, so it is shown next to the health tiles rather than buried.",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [{ "expr": "fairwins_gateway_killswitch", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "OFF", "color": "green", "index": 0 }, "1": { "text": "ENGAGED", "color": "orange", "index": 1 } } }
+          ]
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Endpoint probes",
+      "description": "Public surfaces reachable, with TLS verified.",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [{ "expr": "probe_success", "legendFormat": "{{instance}}", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "FAIL", "color": "red", "index": 0 }, "1": { "text": "OK", "color": "green", "index": 1 } } }
+          ]
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "type": "row",
+      "title": "Runway — the numbers that predict an outage before it happens",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Relayer gas wallet runway (hours)",
+      "description": "Hours of gas left at current burn. Below 48h it cannot be assumed to survive a weekend. This is the metric that turns 'the relayer stopped' into 'the relayer will stop on Saturday'.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [{ "expr": "fairwins_gas_wallet_runway_hours", "legendFormat": "chain {{chain_id}}", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 5 },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 48 }, { "color": "green", "value": 168 }] }
+        }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Paymaster deposit runway (hours)",
+      "description": "Sponsored UserOps (spec 050) stop being sponsored when the EntryPoint deposit empties. The passkey path falls back to user-paid gas, so this degrades quietly — which is exactly why it needs a chart.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [{ "expr": "fairwins_paymaster_deposit_runway_hours", "legendFormat": "chain {{chain_id}}", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 5 },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 48 }, { "color": "green", "value": 168 }] }
+        }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Watched account balances",
+      "description": "Native balance of the accounts that matter. The deployer is the hot key every deploy signs with; running it dry blocks releases.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [{ "expr": "fairwins_address_balance_ether", "legendFormat": "{{role}} ({{chain}})", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Chain head",
+      "description": "Block height at the public RPC. A flat line is a stalled or lying endpoint — a chain that stops advancing looks identical to a healthy one on any up/down check.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [{ "expr": "rate(fairwins_rpc_block_number[10m]) * 60", "legendFormat": "{{chain}} blocks/min", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2 } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "type": "row",
+      "title": "This workstation",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 }
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU utilisation",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [
+        { "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "busy %", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory used",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [
+        { "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "used", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Container memory",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "fairwins-prometheus" },
+      "targets": [
+        { "expr": "topk(8, container_memory_working_set_bytes{name!=\"\"})", "legendFormat": "{{name}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    }
+  ]
+}
