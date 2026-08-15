@@ -29,12 +29,14 @@ derivation path, with more pages loadable), selecting one or more accounts, and 
 an optional label. The saved account records **public data only** — address, vendor, derivation
 path, label. No secret ever exists in the browser; that is the point of the device.
 
-### US2 — Cold-storage accounts are visible app-wide
+### US2 — Cold-storage accounts are usable app-wide
 
 A saved hardware account appears wherever the member's other account types (passkey account,
 vaults, legacy recovered accounts) appear: it is added to the address book (usable in every
-address field), and it is listed in Protect ▸ Off chain with its balance and vendor badge. It is
-watch-first: the app never pretends it can sign for the device silently.
+address field), listed in Protect ▸ Off chain with its vendor badge, and joins the account
+switcher. Choosing it reconnects the device (the derived address must match the saved one) and
+the member then operates as the account — every signature is a physical confirmation on the
+device screen; the app never signs silently.
 
 ### US3 — The Protect page stays scannable
 
@@ -59,10 +61,10 @@ system like other account events.
 - **FR-003**: Ledger connects over WebHID (preferred) or WebUSB; Trezor connects via Trezor
   Connect. On a browser without the needed transport, the vendor option is disabled with an
   honest reason (never a dead control).
-- **FR-004**: Account discovery lists derived accounts for the standard Ethereum paths
-  (BIP-44 `m/44'/60'/x'/0/0` account-index scheme and the legacy Ledger Live
-  `m/44'/60'/0'/0/x` scheme), pageable, each with address and native balance on the connected
-  network.
+- **FR-004**: Account discovery lists derived accounts for both standard Ethereum path schemes —
+  Ledger Live's account-per-hardened-index `m/44'/60'/x'/0/0` and the BIP-44 address-index
+  `m/44'/60'/0'/0/x` convention (Trezor/MEW/pre-Live tooling) — pageable, each with address and
+  native balance on the connected network. The flow starts on the vendor's own default scheme.
 - **FR-005**: Only public data is persisted: `{ address, vendor, path, label, addedAt }` under
   the member's account storage, riding the spec-032 backup as a synced object. Never any key
   material, xpub, or device identifier beyond vendor name.
@@ -92,10 +94,10 @@ system like other account events.
 
 ## Out of scope
 
-- Transaction signing with the device (send-from-cold-storage). This ships watch + receive
-  first; a signing rail is a follow-up spec with its own security lifecycle (the same
-  staged approach specs 082/083 took for perps execution).
-- Bitcoin/Solana hardware accounts — Ethereum-family accounts only for now.
+- Bitcoin/Solana hardware accounts — Ethereum-family accounts only for now (the spec-061
+  Bitcoin derivation constants are wallet-breaking and stay untouched).
+- Hardware devices as vault (Safe) owners' signing rail — vault approvals keep their existing
+  flow; a hardware key can hold a Safe ownership externally without this feature knowing.
 - Any gateway/contract/subgraph change. The feature is frontend-only.
 
 ## Security notes
@@ -103,6 +105,9 @@ system like other account events.
 - No key material, seed, xpub, or PIN ever reaches the app: Ledger/Trezor protocols expose
   addresses per derivation path; the app stores those public artifacts only.
 - The stored record is deliberately too little to fingerprint a device (vendor name only).
-- Sanctions screening applies where funds move; this feature moves no funds.
-- Trezor Connect loads vendor code in a popup from trezor.io — documented in the CSP notes; the
-  Ledger path uses only local WebHID/WebUSB and ships no remote code.
+- Sanctions screening applies where funds move; adding/removing account references moves none.
+  Acting as a hardware account routes through the same submit seams every acting account uses.
+- Trezor Connect loads vendor code in a `window.open` popup on trezor.io — a separate browsing
+  context, so no `script-src`/`frame-src` grant is needed and none is added (see
+  docs/developer-guide/hardware-wallets.md). The Ledger path uses only local WebHID/WebUSB and
+  ships no remote code.

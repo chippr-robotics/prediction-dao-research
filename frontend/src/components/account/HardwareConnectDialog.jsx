@@ -10,7 +10,8 @@ import PropTypes from 'prop-types'
 // WalletContext is read directly with a null fallback (the useEffectiveAccount pattern) so hosts
 // rendered in isolated component tests — where no WalletProvider is mounted — do not hard-crash.
 import { WalletContext } from '../../contexts/WalletContext'
-import { getNetwork } from '../../config/networks'
+// Strict lookup, deliberately not getNetwork() — no default-network fallback (specs 068/071).
+import { NETWORKS } from '../../config/networks'
 import { getReadProvider } from '../../utils/rpcProvider'
 import { connectHardwareAccount } from '../../lib/hardware/connectAccount'
 import { describeHardwareError } from '../../lib/hardware/errors'
@@ -26,7 +27,7 @@ export default function HardwareConnectDialog({ open, entry, onClose, onConnecte
   const [error, setError] = useState(null)
 
   const vendorLabel = VENDOR_LABELS[entry?.vendor] || 'hardware wallet'
-  const networkName = getNetwork(chainId)?.name || 'this network'
+  const networkName = (chainId != null && NETWORKS[chainId]?.name) || 'this network'
 
   const close = useCallback(() => {
     if (phase === 'connecting') return

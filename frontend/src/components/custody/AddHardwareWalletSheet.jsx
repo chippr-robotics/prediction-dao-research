@@ -20,7 +20,9 @@ import { useWallet } from '../../hooks/useWalletManagement'
 // UIContext read with a no-op fallback — see HardwareWalletSection.
 import { UIContext } from '../../contexts/UIContext'
 import { useAddressBook } from '../../hooks/useAddressBook'
-import { getNetwork } from '../../config/networks'
+// Strict lookup, deliberately not getNetwork(): that helper falls back to the default network,
+// which would label another chain's balances with the wrong symbol (specs 068/071 guardrail).
+import { NETWORKS } from '../../config/networks'
 import { getReadProvider } from '../../utils/rpcProvider'
 import { connectHardware, vendorAvailability, VENDOR_LABELS } from '../../lib/hardware/adapters'
 import { describeHardwareError } from '../../lib/hardware/errors'
@@ -65,7 +67,7 @@ export default function AddHardwareWalletSheet({ open, onClose, onSaved, deps = 
   const [savedEntries, setSavedEntries] = useState([])
   const sessionRef = useRef(null)
 
-  const network = getNetwork(chainId)
+  const network = chainId != null ? NETWORKS[chainId] : null
   const symbol = network?.nativeCurrency?.symbol || 'ETH'
   const connectFn = deps.connect ?? connectHardware
   const availability = deps.availability ?? vendorAvailability
