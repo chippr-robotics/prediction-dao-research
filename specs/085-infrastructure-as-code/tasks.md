@@ -24,8 +24,9 @@ cloud operation is left for an operator and is **not** marked complete.
 
 | | |
 |---|---|
-| Guardrail gate + 22 tests | `npm run check:iac` PASS, `npm run test:iac-guardrails` 22/22 |
-| Terraform: bootstrap, 5 modules, 2 environment roots | `terraform validate` passes on all three roots; `fmt -check` clean; lockfiles committed |
+| Guardrail gate, 16 rules | `npm run check:iac` PASS, `npm run test:iac-guardrails` 27/27 |
+| Terraform: bootstrap + 2 environment roots | `terraform validate` passes on all three roots; `fmt -check` clean; `tflint` clean; lockfiles committed |
+| Shared modules (extracted to `chippr-tf-modules`) | all five validate standalone; module-hygiene gate 11/11; bodies byte-identical to their origin |
 | Ansible: 6 roles, 4 playbooks, dynamic inventory | `ansible-lint` passes at the **production** profile; all 4 playbooks pass `--syntax-check` |
 | 3 CI workflows | authored; they run for the first time on this PR |
 | Docs, runbook, CODEOWNERS, superseded headers | complete |
