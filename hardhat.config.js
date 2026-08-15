@@ -382,8 +382,14 @@ module.exports = {
     // They were pure decoration — and worse than decoration, because an override that matches
     // nothing looks like a live compiler decision when read. `@zk-kit/lean-imt.sol` and
     // `poseidon-solidity` were not even root dependencies (they resolved transitively through
-    // `@semaphore-protocol/contracts`, itself declared as a FLOATING `^4.14.2`), so the config
+    // `@semaphore-protocol/contracts`, itself then declared as a FLOATING `^4.14.2`), so the config
     // appeared to pin compiler settings for source this repo did not control the version of.
+    //
+    // The four `@semaphore-protocol/*` manifest entries those resolved through are gone now too.
+    // They outlived the source by several specs; `check:deps` reports no phantom import for any of
+    // them across 1,935 files, and they were the only reason this tree carried snarkjs, circomkit,
+    // circom_tester, `@zk-kit/*`, ffjavascript, poseidon-* and an ethers v5 closure — 93 lockfile
+    // entries and 11 advisories, including the snarkjs double-spend, for source nothing compiles.
     //
     // `test/config/CompilerTargets.test.js` now fails on any override whose target is not a real
     // file belonging to a package contracts/ actually imports, so this cannot silently come back.
