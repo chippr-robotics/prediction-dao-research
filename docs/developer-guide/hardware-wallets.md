@@ -109,15 +109,20 @@ A saved hardware account is a first-class acting identity, exactly like a recove
 account:
 
 1. `useAccountSwitcher` lists it (`kind: 'hardware'`) alongside personal / vault / legacy.
-2. Choosing it opens `HardwareConnectDialog`, which reconnects the device
-   (`connectHardwareAccount` — re-derive + match, above) and hands back a `HardwareSigner`.
-3. `CustodyContext.operateAsHardware` holds that signer **in memory only** — never persisted,
+2. **Choosing it switches instantly, address-only (spec 088)** — no device ceremony at switch
+   time. The public address is enough to view, receive, and navigate as the account; balances
+   everywhere follow it through `useEffectiveAccount`.
+3. The device ceremony is DEFERRED to the moment a signature is needed:
+   `useActiveAccount.submit` (and message signing) asks the CustodyContext **broker**
+   (`requestActingSigner`), and the globally-mounted `SignerRequestHost` renders
+   `HardwareConnectDialog` right then (`connectHardwareAccount` — re-derive + match, above).
+   Cancelling the dialog rejects that one action with a stated reason.
+4. `CustodyContext` holds the attached `HardwareSigner` **in memory only** — never persisted,
    never serialized, cleared on any identity change. It holds no key material (the device does),
    but it wraps a live transport session, so it is session-scoped like the legacy signer.
-4. `useActiveAccount.submit` signs with it in `hardware` mode, behind the same **chain guard** as
-   legacy mode: if the wallet has switched networks since connecting, submit refuses ("switch
-   back…") rather than sending on the wrong chain. `canActAsHardware` requires both the live
-   session and the matching chain.
+5. The chain binding belongs to the SIGNER, set at ceremony time. If the wallet has switched
+   networks since, submit DROPS the stale signer and re-runs the ceremony (binding to the
+   current chain) instead of refusing with a "switch back" error.
 
 After a reload or unplug the in-memory session is gone and the member reconnects — there is
 nothing to restore, by design.

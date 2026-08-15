@@ -425,7 +425,7 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
   } = useWallet()
   const { screenOne } = useAddressScreening()
   const { address, connectedAddress, chainId: identityChainId } = useEffectiveAccount()
-  const { isVault, isLegacy, canActAsVault, canActAsLegacy, submit: submitAsActive } = useActiveAccount()
+  const { isVault, isLegacy, isHardware, canActAsVault, canActAsLegacy, submit: submitAsActive } = useActiveAccount()
   const { showNotification } = useNotification()
   const routerNavigate = useNavigate()
 
@@ -539,13 +539,9 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
           { userMessage: "Switch to the vault's network before this app can propose a transaction from it." },
         )
       }
-      if (isLegacy && !canActAsLegacy) {
-        throw new MiniAppHostError(
-          HOST_REFUSAL.IDENTITY_LOCKED,
-          'miniapp host: recovered account is locked',
-          { userMessage: 'Unlock the recovered account again before this app can send from it.' },
-        )
-      }
+      // Spec 088: a recovered or hardware acting identity needs no pre-unlock gate here —
+      // submitAsActive obtains the acting signer on demand (the global ceremony host renders
+      // the unlock / device dialog), and a member cancel rejects the send honestly.
 
       const to = typeof payload.to === 'string' ? payload.to.trim() : ''
       if (!ADDRESS_PATTERN.test(to)) {
@@ -629,7 +625,7 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
        * passkey acting personally takes the UserOp rail — the same precedence
        * the first-party surfaces use.
        */
-      const isPasskeyPersonal = !isVault && !isLegacy && loginMethod === 'passkey'
+      const isPasskeyPersonal = !isVault && !isLegacy && !isHardware && loginMethod === 'passkey'
 
       if (isPasskeyPersonal) {
         if (typeof sendCalls !== 'function') {
@@ -662,7 +658,7 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
 
       // A classic personal session with no signer has no rail either — say so
       // in the same typed way rather than letting the null reach ethers.
-      if (!isVault && !isLegacy && !signer) {
+      if (!isVault && !isLegacy && !isHardware && !signer) {
         throw new MiniAppHostError(
           HOST_REFUSAL.NO_WRITE_RAIL,
           'miniapp host: no signer and no sendCalls transport on this session',

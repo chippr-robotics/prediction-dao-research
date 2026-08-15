@@ -29,6 +29,7 @@ import AutoConnectPrompt from './components/wallet/AutoConnectPrompt'
 import { ActivityProvider } from './contexts/ActivityProvider.jsx'
 import { NavDrawerProvider } from './contexts/NavDrawerContext.jsx'
 import ActivityNotificationBridge from './components/notifications/ActivityNotificationBridge'
+import SignerRequestHost from './components/account/SignerRequestHost'
 import AppNavDrawer from './components/nav/AppNavDrawer'
 import AttentionFocus from './components/nav/AttentionFocus'
 
@@ -75,6 +76,9 @@ function AppLayout() {
               back lives in the account switcher, where switching always lived. */}
           {/* Spec 041: route a tapped push notification into in-app navigation. */}
           <ActivityNotificationBridge />
+          {/* Spec 088: the deferred-signing ceremony host — unlock/device dialogs render HERE,
+              at the moment a signature is needed, never at account-switch time. */}
+          <SignerRequestHost />
           {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
           <EntryGate />
           {/* Entering the app with no account opens the unlock dialog by itself —

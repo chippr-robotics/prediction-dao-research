@@ -98,12 +98,23 @@ describe('useTransfer while operating as a recovered legacy account', () => {
     expect(out.txHash).toBe('0xdeadbeef')
   })
 
-  it('refuses to send when the recovered account is not unlocked on this network', async () => {
-    activeAccount = { isLegacy: true, canActAsLegacy: false, submit }
+  it('routes a locked recovered account through submit — the ceremony is deferred, never pre-gated (spec 088)', async () => {
+    // No pre-unlock gate anymore: submit() itself obtains the acting signer on demand (the
+    // global ceremony host), so the transfer ROUTES rather than refusing up front.
+    activeAccount = { isLegacy: true, canActAsLegacy: true, submit }
+    submit.mockResolvedValueOnce({ kind: 'sent', txHash: '0xfeed' })
     const { result } = renderHook(() => useTransfer())
-    await expect(
-      result.current.send({ kind: TRANSFER_KIND.NATIVE, to: '0xbbbb000000000000000000000000000000000002', amount: '1' }),
-    ).rejects.toThrow(/unlock|network/i)
-    expect(submit).not.toHaveBeenCalled()
+    const out = await result.current.send({ kind: TRANSFER_KIND.NATIVE, to: '0xbbbb000000000000000000000000000000000002', amount: '1' })
+    expect(submit).toHaveBeenCalledTimes(1)
+    expect(out.route).toBe('legacy')
+  })
+
+  it('routes a hardware acting account through submit, never the connected signer (spec 088)', async () => {
+    activeAccount = { isHardware: true, canActAsHardware: true, submit }
+    submit.mockResolvedValueOnce({ kind: 'sent', txHash: '0xfeed' })
+    const { result } = renderHook(() => useTransfer())
+    const out = await result.current.send({ kind: TRANSFER_KIND.NATIVE, to: '0xbbbb000000000000000000000000000000000002', amount: '1' })
+    expect(submit).toHaveBeenCalledTimes(1)
+    expect(out.route).toBe('hardware')
   })
 })
