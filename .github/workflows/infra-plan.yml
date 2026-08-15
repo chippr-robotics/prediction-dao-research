@@ -87,16 +87,26 @@ jobs:
           python-version: "3.12"
 
       - name: Install Ansible
-        run: |
-          pip install --quiet ansible-core ansible-lint
-          ansible-galaxy collection install -r infra/ansible/requirements.yml
+        run: pip install --quiet ansible-core ansible-lint
+
+      # Install into the path ansible.cfg declares (`collections_path = collections`), not galaxy's
+      # default. Installing to the default while the config points elsewhere leaves an EMPTY
+      # configured path, and every module then fails to resolve — which reads as "this module does
+      # not exist" rather than "it was installed somewhere nothing looks".
+      - name: Install pinned collections
+        working-directory: infra/ansible
+        run: ansible-galaxy collection install -r requirements.yml -p collections
 
       - name: ansible-lint
         working-directory: infra/ansible
+        env:
+          ANSIBLE_COLLECTIONS_PATH: collections
         run: ansible-lint
 
       - name: Playbook syntax check
         working-directory: infra/ansible
+        env:
+          ANSIBLE_COLLECTIONS_PATH: collections
         run: |
           set -euo pipefail
           for pb in site.yml playbooks/*.yml; do
