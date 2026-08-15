@@ -111,6 +111,33 @@ jobs:
           fi
           git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
 
+          # Preflight the credential against the modules repo. Without this, a bad token surfaces
+          # three steps later as a terraform module-download failure, where the real message is
+          # buried under `Could not download module`. The three failure modes below are genuinely
+          # different problems with genuinely different fixes, and git reports them distinctly.
+          if ! err="$(git ls-remote https://github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules."
+            case "$err" in
+              *"Invalid username or token"*|*"Authentication failed"*)
+                echo "::error::The token was REJECTED. If it is a fine-grained PAT, it must list"
+                echo "::error::chippr-tf-modules explicitly under 'Repository access' — a token"
+                echo "::error::scoped to other repositories is rejected here even though it is valid."
+                echo "::error::If it is a classic PAT, it needs the 'repo' scope AND SSO authorisation"
+                echo "::error::for the chippr-robotics organisation."
+                ;;
+              *"not found"*|*"does not exist"*)
+                echo "::error::The repository was NOT FOUND, which for a private repo usually means"
+                echo "::error::the token cannot see it rather than that it is missing — GitHub"
+                echo "::error::returns 404 rather than 403 to a caller without access."
+                ;;
+              *)
+                echo "::error::${err}"
+                ;;
+            esac
+            exit 1
+          fi
+          echo "Module repository reachable."
+
       - name: Init
         working-directory: infra/terraform/environments/${{ matrix.environment }}
         run: terraform init -input=false

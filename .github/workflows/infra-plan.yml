@@ -66,17 +66,15 @@ jobs:
       - name: Check module repository access
         id: modules
         env:
-          # Through `env:`, not interpolated straight into the script — see the note on the plan job's
-          # auth step. A secret spliced into shell source breaks on any newline it contains.
+          # Through `env:`, not interpolated straight into the script. A secret spliced into shell
+          # source breaks apart on any newline it contains — which is how this first failed, with git
+          # reporting `URL rejected: Malformed input to a URL function`.
           TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
         run: |
-          # Trim stray whitespace: a secret pasted with a trailing newline is invisible in the UI and
-          # yields `URL rejected: Malformed input to a URL function` from git.
+          # Trim stray whitespace: a secret pasted with a trailing newline is invisible in the UI.
           token="$(printf '%s' "${TF_MODULES_TOKEN:-}" | tr -d '[:space:]')"
-          if [ -n "${token}" ]; then
-            git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
+
+          if [ -z "${token}" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             {
               echo "### terraform validate: NOT RUN — no access to the module repository"
@@ -88,10 +86,41 @@ jobs:
               echo "Fix: add a fine-grained token with Contents:read on chippr-tf-modules as the"
               echo "\`TF_MODULES_TOKEN\` repository secret."
             } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
 
-      # Bootstrap uses no modules, so it is validated unconditionally — losing that too would mean a
-      # missing token silently drops ALL schema checking.
+          git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+
+          # Preflight the credential. Without this a bad token surfaces three steps later as a
+          # terraform module-download failure, with the real cause buried under
+          # `Could not download module`. A token that is PRESENT but REJECTED is a different problem
+          # from one that is absent, and must not be reported as the same thing.
+          if err="$(git ls-remote https://github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Module repository reachable."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::error::TF_MODULES_TOKEN is set but cannot read chippr-robotics/chippr-tf-modules."
+            case "$err" in
+              *"Invalid username or token"*|*"Authentication failed"*)
+                echo "::error::The token was REJECTED. A fine-grained PAT must list chippr-tf-modules"
+                echo "::error::explicitly under 'Repository access' — a token scoped to other"
+                echo "::error::repositories is rejected here even though it is otherwise valid."
+                echo "::error::A classic PAT needs the 'repo' scope AND SSO authorisation for the"
+                echo "::error::chippr-robotics organisation."
+                ;;
+              *"not found"*|*"does not exist"*)
+                echo "::error::Repository NOT FOUND — for a private repo this usually means the token"
+                echo "::error::cannot see it, since GitHub returns 404 rather than 403 to a caller"
+                echo "::error::without access."
+                ;;
+              *)
+                echo "::error::${err}"
+                ;;
+            esac
+            exit 1
+          fi
+
       - name: terraform validate (bootstrap)
         run: |
           set -euo pipefail
@@ -235,6 +264,33 @@ jobs:
             exit 1
           fi
           git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+
+          # Preflight the credential against the modules repo. Without this, a bad token surfaces
+          # three steps later as a terraform module-download failure, where the real message is
+          # buried under `Could not download module`. The three failure modes below are genuinely
+          # different problems with genuinely different fixes, and git reports them distinctly.
+          if ! err="$(git ls-remote https://github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules."
+            case "$err" in
+              *"Invalid username or token"*|*"Authentication failed"*)
+                echo "::error::The token was REJECTED. If it is a fine-grained PAT, it must list"
+                echo "::error::chippr-tf-modules explicitly under 'Repository access' — a token"
+                echo "::error::scoped to other repositories is rejected here even though it is valid."
+                echo "::error::If it is a classic PAT, it needs the 'repo' scope AND SSO authorisation"
+                echo "::error::for the chippr-robotics organisation."
+                ;;
+              *"not found"*|*"does not exist"*)
+                echo "::error::The repository was NOT FOUND, which for a private repo usually means"
+                echo "::error::the token cannot see it rather than that it is missing — GitHub"
+                echo "::error::returns 404 rather than 403 to a caller without access."
+                ;;
+              *)
+                echo "::error::${err}"
+                ;;
+            esac
+            exit 1
+          fi
+          echo "Module repository reachable."
 
       - name: Init
         working-directory: infra/terraform/environments/${{ matrix.environment }}
