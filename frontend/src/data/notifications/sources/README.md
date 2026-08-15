@@ -39,7 +39,20 @@ See `specs/031-platform-notifications/contracts/activity-source.md` for the full
    are stable so the engine's append-dedup is exact.
 4. **Honest failure**: `ok:false` on hard fetch error (engine keeps prior slice); best-effort enrichment
    degrades / marks `partial` — never fabricates.
+
+   **`ok:false` is louder than it looks.** It is the ONLY thing that raises the member-facing
+   "Couldn't refresh …" notice, so reserve it for "I could not find out". A source that read
+   successfully but has not finished walking event history reports `ok:true, partial:true` — "still
+   reading" is not "could not read", and getting that wrong is what put a red error banner in front
+   of every Polygon member with a Protect vault, on every session. (The notice now also waits for two
+   consecutive failing cycles and names the domains, so a cold start is not announced as an outage.)
 5. **No `Date.now()` / randomness** in pure diff/derive paths (use `nowMs`); network reads live in `detect`.
+6. **Never call `queryFilter` from a deploy block.** Public RPCs cap one `eth_getLogs` at ~10,000
+   blocks and the live contracts are millions of blocks old, so a one-shot scan is not slow — it is a
+   guaranteed error, forever. Read event history through `lib/chain/logScan#scanLogs`, which chunks
+   under the cap, caches what it has scanned (so a 30s poll reads only new blocks), and accepts a
+   `maxChunks` budget so a first backfill cannot become a request storm. Diff nothing off a scan whose
+   `complete` is false: a half-read history looks exactly like things disappearing.
 
 ## Honest client-side detection gaps (documented + omitted, never faked)
 

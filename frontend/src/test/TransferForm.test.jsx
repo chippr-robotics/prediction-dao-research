@@ -48,6 +48,16 @@ vi.mock('../hooks/useActiveAccount', () => ({
     operateAsVault,
   }),
 }))
+// Spec 088 — the form binds balances through the shared effective-account seam.
+vi.mock('../hooks/useEffectiveAccount', () => ({
+  useEffectiveAccount: () => (
+    isVaultMode
+      ? { type: 'vault', address: VAULT_ADDR, isActingAccount: true, connectedAddress: null, chainId: 137, label: null }
+      : { type: 'personal', address: null, isActingAccount: false, connectedAddress: null, chainId: null, label: null }
+  ),
+}))
+vi.mock('../hooks/useHardwareAccounts', () => ({ useHardwareAccounts: () => [] }))
+vi.mock('../hooks/useLegacyAccounts', () => ({ useLegacyAccounts: () => [] }))
 vi.mock('../hooks/useCustodyVaults', () => ({ useCustodyVaults: () => ({ vaults: vaultList }) }))
 vi.mock('../hooks/useAccountAssets', () => ({ useAccountAssets: () => ({ holdings: vaultHoldings, refresh: vi.fn() }) }))
 let holdings = []

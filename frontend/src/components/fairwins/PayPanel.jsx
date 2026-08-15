@@ -10,7 +10,7 @@ import BitcoinSendPanel from '../wallet/BitcoinSendPanel'
 import { useWallet } from '../../hooks'
 import { useTransfer } from '../../hooks/useTransfer'
 import { useSelectableAssets } from '../../hooks/useSelectableAssets'
-import { useActiveAccount } from '../../hooks/useActiveAccount'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useBitcoinWallet } from '../../hooks/useBitcoinWallet'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useNotification } from '../../hooks/useUI'
@@ -46,20 +46,18 @@ function formatUnitsForKeypad(units, decimals) {
 function PayPanel({ onSuccess }) {
   const { isConnected, chainId, openConnectModal } = useWallet()
   const { send, status, error: sendError, refreshBalances } = useTransfer()
-  const { identity, isVault, isLegacy } = useActiveAccount()
   const { screenOne } = useAddressScreening()
   const { showNotification } = useNotification()
   const { switchChainAsync, isPending: switching } = useSwitchChain()
   const btc = useBitcoinWallet()
 
-  // Assets + balances come from whichever account we're ACTING AS (a vault or a
-  // recovered legacy account), else the personal portfolio — consistent with the
-  // Transfer form (FR-014).
-  const actingAddress = isVault && identity?.vaultAddress
-    ? identity.vaultAddress
-    : isLegacy && identity?.address
-      ? identity.address
-      : null
+  // Assets + balances come from whichever account we're ACTING AS, else the personal
+  // portfolio — consistent with the Transfer form (FR-014). Spec 088: resolved through the
+  // shared effective-account seam, so EVERY acting kind (vault, recovered, hardware, derived)
+  // is covered — the inline vault/legacy-only copy this replaces silently showed the CONNECTED
+  // wallet's balances while acting as a hardware account.
+  const { address: effectiveAddress, isActingAccount } = useEffectiveAccount()
+  const actingAddress = isActingAccount ? effectiveAddress : null
   const { options, defaultKey, isGasless } = useSelectableAssets({ activity: ASSET_ACTIVITIES.PAY, actingAddress })
 
   const [selectedKey, setSelectedKey] = useState(null)

@@ -69,7 +69,8 @@ export function useTransfer() {
   const { address, chainId, signer, provider, loginMethod, sendCalls } = useWallet()
   const {
     isVault: operatingAsVault, canActAsVault,
-    isLegacy: operatingAsLegacy, canActAsLegacy,
+    isLegacy: operatingAsLegacy,
+    isHardware: operatingAsHardware,
     submit: submitAsActive,
   } = useActiveAccount()
   const tokens = useChainTokens()
@@ -270,13 +271,12 @@ export function useTransfer() {
         }
       }
 
-      // Spec 062: when acting as a recovered legacy account, the transfer must be
-      // signed by that account's unlocked key — NOT the connected wallet. Route it
-      // through the active-account seam (submit uses the in-memory legacySigner and
-      // re-checks the chain), mirroring the vault branch. Never falls through to the
+      // Spec 062/085/088: when acting as a recovered or hardware account, the transfer must be
+      // signed by THAT account's signer — NOT the connected wallet. Route it through the
+      // active-account seam, which obtains the signer on demand (the deferred unlock / device
+      // ceremony renders via the global SignerRequestHost). Never falls through to the
       // connected signer below.
-      if (operatingAsLegacy) {
-        if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to send from it.')
+      if (operatingAsLegacy || operatingAsHardware) {
         const payload = a.isNative
           ? { to, value, data: '0x' }
           : { to: a.address, value: 0n, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]) }
@@ -285,11 +285,11 @@ export function useTransfer() {
         try {
           const res = await submitAsActive(payload)
           setStatus('success')
-          const result = { sent: true, txHash: res.txHash, route: 'legacy', id: null }
+          const result = { sent: true, txHash: res.txHash, route: operatingAsLegacy ? 'legacy' : 'hardware', id: null }
           setLastResult(result)
           return result
         } catch (err) {
-          const message = err?.shortMessage || err?.message || 'Could not send from the recovered account.'
+          const message = err?.shortMessage || err?.message || (operatingAsLegacy ? 'Could not send from the recovered account.' : 'Could not send from the hardware account.')
           setError(message)
           setStatus('error')
           throw err
@@ -416,7 +416,7 @@ export function useTransfer() {
         throw err
       }
     },
-    [signer, isPasskey, meta, isNetworkStableAsset, tokens.stableName, tokens.nativeDecimals, passkeySponsored, address, chainId, sendCalls, stableDomainVersion, hasRelayer, refreshBalances, operatingAsVault, canActAsVault, operatingAsLegacy, canActAsLegacy, submitAsActive]
+    [signer, isPasskey, meta, isNetworkStableAsset, tokens.stableName, tokens.nativeDecimals, passkeySponsored, address, chainId, sendCalls, stableDomainVersion, hasRelayer, refreshBalances, operatingAsVault, canActAsVault, operatingAsLegacy, operatingAsHardware, submitAsActive]
   )
 
   return useMemo(

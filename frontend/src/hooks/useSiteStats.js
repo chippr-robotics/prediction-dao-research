@@ -2,8 +2,8 @@
  * useSiteStats — wallet-free hook that powers the landing page stats band.
  *
  * Source priority (graceful degradation):
- *   1. Subgraph aggregation (VITE_SUBGRAPH_URL) — counts wagers by status,
- *      sums staked value, counts unique users.
+ *   1. Subgraph aggregation (per-chain endpoint, config/networks.js) — counts
+ *      wagers by status, sums staked value, counts unique users.
  *   2. RPC fallback — reads WagerRegistry.nextWagerId() for the total wager
  *      count when the subgraph is unavailable.
  *
@@ -21,8 +21,8 @@ import { getProvider } from '../utils/blockchainService'
 import { getContractAddressForChain } from '../config/contracts'
 import { useWeb3 } from './useWeb3'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
+import { resolveSubgraphUrl } from '../data/wagers/SubgraphSource'
 
-const SUBGRAPH_URL = import.meta.env?.VITE_SUBGRAPH_URL || ''
 // Stake token is assumed to be a 6-decimal stable (USDC) for the headline
 // USD figure — accurate for the default deployment's stake token.
 const STABLE_DECIMALS = 6
@@ -91,8 +91,8 @@ export function aggregateWagerStats(wagers) {
   }
 }
 
-async function fetchFromSubgraph() {
-  const res = await fetch(SUBGRAPH_URL, {
+async function fetchFromSubgraph(subgraphUrl) {
+  const res = await fetch(subgraphUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: STATS_QUERY, variables: { first: QUERY_PAGE } }),
@@ -119,10 +119,11 @@ async function loadStats(chainId) {
   const cached = cacheByChain.get(cacheKey)
   if (cached && Date.now() - cached.ts < STATS_TTL_MS) return cached.value
 
+  const subgraphUrl = resolveSubgraphUrl(chainId)
   let live = emptyStats()
   let isLive
   try {
-    live = SUBGRAPH_URL ? await fetchFromSubgraph() : await fetchFromRpc(chainId)
+    live = subgraphUrl ? await fetchFromSubgraph(subgraphUrl) : await fetchFromRpc(chainId)
     isLive = true
   } catch {
     try {

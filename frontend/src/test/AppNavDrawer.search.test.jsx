@@ -97,8 +97,12 @@ describe('AppNavDrawer — menu filter (spec 081 US3)', () => {
     renderDrawer()
     type('tra')
 
-    expect(rows()).toEqual(['Trade', 'Transfer'])
-    expect(headings()).toEqual(['Finance'])
+    // Settings joins Trade and Transfer because the filter now spans the nav search index, and
+    // "tra" is a prefix of "tracking" — a synonym the Privacy card answers to. That is the
+    // feature working, not a stray hit: the row carries a Privacy shortcut with it (see
+    // navSearchIndex.test.jsx). It is also why the off-menu heading appears alongside Finance.
+    expect(rows()).toEqual(['Trade', 'Transfer', 'Settings'])
+    expect(headings()).toEqual(['Finance', 'Settings & Account'])
   })
 
   it('shows a match that lives inside a section the member folded', () => {

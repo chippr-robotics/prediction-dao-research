@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 #
+# SUPERSEDED BY TERRAFORM (spec 087). Monitoring is now declared in
+# infra/terraform/modules/monitoring, and the thresholds, uptime targets and content matchers below
+# were ported there WITH their reasoning comments — those comments are the point, and a port that
+# kept the numbers and dropped them would invite someone to "simplify" the matchers back into the
+# form that stayed green through a real outage.
+#
+# This script is retained for reference and as a break-glass path if Terraform is unavailable. It is
+# NOT the source of truth: a change made here and not in Terraform is reverted on the next apply,
+# and will show up as drift in the meantime.
+#
 # ops/monitoring/apply.sh — close the monitoring gap. The project has ZERO uptime checks and ZERO
 # alert policies today; verify with `bash ops/monitoring/apply.sh verify`.
 #

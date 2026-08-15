@@ -42,6 +42,8 @@ describe('activityEngine.detectAll (spec 031)', () => {
     expect(r.sliceUpdates).toHaveProperty('ok')
     expect(r.actionNeededByDomain.bad).toEqual({ z: 'renew' }) // prior action map carried
     expect(r.anyFailure).toBe(true)
+    // Named, so the member-facing notice can say WHAT is stale instead of "some activity".
+    expect(r.failed).toEqual([{ key: 'bad', label: 'bad' }])
   })
 
   it('a thrown source is treated as ok:false (never crashes the cycle)', async () => {
@@ -49,6 +51,14 @@ describe('activityEngine.detectAll (spec 031)', () => {
     const r = await detectAll({ ...ctx, sources: [boom], priorStore: defaultStore() })
     expect(r.anyFailure).toBe(true)
     expect(r.fresh).toEqual([])
+    expect(r.failed).toEqual([{ key: 'boom', label: 'boom' }])
+  })
+
+  it('a partial (but successful) source is not a failure', async () => {
+    const p = source('p', { ok: true, entries: [], nextSnapshots: {}, currentIds: [], actionNeededById: {}, partial: true })
+    const r = await detectAll({ ...ctx, sources: [p], priorStore: defaultStore() })
+    expect(r.anyFailure).toBe(false)
+    expect(r.failed).toEqual([])
   })
 
   it('surfaces a source partial flag', async () => {

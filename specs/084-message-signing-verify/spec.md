@@ -22,21 +22,28 @@ anything — no signature, no transaction, no funds at risk — so it is the saf
 first and the most useful thing to ship alone.
 
 **Independent Test**: Fully testable by pasting a message, a signature and an address and reading
-the outcome. Delivers value with no signing capability present at all.
+the outcome — **with the device offline**. Delivers value with no signing capability present at all,
+and with no network at all for the common case.
 
 **Acceptance Scenarios**:
 
 1. **Given** a message, a signature over it, and the address that made it, **When** the member
    checks the claim, **Then** the outcome states that the address signed the message.
 2. **Given** a message and a signature made by a *different* address, **When** the member checks
-   the claim against the stated address, **Then** the outcome states the claim does not hold and
-   names the address that actually signed.
-3. **Given** a message that has been altered by even one character since it was signed, **When**
-   the member checks it, **Then** the outcome states the claim does not hold.
-4. **Given** a claim that can only be settled by consulting a network, and that network cannot be
-   reached, **When** the member checks it, **Then** the outcome states that the claim could not be
+   the claim against the stated address, **Then** the outcome names the address that actually
+   produced the signature as an established fact, and does **not** declare the claim false — the
+   stated address may be a contract account that accepts that signer, which only that account can
+   confirm.
+3. **Given** the outcome above, **When** the member chooses to ask the stated account on a network
+   they name, and that account holds no contract there or declines, **Then** the outcome states the
+   claim does not hold.
+4. **Given** a message that has been altered by even one character since it was signed, **When**
+   the member checks it, **Then** the outcome does not confirm the claim, and names the address the
+   unaltered bytes would have come from.
+5. **Given** a claim that can only be settled by consulting a network, and that network cannot be
+   reached, **When** the member asks, **Then** the outcome states that the claim could not be
    determined and why — and does **not** state that the claim is false.
-5. **Given** only a message and a signature with no stated address, **When** the member checks,
+6. **Given** only a message and a signature with no stated address, **When** the member checks,
    **Then** the outcome names the address that produced the signature, or states honestly that no
    address can be named for this kind of signature.
 
@@ -103,10 +110,11 @@ checking surface, and confirming every field populates and the outcome is correc
   "could not be determined", never "does not hold". This is the single most important edge case in
   the feature: the two are indistinguishable to a careless implementation and opposite in meaning
   to a member.
-- **The signature recovers to a different address than the one claimed, and the claim cannot be
-  settled on a network.** Not a contradiction: an account that signs through a contract legitimately
-  produces exactly this appearance. Must report "could not be determined" and offer the recovered
-  address as evidence, not as a verdict.
+- **The signature recovers to a different address than the one claimed.** Not a contradiction, and
+  not an edge case either — it is the ordinary offline outcome whenever the claim is about a
+  contract account, because an account that signs through a contract legitimately produces exactly
+  this appearance. Must lead with the recovered address as an established fact, name what remains
+  open, and offer to ask the account rather than reaching for a network on its own.
 - **The record does not say which network the account is on**, and the signature can only be
   settled there. Must be reported as undeterminable with that reason named.
 - **A malformed signature** (wrong shape, truncated, not a signature at all). Must produce a
@@ -171,18 +179,31 @@ checking surface, and confirming every field populates and the outcome is correc
 - **FR-018**: The record's own claim about what kind of signature it carries MUST NOT determine the
   outcome; the system MUST reach its own conclusion from the signature.
 - **FR-019**: Text pasted that is not a record MUST be treated as ordinary input.
+- **FR-020**: Checking a signature against a stated address MUST be performed **entirely on the
+  member's device, with no network access**, whenever the signature is one a public key can be
+  recovered from. This is the default and the common case; it MUST hold with the device offline.
+- **FR-020a**: The system MUST NOT assume a network the member has not stated, and MUST NOT consult
+  one on its own initiative. Consulting a network is an action the member takes explicitly, offered
+  only where it could settle something the offline result could not.
+- **FR-021**: Where a record names a network this build does not serve, the system MUST say so and
+  name it, rather than reporting that the record was silent about its network. It MUST NOT adopt
+  that network.
+- **FR-021a**: Where the offline result cannot settle the claim, the system MUST state plainly what
+  IS established — which address produced the bytes, or that no address can be recovered from them —
+  before and alongside offering to consult a network. The unsettled part MUST NOT be presented as a
+  contradiction.
 
 **Surface**
 
-- **FR-020**: Adding this area MUST NOT materially lengthen the Protect page. Entry to each task
+- **FR-022**: Adding this area MUST NOT materially lengthen the Protect page. Entry to each task
   MUST be a short summary the member can scan, with the form itself on a focused surface.
-- **FR-021**: Each entry MUST show its current state — the last outcome, or the reason the task is
+- **FR-023**: Each entry MUST show its current state — the last outcome, or the reason the task is
   unavailable — without the member opening it.
-- **FR-022**: Work in progress and completed results MUST survive the focused surface being closed
+- **FR-024**: Work in progress and completed results MUST survive the focused surface being closed
   and reopened.
-- **FR-023**: The result of an action MUST be brought into view when it arrives.
-- **FR-024**: This feature MUST NOT move funds, and MUST NOT write anything to a chain.
-- **FR-025**: The surface MUST meet WCAG 2.1 AA.
+- **FR-025**: The result of an action MUST be brought into view when it arrives.
+- **FR-026**: This feature MUST NOT move funds, and MUST NOT write anything to a chain.
+- **FR-027**: The surface MUST meet WCAG 2.1 AA.
 
 ### Key Entities
 
@@ -223,6 +244,9 @@ checking surface, and confirming every field populates and the outcome is correc
   passing test.
 - **SC-008**: Verification is usable on every network the build supports, including networks where
   the product has deployed nothing.
+- **SC-009**: Checking a wallet signature succeeds with the device fully offline, and issues zero
+  network requests. Consulting a network happens only after the member asks for it, and never
+  otherwise.
 
 ## Assumptions
 
@@ -236,7 +260,11 @@ checking surface, and confirming every field populates and the outcome is correc
   freshness requirement is the asker's to impose via the challenge they supply, which is why the
   message is signed verbatim.
 - Existing accounts that prove control through a contract are checkable only on the network that
-  contract is on. This is a property of those accounts, not a choice this feature makes.
+  contract is on. This is a property of those accounts, not a choice this feature makes: **such an
+  account has no public key**. There is no key whose signature recovers to it, and what it produces
+  is an envelope only its own code can interpret, so nothing about those bytes is self-validating.
+  Asking it is the only way, and its answer can change over time as its owners change. Every other
+  case — anything a public key can be recovered from — is settled offline.
 - The feature is client-side only: no new stored data, no new service, no new deployment.
 
 ## Implementation Status

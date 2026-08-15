@@ -34,6 +34,7 @@ vi.mock('../../connectors/passkey', () => ({ readSession: () => ({ credentialId:
 let readProvider = null
 vi.mock('../../utils/rpcProvider', () => ({ getReadProvider: () => readProvider }))
 
+import { cohortChainIds } from '../../config/networks'
 import VerifySection from '../../components/custody/VerifySection'
 import { CustodyContext } from '../../contexts/CustodyContext'
 import {
@@ -42,10 +43,16 @@ import {
   SIGNER_ADDRESS,
   OTHER_ADDRESS,
   EIP191_DOCUMENT_JSON,
+  ERC1271_SIGNATURE,
+  CONTRACT_ACCOUNT,
   stubProvider,
 } from '../fixtures/signedMessages'
 
 const signer = { signMessage: vi.fn(async () => SIGNATURE) }
+
+// A chain this build actually serves. Taken from the cohort rather than hardcoded, so the suite
+// does not silently depend on whether it was built as testnet or mainnet.
+const COHORT_CHAIN = String(cohortChainIds()[0])
 
 beforeEach(() => {
   signer.signMessage.mockClear()
@@ -112,8 +119,11 @@ describe('VerifySection — checking a signature', () => {
     expect(within(result).getByText(/not a failed check/i)).toBeInTheDocument()
   })
 
-  it('reports a definite negative once the chain confirms the address holds no contract', async () => {
-    readProvider = stubProvider({ code: '0x' }) // a plain account on the selected network
+  // The offline check states the fact and stops. A DEFINITE negative needs the account's own
+  // answer, so the member escalates deliberately — the network control does not even exist until
+  // there is a result that a network could settle.
+  it('reaches a definite negative only through the explicit on-chain check', async () => {
+    readProvider = stubProvider({ code: '0x' }) // a plain account on the stated network
     const user = userEvent.setup()
     renderSection()
     await openSheet(user, 'Check a signature')
@@ -124,12 +134,107 @@ describe('VerifySection — checking a signature', () => {
     await user.paste(SIGNATURE)
     await user.click(screen.getByLabelText(/claims to have signed/i))
     await user.paste(OTHER_ADDRESS)
+    // No network control on screen yet — nothing has said one could help.
+    expect(screen.queryByLabelText(/ask that account directly/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+
+    // Offline: the fact, not a verdict.
+    const offline = await screen.findByTestId('verify-result')
+    expect(offline).toHaveAttribute('data-status', 'unverifiable')
+    expect(within(offline).getByText(new RegExp(SIGNER_ADDRESS, 'i'))).toBeInTheDocument()
+
+    // Now the escalation appears, and only now.
+    await user.selectOptions(screen.getByLabelText(/ask that account directly/i), COHORT_CHAIN)
+    await user.click(screen.getByRole('button', { name: /check on-chain/i }))
+
+    const settled = await screen.findByTestId('verify-result')
+    expect(settled).toHaveAttribute('data-status', 'invalid')
+    expect(within(settled).getByText(new RegExp(SIGNER_ADDRESS, 'i'))).toBeInTheDocument()
+  })
+
+  // The strongest form of "does not assume a network" (the #1165 regression, now structural):
+  // the check never touches one. A provider
+  // that would have answered `magic` is on the bench and is never called.
+  it('checks offline and touches no network at all', async () => {
+    const provider = { getCode: vi.fn(async () => '0x6000'), call: vi.fn(async () => `0x1626ba7e${'0'.repeat(56)}`) }
+    readProvider = provider
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+
+    await user.click(screen.getByLabelText(/^Message$/i))
+    await user.paste(MESSAGE)
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(ERC1271_SIGNATURE) // not recoverable — the on-chain leg is the only settler
+    await user.click(screen.getByLabelText(/claims to have signed/i))
+    await user.paste(CONTRACT_ACCOUNT)
     await user.click(screen.getByRole('button', { name: /check signature/i }))
 
     const result = await screen.findByTestId('verify-result')
-    expect(result).toHaveAttribute('data-status', 'invalid')
-    expect(within(result).getByText(/does not match/i)).toBeInTheDocument()
-    expect(within(result).getByText(new RegExp(SIGNER_ADDRESS, 'i'))).toBeInTheDocument()
+    expect(result).toHaveAttribute('data-status', 'unverifiable')
+    expect(within(result).getByText(/not a wallet signature/i)).toBeInTheDocument()
+    expect(provider.getCode).not.toHaveBeenCalled()
+    expect(provider.call).not.toHaveBeenCalled()
+  })
+
+  it('settles a contract-account signature once the member asks the account', async () => {
+    readProvider = stubProvider({ answer: 'magic' })
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+
+    await user.click(screen.getByLabelText(/^Message$/i))
+    await user.paste(MESSAGE)
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(ERC1271_SIGNATURE)
+    await user.click(screen.getByLabelText(/claims to have signed/i))
+    await user.paste(CONTRACT_ACCOUNT)
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+    await screen.findByTestId('verify-result')
+
+    await user.selectOptions(screen.getByLabelText(/ask that account directly/i), COHORT_CHAIN)
+    await user.click(screen.getByRole('button', { name: /check on-chain/i }))
+
+    const settled = await screen.findByTestId('verify-result')
+    expect(settled).toHaveAttribute('data-status', 'valid')
+  })
+
+  it('pre-selects the escalation network from a record that names one this build serves', async () => {
+    readProvider = stubProvider({ answer: 'magic' })
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+    // A record whose signature is NOT recoverable, so the offline check leaves it open and the
+    // escalation appears carrying the chain the record named.
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(
+      JSON.stringify({
+        ...JSON.parse(EIP191_DOCUMENT_JSON),
+        signature: ERC1271_SIGNATURE,
+        address: CONTRACT_ACCOUNT,
+        chainId: Number(COHORT_CHAIN),
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+    await screen.findByTestId('verify-result')
+    expect(screen.getByLabelText(/ask that account directly/i)).toHaveValue(COHORT_CHAIN)
+  })
+
+  // Found while fixing the pre-filled-network bug: a record naming a chain outside this build's
+  // cohort left the select blank, and the check then said "the document does not say which
+  // network" — which is false. It does say; we are the ones who cannot go there. Constitution III
+  // still forbids the cross-cohort read, so the chain is not adopted — but it is named.
+  it('names a chain it cannot serve instead of pretending the record was silent', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    await openSheet(user, 'Check a signature')
+    await user.click(screen.getByLabelText(/^Signature$/i))
+    await user.paste(EIP191_DOCUMENT_JSON) // names Polygon 137; this build is a testnet cohort
+
+    expect(await screen.findByText(/does not serve/i)).toBeInTheDocument()
+    // …and the wallet signature in it is still checkable, because recovery needs no chain.
+    await user.click(screen.getByRole('button', { name: /check signature/i }))
+    expect(await screen.findByTestId('verify-result')).toHaveAttribute('data-status', 'valid')
   })
 
   it('fills every field from a pasted signed-message document', async () => {
@@ -238,6 +343,19 @@ describe('VerifySection — checking a signature', () => {
 })
 
 describe('VerifySection — signing', () => {
+  // Regression, review on #1165: this used `getNetwork()`, which falls back to the build's default
+  // network — so a member on an unsupported chain was told they were signing on "Polygon".
+  // CLAUDE.md requires strict NETWORKS[chainId] lookups in custody code for exactly this reason.
+  it('never names a network the member is not actually on', async () => {
+    walletCtx = { ...walletCtx, chainId: 999999 }
+    const user = userEvent.setup()
+    renderSection()
+    const sheet = await openSheet(user, 'Sign a message')
+
+    expect(within(sheet).getByText('Chain 999999')).toBeInTheDocument()
+    expect(within(sheet).queryByText(/polygon/i)).not.toBeInTheDocument()
+  })
+
   it('signs the message and shows a copyable document', async () => {
     const user = userEvent.setup()
     renderSection()
@@ -282,13 +400,23 @@ describe('VerifySection — signing', () => {
     expect(within(sheet).getByText(/threshold of its owners/i)).toBeInTheDocument()
   })
 
-  it('tells a locked recovered account to unlock rather than failing on click', async () => {
+  it('offers signing for a locked recovered account and requests the ceremony on click (spec 088)', async () => {
     const user = userEvent.setup()
-    renderSection({ active: { mode: 'legacy', address: OTHER_ADDRESS, chainId: 137 }, legacySigner: null })
-    expect(screen.getByText(/unlock this recovered account/i)).toBeInTheDocument()
+    // No in-memory signer: the deferred broker supplies one at sign time — the surface must
+    // OFFER signing rather than telling the member to go unlock somewhere else first.
+    const requestActingSigner = vi.fn(() => new Promise(() => {})) // ceremony pending
+    renderSection({
+      active: { mode: 'legacy', address: OTHER_ADDRESS, chainId: 137 },
+      legacySigner: null,
+      requestActingSigner,
+    })
+    expect(screen.queryByText(/unlock this recovered account/i)).not.toBeInTheDocument()
 
     const sheet = await openSheet(user, 'Sign a message')
-    expect(within(sheet).queryByRole('button', { name: /^sign message$/i })).not.toBeInTheDocument()
+    await user.click(screen.getByLabelText(/message to sign/i))
+    await user.paste('hello')
+    await user.click(within(sheet).getByRole('button', { name: /^sign message$/i }))
+    expect(requestActingSigner).toHaveBeenCalledTimes(1)
   })
 
   // The sheet unmounts on close, so the draft and the document have to live above it.

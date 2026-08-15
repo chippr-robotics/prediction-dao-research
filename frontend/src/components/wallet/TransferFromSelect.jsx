@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import BlockiesAvatar from '../ui/BlockiesAvatar'
+import AccountAvatar from '../account/AccountAvatar'
 
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
@@ -43,7 +43,7 @@ export default function TransferFromSelect({ accounts = [], value, onChange, dis
 
   const row = (account) => (
     <>
-      <BlockiesAvatar address={account.address} size={20} />
+      <AccountAvatar address={account.address} size={20} />
       <span className="pt-from-label">
         {account.label || short(account.address)}
         {account.kind === 'vault' && <span className="pt-from-tag">Vault</span>}

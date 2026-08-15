@@ -202,11 +202,11 @@ describe('NetworkPanel — member RPC endpoints (spec 069)', () => {
     return polygonCard()
   }
 
+  // Matched on the claim, not on its phrasing: the sentence was shortened once already, and what
+  // must survive is that switching is framed as the exception rather than the routine.
   it('frames switching as optional because reads span every network', () => {
     render(<NetworkPanel />)
-    expect(
-      screen.getByText(/only need to switch when sending on a network your wallet is not/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/only need to switch when sending/i)).toBeInTheDocument()
   })
 
   it('shows which route a network is on before anything is configured', () => {

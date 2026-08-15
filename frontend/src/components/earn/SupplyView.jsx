@@ -15,7 +15,8 @@
  *    and the audit caught it: a member holding assets on one network was shown
  *    an instruction they could not follow. What the active network gets here is
  *    a NOTE — one that says in as many words that you do not have to switch to
- *    look around — never a wall in front of the list.
+ *    look around — inside the folded "Where pools are available" disclosure,
+ *    never a wall in front of the list.
  *
  * 2. AVAILABILITY IS ASYMMETRIC AND THE COPY SAYS SO. Trading liquidity is on
  *    every supported Uniswap network; bridge liquidity is ETHEREUM ONLY,
@@ -24,9 +25,12 @@
  *    implies both kinds exist everywhere.
  *
  * 3. A RETIRED POOL STAYS VISIBLE AND WITHDRAWABLE (FR-024). It is filtered out
- *    of nothing. `tokenFilter` narrows by asset, never by state, and a pool a
- *    member holds is rendered whatever the router says about new deposits — a
- *    pool is never hidden while someone's money is inside it.
+ *    of nothing. Every way this list narrows — the `tokenFilter` deep link, the
+ *    search box, the kind chips (`lib/liquidity/poolSearch`) — narrows by what a
+ *    pool IS, never by whether it is taking deposits, and none of them touches
+ *    the POSITIONS list above: a control that could hide a member's own position
+ *    would be hiding their money. A pool a member holds is rendered whatever the
+ *    router says about new deposits.
  *
  * 4. EVERY POSITION FIGURE IS LABELLED AN ESTIMATE (FR-020). Current value,
  *    earnings to date, and — for trading pools — the current composition all
@@ -88,9 +92,16 @@ import {
   NO_POOLS_COPY,
   liquidityAvailabilityCopy,
   liquidityUnavailableCopy,
+  noPoolMatchCopy,
   partialWithdrawalCopy,
   poolKindOf,
 } from '../../lib/liquidity/liquidityCopy'
+import {
+  POOL_KIND_FILTERS,
+  POOL_KIND_FILTER_ALL,
+  filterPools,
+  poolKindsPresent,
+} from '../../lib/liquidity/poolSearch'
 import './Supply.css'
 
 /**
@@ -575,6 +586,10 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
   })
 
   const [tokenFilter, setTokenFilter] = useState(initialTokenFilter)
+  // What the member typed, and which kind of pool they asked for. Both are local:
+  // narrowing a list you are looking at is not a place you can navigate back to.
+  const [query, setQuery] = useState('')
+  const [kindFilter, setKindFilter] = useState(POOL_KIND_FILTER_ALL)
   // `mode` is 'supply' or 'withdraw'. Withdrawing is reachable for a RETIRED pool
   // and carries no platform fee — a member can always exit (FR-021/FR-024).
   const [sheet, setSheet] = useState(null)
@@ -582,13 +597,24 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
   const pools = useMemo(() => data.pools || [], [data.pools])
   const positions = useMemo(() => data.positions || [], [data.positions])
 
-  // FR-024 — the filter narrows by ASSET, never by state. A retired pool matching
-  // the filter is still listed; hiding it would hide a member's own money.
-  const shownPools = useMemo(() => {
-    if (!tokenFilter) return pools
-    const wanted = String(tokenFilter).toUpperCase()
-    return pools.filter((p) => (p.assets || []).some((a) => (a.symbol || '').toUpperCase() === wanted))
-  }, [pools, tokenFilter])
+  // FR-024 — every one of these narrows by what a pool IS, never by state. A
+  // retired pool matching the search is still listed; hiding it would hide a
+  // member's own money. The positions list above is rendered from `positions`
+  // and is deliberately not filtered at all.
+  const shownPools = useMemo(
+    () => filterPools(pools, { query, kind: kindFilter, tokenSymbol: tokenFilter }),
+    [pools, query, kindFilter, tokenFilter],
+  )
+
+  // The chip row is only offered when there is something to choose between: with
+  // one kind curated, a "Trading / Bridge" pair is two controls where one of them
+  // empties the list and the other does nothing.
+  const kindsPresent = useMemo(() => poolKindsPresent(pools), [pools])
+  const narrowed = Boolean(query.trim()) || kindFilter !== POOL_KIND_FILTER_ALL
+  const clearNarrowing = () => {
+    setQuery('')
+    setKindFilter(POOL_KIND_FILTER_ALL)
+  }
 
   const positionKeys = useMemo(
     () => new Set(positions.map((p) => p.pool?.key).filter(Boolean)),
@@ -608,6 +634,16 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
 
   const positionFor = (pool) => positions.find((p) => p.pool?.key === pool.key) || null
 
+  // Two empty states carry `liquidityAvailabilityCopy()` inside their own copy —
+  // an empty catalog, and a ?token= deep link no pool takes. Where they render,
+  // the folded disclosure below would be the same sentence a second time, so it
+  // stands down. A search that found nothing says nothing about availability, so
+  // there it stays.
+  const emptyCatalog = data.status === 'ready' && pools.length === 0
+  const tokenFilterMiss =
+    data.status === 'ready' && pools.length > 0 && shownPools.length === 0 && !narrowed
+  const availabilityStatedElsewhere = emptyCatalog || tokenFilterMiss
+
   /**
    * Point 6 — ONE way in. A row is a summary, not a fork: tapping it opens the
    * pool's sheet, which holds the full disclosure and both actions behind tabs.
@@ -625,7 +661,7 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
   }
 
   return (
-    <div className="earn-lend supply-view">
+    <div className="earn-lend supply-view" data-attention="earn-supply">
       {/* FR-020 — open positions first, exactly like the Lend area. */}
       {positions.length > 0 && (
         <div className="earn-positions">
@@ -660,13 +696,47 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
         )}
       </div>
 
-      {/* Point 2 — the asymmetry, stated where a member decides, not buried.
-          Rendered here only when the active-network note below is absent: that
-          note already ends with this sentence, and the same sentence twice on
-          one screen reads as a glitch. */}
-      {!activeNetworkNote && (
-        <p className="supply-availability" role="note">
-          {liquidityAvailabilityCopy()}
+      {/* Search + kind chips. Offered once there is more than one pool to choose
+          between — a search box over a single row is decoration. */}
+      {data.status === 'ready' && pools.length > 1 && (
+        <div className="supply-toolbar">
+          <div className="supply-search">
+            <span className="supply-search-icon" aria-hidden="true">
+              🔍
+            </span>
+            <input
+              type="search"
+              className="supply-search-input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search pools"
+              aria-label="Search pools by asset, network, or type"
+            />
+          </div>
+
+          {kindsPresent.size > 1 && (
+            <div className="supply-kind-filters" role="group" aria-label="Filter pools by type">
+              {POOL_KIND_FILTERS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`supply-filter-chip${kindFilter === value ? ' selected' : ''}`}
+                  aria-pressed={kindFilter === value}
+                  onClick={() => setKindFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* How many of the curated pools the current search is showing — so a short
+          list reads as a narrowed one rather than as the whole estate. */}
+      {data.status === 'ready' && narrowed && shownPools.length > 0 && (
+        <p className="supply-result-count" role="status">
+          {`Showing ${shownPools.length} of ${pools.length} pools.`}
         </p>
       )}
 
@@ -700,10 +770,23 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
         <p className="earn-state">{NO_POOLS_COPY}</p>
       )}
 
+      {/* Nothing matched. Which of the two things went wrong decides the copy: a
+          deep link asking for an asset no pool takes is a fact about the catalog,
+          while a search that found nothing is a fact about the search — and only
+          one of them is fixed by typing something else. */}
       {data.status === 'ready' && pools.length > 0 && shownPools.length === 0 && (
-        <p className="earn-state">
-          {`No pool takes ${tokenFilter} right now. ${liquidityAvailabilityCopy()}`}
-        </p>
+        <div className="supply-no-match">
+          <p className="earn-state">
+            {narrowed
+              ? noPoolMatchCopy(query)
+              : `No pool takes ${tokenFilter} right now. ${liquidityAvailabilityCopy()}`}
+          </p>
+          {narrowed && (
+            <button type="button" className="earn-btn secondary" onClick={clearNarrowing}>
+              Clear search
+            </button>
+          )}
+        </div>
       )}
 
       {data.status === 'ready' && shownPools.length > 0 && (
@@ -716,11 +799,24 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
         </ul>
       )}
 
-      {/* Point 1 — an active-network NOTE, below the list it does not gate. */}
-      {activeNetworkNote && (
-        <p className="supply-note" role="note">
-          {activeNetworkNote}
-        </p>
+      {/* Point 2 — the asymmetry, still stated where a member decides, but folded
+          away and moved BELOW the list: it is reference material read once, and as
+          a paragraph above the pools it was spending the top of the screen on the
+          same sentence every visit. Collapsed and moved, NOT removed — a member
+          must still be able to find out that bridge pools are Ethereum-only
+          without meeting that fact at the confirm step.
+
+          The active-network note replaces this copy rather than joining it: that
+          note already ends with this sentence, and the same sentence twice on one
+          screen reads as a glitch — which is also why the whole disclosure stands
+          down in the two empty states that already state availability in their own
+          copy (`NO_POOLS_COPY` and the token-filter miss). A search that found
+          nothing does NOT state it, so there the disclosure stays. */}
+      {!availabilityStatedElsewhere && (
+        <details className="supply-availability-details">
+          <summary>Where pools are available</summary>
+          <p className="supply-availability">{activeNetworkNote || liquidityAvailabilityCopy()}</p>
+        </details>
       )}
 
       {data.asOf && (

@@ -14,7 +14,7 @@
 import { useMemo } from 'react'
 import AccordionSection from '../account/AccordionSection'
 import { AccordionGroupContext } from '../account/accordionContext'
-import BlockiesAvatar from '../ui/BlockiesAvatar'
+import AccountAvatar from '../account/AccountAvatar'
 import PolicyBadge from './PolicyBadge'
 import VaultDetail from './VaultDetail'
 import VaultProposalsPanel from './VaultProposalsPanel'
@@ -71,7 +71,7 @@ export default function VaultList({
               key={`${v.chainId}:${v.address}`}
               id={v.address}
               className={`custody-vault-card${v.isTestnet ? ' is-testnet' : ''}`}
-              icon={<BlockiesAvatar address={v.address} size={28} />}
+              icon={<AccountAvatar address={v.address} size={28} />}
               title={
                 <span className="custody-vault-card__title">
                   <span className="custody-vault-card__kind">Multisig</span>

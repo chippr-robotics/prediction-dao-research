@@ -1,0 +1,19 @@
+# Converge every FairWins node to its declared configuration (spec 087, User Story 3).
+#
+# IDEMPOTENT AND SAFELY RE-RUNNABLE. A second consecutive run against an unchanged node reports
+# changed=0 and restarts nothing (SC-005). Handlers fire only on real change.
+#
+# SERIAL: 1 — the bundler and the gateway both carry the gasless path. Converging them
+# simultaneously means any restart takes both down at once.
+---
+- name: Converge FairWins nodes
+  hosts: bundler:gateway
+  serial: 1
+  gather_facts: true
+
+  roles:
+    - common
+    - docker
+    - nginx
+    - fairwins_secrets
+    - fairwins_stack

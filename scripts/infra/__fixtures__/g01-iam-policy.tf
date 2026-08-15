@@ -1,0 +1,5 @@
+# G-01 violation: authoritative for the ENTIRE project policy.
+resource "google_project_iam_policy" "project" {
+  project     = var.project_id
+  policy_data = data.google_iam_policy.admin.policy_data
+}

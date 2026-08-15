@@ -1,0 +1,102 @@
+# Host nginx: the TLS terminator in front of the role's container stack (spec 087, US3).
+---
+- name: Ensure the nginx config and TLS directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ fairwins_ssl_dir }}"
+    - "{{ fairwins_nginx_conf_dir }}"
+  become: true
+
+- name: Read the committed uptime prober allowlist
+  # Same source of truth as the GCP firewall rule: scripts/infra/generate-prober-cidrs.js writes
+  # infra/terraform/environments/prod/prober-cidrs.json, and the drift job fails when it is stale.
+  #
+  # The previous startup script regenerated this from `gcloud` on every boot, which meant the
+  # allowlist could change without any review and only on a reboot. Reading the committed file
+  # instead makes the two allowlists provably the same list.
+  ansible.builtin.slurp:
+    src: "{{ fairwins_repo_dir }}/infra/terraform/environments/prod/prober-cidrs.json"
+  register: nginx_prober_file
+  become: true
+
+- name: Parse the prober allowlist
+  ansible.builtin.set_fact:
+    nginx_prober_cidrs: "{{ (nginx_prober_file.content | b64decode | from_json).cidrs }}"
+
+- name: Refuse to write an empty prober allowlist
+  # An empty allowlist renders `deny all;` alone, locking every prober out of /__probe/ — every
+  # uptime check goes red against a perfectly healthy origin.
+  ansible.builtin.assert:
+    that: nginx_prober_cidrs | length > 0
+    fail_msg: >-
+      prober-cidrs.json is empty. Run `node scripts/infra/generate-prober-cidrs.js` and commit the
+      result. Writing this now would lock every uptime prober out of /__probe/.
+
+- name: Render the prober allowlist
+  ansible.builtin.template:
+    src: google-probers.conf.j2
+    dest: "{{ fairwins_nginx_conf_dir }}/google-probers.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: reload nginx
+
+- name: Install the role's site configuration
+  ansible.builtin.copy:
+    src: "{{ fairwins_repo_dir }}/infra/vm/nginx/fairwins-{{ fairwins_role }}.conf"
+    dest: /etc/nginx/sites-available/fairwins.conf
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: reload nginx
+
+- name: Enable the site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/fairwins.conf
+    dest: /etc/nginx/sites-enabled/fairwins.conf
+    state: link
+  become: true
+  notify: reload nginx
+
+- name: Remove the default site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  become: true
+  notify: reload nginx
+
+- name: Check for the Cloudflare Origin CA certificate
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ fairwins_ssl_dir }}/origin.pem"
+    - "{{ fairwins_ssl_dir }}/origin.key"
+  register: nginx_origin_cert
+  become: true
+
+- name: Report a missing Origin CA certificate
+  # Installing this certificate is the one genuinely manual step on a node (FR-041): it is issued
+  # per-origin by Cloudflare and is not derivable from the repository. nginx must not be started
+  # without it — it would fail and stay down.
+  ansible.builtin.debug:
+    msg: >-
+      Cloudflare Origin CA certificate not installed at {{ fairwins_ssl_dir }}/origin.{pem,key}.
+      nginx is deliberately left stopped. Install it (see docs/runbooks/infrastructure-operations.md),
+      then re-run this playbook.
+  when: nginx_origin_cert.results | rejectattr('stat.exists') | list | length > 0
+
+- name: Enable and start nginx
+  ansible.builtin.systemd_service:
+    name: nginx
+    enabled: true
+    state: started
+  become: true
+  when: nginx_origin_cert.results | rejectattr('stat.exists') | list | length == 0

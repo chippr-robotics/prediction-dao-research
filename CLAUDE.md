@@ -216,8 +216,13 @@ artifacts live under `specs/<feature>/`.
 - **Protect ▸ Verify (message signing) is FRONTEND-ONLY and has THREE verdicts, never two.**
   Members sign an arbitrary message to prove control of an account and check other people's proofs
   (`frontend/src/lib/verify/`, surfaced by `components/custody/VerifySection.jsx`). Verification
-  returns `valid` / `invalid` / **`unverifiable`** — the ERC-1271 leg is a network read, so an RPC
-  timeout is NOT a forged signature and must never render as one; a negative is reported only when
+  returns `valid` / `invalid` / **`unverifiable`**. **`verifyMessage` is OFFLINE and SYNCHRONOUS —
+  never give it a chain or a provider and never make it async**: checking a signature against a
+  public key is arithmetic, and the type is what enforces it. The network lives in the separate
+  `verifyOnChain`, offered to the member as an explicit escalation only where it could settle
+  something, and it exists for one reason — a CONTRACT account has no public key, so only the
+  account itself can say whether it stands behind the bytes. The ERC-1271 leg is a network read, so
+  an RPC timeout is NOT a forged signature and must never render as one; a negative is reported only when
   it is knowable (ECDSA recovered someone else AND the chain says the claimed address holds no
   code, or the account contract itself said no). A mismatching ECDSA recovery is NOT promoted to a
   negative when the on-chain leg could not run — that is exactly what a legitimate smart-account
@@ -228,6 +233,20 @@ artifacts live under `specs/<feature>/`.
   signing anyway would prove control of the member's own account under a "vault" label. Fixtures
   live once, in `frontend/src/test/fixtures/signedMessages.js` (also imported by the capture
   harness). See `docs/developer-guide/message-signing.md` + `specs/084-message-signing-verify/`.
+- **Protect ▸ Off chain (spec 085) is hardware-wallet cold storage — FRONTEND-ONLY, and the store
+  holds PUBLIC METADATA ONLY** (`{ address, vendor, path, label, addedAt }` — never key material,
+  never an xpub, never a device identifier beyond the vendor name). All vendor code sits behind ONE
+  seam, `frontend/src/lib/hardware/adapters.js#connectHardware` — UI code never imports Ledger/Trezor
+  SDKs directly (lazy-loaded, failures normalized to `HW_ERROR_CODES`, rendered via
+  `describeHardwareError`, never a raw SDK message). Every signature is a physical confirmation on
+  the device screen (`HardwareSigner`, which also recover-and-verifies a signed tx before broadcast);
+  reconnect (`connectAccount.js`) RE-DERIVES the saved path and must match the saved address, else
+  refuse. Operate-as holds the device-backed signer in CustodyContext memory only, behind the
+  spec-062 chain guard. Protect's accordion section ids (`custody-onchain`/`custody-verify`/
+  `custody-offchain`) double as drawer-search deep-link ids — don't rename. The
+  `window.__fwHardwareTestAdapter__` seam is `import.meta.env.DEV`-guarded and dead-code-eliminated
+  from production bundles. See `docs/developer-guide/hardware-wallets.md` +
+  `docs/runbooks/hardware-wallet-staging-validation.md` + `specs/085-hardware-wallet-protect/`.
 - **Legacy account recovery (spec 062) is FRONTEND-ONLY** — the **Recovery** section (renamed from
   "Backup & Security"; tab id `security` + `backup` alias unchanged). Members import an old EOA
   **private key** or **BIP-39 word list**; the secret is encrypted at rest (AES-GCM under a
@@ -392,6 +411,23 @@ artifacts live under `specs/<feature>/`.
   group is GONE — the catalog entry lives in **Tools** (tab id `apps` and `/apps/<slug>`
   unchanged). The desktop 64px gutter renders none of this. See
   `docs/developer-guide/nav-drawer.md` + `specs/081-nav-drawer-density/`.
+- **The drawer's search field searches the APP, and `config/navSearchIndex.js` is what makes that
+  true.** Members type protocol names, not menu labels: "morpho" is Earn ▸ Lend, "opensea" is
+  Collect, "bip39" is a card inside Recovery, "rpc" is a tab that is deliberately not in this menu
+  at all. The index tags each nav item with synonyms and names the destinations inside it; matching
+  (`lib/nav/navSearch.js`) ANDs the terms and matches each as a TOKEN PREFIX, so never hand-write
+  stems. Four rules: (1) the index is **descriptive, never authoritative** — the drawer filters
+  items for tenant/chain FIRST and consults the index per surviving item, so an entry can never
+  resurrect a surface the app has hidden; (2) Settings/Network/Membership/Account join results
+  **only while a filter is active** and leave with it — the resting drawer's bounded height (spec
+  081) is unchanged; (3) a destination's `id` IS its `data-attention` marker, and a shortcut
+  deep-links with `focus=<id>` so the surface flashes on arrival (`lib/nav/attention.js`, mounted
+  once as `AttentionFocus` in App.jsx) — a marker is optional and its absence degrades to a plain
+  navigation, never to a broken link; (4) `navId` must be a real nav item / WalletPage tab id, which
+  `src/test/nav/navSearchIndex.test.jsx` enforces. Accordion cards additionally carry `hash`, and
+  `accordionSectionForHash` is the ONE place a `#card` deep link resolves to an OPEN card — for
+  Settings and Recovery alike; do not add a second hash→section map. See
+  `docs/developer-guide/nav-search.md`.
 - **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
   The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
   `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE
@@ -416,6 +452,48 @@ artifacts live under `specs/<feature>/`.
   (`useEndpointsRevision` in provider memo deps); wallet transports are module-load-time, so the panel
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
+
+- **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
+  (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
+  each of which has a way to be silently wrong:
+  (1) **IAM is ADDITIVE ONLY.** `chippr-bots-site-wp` hosts a public WordPress VM plus `clearpath-*`,
+  `fukuii-*`, `kings-edge-*`. `google_project_iam_binding` is one word from the safe `_iam_member`
+  and is **authoritative for that role project-wide** — it strips the role from every other
+  principal, and the plan diff looks small and ordinary. `_iam_policy` is worse (the whole policy).
+  Both are rejected by `npm run check:iac`; the CI identity also lacks `projectIamAdmin`, so the
+  same mistake fails at the API. **Two layers, because either alone has a failure mode.**
+  (2) **Never declare a `google_secret_manager_secret_version`** — it writes the payload into state
+  in plaintext. Terraform owns secret **containers + access bindings** only. The ONE accepted
+  exception is the origin-lock header read via a *data source* (data-source results are ALSO written
+  to state; `sensitive` hides a value from output, not from state) — the gate warns on every such
+  use so it stays countable.
+  (3) **Adoption is by `import`, never recreate**, and a surface is done only at a **zero-diff
+  plan**. If a plan is not clean the CONFIGURATION is wrong — fix the repo, never apply to force
+  live infra to match a generated body. `import` blocks STAY after adoption: they are the audit
+  record and the state-loss recovery path. KMS key versions, secret payloads and the
+  Cloudflare-pinned static IPs are unrecoverable and carry `prevent_destroy`.
+  (4) **Terraform owns Cloud Run SHAPE; Cloud Build owns the IMAGE.** The `ignore_changes` set
+  (`image`, `revision`, `client`, `client_version`) is gate-enforced — without it every merge reports
+  drift, and drift nobody reads is worse than none. The pipeline correspondingly must not set shape
+  flags. **The Cloud Run alto bundler must stay decommissioned** (G-11): re-arming it puts two
+  executors on ONE EOA — colliding nonces, stuck bundles, both instances healthy-looking, no in-band
+  detection.
+  (4a) **The five Terraform modules live in the private `chippr-robotics/chippr-tf-modules`**, pinned
+  by **commit SHA** (a tag can be repointed, a commit cannot; G-16 enforces the pin). Add new modules
+  THERE, not to `infra/terraform/modules/`, which now holds only a pointer — a local module is
+  invisible to the other Chippr projects sharing this estate. `terraform init` needs
+  `TF_MODULES_TOKEN` because the repo is private; a missing token reads as `repository not found`,
+  not as a permission error.
+  (5) **Both Cloudflare rulesets are AUTHORITATIVE for their phase** — an apply deletes any rule
+  added at the dashboard. The geo gate answers HTTP 451 and is a **legal control** (spec 007), under
+  CODEOWNERS. (6) **The nodes have NO public SSH**: `:22` is open to the IAP range only, and the
+  Ansible inventory tunnels through it. If a playbook cannot connect, fix the tunnel — **never widen
+  the firewall**. Handlers restart the whole `fairwins-stack@<role>` unit, never a container (one
+  shared network namespace). Secret delivery **invokes** `infra/vm/common/fetch-secrets.sh` rather
+  than reimplementing it. Apply is **automatic on merge** and executes the *reviewed* plan, gated on
+  the infra-tree digest; a mismatch fails rather than replanning. See
+  `docs/developer-guide/infrastructure-as-code.md` + `docs/runbooks/infrastructure-operations.md`
+  + `specs/087-infrastructure-as-code/`.
 
 - **The repo is an npm WORKSPACE (spec 075): one root lockfile, 8 members, `contracts/` deliberately
   NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
@@ -465,5 +543,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/084-message-signing-verify/plan.md
+at specs/087-infrastructure-as-code/plan.md
 <!-- SPECKIT END -->

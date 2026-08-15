@@ -47,10 +47,12 @@ export default function BitcoinStampsSection() {
       <div className="collectibles-panel-header">
         <div>
           <h4>Bitcoin Stamps</h4>
+          {/* Trimmed, not dropped: spec 061's fail-safe rule is a promise about the member's
+              money — a BTC send can never spend the coins a Stamp rides on — and a member who
+              does not know it will read their spendable balance as wrong. One sentence. */}
           <p className="collectibles-panel-subtitle">
-            Collectibles held in your Bitcoin wallet. Their value is protected: ordinary BTC sends can
-            never spend the coins a Stamp travels with, so this value is excluded from your spendable
-            balance.
+            Held in your Bitcoin wallet. A BTC send can never spend the coins a Stamp rides on, so
+            this value sits outside your spendable balance.
           </p>
         </div>
       </div>

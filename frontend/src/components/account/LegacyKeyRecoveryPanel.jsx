@@ -25,7 +25,7 @@ import { getNetwork } from '../../config/networks'
 import { captureLegacyRecovery } from '../../data/ledger/sources/legacyRecoverySource'
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
-import BlockiesAvatar from '../ui/BlockiesAvatar'
+import AccountAvatar from './AccountAvatar'
 import ActionSheet from './ActionSheet'
 import AccordionSection from './AccordionSection'
 import CrossChainRecoveryPanel from './CrossChainRecoveryPanel'
@@ -414,7 +414,7 @@ function LegacyKeyRecoveryPanel({ deps = {}, defaultOpen = false }) {
               return (
                 <li key={e.address} className="lkr-stored__item">
                   <div className="lkr-stored__row">
-                    <BlockiesAvatar address={e.address} size={40} className="lkr-stored__avatar" />
+                    <AccountAvatar address={e.address} size={40} className="lkr-stored__avatar" />
                     <div className="lkr-stored__meta">
                       <span className="lkr-stored__kind">Recovered</span>
                       <span className="lkr-stored__name">{displayName}</span>

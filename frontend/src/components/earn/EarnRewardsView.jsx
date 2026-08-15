@@ -57,7 +57,7 @@ export default function EarnRewardsView() {
   }, [rewards])
 
   return (
-    <div className="earn-rewards">
+    <div className="earn-rewards" data-attention="earn-rewards">
       <div className="earn-lend-header">
         <h3>
           Rewards

@@ -1,0 +1,13 @@
+# Bundler node (spec 087).
+---
+fairwins_role: bundler
+
+# The bundler's namespace OWNER is alto: it is the only container that may declare `ports:`, and
+# recreating it invalidates every joiner's network namespace. Handlers therefore restart the whole
+# unit, never a single container.
+fairwins_namespace_owner: alto
+
+# Secrets, per container. The internet-facing nginx must NEVER receive the executor key.
+fairwins_secret_env_files:
+  - { file: nginx.env, description: "ORIGIN_LOCK_SECRET only" }
+  - { file: alto.env, description: "the executor key only" }

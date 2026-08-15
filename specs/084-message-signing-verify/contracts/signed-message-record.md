@@ -43,8 +43,11 @@ and may come back weeks later, or be read by a tool that is not this one. That m
 
 ## How a reader verifies
 
+**Step 1 is offline and settles the common case. Step 2 is a separate, deliberate action.**
+
 1. If `signature` is 65 bytes, recover the EIP-191 signer of `message` and compare to `address`.
-   Match ⇒ **valid**, and no network is needed.
+   Match ⇒ **valid**, and no network is needed. A mismatch is a FACT worth reporting ("produced by
+   0xB") but is not yet a verdict — see step 3.
 2. Otherwise, or on a mismatch, ask the account: `eth_call isValidSignature(hashMessage(message),
    signature)` at `address` on `chainId`. Only `0x1626ba7e` counts as acceptance.
 3. If step 2 cannot be completed — no chain given, no route, node unreachable, call reverted — the

@@ -155,6 +155,23 @@
   --transition-fast: 0.15s ease;
   --transition-base: 0.3s ease;
   --transition-slow: 0.5s ease;
+
+  /* Glass surfaces (spec 086) — account cards render as their own translucent layer. */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-solid: rgba(255, 255, 255, 0.92); /* fallback when backdrop-filter is unsupported */
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-highlight: rgba(255, 255, 255, 0.85);
+  --glass-blur: 14px;
+  --glass-shadow: 0 8px 32px rgba(31, 41, 51, 0.14);
+
+  /* Account-card tint palette (spec 086) — rgb triples so cards can mix their own alphas.
+     Ids are stored in the profile store; only this file says what a tint looks like. */
+  --card-tint-mint: 54, 179, 126;
+  --card-tint-sky: 76, 154, 255;
+  --card-tint-violet: 139, 92, 246;
+  --card-tint-amber: 245, 166, 35;
+  --card-tint-rose: 244, 114, 182;
+  --card-tint-slate: 100, 116, 139;
 }
 
 .theme-dark {
@@ -162,4 +179,11 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+
+  /* Glass surfaces (spec 086) */
+  --glass-bg: rgba(20, 28, 36, 0.55);
+  --glass-bg-solid: rgba(20, 28, 36, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.18);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }

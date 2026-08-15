@@ -15,8 +15,9 @@ them is posed.
 | `verify-sign-ready-*` | Sign sheet with a message entered — signing identity, network, and the scheme note. |
 | `verify-sign-signed-*` | Signed: the portable document and its two copy controls. |
 | `verify-check-valid-*` | A document pasted into the signature box auto-fills every field; the wallet signature is confirmed. |
-| `verify-check-invalid-*` | Definite negative — someone else signed it, and the chain confirms the claimed address holds no contract. |
-| `verify-check-unverifiable-*` | The third state: the node is unreachable, so nothing is claimed about the signature. |
+| `verify-check-offline-unsettled-*` | The offline result when the claim is not settled: leads with the fact ("Signed by a different address"), and offers the on-chain escalation rather than accusing. |
+| `verify-check-invalid-*` | Definite negative — reached only after the member asked the account, which confirms the claimed address holds no contract. |
+| `verify-check-unverifiable-*` | The third state: the member asked, the node was unreachable, and the offline fact is repeated rather than lost. |
 | `verify-check-bad-document-*` | An unreadable document: the error replaces the verdict, and Check is disabled while the parse error stands. |
 
 **Not photographed, deliberately:** the withdrawn-signing state (`capability.canSign === false`).
@@ -79,6 +80,24 @@ leaving the area as two entry rows — about 300 px. That change brought its own
 13. **`Copy signature only` lost its border in dark theme** — `--border-color` is a near-black
    hairline there, so inside the tinted result block the button read as a caption. Its border now
    mixes toward the text colour and is visible on either ground.
+
+**Round 5 — offline by construction**
+
+Raised in review: this is public-key validation, so what is the network for? It already was offline
+for every case a public key can answer, but the on-chain leg ran as an automatic fallback and the
+form presented a network selector as an ordinary field — so the surface implied a network was part
+of checking. `verifyMessage` is now synchronous and takes no chain and no provider; the on-chain leg
+is an explicit `verifyOnChain` escalation, offered inside the verdict block only where it could
+settle something. Findings from re-capturing that:
+
+14. **"Could not be checked" became the wrong headline.** We *had* checked — offline — and
+    established a definite fact. The headline now leads with it ("Signed by a different address", or
+    "Only that account can answer" when nothing recovers), and "Could not be checked" is reserved for
+    when we genuinely could not look.
+15. **"This is not a failed check" had drifted below the escalation**, where it read as a footnote
+    to a button rather than a qualification of the verdict. Moved back up with the body.
+16. **The reason named the same address twice** in one paragraph. Tightened to name it once and say
+    where the certainty comes from: "that is certain, and it was established without a network".
 
 ## One harness bug the loop caught, worth recording
 

@@ -15,7 +15,7 @@ import { useWallet } from './useWalletManagement'
 import { CustodyContext } from '../contexts/CustodyContext'
 import { readSession } from '../connectors/passkey'
 import { resolveMessageSigner, signMessageAsAccount, SignatureDeclined } from '../lib/verify/signMessage'
-import { verifyMessage, VERIFY_STATUS } from '../lib/verify/verifyMessage'
+import { verifyMessage, verifyOnChain, VERIFY_STATUS } from '../lib/verify/verifyMessage'
 
 const PERSONAL = { mode: 'personal' }
 
@@ -27,6 +27,8 @@ export function useMessageSigning({ deps = {} } = {}) {
   const custody = useContext(CustodyContext)
   const identity = custody?.active ?? PERSONAL
   const legacySigner = custody?.legacySigner ?? null
+  const hardwareSigner = custody?.hardwareSigner ?? null
+  const requestActingSigner = custody?.requestActingSigner ?? null
 
   const [signing, setSigning] = useState(false)
   const [document, setDocument] = useState(null)
@@ -38,13 +40,14 @@ export function useMessageSigning({ deps = {} } = {}) {
   // Acting as a recovered legacy account (spec 062) signs with THAT key, so the proof is
   // attributed to the recovered address the member is presenting — not to the wallet that
   // happens to be connected underneath it.
-  const activeSigner = identity.mode === 'legacy' ? legacySigner : signer
-  const activeAddress = identity.mode === 'legacy' ? identity.address ?? address : address
+  const isActingSignerMode = identity.mode === 'legacy' || identity.mode === 'hardware'
+  const activeSigner = identity.mode === 'legacy' ? legacySigner : identity.mode === 'hardware' ? hardwareSigner : signer
+  const activeAddress = isActingSignerMode ? identity.address ?? address : address
 
   const resolved = useMemo(() => {
     const credentialId = loginMethod === 'passkey' ? (deps.readSession ?? readSession)()?.credentialId : undefined
     return (deps.resolveMessageSigner ?? resolveMessageSigner)({
-      loginMethod: identity.mode === 'legacy' ? 'legacy' : loginMethod,
+      loginMethod: isActingSignerMode ? 'legacy' : loginMethod,
       signer: activeSigner,
       address: activeAddress,
       chainId,
@@ -55,27 +58,38 @@ export function useMessageSigning({ deps = {} } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loginMethod, activeSigner, activeAddress, chainId, identity])
 
-  // A legacy identity that has lost its in-memory key must be re-unlocked before it can sign;
-  // resolveMessageSigner sees only "no signer", so name the real remedy here.
+  // Spec 088 — an acting identity with no in-memory signer can still sign: the deferred
+  // ceremony (unlock / device connect) runs at sign time via the global SignerRequestHost, so
+  // the capability is honest about being ABLE to sign, and sign() acquires the signer.
   const capability = useMemo(() => {
-    if (identity.mode === 'legacy' && !legacySigner) {
-      return {
-        canSign: false,
-        kind: 'legacy',
-        reason: 'Unlock this recovered account again in Recovery before signing as it.',
-      }
+    if (isActingSignerMode && !activeSigner) {
+      return { canSign: true, kind: identity.mode, scheme: 'eip191' }
     }
     return resolved
-  }, [identity.mode, legacySigner, resolved])
+  }, [isActingSignerMode, activeSigner, identity.mode, resolved])
 
   const sign = useCallback(
     async (message) => {
       setSignError(null)
       setSigning(true)
       try {
+        // Spec 088 — acquire the acting signer on demand: the global ceremony host renders the
+        // unlock / device dialog now, and a cancel surfaces as the cancelled-signing message.
+        let resolvedForSign = capability
+        if (isActingSignerMode && !activeSigner && requestActingSigner) {
+          const acting = await requestActingSigner()
+          resolvedForSign = (deps.resolveMessageSigner ?? resolveMessageSigner)({
+            loginMethod: 'legacy',
+            signer: acting,
+            address: activeAddress,
+            chainId,
+            identity,
+            passkey: null,
+          })
+        }
         const doc = await (deps.signMessageAsAccount ?? signMessageAsAccount)({
           message,
-          resolved: capability,
+          resolved: resolvedForSign,
           chainId,
         })
         setDocument(doc)
@@ -92,7 +106,7 @@ export function useMessageSigning({ deps = {} } = {}) {
         setSigning(false)
       }
     },
-    [capability, chainId, deps],
+    [capability, chainId, deps, isActingSignerMode, activeSigner, requestActingSigner, activeAddress, identity],
   )
 
   const clearSigned = useCallback(() => {
@@ -114,6 +128,10 @@ export function useMessageSigning({ deps = {} } = {}) {
    * So a throw becomes the honest third state instead. "We could not complete the check" is
    * literally true of an internal failure, and `unverifiable` is precisely the state that says so
    * without claiming anything about the signature.
+   *
+   * This is the OFFLINE check: `verifyMessage` cannot reach a network. It stays async and guarded
+   * anyway, because it can still be handed something unexpected, and the never-reject contract is
+   * what the surface depends on.
    */
   const verify = useCallback(
     async (claim) => {
@@ -139,6 +157,35 @@ export function useMessageSigning({ deps = {} } = {}) {
     [deps],
   )
 
+  /**
+   * The explicit escalation, for the one outcome the offline check cannot settle: ask the claimed
+   * account itself, on a network the member names. Same never-reject contract as `verify`.
+   */
+  const checkOnChain = useCallback(
+    async (claim) => {
+      setVerifying(true)
+      try {
+        const result = await (deps.verifyOnChain ?? verifyOnChain)(claim)
+        setVerdict(result)
+        return result
+      } catch (error) {
+        console.error('On-chain signature check failed unexpectedly:', error)
+        const result = {
+          status: VERIFY_STATUS.UNVERIFIABLE,
+          method: null,
+          signer: null,
+          canCheckOnChain: true,
+          reason: 'Something went wrong while asking that account, so nothing could be established. Try again.',
+        }
+        setVerdict(result)
+        return result
+      } finally {
+        setVerifying(false)
+      }
+    },
+    [deps],
+  )
+
   const clearVerdict = useCallback(() => setVerdict(null), [])
 
   return {
@@ -154,6 +201,7 @@ export function useMessageSigning({ deps = {} } = {}) {
     verifying,
     verdict,
     verify,
+    checkOnChain,
     clearVerdict,
   }
 }

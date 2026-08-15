@@ -29,8 +29,9 @@ import AutoConnectPrompt from './components/wallet/AutoConnectPrompt'
 import { ActivityProvider } from './contexts/ActivityProvider.jsx'
 import { NavDrawerProvider } from './contexts/NavDrawerContext.jsx'
 import ActivityNotificationBridge from './components/notifications/ActivityNotificationBridge'
-import OperateAsIndicator from './components/custody/OperateAsIndicator'
+import SignerRequestHost from './components/account/SignerRequestHost'
 import AppNavDrawer from './components/nav/AppNavDrawer'
+import AttentionFocus from './components/nav/AttentionFocus'
 
 //admin
 import AdminPanel from './components/AdminPanel'
@@ -66,10 +67,18 @@ function AppLayout() {
         <div className="app-shell">
           <Header appMode />
           <AppNavDrawer />
-          {/* Spec 043 (US3): persistent banner while operating as a vault, with switch-back. */}
-          <OperateAsIndicator />
+          {/* A menu-search result deep-links with `?focus=<id>`; this briefly highlights whatever
+              carries the matching `data-attention` marker, so the member can see the thing they
+              searched for on a screen they may never have opened before. */}
+          <AttentionFocus />
+          {/* Spec 086: no operating-as banner for ANY acting account kind — the header wallet
+              avatar renders the acting identity, and every kind is treated equally. Switching
+              back lives in the account switcher, where switching always lived. */}
           {/* Spec 041: route a tapped push notification into in-app navigation. */}
           <ActivityNotificationBridge />
+          {/* Spec 088: the deferred-signing ceremony host — unlock/device dialogs render HERE,
+              at the moment a signature is needed, never at account-switch time. */}
+          <SignerRequestHost />
           {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
           <EntryGate />
           {/* Entering the app with no account opens the unlock dialog by itself —
@@ -93,9 +102,15 @@ function AppContent() {
   const { showNotification } = useNotification()
 
   const handleSwitchNetwork = async () => {
-    await switchNetwork()
     announce('Attempting to switch network')
     showNotification('Switching network...', 'info')
+    try {
+      await switchNetwork()
+    } catch (error) {
+      // switchNetwork now genuinely rejects on a member decline / wallet failure (spec 088 —
+      // the old non-async mutate swallowed rejections). The banner stays up; say what happened.
+      showNotification(error?.message || 'The network switch was not completed.', 'warning')
+    }
   }
 
   return (

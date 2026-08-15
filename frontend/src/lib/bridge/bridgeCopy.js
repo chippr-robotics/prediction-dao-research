@@ -206,6 +206,12 @@ export function noBridgeDestinationCopy(symbol) {
     : `${asset} has no destination network available, because no network is set up for bridging in this build yet.`
 }
 
-/** Short section blurb for the Bridge tab, matching STAKING_AREA_DESC. */
-export const BRIDGE_AREA_DESC =
-  'Move an asset you already hold to another network. You see the exact amount that will arrive and every cost before you sign.'
+/**
+ * Short section blurb for a Bridge ENTRY POINT — a tile or a menu row that has to say what the
+ * destination does before a member is inside it.
+ *
+ * It is deliberately NOT rendered at the top of the Bridge tab itself. Inside the tab the quote
+ * states the arriving amount and every cost as figures, and a sentence promising that above them
+ * is a claim the screen below is already making truthfully.
+ */
+export const BRIDGE_AREA_DESC = 'Move an asset you already hold to another network.'

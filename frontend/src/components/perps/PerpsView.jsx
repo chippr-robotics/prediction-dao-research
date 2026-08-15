@@ -573,16 +573,14 @@ export default function PerpsView({ deps }) {
 
 function PerpsHeader() {
   return (
+    /* No intro paragraph: it listed the columns the table already has headings for, and its one
+       load-bearing sentence — that trading happens at the venue, with the member's own wallet — is
+       what `PERPS_TIPS.venue` says in the tip beside this heading. Each venue is still named on
+       every row it supplies, which is where attribution belongs. */
     <div className="perps-header">
-      <div>
-        <h3>
-          Perps <InfoTip label="About perps venues">{PERPS_TIPS.venue}</InfoTip>
-        </h3>
-        <p className="perps-subtitle">
-          Perpetual-futures pairs across Gains Network, GMX, and Hyperliquid — live prices, funding, open
-          interest, and your open positions. Trading happens on the venue with your own wallet.
-        </p>
-      </div>
+      <h3>
+        Perps <InfoTip label="About perps venues">{PERPS_TIPS.venue}</InfoTip>
+      </h3>
     </div>
   )
 }

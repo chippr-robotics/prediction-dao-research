@@ -12,7 +12,7 @@ export default function VaultProposalsPanel({ vault, proposals }) {
   // Spec 049 — the queue instance may be lifted (shared with the Policy section); the internal
   // hook is only live when no instance is passed, so nothing is fetched twice.
   const internal = useVaultProposals(proposals ? null : vault)
-  const { queue, history, loading, error, propose, approve, execute, cancel } = proposals || internal
+  const { queue, history, loading, error, partial, propose, approve, execute, cancel } = proposals || internal
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null)
 
@@ -27,7 +27,7 @@ export default function VaultProposalsPanel({ vault, proposals }) {
           This vault is on {vaultChainLabel}. Switch networks to view and act on its transactions.
         </p>
         {switchNetwork && (
-          <button type="button" onClick={() => switchNetwork(vault.chainId)}>
+          <button type="button" onClick={() => { Promise.resolve(switchNetwork(vault.chainId)).catch(() => {}) }}>
             Switch to {vault.chainName || `network ${vault.chainId}`}
           </button>
         )}
@@ -72,6 +72,15 @@ export default function VaultProposalsPanel({ vault, proposals }) {
       <OwnersThresholdPanel vault={vault} onPropose={run(propose)} busy={busy} />
 
       {loading && <p className="custody-hint">Loading transactions…</p>}
+      {/* A vault's history can span millions of blocks and the RPC caps each read, so it arrives in
+          passes. Until the last one lands this list is real but not yet known to be all of it —
+          which the member has to be told, because an empty queue here would otherwise read as
+          "nothing needs you". */}
+      {!loading && partial && (
+        <p className="custody-hint" role="status">
+          Still reading this vault’s history — anything older may not be listed yet.
+        </p>
+      )}
       {(error || actionError) && (
         <p className="custody-error" role="alert">
           {error || actionError}

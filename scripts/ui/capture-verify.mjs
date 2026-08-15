@@ -175,20 +175,30 @@ const SHOTS = [
     note: 'Valid: document pasted, every field auto-filled, wallet signature confirmed',
   },
   {
-    name: 'check-invalid',
+    name: 'check-offline-unsettled',
     panel: 'check',
     paste: FORGED_DOCUMENT_JSON,
     verify: true,
     chain: 'eoa',
-    note: 'Definite negative: someone else signed it, and the chain confirms the claimed address holds no contract',
+    note: 'Offline result: states who actually produced the bytes, and offers the on-chain escalation rather than accusing',
+  },
+  {
+    name: 'check-invalid',
+    panel: 'check',
+    paste: FORGED_DOCUMENT_JSON,
+    verify: true,
+    escalate: true,
+    chain: 'eoa',
+    note: 'Definite negative, reached only after the member asked the account: the chain confirms the claimed address holds no contract',
   },
   {
     name: 'check-unverifiable',
     panel: 'check',
     paste: FORGED_DOCUMENT_JSON,
     verify: true,
+    escalate: true,
     chain: 'down',
-    note: 'Third state: the node is unreachable, so nothing is claimed about the signature',
+    note: 'Third state: the member asked, the node was unreachable, and the offline fact is repeated rather than lost',
   },
   {
     name: 'check-bad-document',
@@ -373,8 +383,22 @@ async function captureOnce(browser, baseOrigin, shot) {
       await page.locator('#verify-check-signature').fill(shot.paste)
     }
     if (shot.verify) {
+      // The offline check. No network is involved, and for a wallet signature this is the whole
+      // interaction — which is the point of the shot.
       await page.getByRole('button', { name: /check signature/i }).click()
       await page.waitForSelector('[data-testid="verify-result"]', { timeout: 20_000 })
+    }
+    if (shot.escalate) {
+      // The explicit escalation, which only exists once a result says a network could settle it.
+      const select = page.locator('#verify-check-chain')
+      await select.waitFor({ timeout: 20_000 })
+      await select.selectOption(String(CHAIN_ID))
+      await page.getByRole('button', { name: /check on-chain/i }).click()
+      await page.waitForFunction(
+        () => !document.querySelector('[data-testid="verify-result"]')?.textContent?.includes('Asking'),
+        { timeout: 20_000 },
+      )
+      await page.waitForTimeout(400)
     }
 
     mkdirSync(OUT, { recursive: true })

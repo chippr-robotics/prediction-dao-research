@@ -44,6 +44,7 @@ import {
   PORTFOLIO_PATH,
   TAB_ALIASES,
 } from '../config/appNav'
+import { accordionSectionForHash } from '../config/navSearchIndex'
 import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../lib/predict/predictClient'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
@@ -60,13 +61,12 @@ const LEGAL_LINK_ICONS = {
 }
 const LEGAL_LINK_ICON_DEFAULT = 'ban' // Account Moderation (deep-links into /terms)
 
-// Settings deep links → the card each one means. Settings cards are collapsed by
-// default, so a link that only scrolled would leave the member staring at a closed
-// heading; these ids are the AccordionSection ids on the tab.
-const SETTINGS_HASH_SECTIONS = {
-  '#pwa-update': 'pwa-update',
-  '#legal-policies': 'legal-policies',
-  '#notification-profiles': 'notifications',
+// Settings deep links whose hash does not simply name their card — the alias cases. Every other
+// card resolves through the nav search index (`accordionSectionForHash`), which is also what the
+// menu search links to, so a card added there is deep-linkable without being added here too.
+// Cards are collapsed by default, so a link that only scrolled would leave the member staring at
+// a closed heading; these ids are the AccordionSection ids on the tab.
+const SETTINGS_HASH_ALIASES = {
   '#notification-profiles-new': 'notifications',
 }
 
@@ -297,23 +297,31 @@ function WalletPage() {
     }
   }, [pwaCheckForUpdate])
 
-  // Settings cards are collapsed by default, so a deep link has to name the card
-  // it means: the hash picks which one the group opens (see SETTINGS_HASH_SECTIONS),
-  // and the same effect scrolls its header into view. Read from the router's
-  // location rather than window.location so a hash arriving while the tab is
-  // already open still lands.
-  const settingsOpenSection =
-    activeTab === 'settings' ? SETTINGS_HASH_SECTIONS[location.hash] || null : null
+  // Settings and Recovery cards are collapsed by default, so a deep link has to name the card it
+  // means: the hash picks which one the group opens, and the same effect scrolls its header into
+  // view. Read from the router's location rather than window.location so a hash arriving while
+  // the tab is already open still lands.
+  //
+  // Both tabs resolve the same way now. Recovery is a stack of collapsed cards for exactly the
+  // same reason Settings is, and the menu search links into both — sending a member to
+  // "Legacy account recovery" and landing them on a closed heading would be the search stopping
+  // one step short of the thing it found.
+  const hashOpenSection = useMemo(
+    () =>
+      (activeTab === 'settings' ? SETTINGS_HASH_ALIASES[location.hash] : null) ||
+      accordionSectionForHash(activeTab, location.hash),
+    [activeTab, location.hash],
+  )
 
   useEffect(() => {
-    if (!settingsOpenSection) return
+    if (!hashOpenSection) return
     const id = window.setTimeout(() => {
       document
-        .getElementById(`${settingsOpenSection}-header`)
+        .getElementById(`${hashOpenSection}-header`)
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 60)
     return () => window.clearTimeout(id)
-  }, [settingsOpenSection])
+  }, [hashOpenSection])
 
   const selectedPolymarketCategories = useMemo(
     () => preferences?.polymarketCategories || [],
@@ -411,7 +419,9 @@ function WalletPage() {
 
                 {activeTab === 'custody' && (
                   <div className="custody-section" role="tabpanel">
-                    <CustodyPanel />
+                    {/* Spec 085 — Protect is an accordion now; the hash names the card to land open,
+                        same mechanism as Recovery/Settings. */}
+                    <CustodyPanel openSection={hashOpenSection} />
                   </div>
                 )}
 
@@ -482,7 +492,7 @@ function WalletPage() {
                     <p className="security-section__intro">
                       Everything that protects your access to this account. Open a section to see or change it.
                     </p>
-                    <AccordionGroup>
+                    <AccordionGroup openId={hashOpenSection}>
                       {/* Data backup — encrypted backup/restore of device-local data (spec 032). */}
                       <BackupPanel />
                       {/* Spec 045 US5/US6 — account controllers & recovery.
@@ -570,7 +580,7 @@ function WalletPage() {
                     <p className="settings-section__intro">
                       How this app looks and behaves. Open a card to change it.
                     </p>
-                    <AccordionGroup openId={settingsOpenSection}>
+                    <AccordionGroup openId={hashOpenSection}>
                       {/* Each preference panel supplies its own card header + summary. */}
                       <HomePreferencesPanel />
                       <NavigationPreferencesPanel />

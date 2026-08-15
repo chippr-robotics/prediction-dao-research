@@ -8,19 +8,30 @@
  *
  *   'valid'         we checked and the claim holds
  *   'invalid'       we checked and the claim does NOT hold — a definite negative
- *   'unverifiable'  we could not complete the check (no chain, no route, node unreachable)
+ *   'unverifiable'  we could not settle it (and we say what IS known)
  *
- * A negative is only reported when it is knowable offline (ECDSA recovered someone else AND
- * the claimed address is a plain account) or the account contract itself said no. Everything
- * else degrades to 'unverifiable' with the reason named.
+ * A negative is only reported when it is established: offline, that means malformed input; on
+ * chain, it means the account itself declined or holds no code. A recovery that names somebody
+ * else is NOT a negative on its own — the claimed address may be a contract whose owner is that
+ * somebody, and an owner's signature is an ordinary 65-byte ECDSA signature.
  *
- * Two paths, tried in the order that can answer without a network round-trip first:
+ * **`verifyMessage` is OFFLINE. It is synchronous and it cannot perform I/O.** Checking a
+ * signature against a public key is pure arithmetic — recover the key from the signature, derive
+ * the address, compare — and that is the whole of what most callers need. No provider is built, no
+ * chain is named, nothing leaves the machine.
  *
- *   EIP-191  65-byte ECDSA over the personal-message digest. Recovers to an address; comparing
- *            it to the claim is a pure computation — no chain, no provider, works offline.
- *   ERC-1271 A contract account's own opinion (spec 041 passkey accounts, Safe vaults). Does not
- *            recover to anything; the account is asked `isValidSignature(hashMessage(m), sig)` on
- *            the chain the document names, and only the magic value counts.
+ * The on-chain leg lives in `verifyOnChain`, and it exists for one reason: **a contract account
+ * has no public key.** A passkey account (spec 041) or a Safe is a contract at an address; there
+ * is no private key whose signature recovers to it, and what it produces is not a 65-byte ECDSA
+ * signature but an envelope its own code interprets. Nothing about those bytes is self-validating,
+ * so the only way to learn whether that account stands behind them is to ask it —
+ * `isValidSignature(hashMessage(m), sig)` — on the one chain it lives on, where its owner set can
+ * also change over time. That is not verifying a public key over the network; it is asking an
+ * account that hasn't got one.
+ *
+ * So the two are deliberately separate functions rather than one with a flag: the offline answer
+ * is complete on its own, and reaching for a network is a decision the caller makes explicitly
+ * when the offline answer cannot settle the specific claim being made.
  */
 
 import { ethers } from 'ethers'
@@ -136,20 +147,25 @@ const UNVERIFIABLE_REASON = {
 }
 
 /**
- * Verify a claim: "`address` signed `message`, and here is the signature".
+ * Verify a claim — "`address` signed `message`, and here is the signature" — **entirely offline**.
+ *
+ * Synchronous by design: a function that cannot return a promise cannot await a network, so the
+ * offline guarantee is enforced by the signature rather than promised in a comment.
  *
  * @param {object} args
  * @param {string} args.message    exact signed text — never normalized
  * @param {string} args.signature  0x-hex signature bytes
  * @param {string} [args.address]  the claimed signer; omit to just ask "who signed this?"
- * @param {number} [args.chainId]  chain hosting a contract account (required for the ERC-1271 leg)
- * @param {object} [args.provider] test/injection seam; defaults to the member's own route
- * @returns {Promise<{status: string, method: string|null, signer: string|null, reason: string|null}>}
+ * @returns {{status: string, method: string|null, signer: string|null, reason: string|null,
+ *            canCheckOnChain?: boolean}}
  *   `method` is how the verdict was reached ('eip191' | 'erc1271' | null).
- *   `signer` is the recovered address when ECDSA recovery worked — evidence, shown even on a
- *   negative, because "signed by 0xother" is far more useful than "invalid".
+ *   `signer` is the recovered address when ECDSA recovery worked — reported as FACT, including
+ *   alongside outcomes that do not settle the claim, because "produced by 0xother" is the useful
+ *   half of the answer.
+ *   `canCheckOnChain` marks the one outcome that a network could still settle: pass the same
+ *   inputs plus a chain to `verifyOnChain`.
  */
-export async function verifyMessage({ message, signature, address = null, chainId = null, provider = null }) {
+export function verifyMessage({ message, signature, address = null }) {
   if (typeof message !== 'string') {
     return { status: VERIFY_STATUS.INVALID, method: null, signer: null, reason: 'There is no message to check.' }
   }
@@ -188,7 +204,7 @@ export async function verifyMessage({ message, signature, address = null, chainI
       method: null,
       signer: null,
       reason:
-        'These bytes are not a recoverable wallet signature, so no signer can be named. Enter the address that is claimed to have signed and it can be checked against the account itself.',
+        'These bytes are not a recoverable wallet signature, so no signer can be named offline. Enter the address that is claimed to have signed, and that account can be asked directly.',
     }
   }
 
@@ -196,41 +212,83 @@ export async function verifyMessage({ message, signature, address = null, chainI
     return { status: VERIFY_STATUS.VALID, method: SIGN_SCHEMES.EIP191, signer: recovered, reason: null }
   }
 
-  // Either the bytes are not ECDSA (a contract-account envelope) or they recovered to somebody
-  // else. Both are answered by the same question: does the claimed account itself accept them?
-  // A smart-account owner is not the account, so a mismatch here is NOT yet a negative.
+  // The claim is not settled offline, and this is the ONE case where that is true. Two shapes
+  // reach here and they look identical from outside:
+  //
+  //   · the bytes recovered to somebody else — but the claimed address may be a CONTRACT whose
+  //     owner is that somebody, and an owner's signature is an ordinary 65-byte ECDSA signature;
+  //   · the bytes are not recoverable at all — which is what a contract account's envelope is.
+  //
+  // Neither can be turned into a negative here without asking the account itself. What we DO know
+  // offline is stated as fact and returned as `signer`; `canCheckOnChain` says the caller can
+  // settle it by naming a network. Promoting either shape to `invalid` on the strength of a
+  // recovery mismatch is the confidently-wrong accusation this whole surface exists to avoid.
+  return {
+    status: VERIFY_STATUS.UNVERIFIABLE,
+    method: null,
+    signer: recovered,
+    canCheckOnChain: true,
+    reason: recovered
+      ? `These bytes were produced by ${recovered} — that is certain, and it was established without a network. What is not certain is whether the address you entered is a smart contract account that accepts signatures from it; only that account can answer.`
+      : 'These bytes are not a wallet signature, so no address can be recovered from them offline. If the address you entered is a smart contract account, it can be asked directly.',
+  }
+}
+
+/**
+ * The explicit escalation: ask a contract account whether it stands behind the signature.
+ *
+ * Separate from `verifyMessage` and never called by it. Reaching a network is a decision, not a
+ * fallback — the caller has already been told what is knowable offline and is choosing to ask the
+ * one party that can settle the rest.
+ *
+ * @param {object} args  message, signature, address, chainId, and an optional provider seam
+ */
+export async function verifyOnChain({ message, signature, address, chainId, provider = null }) {
+  let claimed
+  try {
+    claimed = ethers.getAddress(address)
+  } catch {
+    return {
+      status: VERIFY_STATUS.INVALID,
+      method: null,
+      signer: null,
+      reason: 'The address to check is not a valid address.',
+    }
+  }
+  const recovered = recoverPersonalSigner(message, signature)
   const onChain = await checkErc1271({ message, signature, address: claimed, chainId, provider })
 
   if (!onChain.answered) {
-    // Note what is NOT happening here: a mismatching ECDSA recovery is not promoted to a negative
-    // just because the on-chain leg couldn't run. The claimed address may well be a contract
-    // account we were simply never told where to find, and its owner key recovering instead is
-    // exactly what that looks like. The recovery is reported as EVIDENCE, not as a verdict.
+    // Could not ask. Still not a negative — an unreachable node says nothing about a signature.
+    // The offline fact is repeated rather than dropped: this result REPLACES the offline one on
+    // screen, and losing "produced by 0xB" to a network error would leave the member with less
+    // than they had before they asked.
     const base = UNVERIFIABLE_REASON[onChain.reason] ?? 'The signature could not be checked.'
     return {
       status: VERIFY_STATUS.UNVERIFIABLE,
       method: null,
       signer: recovered,
+      canCheckOnChain: true,
       reason: recovered
-        ? `${base} As a wallet signature it recovers to ${recovered} — which may be an owner of the account you entered, or an unrelated address.`
+        ? `${base} What is still certain is that these bytes were produced by ${recovered}.`
         : base,
     }
   }
   if (onChain.valid) {
-    return { status: VERIFY_STATUS.VALID, method: SIGN_SCHEMES.ERC1271, signer: null, reason: null }
+    return { status: VERIFY_STATUS.VALID, method: SIGN_SCHEMES.ERC1271, signer: recovered, reason: null }
   }
 
+  // The account answered, so a definite negative is now available — which is exactly what the
+  // member came here for when the offline result left the claim open.
   const plainAccount = onChain.reason === 'no-code'
   let reason
-  if (recovered) {
-    reason = `This signature was produced by ${recovered}, not by the address you entered.`
+  if (plainAccount && recovered) {
+    reason = `That address holds no contract on this network, so it is a plain account — and these bytes were produced by ${recovered}, not by it.`
   } else if (plainAccount) {
-    // Non-recoverable bytes against an address that holds no code on the named chain: nothing
-    // there could have produced them. Say that, rather than implying a contract refused.
     reason =
-      'These bytes are not a wallet signature, and that address holds no contract on the chain given — so it cannot have signed this message.'
+      'These bytes are not a wallet signature, and that address holds no contract on this network — so nothing there could have signed this message.'
   } else {
-    reason = 'That account does not accept this signature for this message.'
+    reason = 'That account was asked directly, and it does not accept this signature for this message.'
   }
   return {
     status: VERIFY_STATUS.INVALID,
@@ -240,13 +298,7 @@ export async function verifyMessage({ message, signature, address = null, chainI
   }
 }
 
-/** Verify straight from a parsed document (`parseSignedMessage().doc`). */
-export function verifySignedMessage(doc, { provider = null } = {}) {
-  return verifyMessage({
-    message: doc.message,
-    signature: doc.signature,
-    address: doc.address,
-    chainId: doc.chainId,
-    provider,
-  })
+/** Verify straight from a parsed document (`parseSignedMessage().doc`) — offline, like its base. */
+export function verifySignedMessage(doc) {
+  return verifyMessage({ message: doc.message, signature: doc.signature, address: doc.address })
 }

@@ -26,6 +26,7 @@
 import { NETWORKS } from './networks'
 import { getContractAddressForChain } from './contracts'
 import { getBitcoinNetwork } from './bitcoinNetworks'
+import { getWrappedNative } from './wrappedNative'
 
 // The five app-aligned regulatory categories (FR-004) plus the honest
 // `unclassified` fallback (FR-012). Order is display order.
@@ -444,16 +445,18 @@ export function getPortfolioRegistry(chainId) {
     baselineSymbol: net.nativeCurrency.symbol,
   })
 
-  // Wrapped native — from the network's DEX config, falling back to the
-  // synced per-chain deployment record.
-  const wnative = net.dex?.wnative || getContractAddressForChain('wmatic', chainId)
-  if (wnative) {
+  // Wrapped native — resolved through the shared seam (config/wrappedNative.js), which
+  // reads the network's DEX config first and falls back to the synced per-chain
+  // deployment record. The Wrap view resolves the same way, so a chain is never
+  // wrappable on one surface and missing from the portfolio on another.
+  const wrapped = getWrappedNative(chainId)
+  if (wrapped) {
     put({
       kind: 'erc20',
-      address: wnative,
-      symbol: `W${net.nativeCurrency.symbol}`,
-      name: `Wrapped ${net.nativeCurrency.name}`,
-      decimals: 18,
+      address: wrapped.address,
+      symbol: wrapped.symbol,
+      name: wrapped.name,
+      decimals: wrapped.decimals,
       categoryId: 'unclassified',
       source: 'app-config',
       baselineSymbol: net.nativeCurrency.symbol,

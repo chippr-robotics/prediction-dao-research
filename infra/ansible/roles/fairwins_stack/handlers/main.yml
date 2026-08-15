@@ -1,0 +1,19 @@
+---
+- name: Reload systemd units
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+  listen: reload systemd units
+  notify: restart fairwins stack
+
+- name: Restart fairwins stack
+  # THE WHOLE UNIT, never an individual container. All containers on a node share ONE network
+  # namespace (network_mode: service:<owner>), reproducing Cloud Run's sidecar namespace — which is
+  # what makes the localhost couplings (ENGINE_URL, REDIS_URL, the engine's webhook URL, the alto
+  # upstream) correct verbatim. Recreating the namespace owner invalidates the joiners, so acting on
+  # a single container leaves a stack that looks healthy and is not.
+  ansible.builtin.systemd_service:
+    name: "fairwins-stack@{{ fairwins_role }}"
+    state: restarted
+  become: true
+  listen: restart fairwins stack

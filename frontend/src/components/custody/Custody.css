@@ -46,6 +46,17 @@
   margin: 0.5rem 0;
 }
 
+/* These buttons sat on the gray subsection background before the accordion refactor (spec 085);
+   on the card's own surface the global button chrome (--bg-secondary, transparent border) is
+   invisible in light mode, so they carry a real border here. */
+.custody-actions button {
+  border-color: var(--border-color, #e3e7eb);
+}
+
+.custody-actions button:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36b37e);
+}
+
 .custody-field {
   display: flex;
   flex-direction: column;
@@ -228,29 +239,6 @@
   text-decoration: underline;
   cursor: pointer;
   padding: 0;
-}
-
-.custody-operateas {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: var(--accent-soft, rgba(79, 70, 229, 0.12));
-  border-bottom: 1px solid var(--accent-color, #4f46e5);
-  font-size: 0.875rem;
-}
-
-.custody-operateas-text code {
-  word-break: break-all;
-}
-
-.custody-operateas-warn {
-  color: var(--error-color, #dc2626);
-}
-
-.custody-operateas-switch {
-  margin-left: auto;
 }
 
 /* Spec 049 — policy step in the create-vault wizard. */

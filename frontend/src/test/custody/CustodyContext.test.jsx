@@ -69,23 +69,29 @@ describe('CustodyContext', () => {
     expect(screen.getByTestId('has-signer')).toHaveTextContent('no') // in-memory key dropped
   })
 
-  it('ignores a legacy descriptor with no signer (never acts as an un-unlocked key)', () => {
-    function BadLegacy() {
-      const { active, operateAsLegacy } = useCustody()
+  it('accepts an address-only legacy descriptor — identity without a key (spec 088)', () => {
+    function AddressOnly() {
+      const { active, legacySigner, operateAsLegacy } = useCustody()
       return (
         <div>
           <span data-testid="mode">{active.mode}</span>
-          <button onClick={() => operateAsLegacy({ address: '0xLegacy', chainId: 137 })}>bad</button>
+          <span data-testid="chain">{String(active.chainId)}</span>
+          <span data-testid="has-key">{legacySigner ? 'yes' : 'no'}</span>
+          <button onClick={() => operateAsLegacy({ address: '0xLegacy', chainId: 137 })}>go</button>
         </div>
       )
     }
     render(
       <CustodyProvider>
-        <BadLegacy />
+        <AddressOnly />
       </CustodyProvider>,
     )
-    fireEvent.click(screen.getByText('bad'))
-    expect(screen.getByTestId('mode')).toHaveTextContent('personal')
+    fireEvent.click(screen.getByText('go'))
+    // The identity switches (viewing needs only the address) — but no signer exists, and the
+    // chain binding stays unset because it belongs to the SIGNER, attached at ceremony time.
+    expect(screen.getByTestId('mode')).toHaveTextContent('legacy')
+    expect(screen.getByTestId('has-key')).toHaveTextContent('no')
+    expect(screen.getByTestId('chain')).toHaveTextContent('undefined')
   })
 
   it('ignores an invalid vault (missing address/chainId)', () => {

@@ -366,11 +366,45 @@ describe('WalletPage — Settings tab', () => {
     )
   })
 
+  it('opens a card whose hash simply names it, resolved from the nav search index', () => {
+    // No entry in SETTINGS_HASH_ALIASES — `accordionSectionForHash` resolves it, which is also
+    // what the menu search links to. A card added to the index is deep-linkable by that alone.
+    renderPage(connectedWalletContext, '/wallet?tab=settings#privacy-prefs')
+    expect(screen.getByRole('button', { name: /^privacy/i })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('marks each card for the menu search’s arrival flash', () => {
+    const { container } = renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    expect(container.querySelector('[data-attention="privacy-prefs"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-attention="legal-policies"]')).toBeInTheDocument()
+  })
+
   it('opens the Notifications card when deep-linked with #notification-profiles', () => {
     renderPage(connectedWalletContext, '/wallet?tab=settings#notification-profiles')
     expect(screen.getByRole('button', { name: /^notifications/i })).toHaveAttribute(
       'aria-expanded',
       'true'
+    )
+  })
+})
+
+describe('WalletPage — Recovery tab deep links', () => {
+  // Recovery is a stack of collapsed cards for the same reason Settings is, and the menu search
+  // links into both. Sending a member to a card and landing them on a closed heading would be the
+  // search stopping one step short of the thing it found.
+  it('opens the card a hash names', () => {
+    renderPage(connectedWalletContext, '/wallet?tab=security#encryption-key')
+    expect(screen.getByRole('button', { name: /^encryption key/i })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+  })
+
+  it('leaves every card collapsed without one', () => {
+    renderPage(connectedWalletContext, '/wallet?tab=security')
+    expect(screen.getByRole('button', { name: /^encryption key/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
     )
   })
 })

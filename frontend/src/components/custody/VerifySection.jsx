@@ -85,6 +85,7 @@ export default function VerifySection({ deps }) {
     verifying,
     verdict,
     verify,
+    checkOnChain,
     clearVerdict,
   } = useMessageSigning({ deps })
 
@@ -96,22 +97,27 @@ export default function VerifySection({ deps }) {
   // the signing side, would leave the returning member looking at a document with no message under
   // it (the form only shows a document that still matches the text on screen).
   const [signText, setSignText] = useState('')
-  const [checkDraft, setCheckDraft] = useState(() => ({
+  // The network starts UNSPECIFIED, deliberately — not pre-filled with whatever the member happens
+  // to be connected to. Pre-filling reads as a stated fact the member never stated, and it has
+  // teeth: a contract-account signature checked against an assumed chain finds no code there and
+  // returns a definite "does not match", when the honest answer is "you haven't said which network
+  // this account is on". A convenience default would have quietly reintroduced the confidently
+  // wrong accusation this whole surface is built to avoid. Pasting a record still fills it in,
+  // because the record actually says. Caught in review on #1165.
+  const [checkDraft, setCheckDraft] = useState({
     message: '',
     signature: '',
     address: '',
-    chainId: chainId != null ? String(chainId) : '',
-  }))
+    chainId: '',
+  })
 
   const checkSummary = verdict ? VERDICT_SUMMARY[verdict.status] : null
 
   return (
     <div className="verify-area">
-      <p className="custody-hint">
-        Prove you control an account, or check somebody else&apos;s proof. Nothing here moves funds
-        and nothing here is written to a chain.
-      </p>
-
+      {/* Spec 085 (FR-010): no intro paragraph — the section's accordion summary carries the
+          one-line state, and the full explanation lives in docs/developer-guide/message-signing.md.
+          The entry rows below are self-describing. */}
       <VerifyEntry
         title="Check a signature"
         summary={checkSummary?.text || 'Confirm an address signed a message'}
@@ -151,6 +157,7 @@ export default function VerifySection({ deps }) {
           verifying={verifying}
           verdict={verdict}
           onVerify={verify}
+          onCheckOnChain={checkOnChain}
           onClear={clearVerdict}
           draft={checkDraft}
           onDraftChange={setCheckDraft}

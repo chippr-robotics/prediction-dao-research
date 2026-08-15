@@ -1,6 +1,12 @@
 /**
  * membershipSource tests (spec 031, FR-029) — tier/expiry snapshot-diff (granted/upgraded/expired),
  * expiring-soon (action: renew, once/day), voucher redeemable (action: redeem), ok:false on read failure.
+ *
+ * The voucher leg reads event history through `lib/chain/logScan` (bounded + resumable, because the
+ * voucher contract is millions of blocks old and public RPCs cap one getLogs at 10,000 blocks). The
+ * scanner is mocked here and unit-tested on its own; what these tests pin is that an INCOMPLETE scan
+ * never becomes a voucher count — and never downgrades the whole source, whose membership read
+ * succeeded.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -9,8 +15,9 @@ const m = vi.hoisted(() => ({ fns: {} }))
 vi.mock('../../utils/blockchainService', () => ({ getProvider: () => ({}) }))
 vi.mock('../../config/contracts', () => ({
   getContractAddressForChain: () => '0x000000000000000000000000000000000000abcd',
-  getDeploymentBlockForChain: () => 0,
+  getDeploymentBlockForChain: () => 500,
 }))
+vi.mock('../../lib/chain/logScan', () => ({ scanLogs: (...a) => m.scan(...a) }))
 vi.mock('ethers', async (orig) => {
   const actual = await orig()
   function FakeContract() {
@@ -42,9 +49,9 @@ const DAY = 86400
 beforeEach(() => {
   m.fns = {
     getMembership: () => ({ tier: 2n, expiresAt: BigInt(NOW_S + 30 * DAY) }), // Silver, 30d out
-    queryFilter: () => [], // no vouchers
     ownerOf: () => ACCT,
   }
+  m.scan = vi.fn(async () => ({ logs: [], complete: true })) // no vouchers, fully scanned
 })
 
 const detect = (prior = { snapshots: {}, aux: {} }, nowMs = NOW) =>
@@ -86,7 +93,7 @@ describe('membershipSource (spec 031)', () => {
   })
 
   it('flags a redeemable voucher as action:redeem and emits on 0→N transition', async () => {
-    m.fns.queryFilter = () => [{ args: { tokenId: 1n } }, { args: { tokenId: 2n } }]
+    m.scan = vi.fn(async () => ({ logs: [{ args: { tokenId: 1n } }, { args: { tokenId: 2n } }], complete: true }))
     m.fns.ownerOf = () => ACCT // both still held
     const res = await detect({ snapshots: { membership: { tier: 2, expiresAt: NOW_S + 30 * DAY }, voucher: { count: 0 } }, aux: {} })
     expect(res.actionNeededById.voucher).toBe('redeemVoucher')
@@ -98,5 +105,25 @@ describe('membershipSource (spec 031)', () => {
     m.fns.getMembership = () => { throw new Error('rpc down') }
     const res = await detect()
     expect(res.ok).toBe(false)
+  })
+
+  // An unfinished backfill would otherwise announce "you have 1 voucher", then "2", then "3" as the
+  // scan walked back through history the member has had all along.
+  it('keeps the prior voucher slice while the scan is incomplete, and never counts a partial one', async () => {
+    m.scan = vi.fn(async () => ({ logs: [{ args: { tokenId: 1n } }], complete: false }))
+    const prior = { snapshots: { membership: { tier: 2, expiresAt: NOW_S + 30 * DAY }, voucher: { count: 0 } }, aux: {} }
+    const res = await detect(prior)
+    expect(res.ok).toBe(true) // the membership read succeeded — this is not a failed cycle
+    expect(res.partial).toBe(true)
+    expect(res.entries.map((e) => e.type)).not.toContain('voucher-redeemable')
+    expect(res.nextSnapshots.voucher).toEqual({ count: 0 })
+  })
+
+  it('marks the cycle partial (never ok:false) when the voucher scan throws', async () => {
+    m.scan = vi.fn(async () => { throw new Error('exceed maximum block range: 10000') })
+    const res = await detect()
+    expect(res.ok).toBe(true)
+    expect(res.partial).toBe(true)
+    expect(res.nextSnapshots.membership).toMatchObject({ tier: 2 }) // the good half survives
   })
 })

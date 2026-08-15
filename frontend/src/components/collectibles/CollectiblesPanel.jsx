@@ -59,13 +59,11 @@ export default function CollectiblesPanel() {
   return (
     <section className="collectibles-panel" aria-label="Collect">
       <div className="collectibles-panel-header">
-        <div>
-          <h3>Collect</h3>
-          <p className="collectibles-panel-subtitle">
-            Digital collectibles owned by your connected wallet on this network. Open one to list it for sale,
-            accept an offer, or view it on OpenSea.
-          </p>
-        </div>
+        {/* No intro paragraph (the rule spec 085 FR-010 set for Verify, applied here): the grid
+            below IS the answer to "what is this", the empty state says where collectibles come
+            from, and every action a member can take lives on the item they open. A sentence
+            describing the controls underneath it is prose a member has to read past twice. */}
+        <h3>Collect</h3>
         {status === 'ready' || status === 'empty' ? (
           <button type="button" className="collectibles-refresh" onClick={refresh}>
             Refresh

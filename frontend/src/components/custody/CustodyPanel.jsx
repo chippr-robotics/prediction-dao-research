@@ -8,6 +8,7 @@
 // the connected one are withheld behind a switch prompt (FR-004).
 
 import { useState } from 'react'
+import PropTypes from 'prop-types'
 import { useWallet } from '../../hooks'
 import { useCustody } from '../../hooks/useCustody'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
@@ -18,6 +19,10 @@ import VaultList from './VaultList'
 import CreateVaultWizard from './CreateVaultWizard'
 import LoadVaultForm from './LoadVaultForm'
 import VerifySection from './VerifySection'
+import HardwareWalletSection from './HardwareWalletSection'
+import AccordionGroup from '../account/AccordionGroup'
+import AccordionSection from '../account/AccordionSection'
+import { useHardwareAccounts } from '../../hooks/useHardwareAccounts'
 import './Custody.css'
 
 /** Custody chains other than the connected one, for the "create elsewhere" affordance (FR-005). */
@@ -70,7 +75,7 @@ function OnChainSection() {
             <p className="custody-hint">
               Custody is available on {elsewhere.map((c) => c.name).join(', ')}.{' '}
               {switchNetwork && (
-                <button type="button" className="custody-link" onClick={() => switchNetwork(elsewhere[0].chainId)}>
+                <button type="button" className="custody-link" onClick={() => { Promise.resolve(switchNetwork(elsewhere[0].chainId)).catch(() => {}) }}>
                   Switch to {elsewhere[0].name}
                 </button>
               )}
@@ -114,44 +119,68 @@ function OnChainSection() {
   )
 }
 
-export default function CustodyPanel() {
+export default function CustodyPanel({ openSection = null }) {
+  // Cheap store read (public metadata only) — powers the collapsed Off chain summary so the
+  // member sees their cold-storage state without opening the section.
+  const hardwareAccounts = useHardwareAccounts()
+
   return (
     <div className="custody-panel">
       <h2 className="custody-heading">Protect</h2>
 
-      <section className="custody-subsection" aria-labelledby="custody-onchain-title">
-        <h3 id="custody-onchain-title" className="custody-subsection-title">
-          On chain
-        </h3>
+      {/* Spec 085 — the three areas are collapsible sections in the shared accordion (one open at
+          a time, the same pattern as the Recovery and Settings tabs), so the tab reads as three
+          headings instead of three full surfaces. Longform explanation lives in the docs, not
+          here (FR-009/FR-010). Section ids double as the drawer-search attention/deep-link ids
+          (navSearchIndex; AccordionSection stamps data-attention itself), and `openSection` is
+          the hash-driven card the page asks us to land open. */}
+      <AccordionGroup defaultOpenId="custody-onchain" openId={openSection} className="custody-accordion">
         {/* Always rendered: the vault list spans chains, so it must survive an unsupported
             connected network (FR-003/FR-005). OnChainSection itself gates creation. */}
-        <OnChainSection />
-      </section>
+        <AccordionSection
+          id="custody-onchain"
+          title="On chain"
+          summary="Multisig vaults you co-control"
+          data-testid="custody-acc-onchain"
+        >
+          <OnChainSection />
+        </AccordionSection>
 
-      {/* Verify — sign an arbitrary message to prove control of an account, and check somebody
-          else's proof. It belongs in Protect rather than under an account surface because it is
-          the only place a member does something to establish who controls what WITHOUT moving
-          value; and unlike the vault sections it needs no deployment on any chain, so it is never
-          gated by the connected network. */}
-      <section className="custody-subsection" aria-labelledby="custody-verify-title">
-        <h3 id="custody-verify-title" className="custody-subsection-title">
-          Verify
-        </h3>
-        <VerifySection />
-      </section>
+        {/* Verify — sign an arbitrary message to prove control of an account, and check somebody
+            else's proof. It belongs in Protect rather than under an account surface because it is
+            the only place a member does something to establish who controls what WITHOUT moving
+            value; and unlike the vault sections it needs no deployment on any chain, so it is
+            never gated by the connected network. */}
+        <AccordionSection
+          id="custody-verify"
+          title="Verify"
+          summary="Sign and check account proofs"
+          data-testid="custody-acc-verify"
+        >
+          <VerifySection />
+        </AccordionSection>
 
-      <section
-        className="custody-subsection custody-subsection--disabled"
-        aria-labelledby="custody-offchain-title"
-        aria-disabled="true"
-      >
-        <h3 id="custody-offchain-title" className="custody-subsection-title">
-          Off chain
-        </h3>
-        <p className="custody-hint">Off-chain custody is coming later.</p>
-      </section>
+        {/* Off chain — cold storage with hardware wallets (spec 085). */}
+        <AccordionSection
+          id="custody-offchain"
+          title="Off chain"
+          summary={
+            hardwareAccounts.length > 0
+              ? `${hardwareAccounts.length} hardware ${hardwareAccounts.length === 1 ? 'account' : 'accounts'}`
+              : 'Cold storage with a hardware wallet'
+          }
+          data-testid="custody-acc-offchain"
+        >
+          <HardwareWalletSection />
+        </AccordionSection>
+      </AccordionGroup>
     </div>
   )
+}
+
+CustodyPanel.propTypes = {
+  /** Accordion card to land open (hash-driven deep link from WalletPage / drawer search). */
+  openSection: PropTypes.string,
 }
 
 export { CUSTODY_SUPPORTED_CHAIN_IDS }

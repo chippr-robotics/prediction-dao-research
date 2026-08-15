@@ -59,6 +59,8 @@
     "purchase:friend-market": "npx hardhat run ./scripts/operations/purchase-friend-market-membership.js --network mordor",
     "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor",
     "check:deps": "node scripts/deps/check-dependency-hygiene.js",
+    "check:iac": "node scripts/infra/check-iac-guardrails.js",
+    "test:iac-guardrails": "node --test \"scripts/infra/__tests__/*.test.js\"",
     "build:miniapps": "npm run build --workspace @fairwins/miniapp-token-mint && npm run build --workspace @fairwins/miniapp-clearpath",
     "deps:reinstall": "bash scripts/deps/reinstall.sh",
     "codegen:abis": "node scripts/codegen/emit-abis.js",
@@ -66,7 +68,8 @@
     "release:version": "node scripts/release/version.js",
     "release:classify": "node scripts/release/classify.js",
     "release:artifacts": "node scripts/release/artifacts.js",
-    "test:release": "node --test \"scripts/release/__tests__/*.test.js\""
+    "test:release": "node --test \"scripts/release/__tests__/*.test.js\"",
+    "test:market-templates": "node --test \"scripts/operations/market-templates/__tests__/*.test.js\""
   },
   "keywords": [
     "futarchy",
@@ -96,12 +99,8 @@
     "@openzeppelin/contracts-upgradeable": "5.4.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.0",
     "@openzeppelin/upgrades-core": "^1.44.2",
-    "@pinata/sdk": "^2.1.0",
     "@safe-global/safe-contracts": "1.4.1",
     "@safe-global/safe-singleton-factory": "^2.0.0",
-    "@semaphore-protocol/group": "^4.14.2",
-    "@semaphore-protocol/identity": "^4.14.2",
-    "@semaphore-protocol/proof": "^4.14.2",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "@types/chai": "^4.3.20",
@@ -121,12 +120,33 @@
     "typechain": "^8.3.2",
     "typescript": "^7.0.2"
   },
-  "dependencies": {
-    "@semaphore-protocol/contracts": "^4.14.2"
-  },
   "overrides": {
     "@safe-global/safe-contracts": {
       "ethers": "$ethers"
+    },
+    "@ledgerhq/hw-app-eth": {
+      "axios": "^1.19.0"
+    },
+    "@ledgerhq/domain-service": {
+      "axios": "^1.19.0"
+    },
+    "@ledgerhq/evm-tools": {
+      "axios": "^1.19.0"
+    },
+    "@graphprotocol/graph-cli": {
+      "glob": "^11.1.0",
+      "immutable": "^5.1.9",
+      "js-yaml": "^4.3.1",
+      "undici": "^7.29.0",
+      "yaml": "^2.9.0"
+    },
+    "gluegun": {
+      "cross-spawn": "^7.0.6",
+      "semver": "^7.8.5",
+      "ejs": "^3.1.10"
+    },
+    "apisauce": {
+      "axios": "^0.33.0"
     },
     "elliptic": "^6.6.1",
     "lodash": "^4.18.0",

@@ -56,7 +56,11 @@ steps:
       - '--build-arg'
       - 'VITE_IPFS_GATEWAY=https://gateway.pinata.cloud'
       - '--build-arg'
-      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.2.0'
+      # Legacy fallback only (frontend/src/data/wagers/SubgraphSource.js
+      # resolveSubgraphUrl) — networks.js's per-chain subgraphUrl for 137 is what
+      # actually resolves. Kept pointed at the live version so it can't silently
+      # diverge again (issue #1172 — this was stuck on the abandoned v0.2.0).
+      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.3.0'
       - '--build-arg'
       - 'VITE_WAGER_SOURCE=subgraph'
       # Enumerated difference 4: the non-production marker (FR-025) and the real-funds disclosure

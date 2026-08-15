@@ -9,6 +9,9 @@
  *   - missing VITE_SUBGRAPH_URL / HTTP error / GraphQL error / throw →
  *     { proposals: [], ok: false } so the caller retains prior state
  *   - proposer is lowercased; a null drawProposer row is dropped
+ *   - the endpoint is resolved per-chain via resolveSubgraphUrl(chainId)
+ *     (issue #1172), not a bare global read — a `chainId` with its own
+ *     per-chain subgraphUrl wins over the legacy VITE_SUBGRAPH_URL override
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -102,6 +105,31 @@ describe('fetchDrawProposals — successful read', () => {
     vi.stubGlobal('fetch', fetchSpy)
     await fetchDrawProposals({ wagerIds: [7, 9] })
     expect(JSON.parse(fetchSpy.mock.calls[0][1].body).variables.ids).toEqual(['7', '9'])
+  })
+})
+
+describe('fetchDrawProposals — per-chain endpoint resolution (issue #1172)', () => {
+  // Regression: callers (MyMarketsModal, wagerSource) already passed `chainId`
+  // through to fetchDrawProposals, but the old implementation destructured
+  // only `{ wagerIds }` and read the global VITE_SUBGRAPH_URL directly,
+  // silently dropping it. A chain with its own networks.js `subgraphUrl` must
+  // now win over the legacy override, proving `chainId` is actually used.
+  it('queries the per-chain subgraphUrl for the given chainId, not the legacy override', async () => {
+    const PER_CHAIN_URL = 'http://per-chain-subgraph.example'
+    vi.doMock('../config/networks', async (importOriginal) => {
+      const actual = await importOriginal()
+      return { ...actual, getSubgraphUrl: (chainId) => (chainId === 12345 ? PER_CHAIN_URL : null) }
+    })
+    vi.resetModules()
+    const { fetchDrawProposals: fetchWithMock } = await import('../data/notifications/drawProposalScan')
+
+    const fetchSpy = mockFetchJson({ data: { wagers: [] } })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await fetchWithMock({ chainId: 12345, wagerIds: ['1'] })
+
+    expect(fetchSpy).toHaveBeenCalledWith(PER_CHAIN_URL, expect.anything())
+    vi.doUnmock('../config/networks')
   })
 })
 

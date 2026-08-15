@@ -9,6 +9,7 @@ require("dotenv").config();
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const pinata = require("./pinataClient");
 
 // Free-to-use image URLs (Unsplash - CC0 license)
 const IMAGE_SOURCES = {
@@ -53,21 +54,18 @@ async function downloadImage(url, filename) {
 }
 
 async function uploadToPinata(filepath, name) {
-  const pinataSDK = require("@pinata/sdk");
-  const pinata = new pinataSDK({ pinataJWTKey: process.env.PINATA_JWT });
+  const credentials = pinata.readPinataCredentials();
+  if (!credentials) {
+    throw new Error(
+      "Pinata credentials not configured. Set PINATA_JWT, or PINATA_API_KEY + PINATA_SECRET_KEY.",
+    );
+  }
 
-  const readableStream = fs.createReadStream(filepath);
-  const options = {
-    pinataMetadata: {
-      name: `market-category-${name}`,
-    },
-    pinataOptions: {
-      cidVersion: 1,
-    },
-  };
-
-  const result = await pinata.pinFileToIPFS(readableStream, options);
-  return `ipfs://${result.IpfsHash}`;
+  const cid = await pinata.pinFile(credentials, filepath, {
+    name: `market-category-${name}`,
+    cidVersion: 1,
+  });
+  return `ipfs://${cid}`;
 }
 
 async function main() {

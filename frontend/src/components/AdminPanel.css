@@ -1471,20 +1471,18 @@
   font-size: 0.875rem;
 }
 
-/* Modal Backdrop */
-.modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
+/* No `.modal-backdrop` rule belongs here. That class is owned by the global
+   ModalSystem (`components/ui/ModalSystem.css`), which is the ONLY thing that
+   renders it — nothing under AdminPanel ever did. An unscoped copy here was
+   dead for the admin panel but not harmless: identical specificity, emitted
+   later in the bundle, so it silently overrode ModalSystem's modal-tier
+   `z-index: 2000` with `1000`. That capped the backdrop's stacking context at
+   1000, and because a child can never escape its parent's context, every modal
+   routed through `showModal` — the membership purchase flow among them — was
+   trapped below the fixed bottom nav (1200) and under the sticky header (1000,
+   later in the DOM), whatever z-index the modal's own overlay declared.
+   Keep admin-only styling scoped to an admin class.
+   Guarded by `src/test/modalBackdropOwnership.test.js`. */
 
 /* ── Oracle adapter admin tab ─────────────────────────────────────────── */
 .oracle-adapters-subtabs {

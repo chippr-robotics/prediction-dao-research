@@ -203,10 +203,6 @@ function TradePanel() {
   const pairNativeSymbol = pairNetwork?.nativeCurrency?.symbol || ''
   const wnativeSymbol = pairNativeSymbol ? `W${pairNativeSymbol}` : 'WNATIVE'
   const pairStableSymbol = pairNetwork?.stablecoin?.symbol || 'the stablecoin'
-  const swapNetworkCount = useMemo(
-    () => new Set(options.map((o) => o.chainId)).size,
-    [options],
-  )
 
   const symbolOf = (token) => token?.symbol || '—'
   const isPerpsOrder = orderType === 'sell_short' || orderType === 'buy_to_cover'
@@ -460,12 +456,10 @@ function TradePanel() {
             </span>
           </div>
         </div>
-        <p className="trade-subtitle">
-          Best-execution swaps routed across {providerName} liquidity
-          {swapNetworkCount > 1
-            ? ` on ${swapNetworkCount} networks — a pair always trades on one of them.`
-            : '.'}
-        </p>
+        {/* No subtitle. It claimed "best execution" — a phrase with a regulatory meaning nobody
+            here is measuring — and then restated the venue badge beside it, which names the
+            provider on the ticket and again on the pair. Which network a pair trades on is on the
+            pair itself, and the switch notice below says so when it matters. */}
       </div>
 
       {/* What the member needs to know about THIS order before placing it. The

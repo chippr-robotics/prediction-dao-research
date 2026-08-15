@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 #
+# SUPERSEDED BY TERRAFORM (spec 087). The VPC, subnet, static IPs, firewall rules, VMs and IAM below
+# are now declared in infra/terraform/environments/prod (modules `network` and `edge-node`), and were
+# adopted by import rather than recreated — the static IPs are pinned in Cloudflare DNS.
+#
+# This script is retained for reference: its comments record WHY each rule and grant is shaped the
+# way it is, and several of those reasons are carried into the Terraform. It is NOT the source of
+# truth. Running it now would create nothing (every step checks for existing state first) but a
+# change made here and not in Terraform is reverted on the next apply.
+#
 # infra/vm/provision.sh — create the two FairWins VMs, their network edge, and their IAM.
 #
 # IDEMPOTENT: every step checks for existing state first, so it is safe to re-run.

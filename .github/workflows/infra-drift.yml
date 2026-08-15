@@ -1,0 +1,235 @@
+# Scheduled drift detection (spec 087, T074-T078, FR-036..FR-038).
+#
+# "No undocumented drift" is the goal in issue #1177. This is what makes that claim CHECKABLE rather
+# than aspirational.
+#
+# It REPORTS, it does not correct. Auto-correcting drift would hide the fact that somebody changed
+# production out of band, which is the very thing worth knowing.
+#
+# The most important property is FR-038: a clean estate must report CLEAN. Recurring false drift —
+# from an attribute this layer does not own, most obviously the Cloud Run image tag the build
+# pipeline deploys on every merge — teaches everyone to ignore the report, and then a real drift
+# arrives to an audience that has stopped reading.
+name: Infra Drift
+
+on:
+  schedule:
+    # 07:00 UTC daily, before the working day in the maintainer's timezone.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+env:
+  TERRAFORM_VERSION: "1.15.8"
+
+concurrency:
+  group: infra-drift
+  cancel-in-progress: false
+
+jobs:
+  prober-staleness:
+    name: Prober allowlist freshness
+    runs-on: ubuntu-latest
+    # Nothing to check against before the trust root exists.
+    if: vars.WIF_PROVIDER != '' && vars.TF_PLAN_SERVICE_ACCOUNT != ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # actions/checkout persists a credential as `http.https://github.com/.extraheader` in the
+          # workspace's LOCAL git config. An explicit Authorization header OVERRIDES a URL-embedded
+          # one, so every git call made from inside the workspace — the module preflight, and
+          # `terraform init` fetching the private modules — silently authenticated as GITHUB_TOKEN,
+          # which is scoped to THIS repository alone and therefore 404s on chippr-tf-modules.
+          #
+          # That is what made a correctly-scoped token look broken: the REST API (which does not read
+          # git config) returned 200 for the same repo at the same moment git returned 404.
+          #
+          # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.TF_PLAN_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Cloudflare's ranges refresh through a data source on every plan. Google's prober addresses
+      # have no data source, so a committed list is the only option — and a committed list nobody
+      # re-checks fails in the worst way: the probers move, checks go red against a healthy origin,
+      # and the team learns to ignore the alert. This makes staleness loud (FR-040).
+      - name: Check the committed prober list against the live one
+        run: node scripts/infra/generate-prober-cidrs.js --check
+
+  drift:
+    name: Drift ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    # No trust root means no state to compare against. Reporting "no drift" here would be a
+    # fabricated result, so the job does not run at all.
+    if: vars.WIF_PROVIDER != '' && vars.TF_APPLY_SERVICE_ACCOUNT != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [prod, staging]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # actions/checkout persists a credential as `http.https://github.com/.extraheader` in the
+          # workspace's LOCAL git config. An explicit Authorization header OVERRIDES a URL-embedded
+          # one, so every git call made from inside the workspace — the module preflight, and
+          # `terraform init` fetching the private modules — silently authenticated as GITHUB_TOKEN,
+          # which is scoped to THIS repository alone and therefore 404s on chippr-tf-modules.
+          #
+          # That is what made a correctly-scoped token look broken: the REST API (which does not read
+          # git config) returned 200 for the same repo at the same moment git returned 404.
+          #
+          # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: google-github-actions/auth@v2
+        with:
+          # The apply identity, not the plan identity: the prod root reads the origin-lock value
+          # through a Secret Manager data source, which the read-only identity is deliberately not
+          # granted (contracts/ci-identity.md).
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.TF_APPLY_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      # `terraform init` must fetch modules from the PRIVATE chippr-tf-modules repository. The
+      # default GITHUB_TOKEN is scoped to this repository only and cannot read it, so a token with
+      # Contents:read on that repo is rewritten into git's config here.
+      #
+      # A missing or wrong token surfaces as `repository not found` on the module source, NOT as a
+      # permission error — GitHub returns 404 rather than 403 for a private repo the caller cannot
+      # see. Read that message as authentication before you go looking for a wrong path.
+      - name: Allow Terraform to fetch private modules
+        env:
+          # Through `env:`, not interpolated straight into the script. Interpolating a secret into a
+          # `run:` body splices its raw bytes into the shell source, so a value containing a newline
+          # breaks the command apart — which is exactly how this first failed, with git reporting
+          # `URL rejected: Malformed input to a URL function`.
+          TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Trim stray whitespace. A secret pasted with a trailing newline is invisible in the UI and
+          # produces a URL git cannot parse.
+          token="$(printf '%s' "${TF_MODULES_TOKEN}" | tr -d '[:space:]')"
+          if [ -z "${token}" ]; then
+            echo "::error::TF_MODULES_TOKEN is empty. terraform init cannot fetch the private modules."
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+
+          # Preflight the credential against the modules repo. Without this, a bad token surfaces
+          # three steps later as a terraform module-download failure, where the real message is
+          # buried under `Could not download module`. The three failure modes below are genuinely
+          # different problems with genuinely different fixes, and git reports them distinctly.
+          if ! err="$(git ls-remote https://github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules."
+            case "$err" in
+              *"Invalid username or token"*|*"Authentication failed"*)
+                echo "::error::The token was REJECTED. If it is a fine-grained PAT, it must list"
+                echo "::error::chippr-tf-modules explicitly under 'Repository access' — a token"
+                echo "::error::scoped to other repositories is rejected here even though it is valid."
+                echo "::error::If it is a classic PAT, it needs the 'repo' scope AND SSO authorisation"
+                echo "::error::for the chippr-robotics organisation."
+                ;;
+              *"not found"*|*"does not exist"*)
+                echo "::error::The repository was NOT FOUND, which for a private repo usually means"
+                echo "::error::the token cannot see it rather than that it is missing — GitHub"
+                echo "::error::returns 404 rather than 403 to a caller without access."
+                ;;
+              *)
+                echo "::error::${err}"
+                ;;
+            esac
+            exit 1
+          fi
+          echo "Module repository reachable."
+
+      - name: Init
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        run: terraform init -input=false
+
+      # -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes present (i.e. drift).
+      - name: Plan
+        id: plan
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set +e
+          terraform plan -input=false -lock-timeout=5m -detailed-exitcode -out=drift.tfplan
+          code=$?
+          set -e
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = "1" ]; then
+            echo "::error::Drift check could not run for ${{ matrix.environment }}."
+            exit 1
+          fi
+
+      # Redacted, same renderer as the PR summary. A drift report that leaks values is a state dump
+      # on a schedule (FR-037).
+      - name: Render redacted drift report
+        if: steps.plan.outputs.exitcode == '2'
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          terraform show -json drift.tfplan > drift.json
+          node "$GITHUB_WORKSPACE/scripts/infra/render-plan-summary.js" drift.json > drift.md
+          cat drift.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report clean
+        if: steps.plan.outputs.exitcode == '0'
+        run: |
+          echo "### ${{ matrix.environment }}: no drift" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The running estate matches the repository." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or update a drift issue
+        if: steps.plan.outputs.exitcode == '2'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const env = '${{ matrix.environment }}';
+            const body = fs.readFileSync(`infra/terraform/environments/${env}/drift.md`, 'utf8');
+            const title = `Infrastructure drift detected: ${env}`;
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'infrastructure,drift',
+            });
+            const existing = open.find((i) => i.title === title);
+            const preamble =
+              `The running \`${env}\` estate no longer matches the repository, as of ` +
+              `${context.sha.slice(0, 7)}.\n\n` +
+              'This report does **not** correct the drift — deciding whether reality or the ' +
+              'repository is right is a human call. If the change was intended, declare it here ' +
+              'and merge. If it was not, this is the record that it happened.\n\n';
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.number, body: preamble + body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body: preamble + body,
+                labels: ['infrastructure', 'drift'],
+              });
+            }

@@ -24,6 +24,11 @@ import {
   applyMiniAppState,
   mergeMiniAppState,
 } from '../miniapps/store'
+import {
+  loadHardwareAccounts,
+  saveHardwareAccounts,
+  mergeHardwareAccounts,
+} from '../hardware/hardwareAccountsStore'
 
 const PREF_KEYS = {
   recentSearches: 'recent_searches',
@@ -173,6 +178,26 @@ export const syncedObjects = [
     load: (account) => loadMiniAppState(account),
     apply: (account, value, mode) => applyMiniAppState(account, value, mode),
     merge: (current, incoming) => mergeMiniAppState(current, incoming),
+  },
+  {
+    // Spec 085 — saved hardware-wallet accounts. The value is PUBLIC metadata only
+    // (address, vendor, derivation path, label) — no key material exists to protect,
+    // because the keys never leave the device. Not network-scoped: a hardware EOA
+    // address is the same across every EVM chain, so entries are keyed by address alone.
+    key: 'hardwareAccounts',
+    label: 'Hardware wallet accounts',
+    networkScoped: false,
+    load: (account) => loadHardwareAccounts(account),
+    apply: (account, value, mode) => {
+      if (mode === 'replace') {
+        saveHardwareAccounts(account, value)
+        return { conflicts: [] }
+      }
+      const { value: merged, conflicts } = mergeHardwareAccounts(loadHardwareAccounts(account), value)
+      saveHardwareAccounts(account, merged)
+      return { conflicts }
+    },
+    merge: (current, incoming) => mergeHardwareAccounts(current, incoming),
   },
 ]
 

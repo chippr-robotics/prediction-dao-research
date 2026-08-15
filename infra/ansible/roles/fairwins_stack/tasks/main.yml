@@ -1,0 +1,48 @@
+# The role's container stack and its systemd units (spec 087, US3, FR-023).
+---
+- name: Install the systemd units and timers
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: /etc/systemd/system/
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - "{{ fairwins_repo_dir }}/infra/vm/systemd/fairwins-stack@.service"
+    - "{{ fairwins_repo_dir }}/infra/vm/systemd/fairwins-probe@.service"
+    - "{{ fairwins_repo_dir }}/infra/vm/systemd/fairwins-probe@.timer"
+  become: true
+  notify: reload systemd units
+
+- name: Flush handlers so systemd sees the units before they are enabled
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the role's stack
+  # ONLY this role's instance. The other role's template instance would start the wrong compose
+  # project against this node's env files.
+  ansible.builtin.systemd_service:
+    name: "fairwins-stack@{{ fairwins_role }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: Enable the probe timer
+  ansible.builtin.systemd_service:
+    name: "fairwins-probe@{{ fairwins_role }}.timer"
+    enabled: true
+    state: started
+  become: true
+
+- name: Read the stack's container state
+  ansible.builtin.command:
+    cmd: docker compose -f {{ fairwins_root }}/{{ fairwins_role }}/docker-compose.yml ps --format json
+  become: true
+  changed_when: false
+  failed_when: false
+  register: fairwins_stack_ps
+
+- name: Report the running stack
+  ansible.builtin.debug:
+    msg: "{{ fairwins_role }} stack: {{ fairwins_stack_ps.stdout_lines | length }} container(s) reported"
