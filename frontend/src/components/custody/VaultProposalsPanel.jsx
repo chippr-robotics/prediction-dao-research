@@ -27,7 +27,7 @@ export default function VaultProposalsPanel({ vault, proposals }) {
           This vault is on {vaultChainLabel}. Switch networks to view and act on its transactions.
         </p>
         {switchNetwork && (
-          <button type="button" onClick={() => { switchNetwork(vault.chainId).catch(() => {}) }}>
+          <button type="button" onClick={() => { Promise.resolve(switchNetwork(vault.chainId)).catch(() => {}) }}>
             Switch to {vault.chainName || `network ${vault.chainId}`}
           </button>
         )}

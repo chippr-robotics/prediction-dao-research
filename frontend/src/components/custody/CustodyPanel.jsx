@@ -75,7 +75,7 @@ function OnChainSection() {
             <p className="custody-hint">
               Custody is available on {elsewhere.map((c) => c.name).join(', ')}.{' '}
               {switchNetwork && (
-                <button type="button" className="custody-link" onClick={() => { switchNetwork(elsewhere[0].chainId).catch(() => {}) }}>
+                <button type="button" className="custody-link" onClick={() => { Promise.resolve(switchNetwork(elsewhere[0].chainId)).catch(() => {}) }}>
                   Switch to {elsewhere[0].name}
                 </button>
               )}

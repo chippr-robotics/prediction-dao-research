@@ -27,7 +27,7 @@ function NetworkUnavailableNotice({ feature = 'This feature', targetName = 'Poly
           <button
             type="button"
             className="network-unavailable__action"
-            onClick={() => { switchNetwork().catch(() => {}) }}
+            onClick={() => { Promise.resolve(switchNetwork()).catch(() => {}) }}
           >
             Switch to {targetName}
           </button>

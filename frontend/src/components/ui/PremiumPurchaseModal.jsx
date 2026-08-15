@@ -729,7 +729,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                       </p>
                       {/* A decline now genuinely rejects (spec 088) — swallow it: the wallet showed its own
                           prompt and the button stays for retry. */}
-                      <button type="button" onClick={() => { switchNetwork(purchaseChainId).catch(() => {}) }}>
+                      <button type="button" onClick={() => { Promise.resolve(switchNetwork(purchaseChainId)).catch(() => {}) }}>
                         Switch to {purchaseNetworkName}
                       </button>
                     </div>
