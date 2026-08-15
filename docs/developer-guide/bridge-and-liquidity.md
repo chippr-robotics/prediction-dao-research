@@ -378,6 +378,31 @@ total supplied, and the estimated return — and **the whole row is a `<button>`
    The row never collapses them into one "closed", never hides the pool, and never disables itself:
    `SupplyView` opens a closed pool the member holds **straight onto Withdraw** (FR-021/FR-024).
 
+### Narrowing the list
+
+The list spans every network with a router and holds both kinds together, so it comes with a search
+box and a *All / Trading / Bridge* chip row (`lib/liquidity/poolSearch.js`). Search matches, as an
+AND over whitespace-separated terms, the words the row itself shows — assets, the joined pair label,
+protocol, network, kind label — so anything a member can read they can type. Two rules:
+
+1. **Narrowing is by identity, never by state.** `poolSearchText()` deliberately excludes
+   `available` / `unavailableReason`, so no query can act as a "hide the closed ones" filter. A pool a
+   member has money in stays findable by its own name (FR-024).
+2. **It narrows the catalog, never the positions.** The *Your pools* list above renders from
+   `positions` and is not filtered at all — a control that could hide a position would hide money.
+
+The `?token=` deep link (`tokenFilter`, an exact symbol match) composes with both rather than being
+replaced by either; the chip row is withheld when only one kind is curated and the search box when
+there is a single pool. An empty result says which kind of empty it is: `noPoolMatchCopy()` for a
+search that reached nothing (a fact about the search, with a *Clear search* control) versus
+`NO_POOLS_COPY` for an empty catalog (a fact about the estate).
+
+The asymmetric availability copy sits in a collapsed `<details>` below the list — "Where pools are
+available" — rather than as a paragraph above it, and it carries the active-network note when there
+is one (the note ends with the same sentence, so the two never render together).
+**Folded, not dropped**: a member who cannot find out that bridge pools are Ethereum-only meets that
+fact at the confirm step instead.
+
 The row draws no sparkline and no composition bar, unlike the design it follows. Neither has an
 honest source — no price feed backs a two-asset split, no history feed backs a trend — and on a value
 surface a decorative chart is a claim (rule 4 of the invariants below).
@@ -417,6 +442,7 @@ survives the app closing, and the gateway status endpoint is a **convenience, no
 | `uniswapPositions.js` | Local full-range tick derivation (identical to `fullRangeTicks`), position discovery, value/earnings/composition — every figure flagged `isEstimate` — and the **exit** calls (`decreaseLiquidity` + `collect`) straight to the position manager. `positionManager` is always an explicit argument, never hardcoded (R4b). |
 | `acrossLpPositions.js` | Bridge-pool supply, read, and exit. **Nothing here imports, resolves, or targets `LiquidityRouter`**; there is no `maxFeeBps` argument and no fee-quoting function, because there is no fee. Answers for unsupported networks with `available: false` **and a reason naming where it is available**. |
 | `liquidityCopy.js` | All member-facing wording, including the asymmetric availability copy and `liquidityFeeCopy` returning `null` for bridge pools, always. |
+| `poolSearch.js` | Narrowing the Supply list — search haystack, kind chips, and the `filterPools` composition of query + kind + `?token=`. Matches on identity only; a pool's state is never part of the haystack. |
 
 Ledger/notification wiring: `LEDGER_CLASS.LIQUIDITY` + `liquidityLedgerSource.js`, and the `bridge` /
 `liquidity` notification domains. Both class names are **new and additive** — nothing is reclassified,

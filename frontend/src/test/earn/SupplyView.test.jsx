@@ -281,6 +281,107 @@ describe('SupplyView — the curated list (FR-015)', () => {
     expect(stated).toHaveLength(1)
     expect(stated[0]).toHaveTextContent(/trading pools/i)
   })
+
+  it('folds the availability copy away without dropping it', () => {
+    render(<SupplyView catalog={catalog()} />)
+    // Reference material a member reads once should not hold the top of the
+    // screen — but it must stay reachable, because a member who cannot find out
+    // that bridge pools are Ethereum-only hits that fact at the confirm step.
+    const summary = screen.getByText('Where pools are available')
+    const details = summary.closest('details')
+    expect(details).toBeTruthy()
+    expect(details.open).toBe(false)
+    expect(details).toHaveTextContent(/Bridge pools are available on Ethereum only/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Searching and narrowing the list
+// ---------------------------------------------------------------------------
+
+describe('SupplyView — search and filters', () => {
+  const search = () => screen.getByRole('searchbox', { name: /search pools/i })
+
+  it('narrows the list as the member types, matching asset, network or protocol', () => {
+    render(<SupplyView catalog={catalog()} />)
+
+    fireEvent.change(search(), { target: { value: 'ethereum' } })
+    expect(bridgeRow()).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /USDC \/ WETH —/ })).not.toBeInTheDocument()
+    // A short list must read as a narrowed one, not as the whole estate.
+    expect(screen.getByText('Showing 1 of 2 pools.')).toBeInTheDocument()
+
+    fireEvent.change(search(), { target: { value: '' } })
+    expect(tradingRow()).toBeInTheDocument()
+    expect(screen.queryByText(/Showing 1 of 2 pools/)).not.toBeInTheDocument()
+  })
+
+  it('filters by pool kind from the chip row', () => {
+    render(<SupplyView catalog={catalog()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trading' }))
+    expect(tradingRow()).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^USDC — Bridge liquidity/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Trading' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    expect(bridgeRow()).toBeInTheDocument()
+  })
+
+  it('offers no kind chips when only one kind is curated', () => {
+    render(<SupplyView catalog={catalog({ pools: [TRADING_POOL, NO_RETURN_POOL] })} />)
+    // Two controls where one empties the list and the other does nothing.
+    expect(screen.queryByRole('group', { name: /filter pools by type/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('searchbox', { name: /search pools/i })).toBeInTheDocument()
+  })
+
+  it('offers no search box for a single pool', () => {
+    render(<SupplyView catalog={catalog({ pools: [TRADING_POOL] })} />)
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+  })
+
+  it('NEVER hides a pool that is closed to new deposits (FR-024)', () => {
+    // A member's exit lives inside that row. Narrowing by identity is allowed to
+    // move it off screen; narrowing by state is not, and no control here does.
+    render(<SupplyView catalog={catalog({ pools: [TRADING_POOL, RETIRED_POOL] })} />)
+
+    fireEvent.change(search(), { target: { value: 'usdc' } })
+    const row = screen.getByRole('button', { name: /USDC \/ WPOL/ })
+    expect(within(row).getByText('Closed to new deposits')).toBeInTheDocument()
+  })
+
+  it('never filters the member’s own positions — only the catalog below them', () => {
+    render(
+      <SupplyView catalog={catalog({ positions: [TRADING_POSITION, BRIDGE_POSITION] })} />,
+    )
+    fireEvent.change(search(), { target: { value: 'zzz' } })
+
+    // The catalog is empty and says so; both positions are still on screen.
+    expect(screen.getByText(/No pool matches “zzz”/i)).toBeInTheDocument()
+    expect(screen.getByText('500 USDC + 0.12 WETH')).toBeInTheDocument()
+    expect(screen.getByText('1,000 USDC')).toBeInTheDocument()
+  })
+
+  it('explains an empty search differently from an empty catalog, and offers a way back', () => {
+    render(<SupplyView catalog={catalog()} />)
+    fireEvent.change(search(), { target: { value: 'solana' } })
+
+    // A search that found nothing is a fact about the search, not about the catalog.
+    expect(screen.getByText(/No pool matches “solana”/i)).toBeInTheDocument()
+    expect(screen.queryByText(/There are no pools to supply right now/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear search/i }))
+    expect(tradingRow()).toBeInTheDocument()
+    expect(search()).toHaveValue('')
+  })
+
+  it('composes with the ?token= deep link rather than replacing it', () => {
+    render(<SupplyView tokenFilter="USDC" catalog={catalog()} />)
+    fireEvent.change(search(), { target: { value: 'polygon' } })
+
+    expect(tradingRow()).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^USDC — Bridge liquidity/ })).not.toBeInTheDocument()
+  })
 })
 
 // ---------------------------------------------------------------------------
