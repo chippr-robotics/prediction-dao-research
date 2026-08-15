@@ -172,6 +172,34 @@ encryption key, recovery codes). Each panel renders itself as an
   `ActionSheet` (centered card on desktop, bottom sheet on mobile) that states
   the consequence first.
 
+### Section copy: a heading, not an essay
+
+A member-facing section starts with its **controls**, not with a paragraph describing them. The rule
+(set for Protect ▸ Verify by spec 085 FR-010, and now applied across the app) is:
+
+> An intro paragraph survives only if it states something the screen underneath cannot show, and
+> that a member needs **before** acting. Otherwise it is deleted, not shortened.
+
+What that rules out, with the failure each one caused:
+
+| Pattern | Why it goes |
+|---|---|
+| "Digital collectibles owned by your wallet. Open one to list it…" | Describes the grid below it and the actions on the item you open. |
+| "…a small builder fee applies, shown before you sign." | A promise of a disclosure is not the disclosure. State the **number**, where it is known, at the confirm step (`TradeConfirm`). |
+| "Best-execution swaps routed across…" | A claim with a regulatory meaning nobody is measuring, over a badge that already names the venue. |
+| "You see the exact amount that will arrive and every cost before you sign." | The quote states those as figures a few rows down. |
+
+What survives, and why: **Wagers** keeps one line, because escrow is the thing that makes it
+different from every other tab in Transfer; **Bitcoin Stamps** keeps one, because a member who does
+not know Stamp coins are unspendable will read their own balance as wrong; **Bridge** keeps its
+"What is bridging?" `InfoTip` — moved onto the first field, since a tip does not need a paragraph to
+hang off. `InfoTip` beside a heading or a label is the default home for anything explanatory: it is
+one tap for the member who wants it and zero lines for the member who does not.
+
+Honest-absence notes (an asset withheld because no route exists, a network that could not be read)
+are **not** intro copy and are not covered by this — they are stated wherever the absence shows up,
+as briefly as the fact allows.
+
 ### Network handling
 
 `config/wagmi.js` defines the default chain (Polygon 137, overridable via

@@ -128,11 +128,11 @@ function NetworkPanel() {
     <div className="network-settings" role="tabpanel">
       <div className="section">
         <h3>Network</h3>
+        {/* The tags and the endpoint rows below explain themselves; what a member cannot see from
+            the list is the one surprising fact — that they rarely need to switch at all. */}
         <p className="section-description">
-          FairWins reads every supported network at once — your assets carry their own network,
-          so you only need to switch when sending on a network your wallet is not currently on.
-          Tags show which protocol features are deployed where, and each network can run on your
-          own RPC endpoint.
+          Your assets carry their own network, so you only need to switch when sending on one your
+          wallet is not already on.
         </p>
 
         {reloadRecommended && (

@@ -51,13 +51,11 @@ export default function PredictPanel() {
   return (
     <section className="predict-panel" aria-label="Predict">
       <div className="predict-panel-header">
-        <div>
-          <h3>Predict</h3>
-          <p className="predict-panel-subtitle">
-            Trade Polymarket prediction markets. Open a market to buy or sell outcome shares — a small
-            FairWins builder fee applies to each trade, shown before you sign.
-          </p>
-        </div>
+        {/* No intro paragraph. The market list says what this is, and the builder fee is
+            disclosed where it can be stated as a NUMBER rather than as "a small fee" — its own
+            line in `TradeConfirm`, before the signature (spec 057). A blurb promising a
+            disclosure is not the disclosure, and it was the first thing on the screen. */}
+        <h3>Predict</h3>
         {(status === 'ready' || status === 'empty') && (
           <button type="button" className="predict-refresh" onClick={refresh}>
             Refresh

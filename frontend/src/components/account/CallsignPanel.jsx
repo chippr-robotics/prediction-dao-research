@@ -758,10 +758,11 @@ export default function CallsignPanel() {
       <h3>
         Callsign <span className="callsign-panel__optional">(optional)</span>
       </h3>
+      {/* The heading already says "(optional)", so this says it once more only in the form that
+          matters — nothing on the platform requires one — and stops. */}
       <p className="section-description">
-        A callsign like <code>%chipprbots</code> is a memorable handle others can use to find you.
-        Callsigns are completely optional — you never need one to create, accept, or settle a wager, and
-        you can change or release yours at any time.
+        A memorable handle like <code>%chipprbots</code> others can use to find you. Nothing requires
+        one, and you can change or release yours at any time.
       </p>
 
       {body}
