@@ -40,6 +40,9 @@ jobs:
     name: Apply ${{ matrix.environment }}
     runs-on: ubuntu-latest
     environment: production
+    # No trust root, no identity to apply as. A merge before bootstrap must not fail the branch;
+    # it simply has nothing to apply. Guarded here rather than discovered at the auth step.
+    if: vars.WIF_PROVIDER != '' && vars.TF_APPLY_SERVICE_ACCOUNT != ''
     strategy:
       # Sequential on purpose: one environment's failure must not leave another mid-apply.
       max-parallel: 1

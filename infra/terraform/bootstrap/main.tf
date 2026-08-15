@@ -28,10 +28,6 @@ provider "google" {
   region  = var.region
 }
 
-data "google_project" "this" {
-  project_id = var.project_id
-}
-
 # ── state backend ─────────────────────────────────────────────────────────────────────────────
 
 resource "google_storage_bucket" "tfstate" {

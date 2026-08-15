@@ -34,6 +34,8 @@ jobs:
   prober-staleness:
     name: Prober allowlist freshness
     runs-on: ubuntu-latest
+    # Nothing to check against before the trust root exists.
+    if: vars.WIF_PROVIDER != '' && vars.TF_PLAN_SERVICE_ACCOUNT != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -58,6 +60,9 @@ jobs:
   drift:
     name: Drift ${{ matrix.environment }}
     runs-on: ubuntu-latest
+    # No trust root means no state to compare against. Reporting "no drift" here would be a
+    # fabricated result, so the job does not run at all.
+    if: vars.WIF_PROVIDER != '' && vars.TF_APPLY_SERVICE_ACCOUNT != ''
     strategy:
       fail-fast: false
       matrix:
