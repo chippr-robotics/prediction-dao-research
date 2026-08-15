@@ -1,0 +1,41 @@
+# Dynamic inventory for the FairWins nodes (spec 085, R11).
+#
+# WHY DYNAMIC: a static inventory needs editing every time a VM is recreated, and would silently
+# target a stale address in the meantime. The VMs already carry the labels this keys on
+# (app=fairwins, role=bundler|gateway), set by the edge-node Terraform module.
+#
+# WHY THE PROXY COMMAND: these nodes have NO public SSH. The firewall opens :22 to 35.235.240.0/20
+# (the IAP TCP forwarding range) and nothing else; :443/:80 are open to Cloudflare ranges only. A
+# playbook written for direct SSH cannot reach them at all — and the fix is a working tunnel, never
+# a wider source range.
+plugin: google.cloud.gcp_compute
+
+projects:
+  - chippr-bots-site-wp
+
+zones:
+  - us-central1-a
+
+filters:
+  - labels.app = fairwins
+
+auth_kind: application
+
+# Group by role so playbooks/bundler.yml and playbooks/gateway.yml select cleanly, and so
+# group_vars/<role>.yml applies.
+keyed_groups:
+  - key: labels.role
+    prefix: ""
+    separator: ""
+
+hostnames:
+  - name
+
+compose:
+  # IAP tunnels to the instance by NAME, so the connection never depends on a public address.
+  ansible_host: name
+  ansible_user: "'ansible'"
+  ansible_ssh_common_args: >-
+    "'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+    -o ProxyCommand=\"gcloud compute start-iap-tunnel %h 22
+    --listen-on-stdin --project=chippr-bots-site-wp --zone=us-central1-a\"'"

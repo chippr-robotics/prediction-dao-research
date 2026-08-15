@@ -1,0 +1,164 @@
+# Automatic apply on merge (spec 085, T066-T069, FR-031..FR-035).
+#
+# ⚠ THIS WORKFLOW MUTATES PRODUCTION WITHOUT A HUMAN IN THE LOOP.
+#
+# Under automatic apply, review approves DIFFS, not PERMISSIONS. The permission boundary is the real
+# control: `fairwins-tf-apply@` is denied the roles needed to destroy the irreplaceable resources or
+# to touch another workload, so a merged mistake fails at the API rather than succeeding quietly.
+# See specs/085-infrastructure-as-code/contracts/ci-identity.md.
+#
+# Three properties this workflow must preserve:
+#   FR-034  it applies the plan that was REVIEWED, never a freshly computed one
+#   FR-035  a failure is loud, and destructive operations are never retried unattended
+#   FR-032  no long-lived credential — GCP auth is federated; the Cloudflare token is the one
+#           exception, because Cloudflare offers no OIDC federation
+name: Infra Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/**"
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+env:
+  TERRAFORM_VERSION: "1.15.8"
+
+# Queue, never cancel. Two infra PRs merging close together would otherwise race for the state lock,
+# with the loser failing after having already passed review. Combined with Terraform's own
+# saved-plan staleness check, a race becomes a clean "re-plan required" instead of a partial change.
+concurrency:
+  group: infra-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      # Sequential on purpose: one environment's failure must not leave another mid-apply.
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        environment: [prod, staging]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Locate the reviewed plan
+        id: locate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Find the PR this commit merged, then its plan run. If the commit did not arrive via a
+            // pull request, there is no reviewed plan and this must not proceed.
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner, repo: context.repo.repo, commit_sha: context.sha,
+            });
+            if (prs.length === 0) {
+              core.setFailed(
+                'No pull request is associated with this commit. Automatic apply executes a plan ' +
+                'that a reviewer saw (FR-034); a direct push to main has no such plan. Open a PR.');
+              return;
+            }
+            const pr = prs[0];
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              head_sha: pr.head.sha, status: 'success',
+            });
+            const planRun = runs.workflow_runs.find((r) => r.name === 'Infra Plan');
+            if (!planRun) {
+              core.setFailed(
+                `No successful Infra Plan run found for PR #${pr.number} head ${pr.head.sha}. ` +
+                'Re-run the plan and merge again.');
+              return;
+            }
+            core.setOutput('run_id', planRun.id);
+            core.setOutput('pr_number', pr.number);
+            core.setOutput('head_sha', pr.head.sha);
+
+      - name: Download the reviewed plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ matrix.environment }}
+          path: infra/terraform/environments/${{ matrix.environment }}
+          run-id: ${{ steps.locate.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # FR-034. Terraform already refuses to apply a saved plan against a MOVED STATE ("Saved plan is
+      # stale"). What it cannot tell is whether the merged CONFIGURATION is the configuration that
+      # was planned — squash merges, rebases, and a second infra PR landing first all change the
+      # tree without touching state. Comparing the tree digest closes that gap.
+      #
+      # The correct outcome on mismatch is a hard stop requiring a re-plan. Computing a fresh plan
+      # here and applying it is precisely what FR-034 forbids.
+      - name: Verify the plan matches the merged tree
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          prov="infra/terraform/environments/${{ matrix.environment }}/plan-provenance.txt"
+          planned_digest="$(grep '^infra_tree_digest=' "$prov" | cut -d= -f2)"
+          merged_digest="$(git rev-parse HEAD:infra/terraform)"
+
+          if [ "$planned_digest" != "$merged_digest" ]; then
+            echo "::error::The reviewed plan does not match the merged configuration."
+            echo "  planned against infra/terraform tree: $planned_digest"
+            echo "  merged infra/terraform tree:          $merged_digest"
+            echo ""
+            echo "The infra tree changed between the plan and the merge — most often because another"
+            echo "infra PR landed first, or because the merge rewrote the commit. Applying now would"
+            echo "execute a plan nobody reviewed (FR-034)."
+            echo ""
+            echo "Fix: re-run the plan on a fresh PR (an empty commit is enough) and merge that."
+            exit 1
+          fi
+          echo "Plan provenance verified: $merged_digest"
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.TF_APPLY_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Init
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        run: terraform init -input=false
+
+      # NO RETRY, EVER (FR-035). Terraform writes state incrementally, so a mid-apply failure leaves
+      # some resources created. An automatic retry would re-attempt destructive operations against a
+      # half-applied estate. The correct response is a human re-planning and inspecting — see
+      # docs/runbooks/infrastructure-operations.md.
+      - name: Apply the reviewed plan
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: terraform apply -input=false -lock-timeout=10m tfplan
+
+      - name: Record the apply
+        if: always()
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        run: |
+          {
+            echo "### Apply: ${{ matrix.environment }} — ${{ job.status }}"
+            echo ""
+            echo "- commit: \`${{ github.sha }}\`"
+            echo "- reviewed in: #${{ steps.locate.outputs.pr_number }} (head \`${{ steps.locate.outputs.head_sha }}\`)"
+            echo "- plan run: ${{ steps.locate.outputs.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report a failed apply
+        if: failure()
+        run: |
+          echo "::error::Apply FAILED for ${{ matrix.environment }}. State may be partially applied."
+          echo "::error::Do NOT re-run this job. Follow the partial-apply procedure in"
+          echo "::error::docs/runbooks/infrastructure-operations.md: re-plan, inspect, then decide."

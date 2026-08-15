@@ -1,0 +1,11 @@
+# Converge the bundler node only (spec 085).
+---
+- name: Converge the bundler
+  hosts: bundler
+  gather_facts: true
+  roles:
+    - common
+    - docker
+    - nginx
+    - fairwins_secrets
+    - fairwins_stack

@@ -1,0 +1,207 @@
+# Infrastructure plan on pull requests (spec 085, T017-T019, FR-027/FR-029).
+#
+# Runs as the READ-ONLY identity. Pull requests come from branches, including forks; a single
+# identity would mean any branch that can trigger a workflow can mutate production. The apply
+# identity is separately restricted to the default branch (contracts/ci-identity.md).
+#
+# Every gate here fails the pipeline on error. Per constitution IV, `continue-on-error` is forbidden
+# on lint/test/build/security steps — a warning in CI is a comment.
+name: Infra Plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "scripts/infra/**"
+      - ".github/workflows/infra-*.yml"
+
+permissions:
+  contents: read
+  id-token: write # required for Workload Identity Federation; no stored key exists (FR-032)
+  pull-requests: write
+
+env:
+  TERRAFORM_VERSION: "1.15.8"
+
+concurrency:
+  group: infra-plan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guardrails:
+    name: Guardrails and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The repository-specific rules. A generic linter does not know that the GCP project is shared,
+      # that some resources are unrecoverable, or that one Cloud Run service must stay
+      # decommissioned. See specs/085-infrastructure-as-code/contracts/guardrails.md.
+      - name: IaC guardrails
+        run: node scripts/infra/check-iac-guardrails.js
+
+      - name: Guardrail gate self-test
+        # A gate that silently passes everything is worse than no gate, because it gets cited as
+        # evidence. This proves every rule still fires.
+        run: node --test "scripts/infra/__tests__/*.test.js"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive infra/terraform
+
+      - name: terraform validate
+        run: |
+          set -euo pipefail
+          for root in infra/terraform/bootstrap infra/terraform/environments/*; do
+            echo "::group::validate $root"
+            terraform -chdir="$root" init -backend=false -input=false
+            terraform -chdir="$root" validate
+            echo "::endgroup::"
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: tflint
+        run: |
+          set -euo pipefail
+          tflint --init --chdir=infra/terraform
+          tflint --recursive --chdir=infra/terraform
+
+  ansible-lint:
+    name: Ansible lint and idempotency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible
+        run: |
+          pip install --quiet ansible-core ansible-lint
+          ansible-galaxy collection install -r infra/ansible/requirements.yml
+
+      - name: ansible-lint
+        working-directory: infra/ansible
+        run: ansible-lint
+
+      - name: Playbook syntax check
+        working-directory: infra/ansible
+        run: |
+          set -euo pipefail
+          for pb in site.yml playbooks/*.yml; do
+            ansible-playbook --syntax-check -i localhost, "$pb"
+          done
+
+      # NOTE: the double-run idempotency assertion (SC-005) requires a reachable node and therefore
+      # runs against a scratch host, not in this workflow. The procedure is quickstart.md scenario 5.
+      # Stating that here rather than silently omitting it: a CI job that claims to prove idempotency
+      # without ever contacting a node would be a fabricated gate.
+
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    needs: [guardrails]
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [prod, staging]
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.TF_PLAN_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Init
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        run: terraform init -input=false
+
+      - name: Plan
+        id: plan
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: terraform plan -input=false -lock-timeout=5m -out=tfplan
+
+      # The apply job on merge must execute THIS plan, not a freshly computed one (FR-034). The tree
+      # digest is what makes that checkable across the merge boundary: Terraform already refuses to
+      # apply a saved plan against a moved state, but it cannot tell that the merged configuration is
+      # the configuration that was planned. Squash merges, rebases and concurrent infra PRs all
+      # change the tree.
+      - name: Record plan provenance
+        id: provenance
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          # State staleness is enforced by Terraform itself: applying a saved plan against a moved
+          # state fails with "Saved plan is stale". What Terraform CANNOT tell is whether the merged
+          # configuration is the configuration that was planned, so that is what this records.
+          digest="$(git rev-parse HEAD:infra/terraform)"
+          {
+            echo "infra_tree_digest=$digest"
+            echo "planned_at_sha=${{ github.event.pull_request.head.sha }}"
+          } > "infra/terraform/environments/${{ matrix.environment }}/plan-provenance.txt"
+          cat "infra/terraform/environments/${{ matrix.environment }}/plan-provenance.txt"
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.environment }}
+          path: |
+            infra/terraform/environments/${{ matrix.environment }}/tfplan
+            infra/terraform/environments/${{ matrix.environment }}/plan-provenance.txt
+          # A plan file embeds the prior state of everything it touches. It must not linger as a
+          # long-lived artifact (guardrail G-15).
+          retention-days: 5
+
+      # A REDACTED summary. The raw plan is never posted as a comment — see G-15.
+      - name: Render redacted summary
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          terraform show -json tfplan > plan.json
+          node "$GITHUB_WORKSPACE/scripts/infra/render-plan-summary.js" plan.json > summary.md
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment plan summary on the PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync(
+              `infra/terraform/environments/${{ matrix.environment }}/summary.md`, 'utf8');
+            const marker = `<!-- infra-plan:${{ matrix.environment }} -->`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body.includes(marker));
+            const payload = `${marker}\n${body}`;
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body: payload,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body: payload,
+              });
+            }

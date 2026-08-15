@@ -1,0 +1,17 @@
+---
+- name: Reload nginx
+  # Validate before reloading: a bad config that passes `systemctl reload` silently keeps the old
+  # one running, so the node reports healthy while serving a configuration nobody declared.
+  ansible.builtin.command:
+    cmd: nginx -t
+  become: true
+  changed_when: false
+  listen: reload nginx
+  notify: reload nginx service
+
+- name: Reload nginx service
+  ansible.builtin.systemd_service:
+    name: nginx
+    state: reloaded
+  become: true
+  listen: reload nginx service

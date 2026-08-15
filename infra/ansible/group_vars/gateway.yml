@@ -1,0 +1,18 @@
+# Gateway node (spec 085).
+---
+fairwins_role: gateway
+
+# The gateway container owns the namespace; the engine and redis join it. That is what makes the
+# four localhost couplings correct verbatim (ENGINE_URL, REDIS_URL, the engine's webhook URL, and
+# the bundler nginx upstream). Rewriting the webhook URL wrong fails SILENTLY — the engine POSTs
+# confirmations into the void, the gateway never learns a transaction landed, and intents report
+# `submitted` forever with no chain fallback.
+fairwins_namespace_owner: gateway
+
+fairwins_secret_env_files:
+  - { file: gateway.env, description: "the gateway secrets" }
+  - { file: engine.env, description: "API_KEY, WEBHOOK_SIGNING_KEY, GCP_PRIVATE_KEY" }
+
+# GCP_PRIVATE_KEY is the exported SA key holding cloudkms.signerVerifier on BOTH hot gas keys. Cloud
+# Run scoped it to the engine alone, and preflight.sh asserts that separation at every start rather
+# than trusting it.

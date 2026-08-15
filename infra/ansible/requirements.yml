@@ -1,0 +1,11 @@
+# Pinned collections (spec 085 FR-026: the same commit resolves to the same tooling everywhere).
+#
+# Pinned EXACTLY, not with a range. A collection is part of what decides how a node is configured;
+# a floating version means a converge run's behaviour depends on when someone last installed.
+collections:
+  - name: google.cloud
+    version: "1.14.0"
+  - name: community.docker
+    version: "5.2.2"
+  - name: ansible.posix
+    version: "2.2.2"

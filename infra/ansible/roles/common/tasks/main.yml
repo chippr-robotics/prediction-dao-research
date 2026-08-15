@@ -1,0 +1,95 @@
+# Base node setup: packages, layout, repo, registry auth, telemetry agent (spec 085, US3).
+---
+- name: Install base packages
+  # state=present, never latest: `latest` reports changed whenever upstream publishes, which would
+  # break the idempotency claim (SC-005), and could upgrade a package under a running service.
+  ansible.builtin.apt:
+    name: "{{ fairwins_base_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Ensure the FairWins layout exists
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ fairwins_root }}"
+    - /etc/fairwins
+  become: true
+
+- name: Check out the repository
+  # The node reads its own configuration from the repository, which is what makes a recreated node
+  # reproducible from repo contents alone (User Story 5).
+  ansible.builtin.git:
+    repo: "{{ fairwins_repo_url }}"
+    dest: "{{ fairwins_repo_dir }}"
+    version: main
+    depth: 1
+    force: true
+  become: true
+  notify: reload fairwins stack
+
+- name: Sync the role's scripts into place
+  ansible.posix.synchronize:
+    src: "{{ fairwins_repo_dir }}/infra/vm/{{ item }}/"
+    dest: "{{ fairwins_root }}/{{ item }}/"
+    delete: true
+    rsync_opts: ["--chmod=D0755,F0755"]
+  delegate_to: "{{ inventory_hostname }}"
+  loop:
+    - common
+    - "{{ fairwins_role }}"
+  become: true
+
+- name: Record the node's role
+  ansible.builtin.copy:
+    dest: /etc/fairwins/role.env
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      FW_ROLE={{ fairwins_role }}
+      FW_PROJECT={{ fairwins_project }}
+      FW_REPO={{ fairwins_repo_dir }}
+  become: true
+
+- name: Configure Docker credentials for Artifact Registry
+  # The attached service account does the image pull on a VM (on Cloud Run the service agent did),
+  # which is why the node needs a repository-scoped artifactregistry.reader grant.
+  ansible.builtin.command:
+    cmd: gcloud auth configure-docker {{ fairwins_artifact_registry }} --quiet
+    creates: /root/.docker/config.json
+  become: true
+
+- name: Check whether the Ops Agent is installed
+  ansible.builtin.stat:
+    path: /etc/google-cloud-ops-agent
+  register: common_ops_agent
+  become: true
+
+- name: Fetch the Ops Agent installer
+  # Downloaded rather than piped from curl into bash: a pipe hides the installer's exit status
+  # unless pipefail is set, and it leaves nothing on disk to inspect when an install goes wrong.
+  ansible.builtin.get_url:
+    url: https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
+    dest: /opt/fairwins/add-google-cloud-ops-agent-repo.sh
+    owner: root
+    group: root
+    mode: "0755"
+  when: not common_ops_agent.stat.exists
+  become: true
+
+- name: Install the Ops Agent
+  # Required for VM memory and disk metrics — the default agentless metrics give CPU only, so
+  # without this the vm-memory-high and vm-disk-filling alert policies have nothing to evaluate and
+  # sit silently green.
+  ansible.builtin.command:
+    cmd: /opt/fairwins/add-google-cloud-ops-agent-repo.sh --also-install
+    creates: /etc/google-cloud-ops-agent
+  when: not common_ops_agent.stat.exists
+  become: true

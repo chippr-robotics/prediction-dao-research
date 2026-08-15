@@ -1,0 +1,10 @@
+---
+- name: Reload fairwins stack
+  # ALWAYS the whole unit. Every container on a node shares one network namespace
+  # (network_mode: service:<owner>), so recreating the owner invalidates the joiners — a
+  # `docker restart` of a single container leaves the stack in a state that looks healthy and is not.
+  ansible.builtin.systemd_service:
+    name: "fairwins-stack@{{ fairwins_role }}"
+    state: restarted
+  become: true
+  listen: reload fairwins stack

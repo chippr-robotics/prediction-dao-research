@@ -1,0 +1,14 @@
+# ansible-lint configuration (spec 085).
+---
+profile: production
+
+exclude_paths:
+  # Installed third-party collections. Linting them reports thousands of findings in code this
+  # repository does not own, which buries the findings in code it does.
+  - collections/
+  - .cache/
+
+# The inventory is a dynamic-plugin config, not a playbook; ansible-lint parses it as YAML and
+# reports on Jinja it cannot resolve without a live GCP connection.
+kinds:
+  - yaml: "inventory/gcp.yml"

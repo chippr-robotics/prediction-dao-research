@@ -1,0 +1,11 @@
+# Converge the gateway node only (spec 085).
+---
+- name: Converge the gateway
+  hosts: gateway
+  gather_facts: true
+  roles:
+    - common
+    - docker
+    - nginx
+    - fairwins_secrets
+    - fairwins_stack
