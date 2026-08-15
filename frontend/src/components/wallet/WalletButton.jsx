@@ -18,6 +18,7 @@ import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import AddressQRModal from '../ui/AddressQRModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
 import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
+import HardwareConnectDialog from '../account/HardwareConnectDialog'
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useAccountSwitcher, ACCOUNT_KIND_TAG, shortAccountAddr } from '../../hooks/useAccountSwitcher'
 import walletIcon from '../../assets/wallet_no_text.svg'
@@ -49,7 +50,7 @@ function WalletButton({ className = '' }) {
   // Acting-account switcher, surfaced as a caret dropdown ON the wallet biticon (spec 063 follow-up):
   // picking an account switches the active identity so the biticon, address, balance, copy, and QR all
   // follow it — no separate "Acting as" row.
-  const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hasChoices } = useAccountSwitcher()
+  const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hardwareEntry, setHardwareEntry, onHardwareConnected, hasChoices } = useAccountSwitcher()
   const [acctMenuOpen, setAcctMenuOpen] = useState(false)
   const { openConnectModal, disconnectWallet } = useWallet()
   const navigate = useNavigate()
@@ -288,6 +289,13 @@ function WalletButton({ className = '' }) {
                   entry={unlockEntry}
                   onClose={() => setUnlockEntry(null)}
                   onUnlocked={onUnlocked}
+                />
+                {/* Hardware accounts reconnect their device before activating (spec 085). */}
+                <HardwareConnectDialog
+                  open={Boolean(hardwareEntry)}
+                  entry={hardwareEntry}
+                  onClose={() => setHardwareEntry(null)}
+                  onConnected={onHardwareConnected}
                 />
               </div>
 

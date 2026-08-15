@@ -112,6 +112,7 @@ nav:
     - Platform Fees (FeeRouter): developer-guide/platform-fees.md
     - Mini-Apps (spec 073): developer-guide/miniapps.md
     - Message Signing (Protect ▸ Verify): developer-guide/message-signing.md
+    - Hardware Wallets (Protect ▸ Off chain): developer-guide/hardware-wallets.md
     - Account Statements: developer-guide/account-statements.md
     - Encryption Architecture: developer-guide/encryption-architecture.md
     - Envelope Encryption Spec: developer-guide/envelope-encryption-spec.md
@@ -156,6 +157,7 @@ nav:
     - Safe Proposal Hub Deploy: runbooks/safe-proposal-hub-deploy.md
     - Batch Operations: runbooks/batch-operations.md
     - Passkey Account Recovery: runbooks/passkey-account-recovery.md
+    - Hardware Wallet Staging Validation: runbooks/hardware-wallet-staging-validation.md
   - Architecture Decisions:
     - Overview: adr/README.md
     - ADR-001 Trail of Bits Toolchain: adr/001-trail-of-bits-toolchain.md

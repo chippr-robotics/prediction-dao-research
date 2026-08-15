@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import NavIcon from '../nav/NavIcon'
 import LegacyUnlockDialog from './LegacyUnlockDialog'
+import HardwareConnectDialog from './HardwareConnectDialog'
 import SensitiveValue from '../common/SensitiveValue'
 import { useAccountSwitcher, ACCOUNT_KIND_TAG, shortAccountAddr } from '../../hooks/useAccountSwitcher'
 import { NETWORKS } from '../../config/networks'
@@ -47,7 +48,7 @@ function formatUsdFull(n) {
  * unavailable) — a card must never show a fabricated $0 while data loads.
  */
 function AccountCardsCarousel({ activeTotalUsd = null }) {
-  const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked } = useAccountSwitcher()
+  const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hardwareEntry, setHardwareEntry, onHardwareConnected } = useAccountSwitcher()
   const trackRef = useRef(null)
   const [scrollIndex, setScrollIndex] = useState(0)
 
@@ -205,6 +206,14 @@ function AccountCardsCarousel({ activeTotalUsd = null }) {
         entry={unlockEntry}
         onClose={() => setUnlockEntry(null)}
         onUnlocked={onUnlocked}
+      />
+
+      {/* Hardware accounts reconnect their device before activating (spec 085). */}
+      <HardwareConnectDialog
+        open={Boolean(hardwareEntry)}
+        entry={hardwareEntry}
+        onClose={() => setHardwareEntry(null)}
+        onConnected={onHardwareConnected}
       />
     </section>
   )

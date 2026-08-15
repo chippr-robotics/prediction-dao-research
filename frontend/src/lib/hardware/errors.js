@@ -1,0 +1,48 @@
+// Spec 085 — typed hardware-wallet failures. Every connect/derive/sign path must end in a stated,
+// human-readable outcome (FR-012): the adapters normalize vendor-specific failures into these codes,
+// and the UI renders `describeHardwareError` verbatim instead of raw SDK messages.
+
+export const HW_ERROR_CODES = Object.freeze({
+  TRANSPORT_UNSUPPORTED: 'transport-unsupported',
+  PERMISSION_DENIED: 'permission-denied',
+  DEVICE_LOCKED: 'device-locked',
+  WRONG_APP: 'wrong-app',
+  USER_CANCELLED: 'user-cancelled',
+  DISCONNECTED: 'disconnected',
+  TIMEOUT: 'timeout',
+  UNKNOWN: 'unknown',
+})
+
+export class HardwareWalletError extends Error {
+  /**
+   * @param {string} code one of HW_ERROR_CODES
+   * @param {string} [message] optional override for the default description
+   * @param {{ cause?: unknown, vendor?: string }} [opts]
+   */
+  constructor(code, message, opts = {}) {
+    super(message || DESCRIPTIONS[code] || DESCRIPTIONS[HW_ERROR_CODES.UNKNOWN])
+    this.name = 'HardwareWalletError'
+    this.code = Object.values(HW_ERROR_CODES).includes(code) ? code : HW_ERROR_CODES.UNKNOWN
+    if (opts.cause !== undefined) this.cause = opts.cause
+    if (opts.vendor) this.vendor = opts.vendor
+  }
+}
+
+const DESCRIPTIONS = {
+  [HW_ERROR_CODES.TRANSPORT_UNSUPPORTED]:
+    'This browser cannot talk to the device. Use a Chromium-based browser with WebHID or WebUSB enabled.',
+  [HW_ERROR_CODES.PERMISSION_DENIED]:
+    'The browser was not given permission to use the device. Choose the device in the browser prompt to continue.',
+  [HW_ERROR_CODES.DEVICE_LOCKED]: 'The device is locked. Unlock it with your PIN and try again.',
+  [HW_ERROR_CODES.WRONG_APP]: 'Open the Ethereum app on the device, then try again.',
+  [HW_ERROR_CODES.USER_CANCELLED]: 'The request was cancelled on the device.',
+  [HW_ERROR_CODES.DISCONNECTED]: 'The device was disconnected. Reconnect it and try again.',
+  [HW_ERROR_CODES.TIMEOUT]: 'The device did not respond in time. Check the connection and try again.',
+  [HW_ERROR_CODES.UNKNOWN]: 'Something went wrong talking to the device. Reconnect it and try again.',
+}
+
+/** One human sentence for any failure out of the hardware layer — never a raw SDK message. */
+export function describeHardwareError(err) {
+  if (err instanceof HardwareWalletError) return err.message
+  return DESCRIPTIONS[HW_ERROR_CODES.UNKNOWN]
+}

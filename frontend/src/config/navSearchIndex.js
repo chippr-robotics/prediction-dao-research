@@ -186,22 +186,36 @@ export const NAV_DESTINATIONS = [
     keywords: ['activity', 'history', 'sent', 'log', 'receipts'],
   },
 
-  // ─── Tools ▸ Protect (specs 043 / 068 / 084) ──────────────────────────────────────────────
+  // ─── Tools ▸ Protect (specs 043 / 068 / 084 / 085) — AccordionSection cards ───────────────
   {
     id: 'custody-onchain',
     navId: 'custody',
+    section: true,
     label: 'Vaults & policies',
     summary: 'Safe multisig vaults, owners, and spending rules.',
     path: '/wallet?tab=custody',
+    hash: '#custody-onchain',
     keywords: ['safe', 'gnosis safe', 'multisig', 'vault', 'vaults', 'guard', 'policy', 'policies', 'rules', 'approvers', 'owners', 'threshold', 'proposals', 'co-signer'],
   },
   {
     id: 'custody-verify',
     navId: 'custody',
+    section: true,
     label: 'Verify',
     summary: 'Sign a message, or check somebody else’s signature.',
     path: '/wallet?tab=custody',
+    hash: '#custody-verify',
     keywords: ['verify', 'sign message', 'signed message', 'signature', 'proof of ownership', 'erc-1271', 'personal_sign'],
+  },
+  {
+    id: 'custody-offchain',
+    navId: 'custody',
+    section: true,
+    label: 'Hardware wallets',
+    summary: 'Cold storage: add and use Ledger or Trezor accounts.',
+    path: '/wallet?tab=custody',
+    hash: '#custody-offchain',
+    keywords: ['hardware wallet', 'ledger', 'trezor', 'cold storage', 'offline', 'off chain', 'device', 'usb wallet'],
   },
 
   // ─── Tools ▸ Recovery (specs 032 / 045 / 062) — AccordionSection cards ────────────────────

@@ -15,6 +15,11 @@ COPY frontend/package.json ./frontend/
 COPY packages/intent-types/package.json ./packages/intent-types/
 COPY tools/miniapp-build/package.json ./tools/miniapp-build/
 
+# Native-module toolchain (spec 085): @trezor/connect-web transitively pulls `usb`, whose install
+# builds libusb via node-gyp when no prebuild matches. Build-stage-only — the runtime image is
+# untouched, and the browser bundle never imports the Node transport that needs it.
+RUN apk add --no-cache python3 make g++ linux-headers eudev-dev
+
 RUN npm ci --workspace frontend --include-workspace-root=false
 
 # The linked workspace SOURCES. `npm ci` writes a workspace link whether or not the target
