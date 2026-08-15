@@ -102,9 +102,15 @@ function AppContent() {
   const { showNotification } = useNotification()
 
   const handleSwitchNetwork = async () => {
-    await switchNetwork()
     announce('Attempting to switch network')
     showNotification('Switching network...', 'info')
+    try {
+      await switchNetwork()
+    } catch (error) {
+      // switchNetwork now genuinely rejects on a member decline / wallet failure (spec 088 —
+      // the old non-async mutate swallowed rejections). The banner stays up; say what happened.
+      showNotification(error?.message || 'The network switch was not completed.', 'warning')
+    }
   }
 
   return (

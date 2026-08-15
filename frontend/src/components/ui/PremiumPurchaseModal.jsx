@@ -727,7 +727,9 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                         {purchaseNetworkName} — buying anywhere else would create a membership the
                         app could never read back.
                       </p>
-                      <button type="button" onClick={() => switchNetwork(purchaseChainId)}>
+                      {/* A decline now genuinely rejects (spec 088) — swallow it: the wallet showed its own
+                          prompt and the button stays for retry. */}
+                      <button type="button" onClick={() => { switchNetwork(purchaseChainId).catch(() => {}) }}>
                         Switch to {purchaseNetworkName}
                       </button>
                     </div>
