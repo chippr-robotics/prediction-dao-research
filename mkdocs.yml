@@ -113,6 +113,7 @@ nav:
     - Mini-Apps (spec 073): developer-guide/miniapps.md
     - Message Signing (Protect ▸ Verify): developer-guide/message-signing.md
     - Hardware Wallets (Protect ▸ Off chain): developer-guide/hardware-wallets.md
+    - Account Cards & Identity (spec 086): developer-guide/account-cards.md
     - Infrastructure as Code (spec 087): developer-guide/infrastructure-as-code.md
     - Account Statements: developer-guide/account-statements.md
     - Encryption Architecture: developer-guide/encryption-architecture.md

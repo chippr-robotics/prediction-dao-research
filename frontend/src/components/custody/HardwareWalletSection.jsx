@@ -17,6 +17,7 @@ import { useHardwareAccounts } from '../../hooks/useHardwareAccounts'
 import { hardwareWalletVault } from '../../lib/hardware/hardwareAccounts'
 import { captureHardwareAccountRemoved } from '../../data/ledger/sources/hardwareWalletSource'
 import AddHardwareWalletSheet from './AddHardwareWalletSheet'
+import AccountAvatar from '../account/AccountAvatar'
 import './HardwareWallet.css'
 
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
@@ -66,6 +67,8 @@ export default function HardwareWalletSection({ deps }) {
                 return (
                   <li key={key} className="hw-list__row" data-testid={`hw-account-${key}`}>
                     <div className="hw-list__id">
+                      {/* Spec 086 — the shared identity avatar, same as every other account tile. */}
+                      <AccountAvatar address={acc.address} size={28} />
                       <span className={`hw-vendor-badge hw-vendor-badge--${acc.vendor}`}>{acc.vendorLabel}</span>
                       <span className="hw-list__text">
                         <span className="hw-list__label">{acc.label}</span>

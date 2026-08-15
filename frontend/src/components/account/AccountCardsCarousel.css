@@ -26,144 +26,43 @@
   display: none;
 }
 
-/* One card per account — the "bank card" of the reference design. The button
-   itself is the listbox option AND the snap target. Two-class selector so the
-   16px padding survives App.css's mobile `button:not([role="switch"])`
-   tap-target padding (the card is far beyond 44px already). */
+/* Card CHROME lives in AccountCard.css (spec 086 — one shared card everywhere). This file only
+   places the card inside the carousel: sizing and snap. The two-class selector keeps its old
+   job of outranking App.css's mobile `button:not([role="switch"])` tap-target rule. */
 .account-cards-track .account-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   flex: 0 0 auto;
   width: min(78%, 320px);
   scroll-snap-align: center;
   min-height: 150px;
-  padding: 16px;
-  border: 1px solid var(--border-color, #e3e7eb);
-  border-left: 4px solid var(--brand-primary, #36b37e);
-  border-radius: var(--radius-lg, 12px);
-  background: var(--bg-secondary, #ffffff);
-  color: var(--text-primary, #1f2933);
-  text-align: left;
-  cursor: pointer;
-  transition: transform var(--transition-fast, 0.15s), box-shadow var(--transition-fast, 0.15s);
-  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
 }
 
-.account-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
-}
-
-.account-card:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
-  outline-offset: 2px;
-}
-
-/* Per-kind accent edge — identity color without abandoning the theme. */
-.account-card--vault {
-  border-left-color: var(--brand-secondary, #4c9aff);
-}
-
-.account-card--legacy {
-  border-left-color: var(--semantic-warning, #f5a623);
-}
-
-.account-card.is-active {
-  border-color: var(--brand-primary, #36b37e);
-  box-shadow: 0 0 0 2px var(--brand-primary, #36b37e), var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
-}
-
-.account-card--vault.is-active {
-  border-left-color: var(--brand-primary, #36b37e);
-}
-
-.account-card--legacy.is-active {
-  border-left-color: var(--brand-primary, #36b37e);
-}
-
-.account-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.account-card-top .blockies-avatar {
-  border-radius: 50%;
-}
-
-.account-card-kind {
-  padding: 2px 8px;
-  border-radius: var(--radius-full, 9999px);
-  background: var(--bg-primary, #f7f9fa);
-  border: 1px solid var(--border-color, #e3e7eb);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary, #5a6772);
-}
-
-.account-card-label {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--text-primary, #1f2933);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Quick-access portfolio total on the ACTIVE card (post-launch feedback). */
-.account-card-balance {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.account-card-balance-label {
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary, #5a6772);
-}
-
-.account-card-balance-value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-primary, #1f2933);
-}
-
-.account-card-bottom {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.account-card-address {
-  font-family: monospace;
-  font-size: 0.85rem;
-  color: var(--text-secondary, #5a6772);
-}
-
-.account-card-network {
-  font-size: 0.75rem;
-  color: var(--text-muted, #8b98a5);
-}
-
-.account-card-state {
+/* Spec 086 — the "⋯" customize control, rendered ON the centered card's bottom-right corner.
+   Positioned over the snap target with the same `min(78%, 320px)` math the card's width uses
+   (right edge of a centered card = 50% + half that width), so it tracks the card responsively.
+   It lives outside the listbox DOM — an option may contain no interactive children. */
+.account-cards-viewport .account-card-menu {
+  position: absolute;
+  /* left/top are set inline from the measured card rect; these are the pre-measure defaults. */
+  left: 10px;
+  top: 10px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-top: auto;
-  font-size: 0.75rem;
-  color: var(--text-muted, #8b98a5);
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.55));
+  color: var(--text-secondary, #5a6772);
+  z-index: 2;
 }
 
-.account-card-state.is-active {
-  color: var(--brand-primary, #36b37e);
-  font-weight: 600;
+.account-cards-viewport .account-card-menu:hover {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--text-primary, #1f2933);
 }
 
 /* Arrows — desktop/keyboard affordance; hidden on touch-first small screens

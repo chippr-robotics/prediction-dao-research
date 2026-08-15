@@ -141,4 +141,36 @@ describe('AccountCardsCarousel (spec 074 US1)', () => {
     render(<AccountCardsCarousel />)
     expect(screen.queryByText(/total balance/i)).not.toBeInTheDocument()
   })
+
+  // Spec 086 — a hardware account is just another card, tagged Hardware like any other kind.
+  it('tags a hardware account Hardware (spec 086 US3)', () => {
+    switcherState.accounts = [
+      PERSONAL,
+      { id: 'hardware:0xaaa', kind: 'hardware', address: '0xAaAa000000000000000000000000000000000001', label: 'Cold storage' },
+    ]
+    render(<AccountCardsCarousel />)
+    expect(screen.getByText('Hardware')).toBeInTheDocument()
+  })
+
+  // Spec 086 — the "⋯" on the centered card opens the Customize sheet for THAT card.
+  it('opens the Customize sheet from the card ellipsis for the centered account (spec 086 US2)', () => {
+    render(<AccountCardsCarousel />)
+    const menu = screen.getByTestId('account-customize-open')
+    // The control names the card it edits — the centered (first) one here.
+    expect(menu).toHaveAccessibleName(/customize personal wallet card/i)
+    fireEvent.click(menu)
+    expect(screen.getByTestId('account-customize')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /customize card/i })).toBeInTheDocument()
+    expect(screen.getByText('Personal wallet', { selector: '.acs-preview__label' })).toBeInTheDocument()
+  })
+
+  // The ellipsis lives OUTSIDE the listbox: an option may contain no interactive children.
+  it('keeps the customize control out of the listbox options', () => {
+    render(<AccountCardsCarousel />)
+    const listbox = screen.getByRole('listbox')
+    expect(listbox.contains(screen.getByTestId('account-customize-open'))).toBe(false)
+    for (const option of screen.getAllByRole('option')) {
+      expect(option.querySelector('button')).toBeNull()
+    }
+  })
 })
