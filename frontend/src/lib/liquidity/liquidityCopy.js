@@ -333,6 +333,23 @@ export function liquidityUnavailableCopy(chainId) {
   return `${here} ${liquidityAvailabilityCopy()} You do not have to switch networks to look — pools from every network are listed here, and your wallet switches over only when you confirm.`
 }
 
+/**
+ * Nothing in the curated list answers what the member searched for.
+ *
+ * Deliberately NOT the empty-catalog copy: pools exist, this search just did not
+ * reach them, and the remedy is a different search rather than waiting for a pool
+ * to be added. It names what can be typed, because a member who does not know
+ * what the box matches on cannot tell an empty result from a broken one.
+ *
+ * @param {string} query what the member typed
+ * @returns {string}
+ */
+export function noPoolMatchCopy(query) {
+  const typed = String(query || '').trim()
+  const subject = typed ? `No pool matches “${typed}”.` : 'No pool matches these filters.'
+  return `${subject} Search by asset (USDC), by network (Base), or by type (trading, bridge).`
+}
+
 /** FR-025 — the curated list is empty everywhere. States it rather than showing a blank area. */
 export const NO_POOLS_COPY = `There are no pools to supply right now. ${liquidityAvailabilityCopy()} Nothing is hidden and nothing is pending — when a pool is added it appears here.`
 
