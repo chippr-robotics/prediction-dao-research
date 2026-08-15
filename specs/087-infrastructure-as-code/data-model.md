@@ -1,6 +1,6 @@
 # Data Model: Infrastructure as Code
 
-**Feature**: 086-infrastructure-as-code | **Phase 1**
+**Feature**: 087-infrastructure-as-code | **Phase 1**
 
 There is no application data model here. The "data" is the **managed-resource inventory**: the set of
 cloud objects this project owns, each with an owner, a protection level, and an adoption state. This

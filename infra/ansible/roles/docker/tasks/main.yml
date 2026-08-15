@@ -1,4 +1,4 @@
-# Docker engine at a pinned version (spec 086, US3).
+# Docker engine at a pinned version (spec 087, US3).
 ---
 - name: Install the Docker apt keyring
   ansible.builtin.get_url:

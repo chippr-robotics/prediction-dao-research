@@ -1,5 +1,5 @@
 /**
- * Trust root for spec 086 (contracts/state-backend.md, contracts/ci-identity.md).
+ * Trust root for spec 087 (contracts/state-backend.md, contracts/ci-identity.md).
  *
  * RUN ONCE, BY A HUMAN WITH OWNER RIGHTS. This root is deliberately excluded from the automatic
  * apply workflow: it needs privileges the CI identities do not have, and a mistake here is the one
@@ -69,7 +69,7 @@ resource "google_iam_workload_identity_pool" "github" {
   project                   = var.project_id
   workload_identity_pool_id = var.wif_pool_id
   display_name              = "GitHub Actions"
-  description               = "OIDC federation for chippr-robotics CI (spec 086)"
+  description               = "OIDC federation for chippr-robotics CI (spec 087)"
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {

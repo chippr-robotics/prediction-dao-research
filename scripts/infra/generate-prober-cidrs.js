@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate the Google uptime prober allowlist (spec 086, T024 / FR-040).
+ * Generate the Google uptime prober allowlist (spec 087, T024 / FR-040).
  *
  * WHY THIS EXISTS
  * Cloudflare publishes its egress ranges and the Terraform provider exposes them as a data source,

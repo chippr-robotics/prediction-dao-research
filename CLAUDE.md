@@ -453,7 +453,7 @@ artifacts live under `specs/<feature>/`.
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
-- **Cloud infrastructure is DECLARATIVE (spec 086), and the GCP project is SHARED.** Terraform
+- **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
   (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
   each of which has a way to be silently wrong:
   (1) **IAM is ADDITIVE ONLY.** `chippr-bots-site-wp` hosts a public WordPress VM plus `clearpath-*`,
@@ -493,7 +493,7 @@ artifacts live under `specs/<feature>/`.
   than reimplementing it. Apply is **automatic on merge** and executes the *reviewed* plan, gated on
   the infra-tree digest; a mismatch fails rather than replanning. See
   `docs/developer-guide/infrastructure-as-code.md` + `docs/runbooks/infrastructure-operations.md`
-  + `specs/086-infrastructure-as-code/`.
+  + `specs/087-infrastructure-as-code/`.
 
 - **The repo is an npm WORKSPACE (spec 075): one root lockfile, 8 members, `contracts/` deliberately
   NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
@@ -543,5 +543,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/086-infrastructure-as-code/plan.md
+at specs/087-infrastructure-as-code/plan.md
 <!-- SPECKIT END -->

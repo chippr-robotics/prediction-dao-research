@@ -1,6 +1,6 @@
 # Cloudflare edge configuration (Spec 007 — Compliance & Legal Gating)
 
-> **⚠ NO LONGER THE SOURCE OF TRUTH (spec 086).** The geo gate and the origin lock are declared in
+> **⚠ NO LONGER THE SOURCE OF TRUTH (spec 087).** The geo gate and the origin lock are declared in
 > `infra/terraform/modules/cloudflare-zone` and applied from `infra/terraform/environments/prod`.
 > The documents here are now **operational reference**: they explain what each rule does and why it
 > is shaped the way it is, which the Terraform carries forward as comments.
@@ -24,7 +24,7 @@ The origin lock is enforced in `frontend/nginx.conf.template` (verified by
 `docker-entrypoint.sh` only when `ORIGIN_LOCK_SECRET` is set). The 451 body lives at
 `frontend/public/451.html` (or as the Cloudflare custom response body).
 
-> These runbooks **have been** promoted to IaC (`cloudflare_ruleset`, spec 086). They are retained
+> These runbooks **have been** promoted to IaC (`cloudflare_ruleset`, spec 087). They are retained
 > as the record of intent behind each rule; the applied configuration lives in Terraform.
 
 ## Tenant domains (spec 072)

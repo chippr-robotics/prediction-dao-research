@@ -12,7 +12,7 @@ README live in `specs/<feature>/screenshots/` — they are part of the feature's
 README says what the loop *changed*, which is the evidence it ran.
 
 Real precedents to copy: `scripts/ui/capture-verify.mjs` (spec 084) and
-`scripts/ui/capture-protect-hardware.mjs` (spec 086), with their findings in
+`scripts/ui/capture-protect-hardware.mjs` (spec 087), with their findings in
 `specs/085-hardware-wallet-protect/screenshots/README.md`.
 
 ## Setting up (once per session)
@@ -36,7 +36,7 @@ Copy an existing `scripts/ui/capture-*.mjs` and change the scenario list. The te
 and every harness must keep:
 
 - **The shot matrix**: every scenario × {desktop 1280×900, mobile 390×844} × {light, dark}.
-  Theme is `localStorage.themeMode`. A bug can hide in exactly one cell — spec 086's invisible
+  Theme is `localStorage.themeMode`. A bug can hide in exactly one cell — spec 087's invisible
   buttons existed only in light mode.
 - **Network isolation**: `context.route` aborts everything that is not the dev server or the
   loopback stub chain. A shot must never quietly depend on the internet.

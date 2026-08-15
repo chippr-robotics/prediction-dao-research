@@ -1,4 +1,4 @@
-# Converge every FairWins node to its declared configuration (spec 086, User Story 3).
+# Converge every FairWins node to its declared configuration (spec 087, User Story 3).
 #
 # IDEMPOTENT AND SAFELY RE-RUNNABLE. A second consecutive run against an unchanged node reports
 # changed=0 and restarts nothing (SC-005). Handlers fire only on real change.

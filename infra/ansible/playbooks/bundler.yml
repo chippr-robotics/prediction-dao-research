@@ -1,4 +1,4 @@
-# Converge the bundler node only (spec 086).
+# Converge the bundler node only (spec 087).
 ---
 - name: Converge the bundler
   hosts: bundler

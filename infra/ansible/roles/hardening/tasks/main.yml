@@ -1,4 +1,4 @@
-# OS hardening (spec 086, US3, FR-018).
+# OS hardening (spec 087, US3, FR-018).
 #
 # Separately invocable via playbooks/harden.yml so that OS-level change is a deliberate act rather
 # than a side effect of a routine converge run.
@@ -55,7 +55,7 @@
     group: root
     mode: "0644"
     content: |
-      // Managed by Ansible (spec 086). Security updates only; docker-ce is held separately.
+      // Managed by Ansible (spec 087). Security updates only; docker-ce is held separately.
       Unattended-Upgrade::Origins-Pattern {
           "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
       };

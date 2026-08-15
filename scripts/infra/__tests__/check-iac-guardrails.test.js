@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Tests for the IaC guardrail gate (spec 086, T008).
+ * Tests for the IaC guardrail gate (spec 087, T008).
  *
  * A gate that silently passes everything is worse than no gate, because it gets cited as evidence
  * that the rules hold. Every rule therefore has a fixture that MUST be rejected, and a compliant

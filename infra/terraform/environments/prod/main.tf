@@ -1,5 +1,5 @@
 /**
- * Production environment (spec 086).
+ * Production environment (spec 087).
  *
  * ⚠ THE GCP PROJECT IS SHARED. `chippr-bots-site-wp` hosts a public WordPress VM on the default
  * network plus the clearpath-*, fukuii-* and kings-edge-* workloads. Nothing here may describe,
@@ -257,14 +257,14 @@ module "edge" {
       type    = "A"
       value   = module.network.static_ips["fairwins-bundler-ip"]
       proxied = true
-      comment = "Managed by Terraform (spec 086). Wired from the reserved address, so DNS cannot desync from the origin."
+      comment = "Managed by Terraform (spec 087). Wired from the reserved address, so DNS cannot desync from the origin."
     },
     {
       name    = "relay"
       type    = "A"
       value   = module.network.static_ips["fairwins-gateway-ip"]
       proxied = true
-      comment = "Managed by Terraform (spec 086)."
+      comment = "Managed by Terraform (spec 087)."
     },
   ]
 

@@ -1,5 +1,5 @@
 /**
- * Hardware-wallet audit records (spec 086, FR-007). Uses the real client
+ * Hardware-wallet audit records (spec 087, FR-007). Uses the real client
  * ledger (jsdom localStorage) to prove the record shape, idempotency of the
  * stable entryId, and — critically — that refs carry ONLY address/vendor/path,
  * nothing a device could be fingerprinted by.

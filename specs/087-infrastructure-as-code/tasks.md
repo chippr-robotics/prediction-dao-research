@@ -4,7 +4,7 @@ description: "Task list for 085 Infrastructure as Code (Terraform + Ansible)"
 
 # Tasks: Infrastructure as Code (Terraform + Ansible)
 
-**Input**: Design documents from `/specs/086-infrastructure-as-code/`
+**Input**: Design documents from `/specs/087-infrastructure-as-code/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md
 

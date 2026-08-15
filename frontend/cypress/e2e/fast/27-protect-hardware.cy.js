@@ -1,6 +1,6 @@
 // =============================================================================
 // 27-protect-hardware.cy.js
-// Fast-tier E2E tests for Protect ▸ hardware wallet cold storage (spec 086).
+// Fast-tier E2E tests for Protect ▸ hardware wallet cold storage (spec 087).
 //
 // Runs WITHOUT a Hardhat node and WITHOUT hardware: the dev-build-only adapter
 // seam (window.__fwHardwareTestAdapter__, adapters.js) stands in for the device.
@@ -43,7 +43,7 @@ const openProtect = (hash = '') => {
   cy.get('.custody-panel', { timeout: 15000 }).should('be.visible')
 }
 
-describe('Protect — hardware wallet cold storage (spec 086)', () => {
+describe('Protect — hardware wallet cold storage (spec 087)', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()

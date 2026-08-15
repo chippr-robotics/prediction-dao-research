@@ -1,6 +1,6 @@
 # Infrastructure as Code
 
-**Spec**: [086-infrastructure-as-code](https://github.com/chippr-robotics/prediction-dao-research/tree/main/specs/086-infrastructure-as-code) · **Issue**: #1177
+**Spec**: [087-infrastructure-as-code](https://github.com/chippr-robotics/prediction-dao-research/tree/main/specs/087-infrastructure-as-code) · **Issue**: #1177
 
 The FairWins cloud estate is described declaratively: **Terraform** provisions cloud resources,
 **Ansible** converges node interiors. The goal is that the environment can be reconstructed or
@@ -80,7 +80,7 @@ false drift, and false drift is how real drift gets ignored.
 | DNS, WAF ruleset, transform ruleset | Terraform |
 | Monitoring channels, checks, policies, log metrics | Terraform |
 
-Full table with rationale: `specs/086-infrastructure-as-code/contracts/ownership-boundary.md`.
+Full table with rationale: `specs/087-infrastructure-as-code/contracts/ownership-boundary.md`.
 
 ## Tooling
 
@@ -242,11 +242,11 @@ The secret store is the only place a token belongs.
 the other Chippr projects sharing this estate and drifts from its shared twin. That directory now
 holds only a pointer.
 
-See `specs/086-infrastructure-as-code/contracts/module-interfaces.md`.
+See `specs/087-infrastructure-as-code/contracts/module-interfaces.md`.
 
 ## Related
 
 - `docs/runbooks/infrastructure-operations.md` — bootstrap, recovery, drift response, rotation
 - `infra/ansible/README.md` — node configuration specifics
 - `docs/runbooks/vm-migration.md` — how the nodes came to be
-- `specs/086-infrastructure-as-code/` — spec, research, plan, contracts, quickstart
+- `specs/087-infrastructure-as-code/` — spec, research, plan, contracts, quickstart

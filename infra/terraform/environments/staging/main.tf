@@ -1,5 +1,5 @@
 /**
- * Staging environment (spec 086, and spec 076 FR-023/FR-026).
+ * Staging environment (spec 087, and spec 076 FR-023/FR-026).
  *
  * TWO SERVICES FROM ONE COMMIT, and that is the design rather than an accident of convenience.
  * Vite folds VITE_NETWORK_ID into the bundle at build time, so ONE IMAGE RESOLVES EXACTLY ONE

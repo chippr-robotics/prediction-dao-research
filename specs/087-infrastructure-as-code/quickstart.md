@@ -1,6 +1,6 @@
 # Quickstart: Validating the IaC Feature
 
-**Feature**: 086-infrastructure-as-code | **Phase 1**
+**Feature**: 087-infrastructure-as-code | **Phase 1**
 
 Runnable scenarios that prove the feature works. Each maps to a success criterion in `spec.md`. Run
 them in order — later scenarios assume earlier ones passed.

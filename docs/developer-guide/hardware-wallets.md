@@ -1,4 +1,4 @@
-# Hardware wallets (Protect ▸ Off chain, spec 086)
+# Hardware wallets (Protect ▸ Off chain, spec 087)
 
 Members keep long-term funds on a Ledger or Trezor and see those accounts inside FairWins: add
 them through a guided flow, watch their balances, receive to them from every address field, and —

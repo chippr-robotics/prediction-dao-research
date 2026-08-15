@@ -1,5 +1,5 @@
 /**
- * Declarative adoption for staging (spec 086 FR-004/FR-005).
+ * Declarative adoption for staging (spec 087 FR-004/FR-005).
  *
  * Same rules as prod: enable one surface at a time, confirm the plan reports "will be imported" and
  * never "must be replaced", and reach a clean plan before moving on. These blocks stay after

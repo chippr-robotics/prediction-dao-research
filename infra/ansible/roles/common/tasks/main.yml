@@ -1,4 +1,4 @@
-# Base node setup: packages, layout, repo, registry auth, telemetry agent (spec 086, US3).
+# Base node setup: packages, layout, repo, registry auth, telemetry agent (spec 087, US3).
 ---
 - name: Install base packages
   # state=present, never latest: `latest` reports changed whenever upstream publishes, which would
