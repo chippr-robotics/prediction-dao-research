@@ -68,7 +68,12 @@
     "release:version": "node scripts/release/version.js",
     "release:classify": "node scripts/release/classify.js",
     "release:artifacts": "node scripts/release/artifacts.js",
-    "test:release": "node --test \"scripts/release/__tests__/*.test.js\""
+    "test:release": "node --test \"scripts/release/__tests__/*.test.js\"",
+    "sec": "node scripts/secrets/with-secrets.js",
+    "secrets:doctor": "node scripts/secrets/doctor.js",
+    "secrets:migrate": "node scripts/secrets/migrate.js",
+    "check:env-hygiene": "node scripts/secrets/check-env-hygiene.js",
+    "test:secrets": "node --test \"scripts/secrets/__tests__/*.test.js\""
   },
   "keywords": [
     "futarchy",

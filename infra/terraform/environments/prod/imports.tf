@@ -105,6 +105,77 @@
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/repositories/cloud-run-source-deploy"
 # }
 
+# ── Phase D1b: workstation secret containers (spec 088) ───────────────────────────────────────
+#
+# These containers were created out of band by `npm run secrets:migrate -- --apply` when the
+# credentials were moved off a developer's .env. They EXIST, so adoption is an import, not a create
+# — importing them is what puts `prevent_destroy` in front of live payloads. A plan that offers to
+# CREATE any of these means the import did not run, and applying it would fail on an
+# already-exists error rather than quietly duplicating anything.
+#
+# Payload versions are never imported (guardrail G-04).
+
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-creator-key"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-creator-key"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-deployer-key"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-deployer-key"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-etherscan-api-key"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-etherscan-api-key"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-floppy-keystore-password"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-floppy-keystore-password"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-floppy-mordor-password"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-floppy-mordor-password"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-floppy-nazgul-prime-password"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-floppy-nazgul-prime-password"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-graph-api-key"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-graph-api-key"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-graph-deploy-key"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-graph-deploy-key"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-pinata-jwt"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-pinata-jwt"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-quicknode-polygon-token"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-quicknode-polygon-token"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-quicknode-polygon-url"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-quicknode-polygon-url"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["fairwins-seed-player-keys"]
+#   id = "projects/chippr-bots-site-wp/secrets/fairwins-seed-player-keys"
+# }
+#
+
 # ── Phase D2: Cloud Run ───────────────────────────────────────────────────────────────────────
 #
 # The decommissioned alto bundler service is deliberately absent — see main.tf and guardrail G-11.

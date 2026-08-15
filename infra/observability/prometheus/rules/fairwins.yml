@@ -1,0 +1,110 @@
+# Alert rules for the local operator stack (spec 088).
+#
+# THESE DO NOT PAGE ANYONE. There is no Alertmanager here on purpose: paging belongs to Cloud
+# Monitoring, which runs whether or not this workstation is switched on (ops/monitoring, and the
+# monitoring module in infra/terraform). These rules exist so the local Grafana can SHOW a
+# condition, and so a threshold that matters is written down as a number rather than living in
+# whoever is looking at the dashboard's head.
+#
+# Every threshold below is chosen to fire while there is still time to act, not at the moment of
+# failure. An alert that fires when the gas wallet is empty tells you about an outage you already
+# have.
+groups:
+  - name: fairwins-runway
+    rules:
+      - alert: GasWalletRunwayLow
+        # 48h clears a weekend. 24h does not, and this is the wallet that pays for every gasless
+        # transaction the platform sends.
+        expr: fairwins_gas_wallet_runway_hours < 48
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Relayer gas wallet on chain {{ $labels.chain_id }} has {{ $value | printf \"%.0f\" }}h of runway"
+          description: >-
+            Below 48 hours the wallet cannot be assumed to survive a weekend. Top it up before it
+            becomes an outage; every gasless intent on this chain fails once it empties.
+
+      - alert: PaymasterDepositRunwayLow
+        expr: fairwins_paymaster_deposit_runway_hours < 48
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Paymaster deposit on chain {{ $labels.chain_id }} has {{ $value | printf \"%.0f\" }}h of runway"
+          description: >-
+            Sponsored UserOps (spec 050) stop being sponsored when the EntryPoint deposit runs out.
+            The passkey path falls back to user-paid gas, so this degrades quietly rather than
+            breaking loudly — which is why it needs a metric.
+
+  - name: fairwins-availability
+    rules:
+      - alert: GatewayDown
+        expr: fairwins_gateway_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Relay gateway /status is not answering"
+
+      - alert: BundlerNotServingEntryPoint
+        # Deliberately NOT `probe_success == 0`. The origin-lock nginx answers 200 on its own health
+        # path without ever touching alto; this fires when the bundler stops doing its actual job
+        # while still looking healthy from outside.
+        expr: fairwins_bundler_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bundler is reachable but not answering eth_supportedEntryPoints"
+          description: >-
+            This is the failure a plain HTTP check cannot see, and the one that stalled gasless
+            transactions on 2026-07-12.
+
+      - alert: KillSwitchEngaged
+        expr: fairwins_gateway_killswitch == 1
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "Relay kill switch is ENGAGED — all relayed intents are halted"
+          description: >-
+            Operator-set, so this is not a fault. It is here because an engaged kill switch and an
+            outage look identical from the member's side.
+
+      - alert: ChainRpcDown
+        expr: fairwins_rpc_up == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Public RPC for {{ $labels.chain }} is not answering"
+
+      - alert: ProbeFailing
+        expr: probe_success == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Endpoint probe failing: {{ $labels.instance }}"
+
+      - alert: TlsCertificateExpiringSoon
+        # 14 days is roughly two renewal attempts' worth of warning for an automated issuer.
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS certificate for {{ $labels.instance }} expires in {{ $value | printf \"%.0f\" }} days"
+
+  - name: workstation
+    rules:
+      - alert: WorkstationDiskFilling
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 0.10
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Workstation filesystem {{ $labels.mountpoint }} is over 90% full"

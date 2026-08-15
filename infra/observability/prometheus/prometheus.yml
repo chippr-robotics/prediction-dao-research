@@ -1,0 +1,91 @@
+# Prometheus configuration for the local FairWins operator stack (spec 088).
+#
+# SCRAPE INTERVALS ARE DELIBERATELY UNEQUAL. The host and containers are cheap and local, so 15s.
+# The production probes cross the public internet and the GCP exporter costs money per API call in
+# a shared project, so they are slower. A uniform 15s here would bill Cloud Monitoring for four
+# times the calls to watch numbers that move on a scale of minutes.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: fairwins-workstation
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── this host and its containers ───────────────────────────────────────────────────────────
+  - job_name: node
+    static_configs:
+      - targets: ["host.docker.internal:9100"]
+        labels:
+          instance: workstation
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # ── FairWins application metrics ───────────────────────────────────────────────────────────
+  # Gas-wallet runway, paymaster deposit, kill switch, chain heads, watched balances.
+  - job_name: fairwins
+    scrape_interval: 60s
+    # The exporter itself fans out to several upstreams with an 8s timeout each; a 10s scrape
+    # timeout would abort the scrape while its own requests were still legitimately in flight.
+    scrape_timeout: 45s
+    static_configs:
+      - targets: ["fairwins-exporter:9101"]
+
+  # ── production endpoint probes ─────────────────────────────────────────────────────────────
+  #
+  # These go through the PUBLIC Cloudflare hostnames, not the origin IPs. The origin firewall opens
+  # :443 to Cloudflare ranges only, so a workstation cannot reach it — and widening that range to
+  # make a local probe work would be trading a real security boundary for a convenience.
+  #
+  # Consequence worth knowing: `/__probe/health` returns 403 through Cloudflare (it is restricted to
+  # Google's uptime probers at the origin nginx). These probe the publicly reachable paths instead.
+  - job_name: blackbox-http
+    scrape_interval: 60s
+    metrics_path: /probe
+    params:
+      module: [fairwins_http_2xx]
+    static_configs:
+      - targets:
+          - https://fairwins.app/
+          - https://relay.fairwins.app/status
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # The bundler needs a POST with a JSON-RPC body and a content match on the EntryPoint address.
+  # A 200 from this host proves only that the origin-lock nginx is alive: its own health path never
+  # touches alto, which is exactly the check that stayed green through the 2026-07-12 stall.
+  - job_name: blackbox-bundler
+    scrape_interval: 60s
+    metrics_path: /probe
+    params:
+      module: [bundler_entrypoint]
+    static_configs:
+      - targets:
+          - https://bundler.fairwins.app/
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ── GCP Cloud Monitoring ───────────────────────────────────────────────────────────────────
+  - job_name: stackdriver
+    scrape_interval: 5m
+    scrape_timeout: 2m
+    static_configs:
+      - targets: ["stackdriver-exporter:9255"]

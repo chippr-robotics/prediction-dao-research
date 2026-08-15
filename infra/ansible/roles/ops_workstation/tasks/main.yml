@@ -1,0 +1,144 @@
+# Operator workstation convergence (spec 088).
+#
+# WHAT THIS ROLE DOES NOT DO, and why each absence is deliberate:
+#
+#   - It never writes a credential. Every secret this machine uses is fetched at point of use from
+#     Secret Manager by `scripts/secrets/`. A role that materialised secrets into a file would
+#     recreate the exact problem this feature removed, with the added twist of doing it on a
+#     schedule.
+#   - It never runs `gcloud auth login`. Authentication is an interactive act by a human being; a
+#     playbook that could authenticate on its own behalf would need a stored credential to do it.
+#     The role VERIFIES authentication and tells the operator what to run, which is the most a
+#     configuration tool can honestly do here.
+#   - It does not become root, install packages, or touch the repository checkout. This is a
+#     general-purpose machine with an owner.
+#
+# Every task is either a check or an idempotent file write. A second run reports changed=0.
+---
+- name: Check that the Google Cloud CLI is installed
+  ansible.builtin.command: gcloud --version
+  register: ops_gcloud_version
+  changed_when: false
+  failed_when: false
+
+- name: Assert the Google Cloud CLI is present
+  ansible.builtin.assert:
+    that: ops_gcloud_version.rc == 0
+    fail_msg: >-
+      gcloud is not on PATH. Every secret this workstation reads is fetched through it
+      (scripts/secrets/fetch.js deliberately shells out to gcloud rather than adding an npm
+      dependency, because an incremental install in this repo drops the platform rolldown binary
+      from the lockfile). Install the Google Cloud CLI and re-run.
+    success_msg: "gcloud present: {{ ops_gcloud_version.stdout_lines[0] | default('unknown') }}"
+
+- name: Determine the active gcloud account
+  ansible.builtin.command: gcloud auth list --filter=status:ACTIVE --format=value(account)
+  register: ops_gcloud_account
+  changed_when: false
+  failed_when: false
+
+- name: Assert an operator is authenticated
+  ansible.builtin.assert:
+    that:
+      - ops_gcloud_account.rc == 0
+      - ops_gcloud_account.stdout | trim | length > 0
+    fail_msg: >-
+      No active gcloud account. Run `gcloud auth login` and
+      `gcloud auth application-default login`, then re-run this playbook.
+    success_msg: "authenticated as {{ ops_gcloud_account.stdout | trim }}"
+
+- name: Verify this operator can impersonate the workstation identity
+  # The single check that distinguishes "configured" from "will fail at the first deploy". It mints
+  # a token and discards it; failure here means the operator is not in workstation_operators, which
+  # is a Terraform change, not a local one.
+  ansible.builtin.command: >-
+    gcloud auth print-access-token
+    --impersonate-service-account={{ ops_workstation_service_account }}
+  register: ops_impersonation
+  changed_when: false
+  failed_when: false
+  # The command's stdout IS an access token. It must not reach the log, and Ansible would otherwise
+  # print it on failure.
+  no_log: true
+
+- name: Report the impersonation result
+  ansible.builtin.assert:
+    that: ops_impersonation.rc == 0
+    fail_msg: >-
+      Cannot impersonate {{ ops_workstation_service_account }}. Add this operator to
+      `workstation_operators` in infra/terraform/environments/prod/terraform.tfvars and apply — the
+      grant is roles/iam.serviceAccountTokenCreator on that account only. This is not fixable on
+      the workstation.
+    success_msg: "can act as {{ ops_workstation_service_account }}"
+
+- name: Create the FairWins profile directory
+  ansible.builtin.file:
+    path: "{{ ops_workstation_profile_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Write the shell profile fragment
+  # A fragment the operator sources, rather than an edit to their .bashrc. Appending to somebody's
+  # shell rc from a product repository is not reversible in any way they would expect, and running
+  # it twice is how you end up with the same export three times.
+  ansible.builtin.copy:
+    dest: "{{ ops_workstation_profile_file }}"
+    mode: "0600"
+    content: |
+      # Managed by infra/ansible/roles/ops_workstation (spec 088). Edits will be overwritten.
+      #
+      # Source this from your shell rc:
+      #   [ -f {{ ops_workstation_profile_file }} ] && . {{ ops_workstation_profile_file }}
+      #
+      # This file contains NO secrets and never will — only the identity to impersonate and the
+      # project to read from. The secrets themselves are fetched at point of use by
+      # `npm run sec -- --profile <name> -- <command>`.
+      export FW_SECRETS_PROJECT={{ ops_workstation_project }}
+      export FW_SECRETS_IMPERSONATE={{ ops_workstation_service_account }}
+  register: ops_profile
+
+- name: Check the repository checkout is where this role expects
+  ansible.builtin.stat:
+    path: "{{ ops_workstation_repo_dir }}/scripts/secrets/registry.js"
+  register: ops_repo
+
+- name: Verify every declared secret is actually readable from this machine
+  # The end-to-end proof. It exercises the real path — impersonation, IAM, container existence —
+  # and prints sizes, never payloads. Skipped rather than failed when the checkout is elsewhere,
+  # because the machine can be correctly configured with the repo in a different directory.
+  ansible.builtin.command: npm run secrets:doctor --silent
+  args:
+    chdir: "{{ ops_workstation_repo_dir }}"
+  environment:
+    FW_SECRETS_PROJECT: "{{ ops_workstation_project }}"
+    FW_SECRETS_IMPERSONATE: "{{ ops_workstation_service_account }}"
+  register: ops_doctor
+  changed_when: false
+  failed_when: false
+  when: ops_repo.stat.exists
+
+- name: Report secret reachability
+  ansible.builtin.debug:
+    msg: "{{ ops_doctor.stdout_lines | default(['(skipped: repository not at ' ~ ops_workstation_repo_dir ~ ')']) }}"
+
+- name: Assert no managed credential has reappeared on disk
+  # The regression guard. Moving secrets into Secret Manager once is easy; the failure mode is
+  # somebody pasting a key back into .env next week to unblock themselves. Convergence is the right
+  # moment to notice.
+  ansible.builtin.command: npm run check:env-hygiene --silent
+  args:
+    chdir: "{{ ops_workstation_repo_dir }}"
+  register: ops_hygiene
+  changed_when: false
+  failed_when: ops_hygiene.rc != 0
+  when: ops_repo.stat.exists
+
+# ── optional: local observability stack ───────────────────────────────────────────────────────
+
+- name: Start the local observability stack
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ ops_workstation_observability_dir }}"
+  register: ops_observability
+  changed_when: "'Started' in ops_observability.stderr or 'Created' in ops_observability.stderr"
+  when: ops_workstation_observability | bool

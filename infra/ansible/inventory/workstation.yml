@@ -1,0 +1,19 @@
+# Static inventory for operator workstations (spec 088).
+#
+# WHY STATIC, when the nodes use a dynamic GCP inventory: a workstation is not a GCE instance and
+# carries no GCP labels to key on. It is somebody's hardware. The dynamic plugin would return
+# nothing for it, and a play that silently matches no hosts reports success — which is the worst
+# possible outcome for a convergence run.
+#
+# WHY LOCAL CONNECTION: the intended use is an operator converging their OWN machine
+# (`ansible-playbook playbooks/workstation.yml`). There is deliberately no SSH path here — a
+# workstation that can be configured remotely by this repo is a workstation that can be
+# reconfigured remotely by anyone who compromises it.
+---
+all:
+  children:
+    workstation:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_python_interpreter: /usr/bin/python3

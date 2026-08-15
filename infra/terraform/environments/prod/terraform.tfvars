@@ -22,10 +22,47 @@ gateway_secret_ids = [
 
 # Secret CONTAINERS under management. Versions and payloads are never declared (guardrail G-04).
 managed_secret_ids = [
+  # Runtime secrets, consumed by the VM containers.
   "origin-lock-secret",
   "alto-executor-key-137",
   "relay-webhook-secret",
   "relay-engine-api-key",
+
+  # Workstation secrets (spec 088). Mirrors scripts/secrets/registry.js — the parity test is what
+  # keeps these in step; do not edit one list without the other.
+  "fairwins-creator-key",
+  "fairwins-deployer-key",
+  "fairwins-etherscan-api-key",
+  "fairwins-floppy-keystore-password",
+  "fairwins-floppy-mordor-password",
+  "fairwins-floppy-nazgul-prime-password",
+  "fairwins-graph-api-key",
+  "fairwins-graph-deploy-key",
+  "fairwins-pinata-jwt",
+  "fairwins-quicknode-polygon-token",
+  "fairwins-quicknode-polygon-url",
+  "fairwins-seed-player-keys",
+]
+
+# ── operator workstation (spec 088) ───────────────────────────────────────────────────────────
+#
+# Everyone listed here can read every secret below by impersonating fairwins-ops@. That is the
+# whole access-review question in one place: this list times that list.
+workstation_operators = ["user:cody.w.burns@gmail.com"]
+
+workstation_secret_ids = [
+  "fairwins-creator-key",
+  "fairwins-deployer-key",
+  "fairwins-etherscan-api-key",
+  "fairwins-floppy-keystore-password",
+  "fairwins-floppy-mordor-password",
+  "fairwins-floppy-nazgul-prime-password",
+  "fairwins-graph-api-key",
+  "fairwins-graph-deploy-key",
+  "fairwins-pinata-jwt",
+  "fairwins-quicknode-polygon-token",
+  "fairwins-quicknode-polygon-url",
+  "fairwins-seed-player-keys",
 ]
 
 notification_emails = ["cody.w.burns@gmail.com"]

@@ -1,0 +1,45 @@
+{
+  "_comment": [
+    "Scrape targets for the FairWins exporter (spec 088).",
+    "",
+    "PUBLIC RPC ENDPOINTS ONLY, deliberately. This exporter runs in a container with no credentials",
+    "and must stay that way: an observability component that needs a secret is a component that can",
+    "leak one, and block height plus a balance are readable from any public node. The QuickNode",
+    "archive endpoint is needed for eth_getLogs, which this exporter never calls.",
+    "",
+    "Addresses are taken from deployments/*.json — the recorded source of truth — not from memory."
+  ],
+  "gatewayStatusUrl": "https://relay.fairwins.app/status",
+  "bundlerRpcUrl": "https://bundler.fairwins.app/",
+  "chains": [
+    {
+      "chainId": 137,
+      "name": "polygon",
+      "rpcUrl": "https://polygon-bor-rpc.publicnode.com",
+      "addresses": [
+        {
+          "role": "deployer",
+          "address": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+          "note": "Hot deploy signer and spec-050 paymaster deployer. Funded; running it dry blocks every deploy."
+        },
+        {
+          "role": "treasury",
+          "address": "0x1215185387E70a48b07D73AcB67002A073F18575",
+          "note": "FeeRouter treasury (spec 060)."
+        }
+      ]
+    },
+    {
+      "chainId": 63,
+      "name": "mordor",
+      "rpcUrl": "https://rpc.mordor.etccooperative.org",
+      "addresses": [
+        {
+          "role": "floppy-mordor",
+          "address": "0x40cE27b66a28cc0965A30C67A88FaD16cD4d21B0",
+          "note": "Mordor floppy keystore account."
+        }
+      ]
+    }
+  ]
+}

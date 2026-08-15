@@ -152,6 +152,38 @@ resource "google_secret_manager_secret" "managed" {
   }
 }
 
+# ── operator workstation ──────────────────────────────────────────────────────────────────────
+#
+# The self-hosted administration machine (spec 088). It is not provisioned here — it is physical
+# hardware — but the identity it acts as and everything it can reach IS declared, which is what
+# makes it a reviewable surface rather than an undescribed box holding a funded deploy key.
+#
+# The secret id list is NOT hand-maintained here: it mirrors `scripts/secrets/registry.js`, and
+# `scripts/secrets/__tests__/terraform-parity.test.js` fails if the two drift. Without that, an
+# operator adds a secret to the registry, the grant silently never appears, and the failure surfaces
+# as PERMISSION_DENIED at use time — which reads exactly like a broken login.
+
+module "workstation" {
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=54b46067c189e40de65b970ec2f5a103e9610eaa"
+
+  project_id                   = var.project_id
+  service_account_id           = "fairwins-ops"
+  service_account_display_name = "FairWins operator workstation"
+
+  operator_principals     = var.workstation_operators
+  secret_accessor_secrets = var.workstation_secret_ids
+
+  # READ-ONLY telemetry only. This is what lets the locally-run Prometheus and Grafana stack
+  # (infra/observability) scrape Cloud Monitoring and read logs while holding no write path of any
+  # kind into the estate. Anything mutating belongs to the CI apply identity, not to a workstation.
+  project_roles = [
+    "roles/monitoring.viewer",
+    "roles/logging.viewer",
+  ]
+
+  depends_on = [google_secret_manager_secret.managed]
+}
+
 # ── artifact registry ─────────────────────────────────────────────────────────────────────────
 
 resource "google_artifact_registry_repository" "cloud_run_source_deploy" {
