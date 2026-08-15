@@ -439,6 +439,42 @@ artifacts live under `specs/<feature>/`.
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
+- **Cloud infrastructure is DECLARATIVE (spec 085), and the GCP project is SHARED.** Terraform
+  (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
+  each of which has a way to be silently wrong:
+  (1) **IAM is ADDITIVE ONLY.** `chippr-bots-site-wp` hosts a public WordPress VM plus `clearpath-*`,
+  `fukuii-*`, `kings-edge-*`. `google_project_iam_binding` is one word from the safe `_iam_member`
+  and is **authoritative for that role project-wide** — it strips the role from every other
+  principal, and the plan diff looks small and ordinary. `_iam_policy` is worse (the whole policy).
+  Both are rejected by `npm run check:iac`; the CI identity also lacks `projectIamAdmin`, so the
+  same mistake fails at the API. **Two layers, because either alone has a failure mode.**
+  (2) **Never declare a `google_secret_manager_secret_version`** — it writes the payload into state
+  in plaintext. Terraform owns secret **containers + access bindings** only. The ONE accepted
+  exception is the origin-lock header read via a *data source* (data-source results are ALSO written
+  to state; `sensitive` hides a value from output, not from state) — the gate warns on every such
+  use so it stays countable.
+  (3) **Adoption is by `import`, never recreate**, and a surface is done only at a **zero-diff
+  plan**. If a plan is not clean the CONFIGURATION is wrong — fix the repo, never apply to force
+  live infra to match a generated body. `import` blocks STAY after adoption: they are the audit
+  record and the state-loss recovery path. KMS key versions, secret payloads and the
+  Cloudflare-pinned static IPs are unrecoverable and carry `prevent_destroy`.
+  (4) **Terraform owns Cloud Run SHAPE; Cloud Build owns the IMAGE.** The `ignore_changes` set
+  (`image`, `revision`, `client`, `client_version`) is gate-enforced — without it every merge reports
+  drift, and drift nobody reads is worse than none. The pipeline correspondingly must not set shape
+  flags. **The Cloud Run alto bundler must stay decommissioned** (G-11): re-arming it puts two
+  executors on ONE EOA — colliding nonces, stuck bundles, both instances healthy-looking, no in-band
+  detection.
+  (5) **Both Cloudflare rulesets are AUTHORITATIVE for their phase** — an apply deletes any rule
+  added at the dashboard. The geo gate answers HTTP 451 and is a **legal control** (spec 007), under
+  CODEOWNERS. (6) **The nodes have NO public SSH**: `:22` is open to the IAP range only, and the
+  Ansible inventory tunnels through it. If a playbook cannot connect, fix the tunnel — **never widen
+  the firewall**. Handlers restart the whole `fairwins-stack@<role>` unit, never a container (one
+  shared network namespace). Secret delivery **invokes** `infra/vm/common/fetch-secrets.sh` rather
+  than reimplementing it. Apply is **automatic on merge** and executes the *reviewed* plan, gated on
+  the infra-tree digest; a mismatch fails rather than replanning. See
+  `docs/developer-guide/infrastructure-as-code.md` + `docs/runbooks/infrastructure-operations.md`
+  + `specs/085-infrastructure-as-code/`.
+
 - **The repo is an npm WORKSPACE (spec 075): one root lockfile, 8 members, `contracts/` deliberately
   NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
   detail — **`monorepo-workspace`** (dependencies, adding a package, recovering a broken install)
