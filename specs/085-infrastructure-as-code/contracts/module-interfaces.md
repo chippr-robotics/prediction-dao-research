@@ -152,7 +152,7 @@ into the form that stayed green through a real outage.
 ## How it is pinned, and why by SHA rather than tag
 
 ```hcl
-source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 ```
 
 A **40-character commit SHA**, not a tag. A tag can be repointed at a different commit; a SHA cannot,
@@ -165,17 +165,55 @@ a SHA. Anyone with push access can add the tag later; it changes no plan.
 
 ## The shared repository is private
 
-`terraform init` needs a credential to fetch it: a **read-only deploy key** on
-`chippr-tf-modules`, stored as the `TF_MODULES_SSH_KEY` repository secret, with module sources using
-`git::ssh://git@github.com/...`.
+`terraform init` needs a credential to fetch it. The default `GITHUB_TOKEN` in a consumer's Actions
+workflow is scoped to that repository alone and **cannot** read the modules repo, so the three infra
+workflows rewrite git's config with `TF_MODULES_TOKEN` before `init`:
 
-A deploy key rather than a personal access token, chosen after a fine-grained PAT failed under every
-credential form: a deploy key is scoped to exactly one repository, is unaffected by the
-organisation's PAT policy, has no resource-owner concept (which is fixed at token creation and
-invisible afterwards), no approval queue, and no expiry. None of that machinery applies to it.
+```yaml
+- name: Allow Terraform to fetch private modules
+  run: |
+    git config --global url."https://x-access-token:${{ secrets.TF_MODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+```
 
-The workflows pin GitHub's published host key rather than running `ssh-keyscan`, which is
-trust-on-first-use — it accepts whatever answers on the day, including an interceptor.
+A missing or wrong token surfaces as **`repository not found`** on the module source, not as a
+permission error — GitHub returns 404 rather than 403 for a private repository the caller cannot
+see. Read that message as authentication before hunting for a wrong path.
+
+### The token must be owned by the ORGANISATION
+
+A fine-grained PAT's **resource owner** is chosen when the token is created and **cannot be edited
+afterwards**. A token owned by a personal account can never see `chippr-robotics` repositories — no
+scope setting, no organisation policy, and no approval changes that.
+
+GitHub reports this as **404 Not Found**, not 403, because a repository you cannot see is
+indistinguishable from one that does not exist. That reads as "the repo is missing" or "the scope is
+wrong", so it sends you to fix things that were never broken. It cost four rounds here.
+
+When creating the token, the **Resource owner** dropdown must be set to `chippr-robotics`. The token
+page then shows *"Access on the chippr-robotics organization"*. If it does not say that, the token
+cannot be repaired — generate a new one.
+
+Required settings:
+
+| Field | Value |
+|---|---|
+| Resource owner | `chippr-robotics` |
+| Repository access | Only select repositories → `chippr-tf-modules` |
+| Repository permissions | Contents: **Read-only** |
+
+The organisation must also permit fine-grained PATs, and may hold the token in a pending-approval
+queue. Verify before storing the secret:
+
+```bash
+git ls-remote https://x-access-token:<TOKEN>@github.com/chippr-robotics/chippr-tf-modules.git HEAD
+```
+
+It should print the commit the modules are pinned to.
+
+### Never paste a token into a screenshot or a chat
+
+Treat any token that has appeared in an image, a transcript, or a log as compromised and revoke it.
+The secret store is the only place a token belongs.
 
 ## Bumping to a new module version
 

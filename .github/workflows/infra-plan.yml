@@ -66,42 +66,87 @@ jobs:
       - name: Check module repository access
         id: modules
         env:
-          # A read-only DEPLOY KEY on chippr-tf-modules, not a PAT. See the note in the plan job.
-          TF_MODULES_SSH_KEY: ${{ secrets.TF_MODULES_SSH_KEY }}
+          # Through `env:`, not interpolated straight into the script. A secret spliced into shell
+          # source breaks apart on any newline it contains — which is how this first failed, with git
+          # reporting `URL rejected: Malformed input to a URL function`.
+          TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
         run: |
-          # Branch rather than early-return: a bare `exit 0` in a merge-gating step is what
-          # test/config/CiGates.test.js rejects, and it is right to — that is how a gate goes dead.
-          if [ -z "${TF_MODULES_SSH_KEY:-}" ]; then
+          # Trim stray whitespace: a secret pasted with a trailing newline is invisible in the UI.
+          token="$(printf '%s' "${TF_MODULES_TOKEN:-}" | tr -d '[:space:]')"
+
+          # Branch rather than early-return. A bare `exit 0` in a merge-gating step is the pattern
+          # test/config/CiGates.test.js exists to reject — it is how a gate goes quietly dead — and
+          # the check is right to refuse it even when the intent here is an honest skip.
+          if [ -z "${token}" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             {
               echo "### terraform validate: NOT RUN — no access to the module repository"
               echo ""
-              echo "\`TF_MODULES_SSH_KEY\` is unset, so \`terraform init\` cannot fetch the modules"
-              echo "from the private \`chippr-tf-modules\` repository and the environment roots"
-              echo "cannot be validated. **No claim is being made that this configuration is valid.**"
+              echo "\`TF_MODULES_TOKEN\` is unset, so \`terraform init\` cannot fetch the modules from"
+              echo "the private \`chippr-tf-modules\` repository and the environment roots cannot be"
+              echo "validated. **No claim is being made that this configuration is valid.**"
               echo ""
-              echo "Fix: add a read-only deploy key to chippr-tf-modules and store its PRIVATE half"
-              echo "as the \`TF_MODULES_SSH_KEY\` repository secret."
+              echo "Fix: add a fine-grained token with Contents:read on chippr-tf-modules as the"
+              echo "\`TF_MODULES_TOKEN\` repository secret."
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            install -d -m 0700 ~/.ssh
-            printf '%s\n' "${TF_MODULES_SSH_KEY}" > ~/.ssh/tf_modules
-            chmod 0600 ~/.ssh/tf_modules
-            printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > ~/.ssh/known_hosts
-            printf '%s\n' 'Host github.com' '  IdentityFile ~/.ssh/tf_modules' '  IdentitiesOnly yes' '  StrictHostKeyChecking yes' > ~/.ssh/config
-            chmod 0600 ~/.ssh/known_hosts ~/.ssh/config
+            # TRY EACH CREDENTIAL FORM. `x-access-token:` is the GitHub *App installation token*
+            # convention; a fine-grained PAT is not an installation token and does not always
+            # authenticate under it. Rather than assume which form is right and read the resulting
+            # 404 as "your token lacks access", try them and report which one actually worked —
+            # otherwise a wrong format here is indistinguishable from a mis-scoped token, and the
+            # person holding the token gets sent to fix something that was never broken.
+            # Probe with the credential INLINE, writing no git config until one works. The earlier
+            # version reconfigured and unset a global rewrite per attempt, which needed `|| true` on
+            # the unsets — and `|| true` in a merge-gating step is exactly what CiGates rejects.
+            # Probing inline removes the need entirely rather than working around the rule.
+            #
+            # `x-access-token:` is the GitHub *App installation token* convention; a fine-grained PAT
+            # is not an installation token and may not authenticate under it. Trying each form means
+            # a wrong URL format can no longer masquerade as a mis-scoped token — otherwise whoever
+            # holds the token gets sent to fix something that was never broken.
+            repo_path="chippr-robotics/chippr-tf-modules.git"
+            worked=""
+            form=""
+            err=""
+            for pair in "x-access-token|x-access-token:${token}" "oauth2|oauth2:${token}" "token-as-username|${token}"; do
+              label="${pair%%|*}"
+              form="${pair#*|}"
+              if err="$(git ls-remote "https://${form}@github.com/${repo_path}" HEAD 2>&1)"; then
+                worked="$label"
+                break
+              fi
+            done
 
-            # Preflight, so a bad key does not surface three steps later as a terraform
-            # module-download failure with the real cause buried.
-            if err="$(git ls-remote ssh://git@github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            # git does NOT redact credentials from its error text, and this is echoed below.
+            err="${err//${token}/***}"
+
+            if [ -n "$worked" ]; then
+              git config --global url."https://${form}@github.com/".insteadOf "https://github.com/"
               echo "available=true" >> "$GITHUB_OUTPUT"
-              echo "Module repository reachable."
+              echo "Module repository reachable (credential form: ${worked})."
             else
               echo "available=false" >> "$GITHUB_OUTPUT"
-              echo "::error::TF_MODULES_SSH_KEY cannot read chippr-robotics/chippr-tf-modules."
-              echo "::error::${err}"
-              echo "::error::Check the PUBLIC half of this key is installed at"
-              echo "::error::github.com/chippr-robotics/chippr-tf-modules/settings/keys"
+              echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules under ANY"
+              echo "::error::credential form (x-access-token:, oauth2:, or token-as-username), so this"
+              echo "::error::is the token's access rather than the URL format."
+              case "$err" in
+                *"Invalid username or token"*|*"Authentication failed"*)
+                  echo "::error::The token was REJECTED. A fine-grained PAT must list"
+                  echo "::error::chippr-tf-modules explicitly under 'Repository access' — a token"
+                  echo "::error::scoped to other repositories is refused here even though it is"
+                  echo "::error::otherwise valid. A classic PAT needs the 'repo' scope AND SSO"
+                  echo "::error::authorisation for the chippr-robotics organisation."
+                  ;;
+                *"not found"*|*"does not exist"*)
+                  echo "::error::Repository NOT FOUND — for a private repo this usually means the"
+                  echo "::error::token cannot see it, since GitHub returns 404 rather than 403 to a"
+                  echo "::error::caller without access. Grant the token access to chippr-tf-modules."
+                  ;;
+                *)
+                  echo "::error::${err}"
+                  ;;
+              esac
               exit 1
             fi
           fi
@@ -232,31 +277,50 @@ jobs:
       # A missing or wrong token surfaces as `repository not found` on the module source, NOT as a
       # permission error — GitHub returns 404 rather than 403 for a private repo the caller cannot
       # see. Read that message as authentication before you go looking for a wrong path.
-      - name: Install the module deploy key
+      - name: Allow Terraform to fetch private modules
         env:
-          # A READ-ONLY deploy key on chippr-tf-modules. Chosen after a fine-grained PAT failed under
-          # every credential form: a deploy key is scoped to one repository, is unaffected by the
-          # organisation's PAT policy, has no resource-owner concept and no approval queue, and does
-          # not expire. None of the machinery that cost four rounds applies to it.
-          TF_MODULES_SSH_KEY: ${{ secrets.TF_MODULES_SSH_KEY }}
+          # Through `env:`, not interpolated straight into the script. Interpolating a secret into a
+          # `run:` body splices its raw bytes into the shell source, so a value containing a newline
+          # breaks the command apart — which is exactly how this first failed, with git reporting
+          # `URL rejected: Malformed input to a URL function`.
+          TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
         run: |
           set -euo pipefail
-          install -d -m 0700 ~/.ssh
-          printf '%s\n' "${TF_MODULES_SSH_KEY}" > ~/.ssh/tf_modules
-          chmod 0600 ~/.ssh/tf_modules
+          # Trim stray whitespace. A secret pasted with a trailing newline is invisible in the UI and
+          # produces a URL git cannot parse.
+          token="$(printf '%s' "${TF_MODULES_TOKEN}" | tr -d '[:space:]')"
+          if [ -z "${token}" ]; then
+            echo "::error::TF_MODULES_TOKEN is empty. terraform init cannot fetch the private modules."
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
 
-          # GitHub's published host key, PINNED rather than discovered with ssh-keyscan. keyscan is
-          # trust-on-first-use: it accepts whatever answers on the day, including an interceptor, so
-          # it would authenticate us to whoever happened to reply.
-          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > ~/.ssh/known_hosts
-          chmod 0600 ~/.ssh/known_hosts
-
-          printf '%s\n' \
-            'Host github.com' \
-            '  IdentityFile ~/.ssh/tf_modules' \
-            '  IdentitiesOnly yes' \
-            '  StrictHostKeyChecking yes' > ~/.ssh/config
-          chmod 0600 ~/.ssh/config
+          # Preflight the credential against the modules repo. Without this, a bad token surfaces
+          # three steps later as a terraform module-download failure, where the real message is
+          # buried under `Could not download module`. The three failure modes below are genuinely
+          # different problems with genuinely different fixes, and git reports them distinctly.
+          if ! err="$(git ls-remote https://github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules."
+            case "$err" in
+              *"Invalid username or token"*|*"Authentication failed"*)
+                echo "::error::The token was REJECTED. If it is a fine-grained PAT, it must list"
+                echo "::error::chippr-tf-modules explicitly under 'Repository access' — a token"
+                echo "::error::scoped to other repositories is rejected here even though it is valid."
+                echo "::error::If it is a classic PAT, it needs the 'repo' scope AND SSO authorisation"
+                echo "::error::for the chippr-robotics organisation."
+                ;;
+              *"not found"*|*"does not exist"*)
+                echo "::error::The repository was NOT FOUND, which for a private repo usually means"
+                echo "::error::the token cannot see it rather than that it is missing — GitHub"
+                echo "::error::returns 404 rather than 403 to a caller without access."
+                ;;
+              *)
+                echo "::error::${err}"
+                ;;
+            esac
+            exit 1
+          fi
+          echo "Module repository reachable."
 
       - name: Init
         working-directory: infra/terraform/environments/${{ matrix.environment }}

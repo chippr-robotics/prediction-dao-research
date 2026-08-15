@@ -140,31 +140,50 @@ jobs:
       # A missing or wrong token surfaces as `repository not found` on the module source, NOT as a
       # permission error — GitHub returns 404 rather than 403 for a private repo the caller cannot
       # see. Read that message as authentication before you go looking for a wrong path.
-      - name: Install the module deploy key
+      - name: Allow Terraform to fetch private modules
         env:
-          # A READ-ONLY deploy key on chippr-tf-modules. Chosen after a fine-grained PAT failed under
-          # every credential form: a deploy key is scoped to one repository, is unaffected by the
-          # organisation's PAT policy, has no resource-owner concept and no approval queue, and does
-          # not expire. None of the machinery that cost four rounds applies to it.
-          TF_MODULES_SSH_KEY: ${{ secrets.TF_MODULES_SSH_KEY }}
+          # Through `env:`, not interpolated straight into the script. Interpolating a secret into a
+          # `run:` body splices its raw bytes into the shell source, so a value containing a newline
+          # breaks the command apart — which is exactly how this first failed, with git reporting
+          # `URL rejected: Malformed input to a URL function`.
+          TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
         run: |
           set -euo pipefail
-          install -d -m 0700 ~/.ssh
-          printf '%s\n' "${TF_MODULES_SSH_KEY}" > ~/.ssh/tf_modules
-          chmod 0600 ~/.ssh/tf_modules
+          # Trim stray whitespace. A secret pasted with a trailing newline is invisible in the UI and
+          # produces a URL git cannot parse.
+          token="$(printf '%s' "${TF_MODULES_TOKEN}" | tr -d '[:space:]')"
+          if [ -z "${token}" ]; then
+            echo "::error::TF_MODULES_TOKEN is empty. terraform init cannot fetch the private modules."
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
 
-          # GitHub's published host key, PINNED rather than discovered with ssh-keyscan. keyscan is
-          # trust-on-first-use: it accepts whatever answers on the day, including an interceptor, so
-          # it would authenticate us to whoever happened to reply.
-          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > ~/.ssh/known_hosts
-          chmod 0600 ~/.ssh/known_hosts
-
-          printf '%s\n' \
-            'Host github.com' \
-            '  IdentityFile ~/.ssh/tf_modules' \
-            '  IdentitiesOnly yes' \
-            '  StrictHostKeyChecking yes' > ~/.ssh/config
-          chmod 0600 ~/.ssh/config
+          # Preflight the credential against the modules repo. Without this, a bad token surfaces
+          # three steps later as a terraform module-download failure, where the real message is
+          # buried under `Could not download module`. The three failure modes below are genuinely
+          # different problems with genuinely different fixes, and git reports them distinctly.
+          if ! err="$(git ls-remote https://github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules."
+            case "$err" in
+              *"Invalid username or token"*|*"Authentication failed"*)
+                echo "::error::The token was REJECTED. If it is a fine-grained PAT, it must list"
+                echo "::error::chippr-tf-modules explicitly under 'Repository access' — a token"
+                echo "::error::scoped to other repositories is rejected here even though it is valid."
+                echo "::error::If it is a classic PAT, it needs the 'repo' scope AND SSO authorisation"
+                echo "::error::for the chippr-robotics organisation."
+                ;;
+              *"not found"*|*"does not exist"*)
+                echo "::error::The repository was NOT FOUND, which for a private repo usually means"
+                echo "::error::the token cannot see it rather than that it is missing — GitHub"
+                echo "::error::returns 404 rather than 403 to a caller without access."
+                ;;
+              *)
+                echo "::error::${err}"
+                ;;
+            esac
+            exit 1
+          fi
+          echo "Module repository reachable."
 
       - name: Init
         working-directory: infra/terraform/environments/${{ matrix.environment }}
