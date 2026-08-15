@@ -42,3 +42,21 @@ resource "google_cloud_run_v2_service" "spa" {
     ]
   }
 }
+
+# A Cloudflare rule whose `name` is a human-readable label, not an identifier. G-10 must NOT judge
+# it: Cloudflare is scoped by zone id and a zone-scoped token, a different boundary from the shared
+# GCP project. A gate that fires on correct configuration is a gate someone will switch off.
+resource "cloudflare_ruleset" "waf_geo" {
+  zone_id = var.zone_id
+  name    = "Compliance geo gate"
+  kind    = "zone"
+  phase   = "http_request_firewall_custom"
+
+  rules = [
+    {
+      action     = "block"
+      expression = "true"
+      enabled    = true
+    }
+  ]
+}

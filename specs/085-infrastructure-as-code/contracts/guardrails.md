@@ -22,7 +22,7 @@ service must stay decommissioned.
 | **G-07** | Every `google_cloud_run_v2_service` declares the full `ignore_changes` set: `template[0].containers[0].image`, `template[0].revision`, `client`, `client_version` | The pipeline owns the artifact | Permanent false drift on every merge, which trains reviewers to ignore drift |
 | **G-08** | No literal `chippr-bots-site-wp`, `us-central1`, or `us-central1-a` inside `modules/**` | Modules must be environment-agnostic to be extractable | Extraction to `chippr-tf-modules` becomes a rewrite (FR-024/FR-024a) |
 | **G-09** | No `provider` block inside `modules/**` | A module with its own provider cannot be used with `for_each` or cleanly versioned | Blocks both reuse and extraction |
-| **G-10** | No resource references an identifier on the non-adoption list (R15): the WordPress VM, the default VPC, `default-allow-*` firewall rules, `clearpath-*`/`fukuii-*`/`kings-edge-*` services | FR-003 | Configuration reaches another workload |
+| **G-10** | Every literal `name` / `secret_id` / `repository_id` / `account_id` on a **GCP** resource matches an allow-list of names this repository owns | FR-003 | Configuration reaches another workload in the shared project |
 | **G-11** | No `google_cloud_run_v2_service` (or v1) named `fairwins-alto-bundler` | Re-arming it puts two executors on one EOA | Colliding nonces and stuck bundles, with both instances reporting healthy and no in-band detection |
 | **G-12** | Every root has a `backend "gcs"` block; no root uses local state except `bootstrap/` | FR-008/FR-009 | State on a laptop, or state shared across environments |
 | **G-13** | `.terraform.lock.hcl` exists and is committed for every root | FR-026 | The same commit resolves to different provider versions on different machines |
@@ -51,6 +51,22 @@ from output, not from state.
 **G-06 is not sufficient on its own.** A change that deletes the resource block also deletes its
 `prevent_destroy`, and Terraform will then destroy the resource. The permission layer is what holds
 in that case. G-06 catches the common case; ci-identity.md catches the rest.
+
+**G-10 is an ALLOW-LIST, and that inversion matters.** It originally enumerated other people's
+workloads — `clearpath-`, `fukuii-`, `kings-edge-` — and rejected references to them. That approach
+is unbounded and was already incomplete: the shared project also hosts the company website, and any
+workload added later would be missed by construction. A deny-list of other people's things can only
+ever be as current as the last person who remembered to update it.
+
+Inverted, an unrecognised GCP resource name is rejected by default. Adding a genuinely new FairWins
+resource means adding its name to `OWNED_NAME_PATTERNS` with a comment — a deliberate act, which is
+the right cost in a shared project. `scripts/infra/__tests__` asserts the rule catches
+`chippr-company-site`, a name that appears in no deny-list anywhere in this repository.
+
+The check is scoped to `google_*` resources. Cloudflare is bounded by zone id and a zone-scoped
+token — a different boundary — and its `name` fields are human-readable rule labels rather than
+identifiers. Judging them would make the rule fire on correct configuration, which is how a gate
+gets switched off. That scoping is itself covered by a test.
 
 **G-11 encodes a deletion.** The rule protects the *absence* of a build step: `cloudbuild.yaml` no
 longer deploys the Cloud Run bundler, and that absence is the only thing preventing a second executor

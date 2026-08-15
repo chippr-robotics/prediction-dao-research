@@ -62,7 +62,38 @@ const REQUIRED_CLOUD_RUN_IGNORES = [
   "client_version",
 ];
 
-/** Substrings identifying workloads this repository does not own (G-10). */
+/**
+ * G-10 works as an ALLOW-LIST, not a deny-list.
+ *
+ * It used to enumerate other people's workloads (`clearpath-`, `fukuii-`, `kings-edge-`) and reject
+ * references to them. That is unbounded and was already incomplete: the shared project also hosts
+ * the company website, and any future workload would be missed by construction. A deny-list of other
+ * people's things can only ever be as current as the last person who remembered to update it.
+ *
+ * So the rule is inverted. Every literal resource NAME must match something this repository owns.
+ * An unrecognised name fails — which is the correct default in a shared project, and means a new
+ * FairWins resource has to be declared here deliberately rather than a foreign one slipping through.
+ */
+const OWNED_NAME_PATTERNS = [
+  /^fairwins[-_]/, // VPC, subnet, IPs, firewall rules, VMs, service accounts
+  /^prediction-dao-research$/, // the production SPA service
+  /^staging(-testnet)?$/, // the two staging cohort services
+  /^cloud-run-source-deploy$/, // the Artifact Registry repository
+  /^origin-lock-secret$/,
+  /^alto-executor-key-137$/,
+  /^relay-(webhook-secret|engine-api-key)$/,
+  /^POLYMARKET_/, // gateway feature credentials, named in their upstream's convention
+  /^github-actions$/, // the WIF pool
+];
+
+/**
+ * Attributes carrying a resource's real name. These are what get compared against the allow-list;
+ * an interpolated or variable-driven value is skipped, because it is not a literal claim about
+ * which resource is being touched.
+ */
+const NAME_ATTRIBUTES = ["name", "secret_id", "repository_id", "account_id", "workload_identity_pool_id"];
+
+/** Known-foreign prefixes. Retained ONLY to give a clearer message than "unrecognised name". */
 const FOREIGN_MARKERS = ["clearpath-", "fukuii-", "kings-edge-", "default-allow-"];
 
 /** The service that must stay decommissioned (G-11). */
@@ -351,6 +382,29 @@ function check(tfRoot, scriptRoots, { includeFixtures = false } = {}) {
             file,
             block.line,
             `references "${marker}" — a workload this project does not own (FR-003)`
+          );
+        }
+      }
+
+      // Allow-list check, GCP resources only. The shared-project hazard is specific to
+      // `chippr-bots-site-wp`: Cloudflare is scoped by zone id and a zone-scoped token, a different
+      // boundary, and its `name` fields are human-readable rule labels rather than identifiers.
+      //
+      // Only literal values are judged: an interpolated or variable-driven name is not a claim about
+      // which specific resource is being touched.
+      const gcpResource = type.startsWith("google_");
+      for (const key of gcpResource ? NAME_ATTRIBUTES : []) {
+        const raw = attr(block.body, key);
+        if (!raw) continue;
+        const literal = raw.match(/^"([^"$]*)"$/);
+        if (!literal) continue;
+        const value = literal[1];
+        if (!OWNED_NAME_PATTERNS.some((re) => re.test(value))) {
+          fail(
+            "G-10",
+            file,
+            block.line,
+            `${type}.${name} declares ${key} = "${value}", which is not a name this repository owns. The GCP project is SHARED — an unrecognised name is rejected by default. If this really is ours, add it to OWNED_NAME_PATTERNS with a comment saying what it is.`
           );
         }
       }

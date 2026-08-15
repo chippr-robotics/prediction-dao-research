@@ -63,6 +63,27 @@ test("every violation reports rule, file, line and a rationale", () => {
   }
 });
 
+test("G-10 catches a foreign workload that appears in no deny-list", () => {
+  // The point of inverting this rule. The company website shares the GCP project and is named in no
+  // list of "other people's workloads" anywhere in this repository — a deny-list would have to have
+  // anticipated it. The allow-list rejects it because it is not something this repo owns.
+  const hit = failing.violations.find(
+    (v) => v.rule === "G-10" && v.message.includes("chippr-company-site")
+  );
+  assert.ok(
+    hit,
+    "an unrecognised GCP resource name must be rejected by default — that is what makes the rule bounded"
+  );
+});
+
+test("G-10 does not judge Cloudflare rule labels", () => {
+  // Cloudflare is scoped by zone id and a zone-scoped token, a different boundary from the shared
+  // GCP project, and its `name` fields are human-readable labels rather than identifiers. Judging
+  // them would make the rule fire on correct configuration, which is how a gate gets disabled.
+  const { violations } = check(PASSING, [PASSING], { includeFixtures: true });
+  assert.deepStrictEqual(violations.filter((v) => v.rule === "G-10"), []);
+});
+
 test("G-01 and G-02 name the additive replacement in their message", () => {
   const g01 = failing.violations.find((v) => v.rule === "G-01");
   const g02 = failing.violations.find((v) => v.rule === "G-02");
