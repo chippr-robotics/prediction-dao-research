@@ -122,3 +122,15 @@ variable "workstation_secret_ids" {
   type        = list(string)
   default     = []
 }
+
+variable "manage_spa" {
+  description = "Manage the SPA Cloud Run service. FALSE until phase D2 is adopted: the declaration does not yet describe the live service, and applying it would clear its runtime env, drop startup CPU boost, and change its scaling ceiling. See spec 087 T038-T040."
+  type        = bool
+  default     = false
+}
+
+variable "manage_monitoring" {
+  description = "Manage uptime checks, alert policies and the log metric. FALSE until the declared alert conditions are reconciled with the live ones — adoption found every threshold differs, two are looser, and one uptime comparison is inverted in a way that may never fire. See spec 087 T052."
+  type        = bool
+  default     = false
+}

@@ -35,7 +35,7 @@ locals {
 # ── network ───────────────────────────────────────────────────────────────────────────────────
 
 module "network" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
 
   project_id   = var.project_id
   region       = var.region
@@ -66,7 +66,7 @@ module "network" {
  * account and sign with the paymaster HSM key. This grant is strictly smaller.
  */
 module "bundler" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
 
   project_id        = var.project_id
   region            = var.region
@@ -106,7 +106,7 @@ module "bundler" {
  * repository-scoped and its secret access is per-secret.
  */
 module "gateway" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
 
   project_id        = var.project_id
   region            = var.region
@@ -164,7 +164,7 @@ resource "google_secret_manager_secret" "managed" {
 # as PERMISSION_DENIED at use time — which reads exactly like a broken login.
 
 module "workstation" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=54b46067c189e40de65b970ec2f5a103e9610eaa"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
 
   project_id                   = var.project_id
   service_account_id           = "fairwins-ops"
@@ -239,8 +239,22 @@ resource "google_kms_crypto_key" "signing" {
 # two executors on ONE EOA — colliding nonces, stuck bundles, both instances reporting healthy, and
 # no in-band detection. Guardrail G-11 rejects any attempt to add it back.
 
+/**
+ * FALSE until the Cloud Run surface is adopted (plan phase D2). Adoption revealed that this
+ * declaration does not yet describe the live service: applying it would clear every runtime
+ * environment variable, drop `startup_cpu_boost`, move the execution environment off GEN1, raise
+ * max instances 20 -> 100, and wipe the `commit-sha` / `gcb-build-id` labels Cloud Build stamps on
+ * every deploy (which are outside the G-07 ignore set, so they would re-drift on every merge).
+ *
+ * Per the adoption contract the CONFIGURATION is what is wrong, and it is fixed here rather than by
+ * applying. That work is spec 087 T038-T040, and T040 requires the shape flags to leave
+ * cloudbuild.yaml in the SAME change that adopts the service — so the service neither loses public
+ * access before, nor fights Terraform after. Until then this stays unmanaged rather than
+ * half-managed.
+ */
 module "spa" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  count  = var.manage_spa ? 1 : 0
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
 
   project_id = var.project_id
   region     = var.region
@@ -279,7 +293,7 @@ data "google_secret_manager_secret_version" "origin_lock" {
 
 module "edge" {
   count  = var.manage_edge ? 1 : 0
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
 
   zone_id = var.cloudflare_zone_id
 
@@ -309,8 +323,32 @@ module "edge" {
 
 # ── monitoring ────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * FALSE until the declared alert conditions are reconciled with the live ones (spec 087 T052).
+ *
+ * `vm_alert_policies` is commented "thresholds carry over from ops/monitoring/apply.sh unchanged".
+ * Adoption measured it, and that is not true of a single policy:
+ *
+ *   vm-cpu-high            live > 0.70 for 900s   declared > 0.90 for 300s   LOOSER
+ *   vm-memory-high         live > 85   for 600s   declared > 90   for 300s   LOOSER
+ *   vm-disk-filling        live > 85   for 600s   declared > 85   for 300s   faster
+ *   probe-failing          live > 2    for 300s   declared > 0    for 600s   different
+ *   vm-instance-down       live condition_absent  declared threshold < 1     different mechanism
+ *   vm-agent-not-reporting live condition_absent  declared threshold < 1     different mechanism
+ *   uptime (bundler)       live < 0.4  for 300s   declared > 1    for 300s   comparison INVERTED
+ *
+ * The last one is the dangerous one: on uptime_check/check_passed, "greater than 1" is a condition
+ * that may never become true, so adopting it could leave the origin check permanently silent while
+ * appearing healthy in the console. Raising CPU 70 -> 90 and memory 85 -> 90 quietly reduces
+ * coverage on the two VMs that carry the whole gasless path.
+ *
+ * Every one of these is fixable in this repository, which is where the adoption contract says to
+ * fix it. None of it is fixable by applying. Until then the live policies keep alerting exactly as
+ * they do today, unmanaged, which is strictly safer than adopting them into a weaker definition.
+ */
 module "monitoring" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  count  = var.manage_monitoring ? 1 : 0
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
 
   project_id          = var.project_id
   notification_emails = var.notification_emails
@@ -325,9 +363,17 @@ module "monitoring" {
       # A plain 200 proves NOTHING: the origin-lock nginx's own /healthz is a static `return 200`
       # that never touches alto — exactly the check that stayed green through the 2026-07-12 outage.
       # 0x5FF137D4 is the EntryPoint v0.6 address prefix in an eth_supportedEntryPoints response.
-      content_match  = "0x5FF137D4"
-      request_method = "POST"
-      body           = base64encode("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_supportedEntryPoints\",\"params\":[]}")
+      content_match = "0x5FF137D4"
+
+      # DELIBERATELY A PLAIN GET, and the POST happens at the origin.
+      # `infra/vm/nginx/fairwins-bundler.conf` turns the prober's GET into the real JSON-RPC call
+      # (`proxy_method POST` + `proxy_set_body`) before forwarding to alto, so the content match
+      # above is already meaningful without the prober sending a body. Declaring `request_method =
+      # "POST"` here is not merely redundant: `request_method` is FORCE-NEW on
+      # google_monitoring_uptime_check_config, so it makes adoption of the live check a
+      # delete-and-recreate, which discards its uptime history and changes the id every alert
+      # policy references. Adoption found exactly that.
+      timeout_seconds = 30
 
       # The origin serves a Cloudflare Origin CA certificate, deliberately not publicly trusted.
       validate_ssl = false
