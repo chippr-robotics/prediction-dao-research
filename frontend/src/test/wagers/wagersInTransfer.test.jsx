@@ -36,8 +36,8 @@ vi.mock('../../components/fairwins/Dashboard', () => ({
 vi.mock('../../components/wallet/TransferForm', () => ({
   default: () => <div data-testid="transfer-form">same-chain send</div>,
 }))
-vi.mock('../../components/wallet/TransferActivityList', () => ({
-  default: () => <div data-testid="transfer-activity">activity</div>,
+vi.mock('../../components/wallet/WrapView', () => ({
+  default: () => <div data-testid="wrap-view">wrap form</div>,
 }))
 vi.mock('../../components/wallet/BridgeView', () => ({
   default: () => <div data-testid="bridge-view">bridge form</div>,
@@ -62,10 +62,10 @@ beforeEach(() => {
 })
 
 describe('Wagers is a view of the Transfer section', () => {
-  it('appears between Bridge and Activity — actions first, history last', () => {
+  it('appears last in a row that is now all actions', () => {
     renderPanel()
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
-      'Transfer', 'Bridge', 'Wagers', 'Activity',
+      'Transfer', 'Wrap', 'Bridge', 'Wagers',
     ])
   })
 
@@ -152,7 +152,7 @@ describe('a tenant without the wagers feature', () => {
         <Panel />
       </MemoryRouter>,
     )
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Transfer', 'Bridge', 'Activity'])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Transfer', 'Wrap', 'Bridge'])
   })
 
   it('falls a saved ?view=wagers link back to Transfer rather than an empty panel', async () => {

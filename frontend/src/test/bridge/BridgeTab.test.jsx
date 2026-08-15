@@ -3,9 +3,9 @@
  *
  * Two things are being proved here:
  *
- *   1. FR-004 — the Bridge surface sits BESIDE the existing send and activity
- *      surfaces, is reachable by a direct link, and does not displace or degrade the
- *      same-chain send flow (which stays the default tab).
+ *   1. FR-004 — the Bridge surface sits BESIDE the other money-moving surfaces, is
+ *      reachable by a direct link, and does not displace or degrade the same-chain
+ *      send flow (which stays the default tab).
  *
  *   2. FR-051/FR-052/FR-053 — every way bridging can be unavailable is presented with
  *      its own stated reason and, where the state came from a read, "as of" that read.
@@ -54,8 +54,8 @@ vi.mock('../../components/wallet/BridgeStatusList', () => ({
 vi.mock('../../components/wallet/TransferForm', () => ({
   default: () => <div data-testid="transfer-form">same-chain send</div>,
 }))
-vi.mock('../../components/wallet/TransferActivityList', () => ({
-  default: () => <div data-testid="transfer-activity">activity</div>,
+vi.mock('../../components/wallet/WrapView', () => ({
+  default: () => <div data-testid="wrap-view">wrap form</div>,
 }))
 // Wagers joined this tab row (spec 073). Stubbed like every other sibling — a real Dashboard would
 // drag the whole wager tree, its providers and its chain reads into a test about tab placement.
@@ -88,11 +88,12 @@ beforeEach(() => {
 })
 
 describe('Bridge tab placement (FR-004)', () => {
-  it('sits beside Transfer and Activity without displacing the send flow', async () => {
+  it('sits beside Transfer and Wrap without displacing the send flow', async () => {
     renderPanel()
     const tabs = screen.getAllByRole('tab')
-    // Wagers was added between Bridge and Activity (spec 073): actions first, history last.
-    expect(tabs.map((t) => t.textContent)).toEqual(['Transfer', 'Bridge', 'Wagers', 'Activity'])
+    // Every tab in this row is now an ACTION: send it, wrap it, move it across networks, stake it.
+    // Activity is gone from here — the ledger feed lives in My Account ▸ Activity.
+    expect(tabs.map((t) => t.textContent)).toEqual(['Transfer', 'Wrap', 'Bridge', 'Wagers'])
     // Default tab is unchanged: the same-chain send flow.
     expect(screen.getByTestId('transfer-form')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Transfer' })).toHaveAttribute('aria-selected', 'true')
