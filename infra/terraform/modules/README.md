@@ -14,7 +14,7 @@ project/region/zone, every environment value an input, every consumer coupling a
 
 ```hcl
 module "network" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=<sha>"
+  source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=<sha>"
   # ...
 }
 ```
@@ -26,11 +26,17 @@ Guardrail **G-16** rejects any unpinned or branch-pinned module source.
 
 ## The repository is private
 
-`terraform init` needs a credential to fetch it. The default `GITHUB_TOKEN` in Actions is scoped to
-this repository only and **cannot** read the modules repo, so the infra workflows rewrite git's
-config using `TF_MODULES_TOKEN` before `init`. If `init` reports `repository not found`, that is
-almost always authentication rather than a wrong path — GitHub returns 404 rather than 403 for a
-private repository the caller cannot see.
+`terraform init` needs a credential to fetch it: a **read-only deploy key** on
+`chippr-tf-modules`, stored as the `TF_MODULES_SSH_KEY` repository secret, with module sources using
+`git::ssh://git@github.com/...`.
+
+A deploy key rather than a personal access token, chosen after a fine-grained PAT failed under every
+credential form: a deploy key is scoped to exactly one repository, is unaffected by the
+organisation's PAT policy, has no resource-owner concept (which is fixed at token creation and
+invisible afterwards), no approval queue, and no expiry. None of that machinery applies to it.
+
+The workflows pin GitHub's published host key rather than running `ssh-keyscan`, which is
+trust-on-first-use — it accepts whatever answers on the day, including an interceptor.
 
 ## Adding a module
 

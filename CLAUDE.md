@@ -467,9 +467,11 @@ artifacts live under `specs/<feature>/`.
   (4a) **The five Terraform modules live in the private `chippr-robotics/chippr-tf-modules`**, pinned
   by **commit SHA** (a tag can be repointed, a commit cannot; G-16 enforces the pin). Add new modules
   THERE, not to `infra/terraform/modules/`, which now holds only a pointer — a local module is
-  invisible to the other Chippr projects sharing this estate. `terraform init` needs
-  `TF_MODULES_TOKEN` because the repo is private; a missing token reads as `repository not found`,
-  not as a permission error.
+  invisible to the other Chippr projects sharing this estate. The repo is private and is fetched over
+  **ssh with a read-only deploy key** (`TF_MODULES_SSH_KEY`), NOT a PAT — a fine-grained token failed
+  under every credential form because its **resource owner is fixed at creation** and org-owned repos
+  are invisible to a personally-owned one, which presents as a 404 rather than a permission error. A
+  deploy key has no resource owner, no org PAT policy, no approval queue and no expiry.
   (5) **Both Cloudflare rulesets are AUTHORITATIVE for their phase** — an apply deletes any rule
   added at the dashboard. The geo gate answers HTTP 451 and is a **legal control** (spec 007), under
   CODEOWNERS. (6) **The nodes have NO public SSH**: `:22` is open to the IAP range only, and the

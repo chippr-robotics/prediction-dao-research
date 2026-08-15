@@ -192,15 +192,23 @@ Modules live in **[`chippr-robotics/chippr-tf-modules`](https://github.com/chipp
 (private) and are consumed by pinned commit SHA:
 
 ```hcl
-source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 ```
 
 A SHA rather than a tag, because a tag can be repointed and a commit cannot. Guardrail **G-16**
 rejects any external module source that is unpinned or pinned to a branch.
 
-Because the repo is private, `terraform init` needs a credential — the workflows rewrite git's config
-with `TF_MODULES_TOKEN` before `init`. A missing token shows up as `repository not found`, not as a
-permission error, because GitHub returns 404 for private repos the caller cannot see.
+`terraform init` needs a credential to fetch it: a **read-only deploy key** on
+`chippr-tf-modules`, stored as the `TF_MODULES_SSH_KEY` repository secret, with module sources using
+`git::ssh://git@github.com/...`.
+
+A deploy key rather than a personal access token, chosen after a fine-grained PAT failed under every
+credential form: a deploy key is scoped to exactly one repository, is unaffected by the
+organisation's PAT policy, has no resource-owner concept (which is fixed at token creation and
+invisible afterwards), no approval queue, and no expiry. None of that machinery applies to it.
+
+The workflows pin GitHub's published host key rather than running `ssh-keyscan`, which is
+trust-on-first-use — it accepts whatever answers on the day, including an interceptor.
 
 **Add new modules there, not to `infra/terraform/modules/`.** A module kept locally is invisible to
 the other Chippr projects sharing this estate and drifts from its shared twin. That directory now

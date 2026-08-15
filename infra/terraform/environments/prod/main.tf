@@ -35,7 +35,7 @@ locals {
 # ── network ───────────────────────────────────────────────────────────────────────────────────
 
 module "network" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   project_id   = var.project_id
   region       = var.region
@@ -66,7 +66,7 @@ module "network" {
  * account and sign with the paymaster HSM key. This grant is strictly smaller.
  */
 module "bundler" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   project_id        = var.project_id
   region            = var.region
@@ -106,7 +106,7 @@ module "bundler" {
  * repository-scoped and its secret access is per-secret.
  */
 module "gateway" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   project_id        = var.project_id
   region            = var.region
@@ -208,7 +208,7 @@ resource "google_kms_crypto_key" "signing" {
 # no in-band detection. Guardrail G-11 rejects any attempt to add it back.
 
 module "spa" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   project_id = var.project_id
   region     = var.region
@@ -247,7 +247,7 @@ data "google_secret_manager_secret_version" "origin_lock" {
 
 module "edge" {
   count  = var.manage_edge ? 1 : 0
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   zone_id = var.cloudflare_zone_id
 
@@ -278,7 +278,7 @@ module "edge" {
 # ── monitoring ────────────────────────────────────────────────────────────────────────────────
 
 module "monitoring" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   project_id          = var.project_id
   notification_emails = var.notification_emails

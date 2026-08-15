@@ -152,7 +152,7 @@ into the form that stayed green through a real outage.
 ## How it is pinned, and why by SHA rather than tag
 
 ```hcl
-source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+source = "git::ssh://git@github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 ```
 
 A **40-character commit SHA**, not a tag. A tag can be repointed at a different commit; a SHA cannot,
@@ -165,19 +165,17 @@ a SHA. Anyone with push access can add the tag later; it changes no plan.
 
 ## The shared repository is private
 
-`terraform init` needs a credential to fetch it. The default `GITHUB_TOKEN` in a consumer's Actions
-workflow is scoped to that repository alone and **cannot** read the modules repo, so the three infra
-workflows rewrite git's config with `TF_MODULES_TOKEN` before `init`:
+`terraform init` needs a credential to fetch it: a **read-only deploy key** on
+`chippr-tf-modules`, stored as the `TF_MODULES_SSH_KEY` repository secret, with module sources using
+`git::ssh://git@github.com/...`.
 
-```yaml
-- name: Allow Terraform to fetch private modules
-  run: |
-    git config --global url."https://x-access-token:${{ secrets.TF_MODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
-```
+A deploy key rather than a personal access token, chosen after a fine-grained PAT failed under every
+credential form: a deploy key is scoped to exactly one repository, is unaffected by the
+organisation's PAT policy, has no resource-owner concept (which is fixed at token creation and
+invisible afterwards), no approval queue, and no expiry. None of that machinery applies to it.
 
-A missing or wrong token surfaces as **`repository not found`** on the module source, not as a
-permission error — GitHub returns 404 rather than 403 for a private repository the caller cannot
-see. Read that message as authentication before hunting for a wrong path.
+The workflows pin GitHub's published host key rather than running `ssh-keyscan`, which is
+trust-on-first-use — it accepts whatever answers on the day, including an interceptor.
 
 ## Bumping to a new module version
 
