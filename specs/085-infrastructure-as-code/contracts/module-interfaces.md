@@ -2,9 +2,17 @@
 
 **Satisfies**: FR-024, FR-024a, FR-025, SC-011
 
-`chippr-tf-modules` does not exist in the `chippr-robotics` organisation (verified 2026-08-14).
-Modules are therefore built locally under `infra/terraform/modules/`, under constraints that make
-extraction a mechanical move rather than a rewrite.
+**Status: extracted.** The modules live in
+[`chippr-robotics/chippr-tf-modules`](https://github.com/chippr-robotics/chippr-tf-modules) and are
+consumed by pinned commit SHA.
+
+They were written locally first, under constraints that made extraction a mechanical move rather
+than a rewrite — and the move proved it: every module body crossed **byte-identical**, verified with
+`cmp` at extraction and again against the copy `terraform init` fetched after rewiring.
+
+The move happened *before anything had been imported into Terraform state*, which is the cheapest
+moment it will ever have. The zero-diff gate below exists to catch an extraction that changes a live
+plan; there was no live plan yet to change.
 
 ## Extraction constraints (gate-enforced where possible)
 
@@ -141,30 +149,51 @@ not publicly trusted. The content matchers carry their reasoning as comments (re
 port that keeps thresholds but drops those comments invites someone to "simplify" the matchers back
 into the form that stayed green through a real outage.
 
-## Promotion path to `chippr-tf-modules`
+## How it is pinned, and why by SHA rather than tag
 
-When the shared repository exists:
+```hcl
+source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+```
 
-1. `git mv infra/terraform/modules/<name>` into `chippr-tf-modules/<name>` — **no change to the
-   module body**; that is what the constraints above buy.
-2. Tag the shared repository (`v0.1.0`).
-3. In each consumer, change the source and pin the version:
+A **40-character commit SHA**, not a tag. A tag can be repointed at a different commit; a SHA cannot,
+which makes it the stricter satisfaction of FR-025. Guardrail **G-16** rejects any external module
+source that is unpinned or pinned to a branch.
 
-   ```hcl
-   # before
-   source = "../../modules/network"
+The shared repository also carries a `v0.1.0` annotated tag locally, but pushing tags is blocked
+through this session's git proxy so it is not on the remote yet. Nothing depends on it — the pin is
+a SHA. Anyone with push access can add the tag later; it changes no plan.
 
-   # after
-   source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//network?ref=v0.1.0"
-   ```
+## The shared repository is private
 
-4. `terraform init -upgrade`, then confirm a **zero-diff plan**. A non-zero diff means the module
-   was not as portable as claimed, and the move is reverted rather than applied.
-5. Commit the updated `.terraform.lock.hcl`.
+`terraform init` needs a credential to fetch it. The default `GITHUB_TOKEN` in a consumer's Actions
+workflow is scoped to that repository alone and **cannot** read the modules repo, so the three infra
+workflows rewrite git's config with `TF_MODULES_TOKEN` before `init`:
 
-Step 4 is the gate. Extraction that changes the plan is not extraction — it is a rewrite wearing a
-`git mv`.
+```yaml
+- name: Allow Terraform to fetch private modules
+  run: |
+    git config --global url."https://x-access-token:${{ secrets.TF_MODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+```
 
-Until then, `source = "../../modules/<name>"` is a relative path within one repository at one commit,
-so FR-025's immutability requirement is satisfied by the commit itself; the `ref=` pin becomes
-load-bearing only after step 3.
+A missing or wrong token surfaces as **`repository not found`** on the module source, not as a
+permission error — GitHub returns 404 rather than 403 for a private repository the caller cannot
+see. Read that message as authentication before hunting for a wrong path.
+
+## Bumping to a new module version
+
+1. Land the change in `chippr-tf-modules`; its own CI runs module hygiene, `fmt`, `validate` and
+   `tflint`.
+2. Update the `?ref=` SHA in each consuming root.
+3. `terraform init -upgrade`, then confirm a **zero-diff plan** — unless the bump is meant to change
+   something, in which case the plan is the review artifact.
+
+Step 3 is the gate. A version bump that silently changes a consumer's plan is the failure shared
+modules exist to prevent.
+
+## Adding a module
+
+Add it to `chippr-tf-modules`, not to `infra/terraform/modules/`. A module kept here would be
+invisible to the other Chippr projects and would drift from its shared twin.
+
+A genuinely FairWins-only module may live here, and still has to satisfy G-08 (no environment
+literals) and G-09 (no `provider` blocks), which remain enforced against that directory.

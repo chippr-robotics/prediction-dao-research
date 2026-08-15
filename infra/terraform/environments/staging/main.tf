@@ -20,7 +20,7 @@
  */
 
 module "staging_mainnet" {
-  source = "../../modules/cloud-run-service"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   project_id = var.project_id
   region     = var.region
@@ -40,7 +40,7 @@ module "staging_mainnet" {
 }
 
 module "staging_testnet" {
-  source = "../../modules/cloud-run-service"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   project_id = var.project_id
   region     = var.region

@@ -34,6 +34,7 @@ const EXPECTED_RULES = [
   ["G-12", "environment root without a GCS backend"],
   ["G-13", "root without a committed provider lockfile"],
   ["G-14", "-target in a committed script"],
+  ["G-16", "an external module source that is unpinned or pinned to a branch"],
 ];
 
 for (const [rule, description] of EXPECTED_RULES) {
@@ -61,6 +62,19 @@ test("every violation reports rule, file, line and a rationale", () => {
     assert.ok(Number.isInteger(v.line) && v.line >= 1, `violation missing usable line: ${JSON.stringify(v)}`);
     assert.ok(v.message.length > 20, `violation message too terse to act on: ${v.message}`);
   }
+});
+
+test("G-16 accepts a 40-character commit SHA pin", () => {
+  // A SHA is stricter than a tag: a tag can be repointed, a commit cannot. The passing fixture uses
+  // one, so this asserts the rule does not fire on the form we actually ship.
+  const { violations } = check(PASSING, [PASSING], { includeFixtures: true });
+  assert.deepStrictEqual(violations.filter((v) => v.rule === "G-16"), []);
+});
+
+test("G-16 flags a branch pin distinctly from a missing pin", () => {
+  const messages = failing.violations.filter((v) => v.rule === "G-16").map((v) => v.message);
+  assert.ok(messages.some((m) => /no \?ref= pin/.test(m)), "a missing pin must be reported");
+  assert.ok(messages.some((m) => /not immutable/.test(m)), "a branch pin must be reported as mutable");
 });
 
 test("G-10 catches a foreign workload that appears in no deny-list", () => {

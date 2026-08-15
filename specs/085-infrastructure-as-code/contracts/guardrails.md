@@ -28,6 +28,7 @@ service must stay decommissioned.
 | **G-13** | `.terraform.lock.hcl` exists and is committed for every root | FR-026 | The same commit resolves to different provider versions on different machines |
 | **G-14** | No `-target` in any committed script or workflow | It applies a subgraph without refreshing the rest | Recorded state stops describing reality — the exact failure this feature prevents |
 | **G-15** | Plan summaries posted to PRs are generated from redacted `terraform show -json`; raw plan files are never posted as comments | SC-008 | Plan files embed prior state values |
+| **G-16** | Every module source resolving outside this repository carries `?ref=` pinned to a 40-char commit SHA or a semver tag | FR-025 | The plan becomes a function of when `init` last ran, not of the commit under review |
 
 ## Notes on specific rules
 
@@ -72,6 +73,11 @@ gets switched off. That scoping is itself covered by a test.
 longer deploys the Cloud Run bundler, and that absence is the only thing preventing a second executor
 against the VM bundler's EOA. `single-alto-gate.sh` detects the condition within 60s and refuses to
 start the VM's alto, but it cannot prevent it.
+
+**G-16 prefers a SHA to a tag.** Both are accepted, but a tag can be repointed at a different commit
+while a commit SHA cannot, so a SHA is the stricter pin. The shared modules are consumed by SHA.
+A relative source (`../../modules/x`) is exempt: it resolves within this repository, so the commit
+under review already pins it.
 
 ## Testing the gate
 

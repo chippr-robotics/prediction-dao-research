@@ -50,10 +50,14 @@ Two facts constrain everything below:
 
 - **Q: The brief names `chippr-tf-modules` as the shared module source, but no repository by that
   name exists in the `chippr-robotics` organisation.**
-  **A: Build modules locally in this repository now, written to be extractable, and document the
-  promotion path.** This keeps the feature self-contained and unblocked; moving a module to a shared
-  source later is then a mechanical change of source address plus a version pin. Encoded as FR-024,
-  FR-024a, FR-025.
+  **A (initial): build modules locally, written to be extractable, and document the promotion path.**
+  **A (revised, same session): the repository was created and the modules were extracted to it.**
+  The issue author judged an org-wide shared source the more correct move, and it was taken
+  immediately — *before any import had run*, which is the cheapest moment extraction will ever have:
+  the zero-diff gate protects against an extraction that changes a live plan, and there was no live
+  plan yet. Every module body crossed byte-identical. Consumers pin by commit SHA rather than tag,
+  since a tag can be repointed and a commit cannot. Encoded as FR-024, FR-024a, FR-025, and enforced
+  by guardrail G-16.
 
 - **Q: The build pipeline deploys a new image to Cloud Run on every merge. If the declarative layer
   also owns the deployed image, the two systems fight and every plan reports drift.**

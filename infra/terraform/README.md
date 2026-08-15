@@ -10,7 +10,7 @@ Start with `docs/developer-guide/infrastructure-as-code.md` for the design, and
 ```
 bootstrap/                run-once trust root: state bucket, WIF pool, the two CI identities.
                           Local state, COMMITTED. Excluded from the apply workflow.
-modules/                  local, extractable modules — see modules/README.md
+modules/                  pointer only — the modules live in chippr-tf-modules
 environments/prod/        state prefix: prod
 environments/staging/     state prefix: staging
 ```

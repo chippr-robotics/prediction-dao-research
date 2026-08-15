@@ -441,6 +441,45 @@ function check(tfRoot, scriptRoots, { includeFixtures = false } = {}) {
     }
   }
 
+  // G-16: a module source resolving outside this repository must be pinned to an immutable ref.
+  // Unpinned, or pinned to a branch, makes a plan a function of when someone last ran `init` — the
+  // deployed infrastructure then depends on timing rather than on the commit under review.
+  for (const file of tfFiles) {
+    const src = stripComments(fs.readFileSync(file, "utf8"));
+    for (const block of extractBlocks(src)) {
+      if (block.kind !== "module") continue;
+      const raw = attr(block.body, "source");
+      if (!raw) continue;
+      const literal = raw.match(/^"([^"]*)"$/);
+      if (!literal) continue;
+      const source = literal[1];
+
+      // A relative path resolves within this repository, so the commit pins it already.
+      if (source.startsWith("./") || source.startsWith("../")) continue;
+
+      const ref = source.match(/[?&]ref=([^&]+)$/);
+      if (!ref) {
+        fail(
+          "G-16",
+          file,
+          block.line,
+          `module "${block.labels[0]}" has an external source with no ?ref= pin. Without one, the plan depends on when \`terraform init\` last ran rather than on the commit under review.`
+        );
+        continue;
+      }
+      const value = ref[1];
+      const immutable = /^[0-9a-f]{40}$/.test(value) || /^v\d+\.\d+\.\d+$/.test(value);
+      if (!immutable) {
+        fail(
+          "G-16",
+          file,
+          block.line,
+          `module "${block.labels[0]}" is pinned to "${value}", which is not immutable. Use a 40-character commit SHA (strictest — a tag can be moved, a SHA cannot) or a semver tag.`
+        );
+      }
+    }
+  }
+
   // G-12 / G-13: every root directory (one holding a `terraform {}` block) needs a remote backend
   // and a committed provider lockfile.
   // A ROOT is a directory Terraform is run from. Modules also carry a `terraform` block (they must

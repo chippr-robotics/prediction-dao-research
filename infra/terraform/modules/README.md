@@ -1,73 +1,41 @@
-# Terraform modules
+# Terraform modules — now shared
 
-Local, reusable descriptions of the patterns that repeat across this estate — and, later, across
-Chippr projects.
+**These modules live in [`chippr-robotics/chippr-tf-modules`](https://github.com/chippr-robotics/chippr-tf-modules).**
 
-| Module | Creates |
-|---|---|
-| [`network`](./network) | custom-mode VPC, subnet, static origin IPs, four ingress rules |
-| [`edge-node`](./edge-node) | one long-running GCE node role + its resource-scoped IAM |
-| [`cloud-run-service`](./cloud-run-service) | one Cloud Run service's shape (the pipeline owns the artifact) |
-| [`cloudflare-zone`](./cloudflare-zone) | DNS records, the geo compliance gate, the origin lock |
-| [`monitoring`](./monitoring) | notification channels, uptime checks, alert policies, log metric |
+`network`, `edge-node`, `cloud-run-service`, `cloudflare-zone` and `monitoring` were extracted there
+so the other Chippr projects sharing this GCP estate can consume the same descriptions instead of
+each maintaining a copy.
 
-## Why these are local
+They moved **byte-identical** — verified with `cmp` at extraction and again against the fetched copy
+after rewiring. That was the promise the module design rested on: no `provider` blocks, no hardcoded
+project/region/zone, every environment value an input, every consumer coupling an output.
 
-The brief for this work named `chippr-tf-modules` as the shared module source. **No repository by
-that name exists in the `chippr-robotics` organisation** (verified 2026-08-14), so building against
-it would have blocked this feature on a separate repository.
+## Consuming them
 
-Instead the modules live here, written under constraints that make extraction a **mechanical move**
-rather than a rewrite.
+```hcl
+module "network" {
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=<sha>"
+  # ...
+}
+```
 
-## Extraction constraints
+Pinned by **commit SHA**, not a branch. A branch ref would make a plan a function of when someone
+last ran `init`. A SHA is also stricter than a tag, since a tag can be moved and a SHA cannot.
 
-| Constraint | Enforced by |
-|---|---|
-| No `provider` block inside a module — providers are passed by the root | guardrail G-09 |
-| No literal project / region / zone in a module body | guardrail G-08 |
-| Every environment-specific value is a `variable` with a type and description | review |
-| Every value a consumer needs is a declared `output` — consumers never reach into internals | review |
-| No `data` lookup of a resource the module does not own — those are inputs | review |
-| Each module has a `README.md` with inputs, outputs, and the resources it creates | review |
+Guardrail **G-16** rejects any unpinned or branch-pinned module source.
 
-The `provider` constraint pays for itself long before extraction: a module carrying its own provider
-block cannot be instantiated with `for_each` or `count`, which is exactly how `edge-node` is used
-(two nodes) and how per-tenant Cloud Run services will be used (N tenants).
+## The repository is private
 
-## Promotion path
+`terraform init` needs a credential to fetch it. The default `GITHUB_TOKEN` in Actions is scoped to
+this repository only and **cannot** read the modules repo, so the infra workflows rewrite git's
+config using `TF_MODULES_TOKEN` before `init`. If `init` reports `repository not found`, that is
+almost always authentication rather than a wrong path — GitHub returns 404 rather than 403 for a
+private repository the caller cannot see.
 
-When `chippr-tf-modules` exists:
+## Adding a module
 
-1. `git mv infra/terraform/modules/<name>` into `chippr-tf-modules/<name>`. **The module body does
-   not change** — that is what the constraints above buy.
-2. Tag the shared repository (`v0.1.0`).
-3. In each consumer, change the source and pin the version:
+Add it to `chippr-tf-modules`, not here. A module in this directory would be invisible to the other
+projects and would drift from its shared twin — the thing extraction was meant to prevent.
 
-   ```hcl
-   # before
-   source = "../../modules/network"
-
-   # after
-   source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//network?ref=v0.1.0"
-   ```
-
-4. `terraform init -upgrade`, then confirm a **zero-diff plan**.
-5. Commit the updated `.terraform.lock.hcl`.
-
-**Step 4 is the gate.** Extraction that changes the plan is not extraction — it is a rewrite wearing
-a `git mv`, and it should be reverted rather than applied.
-
-Until then, `source = "../../modules/<name>"` resolves to one directory at one commit, so the
-immutability requirement is satisfied by the commit itself; the `?ref=` pin becomes load-bearing only
-after step 3.
-
-## Writing a new module
-
-1. Create the directory with `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, `README.md`.
-2. `versions.tf` declares `required_providers` but **no `provider` block**.
-3. Give every variable a `type` and a `description`. Descriptions are read by whoever has to use the
-   module at 3am — say what will go wrong, not just what the field is.
-4. Run `npm run check:iac` and `terraform fmt -check -recursive infra/terraform`.
-5. Give the README a "Things that will bite you" section. Every module here has one, because every
-   module here has at least one behaviour that is surprising and load-bearing.
+A genuinely FairWins-only module can live here; it must still satisfy G-08 (no environment literals)
+and G-09 (no `provider` blocks), which are still enforced against this directory.

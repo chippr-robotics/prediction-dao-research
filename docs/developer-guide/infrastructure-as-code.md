@@ -188,11 +188,25 @@ All fail the pipeline on error. `continue-on-error` is forbidden on them (consti
 
 ## Shared modules
 
-Modules live in `infra/terraform/modules/` and are written to be **extractable** — no provider
-blocks, no hardcoded project/region/zone, every environment value an input, every consumer coupling
-an output. `chippr-tf-modules` does not exist yet; when it does, extraction is a `git mv`, a tag, and
-a `source`/`ref` change, gated on a zero-diff plan. See
-`specs/085-infrastructure-as-code/contracts/module-interfaces.md`.
+Modules live in **[`chippr-robotics/chippr-tf-modules`](https://github.com/chippr-robotics/chippr-tf-modules)**
+(private) and are consumed by pinned commit SHA:
+
+```hcl
+source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+```
+
+A SHA rather than a tag, because a tag can be repointed and a commit cannot. Guardrail **G-16**
+rejects any external module source that is unpinned or pinned to a branch.
+
+Because the repo is private, `terraform init` needs a credential — the workflows rewrite git's config
+with `TF_MODULES_TOKEN` before `init`. A missing token shows up as `repository not found`, not as a
+permission error, because GitHub returns 404 for private repos the caller cannot see.
+
+**Add new modules there, not to `infra/terraform/modules/`.** A module kept locally is invisible to
+the other Chippr projects sharing this estate and drifts from its shared twin. That directory now
+holds only a pointer.
+
+See `specs/085-infrastructure-as-code/contracts/module-interfaces.md`.
 
 ## Related
 

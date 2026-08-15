@@ -389,9 +389,17 @@ Extraction path documented in `infra/terraform/modules/README.md`: move the dire
 `source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//x?ref=vX.Y.Z"`. Nothing in
 the module body changes — that is what the constraints above buy.
 
-**Rationale**: `chippr-tf-modules` does not exist in the `chippr-robotics` organisation (verified).
-Building against a non-existent source would block this feature on a separate repository; building
-non-extractable modules would make the eventual move a rewrite.
+**Rationale**: `chippr-tf-modules` did not exist in the `chippr-robotics` organisation when this was
+written. Building against a non-existent source would have blocked this feature on a separate
+repository; building non-extractable modules would have made the eventual move a rewrite.
+
+**UPDATE (2026-08-15): the repository now exists and the modules have been extracted to it**, before
+any import ran — the cheapest possible moment, since the zero-diff gate protects against an
+extraction that changes a *live* plan and there was no live plan yet. Every module body crossed
+byte-identical (verified with `cmp`, then again against the copy `terraform init` fetched). Consumers
+pin by commit SHA rather than tag, because a tag can be repointed and a commit cannot; G-16 enforces
+it. The constraints below are what made the move mechanical, and they still bind anything added to
+the shared repository.
 
 **Alternatives considered**: *Create the shared repo now* — declined by the issue author. *Skip
 modules, write flat configuration* — rejected; the bundler and gateway VMs are the same pattern

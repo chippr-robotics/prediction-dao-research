@@ -464,6 +464,12 @@ artifacts live under `specs/<feature>/`.
   flags. **The Cloud Run alto bundler must stay decommissioned** (G-11): re-arming it puts two
   executors on ONE EOA — colliding nonces, stuck bundles, both instances healthy-looking, no in-band
   detection.
+  (4a) **The five Terraform modules live in the private `chippr-robotics/chippr-tf-modules`**, pinned
+  by **commit SHA** (a tag can be repointed, a commit cannot; G-16 enforces the pin). Add new modules
+  THERE, not to `infra/terraform/modules/`, which now holds only a pointer — a local module is
+  invisible to the other Chippr projects sharing this estate. `terraform init` needs
+  `TF_MODULES_TOKEN` because the repo is private; a missing token reads as `repository not found`,
+  not as a permission error.
   (5) **Both Cloudflare rulesets are AUTHORITATIVE for their phase** — an apply deletes any rule
   added at the dashboard. The geo gate answers HTTP 451 and is a **legal control** (spec 007), under
   CODEOWNERS. (6) **The nodes have NO public SSH**: `:22` is open to the IAP range only, and the
