@@ -233,6 +233,20 @@ artifacts live under `specs/<feature>/`.
   signing anyway would prove control of the member's own account under a "vault" label. Fixtures
   live once, in `frontend/src/test/fixtures/signedMessages.js` (also imported by the capture
   harness). See `docs/developer-guide/message-signing.md` + `specs/084-message-signing-verify/`.
+- **Protect ▸ Off chain (spec 085) is hardware-wallet cold storage — FRONTEND-ONLY, and the store
+  holds PUBLIC METADATA ONLY** (`{ address, vendor, path, label, addedAt }` — never key material,
+  never an xpub, never a device identifier beyond the vendor name). All vendor code sits behind ONE
+  seam, `frontend/src/lib/hardware/adapters.js#connectHardware` — UI code never imports Ledger/Trezor
+  SDKs directly (lazy-loaded, failures normalized to `HW_ERROR_CODES`, rendered via
+  `describeHardwareError`, never a raw SDK message). Every signature is a physical confirmation on
+  the device screen (`HardwareSigner`, which also recover-and-verifies a signed tx before broadcast);
+  reconnect (`connectAccount.js`) RE-DERIVES the saved path and must match the saved address, else
+  refuse. Operate-as holds the device-backed signer in CustodyContext memory only, behind the
+  spec-062 chain guard. Protect's accordion section ids (`custody-onchain`/`custody-verify`/
+  `custody-offchain`) double as drawer-search deep-link ids — don't rename. The
+  `window.__fwHardwareTestAdapter__` seam is `import.meta.env.DEV`-guarded and dead-code-eliminated
+  from production bundles. See `docs/developer-guide/hardware-wallets.md` +
+  `docs/runbooks/hardware-wallet-staging-validation.md` + `specs/085-hardware-wallet-protect/`.
 - **Legacy account recovery (spec 062) is FRONTEND-ONLY** — the **Recovery** section (renamed from
   "Backup & Security"; tab id `security` + `backup` alias unchanged). Members import an old EOA
   **private key** or **BIP-39 word list**; the secret is encrypted at rest (AES-GCM under a
@@ -439,7 +453,7 @@ artifacts live under `specs/<feature>/`.
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
-- **Cloud infrastructure is DECLARATIVE (spec 085), and the GCP project is SHARED.** Terraform
+- **Cloud infrastructure is DECLARATIVE (spec 086), and the GCP project is SHARED.** Terraform
   (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
   each of which has a way to be silently wrong:
   (1) **IAM is ADDITIVE ONLY.** `chippr-bots-site-wp` hosts a public WordPress VM plus `clearpath-*`,
@@ -479,7 +493,7 @@ artifacts live under `specs/<feature>/`.
   than reimplementing it. Apply is **automatic on merge** and executes the *reviewed* plan, gated on
   the infra-tree digest; a mismatch fails rather than replanning. See
   `docs/developer-guide/infrastructure-as-code.md` + `docs/runbooks/infrastructure-operations.md`
-  + `specs/085-infrastructure-as-code/`.
+  + `specs/086-infrastructure-as-code/`.
 
 - **The repo is an npm WORKSPACE (spec 075): one root lockfile, 8 members, `contracts/` deliberately
   NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
@@ -529,5 +543,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/085-infrastructure-as-code/plan.md
+at specs/086-infrastructure-as-code/plan.md
 <!-- SPECKIT END -->

@@ -1,8 +1,9 @@
-// Spec 043 — Custody shell renders both sub-sections, disables Off chain, gates On chain by Safe availability,
-// and meets WCAG 2.1 AA.
+// Spec 043 + 085 — Custody shell renders the three areas as accordion sections (On chain open by
+// default), gates On chain creation by Safe availability, serves Off chain hardware accounts, and
+// meets WCAG 2.1 AA.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 
 let walletCtx = { chainId: 63 }
@@ -18,16 +19,35 @@ import CustodyPanel from '../../components/custody/CustodyPanel'
 
 beforeEach(() => {
   walletCtx = { chainId: 63 }
+  localStorage.clear()
 })
 
+/** The accordion trigger for a section, by its visible title. */
+const trigger = (name) => screen.getByRole('button', { name })
+
 describe('CustodyPanel', () => {
-  it('renders On chain, Verify and Off chain sub-sections, Off chain disabled', () => {
+  it('renders On chain, Verify and Off chain as accordion sections, On chain open', () => {
     render(<CustodyPanel />)
-    expect(screen.getByRole('heading', { name: /^On chain$/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /^Verify$/i })).toBeInTheDocument()
-    const offchain = screen.getByRole('heading', { name: /^Off chain$/i }).closest('section')
-    expect(offchain).toHaveAttribute('aria-disabled', 'true')
-    expect(screen.getByText(/coming later/i)).toBeInTheDocument()
+    expect(trigger(/^On chain$/i)).toHaveAttribute('aria-expanded', 'true')
+    // Collapsed sections carry their one-line summary in the trigger (spec 085 FR-009).
+    expect(trigger(/Verify/i)).toHaveAttribute('aria-expanded', 'false')
+    expect(trigger(/Off chain/i)).toHaveAttribute('aria-expanded', 'false')
+    // The spec-043 placeholder is gone — Off chain is a live section now.
+    expect(screen.queryByText(/coming later/i)).not.toBeInTheDocument()
+  })
+
+  it('opens one section at a time (exclusive accordion)', () => {
+    render(<CustodyPanel />)
+    fireEvent.click(trigger(/Off chain/i))
+    expect(trigger(/^Off chain$/i)).toHaveAttribute('aria-expanded', 'true')
+    expect(trigger(/On chain/i)).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('serves the hardware wallet area under Off chain', () => {
+    render(<CustodyPanel />)
+    fireEvent.click(trigger(/Off chain/i))
+    // No wallet connected in this mock → the honest gate, not a dead control.
+    expect(screen.getByText(/connect your wallet to add hardware accounts/i)).toBeInTheDocument()
   })
 
   it('shows the onboarding empty state on a supported network (Mordor 63)', () => {
@@ -52,7 +72,7 @@ describe('CustodyPanel', () => {
   it('keeps Verify available on a chain with no custody deployment', () => {
     walletCtx = { chainId: 1 }
     render(<CustodyPanel />)
-    expect(screen.getByRole('heading', { name: /^Verify$/i })).toBeInTheDocument()
+    fireEvent.click(trigger(/Verify/i))
     expect(screen.getByRole('button', { name: /check a signature/i })).toBeInTheDocument()
   })
 

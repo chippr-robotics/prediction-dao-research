@@ -1,4 +1,4 @@
-# Host nginx: the TLS terminator in front of the role's container stack (spec 085, US3).
+# Host nginx: the TLS terminator in front of the role's container stack (spec 086, US3).
 ---
 - name: Ensure the nginx config and TLS directories exist
   ansible.builtin.file:

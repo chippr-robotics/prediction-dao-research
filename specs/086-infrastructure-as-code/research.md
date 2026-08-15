@@ -1,6 +1,6 @@
 # Research: Infrastructure as Code (Terraform + Ansible)
 
-**Feature**: 085-infrastructure-as-code | **Date**: 2026-08-14
+**Feature**: 086-infrastructure-as-code | **Date**: 2026-08-14
 
 Phase 0 output. Every decision below resolves a technical unknown in `plan.md`'s Technical Context
 or a requirement in `spec.md` that has more than one plausible implementation. Findings marked

@@ -46,6 +46,17 @@
   margin: 0.5rem 0;
 }
 
+/* These buttons sat on the gray subsection background before the accordion refactor (spec 085);
+   on the card's own surface the global button chrome (--bg-secondary, transparent border) is
+   invisible in light mode, so they carry a real border here. */
+.custody-actions button {
+  border-color: var(--border-color, #e3e7eb);
+}
+
+.custody-actions button:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36b37e);
+}
+
 .custody-field {
   display: flex;
   flex-direction: column;

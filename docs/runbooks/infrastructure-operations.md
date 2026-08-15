@@ -1,6 +1,6 @@
 # Runbook: Infrastructure operations
 
-**Spec**: [085-infrastructure-as-code](https://github.com/chippr-robotics/prediction-dao-research/tree/main/specs/085-infrastructure-as-code)
+**Spec**: [086-infrastructure-as-code](https://github.com/chippr-robotics/prediction-dao-research/tree/main/specs/086-infrastructure-as-code)
 
 Operational procedures for the declarative estate. Design rationale lives in
 `docs/developer-guide/infrastructure-as-code.md`; this is what to do when something needs doing.

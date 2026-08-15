@@ -18,12 +18,15 @@ export function useActiveAccount() {
   const custody = useContext(CustodyContext)
   const active = custody?.active ?? PERSONAL
   const legacySigner = custody?.legacySigner ?? null
+  const hardwareSigner = custody?.hardwareSigner ?? null
   const operateAsPersonal = custody?.operateAsPersonal ?? NOOP
   const operateAsVault = custody?.operateAsVault ?? NOOP
   const operateAsLegacy = custody?.operateAsLegacy ?? NOOP
+  const operateAsHardware = custody?.operateAsHardware ?? NOOP
   const { chainId, signer, provider } = useWallet()
   const isVault = active.mode === 'vault'
   const isLegacy = active.mode === 'legacy'
+  const isHardware = active.mode === 'hardware'
 
   const submit = useCallback(
     async (payload) => {
@@ -52,9 +55,18 @@ export function useActiveAccount() {
         }
         return submitAsActiveAccount(payload, { mode: 'personal', signer: legacySigner })
       }
+      if (active.mode === 'hardware') {
+        // Spec 085 — sign with the device-backed signer held in memory. Every send is confirmed on
+        // the device screen. If the session is gone (reload, unplug), reconnect before acting.
+        if (!hardwareSigner) throw new Error('Reconnect your hardware wallet to act as this account.')
+        if (active.chainId != null && Number(chainId) !== Number(active.chainId)) {
+          throw new Error('Switch back to the network where you connected this hardware account before acting as it.')
+        }
+        return submitAsActiveAccount(payload, { mode: 'personal', signer: hardwareSigner })
+      }
       return submitAsActiveAccount(payload, { mode: 'personal', signer })
     },
-    [active, chainId, signer, provider, legacySigner],
+    [active, chainId, signer, provider, legacySigner, hardwareSigner],
   )
 
   // Whether a vault action can currently be sent (connected to the vault's network).
@@ -63,8 +75,11 @@ export function useActiveAccount() {
   // the wallet is on the network it was unlocked for (else a switch would send on
   // the wrong chain).
   const canActAsLegacy = isLegacy && Boolean(legacySigner) && (active.chainId == null || Number(chainId) === Number(active.chainId))
+  // A hardware account can act only while its device session is still in memory AND the wallet is
+  // on the network it was connected for (same guard as legacy — a switch would send on the wrong chain).
+  const canActAsHardware = isHardware && Boolean(hardwareSigner) && (active.chainId == null || Number(chainId) === Number(active.chainId))
 
-  return { identity: active, isVault, isLegacy, canActAsVault, canActAsLegacy, submit, operateAsPersonal, operateAsVault, operateAsLegacy }
+  return { identity: active, isVault, isLegacy, isHardware, canActAsVault, canActAsLegacy, canActAsHardware, submit, operateAsPersonal, operateAsVault, operateAsLegacy, operateAsHardware }
 }
 
 export default useActiveAccount

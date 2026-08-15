@@ -1,4 +1,4 @@
-# Pinned collections (spec 085 FR-026: the same commit resolves to the same tooling everywhere).
+# Pinned collections (spec 086 FR-026: the same commit resolves to the same tooling everywhere).
 #
 # Pinned EXACTLY, not with a range. A collection is part of what decides how a node is configured;
 # a floating version means a converge run's behaviour depends on when someone last installed.

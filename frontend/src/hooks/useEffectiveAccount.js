@@ -17,7 +17,7 @@ const PERSONAL = { mode: 'personal' }
 
 /**
  * @returns {{
- *   type: 'personal'|'vault'|'legacy'|'derived',
+ *   type: 'personal'|'vault'|'legacy'|'derived'|'hardware',
  *   address: string|null,          // the acting account's EVM address (its receive/from address on EVM chains)
  *   label: string|null,
  *   isActingAccount: boolean,      // true when acting as anything other than the personal wallet
@@ -46,9 +46,9 @@ export function useEffectiveAccount() {
         chainId: active.chainId ?? null,
       }
     }
-    // Recovered legacy accounts and cross-chain derived accounts both surface as an
-    // acting EVM address via active.address (spec 062 + 063).
-    if ((mode === 'legacy' || mode === 'derived') && active?.address) {
+    // Recovered legacy accounts, cross-chain derived accounts, and hardware accounts all surface
+    // as an acting EVM address via active.address (specs 062 + 063 + 085).
+    if ((mode === 'legacy' || mode === 'derived' || mode === 'hardware') && active?.address) {
       return {
         type: mode,
         address: active.address,

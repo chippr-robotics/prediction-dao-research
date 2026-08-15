@@ -1,7 +1,7 @@
 # infra/ansible — node configuration for the FairWins nodes
 
 Terraform creates the nodes; Ansible keeps their interiors true. The boundary is published in
-`specs/085-infrastructure-as-code/contracts/ownership-boundary.md` — every attribute has exactly one
+`specs/086-infrastructure-as-code/contracts/ownership-boundary.md` — every attribute has exactly one
 owner.
 
 ## Reaching the nodes

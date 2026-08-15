@@ -1,4 +1,4 @@
-# Dynamic inventory for the FairWins nodes (spec 085, R11).
+# Dynamic inventory for the FairWins nodes (spec 086, R11).
 #
 # WHY DYNAMIC: a static inventory needs editing every time a VM is recreated, and would silently
 # target a stale address in the meantime. The VMs already carry the labels this keys on

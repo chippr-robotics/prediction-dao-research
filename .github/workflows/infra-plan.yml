@@ -1,4 +1,4 @@
-# Infrastructure plan on pull requests (spec 085, T017-T019, FR-027/FR-029).
+# Infrastructure plan on pull requests (spec 086, T017-T019, FR-027/FR-029).
 #
 # Runs as the READ-ONLY identity. Pull requests come from branches, including forks; a single
 # identity would mean any branch that can trigger a workflow can mutate production. The apply
@@ -40,7 +40,7 @@ jobs:
 
       # The repository-specific rules. A generic linter does not know that the GCP project is shared,
       # that some resources are unrecoverable, or that one Cloud Run service must stay
-      # decommissioned. See specs/085-infrastructure-as-code/contracts/guardrails.md.
+      # decommissioned. See specs/086-infrastructure-as-code/contracts/guardrails.md.
       - name: IaC guardrails
         run: node scripts/infra/check-iac-guardrails.js
 

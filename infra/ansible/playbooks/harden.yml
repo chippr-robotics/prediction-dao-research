@@ -1,4 +1,4 @@
-# OS-level hardening and security patching (spec 085, US3).
+# OS-level hardening and security patching (spec 086, US3).
 #
 # DELIBERATELY SEPARATE from site.yml. Hardening touches sshd and the kernel, and security patching
 # can require a reboot — neither belongs in a routine converge run that someone might trigger while

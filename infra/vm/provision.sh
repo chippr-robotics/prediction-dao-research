@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# SUPERSEDED BY TERRAFORM (spec 085). The VPC, subnet, static IPs, firewall rules, VMs and IAM below
+# SUPERSEDED BY TERRAFORM (spec 086). The VPC, subnet, static IPs, firewall rules, VMs and IAM below
 # are now declared in infra/terraform/environments/prod (modules `network` and `edge-node`), and were
 # adopted by import rather than recreated — the static IPs are pinned in Cloudflare DNS.
 #

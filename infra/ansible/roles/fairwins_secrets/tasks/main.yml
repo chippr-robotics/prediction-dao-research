@@ -1,4 +1,4 @@
-# Runtime secret delivery (spec 085, US3, FR-016/FR-017).
+# Runtime secret delivery (spec 086, US3, FR-016/FR-017).
 #
 # THIS ROLE PLACES, OWNS AND INVOKES infra/vm/common/fetch-secrets.sh — it does NOT reimplement it.
 # That script already enforces four properties that are laborious to reproduce in Ansible and

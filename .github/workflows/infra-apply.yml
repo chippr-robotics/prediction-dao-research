@@ -1,11 +1,11 @@
-# Automatic apply on merge (spec 085, T066-T069, FR-031..FR-035).
+# Automatic apply on merge (spec 086, T066-T069, FR-031..FR-035).
 #
 # ⚠ THIS WORKFLOW MUTATES PRODUCTION WITHOUT A HUMAN IN THE LOOP.
 #
 # Under automatic apply, review approves DIFFS, not PERMISSIONS. The permission boundary is the real
 # control: `fairwins-tf-apply@` is denied the roles needed to destroy the irreplaceable resources or
 # to touch another workload, so a merged mistake fails at the API rather than succeeding quietly.
-# See specs/085-infrastructure-as-code/contracts/ci-identity.md.
+# See specs/086-infrastructure-as-code/contracts/ci-identity.md.
 #
 # Three properties this workflow must preserve:
 #   FR-034  it applies the plan that was REVIEWED, never a freshly computed one

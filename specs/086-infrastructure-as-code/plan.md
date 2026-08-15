@@ -2,7 +2,7 @@
 
 **Branch**: `claude/infrastructure-as-code-setup-w3cb7o` | **Date**: 2026-08-14 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/085-infrastructure-as-code/spec.md` (issue #1177)
+**Input**: Feature specification from `/specs/086-infrastructure-as-code/spec.md` (issue #1177)
 
 ## Summary
 
@@ -79,7 +79,7 @@ justification. No principle is violated. **GATE PASSES.**
 ### Documentation (this feature)
 
 ```text
-specs/085-infrastructure-as-code/
+specs/086-infrastructure-as-code/
 ├── plan.md                        # This file
 ├── spec.md                        # Feature specification
 ├── research.md                    # Phase 0 — R1..R15 decisions and hazards

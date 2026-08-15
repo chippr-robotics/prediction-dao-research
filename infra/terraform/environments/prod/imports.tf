@@ -1,5 +1,5 @@
 /**
- * Declarative adoption of the live estate (spec 085 FR-004/FR-005, research.md R2).
+ * Declarative adoption of the live estate (spec 086 FR-004/FR-005, research.md R2).
  *
  * WHY `import` BLOCKS AND NOT `terraform import`
  * An import block is visible in the plan BEFORE anything happens: the output literally says

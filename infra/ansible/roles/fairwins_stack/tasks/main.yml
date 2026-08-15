@@ -1,4 +1,4 @@
-# The role's container stack and its systemd units (spec 085, US3, FR-023).
+# The role's container stack and its systemd units (spec 086, US3, FR-023).
 ---
 - name: Install the systemd units and timers
   ansible.builtin.copy:

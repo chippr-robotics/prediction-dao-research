@@ -419,7 +419,9 @@ function WalletPage() {
 
                 {activeTab === 'custody' && (
                   <div className="custody-section" role="tabpanel">
-                    <CustodyPanel />
+                    {/* Spec 085 — Protect is an accordion now; the hash names the card to land open,
+                        same mechanism as Recovery/Settings. */}
+                    <CustodyPanel openSection={hashOpenSection} />
                   </div>
                 )}
 

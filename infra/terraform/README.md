@@ -1,6 +1,6 @@
 # infra/terraform
 
-Declarative description of the FairWins cloud estate (spec 085, issue #1177).
+Declarative description of the FairWins cloud estate (spec 086, issue #1177).
 
 Start with `docs/developer-guide/infrastructure-as-code.md` for the design, and
 `docs/runbooks/infrastructure-operations.md` for procedures. This file is the map.
@@ -44,7 +44,7 @@ service accounts and scoped IAM, Secret Manager containers and access bindings, 
 KMS rings and keys, Cloud Run service shape, Cloudflare DNS and both rulesets, and monitoring
 (channels, uptime checks, alert policies, log metric).
 
-Full inventory with real resource IDs: `specs/085-infrastructure-as-code/data-model.md`.
+Full inventory with real resource IDs: `specs/086-infrastructure-as-code/data-model.md`.
 
 ## What is deliberately NOT managed
 

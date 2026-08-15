@@ -14,6 +14,24 @@ export function CustodyProvider({ children }) {
   // signer lives here in MEMORY ONLY — never persisted, never serialized, cleared
   // on any identity change. It is the private-key material, so it must not leak.
   const [legacySigner, setLegacySigner] = useState(null)
+  // Spec 085: when operating as a hardware account, the device-backed signer lives here the same
+  // way. It holds no key material (the device does), but it wraps a live transport session, so it
+  // is session-scoped and cleared on any identity change just like the legacy signer — and the
+  // underlying transport is CLOSED when the signer is dropped, or the device stays claimed and
+  // unreachable for other tabs/tools until unplug.
+  const [hardwareSigner, setHardwareSignerState] = useState(null)
+  const setHardwareSigner = useCallback((next) => {
+    setHardwareSignerState((prev) => {
+      if (prev && prev !== next) {
+        try {
+          prev.session?.close?.()?.catch?.(() => {})
+        } catch {
+          /* releasing a dead transport must never break an identity switch */
+        }
+      }
+      return next
+    })
+  }, [])
   const prevAddress = useRef(address)
 
   // Reset to the personal wallet whenever the connected account actually changes or disconnects. This is a
@@ -22,15 +40,16 @@ export function CustodyProvider({ children }) {
   useEffect(() => {
     if (prevAddress.current !== address) {
       prevAddress.current = address
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on account change
       setActive({ mode: 'personal' })
       setLegacySigner(null) // drop the in-memory legacy key on account change
+      setHardwareSigner(null) // and the device-backed session
     }
   }, [address])
 
   const operateAsVault = useCallback((vault) => {
     if (!vault?.address || vault.chainId == null) return
     setLegacySigner(null)
+    setHardwareSigner(null)
     setActive({
       mode: 'vault',
       vaultAddress: vault.address,
@@ -41,6 +60,7 @@ export function CustodyProvider({ children }) {
 
   const operateAsPersonal = useCallback(() => {
     setLegacySigner(null)
+    setHardwareSigner(null)
     setActive({ mode: 'personal' })
   }, [])
 
@@ -50,6 +70,7 @@ export function CustodyProvider({ children }) {
   const operateAsLegacy = useCallback((descriptor) => {
     if (!descriptor?.address || !descriptor.signer) return
     setLegacySigner(descriptor.signer)
+    setHardwareSigner(null)
     setActive({
       mode: 'legacy',
       address: descriptor.address,
@@ -59,9 +80,25 @@ export function CustodyProvider({ children }) {
     })
   }, [])
 
+  // Spec 085 — operate as a saved hardware account. The caller connects the device first
+  // (HardwareSigner over a live adapter session) and passes that signer; every action while
+  // operating this way is confirmed on the device's own screen.
+  const operateAsHardware = useCallback((descriptor) => {
+    if (!descriptor?.address || !descriptor.signer) return
+    setLegacySigner(null)
+    setHardwareSigner(descriptor.signer)
+    setActive({
+      mode: 'hardware',
+      address: descriptor.address,
+      chainId: descriptor.chainId != null ? Number(descriptor.chainId) : undefined,
+      vendor: descriptor.vendor || null,
+      label: descriptor.label || '',
+    })
+  }, [])
+
   const value = useMemo(
-    () => ({ active, legacySigner, operateAsVault, operateAsPersonal, operateAsLegacy }),
-    [active, legacySigner, operateAsVault, operateAsPersonal, operateAsLegacy],
+    () => ({ active, legacySigner, hardwareSigner, operateAsVault, operateAsPersonal, operateAsLegacy, operateAsHardware }),
+    [active, legacySigner, hardwareSigner, operateAsVault, operateAsPersonal, operateAsLegacy, operateAsHardware],
   )
 
   return <CustodyContext.Provider value={value}>{children}</CustodyContext.Provider>

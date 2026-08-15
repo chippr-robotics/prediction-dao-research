@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * IaC guardrail gate (spec 085, contracts/guardrails.md).
+ * IaC guardrail gate (spec 086, contracts/guardrails.md).
  *
  * WHY THIS EXISTS
  * Generic Terraform linters do not know the three facts that make this estate dangerous:
@@ -17,7 +17,7 @@
  *      and no in-band detection.
  *
  * This gate is ONE OF TWO LAYERS. The other is the CI service account not holding the permissions
- * (specs/085-infrastructure-as-code/contracts/ci-identity.md), which is what still holds when this
+ * (specs/086-infrastructure-as-code/contracts/ci-identity.md), which is what still holds when this
  * gate is bypassed or wrong. Neither layer is sufficient alone.
  *
  * HCL is scanned textually with brace-aware block extraction rather than a real parser, so the gate
@@ -582,7 +582,7 @@ function main(argv) {
     } else {
       console.error(`\nIaC guardrails: ${violations.length} violation(s)\n`);
       for (const v of violations) console.error(`  ${v.rule}  ${v.file}:${v.line}\n        ${v.message}\n`);
-      console.error("See specs/085-infrastructure-as-code/contracts/guardrails.md for each rule's rationale.\n");
+      console.error("See specs/086-infrastructure-as-code/contracts/guardrails.md for each rule's rationale.\n");
     }
   }
   return violations.length === 0 ? 0 : 1;

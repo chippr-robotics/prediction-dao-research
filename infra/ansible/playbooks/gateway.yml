@@ -1,4 +1,4 @@
-# Converge the gateway node only (spec 085).
+# Converge the gateway node only (spec 086).
 ---
 - name: Converge the gateway
   hosts: gateway

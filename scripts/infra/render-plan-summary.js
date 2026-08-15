@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Render a REDACTED, human-readable plan summary for a pull request (spec 085, FR-027 / SC-008).
+ * Render a REDACTED, human-readable plan summary for a pull request (spec 086, FR-027 / SC-008).
  *
  * WHY NOT JUST POST THE PLAIN-TEXT PLAN
  * A saved plan file embeds the prior state of everything it touches, and `terraform show` renders

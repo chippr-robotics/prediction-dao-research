@@ -1,4 +1,4 @@
-# Scheduled drift detection (spec 085, T074-T078, FR-036..FR-038).
+# Scheduled drift detection (spec 086, T074-T078, FR-036..FR-038).
 #
 # "No undocumented drift" is the goal in issue #1177. This is what makes that claim CHECKABLE rather
 # than aspirational.
