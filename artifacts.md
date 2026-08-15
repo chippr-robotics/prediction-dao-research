@@ -1,6 +1,6 @@
 ### Artifacts
 
-Range: `v1.7.0..v1.8.0`
+Range: `v1.8.0..v1.9.0`
 
 | Artifact | Status | Identity |
 |---|---|---|
@@ -8,4 +8,4 @@ Range: `v1.7.0..v1.8.0`
 | Relay gateway image | moved | — |
 | Contract implementations | unchanged | — |
 | Mini-app packages | unchanged | — |
-| Subgraph endpoint | moved | `v0.2.0` |
+| Subgraph endpoint | moved | `v0.3.0` |
