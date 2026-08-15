@@ -130,6 +130,15 @@
     "@safe-global/safe-contracts": {
       "ethers": "$ethers"
     },
+    "@ledgerhq/hw-app-eth": {
+      "axios": "^1.19.0"
+    },
+    "@ledgerhq/domain-service": {
+      "axios": "^1.19.0"
+    },
+    "@ledgerhq/evm-tools": {
+      "axios": "^1.19.0"
+    },
     "elliptic": "^6.6.1",
     "lodash": "^4.18.0",
     "protobufjs": "^7.5.6",
