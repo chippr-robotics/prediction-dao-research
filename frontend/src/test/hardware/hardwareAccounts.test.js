@@ -1,5 +1,5 @@
 /**
- * hardwareWalletVault CRUD facade (spec 085, FR-005/FR-011).
+ * hardwareWalletVault CRUD facade (spec 087, FR-005/FR-011).
  * Re-adding a saved address must update its label, never duplicate; all
  * address comparisons are case-insensitive; the list is stable oldest-first.
  */

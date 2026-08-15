@@ -1,5 +1,5 @@
 /**
- * connectHardwareAccount (spec 085, FR-008). Reconnecting a saved account must
+ * connectHardwareAccount (spec 086, FR-008). Reconnecting a saved account must
  * verify the device re-derives the saved address — a different device (or
  * passphrase) yields a different account, and the session is closed rather
  * than handed out as a signer for the wrong one.

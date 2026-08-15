@@ -1,5 +1,5 @@
 /**
- * Backup-synced hardware-accounts store (spec 085, FR-005/FR-011).
+ * Backup-synced hardware-accounts store (spec 087, FR-005/FR-011).
  * Uses jsdom localStorage via userStorage; asserts public-artifacts-only shape
  * sanitization, load/save round-trip, the address-keyed newest-wins merge, and
  * the revision pub/sub React surfaces subscribe to.

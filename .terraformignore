@@ -1,0 +1,9 @@
+# Excluded from any Terraform module package (spec 085).
+.git/
+.github/
+node_modules/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+.DS_Store

@@ -1,0 +1,17 @@
+# Code owners (spec 085, FR-039).
+#
+# The Cloudflare edge carries the spec 007 geo compliance gate, which answers HTTP 451, and the
+# origin lock. Both rulesets are AUTHORITATIVE for their Cloudflare phase, so an apply deletes any
+# rule not declared here. Opening a gate that must stay shut — or shutting one that must stay open —
+# is a compliance incident, not an outage, so such a change must not ride along unnoticed inside an
+# unrelated pull request.
+/infra/terraform/modules/cloudflare-zone/   @realcodywburns
+/infra/cloudflare/                          @realcodywburns
+
+# The trust root: the state bucket, the federation pool, and the two CI identities. A change here
+# changes what automation is permitted to do in a project shared with unrelated workloads.
+/infra/terraform/bootstrap/                 @realcodywburns
+
+# The guardrail gate is one of the two layers protecting the shared project. Weakening it must be a
+# deliberate, reviewed act.
+/scripts/infra/check-iac-guardrails.js      @realcodywburns

@@ -1,0 +1,30 @@
+# Shared node configuration (spec 087).
+---
+fairwins_project: chippr-bots-site-wp
+fairwins_region: us-central1
+fairwins_repo_url: https://github.com/chippr-robotics/prediction-dao-research.git
+fairwins_repo_dir: /opt/fairwins/repo
+fairwins_root: /opt/fairwins
+fairwins_run_dir: /run/fairwins
+fairwins_artifact_registry: us-central1-docker.pkg.dev
+
+# Packages are installed at a PRESENT state with explicit versions where it matters. `state: latest`
+# is non-idempotent in the way that counts: it reports changed whenever upstream publishes, and can
+# upgrade Docker underneath a running bundler. OS patching is a separate, deliberately-invoked play
+# (playbooks/harden.yml).
+fairwins_base_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - jq
+  - python3
+  - rsync
+  - nginx
+
+# Pin the engine. An unpinned docker-ce is the single most disruptive thing an unattended converge
+# run can change on these nodes.
+fairwins_docker_version: "5:27.5.1-1~debian.12~bookworm"
+
+fairwins_ssl_dir: /etc/ssl/fairwins
+fairwins_nginx_conf_dir: /etc/nginx/fairwins

@@ -1,0 +1,473 @@
+# Infrastructure plan on pull requests (spec 087, T017-T019, FR-027/FR-029).
+#
+# Runs as the READ-ONLY identity. Pull requests come from branches, including forks; a single
+# identity would mean any branch that can trigger a workflow can mutate production. The apply
+# identity is separately restricted to the default branch (contracts/ci-identity.md).
+#
+# Every gate here fails the pipeline on error. Per constitution IV, `continue-on-error` is forbidden
+# on lint/test/build/security steps — a warning in CI is a comment.
+name: Infra Plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "scripts/infra/**"
+      - ".github/workflows/infra-*.yml"
+
+permissions:
+  contents: read
+  id-token: write # required for Workload Identity Federation; no stored key exists (FR-032)
+  pull-requests: write
+
+env:
+  TERRAFORM_VERSION: "1.15.8"
+
+concurrency:
+  group: infra-plan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guardrails:
+    name: Guardrails and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # actions/checkout persists a credential as `http.https://github.com/.extraheader` in the
+          # workspace's LOCAL git config. An explicit Authorization header OVERRIDES a URL-embedded
+          # one, so every git call made from inside the workspace — the module preflight, and
+          # `terraform init` fetching the private modules — silently authenticated as GITHUB_TOKEN,
+          # which is scoped to THIS repository alone and therefore 404s on chippr-tf-modules.
+          #
+          # That is what made a correctly-scoped token look broken: the REST API (which does not read
+          # git config) returned 200 for the same repo at the same moment git returned 404.
+          #
+          # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The repository-specific rules. A generic linter does not know that the GCP project is shared,
+      # that some resources are unrecoverable, or that one Cloud Run service must stay
+      # decommissioned. See specs/087-infrastructure-as-code/contracts/guardrails.md.
+      - name: IaC guardrails
+        run: node scripts/infra/check-iac-guardrails.js
+
+      - name: Guardrail gate self-test
+        # A gate that silently passes everything is worse than no gate, because it gets cited as
+        # evidence. This proves every rule still fires.
+        run: node --test "scripts/infra/__tests__/*.test.js"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive infra/terraform
+
+      # `terraform validate` on an environment root must FETCH the modules, which live in the
+      # private chippr-tf-modules repository. The default GITHUB_TOKEN is scoped to this repository
+      # only and cannot read it, so a token with Contents:read on that repo is required.
+      #
+      # A missing or wrong token surfaces as `repository not found` on the module source, NOT as a
+      # permission error — GitHub returns 404 rather than 403 for a private repo the caller cannot
+      # see. Read that message as authentication before you go looking for a wrong path.
+      - name: Check module repository access
+        id: modules
+        env:
+          # Through `env:`, not interpolated straight into the script. A secret spliced into shell
+          # source breaks apart on any newline it contains — which is how this first failed, with git
+          # reporting `URL rejected: Malformed input to a URL function`.
+          TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
+        run: |
+          # Trim stray whitespace: a secret pasted with a trailing newline is invisible in the UI.
+          token="$(printf '%s' "${TF_MODULES_TOKEN:-}" | tr -d '[:space:]')"
+
+          # Branch rather than early-return. A bare `exit 0` in a merge-gating step is the pattern
+          # test/config/CiGates.test.js exists to reject — it is how a gate goes quietly dead — and
+          # the check is right to refuse it even when the intent here is an honest skip.
+          if [ -z "${token}" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### terraform validate: NOT RUN — no access to the module repository"
+              echo ""
+              echo "\`TF_MODULES_TOKEN\` is unset, so \`terraform init\` cannot fetch the modules from"
+              echo "the private \`chippr-tf-modules\` repository and the environment roots cannot be"
+              echo "validated. **No claim is being made that this configuration is valid.**"
+              echo ""
+              echo "Fix: add a fine-grained token with Contents:read on chippr-tf-modules as the"
+              echo "\`TF_MODULES_TOKEN\` repository secret."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            # TRY EACH CREDENTIAL FORM. `x-access-token:` is the GitHub *App installation token*
+            # convention; a fine-grained PAT is not an installation token and does not always
+            # authenticate under it. Rather than assume which form is right and read the resulting
+            # 404 as "your token lacks access", try them and report which one actually worked —
+            # otherwise a wrong format here is indistinguishable from a mis-scoped token, and the
+            # person holding the token gets sent to fix something that was never broken.
+            # API TRIAGE FIRST. git reports "token value is wrong", "token cannot see this repo" and
+            # "token is pending org approval" as the same opaque failure, so a git-only probe can
+            # only ever say "it did not work" — which is what sent the token holder round six
+            # settings changes. The REST API distinguishes them by status code, so ask it.
+            #
+            # Only status codes and the token's own login are printed; the credential never is.
+            api_user="$(curl -sS -o /tmp/tokuser.json -w '%{http_code}' \
+              -H "Authorization: Bearer ${token}" -H 'Accept: application/vnd.github+json' \
+              https://api.github.com/user || echo 000)"
+            api_repo="$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${token}" -H 'Accept: application/vnd.github+json' \
+              https://api.github.com/repos/chippr-robotics/chippr-tf-modules || echo 000)"
+            login="$(python3 -c "import json;print(json.load(open('/tmp/tokuser.json')).get('login','?'))" 2>/dev/null || echo '?')"
+            echo "token triage: identity=${login} /user=${api_user} /repos/chippr-tf-modules=${api_repo}"
+
+            if [ "$api_user" = "401" ]; then
+              echo "::error::The token in TF_MODULES_TOKEN is INVALID or REVOKED (/user returned 401)."
+              echo "::error::Its value does not match the token whose settings are being edited — a"
+              echo "::error::scope change cannot fix a stale value. Regenerate the token and paste the"
+              echo "::error::NEW value into the TF_MODULES_TOKEN repository secret."
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            if [ "$api_user" = "200" ] && [ "$api_repo" = "404" ]; then
+              echo "::error::The token is VALID (as ${login}) but cannot see chippr-tf-modules."
+              echo "::error::Either its Repository access does not include that repo, or it is"
+              echo "::error::PENDING ORGANISATION APPROVAL — editing an org-owned token's repository"
+              echo "::error::access can re-queue it. Check:"
+              echo "::error::github.com/organizations/chippr-robotics/settings/personal-access-tokens/pending_requests"
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+
+            # Probe with the credential INLINE, writing no git config until one works. The earlier
+            # version reconfigured and unset a global rewrite per attempt, which needed `|| true` on
+            # the unsets — and `|| true` in a merge-gating step is exactly what CiGates rejects.
+            # Probing inline removes the need entirely rather than working around the rule.
+            #
+            # `x-access-token:` is the GitHub *App installation token* convention; a fine-grained PAT
+            # is not an installation token and may not authenticate under it. Trying each form means
+            # a wrong URL format can no longer masquerade as a mis-scoped token — otherwise whoever
+            # holds the token gets sent to fix something that was never broken.
+            repo_path="chippr-robotics/chippr-tf-modules.git"
+            worked=""
+            form=""
+            err=""
+            for pair in "x-access-token|x-access-token:${token}" "oauth2|oauth2:${token}" "token-as-username|${token}"; do
+              label="${pair%%|*}"
+              form="${pair#*|}"
+              # `-c http.…extraheader=` clears any inherited Authorization header for this call
+              # only. Without persist-credentials:false above this is what was overriding the
+              # URL-embedded credential; it is kept as a second layer because the failure it
+              # prevents is invisible — git succeeds at authenticating, just as the wrong identity.
+              if err="$(git -c http."https://github.com/".extraheader= ls-remote "https://${form}@github.com/${repo_path}" HEAD 2>&1)"; then
+                worked="$label"
+                break
+              fi
+            done
+
+            # git does NOT redact credentials from its error text, and this is echoed below.
+            err="${err//${token}/***}"
+
+            if [ -n "$worked" ]; then
+              git config --global url."https://${form}@github.com/".insteadOf "https://github.com/"
+              echo "available=true" >> "$GITHUB_OUTPUT"
+              echo "Module repository reachable (credential form: ${worked})."
+            else
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules under ANY"
+              echo "::error::credential form (x-access-token:, oauth2:, or token-as-username), so this"
+              echo "::error::is the token's access rather than the URL format."
+              case "$err" in
+                *"Invalid username or token"*|*"Authentication failed"*)
+                  echo "::error::The token was REJECTED. A fine-grained PAT must list"
+                  echo "::error::chippr-tf-modules explicitly under 'Repository access' — a token"
+                  echo "::error::scoped to other repositories is refused here even though it is"
+                  echo "::error::otherwise valid. A classic PAT needs the 'repo' scope AND SSO"
+                  echo "::error::authorisation for the chippr-robotics organisation."
+                  ;;
+                *"not found"*|*"does not exist"*)
+                  echo "::error::Repository NOT FOUND — for a private repo this usually means the"
+                  echo "::error::token cannot see it, since GitHub returns 404 rather than 403 to a"
+                  echo "::error::caller without access. Grant the token access to chippr-tf-modules."
+                  ;;
+                *)
+                  echo "::error::${err}"
+                  ;;
+              esac
+              exit 1
+            fi
+          fi
+
+      - name: terraform validate (bootstrap)
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/terraform/bootstrap init -backend=false -input=false
+          terraform -chdir=infra/terraform/bootstrap validate
+
+      - name: terraform validate (environments)
+        if: steps.modules.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          for root in infra/terraform/environments/*; do
+            echo "::group::validate $root"
+            terraform -chdir="$root" init -backend=false -input=false
+            terraform -chdir="$root" validate
+            echo "::endgroup::"
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: tflint
+        run: |
+          set -euo pipefail
+          tflint --init --chdir=infra/terraform
+          tflint --recursive --chdir=infra/terraform
+
+  ansible-lint:
+    name: Ansible lint and idempotency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # actions/checkout persists a credential as `http.https://github.com/.extraheader` in the
+          # workspace's LOCAL git config. An explicit Authorization header OVERRIDES a URL-embedded
+          # one, so every git call made from inside the workspace — the module preflight, and
+          # `terraform init` fetching the private modules — silently authenticated as GITHUB_TOKEN,
+          # which is scoped to THIS repository alone and therefore 404s on chippr-tf-modules.
+          #
+          # That is what made a correctly-scoped token look broken: the REST API (which does not read
+          # git config) returned 200 for the same repo at the same moment git returned 404.
+          #
+          # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible
+        run: pip install --quiet ansible-core ansible-lint
+
+      # Install into the path ansible.cfg declares (`collections_path = collections`), not galaxy's
+      # default. Installing to the default while the config points elsewhere leaves an EMPTY
+      # configured path, and every module then fails to resolve — which reads as "this module does
+      # not exist" rather than "it was installed somewhere nothing looks".
+      - name: Install pinned collections
+        working-directory: infra/ansible
+        run: ansible-galaxy collection install -r requirements.yml -p collections
+
+      - name: ansible-lint
+        working-directory: infra/ansible
+        env:
+          ANSIBLE_COLLECTIONS_PATH: collections
+        run: ansible-lint
+
+      - name: Playbook syntax check
+        working-directory: infra/ansible
+        env:
+          ANSIBLE_COLLECTIONS_PATH: collections
+        run: |
+          set -euo pipefail
+          for pb in site.yml playbooks/*.yml; do
+            ansible-playbook --syntax-check -i localhost, "$pb"
+          done
+
+      # NOTE: the double-run idempotency assertion (SC-005) requires a reachable node and therefore
+      # runs against a scratch host, not in this workflow. The procedure is quickstart.md scenario 5.
+      # Stating that here rather than silently omitting it: a CI job that claims to prove idempotency
+      # without ever contacting a node would be a fabricated gate.
+
+  # Reports whether the trust root exists yet, so a skipped plan is never mistaken for a clean one.
+  bootstrap-status:
+    name: Bootstrap status
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        run: |
+          if [ -n "${{ vars.WIF_PROVIDER }}" ] && [ -n "${{ vars.TF_PLAN_SERVICE_ACCOUNT }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Terraform plan: NOT RUN — the trust root does not exist yet"
+              echo ""
+              echo "\`WIF_PROVIDER\` and/or \`TF_PLAN_SERVICE_ACCOUNT\` are unset, so there is no"
+              echo "identity to plan as. Until an operator runs \`infra/terraform/bootstrap\`"
+              echo "(docs/runbooks/infrastructure-operations.md), **no plan has been produced and no"
+              echo "claim is being made about whether the configuration matches the estate.**"
+              echo ""
+              echo "This is stated rather than skipped silently: a green check with no plan behind it"
+              echo "reads as \"no changes\", which would be a fabricated result."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    needs: [guardrails, bootstrap-status]
+    # Until bootstrap has been run there is no identity to plan as. The job is skipped rather than
+    # failed — but bootstrap-status above says so out loud, so nobody reads the absence as a pass.
+    if: needs.bootstrap-status.outputs.configured == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [prod, staging]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # actions/checkout persists a credential as `http.https://github.com/.extraheader` in the
+          # workspace's LOCAL git config. An explicit Authorization header OVERRIDES a URL-embedded
+          # one, so every git call made from inside the workspace — the module preflight, and
+          # `terraform init` fetching the private modules — silently authenticated as GITHUB_TOKEN,
+          # which is scoped to THIS repository alone and therefore 404s on chippr-tf-modules.
+          #
+          # That is what made a correctly-scoped token look broken: the REST API (which does not read
+          # git config) returned 200 for the same repo at the same moment git returned 404.
+          #
+          # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
+          persist-credentials: false
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.TF_PLAN_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      # `terraform init` must fetch modules from the PRIVATE chippr-tf-modules repository. The
+      # default GITHUB_TOKEN is scoped to this repository only and cannot read it, so a token with
+      # Contents:read on that repo is rewritten into git's config here.
+      #
+      # A missing or wrong token surfaces as `repository not found` on the module source, NOT as a
+      # permission error — GitHub returns 404 rather than 403 for a private repo the caller cannot
+      # see. Read that message as authentication before you go looking for a wrong path.
+      - name: Allow Terraform to fetch private modules
+        env:
+          # Through `env:`, not interpolated straight into the script. Interpolating a secret into a
+          # `run:` body splices its raw bytes into the shell source, so a value containing a newline
+          # breaks the command apart — which is exactly how this first failed, with git reporting
+          # `URL rejected: Malformed input to a URL function`.
+          TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Trim stray whitespace. A secret pasted with a trailing newline is invisible in the UI and
+          # produces a URL git cannot parse.
+          token="$(printf '%s' "${TF_MODULES_TOKEN}" | tr -d '[:space:]')"
+          if [ -z "${token}" ]; then
+            echo "::error::TF_MODULES_TOKEN is empty. terraform init cannot fetch the private modules."
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+
+          # Preflight the credential against the modules repo. Without this, a bad token surfaces
+          # three steps later as a terraform module-download failure, where the real message is
+          # buried under `Could not download module`. The three failure modes below are genuinely
+          # different problems with genuinely different fixes, and git reports them distinctly.
+          if ! err="$(git ls-remote https://github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules."
+            case "$err" in
+              *"Invalid username or token"*|*"Authentication failed"*)
+                echo "::error::The token was REJECTED. If it is a fine-grained PAT, it must list"
+                echo "::error::chippr-tf-modules explicitly under 'Repository access' — a token"
+                echo "::error::scoped to other repositories is rejected here even though it is valid."
+                echo "::error::If it is a classic PAT, it needs the 'repo' scope AND SSO authorisation"
+                echo "::error::for the chippr-robotics organisation."
+                ;;
+              *"not found"*|*"does not exist"*)
+                echo "::error::The repository was NOT FOUND, which for a private repo usually means"
+                echo "::error::the token cannot see it rather than that it is missing — GitHub"
+                echo "::error::returns 404 rather than 403 to a caller without access."
+                ;;
+              *)
+                echo "::error::${err}"
+                ;;
+            esac
+            exit 1
+          fi
+          echo "Module repository reachable."
+
+      - name: Init
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        run: terraform init -input=false
+
+      - name: Plan
+        id: plan
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: terraform plan -input=false -lock-timeout=5m -out=tfplan
+
+      # The apply job on merge must execute THIS plan, not a freshly computed one (FR-034). The tree
+      # digest is what makes that checkable across the merge boundary: Terraform already refuses to
+      # apply a saved plan against a moved state, but it cannot tell that the merged configuration is
+      # the configuration that was planned. Squash merges, rebases and concurrent infra PRs all
+      # change the tree.
+      - name: Record plan provenance
+        id: provenance
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          # State staleness is enforced by Terraform itself: applying a saved plan against a moved
+          # state fails with "Saved plan is stale". What Terraform CANNOT tell is whether the merged
+          # configuration is the configuration that was planned, so that is what this records.
+          digest="$(git rev-parse HEAD:infra/terraform)"
+          {
+            echo "infra_tree_digest=$digest"
+            echo "planned_at_sha=${{ github.event.pull_request.head.sha }}"
+          } > "infra/terraform/environments/${{ matrix.environment }}/plan-provenance.txt"
+          cat "infra/terraform/environments/${{ matrix.environment }}/plan-provenance.txt"
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.environment }}
+          path: |
+            infra/terraform/environments/${{ matrix.environment }}/tfplan
+            infra/terraform/environments/${{ matrix.environment }}/plan-provenance.txt
+          # A plan file embeds the prior state of everything it touches. It must not linger as a
+          # long-lived artifact (guardrail G-15).
+          retention-days: 5
+
+      # A REDACTED summary. The raw plan is never posted as a comment — see G-15.
+      - name: Render redacted summary
+        working-directory: infra/terraform/environments/${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          terraform show -json tfplan > plan.json
+          node "$GITHUB_WORKSPACE/scripts/infra/render-plan-summary.js" plan.json > summary.md
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment plan summary on the PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync(
+              `infra/terraform/environments/${{ matrix.environment }}/summary.md`, 'utf8');
+            const marker = `<!-- infra-plan:${{ matrix.environment }} -->`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body.includes(marker));
+            const payload = `${marker}\n${body}`;
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body: payload,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body: payload,
+              });
+            }

@@ -1,0 +1,74 @@
+# Runtime secret delivery (spec 087, US3, FR-016/FR-017).
+#
+# THIS ROLE PLACES, OWNS AND INVOKES infra/vm/common/fetch-secrets.sh — it does NOT reimplement it.
+# That script already enforces four properties that are laborious to reproduce in Ansible and
+# dangerous to get wrong:
+#
+#   1. PER-CONTAINER SCOPING. Cloud Run scoped each secret to exactly one container. The
+#      internet-facing container must never receive the engine's GCP_PRIVATE_KEY, which holds
+#      cloudkms.signerVerifier on BOTH hot gas keys.
+#   2. BYTE-EXACT PAYLOADS. Cloud Run injected Secret Manager payloads verbatim. Escaping a newline
+#      in a PEM hands the relayer a key Cloud Run never gave it, and KMS signing then fails
+#      SILENTLY, at first use, on both gas keys.
+#   3. NEVER ON ARGV. /proc/<pid>/cmdline is world-readable; the script refuses to run under `set -x`.
+#   4. REQUIRED vs OPTIONAL. A missing OpenSea/Polymarket credential must not take down the gasless
+#      relay path — those routes fail closed with 503 and the SPA hides the tab (never-stranded).
+#
+# Ansible's job is to make sure the script is present, correct, and wired to systemd.
+---
+- name: Install the secret-fetch systemd unit
+  ansible.builtin.copy:
+    src: "{{ fairwins_repo_dir }}/infra/vm/systemd/fairwins-secrets@.service"
+    dest: /etc/systemd/system/fairwins-secrets@.service
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: reload systemd
+
+- name: Enable secret delivery for THIS role only
+  # Enabling the other role's template instance would run fetch-secrets for the wrong role and
+  # truncate the tmpfs env files the running stack is using.
+  ansible.builtin.systemd_service:
+    name: "fairwins-secrets@{{ fairwins_role }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: Verify the tmpfs secret directory is correctly scoped
+  ansible.builtin.stat:
+    path: "{{ fairwins_run_dir }}"
+  register: fairwins_secrets_run_dir
+  become: true
+
+- name: Assert the secret directory is a private tmpfs
+  # Secret material exists only here, in memory, mode 0700 with 0600 files. If this is a normal
+  # directory on disk, secrets are being written to persistent storage.
+  ansible.builtin.assert:
+    that:
+      - fairwins_secrets_run_dir.stat.exists
+      - fairwins_secrets_run_dir.stat.mode == "0700"
+    fail_msg: >-
+      {{ fairwins_run_dir }} is missing or not 0700. Secret material must exist only in a private
+      tmpfs — check fairwins-secrets@{{ fairwins_role }}.service.
+
+- name: Confirm this role's env files were delivered
+  ansible.builtin.stat:
+    path: "{{ fairwins_run_dir }}/{{ item.file }}"
+  loop: "{{ fairwins_secret_env_files }}"
+  loop_control:
+    label: "{{ item.file }} ({{ item.description }})"
+  register: fairwins_secrets_env_files_stat
+  become: true
+  # Never log a stat of a secret file's attributes alongside its contents elsewhere in a run.
+  no_log: true
+
+- name: Assert every required env file exists
+  ansible.builtin.assert:
+    that: fairwins_secrets_env_files_stat.results | rejectattr('stat.exists') | list | length == 0
+    fail_msg: >-
+      One or more per-container env files are missing from {{ fairwins_run_dir }}. Check
+      `journalctl -u fairwins-secrets@{{ fairwins_role }}` — a missing REQUIRED secret aborts
+      delivery by design.

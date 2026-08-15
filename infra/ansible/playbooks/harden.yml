@@ -1,0 +1,14 @@
+# OS-level hardening and security patching (spec 087, US3).
+#
+# DELIBERATELY SEPARATE from site.yml. Hardening touches sshd and the kernel, and security patching
+# can require a reboot — neither belongs in a routine converge run that someone might trigger while
+# the gasless path is under load.
+#
+# SERIAL: 1 — never restart sshd on both nodes at once.
+---
+- name: Harden FairWins nodes
+  hosts: bundler:gateway
+  serial: 1
+  gather_facts: true
+  roles:
+    - hardening

@@ -114,6 +114,7 @@ nav:
     - Message Signing (Protect ▸ Verify): developer-guide/message-signing.md
     - Hardware Wallets (Protect ▸ Off chain): developer-guide/hardware-wallets.md
     - Account Cards & Identity (spec 086): developer-guide/account-cards.md
+    - Infrastructure as Code (spec 087): developer-guide/infrastructure-as-code.md
     - Account Statements: developer-guide/account-statements.md
     - Encryption Architecture: developer-guide/encryption-architecture.md
     - Envelope Encryption Spec: developer-guide/envelope-encryption-spec.md
@@ -145,6 +146,7 @@ nav:
     - Runbook Index: runbooks/README.md
     - Operations Control Plane: runbooks/operations-control-plane.md
     - Operator Onboarding: runbooks/operator-onboarding.md
+    - Infrastructure Operations (spec 087): runbooks/infrastructure-operations.md
     - Relayer Operations: runbooks/relayer-operations.md
     - Paymaster Operations: runbooks/paymaster-operations.md
     - Callsign Operations: runbooks/callsigns-operations.md

@@ -59,6 +59,8 @@
     "purchase:friend-market": "npx hardhat run ./scripts/operations/purchase-friend-market-membership.js --network mordor",
     "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor",
     "check:deps": "node scripts/deps/check-dependency-hygiene.js",
+    "check:iac": "node scripts/infra/check-iac-guardrails.js",
+    "test:iac-guardrails": "node --test \"scripts/infra/__tests__/*.test.js\"",
     "build:miniapps": "npm run build --workspace @fairwins/miniapp-token-mint && npm run build --workspace @fairwins/miniapp-clearpath",
     "deps:reinstall": "bash scripts/deps/reinstall.sh",
     "codegen:abis": "node scripts/codegen/emit-abis.js",

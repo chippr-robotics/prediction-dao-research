@@ -1,5 +1,5 @@
 /**
- * HardwareSigner (spec 085, FR-008/FR-009). Uses real ethers v6: the mock
+ * HardwareSigner (spec 087, FR-008/FR-009). Uses real ethers v6: the mock
  * session signs with a real Wallet's signing key so the recover-and-cross-check
  * guard is exercised for real — a session signing with the wrong account must
  * never serialize a broadcastable transaction.

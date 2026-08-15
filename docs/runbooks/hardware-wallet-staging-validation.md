@@ -1,4 +1,4 @@
-# Runbook: Hardware Wallet Staging Validation (spec 085)
+# Runbook: Hardware Wallet Staging Validation (spec 087)
 
 Unit and component tests drive mock adapters (FR-013); what they cannot prove is the real
 transport, real vendor firmware, and real browser permission prompts. This checklist is run

@@ -1,5 +1,5 @@
 /**
- * Derivation-path schemes for the account picker (spec 085, FR-004).
+ * Derivation-path schemes for the account picker (spec 087, FR-004).
  * Ledger Live vs BIP-44 path shapes, vendor defaults, and paging.
  */
 import { describe, it, expect } from 'vitest'

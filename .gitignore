@@ -183,3 +183,23 @@ blockscout/
 
 # Turborepo local task cache (spec 075)
 .turbo/
+
+# Terraform (spec 085). NOTE the deliberate exceptions below — both files are
+# committed on purpose and must NOT be added to the ignore list:
+#   .terraform.lock.hcl          provider pinning; guardrail G-13 requires it committed
+#   bootstrap/terraform.tfstate  the trust root's audit record (contracts/state-backend.md)
+.terraform/
+*.tfplan
+crash.log
+crash.*.log
+# Environment state never lives on disk — it is in GCS. Bootstrap state is the one
+# exception and is re-included below.
+*.tfstate
+*.tfstate.*
+!infra/terraform/bootstrap/terraform.tfstate
+# tfvars may carry environment-specific values; the committed ones are explicit.
+*.auto.tfvars
+
+# Ansible (spec 085)
+infra/ansible/*.retry
+infra/ansible/collections/
