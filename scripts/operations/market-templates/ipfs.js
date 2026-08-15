@@ -1,4 +1,5 @@
 const { BET_TYPE_LABELS, CATEGORY_NAMES, getResolutionDateDisplay } = require("./helpers");
+const pinata = require("./pinataClient");
 
 /**
  * IPFS/Pinata Integration for Market Metadata
@@ -9,6 +10,9 @@ const { BET_TYPE_LABELS, CATEGORY_NAMES, getResolutionDateDisplay } = require(".
  * Supported environment variables (in order of preference):
  * - PINATA_JWT (recommended - JWT token from Pinata dashboard)
  * - PINATA_API_KEY + PINATA_SECRET_KEY (legacy - API key pair)
+ *
+ * Pinning goes through `./pinataClient`, not `@pinata/sdk` — see that file for why. The
+ * credential names and their order of preference are unchanged.
  */
 
 // Category images uploaded to IPFS via Pinata (2026-01-29)
@@ -26,36 +30,13 @@ const CATEGORY_IMAGES = {
 const DEFAULT_IMAGE = "ipfs://bafkreick4q37qtmtev7layzljc3oh2c3ydjwzhr75e432bhf2pqnf6avqu";
 
 /**
- * Initialize Pinata SDK
- * Supports JWT (preferred) or API key/secret authentication
- * @returns {Object|null} Pinata SDK instance or null if not configured
+ * Resolve Pinata credentials from the environment.
+ * Supports JWT (preferred) or API key/secret authentication.
+ * @returns {Object|null} credentials for ./pinataClient, or null if not configured
  */
 function initPinata() {
-  const jwt = process.env.PINATA_JWT;
-  const apiKey = process.env.PINATA_API_KEY;
-  const secretKey = process.env.PINATA_SECRET_KEY;
-
-  // Prefer JWT authentication
-  if (jwt) {
-    try {
-      const pinataSDK = require("@pinata/sdk");
-      return new pinataSDK({ pinataJWTKey: jwt });
-    } catch (error) {
-      console.warn("Pinata SDK not installed. Run: npm install @pinata/sdk");
-      return null;
-    }
-  }
-
-  // Fall back to API key/secret
-  if (apiKey && secretKey) {
-    try {
-      const pinataSDK = require("@pinata/sdk");
-      return new pinataSDK(apiKey, secretKey);
-    } catch (error) {
-      console.warn("Pinata SDK not installed. Run: npm install @pinata/sdk");
-      return null;
-    }
-  }
+  const credentials = pinata.readPinataCredentials();
+  if (credentials) return credentials;
 
   console.warn("Pinata credentials not configured. Set PINATA_JWT or PINATA_API_KEY + PINATA_SECRET_KEY.");
   return null;
@@ -149,26 +130,20 @@ function buildMetadataFromTemplate(template, imageUrl, options = {}) {
  * @returns {Promise<string>} IPFS URI
  */
 async function uploadMetadataToPinata(metadata, name) {
-  const pinata = initPinata();
+  const credentials = initPinata();
 
-  if (!pinata) {
+  if (!credentials) {
     // Return a placeholder URI if Pinata not configured
     console.log(`[DRY RUN] Would upload metadata for: ${name}`);
     return `ipfs://placeholder-${Date.now()}`;
   }
 
   try {
-    const options = {
-      pinataMetadata: {
-        name: `market-${name}-${Date.now()}`,
-      },
-      pinataOptions: {
-        cidVersion: 1,
-      },
-    };
-
-    const result = await pinata.pinJSONToIPFS(metadata, options);
-    return `ipfs://${result.IpfsHash}`;
+    const cid = await pinata.pinJson(credentials, metadata, {
+      name: `market-${name}-${Date.now()}`,
+      cidVersion: 1,
+    });
+    return `ipfs://${cid}`;
   } catch (error) {
     console.error(`Failed to upload metadata: ${error.message}`);
     throw error;
@@ -232,11 +207,11 @@ async function batchUploadMetadata(templates, options = {}, delayMs = 500) {
  * @returns {Promise<Object>} Map of category to IPFS URL
  */
 async function uploadCategoryImages(imagesDir) {
-  const pinata = initPinata();
+  const credentials = initPinata();
   const fs = require("fs");
   const path = require("path");
 
-  if (!pinata) {
+  if (!credentials) {
     console.warn("Pinata not configured. Using placeholder images.");
     return CATEGORY_IMAGES;
   }
@@ -254,15 +229,10 @@ async function uploadCategoryImages(imagesDir) {
     }
 
     try {
-      const readableStreamForFile = fs.createReadStream(imagePath);
-      const options = {
-        pinataMetadata: {
-          name: `market-category-${category}`,
-        },
-      };
-
-      const result = await pinata.pinFileToIPFS(readableStreamForFile, options);
-      results[category] = `ipfs://${result.IpfsHash}`;
+      const cid = await pinata.pinFile(credentials, imagePath, {
+        name: `market-category-${category}`,
+      });
+      results[category] = `ipfs://${cid}`;
       console.log(`Uploaded ${category} image: ${results[category]}`);
     } catch (error) {
       console.error(`Failed to upload ${category} image: ${error.message}`);
@@ -278,16 +248,16 @@ async function uploadCategoryImages(imagesDir) {
  * @returns {Promise<boolean>} True if connected
  */
 async function verifyPinataConnection() {
-  const pinata = initPinata();
+  const credentials = initPinata();
 
-  if (!pinata) {
+  if (!credentials) {
     return false;
   }
 
   try {
-    const result = await pinata.testAuthentication();
-    console.log("Pinata connection verified:", result.authenticated);
-    return result.authenticated;
+    const authenticated = await pinata.testAuthentication(credentials);
+    console.log("Pinata connection verified:", authenticated);
+    return authenticated;
   } catch (error) {
     console.error("Pinata authentication failed:", error.message);
     return false;

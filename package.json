@@ -68,7 +68,8 @@
     "release:version": "node scripts/release/version.js",
     "release:classify": "node scripts/release/classify.js",
     "release:artifacts": "node scripts/release/artifacts.js",
-    "test:release": "node --test \"scripts/release/__tests__/*.test.js\""
+    "test:release": "node --test \"scripts/release/__tests__/*.test.js\"",
+    "test:market-templates": "node --test \"scripts/operations/market-templates/__tests__/*.test.js\""
   },
   "keywords": [
     "futarchy",
@@ -98,7 +99,6 @@
     "@openzeppelin/contracts-upgradeable": "5.4.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.0",
     "@openzeppelin/upgrades-core": "^1.44.2",
-    "@pinata/sdk": "^2.1.0",
     "@safe-global/safe-contracts": "1.4.1",
     "@safe-global/safe-singleton-factory": "^2.0.0",
     "@typechain/ethers-v6": "^0.5.1",
