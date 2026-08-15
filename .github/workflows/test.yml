@@ -58,6 +58,11 @@ jobs:
       - name: Run release tooling tests
         run: npm run test:release
 
+      # The Pinata pinning client that replaced `@pinata/sdk`. Stubs `fetch`, so it needs no
+      # credentials and no network — which is why it belongs in this dependency-free job.
+      - name: Run market-template tooling tests
+        run: npm run test:market-templates
+
   # Gate (spec 075, FR-003/FR-015): version skew across manifests and undeclared (phantom)
   # imports. Both invariants were fixed by hand once and had nothing preventing recurrence, which
   # is precisely the failure mode spec 075 exists to remove. Dependency-free, so no npm ci.
