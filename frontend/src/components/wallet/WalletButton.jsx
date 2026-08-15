@@ -12,7 +12,7 @@ import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
 import SensitiveValue from '../common/SensitiveValue'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
-import BlockiesAvatar from '../ui/BlockiesAvatar'
+import AccountAvatar from '../account/AccountAvatar'
 import NavIcon from '../nav/NavIcon'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import AddressQRModal from '../ui/AddressQRModal'
@@ -46,7 +46,12 @@ function WalletButton({ className = '' }) {
   // wallet when no acting account is selected.
   const { address: actingAddress, label: actingLabel, type: actingType, isActingAccount } = useEffectiveAccount()
   const displayAddress = actingAddress || address
-  const acctTypeLabel = actingType === 'vault' ? 'Multisig' : actingType === 'legacy' ? 'Recovered' : actingType === 'derived' ? 'Recovered' : null
+  const acctTypeLabel =
+    actingType === 'vault' ? 'Multisig'
+    : actingType === 'legacy' ? 'Recovered'
+    : actingType === 'derived' ? 'Recovered'
+    : actingType === 'hardware' ? 'Hardware'
+    : null
   // Acting-account switcher, surfaced as a caret dropdown ON the wallet biticon (spec 063 follow-up):
   // picking an account switches the active identity so the biticon, address, balance, copy, and QR all
   // follow it — no separate "Acting as" row.
@@ -192,7 +197,7 @@ function WalletButton({ className = '' }) {
             aria-expanded={isOpen}
             aria-haspopup="true"
           >
-            <BlockiesAvatar address={displayAddress} size={24} />
+            <AccountAvatar address={displayAddress} size={24} />
           </button>
 
           {isOpen && (
@@ -217,11 +222,11 @@ function WalletButton({ className = '' }) {
                       aria-expanded={acctMenuOpen}
                       aria-label="Change acting account"
                     >
-                      <BlockiesAvatar address={displayAddress} size={40} />
+                      <AccountAvatar address={displayAddress} size={40} />
                       <span className="account-caret" aria-hidden="true">▾</span>
                     </button>
                   ) : (
-                    <BlockiesAvatar address={displayAddress} size={40} />
+                    <AccountAvatar address={displayAddress} size={40} />
                   )}
                   <div className="account-details">
                     <button
@@ -269,7 +274,7 @@ function WalletButton({ className = '' }) {
                             className="account-switch-opt"
                             onClick={() => { choose(acc); setAcctMenuOpen(false) }}
                           >
-                            <BlockiesAvatar address={acc.address} size={20} />
+                            <AccountAvatar address={acc.address} size={20} />
                             <span className="account-switch-label">
                               {acc.label || shortAccountAddr(acc.address)}
                               {ACCOUNT_KIND_TAG[acc.kind] && (

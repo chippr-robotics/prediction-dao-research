@@ -141,4 +141,22 @@ describe('AccountCardsCarousel (spec 074 US1)', () => {
     render(<AccountCardsCarousel />)
     expect(screen.queryByText(/total balance/i)).not.toBeInTheDocument()
   })
+
+  // Spec 086 — a hardware account is just another card, tagged Hardware like any other kind.
+  it('tags a hardware account Hardware (spec 086 US3)', () => {
+    switcherState.accounts = [
+      PERSONAL,
+      { id: 'hardware:0xaaa', kind: 'hardware', address: '0xAaAa000000000000000000000000000000000001', label: 'Cold storage' },
+    ]
+    render(<AccountCardsCarousel />)
+    expect(screen.getByText('Hardware')).toBeInTheDocument()
+  })
+
+  // Spec 086 — the Customize sheet opens from the carousel for the active account.
+  it('opens the Customize sheet for the active account (spec 086 US2)', () => {
+    render(<AccountCardsCarousel />)
+    fireEvent.click(screen.getByTestId('account-customize-open'))
+    expect(screen.getByTestId('account-customize')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /customize card/i })).toBeInTheDocument()
+  })
 })

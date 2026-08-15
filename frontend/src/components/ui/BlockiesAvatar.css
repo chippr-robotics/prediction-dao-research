@@ -16,6 +16,15 @@
   border-radius: 50%;
 }
 
+/* Spec 086 — a member-set profile picture rendered by AccountAvatar. Photos, not identicons:
+   cover-cropped and smooth (no pixelated rendering). */
+.account-avatar--custom {
+  border-radius: 50%;
+  display: inline-block;
+  vertical-align: middle;
+  object-fit: cover;
+}
+
 .wallet-avatar-inline {
   margin-right: 8px;
 }

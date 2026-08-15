@@ -29,7 +29,6 @@ import AutoConnectPrompt from './components/wallet/AutoConnectPrompt'
 import { ActivityProvider } from './contexts/ActivityProvider.jsx'
 import { NavDrawerProvider } from './contexts/NavDrawerContext.jsx'
 import ActivityNotificationBridge from './components/notifications/ActivityNotificationBridge'
-import OperateAsIndicator from './components/custody/OperateAsIndicator'
 import AppNavDrawer from './components/nav/AppNavDrawer'
 import AttentionFocus from './components/nav/AttentionFocus'
 
@@ -71,8 +70,9 @@ function AppLayout() {
               carries the matching `data-attention` marker, so the member can see the thing they
               searched for on a screen they may never have opened before. */}
           <AttentionFocus />
-          {/* Spec 043 (US3): persistent banner while operating as a vault, with switch-back. */}
-          <OperateAsIndicator />
+          {/* Spec 086: no operating-as banner for ANY acting account kind — the header wallet
+              avatar renders the acting identity, and every kind is treated equally. Switching
+              back lives in the account switcher, where switching always lived. */}
           {/* Spec 041: route a tapped push notification into in-app navigation. */}
           <ActivityNotificationBridge />
           {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}

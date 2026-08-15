@@ -8,7 +8,7 @@ import { useChainTokens } from '../../hooks/useChainTokens'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import TradePanel from '../fairwins/TradePanel'
 import PremiumPurchaseModal from './PremiumPurchaseModal'
-import BlockiesAvatar from './BlockiesAvatar'
+import AccountAvatar from '../account/AccountAvatar'
 import { buildIdentity } from '../../config/version'
 import './FairWinsUserModal.css'
 
@@ -113,7 +113,7 @@ function FairWinsUserModal() {
       {/* Header Section */}
       <header className="fwum-header">
         <div className="fwum-wallet-info">
-          <BlockiesAvatar address={address} size={48} className="fwum-avatar" />
+          <AccountAvatar address={address} size={48} className="fwum-avatar" />
           <div className="fwum-wallet-details">
             <span className="fwum-address">{shortenAddress(address)}</span>
             <span className="fwum-address-full">{address}</span>
