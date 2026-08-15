@@ -13,7 +13,17 @@ let initPromise = null
 
 async function getTrezorConnect() {
   const mod = await import('@trezor/connect-web')
-  const TrezorConnect = mod.default || mod
+  // The package ships CJS-flavored ESM, and bundler interop wraps it differently per build:
+  // the dev server hands the instance at `mod.default`, the production bundle at
+  // `mod.default.default` (double-default). Resolve by CAPABILITY — the object that actually
+  // has `.init` — because guessing the wrapper shape is exactly what broke in staging
+  // (`TypeError: init is not a function`, invisible behind the generic error sentence).
+  const TrezorConnect = [mod?.default?.default, mod?.default, mod].find(
+    (c) => c && typeof c.init === 'function',
+  )
+  if (!TrezorConnect) {
+    throw new HardwareWalletError(HW_ERROR_CODES.UNKNOWN, 'Trezor Connect failed to load in this browser.')
+  }
   if (!initPromise) {
     // Vendor-required identification of the integrating app (shown to the member in the Trezor
     // popup). Public values, not credentials — resolved from the tenant manifest (spec 072:
@@ -42,7 +52,10 @@ export function classifyTrezorError(payloadOrError) {
   if (code === 'Method_Interrupted' || text.includes('cancelled') || text.includes('canceled')) {
     return HW_ERROR_CODES.USER_CANCELLED
   }
-  if (text.includes('popup') || text.includes('permission')) return HW_ERROR_CODES.PERMISSION_DENIED
+  // "handshake failed" is the popup never completing its hello — in the field that is a blocked
+  // or prematurely closed popup (found in the staging investigation; see nodeShims.js header).
+  if (text.includes('popup') || text.includes('handshake')) return HW_ERROR_CODES.POPUP_BLOCKED
+  if (text.includes('permission')) return HW_ERROR_CODES.PERMISSION_DENIED
   if (text.includes('device disconnected') || text.includes('device not found') || text.includes('transport missing')) {
     return HW_ERROR_CODES.DISCONNECTED
   }

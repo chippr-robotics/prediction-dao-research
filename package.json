@@ -101,9 +101,6 @@
     "@openzeppelin/upgrades-core": "^1.44.2",
     "@safe-global/safe-contracts": "1.4.1",
     "@safe-global/safe-singleton-factory": "^2.0.0",
-    "@semaphore-protocol/group": "^4.14.2",
-    "@semaphore-protocol/identity": "^4.14.2",
-    "@semaphore-protocol/proof": "^4.14.2",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "@types/chai": "^4.3.20",
@@ -123,12 +120,18 @@
     "typechain": "^8.3.2",
     "typescript": "^7.0.2"
   },
-  "dependencies": {
-    "@semaphore-protocol/contracts": "^4.14.2"
-  },
   "overrides": {
     "@safe-global/safe-contracts": {
       "ethers": "$ethers"
+    },
+    "@ledgerhq/hw-app-eth": {
+      "axios": "^1.19.0"
+    },
+    "@ledgerhq/domain-service": {
+      "axios": "^1.19.0"
+    },
+    "@ledgerhq/evm-tools": {
+      "axios": "^1.19.0"
     },
     "elliptic": "^6.6.1",
     "lodash": "^4.18.0",

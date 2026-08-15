@@ -136,10 +136,40 @@ never a silent close, never a raw SDK message:
 | `user-cancelled` | the request was cancelled on the device |
 | `disconnected` | the device was disconnected — reconnect and try again |
 | `timeout` | the device did not respond in time |
+| `popup-blocked` | the vendor window could not open or did not respond — allow popups |
 | `unknown` | something went wrong talking to the device |
 
 `vendorAvailability` applies the same rule before anything connects: a vendor the browser cannot
 reach renders **disabled with the reason**, never as a dead control (FR-003).
+
+At the UI boundary, errors are rendered through **`reportHardwareError`**, not
+`describeHardwareError`: the member still sees only the sentence, but the RAW failure (with its
+`cause`) is logged as a `[hardware-add]` / `[hardware-connect]` console line. This exists because
+the first staging validation reported both vendors failing "with no relevant logs" — the sentence
+was honest, but the swallowed cause made the field report undiagnosable.
+
+## Node globals and bundler interop (the staging connect failures)
+
+Both vendors failed to connect in the first staging round, from two bundling gaps that no
+dev-side flow could reach (Cypress and the capture harness drive the test-adapter seam; only a
+real browser executing the BUILT bundle runs the vendor SDK bytes):
+
+1. **The SDKs assume Node globals.** `@ledgerhq/*` and `@trezor/*` call `Buffer.*` bare; Vite
+   externalizes the Node built-in to an empty stub, so the first device exchange threw
+   `ReferenceError: Buffer is not defined`. Fix: `lib/hardware/nodeShims.js#ensureNodeGlobals` —
+   `connectHardware` installs the npm `buffer` polyfill (and `global`) **before any vendor module
+   loads**. It is deliberately lazy: the rest of the app never gains a Buffer global to lean on.
+2. **Double-default interop.** In the production bundle `@trezor/connect-web`'s instance sits at
+   `mod.default.default` (dev serves it at `mod.default`), so `TrezorConnect.init` was
+   `undefined`. Fix: the adapter resolves the export **by capability** (the object that has
+   `.init`), never by wrapper shape.
+
+Both are pinned by `src/test/hardware/stagingRegressions.test.js`, and
+`scripts/ui/verify-hardware-bundle.mjs` proves the whole path against the built bundle served
+with the REAL nginx CSP/Permissions-Policy headers (run it after any dependency or build-config
+change touching this area). `frame-src` grants `https://connect.trezor.io` for the Connect
+bridge frame; `Permissions-Policy` needs no change (unlisted features like `hid`/`usb` keep
+their default `self` allowlist).
 
 ## The Protect accordion and deep links
 
