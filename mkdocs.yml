@@ -103,7 +103,6 @@ nav:
   - Developer Guide:
     - Setup: developer-guide/setup.md
     - Architecture: developer-guide/architecture.md
-    - Estate Diagrams: architecture/estate.md
     - Smart Contracts: developer-guide/smart-contracts.md
     - Frontend Development: developer-guide/frontend.md
     - ClearPath Multi-Network DAOs: developer-guide/clearpath-multi-network.md
