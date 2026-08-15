@@ -90,18 +90,46 @@ jobs:
               echo "\`TF_MODULES_TOKEN\` repository secret."
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+            # TRY EACH CREDENTIAL FORM. `x-access-token:` is the GitHub *App installation token*
+            # convention; a fine-grained PAT is not an installation token and does not always
+            # authenticate under it. Rather than assume which form is right and read the resulting
+            # 404 as "your token lacks access", try them and report which one actually worked —
+            # otherwise a wrong format here is indistinguishable from a mis-scoped token, and the
+            # person holding the token gets sent to fix something that was never broken.
+            # Probe with the credential INLINE, writing no git config until one works. The earlier
+            # version reconfigured and unset a global rewrite per attempt, which needed `|| true` on
+            # the unsets — and `|| true` in a merge-gating step is exactly what CiGates rejects.
+            # Probing inline removes the need entirely rather than working around the rule.
+            #
+            # `x-access-token:` is the GitHub *App installation token* convention; a fine-grained PAT
+            # is not an installation token and may not authenticate under it. Trying each form means
+            # a wrong URL format can no longer masquerade as a mis-scoped token — otherwise whoever
+            # holds the token gets sent to fix something that was never broken.
+            repo_path="chippr-robotics/chippr-tf-modules.git"
+            worked=""
+            form=""
+            err=""
+            for pair in "x-access-token|x-access-token:${token}" "oauth2|oauth2:${token}" "token-as-username|${token}"; do
+              label="${pair%%|*}"
+              form="${pair#*|}"
+              if err="$(git ls-remote "https://${form}@github.com/${repo_path}" HEAD 2>&1)"; then
+                worked="$label"
+                break
+              fi
+            done
 
-            # Preflight the credential. Without this a bad token surfaces three steps later as a
-            # terraform module-download failure, with the real cause buried under
-            # `Could not download module`. A token that is PRESENT but REJECTED is a different
-            # problem from one that is absent, and must not be reported as the same thing.
-            if err="$(git ls-remote https://github.com/chippr-robotics/chippr-tf-modules.git HEAD 2>&1)"; then
+            # git does NOT redact credentials from its error text, and this is echoed below.
+            err="${err//${token}/***}"
+
+            if [ -n "$worked" ]; then
+              git config --global url."https://${form}@github.com/".insteadOf "https://github.com/"
               echo "available=true" >> "$GITHUB_OUTPUT"
-              echo "Module repository reachable."
+              echo "Module repository reachable (credential form: ${worked})."
             else
               echo "available=false" >> "$GITHUB_OUTPUT"
-              echo "::error::TF_MODULES_TOKEN is set but cannot read chippr-robotics/chippr-tf-modules."
+              echo "::error::TF_MODULES_TOKEN cannot read chippr-robotics/chippr-tf-modules under ANY"
+              echo "::error::credential form (x-access-token:, oauth2:, or token-as-username), so this"
+              echo "::error::is the token's access rather than the URL format."
               case "$err" in
                 *"Invalid username or token"*|*"Authentication failed"*)
                   echo "::error::The token was REJECTED. A fine-grained PAT must list"
