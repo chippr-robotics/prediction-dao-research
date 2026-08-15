@@ -115,11 +115,9 @@ export default function VerifySection({ deps }) {
 
   return (
     <div className="verify-area">
-      <p className="custody-hint">
-        Prove you control an account, or check somebody else&apos;s proof. Nothing here moves funds
-        and nothing here is written to a chain.
-      </p>
-
+      {/* Spec 085 (FR-010): no intro paragraph — the section's accordion summary carries the
+          one-line state, and the full explanation lives in docs/developer-guide/message-signing.md.
+          The entry rows below are self-describing. */}
       <VerifyEntry
         title="Check a signature"
         summary={checkSummary?.text || 'Confirm an address signed a message'}
