@@ -241,12 +241,15 @@ describe('wallet.submit refusals', () => {
     expect(state.active.submit).not.toHaveBeenCalled()
   })
 
-  it('rejects a recovered account whose key is no longer unlocked', async () => {
-    state.active = { ...state.active, isLegacy: true, canActAsLegacy: false }
+  it('routes a locked recovered account through submit — the ceremony is deferred, never a refusal (spec 088)', async () => {
+    // The IDENTITY_LOCKED pre-gate is gone: submitAsActive obtains the acting signer on demand
+    // (the global SignerRequestHost renders the unlock dialog), so the host ROUTES the write and
+    // a member cancel rejects the individual send instead of the host refusing up front.
+    state.active = { ...state.active, isLegacy: true, canActAsLegacy: true }
     const { ref } = mountHost()
-    const error = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch((e) => e)
-    expect(error.reason).toBe(HOST_REFUSAL.IDENTITY_LOCKED)
-    expect(state.active.submit).not.toHaveBeenCalled()
+    const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+    expect(state.active.submit).toHaveBeenCalledTimes(1)
+    expect(result.kind).toBe('sent')
   })
 
   it('refuses to guess the network when the app does not name one', async () => {
