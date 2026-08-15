@@ -65,9 +65,16 @@ jobs:
       # see. Read that message as authentication before you go looking for a wrong path.
       - name: Check module repository access
         id: modules
+        env:
+          # Through `env:`, not interpolated straight into the script — see the note on the plan job's
+          # auth step. A secret spliced into shell source breaks on any newline it contains.
+          TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
         run: |
-          if [ -n "${{ secrets.TF_MODULES_TOKEN }}" ]; then
-            git config --global url."https://x-access-token:${{ secrets.TF_MODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          # Trim stray whitespace: a secret pasted with a trailing newline is invisible in the UI and
+          # yields `URL rejected: Malformed input to a URL function` from git.
+          token="$(printf '%s' "${TF_MODULES_TOKEN:-}" | tr -d '[:space:]')"
+          if [ -n "${token}" ]; then
+            git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
@@ -212,8 +219,22 @@ jobs:
       # permission error — GitHub returns 404 rather than 403 for a private repo the caller cannot
       # see. Read that message as authentication before you go looking for a wrong path.
       - name: Allow Terraform to fetch private modules
+        env:
+          # Through `env:`, not interpolated straight into the script. Interpolating a secret into a
+          # `run:` body splices its raw bytes into the shell source, so a value containing a newline
+          # breaks the command apart — which is exactly how this first failed, with git reporting
+          # `URL rejected: Malformed input to a URL function`.
+          TF_MODULES_TOKEN: ${{ secrets.TF_MODULES_TOKEN }}
         run: |
-          git config --global url."https://x-access-token:${{ secrets.TF_MODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          set -euo pipefail
+          # Trim stray whitespace. A secret pasted with a trailing newline is invisible in the UI and
+          # produces a URL git cannot parse.
+          token="$(printf '%s' "${TF_MODULES_TOKEN}" | tr -d '[:space:]')"
+          if [ -z "${token}" ]; then
+            echo "::error::TF_MODULES_TOKEN is empty. terraform init cannot fetch the private modules."
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
 
       - name: Init
         working-directory: infra/terraform/environments/${{ matrix.environment }}
