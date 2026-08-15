@@ -25,7 +25,7 @@ import { useAddressBook } from '../../hooks/useAddressBook'
 import { NETWORKS } from '../../config/networks'
 import { getReadProvider } from '../../utils/rpcProvider'
 import { connectHardware, vendorAvailability, VENDOR_LABELS } from '../../lib/hardware/adapters'
-import { describeHardwareError } from '../../lib/hardware/errors'
+import { reportHardwareError } from '../../lib/hardware/errors'
 import { defaultSchemeFor, pagePaths, PATH_SCHEMES } from '../../lib/hardware/derivations'
 import { hardwareWalletVault } from '../../lib/hardware/hardwareAccounts'
 import { captureHardwareAccountAdded } from '../../data/ledger/sources/hardwareWalletSource'
@@ -134,7 +134,7 @@ export default function AddHardwareWalletSheet({ open, onClose, onSaved, deps = 
       setOffset(PAGE_SIZE)
       setStep('pick')
     } catch (e) {
-      setError(describeHardwareError(e))
+      setError(reportHardwareError(e, 'hardware-add'))
     } finally {
       setBusy(false)
     }
@@ -149,7 +149,7 @@ export default function AddHardwareWalletSheet({ open, onClose, onSaved, deps = 
       setRows((r) => [...r, ...page])
       setOffset((o) => o + PAGE_SIZE)
     } catch (e) {
-      setError(describeHardwareError(e))
+      setError(reportHardwareError(e, 'hardware-add'))
     } finally {
       setBusy(false)
     }
@@ -168,7 +168,7 @@ export default function AddHardwareWalletSheet({ open, onClose, onSaved, deps = 
         setOffset(PAGE_SIZE)
       } catch (e) {
         setRows([])
-        setError(describeHardwareError(e))
+        setError(reportHardwareError(e, 'hardware-add'))
       } finally {
         setBusy(false)
       }
