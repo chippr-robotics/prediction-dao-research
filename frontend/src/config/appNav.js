@@ -14,15 +14,24 @@
 
 // Quick-access entry pinned to the top of the drawer list. `icon` is a NavIcon
 // name (see components/nav/NavIcon.jsx) — flat line glyphs, not emoji.
-export const HOME_ITEM = { id: 'home', label: 'Home', icon: 'home', to: '/app' }
+//
+// The LABEL is "Payments" and the id stays 'home': the dashboard is where a member pays and gets
+// paid, and the menu should say what the destination does rather than where it sits in the route
+// table. Renaming the id would break `/app`, the landing-view preference, saved deep links and
+// every `pathForNavItem('home')` caller for a wording change, so ids here are route identity and
+// labels are member-facing copy — they are deliberately allowed to differ. `navSearchIndex.js`
+// keeps 'home' as a search term so the old name still finds it.
+export const HOME_ITEM = { id: 'home', label: 'Payments', icon: 'home', to: '/app' }
 
-// Portfolio — pinned into Quick Access alongside Home (not a Finance section
+// Accounts — pinned into Quick Access alongside Payments (not a Finance section
 // item). It is now a VIEW inside the unified My Account experience rather than
 // its own `?tab=` (the account carousel + bottom view nav host it), so the item
 // keeps its 'portfolio' id but routes to `/wallet?tab=account&view=portfolio`
 // via pathForNavItem; the old `?tab=portfolio` deep link redirects there
-// (WalletPage TAB_REDIRECTS).
-export const PORTFOLIO_ITEM = { id: 'portfolio', label: 'Portfolio', icon: 'trending' }
+// (WalletPage TAB_REDIRECTS). Same id/label split as HOME_ITEM above: the drawer
+// says "Accounts" (what the member finds there — their accounts and what they
+// hold), the route keeps saying `portfolio`.
+export const PORTFOLIO_ITEM = { id: 'portfolio', label: 'Accounts', icon: 'trending' }
 
 /*
  * My Account views — the unified account experience (account card carousel on

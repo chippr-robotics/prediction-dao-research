@@ -55,7 +55,7 @@ describe('AppNavDrawer — collapsible sections (spec 081 US1)', () => {
     expect(screen.getByRole('button', { name: 'Trade' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Transfer' })).toBeInTheDocument()
     // Quick Access is open.
-    expect(screen.getByRole('button', { name: 'Portfolio' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Accounts' })).toBeInTheDocument()
 
     // Tools is folded: its items are UNMOUNTED, not merely hidden (research R2), so they are out
     // of the accessibility tree and the tab order too.

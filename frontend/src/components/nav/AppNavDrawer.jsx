@@ -59,14 +59,15 @@ import './AppNavDrawer.css'
  */
 const TAB_TO_MINIAPP = { tokens: 'apps', clearpath: 'apps' }
 
-// The drawer list = a top "Quick Access" group (Home, Portfolio) + the section groups. Built per
+// The drawer list = a top "Quick Access" group (Payments, Accounts — HOME_ITEM and PORTFOLIO_ITEM,
+// whose ids stay 'home'/'portfolio' because they are route identity) + the section groups. Built per
 // render because item visibility is chain-aware (spec 055: Collectibles hides entirely on
 // networks OpenSea doesn't serve or with no gateway configured).
 //
 // Favorited mini-apps used to be spliced into Quick Access here as full-width rows. Since spec
 // 081 they render as a separate horizontal strip above this list instead — pins are unbounded,
 // and the section meant to be the member's shortcut strip was the section pushing every other
-// group off the bottom of a phone screen. Home and Portfolio stay as rows: they are destinations
+// group off the bottom of a phone screen. Payments and Accounts stay as rows: they are destinations
 // the product ships, not shortcuts the member chose.
 //
 // Wagers used to be spliced into the Apps group here, because it was an absolute `/wagers` route

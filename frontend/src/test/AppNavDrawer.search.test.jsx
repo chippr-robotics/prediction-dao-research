@@ -172,7 +172,7 @@ describe('AppNavDrawer — menu filter (spec 081 US3)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand menu' }))
     expect(field()).toHaveValue('')
     // And the whole menu is back, not just what "recov" matched.
-    expect(rows()).toContain('Portfolio')
+    expect(rows()).toContain('Accounts')
   })
 
   it('offers the clear control only while the field has content', () => {
@@ -194,7 +194,7 @@ describe('AppNavDrawer — menu filter (spec 081 US3)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand menu' }))
 
     expect(field()).toHaveValue('')
-    expect(rows()).toContain('Portfolio')
+    expect(rows()).toContain('Accounts')
   })
 
   it('does not render the field in the collapsed desktop gutter', () => {
