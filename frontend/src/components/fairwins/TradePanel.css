@@ -3,17 +3,17 @@
    light/dark automatically, the same way Portfolio and Earn do. */
 
 .trade-panel {
-  --trade-surface: var(--surface-color, #ffffff);
-  --trade-surface-2: var(--bg-secondary, #f5f6f8);
-  --trade-text: var(--text-primary, #111827);
-  --trade-text-2: var(--text-secondary, #6b7280);
-  --trade-text-3: var(--text-muted, #9ca3af);
-  --trade-border: var(--border-color, #e5e7eb);
-  --trade-accent: var(--brand-primary, #36b37e);
-  --trade-accent-hover: var(--primary-button-hover, var(--brand-secondary, #2e9e6b));
-  --trade-success: var(--success-color, #48bb78);
-  --trade-warning: var(--warning-color, #d69e2e);
-  --trade-danger: var(--danger-color, #e5533d);
+  --trade-surface: var(--surface-color);
+  --trade-surface-2: var(--bg-secondary);
+  --trade-text: var(--text-primary);
+  --trade-text-2: var(--text-secondary);
+  --trade-text-3: var(--text-muted);
+  --trade-border: var(--border-color);
+  --trade-accent: var(--brand-primary);
+  --trade-accent-hover: var(--primary-button-hover, var(--brand-secondary));
+  --trade-success: var(--success-color);
+  --trade-warning: var(--warning-color);
+  --trade-danger: var(--danger-color);
 
   /* The panel is a frameless layout container — its parent tab already supplies
      the page padding, and the inner blocks (account, legs, summary) carry their
@@ -438,7 +438,7 @@ button.trade-rate .trade-summary-val {
   margin-top: 0.85rem;
   padding: 0.95rem;
   background: var(--trade-accent);
-  color: var(--primary-button-text, #ffffff);
+  color: var(--primary-button-text);
   border: none;
   border-radius: 12px;
   font-size: 1rem;

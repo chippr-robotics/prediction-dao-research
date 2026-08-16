@@ -6,7 +6,7 @@
   position: relative;
 }
 .asset-logo-badge {
-  border: 2px solid var(--surface-color, var(--bg-secondary, #fff));
+  border: 2px solid var(--surface-color, var(--bg-secondary));
   border-radius: 50%;
   bottom: -2px;
   height: 48%;

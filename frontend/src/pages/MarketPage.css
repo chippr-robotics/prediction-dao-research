@@ -88,7 +88,7 @@
 }
 
 .indicator.active {
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   width: 24px;
   border-radius: 4px;
 }
@@ -198,7 +198,7 @@
 
 .page-share-btn-new:hover {
   opacity: 0.7;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
 }
 
 .page-share-btn-new {
@@ -229,7 +229,7 @@
   justify-content: space-around;
   gap: 1rem;
   padding: 0.5rem;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   border-radius: 12px;
 }
 
@@ -259,7 +259,7 @@
 
 .outcome-btn {
   flex: 1;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   border: 2px solid var(--border-color);
   border-radius: 12px;
   padding: 0.75rem;
@@ -272,13 +272,13 @@
 }
 
 .outcome-btn:hover {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.15);
+  background: rgba(var(--brand-primary-rgb), 0.15);
 }
 
 .outcome-btn.selected {
-  background: rgba(var(--brand-primary, #36B37E), 0.2);
-  border-color: var(--brand-primary, #36B37E);
-  box-shadow: 0 0 20px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+  background: rgba(var(--brand-primary), 0.2);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 20px rgba(var(--brand-primary-rgb), 0.3);
 }
 
 .outcome-label {
@@ -305,7 +305,7 @@
 .order-type-toggle {
   display: flex;
   gap: 0.5rem;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   border-radius: 12px;
   padding: 0.25rem;
 }
@@ -328,8 +328,8 @@
 }
 
 .toggle-btn.active {
-  background: rgba(var(--brand-primary, #36B37E), 0.2);
-  color: var(--brand-primary, #36B37E);
+  background: rgba(var(--brand-primary), 0.2);
+  color: var(--brand-primary);
 }
 
 /* Order Form */
@@ -360,7 +360,7 @@
 }
 
 .form-input {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 0.625rem;
@@ -377,8 +377,8 @@
 
 .form-input:focus {
   outline: none;
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.15);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.15);
 }
 
 .form-input::placeholder {
@@ -400,11 +400,11 @@
 }
 
 .quick-action-btn {
-  background: rgba(var(--brand-primary, #36B37E), 0.1);
-  border: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+  background: rgba(var(--brand-primary), 0.1);
+  border: 1px solid rgba(var(--brand-primary-rgb), 0.3);
   border-radius: 8px;
   padding: 0.5rem 0.75rem;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -412,8 +412,8 @@
 }
 
 .quick-action-btn:hover {
-  background: rgba(var(--brand-primary, #36B37E), 0.2);
-  border-color: var(--brand-primary, #36B37E);
+  background: rgba(var(--brand-primary), 0.2);
+  border-color: var(--brand-primary);
   transform: translateY(-1px);
 }
 
@@ -449,7 +449,7 @@
   font-size: 0.875rem;
   color: var(--text-secondary);
   padding: 0.5rem;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   border-radius: 8px;
 }
 
@@ -459,7 +459,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   border-radius: 12px;
 }
 
@@ -489,7 +489,7 @@
 .total-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
 }
 
 /* Disclaimer text */
@@ -503,7 +503,7 @@
 
 /* Send Button */
 .send-btn {
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   border: none;
   border-radius: 12px;
   padding: 0.875rem;
@@ -515,13 +515,13 @@
 }
 
 .send-btn:hover:not(:disabled) {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.4);
+  box-shadow: 0 4px 12px rgba(var(--brand-primary-rgb), 0.4);
 }
 
 .send-btn:disabled {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+  background: rgba(var(--brand-primary-rgb), 0.3);
   color: var(--text-secondary);
   cursor: not-allowed;
   opacity: 0.5;

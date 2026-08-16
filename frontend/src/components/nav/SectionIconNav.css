@@ -12,8 +12,8 @@
   align-items: stretch;
   gap: 2px;
   padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
-  background: var(--bg-secondary, var(--color-surface, #fff));
-  border-top: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  background: var(--bg-secondary, var(--color-surface));
+  border-top: 1px solid var(--border-color, var(--color-border));
   box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.08);
   overflow-x: auto;
 }
@@ -28,8 +28,8 @@
   left: 0;
   z-index: 0;
   border-radius: 10px;
-  background: var(--brand-primary, var(--color-primary, #36B37E));
-  box-shadow: 0 4px 10px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.35);
+  background: var(--brand-primary, var(--color-primary, var(--brand-primary)));
+  box-shadow: 0 4px 10px rgba(var(--brand-primary-rgb), 0.35);
   transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.25s ease, height 0.25s ease;
   pointer-events: none;
 }
@@ -47,17 +47,17 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--text-muted, var(--color-text-secondary, #8A959E));
+  color: var(--text-muted, var(--color-text-secondary, var(--text-muted)));
   cursor: pointer;
   transition: color 0.2s ease, background 0.15s ease;
 }
 
 .section-icon-nav-item:not(.active):hover {
-  background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.04)));
+  background: var(--bg-primary, var(--color-surface-hover));
 }
 
 .section-icon-nav-item.active {
-  color: var(--brand-primary, var(--color-primary, #36B37E));
+  color: var(--brand-primary, var(--color-primary, var(--brand-primary)));
 }
 
 .section-icon-nav-item:focus-visible {
@@ -66,7 +66,7 @@
 
 .section-icon-nav-item:focus-visible .section-icon-nav-icon {
   border-radius: 10px;
-  box-shadow: 0 0 0 2px var(--bg-secondary, var(--color-surface, #fff)), 0 0 0 4px var(--brand-primary, var(--color-primary, #36B37E));
+  box-shadow: 0 0 0 2px var(--bg-secondary, var(--color-surface)), 0 0 0 4px var(--brand-primary, var(--color-primary, var(--brand-primary)));
 }
 
 .section-icon-nav-icon {

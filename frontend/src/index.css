@@ -1,6 +1,9 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  /* Inter is the brand's text/UI face (Chippr Brand Guidelines v1.0 slide 12).
+     The stack ends in a platform fallback so a failed font load degrades
+     rather than blanks — see src/styles/fonts.css. */
+  font-family: var(--font-sans);
+  line-height: var(--leading-body, 1.625);
   font-weight: 400;
 
   font-synthesis: none;
@@ -48,7 +51,10 @@ body {
 
 a {
   font-weight: 500;
-  color: var(--brand-primary);
+  /* Teal 700, NOT Chippr Teal. The guidelines' own measured table puts Chippr
+     Teal at 4.7:1 on white and annotates it "18px+ / bold 14px+" — links are
+     body-sized, so they take the 7.8:1 anchor instead (spec 090 FR-017). */
+  color: var(--accent-color);
   text-decoration: inherit;
 }
 a:hover {
@@ -65,9 +71,43 @@ body {
   color: var(--text-primary);
 }
 
+/* Web type hierarchy — Chippr Brand Guidelines v1.0 slide 13.
+   1.25 major third from a 16px base; rem sizes, unitless line-heights.
+   Headings take the display face; H4 is already Inter per the guidelines. */
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  font-family: var(--font-display);
+  font-size: var(--text-h1);
+  line-height: var(--leading-h1);
+  font-weight: var(--weight-h1);
+  letter-spacing: var(--tracking-h1);
+}
+
+h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: var(--weight-h2);
+}
+
+h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  line-height: var(--leading-h3);
+  font-weight: var(--weight-h3);
+}
+
+h4 {
+  font-family: var(--font-sans);
+  font-size: var(--text-h4);
+  line-height: var(--leading-h4);
+  font-weight: var(--weight-h4);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
 }
 
 button {
@@ -94,8 +134,20 @@ button:focus-visible {
    `box-sizing: border-box`, subtracts ~38px of horizontal padding from
    fixed-size icon buttons (e.g. 32-36px close/refresh/QR controls). That
    collapses the content box to zero width and squeezes the SVG out of view,
-   leaving an empty square. Reset padding when the button's only element child
-   is an <svg> so text buttons keep their default padding. */
+   leaving an empty square.
+
+   CAREFUL — `:only-child` counts ELEMENT children only, so
+   `<button><svg/>Label</button>` matches too: the svg really is the only
+   element, and the text node does not count. Such a button loses its padding
+   and its label spills out of the control. The spec-090 screenshot round caught
+   exactly that on "＋ New statement" in Reporting.
+
+   The fix belongs in the MARKUP, not here: an icon+text button wraps its label
+   in a <span> so the svg stops being an only child and the selector means what
+   it says. Lowering this rule's specificity instead (`:where()`) was tried and
+   is wrong — the six icon-only controls in the app (keypad keys, the bell, the
+   scan and infotip buttons, the drawer toggle) set their own padding, so a
+   weaker rule lets that padding back in and collapses every one of them. */
 button:has(> svg:only-child) {
   padding: 0;
 }

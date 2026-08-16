@@ -5,7 +5,7 @@ description: Work with this repo's npm workspaces — add or change a dependency
 
 # Working in the FairWins monorepo (spec 075)
 
-One root lockfile, 8 workspace members. Everything below was learned by it going wrong.
+One root lockfile, 10 workspace members. Everything below was learned by it going wrong.
 
 ## Members — use the REAL names
 
@@ -19,10 +19,12 @@ One root lockfile, 8 workspace members. Everything below was learned by it going
 | `frontend/miniapps/token-mint` | `@fairwins/miniapp-token-mint` |
 | `frontend/miniapps/clearpath` | `@fairwins/miniapp-clearpath` |
 | `services/relay-gateway` | `fairwins-relay-gateway` |
+| `services/finops-exporter` | `fairwins-finops-exporter` |
 | `subgraph` | `prediction-dao-research-subgraph` |
 | `tools/miniapp-build` | `@fairwins/miniapp-build` |
 | `packages/abi` | `@fairwins/abi` |
 | `packages/intent-types` | `@fairwins/intent-types` |
+| `packages/finops-catalogue` | `@fairwins/finops-catalogue` |
 
 `contracts/` is deliberately NOT a member — it is not an npm package, it is the root project's
 single compilation unit. It cannot be split (see `specs/075-monorepo-workspaces/research.md` R2).

@@ -42,7 +42,7 @@
   width: 100%;
   max-width: 720px;
   max-height: 90vh;
-  background: var(--bg-secondary, #ffffff);
+  background: var(--bg-secondary);
   border-radius: var(--radius-lg, 16px);
   box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
   display: flex;
@@ -71,8 +71,8 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 1.5rem 1.5rem 1rem;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
-  background: var(--bg-primary, #f8fafc);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
 }
 
 .ppm-header-content {
@@ -83,13 +83,13 @@
   margin: 0;
   font-size: 1.375rem;
   font-weight: 700;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-subtitle {
   margin: 0.25rem 0 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-close-btn {
@@ -101,7 +101,7 @@
   background: transparent;
   border: none;
   border-radius: var(--radius-md, 8px);
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
   font-size: 1.5rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -109,8 +109,8 @@
 }
 
 .ppm-close-btn:hover:not(:disabled) {
-  background: var(--bg-secondary, #ffffff);
-  color: var(--text-primary, #1a202c);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .ppm-close-btn:disabled {
@@ -124,8 +124,8 @@
 
 .ppm-steps {
   display: flex;
-  background: var(--bg-secondary, #ffffff);
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   padding: 0;
 }
 
@@ -139,23 +139,23 @@
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  color: var(--text-tertiary, #a0aec0);
+  color: var(--text-tertiary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .ppm-step:hover:not(:disabled) {
-  color: var(--text-secondary, #718096);
-  background: var(--bg-primary, #f8fafc);
+  color: var(--text-secondary);
+  background: var(--bg-primary);
 }
 
 .ppm-step.active {
-  color: var(--brand-primary, #36B37E);
-  border-bottom-color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
+  border-bottom-color: var(--brand-primary);
 }
 
 .ppm-step.completed {
-  color: var(--success-color, #48bb78);
+  color: var(--success-color);
 }
 
 .ppm-step:disabled {
@@ -171,17 +171,17 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--bg-primary, #f8fafc);
+  background: var(--bg-primary);
   font-weight: 600;
 }
 
 .ppm-step.active .ppm-step-icon {
-  background: rgba(54, 179, 126, 0.1);
-  color: var(--brand-primary, #36B37E);
+  background: rgba(var(--brand-primary-rgb), 0.1);
+  color: var(--brand-primary);
 }
 
 .ppm-step.completed .ppm-step-icon {
-  background: var(--success-color, #48bb78);
+  background: var(--success-color);
   color: white;
 }
 
@@ -228,7 +228,7 @@
   margin: 0 0 0.5rem;
   font-size: 1.0625rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-section-title span {
@@ -238,7 +238,7 @@
 .ppm-section-desc {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -254,22 +254,22 @@
 
 .ppm-role-card {
   position: relative;
-  background: var(--bg-primary, #f8fafc);
-  border: 2px solid var(--border-color, #e2e8f0);
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-lg, 12px);
   transition: all 0.2s ease;
   overflow: hidden;
 }
 
 .ppm-role-card:hover:not(.owned) {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .ppm-role-card.selected {
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.03);
-  box-shadow: 0 4px 16px rgba(54, 179, 126, 0.15);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.03);
+  box-shadow: 0 4px 16px rgba(var(--brand-primary-rgb), 0.15);
 }
 
 .ppm-role-card.owned {
@@ -293,7 +293,7 @@
   right: 1.25rem;
   width: 22px;
   height: 22px;
-  accent-color: var(--brand-primary, #36B37E);
+  accent-color: var(--brand-primary);
   cursor: pointer;
 }
 
@@ -315,7 +315,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-secondary, #ffffff);
+  background: var(--bg-secondary);
   border-radius: var(--radius-md, 8px);
   flex-shrink: 0;
 }
@@ -329,20 +329,20 @@
   display: block;
   font-size: 1.0625rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
   margin-bottom: 0.125rem;
 }
 
 .ppm-role-tagline {
   display: block;
   font-size: 0.8125rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-role-price {
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
   white-space: nowrap;
 }
 
@@ -359,8 +359,8 @@
   padding: 0.25rem 0.625rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--info-color, #4299e1);
-  background: rgba(66, 153, 225, 0.1);
+  color: var(--info-color);
+  background: rgba(var(--info-color-rgb), 0.1);
   border-radius: 20px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -377,28 +377,28 @@
   align-items: flex-start;
   gap: 0.5rem;
   font-size: 0.8125rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
   margin-bottom: 0.375rem;
   line-height: 1.4;
 }
 
 .ppm-feature-check {
-  color: var(--success-color, #48bb78);
+  color: var(--success-color);
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .ppm-role-funds {
   padding: 0.75rem;
-  background: var(--bg-secondary, #ffffff);
+  background: var(--bg-secondary);
   border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--border-color, #e2e8f0);
+  border: 1px solid var(--border-color);
 }
 
 .ppm-funds-label {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: var(--text-tertiary, #a0aec0);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -407,14 +407,14 @@
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
   margin-top: 0.125rem;
 }
 
 .ppm-funds-usage {
   margin: 0.25rem 0 0;
   font-size: 0.75rem;
-  color: var(--text-tertiary, #a0aec0);
+  color: var(--text-tertiary);
   line-height: 1.4;
 }
 
@@ -423,7 +423,7 @@
   top: 0;
   right: 0;
   padding: 0.5rem 1rem;
-  background: var(--success-color, #48bb78);
+  background: var(--success-color);
   color: white;
   font-size: 0.75rem;
   font-weight: 600;
@@ -438,8 +438,8 @@
   display: flex;
   gap: 0.875rem;
   padding: 1rem 1.25rem;
-  background: linear-gradient(135deg, rgba(54, 179, 126, 0.08), rgba(102, 126, 234, 0.08));
-  border: 1px solid rgba(54, 179, 126, 0.2);
+  background: linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.08), rgba(102, 126, 234, 0.08));
+  border: 1px solid rgba(var(--brand-primary-rgb), 0.2);
   border-radius: var(--radius-md, 8px);
   margin-top: 1.25rem;
 }
@@ -452,14 +452,14 @@
 .ppm-bundle-info strong {
   display: block;
   font-size: 0.9375rem;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
 .ppm-bundle-info p {
   margin: 0;
   font-size: 0.8125rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -470,8 +470,8 @@
 .ppm-pricing-summary {
   margin-top: 1.25rem;
   padding: 1rem 1.25rem;
-  background: var(--bg-primary, #f8fafc);
-  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md, 8px);
 }
 
@@ -481,20 +481,20 @@
   align-items: center;
   padding: 0.5rem 0;
   font-size: 0.9375rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-pricing-row.ppm-discount {
-  color: var(--success-color, #48bb78);
+  color: var(--success-color);
 }
 
 .ppm-pricing-row.ppm-total {
   padding-top: 0.75rem;
   margin-top: 0.5rem;
-  border-top: 1px solid var(--border-color, #e2e8f0);
+  border-top: 1px solid var(--border-color);
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 /* ===========================
@@ -512,25 +512,25 @@
   display: flex;
   align-items: flex-start;
   padding: 1.25rem;
-  background: var(--bg-primary, #f8fafc);
-  border: 2px solid var(--border-color, #e2e8f0);
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .ppm-recipient-card:hover {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
 }
 
 .ppm-recipient-card.selected {
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.03);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.03);
 }
 
 .ppm-recipient-card input[type="radio"] {
   margin-top: 0.25rem;
-  accent-color: var(--brand-primary, #36B37E);
+  accent-color: var(--brand-primary);
 }
 
 .ppm-recipient-content {
@@ -549,14 +549,14 @@
 .ppm-recipient-content strong {
   display: block;
   font-size: 0.9375rem;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
 .ppm-recipient-content p {
   margin: 0;
   font-size: 0.8125rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-address-preview {
@@ -564,10 +564,10 @@
   margin-top: 0.5rem;
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-  background: var(--bg-secondary, #ffffff);
+  font-family: var(--font-mono);
+  background: var(--bg-secondary);
   border-radius: var(--radius-sm, 4px);
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 /* ===========================
@@ -586,7 +586,7 @@
   display: block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
@@ -600,9 +600,9 @@
   padding: 0.75rem 1rem;
   font-size: 0.9375rem;
   font-family: inherit;
-  color: var(--text-primary, #1a202c);
-  background: var(--bg-primary, #f8fafc);
-  border: 2px solid var(--border-color, #e2e8f0);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-md, 8px);
   transition: all 0.2s ease;
   outline: none;
@@ -610,8 +610,8 @@
 
 .ppm-field input:focus,
 .ppm-field textarea:focus {
-  border-color: var(--brand-primary, #36B37E);
-  box-shadow: 0 0 0 3px rgba(54, 179, 126, 0.15);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.15);
 }
 
 .ppm-field input.error,
@@ -628,12 +628,12 @@
 .ppm-field textarea {
   resize: vertical;
   min-height: 80px;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
 .ppm-hint {
   font-size: 0.8125rem;
-  color: var(--text-tertiary, #a0aec0);
+  color: var(--text-tertiary);
   margin-top: 0.375rem;
   line-height: 1.4;
 }
@@ -661,7 +661,7 @@
 .ppm-zk-section {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color, #e2e8f0);
+  border-top: 1px solid var(--border-color);
 }
 
 /* ===========================
@@ -673,8 +673,8 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 1rem;
-  background: rgba(66, 153, 225, 0.08);
-  border-left: 3px solid var(--info-color, #4299e1);
+  background: rgba(var(--info-color-rgb), 0.08);
+  border-left: 3px solid var(--info-color);
   border-radius: var(--radius-md, 8px);
   margin-bottom: 1rem;
 }
@@ -687,14 +687,14 @@
 .ppm-info-card strong {
   display: block;
   font-size: 0.875rem;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
 .ppm-info-card p {
   margin: 0;
   font-size: 0.8125rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -706,8 +706,8 @@
   display: flex;
   gap: 0.875rem;
   padding: 1.25rem;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(var(--warning-color-rgb), 0.08);
+  border: 1px solid rgba(var(--warning-color-rgb), 0.3);
   border-radius: var(--radius-md, 8px);
   margin-bottom: 1.5rem;
 }
@@ -732,7 +732,7 @@
 
 .ppm-warning-content li {
   font-size: 0.875rem;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
   line-height: 1.6;
   margin-bottom: 0.25rem;
 }
@@ -748,8 +748,8 @@
    =========================== */
 
 .ppm-review-card {
-  background: var(--bg-primary, #f8fafc);
-  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg, 12px);
   overflow: hidden;
 }
@@ -759,9 +759,9 @@
   padding: 1rem 1.25rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
-  background: var(--bg-secondary, #ffffff);
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -771,13 +771,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .ppm-review-label {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-tertiary, #a0aec0);
+  color: var(--text-tertiary);
 }
 
 .ppm-review-value {
@@ -785,33 +785,33 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-review-value code {
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.8125rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-recipient-badge {
   padding: 0.25rem 0.5rem;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.1);
+  color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   border-radius: 4px;
   text-transform: uppercase;
 }
 
 .ppm-recipient-badge.ppm-gift {
-  color: var(--info-color, #4299e1);
-  background: rgba(66, 153, 225, 0.1);
+  color: var(--info-color);
+  background: rgba(var(--info-color-rgb), 0.1);
 }
 
 .ppm-review-roles {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .ppm-review-roles .ppm-review-label {
@@ -829,7 +829,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem;
-  background: var(--bg-secondary, #ffffff);
+  background: var(--bg-secondary);
   border-radius: var(--radius-md, 8px);
 }
 
@@ -847,24 +847,24 @@
   display: block;
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-review-role-duration {
   display: block;
   font-size: 0.75rem;
-  color: var(--text-tertiary, #a0aec0);
+  color: var(--text-tertiary);
 }
 
 .ppm-review-role-price {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-review-pricing {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .ppm-review-pricing-row {
@@ -873,11 +873,11 @@
   align-items: center;
   padding: 0.375rem 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-review-pricing-row.ppm-discount {
-  color: var(--success-color, #48bb78);
+  color: var(--success-color);
 }
 
 .ppm-discount-amount {
@@ -887,10 +887,10 @@
 .ppm-review-pricing-row.ppm-total {
   padding-top: 0.625rem;
   margin-top: 0.375rem;
-  border-top: 1px dashed var(--border-color, #e2e8f0);
+  border-top: 1px dashed var(--border-color);
   font-size: 1.0625rem;
   font-weight: 700;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-review-funds-info {
@@ -898,7 +898,7 @@
   align-items: flex-start;
   gap: 0.625rem;
   padding: 1rem 1.25rem;
-  background: rgba(54, 179, 126, 0.05);
+  background: rgba(var(--brand-primary-rgb), 0.05);
 }
 
 .ppm-funds-icon {
@@ -909,12 +909,12 @@
 .ppm-review-funds-info p {
   margin: 0;
   font-size: 0.8125rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .ppm-review-funds-info strong {
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 /* ===========================
@@ -927,8 +927,8 @@
   gap: 0.75rem;
   align-items: flex-start;
   padding: 1rem;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid #f59e0b;
+  background: rgba(var(--warning-color-rgb), 0.08);
+  border: 1px solid var(--warning-color);
   border-radius: var(--radius-md, 8px);
   margin-top: 1rem;
 }
@@ -950,7 +950,7 @@
 .ppm-connect-warning p {
   margin: 0 0 0.75rem;
   font-size: 0.875rem;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-network-warning button {
@@ -958,7 +958,7 @@
   font-size: 0.875rem;
   font-weight: 600;
   color: #000;
-  background: #f59e0b;
+  background: var(--warning-color);
   border: none;
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
@@ -986,13 +986,13 @@
   margin: 0 0 0.5rem;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-complete-desc {
   margin: 0 0 1.5rem;
   font-size: 0.9375rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-purchase-results {
@@ -1008,12 +1008,12 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.875rem 1rem;
-  background: var(--bg-primary, #f8fafc);
+  background: var(--bg-primary);
   border-radius: var(--radius-md, 8px);
 }
 
 .ppm-result-item.success {
-  border-left: 3px solid var(--success-color, #48bb78);
+  border-left: 3px solid var(--success-color);
 }
 
 .ppm-result-item.failed {
@@ -1032,8 +1032,8 @@
 }
 
 .ppm-result-item.success .ppm-result-icon {
-  background: rgba(72, 187, 120, 0.1);
-  color: var(--success-color, #48bb78);
+  background: rgba(var(--success-color-rgb), 0.1);
+  color: var(--success-color);
 }
 
 .ppm-result-item.failed .ppm-result-icon {
@@ -1050,12 +1050,12 @@
   display: block;
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-result-status {
   font-size: 0.8125rem;
-  color: var(--success-color, #48bb78);
+  color: var(--success-color);
 }
 
 .ppm-result-error {
@@ -1066,7 +1066,7 @@
 .ppm-tx-link {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
   text-decoration: none;
 }
 
@@ -1080,7 +1080,7 @@
 
 .ppm-whats-next {
   text-align: left;
-  background: var(--bg-primary, #f8fafc);
+  background: var(--bg-primary);
   border-radius: var(--radius-md, 8px);
   padding: 1.25rem;
 }
@@ -1089,7 +1089,7 @@
   margin: 0 0 0.875rem;
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-whats-next ul {
@@ -1104,7 +1104,7 @@
   gap: 0.625rem;
   padding: 0.5rem 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-whats-next li span {
@@ -1120,8 +1120,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  border-top: 1px solid var(--border-color, #e2e8f0);
-  background: var(--bg-primary, #f8fafc);
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
 }
 
 .ppm-footer-left,
@@ -1134,17 +1134,17 @@
   padding: 0.75rem 1.25rem;
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
-  background: var(--bg-secondary, #ffffff);
-  border: 2px solid var(--border-color, #e2e8f0);
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .ppm-btn-secondary:hover:not(:disabled) {
-  border-color: var(--text-secondary, #718096);
-  background: var(--bg-primary, #f8fafc);
+  border-color: var(--text-secondary);
+  background: var(--bg-primary);
 }
 
 .ppm-btn-secondary:disabled {
@@ -1157,7 +1157,7 @@
   font-size: 0.9375rem;
   font-weight: 600;
   color: white;
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
@@ -1165,9 +1165,9 @@
 }
 
 .ppm-btn-primary:hover:not(:disabled) {
-  background: var(--primary-button-hover, #2f9e6e);
+  background: var(--primary-button-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(54, 179, 126, 0.3);
+  box-shadow: 0 4px 12px rgba(var(--brand-primary-rgb), 0.3);
 }
 
 .ppm-btn-primary:active:not(:disabled) {
@@ -1210,15 +1210,15 @@
   justify-content: center;
   padding: 3rem 1rem;
   gap: 1rem;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 
 .ppm-loading-tiers .ppm-spinner {
   width: 32px;
   height: 32px;
   border-width: 3px;
-  border-color: var(--border-color, #e2e8f0);
-  border-top-color: var(--brand-primary, #36b37e);
+  border-color: var(--border-color);
+  border-top-color: var(--brand-primary);
 }
 
 .ppm-loading-tiers p {
@@ -1233,8 +1233,8 @@
      vars were undefined) forced a light box, leaving the light dark-theme text
      illegible. Text colour keeps flowing from the theme-aware `.ppm-info-card`
      rules. */
-  background: rgba(59, 130, 246, 0.1);
-  border-color: var(--info-color, #3b82f6);
+  background: rgba(var(--info-color-rgb), 0.1);
+  border-color: var(--info-color);
 }
 
 .ppm-current-tier-info .ppm-tier-badge {
@@ -1247,25 +1247,25 @@
    =========================== */
 
 :root.theme-dark .ppm-modal {
-  background: var(--bg-secondary, #1a202c);
+  background: var(--bg-secondary);
 }
 
 :root.theme-dark .ppm-header {
-  background: var(--bg-primary, #2d3748);
-  border-color: var(--border-color, #4a5568);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
 }
 
 :root.theme-dark .ppm-steps {
-  background: var(--bg-secondary, #1a202c);
-  border-color: var(--border-color, #4a5568);
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
 }
 
 :root.theme-dark .ppm-step:hover:not(:disabled) {
-  background: var(--bg-primary, #2d3748);
+  background: var(--bg-primary);
 }
 
 :root.theme-dark .ppm-step-icon {
-  background: var(--bg-primary, #2d3748);
+  background: var(--bg-primary);
 }
 
 :root.theme-dark .ppm-role-card,
@@ -1276,31 +1276,31 @@
 :root.theme-dark .ppm-review-card,
 :root.theme-dark .ppm-result-item,
 :root.theme-dark .ppm-whats-next {
-  background: var(--bg-primary, #2d3748);
-  border-color: var(--border-color, #4a5568);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
 }
 
 :root.theme-dark .ppm-role-icon,
 :root.theme-dark .ppm-role-funds,
 :root.theme-dark .ppm-review-card h4,
 :root.theme-dark .ppm-review-role-item {
-  background: var(--bg-secondary, #1a202c);
-  border-color: var(--border-color, #4a5568);
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
 }
 
 :root.theme-dark .ppm-footer {
-  background: var(--bg-primary, #2d3748);
-  border-color: var(--border-color, #4a5568);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
 }
 
 :root.theme-dark .ppm-btn-secondary {
-  background: var(--bg-primary, #2d3748);
-  border-color: var(--border-color, #4a5568);
-  color: var(--text-primary, #f7fafc);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 :root.theme-dark .ppm-btn-secondary:hover:not(:disabled) {
-  background: var(--bg-secondary, #1a202c);
+  background: var(--bg-secondary);
 }
 
 /* ===========================
@@ -1317,22 +1317,22 @@
 .ppm-tier-card {
   position: relative;
   padding: 1.25rem;
-  background: var(--bg-primary, #f8fafc);
-  border: 2px solid var(--border-color, #e2e8f0);
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-md, 12px);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .ppm-tier-card:hover {
-  border-color: var(--tier-color, var(--primary, #4299e1));
-  background: var(--bg-secondary, #ffffff);
+  border-color: var(--tier-color, var(--primary));
+  background: var(--bg-secondary);
 }
 
 .ppm-tier-card.selected {
-  border-color: var(--tier-color, var(--primary, #4299e1));
-  background: var(--bg-secondary, #ffffff);
-  box-shadow: 0 0 0 2px var(--tier-color, var(--primary, #4299e1));
+  border-color: var(--tier-color, var(--primary));
+  background: var(--bg-secondary);
+  box-shadow: 0 0 0 2px var(--tier-color, var(--primary));
 }
 
 .ppm-tier-radio {
@@ -1367,7 +1367,7 @@
 .ppm-tier-price {
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--primary, #4299e1);
+  color: var(--primary);
 }
 
 .ppm-tier-limits {
@@ -1386,12 +1386,12 @@
 }
 
 .ppm-limit-label {
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-limit-value {
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-tier-features {
@@ -1405,12 +1405,12 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
   margin-bottom: 0.25rem;
 }
 
 .ppm-tier-features li .ppm-feature-check {
-  color: var(--success, #48bb78);
+  color: var(--success);
   font-size: 0.75rem;
 }
 
@@ -1420,7 +1420,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .ppm-review-tier .ppm-tier-badge {
@@ -1430,7 +1430,7 @@
 
 /* Tier Summary in Complete Step */
 .ppm-tier-summary {
-  background: var(--bg-primary, #f8fafc);
+  background: var(--bg-primary);
   padding: 1.25rem;
   border-radius: var(--radius-md, 12px);
   margin-bottom: 1.5rem;
@@ -1440,7 +1440,7 @@
   margin: 0 0 1rem;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-tier-summary ul {
@@ -1450,7 +1450,7 @@
 
 .ppm-tier-summary li {
   margin-bottom: 0.5rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 /* Multi-role benefits display */
@@ -1462,9 +1462,9 @@
 
 .ppm-role-benefit-section {
   padding: 0.75rem;
-  background: var(--bg-secondary, #f1f5f9);
+  background: var(--bg-secondary);
   border-radius: var(--radius-sm, 6px);
-  border-left: 3px solid var(--tier-color, #4299e1);
+  border-left: 3px solid var(--tier-color);
 }
 
 .ppm-role-benefit-section h5 {
@@ -1474,12 +1474,12 @@
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 .ppm-role-summary-section {
   padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .ppm-role-summary-section:last-child {
@@ -1494,7 +1494,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--text-primary, #1a202c);
+  color: var(--text-primary);
 }
 
 /* ===========================
@@ -1647,13 +1647,13 @@
 }
 
 .ppm-key-reg-success {
-  background: rgba(72, 187, 120, 0.08);
-  border-left-color: var(--success-color, #48bb78);
+  background: rgba(var(--success-color-rgb), 0.08);
+  border-left-color: var(--success-color);
 }
 
 .ppm-key-reg-warn {
-  background: rgba(245, 158, 11, 0.08);
-  border-left-color: var(--warning-color, #f59e0b);
+  background: rgba(var(--warning-color-rgb), 0.08);
+  border-left-color: var(--warning-color);
 }
 
 @media print {
@@ -1694,21 +1694,21 @@
 .ppm-progress-position {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-progress-bar {
   width: 100%;
   height: 6px;
   border-radius: 999px;
-  background: var(--bg-primary, #f8fafc);
+  background: var(--bg-primary);
   overflow: hidden;
 }
 
 .ppm-progress-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   transition: width 0.3s ease;
 }
 
@@ -1726,16 +1726,16 @@
   gap: 0.75rem;
   align-items: flex-start;
   padding: 0.75rem;
-  border: 1px solid var(--border-color, #e2e8f0);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
-  background: var(--bg-secondary, #ffffff);
+  background: var(--bg-secondary);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .ppm-progress-step--active,
 .ppm-progress-step--confirming {
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.06);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.06);
 }
 
 .ppm-progress-step--completed {
@@ -1743,7 +1743,7 @@
 }
 
 .ppm-progress-step--failed {
-  border-color: var(--error-color, #e53e3e);
+  border-color: var(--error-color);
   background: rgba(229, 62, 62, 0.06);
 }
 
@@ -1755,19 +1755,19 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--bg-primary, #f8fafc);
-  color: var(--text-tertiary, #a0aec0);
+  background: var(--bg-primary);
+  color: var(--text-tertiary);
   font-weight: 700;
   font-size: 0.9rem;
 }
 
 .ppm-progress-step--completed .ppm-progress-step-icon {
-  background: var(--success-color, #48bb78);
+  background: var(--success-color);
   color: #fff;
 }
 
 .ppm-progress-step--failed .ppm-progress-step-icon {
-  background: var(--error-color, #e53e3e);
+  background: var(--error-color);
   color: #fff;
 }
 
@@ -1780,7 +1780,7 @@
 
 .ppm-progress-step-label {
   font-weight: 600;
-  color: var(--text-primary, #2d3748);
+  color: var(--text-primary);
 }
 
 .ppm-progress-step-kind {
@@ -1788,26 +1788,26 @@
   font-weight: 600;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  color: var(--text-tertiary, #a0aec0);
+  color: var(--text-tertiary);
 }
 
 .ppm-progress-step-kind--signature {
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
 }
 
 .ppm-progress-step-detail {
   font-size: 0.82rem;
-  color: var(--text-secondary, #718096);
+  color: var(--text-secondary);
 }
 
 .ppm-progress-step-status {
   font-size: 0.8rem;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
 }
 
 .ppm-progress-step-error {
   font-size: 0.82rem;
-  color: var(--error-color, #e53e3e);
+  color: var(--error-color);
 }
 
 .ppm-progress-actions {
@@ -1818,13 +1818,13 @@
 
 /* Dark theme */
 :root.theme-dark .ppm-progress-step {
-  background: var(--bg-secondary, #1a202c);
-  border-color: var(--border-color, #2d3748);
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
 }
 
 :root.theme-dark .ppm-progress-bar,
 :root.theme-dark .ppm-progress-step-icon {
-  background: var(--bg-primary, #171923);
+  background: var(--bg-primary);
 }
 
 /* Reduced motion */
@@ -1838,11 +1838,11 @@
 .ppm-voucher-alt {
   margin-top: 1rem;
   padding-top: 1.25rem;
-  border-top: 1px dashed var(--border-color, #2d3748);
+  border-top: 1px dashed var(--border-color);
 }
 .ppm-voucher-alt-text {
   margin: 0.25rem 0 0.75rem;
-  color: var(--text-secondary, #a0aec0);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.5;
 }

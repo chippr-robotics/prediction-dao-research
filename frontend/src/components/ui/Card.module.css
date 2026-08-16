@@ -11,7 +11,7 @@
 /* Hover Effect */
 .card-hover:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(45, 122, 79, 0.2);
+  box-shadow: 0 8px 20px rgba(var(--success-color-rgb), 0.2);
   border-color: #34A853;
 }
 

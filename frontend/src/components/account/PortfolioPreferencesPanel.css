@@ -20,13 +20,13 @@
   font-weight: 600;
 }
 .portfolio-prefs-sub {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 .portfolio-prefs-switch {
   appearance: none;
-  background: var(--surface-color, var(--bg-secondary, #e5e7eb));
-  border: 1px solid var(--border-color, #d1d5db);
+  background: var(--surface-color, var(--bg-secondary));
+  border: 1px solid var(--border-color);
   border-radius: 999px;
   cursor: pointer;
   flex: none;
@@ -51,13 +51,13 @@
   width: 18px;
 }
 .portfolio-prefs-switch.on {
-  background: var(--brand-primary, #36B37E);
-  border-color: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
 }
 .portfolio-prefs-switch.on::after {
   transform: translateX(20px);
 }
 .portfolio-prefs-switch:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }

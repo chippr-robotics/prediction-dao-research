@@ -36,18 +36,18 @@ describe('tenant config (spec 072)', () => {
     // Values from frontend/public/manifest.webmanifest
     expect(brand.pwa.name).toBe('🍀FairWins')
     expect(brand.pwa.shortName).toBe('FairWins')
-    expect(brand.pwa.themeColor).toBe('#36B37E')
-    expect(brand.pwa.backgroundColor).toBe('#0E141B')
+    expect(brand.pwa.themeColor).toBe('#2E7D8C')
+    expect(brand.pwa.backgroundColor).toBe('#122126')
   })
 
   it('default tenant theme tokens match the static theme.css values (US3)', () => {
     const theme = getActiveTenant().brand.theme
-    expect(theme.base['--brand-primary']).toBe('#36B37E')
-    expect(theme.base['--brand-secondary']).toBe('#4C9AFF')
-    expect(theme.light['--primary-button']).toBe('#36B37E')
-    expect(theme.light['--primary-button-hover']).toBe('#2F9E6E')
-    expect(theme.dark['--primary-button']).toBe('#45C492')
-    expect(theme.dark['--primary-button-text']).toBe('#0E141B')
+    expect(theme.base['--brand-primary']).toBe('#2E7D8C')
+    expect(theme.base['--brand-secondary']).toBe('#1F5966')
+    expect(theme.light['--primary-button']).toBe('#2E7D8C')
+    expect(theme.light['--primary-button-hover']).toBe('#1F5966')
+    expect(theme.dark['--primary-button']).toBe('#6FAEBB')
+    expect(theme.dark['--primary-button-text']).toBe('#1C333B')
   })
 
   it('applies the platform-fairwins class for the default tenant', () => {

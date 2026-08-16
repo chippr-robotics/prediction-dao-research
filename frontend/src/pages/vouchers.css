@@ -21,7 +21,7 @@
 
 .vch-privacy {
   border: 1px solid var(--border-color);
-  border-left: 4px solid var(--brand-primary, #6c8cff);
+  border-left: 4px solid var(--brand-primary);
   border-radius: var(--radius-md, 8px);
   background: var(--bg-secondary);
   padding: 0.85rem 1rem;
@@ -46,7 +46,7 @@
   color: #d9534f;
 }
 .vch-tx {
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .vch-card {
@@ -88,8 +88,8 @@
   transition: var(--transition-base, all 0.15s ease);
 }
 .vch-tier.is-selected {
-  border-color: var(--brand-primary, #6c8cff);
-  box-shadow: 0 0 0 1px var(--brand-primary, #6c8cff);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 1px var(--brand-primary);
 }
 .vch-tier-badge {
   display: inline-block;
@@ -228,7 +228,7 @@
 .vch-refresh {
   background: none;
   border: none;
-  color: var(--brand-primary, #6c8cff);
+  color: var(--brand-primary);
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -270,8 +270,8 @@
   cursor: pointer;
 }
 .vch-voucher-item.is-selected {
-  border-color: var(--brand-primary, #6c8cff);
-  box-shadow: 0 0 0 1px var(--brand-primary, #6c8cff);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 1px var(--brand-primary);
 }
 .vch-voucher-meta {
   color: var(--text-secondary);

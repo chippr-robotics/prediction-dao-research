@@ -15,8 +15,8 @@
 .stm-dialog {
   width: 100%;
   max-width: 340px;
-  background: var(--bg-secondary, #141C24);
-  border: 1px solid var(--border-color, #23303D);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
   padding: 1.25rem;
   display: flex;
@@ -29,13 +29,13 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary, #E6EDF3);
+  color: var(--text-primary);
 }
 
 .stm-label {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--text-secondary, #AAB6C2);
+  color: var(--text-secondary);
 }
 
 .stm-input {
@@ -46,7 +46,7 @@
   margin: 0;
   font-size: 0.75rem;
   line-height: 1.4;
-  color: #E5533D;
+  color: var(--danger-color);
 }
 
 .stm-actions {

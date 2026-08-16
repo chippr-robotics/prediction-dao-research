@@ -120,6 +120,92 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
+  # ---- FinOps exporter (spec 089), INSIDE the gateway's namespace ----
+  #
+  # READ-ONLY BY CONSTRUCTION: no signer, no write route, no public surface. It binds LOOPBACK ONLY
+  # and declares no `ports:` — nginx does not proxy it and it is unreachable from outside this VM
+  # (FR-027). Alloy reaches it at localhost:9464 verbatim, because it shares this namespace.
+  #
+  # Its credentials are vendor READ tokens in their own env file; fetch-secrets.sh refuses to boot if
+  # key material ever lands there.
+  finops:
+    container_name: fairwins-gateway-finops
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:latest
+    restart: unless-stopped
+    pull_policy: missing
+    network_mode: "service:gateway"
+    env_file:
+      - /run/fairwins/finops.env   # vendor READ tokens only. MUST NOT contain a signing key.
+    environment:
+      PORT: "9464"
+      FINOPS_BIND_HOST: "127.0.0.1"
+      # The build's cohort. Reads never cross the testnet/mainnet boundary (constitution III).
+      FINOPS_COHORT_CHAIN_IDS: "63,137"
+      RPC_URLS_63: "https://rpc.mordor.etccooperative.org,https://geth-mordor.etc-network.info"
+      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.llamarpc.com"
+      # Contracts it READS. Same addresses the gateway uses; nothing new is trusted.
+      PAYMASTER_ADDRESS_137: "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105"
+      GAS_WALLET_63: "0xf505d95F62bEE94437C112d3D64ee7Df0Fa973aC"
+      GAS_WALLET_137: "0x3BB28b184b8a748dE22aBD076634F85adADA82db"
+      # FEE_ROUTER_ADDRESS / MEMBERSHIP_MANAGER_ADDRESS / BUNDLER_EXECUTOR_137: set these to light up
+      # fee, membership and bundler-pool panels. Unset is HONEST — those sources report
+      # `not-configured` rather than a fabricated zero — so leaving one unset degrades one panel and
+      # nothing else.
+      GCP_PROJECT_ID: "chippr-bots-site-wp"
+      FINOPS_BILLING_DATASET: "billing_export"
+      # Cloudflare and QuickNode publish NO dollar figure (spec 089 research R1). These declared plan
+      # prices are what the `modelled` cost is computed from, and the dashboard labels it as such.
+      # Unset ⇒ usage is still reported, no dollar figure is invented.
+      # FINOPS_CLOUDFLARE_PLAN_USD / FINOPS_QUICKNODE_PLAN_USD: set once the plan prices are confirmed.
+      CLOUDFLARE_ZONE_ID: ""
+    cpus: 0.2
+    mem_limit: 192m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9464/healthz | grep -q '\"status\":\"ok\"' || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s     # the first collectAll() fans out across every source before listening
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ---- Grafana Alloy (spec 089), INSIDE the gateway's namespace ----
+  #
+  # Scrapes localhost:9464 and remote_writes to Grafana Cloud. It exists so the exporter never has to
+  # own snappy-protobuf remote_write, a WAL, or retry semantics (research R10).
+  alloy:
+    container_name: fairwins-gateway-alloy
+    image: grafana/alloy:v1.10.2
+    restart: unless-stopped
+    pull_policy: missing
+    network_mode: "service:gateway"
+    depends_on:
+      finops:
+        condition: service_started
+    env_file:
+      - /run/fairwins/alloy.env    # GRAFANA_CLOUD_PROM_TOKEN only.
+    environment:
+      # Endpoint and username are ACCOUNT IDENTIFIERS, not secrets; only the token is fetched.
+      GRAFANA_CLOUD_PROM_URL: ""
+      GRAFANA_CLOUD_PROM_USER: ""
+      FINOPS_COHORT: "mainnet"
+      FW_NODE_NAME: "fairwins-gateway"
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      # NOT exposed: the agent's own UI would be a second HTTP surface on this VM for no benefit.
+      - --server.http.listen-addr=127.0.0.1:12345
+    volumes:
+      - /opt/fairwins/repo/infra/grafana/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+    cpus: 0.15
+    mem_limit: 192m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
   # ---- ephemeral redis, INSIDE the gateway's namespace ----
   redis:
     container_name: fairwins-gateway-redis
@@ -141,3 +227,11 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+# ---- named volumes ----
+#
+# Alloy's write-ahead log. Persisted, unlike redis above, because the WAL is what carries samples
+# across a Grafana Cloud outage or a stack restart — an ephemeral WAL would silently drop exactly the
+# data collected during the incident somebody later wants to look at.
+volumes:
+  alloy-data:

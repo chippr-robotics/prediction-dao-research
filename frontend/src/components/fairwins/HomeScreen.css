@@ -70,7 +70,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
-  border: 1px solid var(--border-color, #23303D);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
 }
 
@@ -88,7 +88,7 @@
 }
 
 .pay-confirm-row .k {
-  color: var(--text-muted, #7A8590);
+  color: var(--text-muted);
 }
 
 .pay-confirm-actions,

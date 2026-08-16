@@ -7,7 +7,7 @@
   max-width: calc(100vw - 24px);
   max-height: 70vh;
   overflow-y: auto;
-  background: var(--bg-primary, #fff);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
@@ -98,19 +98,19 @@
 }
 
 .activity-feed-entry.severity-success {
-  border-left-color: #22c55e;
+  border-left-color: var(--success-color);
 }
 
 .activity-feed-entry.severity-warning {
-  border-left-color: #f59e0b;
+  border-left-color: var(--warning-color);
 }
 
 .activity-feed-entry.severity-error {
-  border-left-color: #dc2626;
+  border-left-color: var(--danger-color);
 }
 
 .activity-feed-entry.severity-info {
-  border-left-color: var(--brand-primary, #6366f1);
+  border-left-color: var(--brand-primary);
 }
 
 .activity-feed-entry .entry-icon {

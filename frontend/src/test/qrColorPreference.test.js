@@ -29,15 +29,17 @@ function contrastOnWhite(hex) {
 }
 
 describe('QR_COLOR_PALETTE (C7)', () => {
-  it('offers exactly the four curated entries, in order', () => {
+  it('offers exactly the five curated entries, in order', () => {
     expect(QR_COLOR_PALETTE.map((e) => e.id)).toEqual([
       'midnight',
+      'teal',
       'forest',
       'ocean',
       'plum',
     ])
     expect(QR_COLOR_PALETTE.map((e) => e.fg)).toEqual([
       '#0E141B',
+      '#1F5966',
       '#14532D',
       '#1E3A8A',
       '#581C87',
@@ -51,6 +53,7 @@ describe('QR_COLOR_PALETTE (C7)', () => {
     }
     expect(QR_COLOR_PALETTE.map((e) => e.name)).toEqual([
       'Midnight',
+      'Teal',
       'Forest',
       'Ocean',
       'Plum',

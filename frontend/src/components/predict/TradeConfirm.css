@@ -19,10 +19,10 @@
   position: absolute;
 }
 .trade-confirm {
-  background: var(--surface-color, var(--bg-secondary, #fff));
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--surface-color, var(--bg-secondary));
+  border: 1px solid var(--border-color);
   border-radius: 14px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
@@ -32,7 +32,7 @@
   width: 100%;
 }
 .trade-confirm:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: -2px;
 }
 .trade-confirm-header {
@@ -47,16 +47,16 @@
 }
 .trade-confirm-close {
   background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   cursor: pointer;
   padding: 0.3rem 0.7rem;
 }
 
 .trade-confirm-status,
 .trade-confirm-done {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -72,20 +72,20 @@
   gap: 0.5rem;
 }
 .trade-confirm-amount-row input {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   flex: 1;
   font-size: 1rem;
   padding: 0.5rem 0.6rem;
 }
 .trade-confirm-price {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .trade-confirm-breakdown {
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -93,7 +93,7 @@
   padding-top: 0.6rem;
 }
 .trade-confirm-breakdown > div {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   display: flex;
   justify-content: space-between;
 }
@@ -103,27 +103,27 @@
 }
 /* The FairWins builder fee is emphasised, never buried — it is a real cost the member pays. */
 .trade-confirm-builder-line {
-  color: var(--text-primary, #111827) !important;
+  color: var(--text-primary) !important;
   font-weight: 600;
 }
 .trade-confirm-total {
-  border-top: 1px solid var(--border-color, #e5e7eb);
-  color: var(--text-primary, #111827) !important;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-primary) !important;
   font-weight: 700;
   margin-top: 0.3rem;
   padding-top: 0.4rem;
 }
 
 .trade-confirm-warn {
-  background: var(--warning-bg, #fef3c7);
+  background: var(--warning-bg);
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.85rem;
   margin: 0;
   padding: 0.45rem 0.6rem;
 }
 .trade-confirm-fee-note {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   margin: 0;
 }
@@ -135,13 +135,13 @@
 }
 .trade-confirm-cancel {
   background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   padding: 0.5rem 1rem;
 }
 .trade-confirm-submit {
-  background: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
   border: 0;
   border-radius: 8px;
   color: #fff;
@@ -156,7 +156,7 @@
 
 .trade-confirm-blocked,
 .trade-confirm-error {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 8px;
   padding: 0.6rem 0.75rem;
 }

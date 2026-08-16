@@ -1,6 +1,6 @@
 # Feature Specification: Multi-Chain Activity Ledger
 
-**Feature Branch**: `090-multi-chain-activity`
+**Feature Branch**: `091-multi-chain-activity`
 
 **Created**: 2026-08-16
 

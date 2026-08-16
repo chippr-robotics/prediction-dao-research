@@ -104,17 +104,17 @@
 }
 
 .dev-warning-modal-highlights {
-  background: var(--bg-secondary, #f8f9fa);
+  background: var(--bg-secondary);
   padding: 1rem;
   border-radius: var(--radius-md, 8px);
-  border-left: 4px solid var(--brand-primary, #4caf50);
+  border-left: 4px solid var(--brand-primary);
 }
 
 .dev-warning-notice {
-  background: rgba(255, 152, 0, 0.1);
+  background: rgba(var(--warning-color-rgb), 0.1);
   padding: 1rem;
   border-radius: var(--radius-md, 8px);
-  border-left: 4px solid rgba(255, 152, 0, 0.8);
+  border-left: 4px solid rgba(var(--warning-color-rgb), 0.8);
 }
 
 .dev-warning-notice .dev-warning-modal-message {

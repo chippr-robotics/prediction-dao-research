@@ -141,7 +141,7 @@
 
 .notif-pref-row-warn {
   font-size: 0.75rem;
-  color: var(--color-warning, #b45309);
+  color: var(--color-warning);
 }
 
 /* Segmented three-way control (Push / In-app / Silent) */

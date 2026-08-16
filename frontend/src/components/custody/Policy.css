@@ -74,7 +74,7 @@
 }
 
 .custody-policy-compare-col {
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.25));
+  border: 1px solid var(--border-color);
   border-radius: 0.375rem;
   padding: 0.5rem 0.75rem;
 }

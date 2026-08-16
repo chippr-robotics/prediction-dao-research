@@ -2,7 +2,7 @@
 
 .tp-container {
   padding: 1rem;
-  background: var(--surface-color, var(--bg-secondary, #FFFFFF));
+  background: var(--surface-color, var(--bg-secondary));
   border-radius: 8px;
   margin-bottom: 1rem;
 }
@@ -14,15 +14,15 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: var(--warning-bg, rgba(255, 193, 7, 0.1));
-  border: 1px solid var(--warning-border, rgba(255, 193, 7, 0.3));
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
   border-radius: 8px;
   margin-bottom: 1rem;
 }
 
 .tp-pending-icon {
   font-size: 1.5rem;
-  color: var(--warning-color, #ffc107);
+  color: var(--warning-color);
 }
 
 .tp-pending-content {
@@ -32,14 +32,14 @@
 
 .tp-pending-content strong {
   display: block;
-  color: var(--text-primary, #1F2933);
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
 .tp-pending-content p {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #5A6772);
+  color: var(--text-secondary);
 }
 
 .tp-pending-actions {
@@ -74,29 +74,29 @@
   justify-content: center;
   font-size: 0.875rem;
   font-weight: 600;
-  background: var(--bg-primary, #F7F9FA);
-  border: 2px solid var(--border-color, #E3E7EB);
-  color: var(--text-secondary, #5A6772);
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  color: var(--text-secondary);
   transition: all 0.3s ease;
   z-index: 2;
 }
 
 .tp-step.current .tp-step-indicator {
-  background: var(--primary-color, #6366f1);
-  border-color: var(--primary-color, #6366f1);
+  background: var(--primary-color);
+  border-color: var(--primary-color);
   color: #fff;
 }
 
 .tp-step.complete .tp-step-indicator {
-  background: var(--success-color, #10b981);
-  border-color: var(--success-color, #10b981);
+  background: var(--success-color);
+  border-color: var(--success-color);
   color: #fff;
 }
 
 .tp-step-label {
   margin-top: 0.5rem;
   font-size: 0.75rem;
-  color: var(--text-secondary, #5A6772);
+  color: var(--text-secondary);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -106,7 +106,7 @@
 
 .tp-step.current .tp-step-label,
 .tp-step.complete .tp-step-label {
-  color: var(--text-primary, #1F2933);
+  color: var(--text-primary);
 }
 
 .tp-step-connector {
@@ -115,12 +115,12 @@
   left: calc(50% + 20px);
   right: calc(-50% + 20px);
   height: 2px;
-  background: var(--border-color, #E3E7EB);
+  background: var(--border-color);
   z-index: 1;
 }
 
 .tp-step-connector.complete {
-  background: var(--success-color, #10b981);
+  background: var(--success-color);
 }
 
 .tp-check {
@@ -146,8 +146,8 @@
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid var(--border-color, #E3E7EB);
-  border-top-color: var(--brand-primary, #36B37E);
+  border: 2px solid var(--border-color);
+  border-top-color: var(--brand-primary);
   border-radius: 50%;
   animation: tp-spin 0.8s linear infinite;
 }
@@ -166,7 +166,7 @@
 
 .tp-step-description {
   font-size: 0.875rem;
-  color: var(--text-secondary, #5A6772);
+  color: var(--text-secondary);
   margin-bottom: 0.5rem;
 }
 
@@ -176,10 +176,10 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: var(--primary-bg, rgba(99, 102, 241, 0.1));
-  border: 1px solid var(--primary-border, rgba(99, 102, 241, 0.3));
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border);
   border-radius: 6px;
-  color: var(--primary-color, #6366f1);
+  color: var(--primary-color);
   font-size: 0.875rem;
 }
 
@@ -194,8 +194,8 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: var(--error-bg, rgba(239, 68, 68, 0.1));
-  border: 1px solid var(--error-border, rgba(239, 68, 68, 0.3));
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
   border-radius: 8px;
   margin-top: 1rem;
 }
@@ -204,7 +204,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--error-color, #ef4444);
+  background: var(--error-color);
   color: #fff;
   display: flex;
   align-items: center;
@@ -220,14 +220,14 @@
 
 .tp-error-content strong {
   display: block;
-  color: var(--error-color, #ef4444);
+  color: var(--error-color);
   margin-bottom: 0.25rem;
 }
 
 .tp-error-content p {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #5A6772);
+  color: var(--text-secondary);
   word-break: break-word;
 }
 
@@ -242,8 +242,8 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: var(--success-bg, rgba(16, 185, 129, 0.1));
-  border: 1px solid var(--success-border, rgba(16, 185, 129, 0.3));
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
   border-radius: 8px;
   margin-top: 1rem;
 }
@@ -252,7 +252,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--success-color, #10b981);
+  background: var(--success-color);
   color: #fff;
   display: flex;
   align-items: center;
@@ -267,13 +267,13 @@
 
 .tp-success-content strong {
   display: block;
-  color: var(--success-color, #10b981);
+  color: var(--success-color);
   margin-bottom: 0.25rem;
 }
 
 /* Transaction Links */
 .tp-tx-link {
-  color: var(--primary-color, #6366f1);
+  color: var(--primary-color);
   text-decoration: none;
   font-size: 0.875rem;
 }
@@ -289,10 +289,10 @@
   gap: 0.5rem;
   margin-top: 1rem;
   padding: 0.75rem;
-  background: var(--bg-primary, #F7F9FA);
+  background: var(--bg-primary);
   border-radius: 6px;
   font-size: 0.875rem;
-  color: var(--text-secondary, #5A6772);
+  color: var(--text-secondary);
 }
 
 /* Buttons */
@@ -308,23 +308,23 @@
 }
 
 .tp-btn-primary {
-  background: var(--brand-primary, var(--primary-button, #36B37E));
-  color: var(--primary-button-text, #fff);
+  background: var(--brand-primary, var(--primary-button));
+  color: var(--primary-button-text);
 }
 
 .tp-btn-primary:hover {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
 }
 
 .tp-btn-secondary {
-  background: var(--bg-secondary, #FFFFFF);
-  color: var(--text-secondary, #5A6772);
-  border: 1px solid var(--border-color, #E3E7EB);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 
 .tp-btn-secondary:hover {
-  background: var(--surface-color, var(--bg-primary, #F7F9FA));
-  color: var(--text-primary, #1F2933);
+  background: var(--surface-color, var(--bg-primary));
+  color: var(--text-primary);
 }
 
 /* Responsive */

@@ -19,13 +19,19 @@
  * setFillColor/setTextColor/setDrawColor take.
  */
 
-/** Canonical FairWins-default brand tokens; also the fallback for a thin brand. */
+/**
+ * Canonical FairWins-default brand tokens; also the fallback for a thin brand.
+ *
+ * Chippr Robotics Brand Guidelines v1.0 (spec 090). These are the print/PDF
+ * equivalents of the app's `--brand-primary` / status tokens — kept as literals
+ * because a generated document has no CSS custom properties to read.
+ */
 const DEFAULT_TOKENS = Object.freeze({
-  primary: '#36B37E',
-  positive: '#2ECC71',
-  negative: '#E5533D',
-  warning: '#F5A623',
-  neutral: '#7A8794',
+  primary: '#2E7D8C', // Chippr Teal
+  positive: '#1E7A4F',
+  negative: '#C0392B',
+  warning: '#F2A33C', // Amber
+  neutral: '#5E6B70', // Steel
 })
 
 // ---------------------------------------------------------------- colour math

@@ -15,7 +15,7 @@
 /* The raw uiFeeFactor sits under its bps reading — the bps is the number, this is the receipt. */
 .perps-fees .perps-fees__factor {
   display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   opacity: 0.75;
   word-break: break-all;
@@ -30,7 +30,7 @@
   padding: 0.75rem 0.9rem;
   border-left: 3px solid #ef4444;
   border-radius: 4px;
-  background: rgba(239, 68, 68, 0.08);
+  background: rgba(var(--danger-color-rgb), 0.08);
   line-height: 1.5;
 }
 

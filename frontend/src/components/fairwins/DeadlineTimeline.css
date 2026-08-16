@@ -32,7 +32,7 @@
 }
 
 .dt-node-draggable:focus-visible {
-  outline: 2px solid var(--timeline-active, var(--brand-primary, #36B37E));
+  outline: 2px solid var(--timeline-active, var(--brand-primary));
   outline-offset: 2px;
   border-radius: 50%;
 }

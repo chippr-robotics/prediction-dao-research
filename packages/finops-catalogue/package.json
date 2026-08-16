@@ -1,0 +1,24 @@
+{
+  "name": "@fairwins/finops-catalogue",
+  "private": true,
+  "type": "module",
+  "description": "The single declaration of every FairWins revenue and cost source (spec 089). Read by the finops exporter, the Grafana dashboard generator, and the check:finops CI gate. Zero runtime dependencies; resolvable by plain Node.",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./sources": "./src/sources.js",
+    "./schema": "./src/schema.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src"
+  ],
+  "//gates": [
+    "No test script here, matching @fairwins/intent-types and @fairwins/abi. This package's",
+    "correctness is not checkable in isolation: it is correct only relative to the contracts that",
+    "define the fee services, the exporter that emits the metrics, and the dashboards that query",
+    "them — all outside this directory. The gate that does that is:",
+    "  scripts/finops/check-finops-coverage.js   (npm run check:finops)",
+    "Schema validity IS checked in isolation, but by that same gate, so there is one place to look."
+  ]
+}

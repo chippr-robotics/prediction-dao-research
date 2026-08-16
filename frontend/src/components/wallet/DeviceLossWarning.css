@@ -11,7 +11,7 @@
   border-radius: var(--radius-lg, 12px);
   border: 1px solid color-mix(in srgb, #d97706 35%, transparent);
   background: color-mix(in srgb, #d97706 12%, transparent);
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
 }
 
 .device-loss-warning strong {
@@ -21,7 +21,7 @@
 
 .device-loss-warning p {
   margin: 0;
-  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  color: var(--color-text-secondary, var(--text-secondary));
   font-size: 0.9rem;
 }
 
@@ -35,9 +35,9 @@
 .device-loss-warning .btn {
   appearance: none;
   border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
-  background: var(--color-surface, var(--surface-color, #fff));
-  color: var(--color-text, var(--text-primary, #111827));
+  border: 1px solid var(--color-border, var(--border-color));
+  background: var(--color-surface, var(--surface-color));
+  color: var(--color-text, var(--text-primary));
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
@@ -46,9 +46,9 @@
 }
 .device-loss-warning .btn-primary {
   border-color: transparent;
-  background: var(--primary-button, var(--brand-primary, #36B37E));
-  color: var(--primary-button-text, #fff);
+  background: var(--primary-button, var(--brand-primary));
+  color: var(--primary-button-text);
 }
 .device-loss-warning .btn-primary:hover {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
 }
