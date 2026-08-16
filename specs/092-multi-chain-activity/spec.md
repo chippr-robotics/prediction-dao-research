@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-16
 
-**Status**: Draft
+**Status**: Implemented (this branch)
 
 **Input**: User description: "Multi-chain activity ledger: the Account tab's Activity feed and Stats (P&L chart, summary tiles, breakdowns) should merge activity history from every chain in the build's cohort — not just the active network — so an account's recorded history reflects its entire estate. Reads span the cohort with per-chain failure isolation (spec-071 estate-read pattern: read / not-deployed / unreachable, an unreachable chain never renders as zero activity and any merged total missing a chain is labelled partial and names it). Entries stay chain-tagged, dedup/identity stays per-chain, and writes remain single-chain. Follows up the estate breakdown shipped in PR #1200, which covered balances but not history."
 

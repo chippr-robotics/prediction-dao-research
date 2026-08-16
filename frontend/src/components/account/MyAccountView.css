@@ -44,6 +44,14 @@
   flex-wrap: wrap;
 }
 
+/* Spec 092: named partial-figure disclosure — a statement about the numbers,
+   so it sits directly above them. Text tokens only, never color-alone. */
+.my-account-partial {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted, var(--text-secondary));
+}
+
 /* Desktop view switcher — same shape as the Transfer section's .pt-tabs.
    Hidden on mobile, where WalletPage's bottom icon bar (SectionIconNav)
    carries the same three views: exactly one switcher per width (FR-007). */

@@ -8,7 +8,10 @@
  * sit in the client store while the Account tab and the tax report both show
  * nothing. Every new domain source belongs in the list below.
  */
+import { cohortChainIds, isInCohort } from '../../config/networks'
+import { readProviderFor as estateReadProviderFor } from '../../lib/chains/estate'
 import { createLedgerRepository } from './ledgerRepository'
+import { createEstateLedger } from './estateLedger'
 import { createWagerLedgerSource } from './sources/wagerLedgerSource'
 import { createTransferLedgerSource } from './sources/transferLedgerSource'
 import { createEarnLedgerSource } from './sources/earnLedgerSource'
@@ -64,6 +67,8 @@ export {
   miniAppEntryId,
   MINIAPP_KIND,
 } from './sources/miniAppSource'
+// Spec 092 — the cohort-wide activity merge (pure factory; default wiring below).
+export { createEstateLedger } from './estateLedger'
 export * from './constants'
 export * from './identity'
 export { normalizeEntry, collapseBridgeEntries, bridgeLogicalKey } from './normalize'
@@ -76,6 +81,27 @@ export {
   pruneClientRecords,
 } from './ledgerClientStore'
 export { migrateLegacyActivity } from './migrate'
+
+/**
+ * The app's standard ESTATE ledger (spec 092): the default per-chain
+ * repository read once per cohort chain, merged with per-chain honesty.
+ * Wired here — not in estateLedger.js — so the pure factory never imports
+ * this module back (no cycle) and tests inject their own seams.
+ */
+export function getDefaultEstateLedger() {
+  return createEstateLedgerDefault()
+}
+
+function createEstateLedgerDefault() {
+  const { listEntries } = getDefaultLedgerRepository()
+  return createEstateLedger({
+    listEntries,
+    readProviderFor: (chainId, walletChainId, walletProvider) =>
+      estateReadProviderFor(chainId, walletChainId, walletProvider),
+    isInCohort,
+    cohortChainIds,
+  })
+}
 
 /** The app's standard ledger for a chain — every domain source wired. */
 export function getDefaultLedgerRepository() {

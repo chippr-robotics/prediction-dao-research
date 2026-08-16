@@ -18,7 +18,7 @@ foundational merge seam; US2 (estate stats) and US3 (network filter) build on it
 *(No project scaffolding needed — existing frontend feature slice. The only setup is knowing
 the seams: `data/ledger/`, `lib/chains/estate.js`, `hooks/useAccountStats.js`.)*
 
-- [ ] T001 Verify the dev tree is healthy (`npm run check:deps`) and the baseline account suites
+- [x] T001 Verify the dev tree is healthy (`npm run check:deps`) and the baseline account suites
       pass: `npx vitest run frontend/src/test/account/ frontend/src/test/ledger/`
 
 ---
@@ -27,7 +27,7 @@ the seams: `data/ledger/`, `lib/chains/estate.js`, `hooks/useAccountStats.js`.)*
 
 **Purpose**: the merge seam every story consumes.
 
-- [ ] T002 Write the contract test suite for the merge seam in
+- [x] T002 Write the contract test suite for the merge seam in
       `frontend/src/test/ledger/estateLedger.test.js`: one case per guarantee in
       `contracts/estate-activity.md` (never rejects; cohort bounding drops cross-cohort ids
       silently; per-chain isolation — one throwing chain yields `unreachable` while siblings
@@ -35,12 +35,12 @@ the seams: `data/ledger/`, `lib/chains/estate.js`, `hooks/useAccountStats.js`.)*
       that chain's provider; dedup by entryId with first-occurrence-wins; merged newest-first
       ordering with undated rows last; empty-but-read is `state:'read', entryCount:0`). Use the
       `deps` injection seam; no network.
-- [ ] T003 Implement `frontend/src/data/ledger/estateLedger.js` — `listEntriesAcrossEstate` per
+- [x] T003 Implement `frontend/src/data/ledger/estateLedger.js` — `listEntriesAcrossEstate` per
       the contract: chains from `cohortChainIds()` filtered by `isInCohort`, providers via
       `readProviderFor` (null ⇒ unreachable, never a throw), per-chain
       `getDefaultLedgerRepository().listEntries`, merged + deduped + sorted result with
       `chainStates`, `partialChains`, `staleByChain`, `prunedByChain` (data-model.md shapes).
-- [ ] T004 Export the new module from `frontend/src/data/ledger/index.js` and confirm T002 is
+- [x] T004 Export the new module from `frontend/src/data/ledger/index.js` and confirm T002 is
       green.
 
 **Checkpoint**: the seam is proven in isolation; user stories can consume it.
@@ -55,12 +55,12 @@ active-network switching; unreachable chains disclosed by name, never as zero.
 **Independent test**: seed two chains via the hook's injection seams; both appear interleaved
 with network tags; make one chain unreachable — the other renders plus a named notice.
 
-- [ ] T005 [US1] Extend `frontend/src/test/account/useAccountStats.acting.test.jsx`: the hook
+- [x] T005 [US1] Extend `frontend/src/test/account/useAccountStats.acting.test.jsx`: the hook
       calls the estate seam (not single-chain listEntries), returns merged `activity` with
       per-entry chainIds intact, exposes `networkStates` + `partialChains` (display names), and
       labels per-class staleness as "class on Network". Cover: two readable chains; one
       unreachable; all unreachable (honest failure — stale last-known, never zeros, FR-009).
-- [ ] T006 [US1] Rework `frontend/src/hooks/useAccountStats.js`: replace the single-chain
+- [x] T006 [US1] Rework `frontend/src/hooks/useAccountStats.js`: replace the single-chain
       `listEntries` call with `listEntriesAcrossEstate`; load wagers per cohort chain with the
       same isolation (a failing chain's wagers contribute nothing and join `partialChains`);
       key wager status lookups by `chainId:wagerId`; make wager-title maps per-chain
@@ -68,16 +68,16 @@ with network tags; make one chain unreachable — the other renders plus a named
       `frontend/src/lib/account/ledgerAdapters.js`); retire the active-network
       `isSupportedNetwork` gate for the estate path (keep the active-chain wallet-balance tile
       read); keep the 50-row display cap applied after the merged sort.
-- [ ] T007 [P] [US1] Extend `frontend/src/test/account/RecentActivityFeed.test.jsx`: every row
+- [x] T007 [P] [US1] Extend `frontend/src/test/account/RecentActivityFeed.test.jsx`: every row
       shows its network name from `entry.chainId`; explorer links target the entry's own chain
       (extend the existing link test with a second-chain entry); the partial notice renders
       `role="status"` naming unreachable networks; the pruning disclosure names its network.
-- [ ] T008 [US1] Update `frontend/src/components/account/RecentActivityFeed.jsx` +
+- [x] T008 [US1] Update `frontend/src/components/account/RecentActivityFeed.jsx` +
       `RecentActivityFeed.css`: per-row network tag (text, via `networkName(chainId)` from
       `frontend/src/lib/chains/estate.js`); accept and render `partialChains` (display names)
       as a `role="status"` notice distinct from per-class staleness; make the pruning marker
       per-network (`prunedByChain`).
-- [ ] T009 [US1] Update `frontend/src/components/account/MyAccountView.jsx`: pass the new
+- [x] T009 [US1] Update `frontend/src/components/account/MyAccountView.jsx`: pass the new
       props through to the feed; replace the retired "Network not supported" Activity state
       with the estate states (account-aware empty states from spec 091's PR are retained);
       extend `frontend/src/test/account/MyAccountView.test.jsx` accordingly.
@@ -95,19 +95,19 @@ labelled and name missing networks.
 hand-computed combination; with one chain unreachable, figures recompute from the readable
 chain and carry the named partial disclosure.
 
-- [ ] T010 [US2] Extend `frontend/src/test/account/useAccountStats.acting.test.jsx` (or a new
+- [x] T010 [US2] Extend `frontend/src/test/account/useAccountStats.acting.test.jsx` (or a new
       `useAccountStats.estate.test.jsx` if the file grows unwieldy): summary/series/breakdowns
       computed from two chains match hand-computed totals (SC-003 — no double counting, no
       drops); settled-status filtering keys on `chainId:wagerId` so wager #12 on two chains
       never cross-contaminates.
-- [ ] T011 [US2] Wire the merged transfers/wagers through the pure helpers in
+- [x] T011 [US2] Wire the merged transfers/wagers through the pure helpers in
       `frontend/src/hooks/useAccountStats.js` (`computeSummary`, `computePnlSeries`,
       `computeBreakdowns` stay unchanged — verify their inputs are chain-agnostic and fix the
       status-map keying at the call site).
-- [ ] T012 [P] [US2] Extend `frontend/src/test/account/MyAccountView.test.jsx`: Stats shows one
+- [x] T012 [P] [US2] Extend `frontend/src/test/account/MyAccountView.test.jsx`: Stats shows one
       partial disclosure naming unreachable networks beside the tiles; all-unreachable shows
       the honest failure state; no partial language when `partialChains` is empty.
-- [ ] T013 [US2] Update `frontend/src/components/account/MyAccountView.jsx` (+`MyAccountView.css`
+- [x] T013 [US2] Update `frontend/src/components/account/MyAccountView.jsx` (+`MyAccountView.css`
       if needed): render the Stats partial disclosure; keep the estate breakdown and
       account-aware empty states as shipped.
 
@@ -122,11 +122,11 @@ chain and carry the named partial disclosure.
 **Independent test**: two-chain fixture — filter to one network, only its entries remain and
 compose with class/search; clear it, the merged record returns.
 
-- [ ] T014 [P] [US3] Extend `frontend/src/test/account/RecentActivityFeed.test.jsx`: network
+- [x] T014 [P] [US3] Extend `frontend/src/test/account/RecentActivityFeed.test.jsx`: network
       filter options are the networks present in the record plus "All networks" (default);
       selection composes with class filter and search; wager-message search still matches
       across networks.
-- [ ] T015 [US3] Implement the network filter in
+- [x] T015 [US3] Implement the network filter in
       `frontend/src/components/account/RecentActivityFeed.jsx` using the existing dropdown
       menu idiom (aria roles match the class filter), options derived from the entries'
       chainIds via `networkName`.
@@ -137,16 +137,16 @@ compose with class/search; clear it, the merged record returns.
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T016 [P] Extend `frontend/src/test/account/MyAccountView.axe.test.jsx` to cover the feed
+- [x] T016 [P] Extend `frontend/src/test/account/MyAccountView.axe.test.jsx` to cover the feed
       with network badges/filter and the Stats partial disclosure (WCAG 2.1 AA, constitution V).
-- [ ] T017 [P] Update `docs/developer-guide/chain-estate-reads.md` (or add a short
+- [x] T017 [P] Update `docs/developer-guide/chain-estate-reads.md` (or add a short
       `docs/developer-guide/multi-chain-activity.md` cross-referencing it) documenting the
       activity merge seam, its contract, and the two disclosure layers (chain state vs class
       staleness).
-- [ ] T018 Run the affected suites and lint:
+- [x] T018 Run the affected suites and lint:
       `npx vitest run frontend/src/test/ledger/ frontend/src/test/account/` plus
       `npx eslint` over changed files; confirm no new warnings.
-- [ ] T019 Update `specs/092-multi-chain-activity/spec.md` status to reflect delivery and note
+- [x] T019 Update `specs/092-multi-chain-activity/spec.md` status to reflect delivery and note
       any deliberate deviations discovered during implementation.
 
 ---
