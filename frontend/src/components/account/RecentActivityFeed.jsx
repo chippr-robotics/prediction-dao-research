@@ -54,9 +54,22 @@ function amountLine(e) {
 }
 
 /**
+ * Context line saying WHICH wager an entry belongs to: the wager's message
+ * (its My Wagers display title, annotated upstream as `wagerTitle`), or the
+ * wager id when no title is known — never nothing for a wager entry.
+ */
+function wagerContextLine(e) {
+  if (e.class !== 'wager') return null
+  if (e.wagerTitle) return e.wagerTitle
+  const id = e.refs?.wagerId
+  return id != null && id !== '' ? `Wager #${id}` : null
+}
+
+/**
  * Case-insensitive search across everything a member might remember about a
- * transaction: what it was (label/kind/class), the token, the amounts (raw and
- * USD-formatted), the tx hash, and a failure reason.
+ * transaction: what it was (label/kind/class), the wager's message and id,
+ * the token, the amounts (raw and USD-formatted), the tx hash, and a failure
+ * reason.
  */
 function entryMatchesQuery(e, meta, query) {
   const q = query.trim().toLowerCase()
@@ -65,6 +78,8 @@ function entryMatchesQuery(e, meta, query) {
     meta.label,
     e.kind,
     e.class,
+    e.wagerTitle,
+    e.refs?.wagerId != null ? `#${e.refs.wagerId}` : null,
     e.tokenSymbol,
     e.amount != null ? String(e.amount) : null,
     e.valueUsd != null ? formatUsd(e.valueUsd) : null,
@@ -272,7 +287,7 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
             ref={searchInputRef}
             type="search"
             className="account-feed-search-input"
-            placeholder="Search by type, token, amount, or tx hash"
+            placeholder="Search by type, wager, token, amount, or tx hash"
             aria-label="Search activity"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -314,6 +329,7 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
             const url = explorerTxUrl(e.chainId ?? chainId, e.txHash)
             const relative = e.timestamp != null ? formatRelativeTime(e.timestamp) : null
             const amount = amountLine(e)
+            const context = wagerContextLine(e)
             const failed = e.status === 'failed'
             return (
               <li className={`account-feed-row${failed ? ' failed' : ''}`} key={e.entryId}>
@@ -328,6 +344,9 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
                       <span className="account-feed-badge-unvalued" title="No USD value could be determined for this entry"> · unvalued</span>
                     )}
                   </span>
+                  {context != null && (
+                    <span className="account-feed-context" title={context}>{context}</span>
+                  )}
                   {amount != null && (
                     <span className="account-feed-amount">
                       <SensitiveValue>{amount}</SensitiveValue>{' '}

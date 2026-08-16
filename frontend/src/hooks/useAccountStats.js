@@ -31,7 +31,12 @@ import {
   isSettledStatus,
   DEFAULT_RANGE,
 } from '../lib/account'
-import { wagerTransfersFromLedger, tokenMetaFromLedger } from '../lib/account/ledgerAdapters'
+import {
+  wagerTransfersFromLedger,
+  tokenMetaFromLedger,
+  wagerTitlesById,
+  annotateWagerEntries,
+} from '../lib/account/ledgerAdapters'
 
 const POLL_MS = 60_000
 
@@ -288,7 +293,13 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE, accountAd
 
   // The Account tab's canonical activity record: ALL classes, newest first,
   // failed entries included and labeled (they are excluded from totals above).
-  const activity = useMemo(() => ledgerEntries.slice(0, 50), [ledgerEntries])
+  // Wager entries carry the wager's message (its My Wagers display title) so
+  // the feed can say WHICH wager a deposit/payout/refund belongs to.
+  const wagerTitles = useMemo(() => wagerTitlesById(wagers), [wagers])
+  const activity = useMemo(
+    () => annotateWagerEntries(ledgerEntries.slice(0, 50), wagerTitles),
+    [ledgerEntries, wagerTitles],
+  )
 
   const isEmpty = isConnected && !isLoading && wagers.length === 0 && ledgerEntries.length === 0
 

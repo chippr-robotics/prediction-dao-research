@@ -9,6 +9,7 @@
  * they can never contribute to a total (FR-003) — they remain visible in the
  * activity record itself.
  */
+import { getMarketDisplayTitle } from '../wagers/displayTitle'
 
 /** Ledger entries (class 'wager', not failed) → dashboard transfer rows. */
 export function wagerTransfersFromLedger(entries = []) {
@@ -29,6 +30,36 @@ export function wagerTransfersFromLedger(entries = []) {
     })
   }
   return out
+}
+
+/**
+ * wagerId → display title (the wager's message) from the member's wager
+ * records — the same title My Wagers renders, so the activity feed and the
+ * wager list can never name the same wager differently. Records without a
+ * usable id are skipped; the feed falls back to "Wager #id".
+ */
+export function wagerTitlesById(wagers = []) {
+  const titles = new Map()
+  for (const w of wagers) {
+    if (w?.id == null) continue
+    const title = getMarketDisplayTitle(w)
+    if (title) titles.set(String(w.id), title)
+  }
+  return titles
+}
+
+/**
+ * Annotate wager-class ledger entries with the wager's message (`wagerTitle`)
+ * so the activity feed can say WHICH wager a deposit/payout/refund belongs to.
+ * Non-wager entries and entries without a known title pass through untouched;
+ * entries are copied, never mutated (the ledger array is shared state).
+ */
+export function annotateWagerEntries(entries = [], titles = new Map()) {
+  return entries.map((e) => {
+    if (e.class !== 'wager') return e
+    const title = titles.get(String(e.refs?.wagerId ?? ''))
+    return title ? { ...e, wagerTitle: title } : e
+  })
 }
 
 /** tokenMetaByAddress map (breakdowns) from ledger entries. */
