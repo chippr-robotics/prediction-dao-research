@@ -42,8 +42,11 @@
 
 /** Terms a nav ITEM answers to beyond its own label. */
 export const NAV_ITEM_TERMS = {
-  home: ['dashboard', 'start', 'overview'],
-  portfolio: ['balances', 'holdings', 'assets', 'net worth', 'tokens', 'nfts', 'value'],
+  // 'home' and 'portfolio' are the items' FORMER labels ("Payments" and "Accounts" now). They stay
+  // as terms because members who learned the old names — and anyone following an older screenshot,
+  // doc, or support answer — must still land on the same destination by typing them.
+  home: ['home', 'dashboard', 'start', 'overview'],
+  portfolio: ['portfolio', 'balances', 'holdings', 'assets', 'net worth', 'tokens', 'nfts', 'value'],
   earn: ['defi', 'yield', 'passive income', 'interest', 'apy'],
   trade: ['swap', 'exchange', 'dex', 'convert', 'buy', 'sell'],
   collectibles: ['nft', 'nfts', 'opensea', 'collectibles', 'gallery', 'art', 'erc-721'],

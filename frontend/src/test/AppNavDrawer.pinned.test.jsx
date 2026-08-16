@@ -155,15 +155,15 @@ describe('AppNavDrawer — pinned apps strip (spec 081 US2)', () => {
     expect(tile.querySelector('.pinned-app-tile-label')).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('leaves Quick Access as Home and Portfolio only — pins never become rows again', () => {
+  it('leaves Quick Access as Payments and Accounts only — pins never become rows again', () => {
     pin(3)
     const { container } = renderDrawer()
 
     const rowLabels = Array.from(
       container.querySelectorAll('.portal-nav-group-items .portal-nav-item-label')
     ).map((el) => el.textContent)
-    expect(rowLabels).toContain('Home')
-    expect(rowLabels).toContain('Portfolio')
+    expect(rowLabels).toContain('Payments')
+    expect(rowLabels).toContain('Accounts')
     expect(rowLabels).not.toContain('App 1')
   })
 
