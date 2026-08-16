@@ -158,7 +158,7 @@
 }
 
 .share-wager-copy-btn:hover {
-  background: linear-gradient(135deg, #3DC48B 0%, var(--brand-primary) 100%);
+  background: var(--gradient-brand);
   transform: translateY(-1px);
 }
 

@@ -349,12 +349,12 @@
 }
 
 .status-badge.demo {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-brand);
   color: white;
 }
 
 .status-badge.live {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: var(--gradient-brand-soft);
   color: white;
 }
 
@@ -770,7 +770,7 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: 8px;
-  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  background: var(--gradient-gold);
   color: #000;
   text-transform: uppercase;
   letter-spacing: 0.5px;

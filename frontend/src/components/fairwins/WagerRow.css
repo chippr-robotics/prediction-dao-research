@@ -32,7 +32,7 @@
   margin-top: 0.2rem;
   font-size: 0.7rem;
   font-weight: 600;
-  color: #9F7AEA;
+  color: var(--chart-series-c);
 }
 
 /* ── Decrypted private terms (spec 018 FR-002), rendered in the detail view ── */
@@ -113,7 +113,7 @@
 .wc-action-primary { color: #fff; background: var(--brand-secondary); }
 .wc-action-primary:hover:not(:disabled) { filter: brightness(1.08); }
 
-.wc-action-success { color: #fff; background: #16a34a; }
+.wc-action-success { color: #fff; background: var(--success-color); }
 .wc-action-success:hover:not(:disabled) { filter: brightness(1.08); }
 
 .wc-action-danger { color: var(--danger-color); background: transparent; border-color: rgba(var(--danger-color-rgb), 0.5); }

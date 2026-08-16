@@ -70,7 +70,7 @@
 
 .oc-qr-caption {
   font-size: 0.8rem;
-  color: #333;
+  color: var(--text-primary);
   text-align: center;
   max-width: 220px;
 }
@@ -86,7 +86,7 @@
 .oc-notice--warn {
   background: rgba(255, 184, 0, 0.1);
   border: 1px solid rgba(255, 184, 0, 0.35);
-  color: #d99b00;
+  color: var(--warning-text);
 }
 
 /* Take-a-challenge step checklist — shows the approve → sign → confirm sequence. */
@@ -141,7 +141,7 @@
   content: '\2713';
   background: var(--fm-accent);
   border-color: var(--fm-accent);
-  color: #0a0a0a;
+  color: var(--chippr-gunmetal);
 }
 
 /* Datetime inputs for the maker's accept/resolve deadlines. */
@@ -150,7 +150,7 @@
 }
 
 .oc-deadline-warn {
-  color: #d99b00;
+  color: var(--warning-text);
 }
 
 /* ── Deadline timeline (testing feedback) ────────────────────────────

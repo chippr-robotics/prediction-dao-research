@@ -380,7 +380,7 @@ select[aria-invalid="true"] {
 
 .status-cancelled,
 .status-default {
-  background-color: #6b7280;
+  background-color: var(--text-secondary);
 }
 
 .status-executed {

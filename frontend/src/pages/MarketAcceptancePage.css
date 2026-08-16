@@ -47,7 +47,7 @@
 
 .map-error-icon {
   font-size: 4rem;
-  color: #ef4444;
+  color: var(--danger-color);
   margin-bottom: 1.5rem;
 }
 

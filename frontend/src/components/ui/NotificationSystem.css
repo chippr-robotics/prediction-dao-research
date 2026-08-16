@@ -68,7 +68,7 @@
 /* Notification types */
 .notification-info {
   border-left: 4px solid var(--info-color);
-  color: #1e40af;
+  color: var(--info-text);
 }
 
 .notification-info .notification-icon {
@@ -76,17 +76,17 @@
 }
 
 .notification-success {
-  border-left: 4px solid #10b981;
-  color: #065f46;
+  border-left: 4px solid var(--success-color);
+  color: var(--success-text);
 }
 
 .notification-success .notification-icon {
-  color: #10b981;
+  color: var(--success-color);
 }
 
 .notification-warning {
   border-left: 4px solid var(--warning-color);
-  color: #92400e;
+  color: var(--warning-text);
 }
 
 .notification-warning .notification-icon {
@@ -94,12 +94,12 @@
 }
 
 .notification-error {
-  border-left: 4px solid #ef4444;
-  color: #991b1b;
+  border-left: 4px solid var(--danger-color);
+  color: var(--danger-text);
 }
 
 .notification-error .notification-icon {
-  color: #ef4444;
+  color: var(--danger-color);
 }
 
 /* Responsive */

@@ -75,12 +75,12 @@
 
 .supply-sheet .supply-kind-badge.trading {
   background: rgba(37, 99, 235, 0.14);
-  color: #1d4ed8;
+  color: var(--info-text);
 }
 
 .supply-sheet .supply-kind-badge.bridge {
   background: rgba(13, 148, 136, 0.14);
-  color: #0f766e;
+  color: var(--brand-secondary);
 }
 
 /* The fee block states a RATE and what it applies to. There is deliberately no room in this
@@ -164,11 +164,11 @@
 @media (prefers-color-scheme: dark) {
   .supply-sheet .supply-kind-badge.trading {
     background: rgba(96, 165, 250, 0.18);
-    color: #93c5fd;
+    color: var(--info-color);
   }
 
   .supply-sheet .supply-kind-badge.bridge {
     background: rgba(45, 212, 191, 0.18);
-    color: #5eead4;
+    color: var(--brand-accent);
   }
 }

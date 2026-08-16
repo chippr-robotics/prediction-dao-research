@@ -116,9 +116,9 @@
   color: var(--color-text-tertiary);
 }
 .bridge-status-recourse {
-  background: color-mix(in srgb, #d97706 12%, transparent);
+  background: color-mix(in srgb, var(--warning-text) 12%, transparent);
   border-radius: 10px;
-  color: #b45309;
+  color: var(--warning-text);
   padding: 0.6rem 0.75rem;
 }
 
@@ -149,8 +149,8 @@
   flex: 0 0 auto;
   margin-top: 0.35rem;
 }
-.bridge-dot.moving { background: #d97706; }
-.bridge-dot.attention { background: #b45309; }
+.bridge-dot.moving { background: var(--warning-text); }
+.bridge-dot.attention { background: var(--warning-text); }
 .bridge-dot.delivered { background: var(--color-success); }
 .bridge-dot.returned { background: var(--color-text-tertiary); }
 .bridge-dot.failed { background: var(--color-error, var(--danger-color)); }
@@ -159,7 +159,7 @@
    Transfer section's spacing. */
 .bridge-notice {
   border: 1px solid var(--color-border, var(--border-color));
-  border-left: 4px solid #d97706;
+  border-left: 4px solid var(--warning-text);
   border-radius: 12px;
   background: var(--color-surface-secondary, var(--bg-secondary));
   padding: 1rem;

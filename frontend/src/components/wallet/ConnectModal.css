@@ -116,8 +116,11 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--success-color);
-  background: color-mix(in srgb, var(--success-color) 12%, transparent);
+  /* A RECOMMENDATION, not a success state — nothing has succeeded yet. Green
+     here competed with the status palette, where green means "this worked"
+     (spec 091 screenshot round 2). Brand emphasis is what it actually means. */
+  color: var(--accent-color);
+  background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
 }

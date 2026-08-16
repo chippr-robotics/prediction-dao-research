@@ -170,7 +170,7 @@
   font-family: var(--font-sans);
   font-size: 2rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary);
   letter-spacing: 0.05em;
   margin: 8px 0;
   text-shadow: 0 0 20px rgba(var(--brand-primary-rgb), 0.4);

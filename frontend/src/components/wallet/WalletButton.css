@@ -478,13 +478,13 @@
 .my-markets-btn {
   width: 100%;
   justify-content: center;
-  background: linear-gradient(135deg, var(--brand-secondary) 0%, #3A7FD5 100%);
+  background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--info-color) 100%);
   border: none;
   color: white;
 }
 
 .my-markets-btn:hover {
-  background: linear-gradient(135deg, #5CA9FF 0%, var(--brand-secondary) 100%);
+  background: linear-gradient(135deg, var(--info-color) 0%, var(--brand-secondary) 100%);
   border: none;
   box-shadow: 0 2px 8px rgba(var(--brand-secondary-rgb), 0.3);
 }
@@ -522,8 +522,8 @@
 }
 
 .create-market-btn:hover {
-  background: #3d8b40;
-  border-color: #3d8b40;
+  background: var(--success-color);
+  border-color: var(--success-color);
 }
 
 .purchase-access-btn {

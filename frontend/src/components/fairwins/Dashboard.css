@@ -114,7 +114,7 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 0.25rem 0;
-  background: linear-gradient(135deg, var(--brand-primary) 0%, #00cec9 100%);
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -474,32 +474,32 @@
 
 .status-pending {
   background: rgba(253, 203, 110, 0.2);
-  color: #fdcb6e;
+  color: var(--warning-color);
 }
 
 .status-active {
   background: rgba(var(--success-color-rgb), 0.2);
-  color: #00b894;
+  color: var(--success-color);
 }
 
 .status-resolving {
   background: rgba(9, 132, 227, 0.2);
-  color: #0984e3;
+  color: var(--info-color);
 }
 
 .status-disputed {
   background: rgba(225, 112, 85, 0.2);
-  color: #e17055;
+  color: var(--danger-color);
 }
 
 .status-resolved {
   background: rgba(108, 92, 231, 0.2);
-  color: #a29bfe;
+  color: var(--chart-series-c);
 }
 
 .status-expired {
   background: rgba(99, 110, 114, 0.2);
-  color: #636e72;
+  color: var(--text-muted);
 }
 
 /* ============================================================================
@@ -897,9 +897,9 @@
 }
 
 .welcome-resolution-accent-either { background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent)); }
-.welcome-resolution-accent-initiator { background: linear-gradient(90deg, #6366f1, #818cf8); }
-.welcome-resolution-accent-receiver { background: linear-gradient(90deg, #2962ff, #448aff); }
-.welcome-resolution-accent-thirdparty { background: linear-gradient(90deg, var(--danger-color), #ff7961); }
+.welcome-resolution-accent-initiator { background: linear-gradient(90deg, var(--chart-series-d), var(--chart-series-c)); }
+.welcome-resolution-accent-receiver { background: linear-gradient(90deg, var(--info-color), var(--info-color)); }
+.welcome-resolution-accent-thirdparty { background: linear-gradient(90deg, var(--danger-color), var(--danger-color)); }
 
 .welcome-resolution-card h3 {
   font-size: 0.95rem;
