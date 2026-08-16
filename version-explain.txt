@@ -1,37 +1,10 @@
-previous: v1.9.0
-commits:  32
-  [unclassified] Merge pull request #1203 from chippr-robotics/staging
-  [unclassified] Merge pull request #1202 from chippr-robotics/claude/activity-stats-wager-messages-n4ul0r
-  [test -> patch] assert full explorer URL prefixes, not host substrings
-  [feat -> minor] merge activity and stats across the cohort (spec 092)
-  [docs -> patch] task breakdown for 092 multi-chain activity
-  [docs -> patch] plan + design artifacts for 092 multi-chain activity
-  [docs -> patch] renumber multi-chain activity to 092 (091 double-booked)
-  [unclassified] Merge pull request #1201 from chippr-robotics/claude/fairwins-neutral-tokens-doqie6
-  [unclassified] Merge pull request #1200 from chippr-robotics/claude/activity-stats-wager-messages-n4ul0r
-  [refactor -> patch] consolidate the remaining colour literals onto tokens
-  [unclassified] Merge origin/staging: renumber spec to 091, adopt brand tokens
-  [unclassified] Merge pull request #1199 from chippr-robotics/claude/fairwins-chippr-branding-doqie6
-  [unclassified] Merge pull request #1198 from chippr-robotics/claude/finops-grafana-dashboard-pjfc8z
-  [docs -> patch] draft spec 090 — multi-chain activity ledger
-  [feat -> minor] estate-wide stats and account-aware empty states
-  [fix -> patch] restore finops spec references clobbered by the brand spec renumber
-  [feat -> minor] show the wager's message on wager activity entries
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/fairwins-chippr-branding-doqie6
-  [fix -> patch] resolve the four findings from the actor-critic screenshot loop
-  [fix -> patch] staleness alerts fired for every not-configured source
-  [feat -> minor] align app styling defaults with Chippr Brand Guidelines v1.0
-  [unclassified] Merge pull request #1195 from chippr-robotics/claude/finops-grafana-dashboard-pjfc8z
-  [unclassified] Merge pull request #1196 from chippr-robotics/chore/backmerge-main-into-staging
-  [unclassified] Merge pull request #1197 from chippr-robotics/chore/backmerge-automation
-  [fix -> patch] unblock and automate the main-into-staging back-merge
-  [fix -> patch] six honesty defects found in review
-  [fix -> patch] let the release set the new manifests' versions
-  [feat -> minor] real-time revenue and cost observability (spec 089)
-  [unclassified] Merge pull request #1194 from chippr-robotics/claude/side-panel-quick-access-labels-3i3xeh
-  [fix -> patch] rename drawer Quick Access labels to Payments and Accounts
-  [unclassified] Merge pull request #1193 from chippr-robotics/release/v1.9.0-changelog
-  [skipped] chore(release): v1.9.0 [skip release]
-bump:     minor
+previous: v1.10.0
+commits:  5
+  [unclassified] Merge pull request #1207 from chippr-robotics/staging
+  [unclassified] Merge pull request #1206 from chippr-robotics/chore/auto-backmerge-main-into-staging
+  [chore -> patch] wire the exporter's deploy config (#1205)
+  [unclassified] Merge pull request #1204 from chippr-robotics/release/v1.10.0-changelog
+  [skipped] chore(release): v1.10.0 [skip release]
+bump:     patch
 reason:   computed
-next:     v1.10.0
+next:     v1.10.1

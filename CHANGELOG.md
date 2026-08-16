@@ -14,6 +14,27 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.10.1 — 2026-08-16
+
+Promoted from: v1.10.1-rc.2
+Previous release: v1.10.0 · Range: `v1.10.0..v1.10.1` (5 commits)
+
+### 🧹 Maintenance
+
+- chore(finops): wire the exporter's deploy config (#1205)
+
+### Artifacts
+
+Range: `v1.10.0..v1.10.1`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.10.0 — 2026-08-16
 
 Promoted from: v1.10.0-rc.6
