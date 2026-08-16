@@ -130,7 +130,7 @@ services:
   # key material ever lands there.
   finops:
     container_name: fairwins-gateway-finops
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:latest
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:finops-089
     restart: unless-stopped
     pull_policy: missing
     network_mode: "service:gateway"
@@ -147,17 +147,23 @@ services:
       PAYMASTER_ADDRESS_137: "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105"
       GAS_WALLET_63: "0xf505d95F62bEE94437C112d3D64ee7Df0Fa973aC"
       GAS_WALLET_137: "0x3BB28b184b8a748dE22aBD076634F85adADA82db"
-      # FEE_ROUTER_ADDRESS / MEMBERSHIP_MANAGER_ADDRESS / BUNDLER_EXECUTOR_137: set these to light up
-      # fee, membership and bundler-pool panels. Unset is HONEST — those sources report
-      # `not-configured` rather than a fabricated zero — so leaving one unset degrades one panel and
-      # nothing else.
+      # Read from deployments/polygon-chain137-v2.json — the recorded source of truth for addresses.
+      # Unset would be HONEST (those sources report `not-configured` rather than a fabricated zero),
+      # but all three are deployed, so leaving them unset would hide revenue that exists.
+      FEE_ROUTER_ADDRESS: "0xf8161fC26172621E9fbcc6c39500Bb14b0902B35"
+      MEMBERSHIP_MANAGER_ADDRESS: "0xEfd1a880c6BfBf38A661A3F5fF6d5ECB296D557a"
+      BUNDLER_EXECUTOR_137: "0x7C6da19ae005D4F13BB8660Ac989c48aCcFE84F6"
       GCP_PROJECT_ID: "chippr-bots-site-wp"
       FINOPS_BILLING_DATASET: "billing_export"
       # Cloudflare and QuickNode publish NO dollar figure (spec 089 research R1). These declared plan
       # prices are what the `modelled` cost is computed from, and the dashboard labels it as such.
       # Unset ⇒ usage is still reported, no dollar figure is invented.
-      # FINOPS_CLOUDFLARE_PLAN_USD / FINOPS_QUICKNODE_PLAN_USD: set once the plan prices are confirmed.
-      CLOUDFLARE_ZONE_ID: ""
+      # The zone is on Cloudflare's FREE plan, so 0 here is an ASSERTED zero, not an unset default —
+      # which is the distinction the collector draws: unset reports `not-configured`, 0 reports a
+      # modelled cost of nothing. QuickNode stays unset until the account upgrade, and correctly
+      # reports `not-configured` rather than inventing a figure.
+      CLOUDFLARE_ZONE_ID: "a548702815279eab4646275cde3be103"
+      FINOPS_CLOUDFLARE_PLAN_USD: "0"
     cpus: 0.2
     mem_limit: 192m
     healthcheck:
@@ -187,8 +193,8 @@ services:
       - /run/fairwins/alloy.env    # GRAFANA_CLOUD_PROM_TOKEN only.
     environment:
       # Endpoint and username are ACCOUNT IDENTIFIERS, not secrets; only the token is fetched.
-      GRAFANA_CLOUD_PROM_URL: ""
-      GRAFANA_CLOUD_PROM_USER: ""
+      GRAFANA_CLOUD_PROM_URL: "https://prometheus-prod-66-prod-us-east-3.grafana.net/api/prom/push"
+      GRAFANA_CLOUD_PROM_USER: "3500268"
       FINOPS_COHORT: "mainnet"
       FW_NODE_NAME: "fairwins-gateway"
     command:
