@@ -81,6 +81,26 @@ describe('useAccountStats({ accountAddress }) — acting override (spec 074)', (
     await waitFor(() => expect(result.current.summary.walletBalanceUsd).toBe(5))
   })
 
+  it('annotates wager activity entries with the wager message from the loaded records', async () => {
+    listMyWagers.mockResolvedValueOnce({
+      items: [{ id: 7, metadata: { name: 'Pizza bet with Sam' } }],
+      hasMore: false,
+      nextCursor: null,
+    })
+    listEntries.mockResolvedValueOnce({
+      entries: [
+        { entryId: 'w-7', class: 'wager', kind: 'deposit', refs: { wagerId: '7' } },
+        { entryId: 't-1', class: 'transfer', kind: 'send', refs: {} },
+      ],
+      staleClasses: [],
+      prunedBefore: null,
+    })
+    const { result } = renderHook(() => useAccountStats())
+    await waitFor(() => expect(result.current.activity).toHaveLength(2))
+    expect(result.current.activity[0].wagerTitle).toBe('Pizza bet with Sam')
+    expect(result.current.activity[1].wagerTitle).toBeUndefined()
+  })
+
   it('clears held balances when the effective address changes (A4)', async () => {
     const { result, rerender } = renderHook(({ accountAddress }) => useAccountStats({ accountAddress }), {
       initialProps: { accountAddress: ACTING },

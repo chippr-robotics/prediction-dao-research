@@ -43,6 +43,7 @@ const entries = [
     timestampProvenance: 'chain',
     txHash: TX_A,
     refs: { wagerId: '1' },
+    wagerTitle: 'Pizza bet with Sam',
   },
   {
     entryId: `oc:80002:wt:${TX_B}-1-deposit`,
@@ -58,7 +59,7 @@ const entries = [
     timestamp: NOW - 120_000,
     timestampProvenance: 'chain',
     txHash: TX_B,
-    refs: { wagerId: '1' },
+    refs: { wagerId: '2' },
   },
   {
     entryId: 'cl:t-9',
@@ -86,6 +87,31 @@ describe('RecentActivityFeed (spec 051 US1)', () => {
     expect(screen.getByText('Deposit')).toBeInTheDocument()
     expect(screen.getByText('Transfer')).toBeInTheDocument()
     expect(screen.getAllByText('USDC').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('says which wager an entry belongs to: the wager message, or "Wager #id" when untitled', () => {
+    render(<RecentActivityFeed entries={entries} chainId={80002} />)
+    // The payout carries its wager's message (annotated upstream from the
+    // member's wager records — the same title My Wagers renders).
+    expect(screen.getByText('Pizza bet with Sam')).toBeInTheDocument()
+    // The deposit's wager has no known title — the id still identifies it.
+    expect(screen.getByText('Wager #2')).toBeInTheDocument()
+    // Non-wager entries get no context line.
+    expect(screen.queryByText(/Wager #(?!2)/)).not.toBeInTheDocument()
+  })
+
+  it('finds wager entries by their message and by wager id', async () => {
+    const user = userEvent.setup()
+    render(<RecentActivityFeed entries={entries} chainId={80002} />)
+    await user.click(screen.getByRole('button', { name: /search activity/i }))
+    const input = screen.getByRole('searchbox', { name: /search activity/i })
+    await user.type(input, 'pizza bet')
+    expect(screen.getByText('Payout')).toBeInTheDocument()
+    expect(screen.queryByText('Deposit')).not.toBeInTheDocument()
+    await user.clear(input)
+    await user.type(input, '#2')
+    expect(screen.getByText('Deposit')).toBeInTheDocument()
+    expect(screen.queryByText('Payout')).not.toBeInTheDocument()
   })
 
   it('builds an explorer link only for entries with a real transaction hash', () => {

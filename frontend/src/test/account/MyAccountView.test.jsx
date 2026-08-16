@@ -241,3 +241,66 @@ describe('MyAccountView — unified account experience (spec 074)', () => {
     expect(screen.getByRole('button', { name: /create a wager/i })).toBeInTheDocument()
   })
 })
+
+describe('MyAccountView — imported/acting accounts get useful stats, not a wager pitch', () => {
+  const actAsRecovered = () => {
+    effectiveAccount = {
+      ...effectiveAccount,
+      type: 'legacy',
+      address: '0x5250000000000000000000000000000000000000',
+      label: 'Mordor Hot',
+      isActingAccount: true,
+    }
+  }
+  const estatePortfolio = () => ({
+    ...readyPortfolio(),
+    holdings: [{ network: 'Mordor Testnet', balance: 5000, usd: 11555.68, asset: { id: 'metc' } }],
+    categories: [
+      { category: { id: 'network-assets', label: 'Network Assets' }, aggregates: [{ balance: 5000 }], subtotalUsd: 11555.68 },
+    ],
+    totalUsd: 11555.68,
+  })
+
+  it('never pitches "Create a wager" at an acting account with no activity', () => {
+    actAsRecovered()
+    useAccountStatsMock.mockImplementation(() => ({ ...baseStats(), isEmpty: true }))
+    renderView('/wallet?tab=account&view=activity')
+    expect(screen.getByText(/no activity recorded yet/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create a wager/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the estate breakdown on Stats for an empty acting account instead of a blanket empty state', () => {
+    actAsRecovered()
+    useAccountStatsMock.mockImplementation(() => ({ ...baseStats(), isEmpty: true }))
+    usePortfolioMock.mockImplementation(() => estatePortfolio())
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
+    expect(screen.getByText('Mordor Testnet')).toBeInTheDocument()
+    expect(screen.getByText(/no wager activity for this account/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create a wager/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps the create CTA on Stats for an empty PERSONAL account, alongside the estate', () => {
+    useAccountStatsMock.mockImplementation(() => ({ ...baseStats(), isEmpty: true }))
+    usePortfolioMock.mockImplementation(() => estatePortfolio())
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create a wager/i })).toBeInTheDocument()
+  })
+
+  it('renders the estate breakdown beside the wager stats when wager data exists', () => {
+    usePortfolioMock.mockImplementation(() => estatePortfolio())
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/wallet balance/i)).toBeInTheDocument()
+    expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
+  })
+
+  it('still shows the estate on Stats when the active network is unsupported', () => {
+    actAsRecovered()
+    useAccountStatsMock.mockImplementation(() => ({ ...baseStats(), isSupportedNetwork: false }))
+    usePortfolioMock.mockImplementation(() => estatePortfolio())
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
+    expect(screen.getByText(/wager stats unavailable here/i)).toBeInTheDocument()
+  })
+})

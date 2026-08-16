@@ -1,0 +1,101 @@
+.estate-breakdown {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  padding: 14px 16px;
+  margin: 0 0 16px;
+}
+
+.estate-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.estate-title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.estate-total {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.estate-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .estate-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+.estate-group-title {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.estate-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.estate-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 30%) 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.estate-row-label {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* One measure, one hue: the bar encodes magnitude only — identity is the text
+   label and the exact value sits beside every bar, so color is never the sole
+   carrier. Track and fill both come from theme tokens (light + dark). */
+.estate-row-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.estate-row-bar {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--brand-primary);
+}
+
+.estate-row-value {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.estate-note {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, var(--text-secondary));
+}

@@ -208,6 +208,17 @@
   color: var(--text-secondary);
 }
 
+/* The wager's message — WHICH wager this deposit/payout/refund belongs to.
+   One line, ellipsized: the full message lives in the title attribute and in
+   My Wagers; the feed row only needs to identify the wager. */
+.account-feed-context {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .account-feed-token {
   color: var(--text-muted, var(--text-secondary));
 }
