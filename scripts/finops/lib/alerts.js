@@ -109,17 +109,38 @@ export function buildAlertRules(sources) {
       rule({
         uid: `finops-stale-${source.id}`,
         title: `FinOps source stale: ${source.label}`,
-        // Only alerts for sources that ARE configured. A not-configured source is an unwired
-        // feature, and paging about it every interval forever is how an alert channel gets muted.
+        /**
+         * THIS EXPRESSION MUST ALWAYS PRODUCE A SAMPLE. That is the whole reason for its shape.
+         *
+         * The obvious form — `time() - last_success > N and on(source) configured == 1` — yields an
+         * EMPTY vector for a source that has never been read successfully, because
+         * `source_last_success_timestamp_seconds` is absent until the first success. Combined with
+         * `noDataState: Alerting` (correct, and kept), empty means FIRING. So every legitimately
+         * `not-configured` source — an unset vendor token, an unregistered referral code, a contract
+         * address left blank — would page immediately and forever, which is precisely what FR-006
+         * says must not happen and exactly how an alert channel gets muted.
+         *
+         * Both gauges here are emitted on every scrape for every live source, so the product always
+         * has a value:
+         *
+         *   read            1 * (1 - 1) = 0   quiet
+         *   unreadable      1 * (1 - 0) = 1   fires   <- the condition we want
+         *   not-configured  0 * (1 - 0) = 0   quiet   <- an unwired feature is not an outage
+         *
+         * NoData now means something real and worth paging for: the exporter stopped being scraped
+         * at all. `for: 15m` supplies the duration that `last_success` used to; the exact age is on
+         * the Source health panel and at /status.
+         */
         expr:
-          `(time() - fairwins_finops_source_last_success_timestamp_seconds{source="${source.id}"} > ${source.interval * 4}) ` +
-          `and on(source) (fairwins_finops_source_configured{source="${source.id}"} == 1)`,
+          `fairwins_finops_source_configured{source="${source.id}"} * ` +
+          `(1 - fairwins_finops_source_up{source="${source.id}"})`,
         evaluator: { type: 'gt', params: [0] },
         forDuration: '15m',
         severity: source.kind === 'cost' && source.collector === 'pools' ? 'critical' : 'warning',
         summary:
-          `${source.label} has not been read successfully for more than ${source.interval * 4}s. ` +
-          `Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.`,
+          `${source.label} is configured but could not be read for 15m. ` +
+          `Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. ` +
+          `(A source that is merely not-configured does NOT reach this alert.)`,
         runbookAnchor: source.docs.split('#')[1] ?? 'source-health',
         labels: { source: source.id },
       }),

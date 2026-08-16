@@ -153,7 +153,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-earn-lend\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-earn-lend\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-earn-lend\"} * (1 - fairwins_finops_source_up{source=\"fee-earn-lend\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -197,7 +197,7 @@
             "source": "fee-earn-lend"
           },
           "annotations": {
-            "summary": "Earn — lending fee has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Earn — lending fee is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fee-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Earn — lending fee."
           }
@@ -219,7 +219,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-polymarket-taker\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-polymarket-taker\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-polymarket-taker\"} * (1 - fairwins_finops_source_up{source=\"fee-polymarket-taker\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -263,7 +263,7 @@
             "source": "fee-polymarket-taker"
           },
           "annotations": {
-            "summary": "Predict — Polymarket taker (builder fee) has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Predict — Polymarket taker (builder fee) is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fee-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Predict — Polymarket taker (builder fee)."
           }
@@ -285,7 +285,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-polymarket-maker\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-polymarket-maker\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-polymarket-maker\"} * (1 - fairwins_finops_source_up{source=\"fee-polymarket-maker\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -329,7 +329,7 @@
             "source": "fee-polymarket-maker"
           },
           "annotations": {
-            "summary": "Predict — Polymarket maker (builder fee) has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Predict — Polymarket maker (builder fee) is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fee-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Predict — Polymarket maker (builder fee)."
           }
@@ -351,7 +351,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-stake-lido\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-stake-lido\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-stake-lido\"} * (1 - fairwins_finops_source_up{source=\"fee-stake-lido\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -395,7 +395,7 @@
             "source": "fee-stake-lido"
           },
           "annotations": {
-            "summary": "Stake — Lido liquid staking has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Stake — Lido liquid staking is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fee-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Stake — Lido liquid staking."
           }
@@ -417,7 +417,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-stake-polygon\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-stake-polygon\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-stake-polygon\"} * (1 - fairwins_finops_source_up{source=\"fee-stake-polygon\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -461,7 +461,7 @@
             "source": "fee-stake-polygon"
           },
           "annotations": {
-            "summary": "Stake — Polygon liquid staking has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Stake — Polygon liquid staking is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fee-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Stake — Polygon liquid staking."
           }
@@ -483,7 +483,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-bridge-transfer\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-bridge-transfer\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-bridge-transfer\"} * (1 - fairwins_finops_source_up{source=\"fee-bridge-transfer\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -527,7 +527,7 @@
             "source": "fee-bridge-transfer"
           },
           "annotations": {
-            "summary": "Bridge — transfer fee has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Bridge — transfer fee is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fee-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Bridge — transfer fee."
           }
@@ -549,7 +549,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-liquidity-deposit\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-liquidity-deposit\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-liquidity-deposit\"} * (1 - fairwins_finops_source_up{source=\"fee-liquidity-deposit\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -593,7 +593,7 @@
             "source": "fee-liquidity-deposit"
           },
           "annotations": {
-            "summary": "Supply — liquidity deposit fee has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Supply — liquidity deposit fee is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fee-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Supply — liquidity deposit fee."
           }
@@ -615,7 +615,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-perps-hl-builder\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-perps-hl-builder\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-perps-hl-builder\"} * (1 - fairwins_finops_source_up{source=\"fee-perps-hl-builder\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -659,7 +659,7 @@
             "source": "fee-perps-hl-builder"
           },
           "annotations": {
-            "summary": "Perps — Hyperliquid builder fee has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Perps — Hyperliquid builder fee is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fee-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Perps — Hyperliquid builder fee."
           }
@@ -681,7 +681,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"fee-waived-no-treasury\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"fee-waived-no-treasury\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"fee-waived-no-treasury\"} * (1 - fairwins_finops_source_up{source=\"fee-waived-no-treasury\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -725,7 +725,7 @@
             "source": "fee-waived-no-treasury"
           },
           "annotations": {
-            "summary": "Fees waived (no treasury configured) has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Fees waived (no treasury configured) is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#fees-waived",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Fees waived (no treasury configured)."
           }
@@ -747,7 +747,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"membership-received\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"membership-received\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"membership-received\"} * (1 - fairwins_finops_source_up{source=\"membership-received\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -791,7 +791,7 @@
             "source": "membership-received"
           },
           "annotations": {
-            "summary": "Membership — received by treasury has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Membership — received by treasury is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#membership-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Membership — received by treasury."
           }
@@ -813,7 +813,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"membership-accrued\"} > 480) and on(source) (fairwins_finops_source_configured{source=\"membership-accrued\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"membership-accrued\"} * (1 - fairwins_finops_source_up{source=\"membership-accrued\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -857,7 +857,7 @@
             "source": "membership-accrued"
           },
           "annotations": {
-            "summary": "Membership — accrued, not yet withdrawn has not been read successfully for more than 480s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Membership — accrued, not yet withdrawn is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#membership-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Membership — accrued, not yet withdrawn."
           }
@@ -879,7 +879,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"referral-opensea\"} > 14400) and on(source) (fairwins_finops_source_configured{source=\"referral-opensea\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"referral-opensea\"} * (1 - fairwins_finops_source_up{source=\"referral-opensea\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -923,7 +923,7 @@
             "source": "referral-opensea"
           },
           "annotations": {
-            "summary": "Collect — OpenSea referral has not been read successfully for more than 14400s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Collect — OpenSea referral is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#referral-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Collect — OpenSea referral."
           }
@@ -945,7 +945,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"referral-gains\"} > 14400) and on(source) (fairwins_finops_source_configured{source=\"referral-gains\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"referral-gains\"} * (1 - fairwins_finops_source_up{source=\"referral-gains\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -989,7 +989,7 @@
             "source": "referral-gains"
           },
           "annotations": {
-            "summary": "Perps — Gains referral has not been read successfully for more than 14400s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Perps — Gains referral is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#referral-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Perps — Gains referral."
           }
@@ -1011,7 +1011,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"referral-gmx\"} > 14400) and on(source) (fairwins_finops_source_configured{source=\"referral-gmx\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"referral-gmx\"} * (1 - fairwins_finops_source_up{source=\"referral-gmx\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1055,7 +1055,7 @@
             "source": "referral-gmx"
           },
           "annotations": {
-            "summary": "Perps — GMX referral has not been read successfully for more than 14400s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Perps — GMX referral is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#referral-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Perps — GMX referral."
           }
@@ -1077,7 +1077,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"referral-polymarket-rewards\"} > 14400) and on(source) (fairwins_finops_source_configured{source=\"referral-polymarket-rewards\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"referral-polymarket-rewards\"} * (1 - fairwins_finops_source_up{source=\"referral-polymarket-rewards\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1121,7 +1121,7 @@
             "source": "referral-polymarket-rewards"
           },
           "annotations": {
-            "summary": "Predict — Polymarket weekly builder rewards has not been read successfully for more than 14400s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Predict — Polymarket weekly builder rewards is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#referral-revenue",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Predict — Polymarket weekly builder rewards."
           }
@@ -1143,7 +1143,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"paymaster-gas\"} > 240) and on(source) (fairwins_finops_source_configured{source=\"paymaster-gas\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"paymaster-gas\"} * (1 - fairwins_finops_source_up{source=\"paymaster-gas\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1187,7 +1187,7 @@
             "source": "paymaster-gas"
           },
           "annotations": {
-            "summary": "Paymaster — sponsored gas has not been read successfully for more than 240s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Paymaster — sponsored gas is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#prepaid-pools",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Paymaster — sponsored gas."
           }
@@ -1209,7 +1209,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"relayer-gas-polygon\"} > 240) and on(source) (fairwins_finops_source_configured{source=\"relayer-gas-polygon\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"relayer-gas-polygon\"} * (1 - fairwins_finops_source_up{source=\"relayer-gas-polygon\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1253,7 +1253,7 @@
             "source": "relayer-gas-polygon"
           },
           "annotations": {
-            "summary": "Relayer gas — Polygon has not been read successfully for more than 240s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Relayer gas — Polygon is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#prepaid-pools",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Relayer gas — Polygon."
           }
@@ -1275,7 +1275,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"relayer-gas-mordor\"} > 240) and on(source) (fairwins_finops_source_configured{source=\"relayer-gas-mordor\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"relayer-gas-mordor\"} * (1 - fairwins_finops_source_up{source=\"relayer-gas-mordor\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1319,7 +1319,7 @@
             "source": "relayer-gas-mordor"
           },
           "annotations": {
-            "summary": "Relayer gas — Mordor has not been read successfully for more than 240s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Relayer gas — Mordor is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#prepaid-pools",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Relayer gas — Mordor."
           }
@@ -1341,7 +1341,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"bundler-gas-polygon\"} > 240) and on(source) (fairwins_finops_source_configured{source=\"bundler-gas-polygon\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"bundler-gas-polygon\"} * (1 - fairwins_finops_source_up{source=\"bundler-gas-polygon\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1385,7 +1385,7 @@
             "source": "bundler-gas-polygon"
           },
           "annotations": {
-            "summary": "Bundler gas — Polygon has not been read successfully for more than 240s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Bundler gas — Polygon is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#prepaid-pools",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Bundler gas — Polygon."
           }
@@ -1407,7 +1407,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"gcp\"} > 86400) and on(source) (fairwins_finops_source_configured{source=\"gcp\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"gcp\"} * (1 - fairwins_finops_source_up{source=\"gcp\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1451,7 +1451,7 @@
             "source": "gcp"
           },
           "annotations": {
-            "summary": "GCP has not been read successfully for more than 86400s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "GCP is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#gcp-cost",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: GCP."
           }
@@ -1473,7 +1473,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"cloudflare\"} > 14400) and on(source) (fairwins_finops_source_configured{source=\"cloudflare\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"cloudflare\"} * (1 - fairwins_finops_source_up{source=\"cloudflare\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1517,7 +1517,7 @@
             "source": "cloudflare"
           },
           "annotations": {
-            "summary": "Cloudflare has not been read successfully for more than 14400s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Cloudflare is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#cloudflare-cost",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Cloudflare."
           }
@@ -1539,7 +1539,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"quicknode\"} > 14400) and on(source) (fairwins_finops_source_configured{source=\"quicknode\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"quicknode\"} * (1 - fairwins_finops_source_up{source=\"quicknode\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1583,7 +1583,7 @@
             "source": "quicknode"
           },
           "annotations": {
-            "summary": "QuickNode has not been read successfully for more than 14400s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "QuickNode is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#quicknode-cost",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: QuickNode."
           }
@@ -1605,7 +1605,7 @@
               "datasourceUid": "${datasource}",
               "model": {
                 "refId": "A",
-                "expr": "(time() - fairwins_finops_source_last_success_timestamp_seconds{source=\"grafana-cloud\"} > 14400) and on(source) (fairwins_finops_source_configured{source=\"grafana-cloud\"} == 1)",
+                "expr": "fairwins_finops_source_configured{source=\"grafana-cloud\"} * (1 - fairwins_finops_source_up{source=\"grafana-cloud\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
@@ -1649,7 +1649,7 @@
             "source": "grafana-cloud"
           },
           "annotations": {
-            "summary": "Grafana Cloud (this system) has not been read successfully for more than 14400s. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero.",
+            "summary": "Grafana Cloud (this system) is configured but could not be read for 15m. Its panels show no data; any total including it is PARTIAL. An unread source is not a zero. (A source that is merely not-configured does NOT reach this alert.)",
             "runbook_url": "https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md#self-cost",
             "description": "Observed: {{ $values.A }}. Rule: FinOps source stale: Grafana Cloud (this system)."
           }
