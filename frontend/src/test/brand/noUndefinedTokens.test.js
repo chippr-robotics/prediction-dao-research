@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, relative, join, sep } from 'node:path'
 
-// Guard against `var(--token-that-does-not-exist, #hardcoded)` (spec 089).
+// Guard against `var(--token-that-does-not-exist, #hardcoded)` (spec 090).
 //
 // WHY THIS EXISTS
 // This is the bug the screenshot round found that no other check could. The app
@@ -128,7 +128,7 @@ function report(findings) {
   return lines.join('\n')
 }
 
-describe('no undefined CSS custom properties (spec 089)', () => {
+describe('no undefined CSS custom properties (spec 090)', () => {
   it('finds theme tokens to check against', () => {
     // A parser that silently matched nothing would make the assertion below
     // pass for the wrong reason — every var() would look "defined" or none would.

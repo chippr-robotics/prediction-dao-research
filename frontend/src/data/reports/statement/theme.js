@@ -22,7 +22,7 @@
 /**
  * Canonical FairWins-default brand tokens; also the fallback for a thin brand.
  *
- * Chippr Robotics Brand Guidelines v1.0 (spec 089). These are the print/PDF
+ * Chippr Robotics Brand Guidelines v1.0 (spec 090). These are the print/PDF
  * equivalents of the app's `--brand-primary` / status tokens — kept as literals
  * because a generated document has no CSS custom properties to read.
  */

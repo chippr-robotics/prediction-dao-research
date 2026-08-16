@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, relative, join, sep } from 'node:path'
 
-// Regression guard for spec 089 — Chippr brand alignment.
+// Regression guard for spec 090 — Chippr brand alignment.
 //
 // The FairWins app shipped a green/blue palette (#36B37E Winning Green, #4C9AFF
 // Odds Blue, #7BDCB5 Momentum Mint) that the Chippr Robotics Brand Guidelines
@@ -13,7 +13,7 @@ import { dirname, resolve, relative, join, sep } from 'node:path'
 //
 // This guard exists because the palette lives in ONE place (theme.css + the
 // tenant manifest) only for as long as nobody restates a value inline. Before
-// spec 089 there were 686 hex literals and 169 rgba() brand triples spread over
+// spec 090 there were 686 hex literals and 169 rgba() brand triples spread over
 // 74 CSS files — 447 of them #36B37E alone — which meant the "single source of
 // truth" governed almost nothing. A reintroduced literal doesn't fail visibly;
 // it just quietly stops tracking the palette until somebody notices two
@@ -21,7 +21,7 @@ import { dirname, resolve, relative, join, sep } from 'node:path'
 //
 // Scope note: this guard bans the RETIRED BRAND HUES, not every hardcoded
 // color. The remaining Tailwind-ish neutral greys (#6B7280 and friends) are
-// pre-existing debt tracked separately (spec 089 research R8) — they are not
+// pre-existing debt tracked separately (spec 090 research R8) — they are not
 // brand hues and do not clash with the teal system.
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -126,7 +126,7 @@ function report(violations) {
     `${violations.length} retired brand color literal(s) in ${byFile.size} file(s).`,
     '',
     'Color must come from a token so the palette stays changeable from one place.',
-    'See specs/089-chippr-brand-alignment/contracts/color-tokens.md for the mapping.',
+    'See specs/090-chippr-brand-alignment/contracts/color-tokens.md for the mapping.',
     '',
   ]
   for (const [file, vs] of byFile) {
@@ -137,7 +137,7 @@ function report(violations) {
   return lines.join('\n')
 }
 
-describe('no legacy brand colors in shipped styling (spec 089)', () => {
+describe('no legacy brand colors in shipped styling (spec 090)', () => {
   it('finds files to scan', () => {
     // A glob that silently matches nothing would make every assertion below
     // pass for the wrong reason.

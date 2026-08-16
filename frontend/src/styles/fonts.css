@@ -1,5 +1,5 @@
 /**
- * Brand typefaces — Chippr Robotics Brand Guidelines v1.0, slide 12 (spec 089).
+ * Brand typefaces — Chippr Robotics Brand Guidelines v1.0, slide 12 (spec 090).
  *
  *   Space Grotesk  — display: headlines, hero copy, the wordmark
  *   Inter          — text & UI: body copy, interfaces, documentation
@@ -14,7 +14,7 @@
  * disclose app usage to that third party on every cold load. Serving from our
  * own origin needs no CSP change at all (`font-src 'self'` is already granted)
  * and leaves the Google origins REMOVABLE later — a tightening the CDN route
- * blocks. See specs/089-chippr-brand-alignment/research.md R7.
+ * blocks. See specs/090-chippr-brand-alignment/research.md R7.
  *
  * Variable fonts: one file per family covers the whole weight range, so the
  * three faces cost three requests rather than one per weight. @fontsource sets

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-shot font-stack codemod for spec 089 (Chippr brand alignment).
+ * One-shot font-stack codemod for spec 090 (Chippr brand alignment).
  *
  * WHY THIS EXISTS
  * Defining --font-sans/--font-display/--font-mono at :root does not make the

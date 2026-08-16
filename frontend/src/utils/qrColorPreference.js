@@ -9,7 +9,7 @@
  * scannable code by construction. Inverted (light-on-dark) options are
  * excluded — many scanners cannot read them.
  *
- * Brand note (spec 089): Chippr Teal #2E7D8C measures only 4.74:1 on white and
+ * Brand note (spec 090): Chippr Teal #2E7D8C measures only 4.74:1 on white and
  * so cannot be offered here. Teal 700 #1F5966 — the palette's deep anchor, and
  * the same colour the app uses for links — measures 7.84:1 and IS offered, so
  * a member can put the brand colour on their code without picking one that

@@ -1,6 +1,6 @@
 # Research: Chippr Brand Alignment
 
-**Feature**: 089-chippr-brand-alignment
+**Feature**: 090-chippr-brand-alignment
 **Date**: 2026-08-16
 
 ## R1 — Are the guidelines' published contrast numbers trustworthy?

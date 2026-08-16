@@ -20,6 +20,7 @@ echo "==> removing node_modules trees and the lockfile"
 rm -rf node_modules \
        frontend/node_modules \
        services/relay-gateway/node_modules \
+       services/finops-exporter/node_modules \
        services/relayer/node_modules \
        subgraph/node_modules \
        tools/miniapp-build/node_modules \

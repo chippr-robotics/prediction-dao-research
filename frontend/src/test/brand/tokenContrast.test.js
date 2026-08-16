@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
-// WCAG 2.1 AA contrast audit over the shipped color tokens (spec 089).
+// WCAG 2.1 AA contrast audit over the shipped color tokens (spec 090).
 //
 // Constitution V requires WCAG 2.1 AA. Before this guard, that was asserted by
 // hand at design time and then trusted forever — which is how a token tweak
@@ -17,7 +17,7 @@ import { dirname, resolve } from 'node:path'
 // shipped an accessibility regression under the banner of following the brand.
 //
 // The obligations below are the contract in
-// specs/089-chippr-brand-alignment/contracts/color-tokens.md. If that file and
+// specs/090-chippr-brand-alignment/contracts/color-tokens.md. If that file and
 // this test disagree, one of them is a bug.
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -185,7 +185,7 @@ const THEMES = [
   { name: 'dark', selectors: DARK_SELECTORS },
 ]
 
-describe('shipped color tokens meet WCAG 2.1 AA (spec 089)', () => {
+describe('shipped color tokens meet WCAG 2.1 AA (spec 090)', () => {
   const css = readFileSync(THEME_CSS, 'utf8')
 
   it.each(THEMES)('$name theme defines every token an obligation names', ({ selectors }) => {

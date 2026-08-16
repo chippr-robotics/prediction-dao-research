@@ -1,4 +1,4 @@
-# Actor-critic screen validation — Chippr brand alignment (spec 089)
+# Actor-critic screen validation — Chippr brand alignment (spec 090)
 
 **FR-023 / SC-003.** Real screenshots of the running app, critiqued against a written checklist,
 fixed, and re-captured until a full round produced no findings.

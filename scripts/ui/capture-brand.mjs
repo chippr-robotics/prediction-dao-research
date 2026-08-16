@@ -1,9 +1,9 @@
 /**
- * Visual capture harness for the Chippr brand alignment (spec 089) — the "actor" half of the
+ * Visual capture harness for the Chippr brand alignment (spec 090) — the "actor" half of the
  * actor-critic screenshot loop. It renders the REAL app in a real browser across the surfaces a
  * member actually touches and writes PNGs for a critic to judge against the brand contract; fixes
  * land in the token layer or the component CSS and the loop repeats until a full round is clean.
- * Final shots live in `specs/089-chippr-brand-alignment/screenshots/`.
+ * Final shots live in `specs/090-chippr-brand-alignment/screenshots/`.
  *
  * Usage:
  *   npm run dev --workspace frontend -- --port 5199 --strictPort   # terminal 1
@@ -36,7 +36,7 @@ const { chromium } = require('playwright')
 
 // Positional base URL, ignoring flags — so `--only=` may be passed in any position.
 const BASE = process.argv.slice(2).find((a) => !a.startsWith('--')) || 'http://127.0.0.1:5199'
-const OUT = resolve(process.cwd(), 'specs/089-chippr-brand-alignment/screenshots')
+const OUT = resolve(process.cwd(), 'specs/090-chippr-brand-alignment/screenshots')
 const RPC_PORT = 9799
 const RPC_ORIGIN = `http://127.0.0.1:${RPC_PORT}`
 const CHAIN_ID = 137

@@ -2,7 +2,7 @@
 
 **Branch**: `claude/fairwins-chippr-branding-doqie6` | **Date**: 2026-08-16 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/089-chippr-brand-alignment/spec.md`
+**Input**: Feature specification from `/specs/090-chippr-brand-alignment/spec.md`
 
 ## Summary
 
@@ -83,7 +83,7 @@ justified extension rather than a deviation.
 ### Documentation (this feature)
 
 ```text
-specs/089-chippr-brand-alignment/
+specs/090-chippr-brand-alignment/
 ├── spec.md
 ├── plan.md              # this file
 ├── research.md          # R1–R11 + risk register
@@ -199,7 +199,7 @@ screenshot loop, which cannot start until the app renders the new palette.
 | FR-008, FR-009 | Screenshot round — status surfaces enumerated in the harness scenario list |
 | FR-019, FR-020, SC-004 | `git diff --stat` empty on `frontend/public/assets/*` |
 | FR-021 | Existing `tenantConfig.test.js` + manifest validation (`npm run tenants:validate`) |
-| FR-023, SC-003 | `specs/089-chippr-brand-alignment/screenshots/` + findings README |
+| FR-023, SC-003 | `specs/090-chippr-brand-alignment/screenshots/` + findings README |
 | SC-005 | `npm run test:frontend`, existing accessibility job |
 | SC-006 | Implied by SC-001 passing: no brand literals remain outside token definitions |
 

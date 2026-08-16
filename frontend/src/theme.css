@@ -1,13 +1,13 @@
 /**
- * Theme Variables — Chippr Robotics Brand Guidelines v1.0 (spec 089)
+ * Theme Variables — Chippr Robotics Brand Guidelines v1.0 (spec 090)
  *
  * This file is the ONLY place a color value is stated. Everything else asks for
  * a token. That is what makes the palette changeable from one place — and it is
  * only true for as long as nobody restates a value inline, which is what
  * src/test/brand/noLegacyBrandColors.test.js enforces.
  *
- * Contract: specs/089-chippr-brand-alignment/contracts/color-tokens.md
- *           specs/089-chippr-brand-alignment/contracts/type-tokens.md
+ * Contract: specs/090-chippr-brand-alignment/contracts/color-tokens.md
+ *           specs/090-chippr-brand-alignment/contracts/type-tokens.md
  * Audit:    src/test/brand/tokenContrast.test.js asserts every declared
  *           foreground/background pairing against WCAG 2.1 AA in BOTH themes.
  *
@@ -144,7 +144,7 @@
    color, and Amber alone cannot express succeeded / failed / warning /
    destructive. A member acts differently on each of those, so collapsing them
    would be a constitution-III (honest state) failure at the color layer.
-   Rationale: specs/089-chippr-brand-alignment/research.md R5.
+   Rationale: specs/090-chippr-brand-alignment/research.md R5.
    =================================== */
 
 :root {

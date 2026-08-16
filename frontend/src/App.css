@@ -11,7 +11,7 @@ body {
   max-width: 100vw;
 }
 
-/* Type-role utilities — Chippr Brand Guidelines v1.0 slide 13 (spec 089).
+/* Type-role utilities — Chippr Brand Guidelines v1.0 slide 13 (spec 090).
    The heading roles are applied to h1–h4 in index.css; these cover the roles
    that are not heading elements, so a surface can ask for a role instead of
    inventing a size. */

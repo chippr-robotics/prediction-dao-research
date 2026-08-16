@@ -119,6 +119,35 @@ case "$ROLE" in
     if grep -q '^PM_SIGNER_PRIVATE_KEY=' "$GW"; then
       die "PM_SIGNER_PRIVATE_KEY is set — it silently overrides PM_SIGNER_KMS_KEY. Remove it."
     fi
+
+    # ---- FinOps exporter + Alloy (spec 089) ----
+    #
+    # SEPARATE ENV FILES, deliberately. The exporter reads vendor billing APIs; Alloy holds the
+    # Grafana Cloud push credential. Neither has any business seeing the gateway's relay secrets, and
+    # the gateway must not see theirs — that per-container scoping is invariant 1 of this script, and
+    # a FinOps feature is a poor reason to be the first to widen it.
+    #
+    # EVERY ONE IS OPTIONAL. A missing vendor credential makes that source `not-configured`, which is
+    # a first-class honest state (spec 089 FR-006), not a failure. Losing a cost panel must never
+    # take down the gasless relay path — the never-stranded rule applies here exactly as it does to
+    # Collect and Predict above.
+    FO="${RUN_DIR}/finops.env"; AY="${RUN_DIR}/alloy.env"
+    new_envfile "$FO"; new_envfile "$AY"
+
+    log "finops exporter container (all optional — an absent credential is 'not-configured', not an outage):"
+    emit "$FO" CLOUDFLARE_ANALYTICS_TOKEN finops-cloudflare-token   latest optional
+    emit "$FO" QUICKNODE_API_KEY          finops-quicknode-key      latest optional
+    emit "$FO" POLYMARKET_API_KEY         POLYMARKET_API_KEY        latest optional
+
+    log "alloy container:"
+    emit "$AY" GRAFANA_CLOUD_PROM_TOKEN   finops-grafana-cloud-token latest optional
+
+    # The exporter is READ-ONLY BY CONSTRUCTION (spec 089 FR-026): it reports on money and must never
+    # be able to move any. It has no signer and no write route, and a signing key reaching its
+    # environment would be a silent, total inversion of that property — so refuse to boot instead.
+    if grep -qE '^(PM_SIGNER_PRIVATE_KEY|ALTO_EXECUTOR_PRIVATE_KEYS|GCP_PRIVATE_KEY|.*_PRIVATE_KEYS?)=' "$FO"; then
+      die "the finops exporter env contains key material — it is a read-only reporter and must never hold a signing key"
+    fi
     ;;
 
   bundler)

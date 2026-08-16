@@ -53,7 +53,7 @@ a {
   font-weight: 500;
   /* Teal 700, NOT Chippr Teal. The guidelines' own measured table puts Chippr
      Teal at 4.7:1 on white and annotates it "18px+ / bold 14px+" — links are
-     body-sized, so they take the 7.8:1 anchor instead (spec 089 FR-017). */
+     body-sized, so they take the 7.8:1 anchor instead (spec 090 FR-017). */
   color: var(--accent-color);
   text-decoration: inherit;
 }
@@ -139,7 +139,7 @@ button:focus-visible {
    CAREFUL — `:only-child` counts ELEMENT children only, so
    `<button><svg/>Label</button>` matches too: the svg really is the only
    element, and the text node does not count. Such a button loses its padding
-   and its label spills out of the control. The spec-089 screenshot round caught
+   and its label spills out of the control. The spec-090 screenshot round caught
    exactly that on "＋ New statement" in Reporting.
 
    The fix belongs in the MARKUP, not here: an icon+text button wraps its label

@@ -1,6 +1,6 @@
 # Tasks: Chippr Brand Alignment for FairWins Styling Defaults
 
-**Feature**: 089-chippr-brand-alignment
+**Feature**: 090-chippr-brand-alignment
 **Branch**: `claude/fairwins-chippr-branding-doqie6`
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md)
 
@@ -129,10 +129,10 @@ the audits cannot model.
 - [ ] T037 Install operator-scoped Playwright at `/tmp/pw` (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, Chromium is pre-installed) — **never** a workspace dependency
 - [ ] T038 Write the harness at `scripts/ui/capture-brand.mjs` following `scripts/ui/capture-verify.mjs`: the shot matrix is every scenario × {desktop 1280×900, mobile 390×844} × {light, dark}; abort all non-dev-server network; stub at real app seams (EIP-6963 `window.ethereum`, spec-069 RPC override, seeded `fw_user_*` / `fw_global_prefs`); suppress `.dev-warning-banner` and `.notification` via `addStyleTag`; one retry per shot then fail loudly
 - [ ] T039 Choose the scenario list to cover both the brand surfaces and the honesty surfaces: home/portfolio, wallet, transfer, wagers, earn, collect, settings, recovery, protect, admin, plus at least one each of a warning banner, an error state, a destructive confirmation, and a chart
-- [ ] T040 Run the capture and write the full matrix to `specs/089-chippr-brand-alignment/screenshots/`
-- [ ] T041 Critique every PNG against the checklist in `quickstart.md` step 7 — legible, functional, honest, on-brand, composed — and record findings in `specs/089-chippr-brand-alignment/screenshots/README.md`
+- [ ] T040 Run the capture and write the full matrix to `specs/090-chippr-brand-alignment/screenshots/`
+- [ ] T041 Critique every PNG against the checklist in `quickstart.md` step 7 — legible, functional, honest, on-brand, composed — and record findings in `specs/090-chippr-brand-alignment/screenshots/README.md`
 - [ ] T042 Fix findings and re-run the **whole** matrix; a fix for one cell can regress another. Repeat until a full round yields zero findings. If findings persist after three rounds, stop patching pixels and read the CSS of the neighbouring surface the design should match
-- [ ] T043 Finalize `specs/089-chippr-brand-alignment/screenshots/README.md` with the shot table and what each round changed — that record is the evidence the loop ran
+- [ ] T043 Finalize `specs/090-chippr-brand-alignment/screenshots/README.md` with the shot table and what each round changed — that record is the evidence the loop ran
 
 ---
 

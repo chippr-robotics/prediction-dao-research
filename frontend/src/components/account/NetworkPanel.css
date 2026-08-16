@@ -60,7 +60,7 @@
 
 /* MAINNET is a CLASSIFICATION, not a status — it is not "good news", it is which
    estate you are looking at. Green here read as a success signal competing with
-   the brand teal beside it (spec 089 screenshot round 1), so it takes the brand
+   the brand teal beside it (spec 090 screenshot round 1), so it takes the brand
    tint. Testnet keeps amber, which IS a signal: real funds behave differently. */
 .network-kind.mainnet {
   color: var(--accent-color);

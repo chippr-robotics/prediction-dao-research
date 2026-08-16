@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-shot color codemod for spec 089 (Chippr brand alignment).
+ * One-shot color codemod for spec 090 (Chippr brand alignment).
  *
  * WHY THIS EXISTS
  * The FairWins app stated color values inline in 74 CSS files — 686 hex
@@ -38,7 +38,7 @@ const REPO = resolve(__dirname, '../..')
 const DRY_RUN = process.argv.includes('--dry-run')
 
 // ---------------------------------------------------------------------------
-// Mapping tables — see specs/089-chippr-brand-alignment/data-model.md
+// Mapping tables — see specs/090-chippr-brand-alignment/data-model.md
 // ---------------------------------------------------------------------------
 
 /**

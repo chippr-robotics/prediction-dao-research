@@ -1,6 +1,6 @@
 # Brand tokens — colour and typography
 
-FairWins renders in the **Chippr Robotics Brand Guidelines v1.0** system (spec 089). This page is
+FairWins renders in the **Chippr Robotics Brand Guidelines v1.0** system (spec 090). This page is
 what you need to add a surface without inventing a colour.
 
 The guidelines govern **colour and typography across the estate**; product marks stay with their
@@ -63,7 +63,7 @@ never fills a large area.
 ## Status colours
 
 The Chippr palette defines no success or error colour. A wallet needs four distinguishable states,
-so this is a documented extension (spec 089 research R5), not a deviation.
+so this is a documented extension (spec 090 research R5), not a deviation.
 
 | Role | Text token | Surface token | Fill token |
 |---|---|---|---|
@@ -111,7 +111,7 @@ Three Vitest suites in `frontend/src/test/brand/`, all gating CI:
 
 `var(--color-primary, #6d28d9)` looks like a themed reference and behaves like a hardcoded violet,
 because the token does not exist and the fallback always renders. The app had **177** such
-references across **90** names before spec 089, and they were why green survived the palette sweep.
+references across **90** names before spec 090, and they were why green survived the palette sweep.
 
 If you need a name that does not exist, **define it in `theme.css`** mapping onto a real token —
 do not lean on the fallback. There is a compatibility alias block near the bottom of `theme.css`
@@ -131,5 +131,5 @@ runtime, so a stale manifest silently reverts a palette change. `tenantConfig.te
 4. Re-run the screenshot loop (`scripts/ui/capture-brand.mjs`). The audits check arithmetic; only
    the pixels show you a control that has disappeared into its own card.
 
-See `specs/089-chippr-brand-alignment/` for the full contract, and
-`specs/089-chippr-brand-alignment/screenshots/README.md` for what the visual loop actually caught.
+See `specs/090-chippr-brand-alignment/` for the full contract, and
+`specs/090-chippr-brand-alignment/screenshots/README.md` for what the visual loop actually caught.

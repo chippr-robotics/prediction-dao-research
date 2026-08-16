@@ -103,7 +103,7 @@ NODE_PATH=/tmp/pw/node_modules node scripts/ui/capture-brand.mjs
 ```
 
 **Expected**: every scenario × {desktop 1280×900, mobile 390×844} × {light, dark} written to
-`specs/089-chippr-brand-alignment/screenshots/`.
+`specs/090-chippr-brand-alignment/screenshots/`.
 
 Then read every PNG and judge against the critic checklist:
 
@@ -139,4 +139,4 @@ can regress another. Exit when a full round produces zero findings.
 | Tenants intact | `npm run tenants:validate` |
 | Suite green | `npm run test:frontend` |
 | Builds | `npx vite build --mode development --root frontend` |
-| Screenshots clean | `specs/089-chippr-brand-alignment/screenshots/README.md` shows a zero-finding round |
+| Screenshots clean | `specs/090-chippr-brand-alignment/screenshots/README.md` shows a zero-finding round |
