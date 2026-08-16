@@ -262,8 +262,9 @@ describe('RecentActivityFeed — merged multi-network record (spec 092)', () => 
     render(<RecentActivityFeed entries={merged} chainId={80002} />)
     const links = screen.getAllByRole('link', { name: /view tx/i })
     const hrefs = links.map((l) => l.getAttribute('href'))
-    expect(hrefs.some((h) => h.includes('etc-mordor.blockscout.com') && h.includes(TX_C))).toBe(true)
-    expect(hrefs.some((h) => h.includes('amoy.polygonscan.com'))).toBe(true)
+    // Full-prefix assertions (not substring checks): the entry's explorer, exactly.
+    expect(hrefs).toContain(`https://etc-mordor.blockscout.com/tx/${TX_C}`)
+    expect(hrefs.some((h) => h.startsWith('https://amoy.polygonscan.com/tx/'))).toBe(true)
   })
 
   it('discloses unreachable networks by name, distinct from class staleness', () => {
