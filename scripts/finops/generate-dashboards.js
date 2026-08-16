@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate the FinOps Grafana dashboards and alert rules from the catalogue (spec 090).
+ * Generate the FinOps Grafana dashboards and alert rules from the catalogue (spec 089).
  *
  *   npm run finops:generate            write infra/grafana/
  *   npm run finops:generate -- --check exit 1 if the committed tree is stale (used by check:finops)
@@ -74,7 +74,7 @@ function buildOverview() {
         '',
         '- **Sources currently MISSING** — if that table has rows, the totals above it are *partial and understated*.',
         '- **(modelled)** in a panel title means the dollar figure is our arithmetic over a declared plan rate, not an invoice.',
-        '  Only GCP is `billed`. Cloudflare and QuickNode publish no dollar figure at all (spec 090 research R1).',
+        '  Only GCP is `billed`. Cloudflare and QuickNode publish no dollar figure at all (spec 089 research R1).',
         '- **NOT YET LIVE** panels are declared sources with nothing to read. They contribute nothing to any total.',
         '- Freshness differs by source: chain reads are seconds old, the GCP billing export lags hours. See *Source health*.',
       ].join('\n'),

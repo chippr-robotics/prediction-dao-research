@@ -1,5 +1,5 @@
 /**
- * Grafana alert rules, generated from the catalogue (spec 090, FR-015…FR-018).
+ * Grafana alert rules, generated from the catalogue (spec 089, FR-015…FR-018).
  *
  * The estate's existing alerting is entirely about liveness — uptime checks, VM CPU, VM disk. Not
  * one alert is about money. These are.

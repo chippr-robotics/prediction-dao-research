@@ -1,6 +1,6 @@
 # Runbook: FinOps operations
 
-Operating the FinOps exporter, dashboards and alerts (spec 090).
+Operating the FinOps exporter, dashboards and alerts (spec 089).
 
 Every alert rule links to a section here by anchor. If you add an alert, add its section — an alert
 that says what is wrong but not what to do gets acknowledged and forgotten.

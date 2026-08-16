@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The FinOps coverage gate (spec 090, FR-019…FR-023).
+ * The FinOps coverage gate (spec 089, FR-019…FR-023).
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  *  THIS IS THE FEATURE'S LOAD-BEARING PIECE.

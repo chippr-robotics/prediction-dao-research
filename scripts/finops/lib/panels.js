@@ -1,5 +1,5 @@
 /**
- * Grafana panel builders (spec 090).
+ * Grafana panel builders (spec 089).
  *
  * Dashboards are GENERATED from the catalogue rather than hand-written. Two reasons, and the second
  * is the important one:

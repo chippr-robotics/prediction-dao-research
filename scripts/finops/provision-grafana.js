@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Push the generated dashboards and alert rules to Grafana Cloud (spec 090, FR-017).
+ * Push the generated dashboards and alert rules to Grafana Cloud (spec 089, FR-017).
  *
  *   npm run finops:provision              apply
  *   npm run finops:provision -- --dry-run show what would change, touch nothing
@@ -143,7 +143,7 @@ async function main() {
         folderUid,
         // The repo is the source of truth; a UI edit is drift, not an input.
         overwrite: true,
-        message: 'Provisioned from prediction-dao-research (spec 090). Edit the catalogue, not the UI.',
+        message: 'Provisioned from prediction-dao-research (spec 089). Edit the catalogue, not the UI.',
       },
     })
     console.log(`provisioned dashboard ${dash.uid} (${dash.title})`)
