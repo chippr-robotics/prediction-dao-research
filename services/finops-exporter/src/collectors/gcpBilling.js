@@ -56,8 +56,22 @@ export function createGcpBillingCollector({ config, bigQuery, log = console.warn
       const message = String(err?.message ?? err)
       // A missing dataset is a CONFIGURATION fact, not an outage: the export has not been enabled.
       // Reporting it as unreadable would page somebody about a thing that has never existed.
-      if (/not found|does not exist|Not found: Dataset|Not found: Table/i.test(message)) {
-        return notConfigured(`billing export ${billingDataset} not found — is the export enabled?`)
+      //
+      // `does not match any table` is the SAME fact wearing different words, and it is the one a
+      // freshly-enabled export actually returns: the dataset exists, the wildcard resolves to
+      // nothing, and it stays that way for HOURS because Google populates the first table on its own
+      // schedule and never backfills. Measured 2026-08-16, minutes after enabling the export:
+      //
+      //   chippr-bots-site-wp:billing_export.gcp_billing_export_v1_* does not match any table.
+      //
+      // That message matches none of the patterns above, so it fell through to `unreadable` — which
+      // is `configured=1, up=0`, which fires the staleness alert 15 minutes later. Paging an
+      // operator overnight because Google has not written the first row yet is exactly the
+      // false-alarm class that gets an alert channel muted.
+      if (/not found|does not exist|Not found: Dataset|Not found: Table|does not match any table/i.test(message)) {
+        return notConfigured(
+          `billing export ${billingDataset} has no tables yet — a newly enabled export takes hours to appear, and is never backfilled`,
+        )
       }
       /**
        * Serving a stale-but-real total beats reporting nothing during a transient BigQuery failure —

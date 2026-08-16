@@ -240,4 +240,28 @@ describe('the GCP fallback does not refresh the success timestamp', () => {
     const collect = await make()
     expect((await collect({ id: 'gcp' })).state).toBe('not-configured')
   })
+
+  it('treats a freshly-enabled export with no tables as not-configured', async () => {
+    // The message a newly enabled export actually returns — different words, same fact. It matched
+    // none of the original patterns, so it fell through to `unreadable`, which is configured=1/up=0,
+    // which fires the staleness alert 15 minutes later. Google populates the first table on its own
+    // schedule (hours) and never backfills, so that would have paged overnight for nothing.
+    const make = collectorWith(async () => {
+      throw new Error('p:billing_export.gcp_billing_export_v1_* does not match any table.')
+    })
+    const collect = await make()
+    const r = await collect({ id: 'gcp' })
+    expect(r.state).toBe('not-configured')
+    expect(r.value).toBeNull()
+    expect(r.reason).toMatch(/no tables yet/i)
+  })
+
+  it('still reports a genuine query failure as unreadable', async () => {
+    // The narrowing above must not swallow real breakage.
+    const make = collectorWith(async () => {
+      throw new Error('quota exceeded for project')
+    })
+    const collect = await make()
+    expect((await collect({ id: 'gcp' })).state).toBe('unreadable')
+  })
 })
