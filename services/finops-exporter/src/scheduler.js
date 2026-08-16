@@ -21,8 +21,17 @@ import { attempt, notConfigured, unreadable } from './reading.js'
 const STALE_FACTOR = 3
 
 export function createScheduler({ sources, collectors, now = () => Date.now(), log = console.warn }) {
-  /** @type {Map<string, {reading: object, collectedAt: number, durationMs: number}>} */
+  /** @type {Map<string, {reading: object, collectedAt: number, durationMs: number, lastSuccessAt: number|null}>} */
   const state = new Map()
+  /**
+   * Sources with a collection in flight.
+   *
+   * A collection slower than its own interval would otherwise have the next tick start on top of it:
+   * concurrent polls of the same source, multiplying load on the exact vendor or RPC that is already
+   * struggling. The guard makes each source strictly serial — a tick that arrives while one is
+   * running is DROPPED, not queued, because a queue would just defer the pile-up.
+   */
+  const inFlight = new Set()
   const timers = []
   let running = false
 
@@ -37,18 +46,37 @@ export function createScheduler({ sources, collectors, now = () => Date.now(), l
   }
 
   async function collectOne(source) {
+    if (inFlight.has(source.id)) return state.get(source.id)?.reading
+    inFlight.add(source.id)
+
     const started = now()
-    const fn = collectorFor(source)
-    const reading = await attempt(() => fn(source))
-    const durationMs = now() - started
+    try {
+      const fn = collectorFor(source)
+      const reading = await attempt(() => fn(source))
+      const durationMs = now() - started
 
-    state.set(source.id, { reading, collectedAt: now(), durationMs })
+      /**
+       * `lastSuccessAt` SURVIVES a failed collection.
+       *
+       * It is the scheduler that must remember this, not the registry: the registry is rebuilt from
+       * scratch on every scrape, so a gauge derived from the CURRENT reading vanishes the moment a
+       * source goes unreadable — taking with it the one number that says HOW LONG it has been
+       * unreadable. A staleness alert would then see an absent series rather than a growing age,
+       * which is the difference between "stale for 6 hours" and "no idea".
+       */
+      const previous = state.get(source.id)
+      const lastSuccessAt = reading.state === 'read' ? reading.at : (previous?.lastSuccessAt ?? null)
 
-    if (reading.state === 'unreadable') {
-      // Reasons are already redacted by the Reading constructor (FR-025).
-      log(`[finops] ${source.id}: unreadable — ${reading.reason}`)
+      state.set(source.id, { reading, collectedAt: now(), durationMs, lastSuccessAt })
+
+      if (reading.state === 'unreadable') {
+        // Reasons are already redacted by the Reading constructor (FR-025).
+        log(`[finops] ${source.id}: unreadable — ${reading.reason}`)
+      }
+      return reading
+    } finally {
+      inFlight.delete(source.id)
     }
-    return reading
   }
 
   return {
@@ -63,7 +91,7 @@ export function createScheduler({ sources, collectors, now = () => Date.now(), l
       for (const source of sources) {
         // A `planned` source has nothing to collect — it declares no metric by construction.
         if (source.status === 'planned') {
-          state.set(source.id, { reading: notConfigured('not yet live'), collectedAt: now(), durationMs: 0 })
+          state.set(source.id, { reading: notConfigured('not yet live'), collectedAt: now(), durationMs: 0, lastSuccessAt: null })
           continue
         }
         const t = setInterval(() => {
@@ -92,13 +120,14 @@ export function createScheduler({ sources, collectors, now = () => Date.now(), l
       return sources.map((source) => {
         const entry = state.get(source.id)
         if (!entry) {
-          return { source, reading: unreadable('not collected yet'), durationMs: null, stale: true }
+          return { source, reading: unreadable('not collected yet'), durationMs: null, lastSuccessAt: null, stale: true }
         }
         const age = (now() - entry.collectedAt) / 1000
         return {
           source,
           reading: entry.reading,
           durationMs: entry.durationMs,
+          lastSuccessAt: entry.lastSuccessAt,
           stale: age > source.interval * STALE_FACTOR,
         }
       })

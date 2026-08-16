@@ -101,8 +101,12 @@ export function createApp(overrides = {}) {
 
     registry.emit('info', 'gauge', 'Exporter build identity.', { ...config.build }, 1)
 
-    for (const { source, reading, durationMs } of readings) {
-      registry.record(source, reading)
+    for (const { source, reading, durationMs, lastSuccessAt } of readings) {
+      // Prepaid pools opt out of the generic value emission: their Reading carries a BALANCE in a
+      // native unit, while their catalogue metric is `cost_usd_total`. Letting record() emit it
+      // would publish a balance labelled as a USD cost, with no `basis` — so a cost total would add
+      // pool balances to actual spend. `emitPoolSeries` publishes the real series below.
+      registry.record(source, reading, {}, { lastSuccessAt, emitValue: !source.pool })
       if (durationMs != null) {
         registry.emit(
           'collection_duration_seconds',

@@ -55,9 +55,15 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
   }
 
   async function collectQuickNode(source) {
-    // Sources with no vendor API: the declared subscription is the entire model.
-    const flat = config.flatSubscriptions[source.id]
-    if (flat != null) return read(flat, 'USD', { labels: { basis: 'modelled' } })
+    // Sources with no vendor API: the declared subscription is the entire model. An UNSET price is
+    // `not-configured`, never 0 — see the note on `flatSubscriptions` in config/index.js.
+    if (source.id in config.flatSubscriptions) {
+      const flat = config.flatSubscriptions[source.id]
+      if (flat == null) {
+        return notConfigured(`no plan price declared for '${source.id}' — set its FINOPS_*_PLAN_USD (0 asserts a free tier)`)
+      }
+      return read(flat, 'USD', { labels: { basis: 'modelled' } })
+    }
 
     const { planMonthlyUsd, usdPerMillionCredits } = config.quicknode
 

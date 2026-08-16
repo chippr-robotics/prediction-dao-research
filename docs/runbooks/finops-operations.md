@@ -207,8 +207,12 @@ If the plan includes the enterprise `/exporter/prometheus` endpoint, set `QUICKN
 What this system costs: the Grafana Cloud plan plus the BigQuery query spend the exporter incurs.
 Catalogued on purpose — a FinOps system that hides its own cost is not credible about anything else.
 
-Zero on the free tier. It stops being zero the moment the series budget is exceeded, which is what
-the cardinality rules exist to prevent.
+The free tier really is $0 — but assert it by setting `FINOPS_GRAFANA_PLAN_USD=0`. Left unset, the
+source reports `not-configured`, because "we confirmed the free tier" and "nobody ever set this" are
+different facts and a defaulted zero renders as the first while meaning the second.
+
+It stops being zero the moment the series budget is exceeded, which is what the cardinality rules
+exist to prevent.
 
 ### planned-sources
 

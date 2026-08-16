@@ -62,6 +62,12 @@ exported separately as `vendor_usage` because usage is a fact even when the doll
 Never collapse the two. Presenting our own arithmetic as an invoice is the specific dishonesty this
 label exists to prevent.
 
+A unit with no rate yields **no USD figure at all** — `rateFor` returns `null`, and `aggregate`
+suppresses the roll-up and names the unit that blocked it. It deliberately does not return `0` for a
+testnet unit: that would make the unit look convertible (silently contributing $0 to a total) and,
+because the rate is keyed on the unit rather than the network, would price Ethereum Classic *mainnet*
+gas at nothing. Understating a cost is the one direction this system must never fail in.
+
 ### 3. Alert on runway, not on balance
 
 The paymaster deposit and the executor EOAs are prepaid pools. When one empties, sponsorship or

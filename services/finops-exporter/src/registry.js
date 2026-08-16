@@ -59,8 +59,15 @@ export function createRegistry() {
      * @param {object} source   catalogue entry
      * @param {object} reading  a Reading
      * @param {object} [labels] extra labels for the value sample (e.g. chain, gcp_service)
+     * @param {object} [opts]
+     * @param {number|null} [opts.lastSuccessAt] epoch ms of the last SUCCESSFUL read, from the
+     *   scheduler. Emitted regardless of the current state — see below.
+     * @param {boolean} [opts.emitValue=true] set false when the source's value metric is emitted
+     *   elsewhere (prepaid pools: the Reading carries a BALANCE, and their `cost_usd_total` is a
+     *   converted spend computed by `emitPoolSeries`).
      */
-    record(source, reading, labels = {}) {
+    record(source, reading, labels = {}, opts = {}) {
+      const { lastSuccessAt = null, emitValue = true } = opts
       const configured = reading.state === NOT_CONFIGURED ? 0 : 1
       const up = reading.state === READ ? 1 : 0
 
@@ -85,15 +92,27 @@ export function createRegistry() {
         )
       }
 
-      if (reading.state !== READ) return
+      /**
+       * EMITTED REGARDLESS OF THE CURRENT STATE — this is the point of it.
+       *
+       * The registry is rebuilt on every scrape, so deriving this from the current Reading would
+       * make it VANISH the moment a source goes unreadable, taking with it the only number that
+       * says how long it has been unreadable. The staleness alert would then see an absent series
+       * instead of a growing age: "no idea" rendered as if it were "stale for 6 hours".
+       *
+       * The scheduler holds it across failures; absent here means genuinely never read.
+       */
+      if (lastSuccessAt != null) {
+        this.emit(
+          'source_last_success_timestamp_seconds',
+          'gauge',
+          'Unix seconds of the last successful read, carried across failures. Absent only if this source has NEVER been read.',
+          { source: source.id },
+          Math.floor(lastSuccessAt / 1000),
+        )
+      }
 
-      this.emit(
-        'source_last_success_timestamp_seconds',
-        'gauge',
-        'Unix seconds of the last successful read. Absent if this source has never been read.',
-        { source: source.id },
-        Math.floor(reading.at / 1000),
-      )
+      if (reading.state !== READ || !emitValue) return
 
       this.emit(
         source.metric,

@@ -285,9 +285,10 @@ const gasPools = [
     credential: null,
     docs: 'finops-operations.md#prepaid-pools',
     meaning:
-      'Gas spent relaying intents on Mordor. Mordor is a TESTNET: its gas has no market price, so the USD figure ' +
-      'is 0 by definition and only the native drawdown and runway are meaningful. It is tracked because running ' +
-      'out still breaks the testnet cohort.',
+      'Gas spent relaying intents on Mordor, in native units. NO USD figure is produced: there is no ETC price ' +
+      'feed, and valuing it at 0 would both understate a real cost and mean that Ethereum Classic MAINNET gas ' +
+      'was priced at nothing too. Only the native drawdown and the runway are meaningful here — which is all that ' +
+      'was ever needed, since running out still breaks the testnet cohort.',
   },
   {
     id: 'bundler-gas-polygon',
@@ -375,7 +376,8 @@ const vendors = [
     meaning:
       'What the FinOps system itself costs: the Grafana Cloud plan plus the BigQuery query spend this exporter ' +
       'incurs reading the billing export. FR-029 — a FinOps system that hides its own cost is not credible. ' +
-      'Zero on the free tier, and it stops being zero the moment the series budget is exceeded.',
+      'The free tier really is $0, but assert that by setting FINOPS_GRAFANA_PLAN_USD=0: unset reports ' +
+      'not-configured, because "we are on the free tier" and "nobody set this" are different facts.',
   },
 ]
 

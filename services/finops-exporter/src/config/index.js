@@ -111,9 +111,17 @@ export function loadConfig(env = process.env) {
       usdPerMillionCredits: num(env.FINOPS_QUICKNODE_USD_PER_MCREDIT, null),
     },
 
-    /** Flat, declared subscriptions with no vendor API at all. */
+    /**
+     * Flat, declared subscriptions with no vendor API at all.
+     *
+     * Defaults to null, NOT 0. Grafana Cloud's free tier really does cost $0, but "the operator
+     * confirmed we are on the free tier" and "nobody ever set this" are different facts, and a
+     * defaulted 0 renders as the former while meaning the latter. Set
+     * `FINOPS_GRAFANA_PLAN_USD=0` explicitly to assert the free tier; until then the source reports
+     * `not-configured`, consistent with how every other unset plan price behaves.
+     */
     flatSubscriptions: {
-      'grafana-cloud': num(env.FINOPS_GRAFANA_PLAN_USD, 0),
+      'grafana-cloud': num(env.FINOPS_GRAFANA_PLAN_USD, null),
     },
 
     referral: {

@@ -59,13 +59,21 @@ export function createGcpBillingCollector({ config, bigQuery, log = console.warn
       if (/not found|does not exist|Not found: Dataset|Not found: Table/i.test(message)) {
         return notConfigured(`billing export ${billingDataset} not found — is the export enabled?`)
       }
-      // Serving a stale-but-real total beats reporting nothing during a transient BigQuery failure,
-      // but ONLY if the staleness is visible — which it is, via source_last_success_timestamp.
+      /**
+       * Serving a stale-but-real total beats reporting nothing during a transient BigQuery failure —
+       * but ONLY while the staleness stays visible.
+       *
+       * The `at` carried here is the timestamp of the read that actually SUCCEEDED, not now. An
+       * earlier version stamped it `Date.now() - 1`, which made `source_last_success_timestamp`
+       * advance on every failed poll: during a sustained outage the source would have looked
+       * perpetually fresh and the staleness alert would never have fired. Serving old data is
+       * acceptable; lying about its age is not.
+       */
       if (lastGood) {
-        log(`[finops] gcp: query failed, serving last good — ${message}`)
+        log(`[finops] gcp: query failed, serving last good from ${new Date(lastGood.at).toISOString()} — ${message}`)
         return read(lastGood.rows.reduce((a, r) => a + r.cost, 0), 'USD', {
           labels: { basis: 'billed' },
-          at: Date.now() - 1,
+          at: lastGood.at,
         })
       }
       return unreadable(message)
@@ -85,6 +93,9 @@ export function createGcpBillingCollector({ config, bigQuery, log = console.warn
     lastGood = {
       rows: rows.map((r) => ({ service: r.service ?? 'unknown', cost: Number(r.cost) || 0 })),
       lagSeconds: latest ? Math.max(0, (Date.now() - latest) / 1000) : null,
+      // When this data was actually obtained. Replayed verbatim on the fallback path above so a
+      // served-stale value never claims to be fresh.
+      at: Date.now(),
     }
 
     const total = lastGood.rows.reduce((a, r) => a + r.cost, 0)

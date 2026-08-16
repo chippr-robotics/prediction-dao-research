@@ -70,10 +70,20 @@ export function createFxReader({ config, providers, log = console.warn, now = ()
      */
     rateFor(unit) {
       if (unit === 'USD' || unit === 'USDC') return 1
-      // Mordor is a testnet: its gas has no market price, and 0 is the honest answer rather than an
-      // absence. It is why relayer-gas-mordor's meaning says only the native drawdown matters.
-      if (unit === 'ETC') return 0
       if (unit === 'POL') return cached.stale ? null : cached.price
+      /**
+       * ETC returns null (unknown), NOT 0.
+       *
+       * An earlier version returned 0, reasoning that Mordor is a testnet whose gas is worthless.
+       * That was wrong twice. It made ETC look CONVERTIBLE, so a USD roll-up silently included it at
+       * $0 instead of declining to produce one — and the rate is keyed on the UNIT, not the network,
+       * so a source on Ethereum Classic MAINNET (chain 61, in the declared enumeration) would have
+       * had its real cost valued at zero. Understating a cost is the one direction this system must
+       * never fail in.
+       *
+       * With null, the Mordor pool still reports its balance, burn and runway in native ETC — which
+       * is all that was ever meaningful there — and simply produces no dollar figure.
+       */
       return null
     },
 
