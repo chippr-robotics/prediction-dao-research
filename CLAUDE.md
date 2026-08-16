@@ -515,9 +515,17 @@ artifacts live under `specs/<feature>/`.
   (the guidelines' endorsement model: master brand owns colour and type, products own their marks)
   — do not modify the logo assets or build a co-branded lockup. Retired and CI-failing: `#2FA043`,
   `#36B37E`, `#4C9AFF`, `#7BDCB5`. `tenants/fairwins/manifest.json` must declare the same values as
-  `theme.css` (the manifest wins at runtime). Three guards gate CI in `frontend/src/test/brand/`.
-  See `docs/developer-guide/brand-tokens.md` + `specs/090-chippr-brand-alignment/`.
-- **FinOps (spec 090): the CATALOGUE is the source of truth, and a zero is never an absence.**
+  `theme.css` (the manifest wins at runtime). **Spec 091 finished the job: `theme.css` is now the
+  ONLY file in shipped styling that may state a colour**, enforced by `noHardcodedColors.test.js`
+  with two reasoned exemptions — white/black (absolutes, not palette colours) and third-party
+  identity (`NetworkPill.css`, Bitcoin `#F7931A`), where teal would be *wrong* rather than merely
+  off-brand. 091 also added tier metals (gold = Amber, so the estate keeps one yellow) and
+  `--gradient-brand`; **a gradient built from two different semantic tokens is a bug** — a
+  `--brand-primary → --success-color` button says something untrue about what it does, which is
+  exactly what the 091 screenshot round caught. FOUR guards now gate CI in
+  `frontend/src/test/brand/`. See `docs/developer-guide/brand-tokens.md` +
+  `specs/090-chippr-brand-alignment/` + `specs/091-neutral-token-consolidation/`.
+- **FinOps (spec 089): the CATALOGUE is the source of truth, and a zero is never an absence.**
   `packages/finops-catalogue` declares every revenue and cost source exactly once; the exporter
   (`services/finops-exporter`), the dashboard generator (`scripts/finops/generate-dashboards.js`)
   and the CI gate (`npm run check:finops`) all derive from it. **Adding a revenue or cost source to

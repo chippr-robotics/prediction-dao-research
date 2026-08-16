@@ -334,7 +334,7 @@
 
 .address-qr-network-badge--bitcoin {
   border-color: #f7931a;
-  color: #b36400;
+  color: var(--warning-text);
   background: rgba(247, 147, 26, 0.12);
 }
 

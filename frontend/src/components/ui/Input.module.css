@@ -1,10 +1,10 @@
 /* Input Base Styles */
 .input {
   padding: 0.75rem;
-  border: 1px solid #2D7A4F;
+  border: 1px solid var(--brand-primary);
   border-radius: 8px;
-  background: #0f1810;
-  color: #f1f5f9;
+  background: var(--chippr-gunmetal);
+  color: var(--bg-tertiary);
   font-size: 1rem;
   font-family: var(--font-sans);
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -13,26 +13,26 @@
 }
 
 .input::placeholder {
-  color: #94a3b8;
+  color: var(--text-muted);
   opacity: 1;
 }
 
 /* Focus State - Accessibility */
 .input:focus {
   outline: none;
-  border-color: #34A853;
+  border-color: var(--success-color);
   box-shadow: 0 0 0 3px rgba(var(--success-color-rgb), 0.1);
 }
 
 .input:focus-visible {
-  outline: 2px solid #2D7A4F;
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
 /* Fallback for browsers without :focus-visible */
 @supports not selector(:focus-visible) {
   .input:focus {
-    outline: 2px solid #2D7A4F;
+    outline: 2px solid var(--brand-primary);
     outline-offset: 2px;
   }
 }
@@ -41,7 +41,7 @@
 .input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: #1a2820;
+  background: var(--bg-tertiary);
 }
 
 /* Error State */

@@ -349,8 +349,8 @@
   color: var(--color-error, var(--danger-color));
 }
 .pt-notice-warn {
-  background: color-mix(in srgb, #d97706 14%, transparent);
-  color: #b45309;
+  background: color-mix(in srgb, var(--warning-text) 14%, transparent);
+  color: var(--warning-text);
 }
 .pt-notice-success {
   background: color-mix(in srgb, var(--color-success) 12%, transparent);

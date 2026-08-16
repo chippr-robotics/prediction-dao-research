@@ -71,7 +71,7 @@
 /* Modal header */
 .modal-header {
   padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -82,7 +82,7 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 /* Modal content */
@@ -103,14 +103,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--text-secondary);
   transition: color 0.2s;
   flex-shrink: 0;
   border-radius: 4px;
 }
 
 .modal-close:hover {
-  color: #111827;
+  color: var(--text-primary);
   background: var(--bg-tertiary);
 }
 

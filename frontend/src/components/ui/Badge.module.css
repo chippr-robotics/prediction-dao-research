@@ -36,7 +36,7 @@
 
 /* Neutral Variant */
 .badge-neutral {
-  background: #94a3b8;
+  background: var(--text-muted);
   color: white;
 }
 

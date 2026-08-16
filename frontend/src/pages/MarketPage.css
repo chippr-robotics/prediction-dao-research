@@ -481,7 +481,7 @@
 }
 
 .reward-value {
-  color: #90EE90; /* Light green for reward */
+  color: var(--success-color); /* Light green for reward */
   font-weight: 600;
 }
 
@@ -495,7 +495,7 @@
 /* Disclaimer text */
 .calc-disclaimer {
   font-size: 0.75rem;
-  color: #999; /* Light grey */
+  color: var(--text-muted); /* Light grey */
   text-align: center;
   margin-top: 0.25rem;
   font-style: italic;

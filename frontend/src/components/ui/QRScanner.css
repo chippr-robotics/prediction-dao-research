@@ -106,7 +106,7 @@
   max-width: 28rem;
   font-size: 0.875rem;
   line-height: 1.4;
-  color: #cbd5e1;
+  color: var(--border-color);
 }
 
 @keyframes fadeIn {

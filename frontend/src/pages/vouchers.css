@@ -43,7 +43,7 @@
   color: var(--text-secondary);
 }
 .vch-error {
-  color: #d9534f;
+  color: var(--danger-color);
 }
 .vch-tx {
   font-family: var(--font-mono);
@@ -95,7 +95,7 @@
   display: inline-block;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  color: #1a1a1a;
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 0.85rem;
 }
@@ -150,10 +150,10 @@
 
 .vch-success,
 .vch-ok {
-  color: #3c9a5f;
+  color: var(--success-color);
 }
 .vch-warn {
-  color: #c77d11;
+  color: var(--warning-text);
 }
 
 /* Buy row: quantity + optional gift address (spec 026) */
@@ -182,7 +182,7 @@
   flex: 0 0 auto;
 }
 .vch-input-error {
-  border-color: #c77d11;
+  border-color: var(--warning-text);
 }
 
 /* Gift / transfer address fields take the full row (single line) with the

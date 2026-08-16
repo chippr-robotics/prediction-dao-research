@@ -2,7 +2,7 @@
    market picker. Variants are toggled via `.pmb--feed` and `.pmb--inline`. */
 
 .pmb {
-  --pmb-accent: #2d9cdb;
+  --pmb-accent: var(--info-color);
   --pmb-accent-soft: rgba(45, 156, 219, 0.12);
   --pmb-border: var(--border-color);
   --pmb-surface: var(--surface-2);
@@ -195,7 +195,7 @@
   gap: 0.75rem;
   padding: 0.6rem 0.8rem;
   background: rgba(var(--danger-color-rgb), 0.08);
-  color: #ff8a90;
+  color: var(--danger-color);
   border: 1px solid rgba(var(--danger-color-rgb), 0.3);
   border-radius: 8px;
   font-size: 0.85rem;
@@ -205,7 +205,7 @@
 .pmb__retry {
   padding: 0.3rem 0.7rem;
   background: rgba(var(--danger-color-rgb), 0.15);
-  color: #ff8a90;
+  color: var(--danger-color);
   border: 1px solid rgba(var(--danger-color-rgb), 0.4);
   border-radius: 6px;
   font-size: 0.8rem;

@@ -3,7 +3,7 @@
  * actor-critic screenshot loop. It renders the REAL app in a real browser across the surfaces a
  * member actually touches and writes PNGs for a critic to judge against the brand contract; fixes
  * land in the token layer or the component CSS and the loop repeats until a full round is clean.
- * Final shots live in `specs/090-chippr-brand-alignment/screenshots/`.
+ * Final shots live in `specs/091-neutral-token-consolidation/screenshots/`.
  *
  * Usage:
  *   npm run dev --workspace frontend -- --port 5199 --strictPort   # terminal 1
@@ -36,7 +36,7 @@ const { chromium } = require('playwright')
 
 // Positional base URL, ignoring flags — so `--only=` may be passed in any position.
 const BASE = process.argv.slice(2).find((a) => !a.startsWith('--')) || 'http://127.0.0.1:5199'
-const OUT = resolve(process.cwd(), 'specs/090-chippr-brand-alignment/screenshots')
+const OUT = resolve(process.cwd(), 'specs/091-neutral-token-consolidation/screenshots')
 const RPC_PORT = 9799
 const RPC_ORIGIN = `http://127.0.0.1:${RPC_PORT}`
 const CHAIN_ID = 137
@@ -179,6 +179,33 @@ const SHOTS = [
     note: 'Landing page — the first Chippr-palette surface anyone sees, and the one carrying the dark hero header override',
   },
   {
+    name: 'landing-public',
+    // `?stay=1` pins LandingRoute to the marketing page. Without it `/` forwards
+    // to the wallet for anyone with history, so the most-swept stylesheet in
+    // this spec (LandingPage.css) never renders in a shot at all.
+    url: '/?stay=1',
+    wait: '.landing-page',
+    frame: null,
+    noConnect: true,
+    note: 'The landing page as a signed-out visitor sees it. The connected `landing` shot redirects to the wallet, so without this the most-swept stylesheet in spec 091 (LandingPage.css, 55 literals) is never photographed at all.',
+  },
+  {
+    name: 'components',
+    url: '/ui-components',
+    wait: '.component-examples',
+    frame: null,
+    noConnect: true,
+    note: 'The component gallery — the widest single view of buttons, inputs, badges and cards in one frame.',
+  },
+  {
+    name: 'state-demo',
+    url: '/state-demo',
+    wait: '.demo-container',
+    frame: null,
+    noConnect: true,
+    note: 'StateManagementDemo — 34 literals swept, including the error/success/info notice blocks.',
+  },
+  {
     name: 'home',
     url: '/app',
     wait: '.app-shell',
@@ -294,7 +321,7 @@ function expand() {
 
 async function seedPage(page, shot) {
   await page.addInitScript(
-    ({ theme, account, chainIdHex, chainId, rpcOrigin }) => {
+    ({ theme, account, chainIdHex, chainId, rpcOrigin, noWallet }) => {
       window.localStorage.setItem('themeMode', theme)
       window.localStorage.setItem('themePlatform', 'fairwins')
       window.localStorage.setItem('dev_warning_banner_dismissed', 'true')
@@ -314,6 +341,13 @@ async function seedPage(page, shot) {
           },
         })
       )
+
+      // A `noConnect` shot must have NO wallet at all, not merely an unclicked
+      // connect modal: wagmi auto-reconnects to an injected provider whose
+      // eth_accounts already answers, so injecting one and skipping the click
+      // still photographs the connected app. That is how the first pass filed
+      // the wallet page under the name `landing-public`.
+      if (noWallet) return
 
       const provider = {
         isMetaMask: true,
@@ -370,6 +404,7 @@ async function seedPage(page, shot) {
       chainIdHex: `0x${CHAIN_ID.toString(16)}`,
       chainId: CHAIN_ID,
       rpcOrigin: RPC_ORIGIN,
+      noWallet: Boolean(shot.noConnect),
     }
   )
 }
@@ -431,7 +466,7 @@ async function captureOnce(browser, baseOrigin, shot) {
       content: '.dev-warning-banner, .notification { display: none !important; }',
     })
 
-    await connectWallet(page)
+    if (!shot.noConnect) await connectWallet(page)
 
     if (shot.openNav) {
       const trigger = page

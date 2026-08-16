@@ -1,9 +1,9 @@
 /* Card Base Styles */
 .card {
-  background: #1a2820;
+  background: var(--bg-tertiary);
   padding: 2rem;
   border-radius: 12px;
-  border: 1px solid #2D7A4F;
+  border: 1px solid var(--brand-primary);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
 }
@@ -12,7 +12,7 @@
 .card-hover:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(var(--success-color-rgb), 0.2);
-  border-color: #34A853;
+  border-color: var(--success-color);
 }
 
 /* Interactive Card */
@@ -26,14 +26,14 @@
 
 /* Focus State - Accessibility */
 .card-interactive:focus-visible {
-  outline: 2px solid #2D7A4F;
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
 /* Fallback for browsers without :focus-visible */
 @supports not selector(:focus-visible) {
   .card-interactive:focus {
-    outline: 2px solid #2D7A4F;
+    outline: 2px solid var(--brand-primary);
     outline-offset: 2px;
   }
 }

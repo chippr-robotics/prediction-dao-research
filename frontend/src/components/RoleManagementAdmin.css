@@ -331,7 +331,7 @@
   padding: 0.125rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
-  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  background: var(--gradient-gold);
   color: #000;
   border-radius: 4px;
   text-transform: uppercase;
@@ -388,7 +388,7 @@
   padding: 0.125rem 0.5rem;
   font-size: 0.7rem;
   font-weight: 600;
-  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  background: var(--gradient-gold);
   color: #000;
   border-radius: 4px;
   text-transform: uppercase;

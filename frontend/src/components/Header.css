@@ -65,7 +65,7 @@
 .header-logo-text {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #2D7A4F;
+  color: var(--brand-primary);
   margin-left: 0.5rem;
 }
 
@@ -98,7 +98,7 @@
   left: 0;
   width: 0;
   height: 2px;
-  background: #2D7A4F;
+  background: var(--brand-primary);
   transition: width 0.3s ease;
 }
 
@@ -108,7 +108,7 @@
 
 .nav-link:hover,
 .nav-link.active {
-  color: #2D7A4F;
+  color: var(--brand-primary);
 }
 
 .nav-link.active::after {
@@ -116,7 +116,7 @@
 }
 
 .nav-link:focus-visible {
-  outline: 2px solid #2D7A4F;
+  outline: 2px solid var(--brand-primary);
   outline-offset: 4px;
   border-radius: 4px;
 }
@@ -129,7 +129,7 @@
 }
 
 .connect-wallet-button {
-  background: linear-gradient(135deg, #2D7A4F 0%, #1e5a37 100%);
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--success-text) 100%);
   color: white;
   padding: 0.75rem 1.5rem;
   border: none;
@@ -154,7 +154,7 @@
 }
 
 .connect-wallet-button:focus-visible {
-  outline: 3px solid #2D7A4F;
+  outline: 3px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -168,22 +168,22 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
-  background: #f0fdf4;
+  background: var(--success-bg);
   border-radius: 8px;
-  border: 2px solid #2D7A4F;
+  border: 2px solid var(--brand-primary);
 }
 
 .wallet-address {
   font-weight: 600;
-  color: #2D7A4F;
+  color: var(--brand-primary);
   font-size: 0.95rem;
   font-family: var(--font-mono);
 }
 
 .disconnect-button {
   background: transparent;
-  color: #2D7A4F;
-  border: 1px solid #2D7A4F;
+  color: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 500;
@@ -193,12 +193,12 @@
 }
 
 .disconnect-button:hover {
-  background: #2D7A4F;
+  background: var(--brand-primary);
   color: white;
 }
 
 .disconnect-button:focus-visible {
-  outline: 2px solid #2D7A4F;
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -280,7 +280,7 @@
 }
 
 .mobile-nav-link:hover {
-  color: #2D7A4F;
+  color: var(--brand-primary);
 }
 
 /* Responsive Design */

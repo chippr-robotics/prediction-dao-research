@@ -321,12 +321,12 @@
 }
 
 .fwum-mode-badge.demo {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-brand);
   color: white;
 }
 
 .fwum-mode-badge.live {
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-color) 100%);
   color: white;
 }
 
@@ -444,8 +444,8 @@
   padding: 0.125rem 0.5rem;
   font-size: 0.6875rem;
   font-weight: 700;
-  color: #1a202c;
-  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: var(--text-primary);
+  background: var(--gradient-gold);
   border-radius: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -636,15 +636,15 @@
 }
 
 .fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.platform {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--gradient-brand);
 }
 
 .fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.currency {
-  background: linear-gradient(135deg, #48bb78, #38a169);
+  background: linear-gradient(135deg, var(--success-color), var(--success-color));
 }
 
 .fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.data {
-  background: linear-gradient(135deg, #ed64a6, #d53f8c);
+  background: var(--gradient-brand-soft);
 }
 
 .fwum-toggle-thumb {

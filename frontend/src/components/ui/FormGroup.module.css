@@ -9,7 +9,7 @@
 .form-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--bg-tertiary);
   display: flex;
   align-items: center;
   gap: 0.25rem;

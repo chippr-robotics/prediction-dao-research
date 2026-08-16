@@ -9,13 +9,13 @@
   gap: 0.6rem;
   padding: 1rem 1.1rem;
   border-radius: var(--radius-lg, 12px);
-  border: 1px solid color-mix(in srgb, #d97706 35%, transparent);
-  background: color-mix(in srgb, #d97706 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-text) 35%, transparent);
+  background: color-mix(in srgb, var(--warning-text) 12%, transparent);
   color: var(--color-text, var(--text-primary));
 }
 
 .device-loss-warning strong {
-  color: #b45309;
+  color: var(--warning-text);
   font-size: 0.95rem;
 }
 

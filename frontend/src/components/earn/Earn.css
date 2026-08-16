@@ -470,22 +470,22 @@
 }
 .staking-badge.liquid {
   background: rgba(var(--success-color-rgb), 0.15);
-  color: #15803d;
+  color: var(--success-color);
 }
 .staking-badge.delegated {
   background: rgba(var(--info-color-rgb), 0.15);
-  color: #1d4ed8;
+  color: var(--info-text);
 }
 .staking-ready-flag {
   display: inline-block;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #15803d;
+  color: var(--success-color);
 }
 .staking-unbonding-flag {
   display: inline-block;
   font-size: 0.72rem;
-  color: #92700e;
+  color: var(--warning-text);
 }
 .earn-disclosure {
   font-size: 0.78rem;

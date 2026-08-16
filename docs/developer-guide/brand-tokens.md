@@ -99,13 +99,41 @@ brand face silently does not apply — that is why 62 of them had to be swept.
 
 ## Guards
 
-Three Vitest suites in `frontend/src/test/brand/`, all gating CI:
+Four Vitest suites in `frontend/src/test/brand/`, all gating CI:
 
 | Guard | What it prevents |
 |---|---|
-| `noLegacyBrandColors.test.js` | A retired brand hue reappearing in shipped styling |
+| `noHardcodedColors.test.js` | **Any** colour literal outside `theme.css` — the one that makes the rule above true rather than aspirational |
+| `noLegacyBrandColors.test.js` | A retired brand hue reappearing, named specifically |
 | `tokenContrast.test.js` | A token pairing dropping below WCAG 2.1 AA, in **both** themes |
 | `noUndefinedTokens.test.js` | `var(--nonexistent, #hardcoded)` — see below |
+
+### What the literal gate allows, and why
+
+Two exemptions, each stated in the test with a reason:
+
+- **White and black.** Not palette colours. `#fff` on a brand fill is not `--surface-color`, and
+  `#000` at 6% alpha is a shadow. Forcing ~100 call sites through tokens would make them less
+  honest, not more.
+- **Third-party identity.** `NetworkPill.css` (Polygon purple, Ethereum indigo) and Bitcoin's
+  `#F7931A`. A network pill rendered in teal is not on-brand — it is **wrong**, because it tells the
+  member something untrue about which chain they are on.
+
+Adding a row to either allowlist is a design decision: it is a promise that the colour belongs to
+someone else. If it is ours, it belongs in `theme.css`.
+
+## Tier metals and gradients (spec 091)
+
+Two more token families, both documented exceptions on the same footing as status colour:
+
+| Token | Notes |
+|---|---|
+| `--tier-bronze` / `--tier-silver` / `--tier-gold` | Rank has no vocabulary in the palette, and the metals are a convention members read without a legend. **Gold resolves to Amber** — the brand's own warm colour — keeping the estate to one yellow. |
+| `--gradient-brand` / `--gradient-brand-soft` / `--gradient-gold` | The app carried an indigo→violet gradient on avatars and the error boundary. One token, so the next change is one line rather than nine. |
+
+A gradient whose stops are two different semantic tokens is almost always a mistake: a primary
+button built from `--brand-primary → --success-color` says something untrue about what it does.
+Use `--gradient-brand`, or `color-mix()` off a single token.
 
 ### The undefined-token trap
 
@@ -131,5 +159,7 @@ runtime, so a stale manifest silently reverts a palette change. `tenantConfig.te
 4. Re-run the screenshot loop (`scripts/ui/capture-brand.mjs`). The audits check arithmetic; only
    the pixels show you a control that has disappeared into its own card.
 
-See `specs/090-chippr-brand-alignment/` for the full contract, and
-`specs/090-chippr-brand-alignment/screenshots/README.md` for what the visual loop actually caught.
+See `specs/090-chippr-brand-alignment/` for the full contract and
+`specs/091-neutral-token-consolidation/` for the sweep that made the literal gate possible. Both
+carry a `screenshots/README.md` recording what the visual loop caught that the audits could not —
+in 091's case, two role-mapping mistakes that every automated check read as correct.

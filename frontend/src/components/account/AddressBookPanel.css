@@ -212,11 +212,11 @@
 }
 
 .ab-meta-review {
-  color: #b45309;
+  color: var(--warning-text);
 }
 
 :root.theme-dark .ab-meta-review {
-  color: #fbbf24;
+  color: var(--warning-color);
 }
 
 .ab-contact-grid {

@@ -612,7 +612,7 @@
 }
 
 .no-price {
-  color: #ff5252;
+  color: var(--danger-color);
 }
 
 .probability {

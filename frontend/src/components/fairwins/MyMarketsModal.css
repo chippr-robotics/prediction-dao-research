@@ -605,7 +605,7 @@
 /* Offer (odds) wagers — distinct from even-money friend wagers */
 .mm-type-badge.mm-type-offer {
   background: rgba(255, 171, 0, 0.15);
-  color: #FFAB00;
+  color: var(--warning-color);
 }
 
 /* Status Badge */
@@ -626,7 +626,7 @@
 
 .mm-status-badge.status-pending-acceptance {
   background: rgba(156, 39, 176, 0.15);
-  color: #AB47BC;
+  color: var(--chart-series-d);
 }
 
 .mm-status-badge.status-pending {
@@ -652,7 +652,7 @@
 /* Draw — distinct from resolved (blue) and refunded/cancelled (grey). */
 .mm-status-badge.status-draw {
   background: rgba(159, 122, 234, 0.15);
-  color: #9F7AEA;
+  color: var(--chart-series-c);
 }
 
 .mm-status-badge.status-default {
@@ -703,7 +703,7 @@
 }
 
 .mm-action-btn.mm-action-resolve:hover {
-  background: linear-gradient(135deg, #3DC48B 0%, var(--brand-primary) 100%);
+  background: var(--gradient-brand);
 }
 
 .mm-action-btn.mm-action-dispute {
@@ -717,12 +717,12 @@
 }
 
 .mm-action-btn.mm-action-accept {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, var(--chart-series-d) 0%, var(--chart-series-d) 100%);
   color: white;
 }
 
 .mm-action-btn.mm-action-accept:hover {
-  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+  background: linear-gradient(135deg, var(--chart-series-c) 0%, var(--chart-series-c) 100%);
 }
 
 .mm-action-btn.mm-action-clear {
@@ -741,29 +741,29 @@
 }
 
 .mm-action-btn.mm-action-claim:hover:not(:disabled) {
-  background: linear-gradient(135deg, #3DC48B 0%, var(--brand-primary) 100%);
+  background: var(--gradient-brand);
 }
 
 /* Refund — returning your own stake (not winnings), so a neutral blue rather
    than the green Claim treatment. */
 .mm-action-btn.mm-action-refund {
-  background: linear-gradient(135deg, var(--brand-secondary) 0%, #3A7FD5 100%);
+  background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--info-color) 100%);
   color: white;
 }
 
 .mm-action-btn.mm-action-refund:hover:not(:disabled) {
-  background: linear-gradient(135deg, #5CA9FF 0%, var(--brand-secondary) 100%);
+  background: linear-gradient(135deg, var(--info-color) 0%, var(--brand-secondary) 100%);
 }
 
 /* Respond to Draw — a counterparty needs an answer, so an attention amber that
    matches the resolve/dispute family. */
 .mm-action-btn.mm-action-draw {
-  background: linear-gradient(135deg, var(--warning-color) 0%, #D99520 100%);
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--warning-color) 100%);
   color: var(--chippr-gunmetal);
 }
 
 .mm-action-btn.mm-action-draw:hover:not(:disabled) {
-  background: linear-gradient(135deg, #FFB834 0%, var(--warning-color) 100%);
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--warning-color) 100%);
 }
 
 .mm-action-btn:disabled {
@@ -884,7 +884,7 @@
 }
 
 .mm-resolve-countdown-full strong {
-  color: #6CB8FF;
+  color: var(--info-color);
 }
 
 /* Detail View */
@@ -1151,7 +1151,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background: linear-gradient(135deg, var(--brand-secondary) 0%, #3A7FD5 100%);
+  background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--info-color) 100%);
   border: none;
   border-radius: 8px;
   color: white;
@@ -1163,7 +1163,7 @@
 }
 
 .mm-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #5CA9FF 0%, var(--brand-secondary) 100%);
+  background: linear-gradient(135deg, var(--info-color) 0%, var(--brand-secondary) 100%);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(var(--brand-secondary-rgb), 0.35);
 }
@@ -1175,11 +1175,11 @@
 }
 
 .mm-btn-primary.warning {
-  background: linear-gradient(135deg, var(--warning-color) 0%, #D99520 100%);
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--warning-color) 100%);
 }
 
 .mm-btn-primary.warning:hover:not(:disabled) {
-  background: linear-gradient(135deg, #FFB834 0%, var(--warning-color) 100%);
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--warning-color) 100%);
   box-shadow: 0 4px 12px rgba(var(--warning-color-rgb), 0.35);
 }
 
@@ -1239,7 +1239,7 @@
   background: rgba(var(--danger-color-rgb), 0.1);
   border: 1px solid rgba(var(--danger-color-rgb), 0.3);
   border-radius: 8px;
-  color: #DC3545;
+  color: var(--danger-color);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -1248,7 +1248,7 @@
 
 .mm-btn-danger:hover:not(:disabled) {
   background: rgba(var(--danger-color-rgb), 0.2);
-  border-color: #DC3545;
+  border-color: var(--danger-color);
 }
 
 .mm-btn-danger:disabled {
@@ -1263,7 +1263,7 @@
 }
 
 .mm-withdraw-error {
-  color: #DC3545;
+  color: var(--danger-color);
   font-size: 0.813rem;
   margin: 0;
 }
@@ -1287,13 +1287,13 @@
   height: 32px;
   border-radius: 50%;
   background: rgba(var(--success-color-rgb), 0.15);
-  color: #10b981;
+  color: var(--success-color);
   font-size: 1.125rem;
 }
 
 .mm-withdraw-success p {
   margin: 0;
-  color: #10b981;
+  color: var(--success-color);
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -1357,7 +1357,7 @@
 }
 
 .mm-encrypted-header svg {
-  color: #6C5CE7;
+  color: var(--chart-series-d);
 }
 
 .mm-encrypted-hint {
@@ -1387,7 +1387,7 @@
   background: rgba(108, 92, 231, 0.15);
   border: 1px solid rgba(108, 92, 231, 0.4);
   border-radius: 6px;
-  color: #B5A8FF;
+  color: var(--chart-series-c);
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -1396,7 +1396,7 @@
 
 .mm-decrypt-btn:hover {
   background: rgba(108, 92, 231, 0.25);
-  border-color: #6C5CE7;
+  border-color: var(--chart-series-d);
 }
 
 .mm-decrypting-indicator {
@@ -1414,7 +1414,7 @@
 }
 
 .mm-decrypt-error-message {
-  color: #DC3545;
+  color: var(--danger-color);
   font-size: 0.8rem;
 }
 

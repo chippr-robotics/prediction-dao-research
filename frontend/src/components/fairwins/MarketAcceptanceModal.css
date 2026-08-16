@@ -235,7 +235,7 @@
   background: rgba(var(--warning-color-rgb), 0.1);
   border: 1px solid rgba(var(--warning-color-rgb), 0.3);
   border-radius: 8px;
-  color: #ffc107;
+  color: var(--warning-color);
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -243,7 +243,7 @@
 .ma-deadline-warning.expired {
   background: rgba(var(--danger-color-rgb), 0.1);
   border-color: rgba(var(--danger-color-rgb), 0.3);
-  color: #ef4444;
+  color: var(--danger-color);
 }
 
 .ma-clock-icon {
@@ -359,7 +359,7 @@
 }
 
 .ma-financial-lose .ma-financial-value {
-  color: #ef4444;
+  color: var(--danger-color);
 }
 
 .ma-arbitrator-note {
@@ -505,7 +505,7 @@
 .ma-not-invited {
   background: rgba(var(--danger-color-rgb), 0.1);
   border: 1px solid rgba(var(--danger-color-rgb), 0.3);
-  color: #ef4444;
+  color: var(--danger-color);
 }
 
 .ma-connect-prompt {
@@ -573,7 +573,7 @@
 }
 
 .ma-btn-danger:hover {
-  background: #b91c1c;
+  background: var(--danger-text);
 }
 
 /* Confirmation Step */
@@ -612,7 +612,7 @@
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.875rem;
-  color: #ff9800;
+  color: var(--warning-color);
   font-size: 0.9375rem;
 }
 
@@ -643,7 +643,7 @@
 }
 
 .ma-check-icon {
-  color: #ff9800;
+  color: var(--warning-color);
   font-size: 0.75rem;
   margin-top: 0.125rem;
   flex-shrink: 0;
@@ -777,7 +777,7 @@
   align-items: center;
   justify-content: center;
   font-size: 2rem;
-  color: #ef4444;
+  color: var(--danger-color);
   margin: 0 auto 1.5rem;
 }
 
@@ -789,7 +789,7 @@
 
 .ma-error-message {
   margin: 0 0 1.5rem 0;
-  color: #ef4444;
+  color: var(--danger-color);
   background: rgba(var(--danger-color-rgb), 0.1);
   padding: 0.75rem;
   border-radius: 8px;
@@ -829,7 +829,7 @@
   font-size: 0.875rem;
   background: rgba(var(--warning-color-rgb), 0.1);
   border: 1px solid rgba(var(--warning-color-rgb), 0.3);
-  color: #ffc107;
+  color: var(--warning-color);
 }
 
 /* Mobile Responsive */

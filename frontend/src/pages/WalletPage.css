@@ -1308,7 +1308,7 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: 8px;
-  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  background: var(--gradient-gold);
   color: #000;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1407,17 +1407,17 @@
 }
 
 .polymarket-category-option:hover {
-  border-color: #2d9cdb;
+  border-color: var(--info-color);
 }
 
 .polymarket-category-option.checked {
   background: rgba(45, 156, 219, 0.12);
-  border-color: #2d9cdb;
-  color: #2d9cdb;
+  border-color: var(--info-color);
+  color: var(--info-color);
 }
 
 .polymarket-category-option input[type="checkbox"] {
-  accent-color: #2d9cdb;
+  accent-color: var(--info-color);
 }
 
 /* PWA install preference toggle (Settings tab) */
