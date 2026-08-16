@@ -26,7 +26,7 @@
   max-width: 460px;
   max-height: 85vh;
   overflow-y: auto;
-  background: var(--surface-color, #ffffff);
+  background: var(--surface-color);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
   border-radius: 16px;

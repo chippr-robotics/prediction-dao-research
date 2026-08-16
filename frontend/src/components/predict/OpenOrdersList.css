@@ -1,7 +1,7 @@
 /* OpenOrdersList (spec 057 US3) — connected wallet's open CLOB orders. */
 
 .predict-orders {
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -19,15 +19,15 @@
 }
 .predict-orders-refresh {
   background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.8rem;
   padding: 0.25rem 0.6rem;
 }
 .predict-orders-status {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -41,7 +41,7 @@
 }
 .predict-order {
   align-items: center;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   display: flex;
   gap: 0.6rem;
@@ -55,21 +55,21 @@
   padding: 0.1rem 0.45rem;
 }
 .predict-order-side[data-side='BUY'] {
-  background: var(--success-bg, #dcfce7);
-  color: var(--success-text, #166534);
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 .predict-order-side[data-side='SELL'] {
   background: var(--bg-tertiary);
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
 }
 .predict-order-detail {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 .predict-order-cancel {
   background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   cursor: pointer;
   margin-left: auto;
   padding: 0.3rem 0.8rem;

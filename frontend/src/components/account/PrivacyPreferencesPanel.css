@@ -20,13 +20,13 @@
   font-weight: 600;
 }
 .privacy-prefs-sub {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 .privacy-prefs-switch {
   appearance: none;
-  background: var(--surface-color, var(--bg-secondary, #e5e7eb));
-  border: 1px solid var(--border-color, #d1d5db);
+  background: var(--surface-color, var(--bg-secondary));
+  border: 1px solid var(--border-color);
   border-radius: 999px;
   cursor: pointer;
   flex: none;

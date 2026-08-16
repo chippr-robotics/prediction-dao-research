@@ -56,9 +56,9 @@
   justify-content: center;
   width: 42px;
   min-width: 42px;
-  border: 1px solid var(--border-color, #cbd5e1);
+  border: 1px solid var(--border-color);
   border-radius: 0.625rem;
-  background: var(--bg-primary, #f8fafc);
+  background: var(--bg-primary);
   color: inherit;
   cursor: pointer;
 }
@@ -106,10 +106,10 @@
 .ab-field input,
 .ab-field select {
   padding: 0.55rem 0.75rem;
-  border: 1px solid var(--border-color, #cbd5e1);
+  border: 1px solid var(--border-color);
   border-radius: 0.625rem;
-  background: var(--bg-primary, #fff);
-  color: var(--text-primary, #0f172a);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font: inherit;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -142,10 +142,10 @@
   padding: 0.75rem 1.1rem 0.75rem 2.6rem;
   font: inherit;
   font-size: 0.95rem;
-  border: 1px solid var(--border-color, #cbd5e1);
+  border: 1px solid var(--border-color);
   border-radius: 999px;
-  background: var(--bg-secondary, #fff);
-  color: var(--text-primary, #0f172a);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -227,11 +227,11 @@
 
 /* Compact expandable roster card (issue #1023, design 3a). */
 .ab-contact-card {
-  border: 1px solid var(--border-color, #e2e8f0);
+  border: 1px solid var(--border-color);
   border-radius: 1rem;
   padding: 0.9rem 1rem;
-  background: var(--bg-secondary, #fff);
-  color: var(--text-primary, #0f172a);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -383,7 +383,7 @@
 }
 
 .ab-address-row {
-  border-top: 1px solid var(--border-color, #f1f5f9);
+  border-top: 1px solid var(--border-color);
   padding-top: 0.65rem;
   display: flex;
   flex-direction: column;
@@ -415,8 +415,8 @@
   font-size: 0.85rem;
   padding: 0.3rem 0.55rem;
   border-radius: 0.5rem;
-  background: var(--bg-primary, #f1f5f9);
-  color: var(--text-primary, #0f172a);
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .ab-address-full {
@@ -429,13 +429,13 @@
   margin: 0;
   font-size: 0.8rem;
   line-height: 1.5;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
 }
 
 .ab-contact-actions {
   display: flex;
   gap: 0.5rem;
-  border-top: 1px solid var(--border-color, #f1f5f9);
+  border-top: 1px solid var(--border-color);
   padding-top: 0.5rem;
 }
 
@@ -444,21 +444,21 @@
   grid-template-columns: 1fr;
   gap: 0.5rem;
   padding: 0.5rem 0;
-  border-bottom: 1px dashed var(--border-color, #e2e8f0);
+  border-bottom: 1px dashed var(--border-color);
 }
 
 .ab-empty {
-  border: 1px dashed var(--border-color, #cbd5e1);
+  border: 1px dashed var(--border-color);
   border-radius: 1rem;
   padding: 2rem 1.5rem;
   text-align: center;
-  color: var(--text-muted, #64748b);
-  background: var(--bg-secondary, #fff);
+  color: var(--text-muted);
+  background: var(--bg-secondary);
 }
 
 .ab-empty h3 {
   margin: 0 0 0.5rem;
-  color: var(--text-primary, #0f172a);
+  color: var(--text-primary);
 }
 
 .ab-empty p {
@@ -469,7 +469,7 @@
   cursor: pointer;
   border: none;
   background: transparent;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
   border-radius: 0.55rem;
   padding: 0.35rem;
   font: inherit;
@@ -483,8 +483,8 @@
 
 .ab-btn:hover,
 .ab-btn:focus-visible {
-  color: var(--text-primary, #0f172a);
-  background: var(--btn-hover-bg, rgba(127, 127, 127, 0.14));
+  color: var(--text-primary);
+  background: var(--btn-hover-bg);
   outline: none;
 }
 
@@ -523,7 +523,7 @@
 
 .ab-btn-primary {
   background: var(--primary-button, var(--brand-primary));
-  color: var(--primary-button-text, #fff);
+  color: var(--primary-button-text);
   padding: 0.5rem 1rem;
   border-radius: 999px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
@@ -532,7 +532,7 @@
 .ab-btn-primary:hover,
 .ab-btn-primary:focus-visible {
   background: var(--primary-button-hover);
-  color: var(--primary-button-text, #fff);
+  color: var(--primary-button-text);
 }
 
 .ab-btn-primary:focus-visible {
@@ -540,27 +540,27 @@
 }
 
 .ab-btn-danger {
-  color: var(--danger-color, #b91c1c);
+  color: var(--danger-color);
 }
 
 .ab-btn-danger:hover,
 .ab-btn-danger:focus-visible {
   background: rgba(185, 28, 28, 0.12);
-  color: var(--danger-color, #b91c1c);
+  color: var(--danger-color);
 }
 
 .ab-copy-btn {
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
 }
 
 .ab-copy-btn--copied {
-  color: var(--success-color, #15803d);
+  color: var(--success-color);
 }
 
 .ab-copy-btn--copied:hover,
 .ab-copy-btn--copied:focus-visible {
   background: rgba(21, 128, 61, 0.12);
-  color: var(--success-color, #15803d);
+  color: var(--success-color);
 }
 
 .ab-modal-backdrop {
@@ -578,8 +578,8 @@
 }
 
 .ab-modal {
-  background: var(--bg-secondary, #fff);
-  color: var(--text-primary, #0f172a);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   border-radius: 1rem;
   padding: 1.5rem;
   width: min(560px, 100%);
@@ -599,7 +599,7 @@
 }
 
 .ab-addresses-fieldset {
-  border: 1px solid var(--border-color, #e2e8f0);
+  border: 1px solid var(--border-color);
   border-radius: 0.75rem;
   padding: 0.85rem;
   display: flex;
@@ -614,18 +614,18 @@
 }
 
 .ab-error {
-  color: var(--danger-color, #b91c1c);
+  color: var(--danger-color);
   font-size: 0.85rem;
   margin: 0;
 }
 
 .ab-warn {
-  color: var(--warning-color, #b45309);
+  color: var(--warning-color);
   font-size: 0.78rem;
 }
 
 .ab-conflict {
-  border: 1px solid var(--border-color, #e2e8f0);
+  border: 1px solid var(--border-color);
   border-radius: 0.6rem;
   padding: 0.5rem;
   display: flex;

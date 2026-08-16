@@ -116,11 +116,11 @@
 .wc-action-success { color: #fff; background: #16a34a; }
 .wc-action-success:hover:not(:disabled) { filter: brightness(1.08); }
 
-.wc-action-danger { color: var(--danger-color); background: transparent; border-color: rgba(229, 83, 61, 0.5); }
-.wc-action-danger:hover:not(:disabled) { background: rgba(229, 83, 61, 0.1); }
+.wc-action-danger { color: var(--danger-color); background: transparent; border-color: rgba(var(--danger-color-rgb), 0.5); }
+.wc-action-danger:hover:not(:disabled) { background: rgba(var(--danger-color-rgb), 0.1); }
 
-.wc-action-warning { color: var(--warning-color); background: transparent; border-color: rgba(245, 166, 35, 0.5); }
-.wc-action-warning:hover:not(:disabled) { background: rgba(245, 166, 35, 0.1); }
+.wc-action-warning { color: var(--warning-color); background: transparent; border-color: rgba(var(--warning-color-rgb), 0.5); }
+.wc-action-warning:hover:not(:disabled) { background: rgba(var(--warning-color-rgb), 0.1); }
 
 .wc-action-ghost {
   color: var(--text-primary);

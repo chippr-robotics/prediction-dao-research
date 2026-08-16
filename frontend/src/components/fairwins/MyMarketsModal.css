@@ -630,12 +630,12 @@
 }
 
 .mm-status-badge.status-pending {
-  background: rgba(245, 166, 35, 0.15);
+  background: rgba(var(--warning-color-rgb), 0.15);
   color: var(--warning-color);
 }
 
 .mm-status-badge.status-disputed {
-  background: rgba(229, 83, 61, 0.15);
+  background: rgba(var(--danger-color-rgb), 0.15);
   color: var(--danger-color);
 }
 
@@ -707,13 +707,13 @@
 }
 
 .mm-action-btn.mm-action-dispute {
-  background: rgba(245, 166, 35, 0.15);
+  background: rgba(var(--warning-color-rgb), 0.15);
   color: var(--warning-color);
-  border: 1px solid rgba(245, 166, 35, 0.3);
+  border: 1px solid rgba(var(--warning-color-rgb), 0.3);
 }
 
 .mm-action-btn.mm-action-dispute:hover {
-  background: rgba(245, 166, 35, 0.25);
+  background: rgba(var(--warning-color-rgb), 0.25);
 }
 
 .mm-action-btn.mm-action-accept {
@@ -726,13 +726,13 @@
 }
 
 .mm-action-btn.mm-action-clear {
-  background: rgba(229, 83, 61, 0.12);
+  background: rgba(var(--danger-color-rgb), 0.12);
   color: var(--danger-color);
-  border: 1px solid rgba(229, 83, 61, 0.35);
+  border: 1px solid rgba(var(--danger-color-rgb), 0.35);
 }
 
 .mm-action-btn.mm-action-clear:hover {
-  background: rgba(229, 83, 61, 0.22);
+  background: rgba(var(--danger-color-rgb), 0.22);
 }
 
 .mm-action-btn.mm-action-claim {
@@ -798,7 +798,7 @@
 
 /* Expired offer treatment */
 .mm-status-badge.status-expired {
-  background: rgba(229, 83, 61, 0.15);
+  background: rgba(var(--danger-color-rgb), 0.15);
   color: var(--danger-color);
 }
 
@@ -1078,7 +1078,7 @@
 }
 
 .mm-outcome-display.negative {
-  background: rgba(229, 83, 61, 0.15);
+  background: rgba(var(--danger-color-rgb), 0.15);
   color: var(--danger-color);
 }
 
@@ -1109,8 +1109,8 @@
 
 .mm-dispute-card {
   padding: 1rem;
-  background: rgba(229, 83, 61, 0.05);
-  border: 1px solid rgba(229, 83, 61, 0.2);
+  background: rgba(var(--danger-color-rgb), 0.05);
+  border: 1px solid rgba(var(--danger-color-rgb), 0.2);
   border-radius: 10px;
 }
 
@@ -1118,7 +1118,7 @@
   display: flex;
   justify-content: space-between;
   padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(229, 83, 61, 0.1);
+  border-bottom: 1px solid rgba(var(--danger-color-rgb), 0.1);
 }
 
 .mm-dispute-item:last-child {
@@ -1180,7 +1180,7 @@
 
 .mm-btn-primary.warning:hover:not(:disabled) {
   background: linear-gradient(135deg, #FFB834 0%, var(--warning-color) 100%);
-  box-shadow: 0 4px 12px rgba(245, 166, 35, 0.35);
+  box-shadow: 0 4px 12px rgba(var(--warning-color-rgb), 0.35);
 }
 
 .mm-btn-secondary {
@@ -1215,8 +1215,8 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background: rgba(245, 166, 35, 0.1);
-  border: 1px solid rgba(245, 166, 35, 0.3);
+  background: rgba(var(--warning-color-rgb), 0.1);
+  border: 1px solid rgba(var(--warning-color-rgb), 0.3);
   border-radius: 8px;
   color: var(--warning-color);
   font-size: 0.875rem;
@@ -1226,7 +1226,7 @@
 }
 
 .mm-btn-warning:hover:not(:disabled) {
-  background: rgba(245, 166, 35, 0.2);
+  background: rgba(var(--warning-color-rgb), 0.2);
   border-color: var(--warning-color);
 }
 
@@ -1236,8 +1236,8 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background: rgba(220, 53, 69, 0.1);
-  border: 1px solid rgba(220, 53, 69, 0.3);
+  background: rgba(var(--danger-color-rgb), 0.1);
+  border: 1px solid rgba(var(--danger-color-rgb), 0.3);
   border-radius: 8px;
   color: #DC3545;
   font-size: 0.875rem;
@@ -1247,7 +1247,7 @@
 }
 
 .mm-btn-danger:hover:not(:disabled) {
-  background: rgba(220, 53, 69, 0.2);
+  background: rgba(var(--danger-color-rgb), 0.2);
   border-color: #DC3545;
 }
 
@@ -1274,8 +1274,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 1rem;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(var(--success-color-rgb), 0.08);
+  border: 1px solid rgba(var(--success-color-rgb), 0.25);
   border-radius: 8px;
 }
 
@@ -1286,7 +1286,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(var(--success-color-rgb), 0.15);
   color: #10b981;
   font-size: 1.125rem;
 }
@@ -1299,7 +1299,7 @@
 }
 
 .mm-tx-link {
-  color: var(--text-accent, #6366f1);
+  color: var(--text-accent);
   font-size: 0.813rem;
   text-decoration: none;
 }
@@ -1312,7 +1312,7 @@
 
 .mm-refund-hint {
   margin: 0;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   line-height: 1.4;
 }
@@ -1563,7 +1563,7 @@
 
 .mm-outcome-btn.selected.negative {
   border-color: var(--danger-color);
-  background: rgba(229, 83, 61, 0.1);
+  background: rgba(var(--danger-color-rgb), 0.1);
   color: var(--danger-color);
 }
 
@@ -1702,8 +1702,8 @@
 /* Dispute Details (for Respond mode) */
 .mm-dispute-details {
   padding: 1rem;
-  background: rgba(229, 83, 61, 0.05);
-  border: 1px solid rgba(229, 83, 61, 0.15);
+  background: rgba(var(--danger-color-rgb), 0.05);
+  border: 1px solid rgba(var(--danger-color-rgb), 0.15);
   border-radius: 10px;
   margin-bottom: 1rem;
 }
@@ -1765,7 +1765,7 @@
 
 .mm-resolution-btn.selected.reject {
   border-color: var(--danger-color);
-  background: rgba(229, 83, 61, 0.1);
+  background: rgba(var(--danger-color-rgb), 0.1);
   color: var(--danger-color);
 }
 
@@ -1775,8 +1775,8 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.875rem;
-  background: rgba(245, 166, 35, 0.1);
-  border: 1px solid rgba(245, 166, 35, 0.3);
+  background: rgba(var(--warning-color-rgb), 0.1);
+  border: 1px solid rgba(var(--warning-color-rgb), 0.3);
   border-radius: 8px;
   margin-bottom: 1rem;
   color: var(--warning-color);
@@ -1803,8 +1803,8 @@
 /* Error Banner */
 .mm-error-banner {
   padding: 0.875rem;
-  background: rgba(229, 83, 61, 0.1);
-  border: 1px solid rgba(229, 83, 61, 0.3);
+  background: rgba(var(--danger-color-rgb), 0.1);
+  border: 1px solid rgba(var(--danger-color-rgb), 0.3);
   border-radius: 8px;
   color: var(--danger-color);
   font-size: 0.875rem;
@@ -2136,7 +2136,7 @@
 }
 
 .theme-light .my-markets-modal {
-  background: var(--bg-secondary, #FFFFFF);
+  background: var(--bg-secondary);
   box-shadow:
     0 0 0 1px rgba(var(--brand-secondary-rgb), 0.1),
     0 20px 60px rgba(0, 0, 0, 0.12);
@@ -2147,7 +2147,7 @@
 }
 
 .theme-light .mm-sub-modal {
-  background: var(--bg-secondary, #FFFFFF);
+  background: var(--bg-secondary);
   box-shadow:
     0 0 0 1px rgba(var(--brand-secondary-rgb), 0.1),
     0 16px 48px rgba(0, 0, 0, 0.15);

@@ -3,9 +3,9 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  border: 1px solid var(--border-color, #e0e0e0);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: var(--bg-secondary, #f5f5f5);
+  background: var(--bg-secondary);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -14,12 +14,12 @@
 }
 
 .currency-toggle:hover:not(:disabled) {
-  background: var(--bg-tertiary, #ebebeb);
-  border-color: var(--border-hover, #ccc);
+  background: var(--bg-tertiary);
+  border-color: var(--border-hover);
 }
 
 .currency-toggle:focus {
-  outline: 2px solid var(--focus-color, #4a90e2);
+  outline: 2px solid var(--focus-color);
   outline-offset: 2px;
 }
 
@@ -29,15 +29,15 @@
 }
 
 .currency-option {
-  color: var(--text-secondary, #666);
+  color: var(--text-secondary);
   transition: color 0.2s ease;
 }
 
 .currency-option.active {
-  color: var(--text-primary, #000);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .currency-divider {
-  color: var(--border-color, #e0e0e0);
+  color: var(--border-color);
 }

@@ -24,7 +24,7 @@
 
 .button-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(45, 122, 79, 0.4);
+  box-shadow: 0 4px 12px rgba(var(--success-color-rgb), 0.4);
 }
 
 .button-primary:active:not(:disabled) {

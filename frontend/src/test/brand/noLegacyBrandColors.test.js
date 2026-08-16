@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve, relative } from 'node:path'
-import { globSync } from 'glob'
+import { dirname, resolve, relative, join, sep } from 'node:path'
 
 // Regression guard for spec 089 — Chippr brand alignment.
 //
@@ -55,29 +54,42 @@ const BANNED_RGB = {
   '123, 220, 181': '#7BDCB5 as an rgba triple — use rgba(var(--brand-accent-rgb), a)',
 }
 
-/** Files whose styling ships to a member. */
-const SHIPPED_GLOBS = [
-  'frontend/src/**/*.css',
-  'frontend/src/**/*.jsx',
-  'frontend/src/**/*.js',
-  'frontend/index.html',
-  'tenants/*/manifest.json',
-]
+/**
+ * Minimal recursive walk. Deliberately not `glob`: this repo's dependency
+ * hygiene gate (spec 075 FR-003) rejects a package that resolves only through
+ * npm hoisting, and a test guard does not justify a lockfile entry.
+ */
+function walk(dir, match, out = []) {
+  let entries
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return out
+  }
+  for (const entry of entries) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue
+      walk(full, match, out)
+    } else if (match(full)) {
+      out.push(full)
+    }
+  }
+  return out
+}
 
 /**
- * Tests may legitimately name an old value while describing history, and
- * archived trees are reference-only (constitution: contracts-archive et al).
+ * Files whose styling ships to a member. Tests are exempt: a fixture may
+ * legitimately name an old value while describing history.
  */
-const EXEMPT = [
-  'frontend/src/test/**',
-  '**/node_modules/**',
-  '**/dist/**',
-]
-
 function shippedFiles() {
-  return SHIPPED_GLOBS.flatMap((pattern) =>
-    globSync(pattern, { cwd: REPO, ignore: EXEMPT, absolute: true, nodir: true })
-  ).sort()
+  const exemptPrefix = resolve(FRONTEND, 'src/test') + sep
+  const styling = walk(
+    resolve(FRONTEND, 'src'),
+    (f) => /\.(css|jsx|js)$/.test(f) && !f.startsWith(exemptPrefix)
+  )
+  const extras = [resolve(FRONTEND, 'index.html'), ...walk(resolve(REPO, 'tenants'), (f) => f.endsWith('manifest.json'))]
+  return [...styling, ...extras].sort()
 }
 
 /** Normalize `rgba( 54 , 179 , 126` spacing so a reformat can't smuggle a triple past us. */

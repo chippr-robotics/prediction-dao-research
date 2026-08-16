@@ -2,7 +2,7 @@
 
 .tp-container {
   padding: 1rem;
-  background: var(--surface-color, var(--bg-secondary, #FFFFFF));
+  background: var(--surface-color, var(--bg-secondary));
   border-radius: 8px;
   margin-bottom: 1rem;
 }
@@ -14,15 +14,15 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: var(--warning-bg, rgba(255, 193, 7, 0.1));
-  border: 1px solid var(--warning-border, rgba(255, 193, 7, 0.3));
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
   border-radius: 8px;
   margin-bottom: 1rem;
 }
 
 .tp-pending-icon {
   font-size: 1.5rem;
-  color: var(--warning-color, #ffc107);
+  color: var(--warning-color);
 }
 
 .tp-pending-content {
@@ -82,14 +82,14 @@
 }
 
 .tp-step.current .tp-step-indicator {
-  background: var(--primary-color, #6366f1);
-  border-color: var(--primary-color, #6366f1);
+  background: var(--primary-color);
+  border-color: var(--primary-color);
   color: #fff;
 }
 
 .tp-step.complete .tp-step-indicator {
-  background: var(--success-color, #10b981);
-  border-color: var(--success-color, #10b981);
+  background: var(--success-color);
+  border-color: var(--success-color);
   color: #fff;
 }
 
@@ -120,7 +120,7 @@
 }
 
 .tp-step-connector.complete {
-  background: var(--success-color, #10b981);
+  background: var(--success-color);
 }
 
 .tp-check {
@@ -176,10 +176,10 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: var(--primary-bg, rgba(99, 102, 241, 0.1));
-  border: 1px solid var(--primary-border, rgba(99, 102, 241, 0.3));
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border);
   border-radius: 6px;
-  color: var(--primary-color, #6366f1);
+  color: var(--primary-color);
   font-size: 0.875rem;
 }
 
@@ -194,8 +194,8 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: var(--error-bg, rgba(239, 68, 68, 0.1));
-  border: 1px solid var(--error-border, rgba(239, 68, 68, 0.3));
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
   border-radius: 8px;
   margin-top: 1rem;
 }
@@ -204,7 +204,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--error-color, #ef4444);
+  background: var(--error-color);
   color: #fff;
   display: flex;
   align-items: center;
@@ -220,7 +220,7 @@
 
 .tp-error-content strong {
   display: block;
-  color: var(--error-color, #ef4444);
+  color: var(--error-color);
   margin-bottom: 0.25rem;
 }
 
@@ -242,8 +242,8 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: var(--success-bg, rgba(16, 185, 129, 0.1));
-  border: 1px solid var(--success-border, rgba(16, 185, 129, 0.3));
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
   border-radius: 8px;
   margin-top: 1rem;
 }
@@ -252,7 +252,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--success-color, #10b981);
+  background: var(--success-color);
   color: #fff;
   display: flex;
   align-items: center;
@@ -267,13 +267,13 @@
 
 .tp-success-content strong {
   display: block;
-  color: var(--success-color, #10b981);
+  color: var(--success-color);
   margin-bottom: 0.25rem;
 }
 
 /* Transaction Links */
 .tp-tx-link {
-  color: var(--primary-color, #6366f1);
+  color: var(--primary-color);
   text-decoration: none;
   font-size: 0.875rem;
 }
@@ -309,7 +309,7 @@
 
 .tp-btn-primary {
   background: var(--brand-primary, var(--primary-button));
-  color: var(--primary-button-text, #fff);
+  color: var(--primary-button-text);
 }
 
 .tp-btn-primary:hover {
@@ -317,7 +317,7 @@
 }
 
 .tp-btn-secondary {
-  background: var(--bg-secondary, #FFFFFF);
+  background: var(--bg-secondary);
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
 }

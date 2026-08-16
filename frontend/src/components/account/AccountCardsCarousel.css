@@ -55,7 +55,7 @@
   line-height: 1;
   border-radius: var(--radius-full, 9999px);
   border: 1px solid var(--border-color);
-  background: var(--glass-bg, rgba(255, 255, 255, 0.55));
+  background: var(--glass-bg);
   color: var(--text-secondary);
   z-index: 2;
 }
@@ -76,7 +76,7 @@
   padding: 0;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-full, 9999px);
-  background: var(--bg-secondary, #ffffff);
+  background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 1.1rem;
   line-height: 1;

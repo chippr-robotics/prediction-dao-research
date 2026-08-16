@@ -14,9 +14,9 @@
   width: calc(100% - 2rem);
   max-width: 440px;
   padding: 0.75rem 0.85rem;
-  background: var(--bg-primary, #fff);
-  color: var(--text-primary, #111);
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24);
   animation: pwaToastUp 0.2s ease-out;
@@ -49,7 +49,7 @@
 .pwa-update-toast-text strong { font-size: 0.92rem; font-weight: 600; }
 .pwa-update-toast-text span {
   font-size: 0.82rem;
-  color: var(--text-secondary, #666);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -84,12 +84,12 @@
   border: none;
   border-radius: 8px;
   background: none;
-  color: var(--text-secondary, #777);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 .pwa-update-toast-dismiss:hover {
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.06));
-  color: var(--text-primary, #111);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {

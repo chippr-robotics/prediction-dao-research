@@ -9,7 +9,7 @@
 }
 
 .bridge-status-state {
-  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  color: var(--color-text-secondary, var(--text-secondary));
   padding: 1.25rem 0.25rem;
   text-align: center;
 }
@@ -32,22 +32,22 @@
   gap: 0.35rem;
   font-size: 1rem;
   margin: 0.5rem 0 0;
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
 }
 
 .bridge-refresh {
   appearance: none;
   background: transparent;
-  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
+  border: 1px solid var(--color-border, var(--border-color));
   border-radius: 999px;
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 600;
   padding: 0.3rem 0.8rem;
 }
 .bridge-refresh:focus-visible {
-  outline: 2px solid var(--color-primary, #6d28d9);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -64,7 +64,7 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.9rem 0.25rem;
-  border-bottom: 1px solid var(--color-border, #eee);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .bridge-status-body {
@@ -84,12 +84,12 @@
 .bridge-status-label {
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  color: var(--color-text-secondary, var(--text-secondary));
 }
 .bridge-status-amount {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--color-primary, #6d28d9);
+  color: var(--color-primary);
 }
 
 .bridge-status-route {
@@ -98,10 +98,10 @@
   flex-wrap: wrap;
   gap: 0.35rem;
   font-size: 0.9rem;
-  color: var(--color-text, var(--text-primary, #374151));
+  color: var(--color-text, var(--text-primary));
 }
 .bridge-status-arrow {
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
 }
 
 .bridge-status-detail,
@@ -109,11 +109,11 @@
 .bridge-status-meta {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  color: var(--color-text-secondary, var(--text-secondary));
 }
 .bridge-status-meta {
   font-size: 0.78rem;
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
 }
 .bridge-status-recourse {
   background: color-mix(in srgb, #d97706 12%, transparent);
@@ -129,7 +129,7 @@
   font-size: 0.85rem;
 }
 .bridge-tx-link {
-  color: var(--color-primary, #6d28d9);
+  color: var(--color-primary);
   text-decoration: none;
 }
 .bridge-tx-link:hover,
@@ -137,7 +137,7 @@
   text-decoration: underline;
 }
 .bridge-status-nolink {
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
 }
 
 /* Status dots — one per displayed state, never a colour that implies delivery
@@ -151,17 +151,17 @@
 }
 .bridge-dot.moving { background: #d97706; }
 .bridge-dot.attention { background: #b45309; }
-.bridge-dot.delivered { background: var(--color-success, #16a34a); }
-.bridge-dot.returned { background: var(--color-text-tertiary, #9ca3af); }
+.bridge-dot.delivered { background: var(--color-success); }
+.bridge-dot.returned { background: var(--color-text-tertiary); }
 .bridge-dot.failed { background: var(--color-error, var(--danger-color)); }
 
 /* Honest-unavailable notice — the Earn `earn-unavailable` pattern, in the
    Transfer section's spacing. */
 .bridge-notice {
-  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
+  border: 1px solid var(--color-border, var(--border-color));
   border-left: 4px solid #d97706;
   border-radius: 12px;
-  background: var(--color-surface-secondary, var(--bg-secondary, #f9fafb));
+  background: var(--color-surface-secondary, var(--bg-secondary));
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -169,31 +169,31 @@
 }
 .bridge-notice-title {
   font-weight: 700;
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
   margin: 0;
 }
 .bridge-notice p {
   margin: 0;
-  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  color: var(--color-text-secondary, var(--text-secondary));
   font-size: 0.9rem;
 }
 .bridge-notice-asof {
   font-size: 0.78rem;
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
 }
 .bridge-notice-action {
   appearance: none;
   align-self: flex-start;
   background: transparent;
-  border: 1px solid var(--color-border, #e5e7eb);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
   padding: 0.4rem 1rem;
 }
 .bridge-notice-action:focus-visible {
-  outline: 2px solid var(--color-primary, #6d28d9);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }

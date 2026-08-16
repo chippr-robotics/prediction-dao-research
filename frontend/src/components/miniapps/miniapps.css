@@ -195,7 +195,7 @@
   min-width: 0;
 }
 .miniapp-catalog-search input {
-  background: var(--surface-color, #fff);
+  background: var(--surface-color);
   border: 1px solid var(--border-color);
   border-radius: 999px;
   color: var(--text-primary);
@@ -419,7 +419,7 @@
    in the DOM (tab order = "after the content", the native idiom for bottom navs) and the
    catalog carries a spacer (`.miniapp-catalog-with-bar`) so it never occludes the last row. */
 .miniapp-store-bar {
-  background: var(--surface-color, #fff);
+  background: var(--surface-color);
   border-top: 1px solid var(--border-color);
   bottom: 0;
   display: flex;
@@ -501,7 +501,7 @@
   z-index: 2000;
 }
 .miniapp-sheet {
-  background: var(--surface-color, #fff);
+  background: var(--surface-color);
   border: 1px solid var(--border-color);
   border-bottom: none;
   border-radius: 20px 20px 0 0;
@@ -628,7 +628,7 @@
   background: var(--primary-button, var(--brand-primary));
   border: 1px solid transparent;
   border-radius: 999px;
-  color: var(--primary-button-text, #fff);
+  color: var(--primary-button-text);
   display: inline-flex;
   font-size: 0.9rem;
   font-weight: 600;
@@ -725,7 +725,7 @@
 /* A crash is the package failing inside its boundary. The host survived; say so in warning colour
    rather than error red, because nothing the member owns is at risk. */
 .miniapp-workspace-crash {
-  border-left-color: var(--warning, #d98324);
+  border-left-color: var(--warning);
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -834,7 +834,7 @@
   padding: 0.65rem 0.85rem;
 }
 .miniapp-submit-notice.is-error {
-  border-left-color: var(--error-color, #d64545);
+  border-left-color: var(--error-color);
 }
 .miniapp-submit-notice.is-success {
   border-left-color: var(--brand-primary);
@@ -865,7 +865,7 @@
 .miniapp-submit-field input[type='text'],
 .miniapp-submit-field textarea,
 .miniapp-submit-field select {
-  background: var(--surface-color, #fff);
+  background: var(--surface-color);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   color: var(--text-primary);
@@ -886,7 +886,7 @@
 /* An invalid field is marked by a heavier border AND its own message — never by colour alone. */
 .miniapp-submit-field.has-error input[type='text'],
 .miniapp-submit-field.has-error textarea {
-  border-color: var(--error-color, #d64545);
+  border-color: var(--error-color);
   border-width: 2px;
 }
 .miniapp-submit-hint {
@@ -981,7 +981,7 @@
 
 /* The one client-side finding that holds up a submission — heaviest treatment on the surface. */
 .miniapp-submit-mismatch {
-  border: 1px solid var(--error-color, #d64545);
+  border: 1px solid var(--error-color);
   border-left-width: 4px;
   border-radius: 8px;
   font-size: 0.84rem;
@@ -1014,7 +1014,7 @@
   background: var(--primary-button, var(--brand-primary));
   border: 1px solid transparent;
   border-radius: 8px;
-  color: var(--primary-button-text, #fff);
+  color: var(--primary-button-text);
   cursor: pointer;
   font-size: 0.88rem;
   font-weight: 600;
@@ -1064,7 +1064,7 @@
 }
 
 .miniapp-submission {
-  background: var(--surface-color, #fff);
+  background: var(--surface-color);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   display: flex;

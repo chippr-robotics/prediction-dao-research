@@ -29,10 +29,9 @@
  *   node scripts/brand/codemod-colors.mjs [--dry-run]
  */
 
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve, relative } from 'node:path'
-import { globSync } from 'glob'
+import { dirname, resolve, relative, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO = resolve(__dirname, '../..')
@@ -93,19 +92,67 @@ const SCOPED = {
   '#23303D': { light: null, dark: '--border-color' },
 }
 
-/** rgba() triples → the matching -rgb token. */
+/**
+ * rgba() triples → the matching -rgb token.
+ *
+ * The status triples were added in round 2 of the screenshot loop. They are the
+ * TINT form of the status colours — `rgba(34, 197, 94, 0.1)` behind a success
+ * chip — and they are invisible to a hex scan, so 38 bright Tailwind-green
+ * surfaces survived the first sweep and photographed as leftover green next to
+ * the teal. A tint is as much a brand colour as a fill.
+ */
 const RGB_TRIPLES = {
+  // brand
   '54,179,126': '--brand-primary-rgb',
   '76,154,255': '--brand-secondary-rgb',
   '123,220,181': '--brand-accent-rgb',
+  // success (Tailwind green-500/emerald-500, chakra green, and the old mid-green)
+  '34,197,94': '--success-color-rgb',
+  '16,185,129': '--success-color-rgb',
+  '72,187,120': '--success-color-rgb',
+  '45,122,79': '--success-color-rgb',
+  '46,204,113': '--success-color-rgb',
+  '59,156,120': '--success-color-rgb',
+  '0,184,148': '--success-color-rgb',
+  // danger
+  '229,83,61': '--danger-color-rgb',
+  '239,68,68': '--danger-color-rgb',
+  '220,38,38': '--danger-color-rgb',
+  '220,53,69': '--danger-color-rgb',
+  // warning / amber
+  '245,158,11': '--warning-color-rgb',
+  '245,166,35': '--warning-color-rgb',
+  '255,193,7': '--warning-color-rgb',
+  '255,152,0': '--warning-color-rgb',
+  // info
+  '59,130,246': '--info-color-rgb',
+  '66,153,225': '--info-color-rgb',
 }
 
-const TARGET_GLOB = 'frontend/src/**/*.css'
+const CSS_ROOT = 'frontend/src'
+// Path prefixes, matched against the repo-relative path.
 const EXCLUDE = [
   'frontend/src/theme.css',   // the source of truth — it STATES the values
-  'frontend/src/test/**',     // fixtures may name old values while describing history
-  '**/node_modules/**',
+  'frontend/src/test/',       // fixtures may name old values while describing history
 ]
+
+/**
+ * Minimal recursive file walk. Deliberately not `glob`: this repo's dependency
+ * hygiene gate (spec 075 FR-003) rejects a package that resolves only through
+ * npm hoisting, and a ten-line walker is not worth a lockfile re-resolve.
+ */
+function walkCss(dir, out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue
+      walkCss(full, out)
+    } else if (entry.name.endsWith('.css')) {
+      out.push(full)
+    }
+  }
+  return out
+}
 
 // ---------------------------------------------------------------------------
 // Scope-aware rewriting
@@ -168,13 +215,13 @@ function dropDeadFallbacks(text) {
     /var\(\s*(--[\w-]+)\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\([^()]*\))\s*\)/g,
     (match, token, fallback) => {
       if (!DEFINED_TOKENS.has(token)) return match
-      const isMapped =
-        UNIVERSAL[fallback.toUpperCase()] ||
-        SCOPED[fallback.toUpperCase()] ||
-        Object.keys(RGB_TRIPLES).some((t) => fallback.replace(/\s+/g, '').includes(t))
-      // Only touch fallbacks this spec is responsible for; unrelated fallbacks
-      // are somebody else's cleanup.
-      return isMapped ? `var(${token})` : match
+      // ANY colour literal here is unreachable, so dropping it cannot change a
+      // rendered pixel — and leaving it is how off-palette colour hides. Round 1
+      // of the screenshot loop found `var(--color-success, #15803d)` rendering a
+      // bright green next to the teal, because the token was undefined; once
+      // defined, the same literal becomes a lie that reads like a value.
+      // Non-colour fallbacks (lengths, keywords) are left alone.
+      return `var(${token})`
     }
   )
 
@@ -228,7 +275,9 @@ function rewriteSegment(text, dark, report) {
 // Run
 // ---------------------------------------------------------------------------
 
-const files = globSync(TARGET_GLOB, { cwd: REPO, ignore: EXCLUDE, absolute: true, nodir: true }).sort()
+const files = walkCss(resolve(REPO, CSS_ROOT))
+  .filter((f) => !EXCLUDE.some((e) => relative(REPO, f) === e || relative(REPO, f).startsWith(e)))
+  .sort()
 
 let totalReplaced = 0
 let filesChanged = 0

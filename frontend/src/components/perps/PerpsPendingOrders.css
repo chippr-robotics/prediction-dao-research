@@ -8,7 +8,7 @@
    theme — a light amber panel with inherited text is unreadable in the dark theme. */
 
 .perps-orders {
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -53,7 +53,7 @@
   gap: 0.45rem;
 }
 .perps-orders-group-title {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -71,7 +71,7 @@
 }
 
 .perps-orders-row {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -101,8 +101,8 @@
   text-transform: uppercase;
 }
 .perps-orders-direction-long {
-  background: color-mix(in srgb, var(--semantic-win, #16a34a) 15%, transparent);
-  color: var(--semantic-win, #16a34a);
+  background: color-mix(in srgb, var(--semantic-win) 15%, transparent);
+  color: var(--semantic-win);
 }
 .perps-orders-direction-short {
   background: color-mix(in srgb, var(--semantic-loss) 15%, transparent);
@@ -120,7 +120,7 @@
 }
 
 .perps-orders-what {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.82rem;
   margin: 0;
 }
@@ -134,7 +134,7 @@
   margin: 0;
 }
 .perps-orders-reason-label {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 /* The venue's own words, verbatim — set apart so it reads as a quotation, not as our sentence.
    It can be a long unbroken error name, so it wraps rather than widening the page. */
@@ -146,7 +146,7 @@
    block height. Deliberately NOT the quotation treatment above: no attribution label and no
    monospace, because the monospace is what says "these are someone else's exact words". */
 .perps-orders-observation {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.82rem;
   margin: 0;
 }
@@ -158,7 +158,7 @@
   margin: 0;
 }
 .perps-orders-stats dt {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.72rem;
 }
 .perps-orders-stats dd {
@@ -172,7 +172,7 @@
 .perps-orders-rail-note,
 .perps-orders-no-handle,
 .perps-orders-note {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.78rem;
   margin: 0;
 }
@@ -188,7 +188,7 @@
   background: var(--brand-primary);
   border: 1px solid var(--brand-primary);
   border-radius: 10px;
-  color: var(--text-on-brand, #ffffff);
+  color: var(--text-on-brand);
   cursor: pointer;
   font-size: 0.88rem;
   font-weight: 600;

@@ -149,26 +149,51 @@
 
 :root {
   --success-color: #1E7A4F;     /* 5.3:1 on white; ~150° — clearly not teal */
+  --success-color-rgb: 30, 122, 79;
   --warning-color: #F2A33C;     /* Amber — SIGNAL ONLY, fills and borders */
+  --warning-color-rgb: 242, 163, 60;
   --danger-color: #C0392B;      /* 5.4:1 on white */
+  --danger-color-rgb: 192, 57, 43;
   --info-color: #1F5966;        /* Teal 700 — info is brand-neutral */
-  --warning-bg: #FDF2E4;        /* Amber over white; banner surface */
+  --info-color-rgb: 31, 89, 102;
+  /* Status surfaces are OPAQUE, not alpha tints. An alpha tint's contrast is a
+     function of whatever sits behind it, which is unknowable where the token is
+     defined: the dark amber chip measured 5.89 on the page background and 4.10
+     on a raised panel — the screenshot round caught what the audit's model
+     could not. Opaque values contrast the same everywhere. */
+  --success-bg: #E4F2EB;
+  --warning-bg: #FDF2E4;
+  --danger-bg: #F9E7E5;
+  --info-bg: #E4EDEF;
+  --success-text: #14603C;      /* 7.0:1 on --success-bg */
   --warning-text: #7A4A00;      /* 7.5:1 on white — Amber itself is 2.1:1 and
                                    must never be small text on a light field */
+  --danger-text: #96261A;
+  --info-text: #1A4C57;
 }
 
 .theme-dark {
   --success-color: #57C795;
+  --success-color-rgb: 87, 199, 149;
   --warning-color: #F2A33C;     /* Amber on Gunmetal is 6.4:1 — the pairing the
                                    guidelines measure and endorse */
+  --warning-color-rgb: 242, 163, 60;
   --danger-color: #F58A7E;
+  --danger-color-rgb: 245, 138, 126;
   --info-color: #83B9C4;
-  --warning-bg: rgba(242, 163, 60, 0.16);
+  --info-color-rgb: 131, 185, 196;
+  --success-bg: #16332A;
+  --warning-bg: #38301F;
+  --danger-bg: #3A2422;
+  --info-bg: #1B333A;
+  --success-text: #57C795;
   --warning-text: #F2A33C;
+  --danger-text: #F58A7E;
+  --info-text: #83B9C4;
 }
 
 /* ===================================
-   LEGACY SUPPORT
+   LEGACY SUPPORT + COMPATIBILITY ALIASES
    =================================== */
 
 :root {
@@ -177,6 +202,129 @@
   --bg-dark: var(--bg-primary);
   --bg-light: var(--bg-secondary);
   --hover-color: var(--primary-button-hover);
+}
+
+/*
+ * A SHADOW VOCABULARY that components have been referencing for a long time and
+ * that nothing ever defined. `var(--color-primary, #6d28d9)` looks like a themed
+ * reference and behaves like a hardcoded violet, because the token does not
+ * exist and the fallback is what renders — always, in both themes.
+ *
+ * There are 177 such references across 90 distinct names, `--color-primary`
+ * alone used 109 times. They are exactly why green survived the palette sweep:
+ * `var(--color-success, #15803d)` on the network chips is not tokenised colour,
+ * it is a hex hiding inside a var(). The colour codemod could not see them —
+ * it removes literals, and these literals ARE the live value.
+ *
+ * Defining the names is the fix, not editing 177 call sites: one block here
+ * makes every one of them resolve to the palette, in both themes, for free.
+ * `src/test/brand/noUndefinedTokens.test.js` fails if a new one appears.
+ *
+ * These are a COMPATIBILITY LAYER, not new API. New code uses the real token
+ * names above.
+ */
+:root {
+  /* brand */
+  --color-primary: var(--brand-primary);
+  --color-primary-dark: var(--primary-button-hover);
+  --color-primary-alpha: rgba(var(--brand-primary-rgb), 0.12);
+  --color-on-primary: var(--primary-button-text);
+  --color-accent: var(--brand-primary);
+  --accent: var(--brand-primary);
+  --accent-green: var(--brand-primary); /* named for the retired palette; teal now */
+  --accent-hover: var(--primary-button-hover);
+  --accent-soft: rgba(var(--brand-primary-rgb), 0.15);
+  --brand: var(--brand-primary);
+  --primary: var(--brand-primary);
+  --primary-hover: var(--primary-button-hover);
+  --primary-bg: var(--highlight-color);
+  --primary-border: var(--brand-primary);
+  --btn-hover-bg: var(--primary-button-hover);
+  --text-accent: var(--accent-color);
+  --tier-color: var(--brand-primary);
+  --tile-accent: var(--highlight-color);
+  --tile-border: var(--brand-primary);
+  --chip-bg: var(--highlight-color);
+  --focus-color: var(--brand-primary);
+
+  /* text */
+  --color-text: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-muted);
+  --color-text-muted: var(--text-muted);
+  --text-tertiary: var(--text-muted);
+
+  /* surfaces */
+  --color-surface: var(--surface-color);
+  --color-surface-secondary: var(--bg-tertiary);
+  --color-surface-tertiary: var(--bg-tertiary);
+  --color-surface-alt: var(--bg-tertiary);
+  --color-surface-muted: var(--bg-tertiary);
+  --color-surface-raised: var(--bg-tertiary);
+  --color-surface-hover: var(--bg-tertiary);
+  --surface-secondary: var(--bg-tertiary);
+  --surface-muted: var(--bg-tertiary);
+  --surface-raised: var(--bg-tertiary);
+  --surface-hover: var(--bg-tertiary);
+  --surface-darker: var(--bg-primary);
+  --surface-2: var(--bg-tertiary);
+  --surface-3: var(--bg-tertiary);
+  --surface-bg: var(--surface-color);
+  --card-bg: var(--surface-color);
+  --input-bg: var(--bg-secondary);
+  --hover-bg: var(--bg-tertiary);
+  --bg-hover: var(--bg-tertiary);
+  --background-color: var(--bg-primary);
+  --background-primary: var(--bg-primary);
+  --background-secondary: var(--bg-secondary);
+
+  /* borders */
+  --color-border: var(--border-color);
+  --border-hover: var(--brand-primary);
+  --border-strong: var(--text-muted);
+
+  /* status */
+  --color-success: var(--success-text);
+  --success: var(--success-color);
+  --color-success-bg: var(--success-bg);
+  --success-border: var(--success-color);
+  --color-error: var(--danger-color);
+  --color-danger: var(--danger-color);
+  --danger: var(--danger-color);
+  --error-color: var(--danger-color);
+  --color-error-dark: var(--danger-text);
+  --danger-color-hover: var(--danger-text);
+  --color-error-bg: var(--danger-bg);
+  --error-bg: var(--danger-bg);
+  --error-border: var(--danger-color);
+  /* Warning aliases are TEXT colours at every call site found (chip labels,
+     notice copy). Amber itself is 2.1:1 on white — pointing these at
+     --warning-color would ship unreadable warnings. */
+  --color-warning: var(--warning-text);
+  --warning: var(--warning-text);
+  --warning-border: var(--warning-color);
+  --color-info: var(--info-color);
+  --color-info-bg: var(--info-bg);
+  --text-on-brand: var(--primary-button-text);
+
+  /* FriendMarkets + Trade panel local vocabularies */
+  --fm-accent: var(--brand-primary);
+  --fm-border: var(--border-color);
+  --fm-surface-2: var(--bg-tertiary);
+  --fm-text: var(--text-primary);
+  --fm-text-muted: var(--text-muted);
+  --trade-accent: var(--brand-primary);
+  --trade-border: var(--border-color);
+  --trade-surface: var(--surface-color);
+  --trade-surface-2: var(--bg-tertiary);
+  --trade-text: var(--text-primary);
+  --trade-text-2: var(--text-secondary);
+
+  /* hardware vendor marks (spec 085) — vendor identity, deliberately not brand */
+  --hw-ledger-color: #1C333B;
+  --hw-trezor-color: #1F5966;
+
+  --shadow-xl: var(--shadow-lg);
 }
 
 /* ===================================

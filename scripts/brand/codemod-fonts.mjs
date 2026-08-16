@@ -20,10 +20,9 @@
  * Usage: node scripts/brand/codemod-fonts.mjs [--dry-run]
  */
 
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve, relative } from 'node:path'
-import { globSync } from 'glob'
+import { dirname, resolve, relative, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO = resolve(__dirname, '../..')
@@ -53,16 +52,36 @@ const SANS_MARKERS = [
   'roboto',
 ]
 
-const TARGET_GLOB = 'frontend/src/**/*.css'
+const CSS_ROOT = 'frontend/src'
+// Path prefixes, matched against the repo-relative path.
 const EXCLUDE = [
   'frontend/src/theme.css',        // declares the stacks
   'frontend/src/index.css',        // applies them at the root
   'frontend/src/styles/fonts.css', // loads the faces
-  'frontend/src/test/**',
-  '**/node_modules/**',
+  'frontend/src/test/',            // fixtures are not shipped styling
 ]
 
-const files = globSync(TARGET_GLOB, { cwd: REPO, ignore: EXCLUDE, absolute: true, nodir: true }).sort()
+/**
+ * Minimal recursive file walk. Deliberately not `glob`: this repo's dependency
+ * hygiene gate (spec 075 FR-003) rejects a package that resolves only through
+ * npm hoisting, and a ten-line walker is not worth a lockfile re-resolve.
+ */
+function walkCss(dir, out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue
+      walkCss(full, out)
+    } else if (entry.name.endsWith('.css')) {
+      out.push(full)
+    }
+  }
+  return out
+}
+
+const files = walkCss(resolve(REPO, CSS_ROOT))
+  .filter((f) => !EXCLUDE.some((e) => relative(REPO, f) === e || relative(REPO, f).startsWith(e)))
+  .sort()
 
 let changed = 0
 let replaced = 0

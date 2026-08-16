@@ -19,10 +19,10 @@
   position: absolute;
 }
 .sell-confirm {
-  background: var(--surface-color, var(--bg-secondary, #fff));
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--surface-color, var(--bg-secondary));
+  border: 1px solid var(--border-color);
   border-radius: 14px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
@@ -47,16 +47,16 @@
 }
 .sell-confirm-close {
   background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   cursor: pointer;
   padding: 0.3rem 0.7rem;
 }
 
 .sell-confirm-status,
 .sell-confirm-done {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -71,20 +71,20 @@
   gap: 0.5rem;
 }
 .sell-confirm-price-row input {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   flex: 1;
   font-size: 1rem;
   padding: 0.5rem 0.6rem;
 }
 .sell-confirm-price-row select {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 0.5rem;
 }
 
 .sell-confirm-breakdown {
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -92,7 +92,7 @@
   padding-top: 0.6rem;
 }
 .sell-confirm-breakdown > div {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   display: flex;
   justify-content: space-between;
 }
@@ -101,8 +101,8 @@
   margin: 0;
 }
 .sell-confirm-net {
-  border-top: 1px solid var(--border-color, #e5e7eb);
-  color: var(--text-primary, #111827) !important;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-primary) !important;
   font-weight: 700;
   margin-top: 0.3rem;
   padding-top: 0.4rem;
@@ -117,7 +117,7 @@
   padding: 0.45rem 0.6rem;
 }
 .sell-confirm-reward {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   margin: 0;
 }
@@ -129,7 +129,7 @@
 }
 .sell-confirm-cancel {
   background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   padding: 0.5rem 1rem;

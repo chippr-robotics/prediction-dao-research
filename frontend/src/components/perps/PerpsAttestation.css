@@ -12,7 +12,7 @@
  */
 
 .perps-attest {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -28,15 +28,15 @@
 /* The plain risk sentence. It carries body weight on purpose — a leveraged-loss warning set as
    fine print is a warning nobody reads. */
 .perps-attest-risk {
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   font-size: 0.82rem;
   margin: 0;
 }
 
 .perps-attest-superseded {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   font-size: 0.8rem;
   margin: 0;
   padding: 0.45rem 0.6rem;
@@ -53,7 +53,7 @@
   padding: 0;
 }
 .perps-attest-items legend {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.78rem;
   padding: 0;
 }
@@ -77,7 +77,7 @@
   outline-offset: 2px;
 }
 .perps-attest-item label {
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.82rem;
   line-height: 1.45;
@@ -89,7 +89,7 @@
 /* Notes and refusals -------------------------------------------------------------------------- */
 
 .perps-attest-note {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.76rem;
   margin: 0;
 }
@@ -106,7 +106,7 @@
   background: var(--brand-primary);
   border: 1px solid var(--brand-primary);
   border-radius: 10px;
-  color: var(--text-on-brand, #fff);
+  color: var(--text-on-brand);
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;

@@ -30,7 +30,7 @@
 }
 
 .supply-note {
-  border-left: 3px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-left: 3px solid var(--border-color);
   padding-left: 0.6rem;
 }
 
@@ -74,7 +74,7 @@
   flex: 1 1 12rem;
   min-width: 0;
   padding: 0 0.6rem;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 999px;
   background: var(--bg-secondary, transparent);
 }
@@ -118,7 +118,7 @@
 /* Scoped to the view on purpose: index.css carries a global
    `button { padding: 0.6em 1.2em }` that would otherwise swallow these. */
 .supply-view .supply-filter-chip {
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   background: none;
   color: var(--text-secondary);
   border-radius: 999px;
@@ -175,7 +175,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.7rem 0.85rem;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   /* Longhand, not the `border-left` shorthand: an undefined brand token would make
      the whole shorthand invalid and take the border with it, leaving a borderless
      row. This way the accent can only lose its colour, never the row its edge. */
@@ -297,7 +297,7 @@ button.supply-row:focus-visible {
 }
 
 .supply-row-chip.closed {
-  color: var(--danger-color, #c0392b);
+  color: var(--danger-color);
 }
 
 .supply-card-logos {
@@ -328,7 +328,7 @@ button.supply-row:focus-visible {
 }
 
 .supply-kind-badge.closed {
-  color: var(--danger-color, #c0392b);
+  color: var(--danger-color);
 }
 
 /* --- figures --------------------------------------------------------------
@@ -406,7 +406,7 @@ button.supply-row:focus-visible {
 }
 
 .supply-card-state {
-  border-left: 3px solid var(--danger-color, #c0392b);
+  border-left: 3px solid var(--danger-color);
   padding-left: 0.6rem;
 }
 
@@ -417,7 +417,7 @@ button.supply-row:focus-visible {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 10px;
 }
 

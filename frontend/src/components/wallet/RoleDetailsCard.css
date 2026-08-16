@@ -53,17 +53,17 @@
 }
 
 .role-status.expired {
-  background: rgba(220, 38, 38, 0.15);
+  background: rgba(var(--danger-color-rgb), 0.15);
   color: var(--danger-color);
 }
 
 .role-status.at-limit {
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(var(--warning-color-rgb), 0.15);
   color: var(--warning-color);
 }
 
 .role-status.expiring-soon {
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(var(--warning-color-rgb), 0.1);
   color: var(--warning-color);
 }
 
@@ -158,7 +158,7 @@
 
 .role-card.needs-attention {
   border-color: var(--warning-color);
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.1);
+  box-shadow: 0 0 0 1px rgba(var(--warning-color-rgb), 0.1);
 }
 
 .role-card .role-card-header {
@@ -266,20 +266,20 @@
 }
 
 .role-alert.expired {
-  background: rgba(220, 38, 38, 0.1);
-  border: 1px solid rgba(220, 38, 38, 0.25);
+  background: rgba(var(--danger-color-rgb), 0.1);
+  border: 1px solid rgba(var(--danger-color-rgb), 0.25);
   color: var(--danger-color);
 }
 
 .role-alert.at-limit {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  background: rgba(var(--warning-color-rgb), 0.1);
+  border: 1px solid rgba(var(--warning-color-rgb), 0.25);
   color: var(--warning-color);
 }
 
 .role-alert.expiring-soon {
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: rgba(var(--warning-color-rgb), 0.08);
+  border: 1px solid rgba(var(--warning-color-rgb), 0.2);
   color: var(--warning-color);
 }
 

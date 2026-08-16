@@ -24,7 +24,7 @@
   border-left-width: 4px;
   border-left-color: var(--border-color);
   border-radius: var(--radius-md, 8px);
-  background: var(--bg-secondary, #fff);
+  background: var(--bg-secondary);
 }
 
 /* The row's left edge carries the last outcome, so the answer is legible without opening the
@@ -56,7 +56,7 @@
   margin: 0.125rem 0 0;
   font-size: 0.8125rem;
   line-height: 1.4;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
 }
 
 .verify-entry__action {
@@ -95,7 +95,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--surface-color, #fff);
+  background: var(--surface-color);
 }
 
 .verify-form {
@@ -131,14 +131,14 @@
 .verify-form .custody-hint {
   font-size: 0.8125rem;
   line-height: 1.45;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
 }
 
 .verify-hint {
   margin: 0;
   font-size: 0.8125rem;
   line-height: 1.45;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
 }
 
 .verify-textarea,
@@ -147,7 +147,7 @@
   padding: 0.5rem 0.625rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md, 8px);
-  background: var(--bg-secondary, #fff);
+  background: var(--bg-secondary);
   color: var(--text-primary);
   font: inherit;
   font-size: 0.875rem;
@@ -201,7 +201,7 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
 }
 
 .verify-meta dd {
@@ -255,7 +255,7 @@
   cursor: not-allowed;
   background: transparent;
   border-color: var(--border-color);
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
 }
 
 .verify-secondary:disabled {

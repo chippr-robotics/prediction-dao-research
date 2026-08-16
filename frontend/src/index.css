@@ -134,8 +134,20 @@ button:focus-visible {
    `box-sizing: border-box`, subtracts ~38px of horizontal padding from
    fixed-size icon buttons (e.g. 32-36px close/refresh/QR controls). That
    collapses the content box to zero width and squeezes the SVG out of view,
-   leaving an empty square. Reset padding when the button's only element child
-   is an <svg> so text buttons keep their default padding. */
+   leaving an empty square.
+
+   CAREFUL — `:only-child` counts ELEMENT children only, so
+   `<button><svg/>Label</button>` matches too: the svg really is the only
+   element, and the text node does not count. Such a button loses its padding
+   and its label spills out of the control. The spec-089 screenshot round caught
+   exactly that on "＋ New statement" in Reporting.
+
+   The fix belongs in the MARKUP, not here: an icon+text button wraps its label
+   in a <span> so the svg stops being an only child and the selector means what
+   it says. Lowering this rule's specificity instead (`:where()`) was tried and
+   is wrong — the six icon-only controls in the app (keypad keys, the bell, the
+   scan and infotip buttons, the drawer toggle) set their own padding, so a
+   weaker rule lets that padding back in and collapses every one of them. */
 button:has(> svg:only-child) {
   padding: 0;
 }

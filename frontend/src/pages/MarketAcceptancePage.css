@@ -2,7 +2,7 @@
 
 .map-container {
   min-height: 100vh;
-  background: var(--background-color, #0a0a0a);
+  background: var(--background-color);
 }
 
 .map-loading {
@@ -11,14 +11,14 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: var(--background-color, #0a0a0a);
-  color: var(--text-primary, #fff);
+  background: var(--background-color);
+  color: var(--text-primary);
 }
 
 .map-spinner {
   width: 48px;
   height: 48px;
-  border: 3px solid var(--border-color, #333);
+  border: 3px solid var(--border-color);
   border-top-color: var(--color-primary, var(--brand-secondary));
   border-radius: 50%;
   margin-bottom: 1.5rem;
@@ -30,7 +30,7 @@
 }
 
 .map-loading p {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   font-size: 1rem;
 }
 
@@ -40,7 +40,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: var(--background-color, #0a0a0a);
+  background: var(--background-color);
   padding: 2rem;
   text-align: center;
 }
@@ -54,12 +54,12 @@
 .map-error h2 {
   margin: 0 0 1rem 0;
   font-size: 1.5rem;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
 }
 
 .map-error p {
   margin: 0 0 2rem 0;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   max-width: 400px;
   line-height: 1.5;
 }

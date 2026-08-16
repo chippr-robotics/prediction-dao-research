@@ -14,11 +14,11 @@
   gap: 0.85rem;
   padding: 0.9rem 1rem;
   border-radius: var(--radius-lg, 12px);
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.65));
+  border: 1px solid var(--glass-border);
   background:
     linear-gradient(135deg, rgba(var(--card-tint, 127, 127, 127), var(--card-tint-alpha, 0)) 0%, transparent 65%),
     var(--card-pattern, none),
-    var(--glass-bg-solid, rgba(255, 255, 255, 0.92));
+    var(--glass-bg-solid);
   box-shadow: var(--glass-shadow, 0 8px 32px rgba(31, 41, 51, 0.14));
 }
 

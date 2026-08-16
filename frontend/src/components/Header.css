@@ -141,12 +141,12 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 2px 8px rgba(45, 122, 79, 0.2);
+  box-shadow: 0 2px 8px rgba(var(--success-color-rgb), 0.2);
 }
 
 .connect-wallet-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(45, 122, 79, 0.3);
+  box-shadow: 0 4px 12px rgba(var(--success-color-rgb), 0.3);
 }
 
 .connect-wallet-button:active {

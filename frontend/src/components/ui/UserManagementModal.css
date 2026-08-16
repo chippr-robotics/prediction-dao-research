@@ -126,7 +126,7 @@
   padding: 12px 16px;
   margin: 16px 0;
   background: var(--semantic-loss);
-  background: rgba(229, 83, 61, 0.1);
+  background: rgba(var(--danger-color-rgb), 0.1);
   border: 1px solid var(--semantic-loss);
   border-radius: 8px;
   color: var(--semantic-loss);
@@ -302,7 +302,7 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--primary-button-text, #ffffff);
+  color: var(--primary-button-text);
   background: var(--danger-color);
   border: none;
   border-radius: 6px;
@@ -311,7 +311,7 @@
 }
 
 .disconnect-btn:hover {
-  background: var(--danger-color-hover, #b91c1c);
+  background: var(--danger-color-hover);
 }
 
 /* Network toggle (Testnet/Mainnet) */
@@ -328,7 +328,7 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--primary-button-text, #ffffff);
+  color: var(--primary-button-text);
   background: var(--primary-button);
   border: none;
   border-radius: 6px;
@@ -420,7 +420,7 @@
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--primary-button-text, #ffffff);
+  color: var(--primary-button-text);
   background: var(--primary-button);
   border: none;
   border-radius: 8px;
@@ -474,8 +474,8 @@
 
 .search-help {
   padding: 16px;
-  background: var(--color-info-bg, rgba(66, 153, 225, 0.1));
-  border-left: 3px solid var(--color-info, #4299e1);
+  background: var(--color-info-bg);
+  border-left: 3px solid var(--color-info);
   border-radius: 6px;
 }
 
@@ -519,7 +519,7 @@
   padding: 14px 32px;
   font-size: 16px;
   font-weight: 600;
-  color: var(--primary-button-text, #ffffff);
+  color: var(--primary-button-text);
   background: var(--primary-button);
   border: none;
   border-radius: 8px;
@@ -801,7 +801,7 @@
   padding: 10px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--primary-button-text, #ffffff);
+  color: var(--primary-button-text);
   background: linear-gradient(135deg, var(--primary-button), var(--accent-color));
   border: none;
   border-radius: 8px;
@@ -826,14 +826,14 @@
   background: linear-gradient(135deg, rgba(237, 100, 166, 0.05), rgba(255, 77, 77, 0.05));
   padding: 20px !important;
   border-radius: 8px;
-  border: 1px solid var(--color-error, #f56565);
+  border: 1px solid var(--color-error);
 }
 
 .admin-panel-btn {
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--primary-button-text, #ffffff);
+  color: var(--primary-button-text);
   background: var(--danger-color);
   border: none;
   border-radius: 8px;
@@ -842,7 +842,7 @@
 }
 
 .admin-panel-btn:hover {
-  background: var(--danger-color-hover, #b91c1c);
+  background: var(--danger-color-hover);
   transform: translateY(-1px);
 }
 

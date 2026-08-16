@@ -31,8 +31,8 @@
   width: var(--portal-rail-expanded);
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border-color, var(--color-border, #e5e7eb));
-  background: var(--bg-secondary, var(--color-surface-secondary, #f9fafb));
+  border-right: 1px solid var(--border-color, var(--color-border));
+  background: var(--bg-secondary, var(--color-surface-secondary));
   overflow-x: hidden;
   transition: flex-basis 0.22s ease, width 0.22s ease;
 }
@@ -72,13 +72,13 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-tertiary, var(--color-text-secondary, #8895A1));
+  color: var(--text-tertiary, var(--color-text-secondary));
 }
 
 /* First heading hugs the top; later ones get breathing room from the group above. */
 .portal-nav-group-label:not(:first-child) {
   margin-top: 10px;
-  border-top: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  border-top: 1px solid var(--border-color, var(--color-border));
   padding-top: 12px;
 }
 
@@ -112,13 +112,13 @@
 
 .portal-nav-group-toggle:not(:first-child) {
   margin-top: 10px;
-  border-top: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  border-top: 1px solid var(--border-color, var(--color-border));
   padding-top: 12px;
 }
 
 .portal-nav-group-toggle:hover {
   color: var(--text-primary, var(--color-text, var(--text-primary)));
-  background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.04)));
+  background: var(--bg-primary, var(--color-surface-hover));
 }
 
 .portal-nav-group-toggle:focus-visible {
@@ -187,7 +187,7 @@
 
 .portal-nav-subitem:hover,
 .portal-nav-subitem:focus-visible {
-  background: var(--bg-primary, rgba(0, 0, 0, 0.04));
+  background: var(--bg-primary);
   color: var(--text-primary);
 }
 
@@ -215,7 +215,7 @@
   margin: 0;
   padding: 16px 12px;
   font-size: 13px;
-  color: var(--text-tertiary, var(--color-text-secondary, #8895A1));
+  color: var(--text-tertiary, var(--color-text-secondary));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -244,7 +244,7 @@
 
 .portal-nav-item:hover {
   color: var(--text-primary, var(--color-text, var(--text-primary)));
-  background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.04)));
+  background: var(--bg-primary, var(--color-surface-hover));
 }
 
 /* Flat "glass" icon tile — a translucent, brand-tinted chip behind each nav
@@ -350,7 +350,7 @@
   padding: 0;
   margin: 6px 0;
   overflow: hidden;
-  border-top: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  border-top: 1px solid var(--border-color, var(--color-border));
   color: transparent;
 }
 
@@ -366,7 +366,7 @@
   gap: 8px;
   padding: 10px;
   min-height: 52px;
-  border-bottom: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  border-bottom: 1px solid var(--border-color, var(--color-border));
 }
 
 .portal-shell.portal-collapsed .portal-sidebar-header {
@@ -380,7 +380,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: var(--text-tertiary, var(--color-text-secondary, #8895A1));
+  color: var(--text-tertiary, var(--color-text-secondary));
 }
 
 /* Sidebar show/hide toggle (hamburger) */
@@ -393,9 +393,9 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  border: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  border: 1px solid var(--border-color, var(--color-border));
   border-radius: 8px;
-  background: var(--bg-secondary, var(--color-surface, #fff));
+  background: var(--bg-secondary, var(--color-surface));
   color: var(--text-primary, var(--color-text, var(--text-primary)));
   font-size: 14px;
   font-weight: 600;

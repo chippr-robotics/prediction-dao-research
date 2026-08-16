@@ -22,7 +22,7 @@
 .chain-state-table td {
   text-align: left;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  border-bottom: 1px solid var(--border-color, var(--color-border));
   vertical-align: top;
 }
 
@@ -30,7 +30,7 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-tertiary, var(--color-text-secondary, #8895A1));
+  color: var(--text-tertiary, var(--color-text-secondary));
 }
 
 .chain-state-value {
@@ -47,7 +47,7 @@
 /* NOT an answer. Must never be mistaken for a zero, so it is the one state that gets a
    warning colour AND its own wording AND the failure reason. */
 .chain-state-unreadable {
-  color: var(--color-warning, #B45309);
+  color: var(--color-warning);
   display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -88,7 +88,7 @@
 .chain-state-partial {
   margin: 0.25rem 0 0;
   font-size: 0.8125rem;
-  color: var(--color-warning, #B45309);
+  color: var(--color-warning);
 }
 
 .sr-only {

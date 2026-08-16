@@ -16,7 +16,7 @@
   margin: 0 0 0.25rem;
 }
 .perps-subtitle {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.85rem;
   margin: 0;
   max-width: 42rem;
@@ -35,9 +35,9 @@
 }
 .perps-filter-pill {
   background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 999px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.82rem;
   padding: 0.3rem 0.8rem;
@@ -45,11 +45,11 @@
 .perps-filter-pill.active {
   background: var(--brand-primary);
   border-color: var(--brand-primary);
-  color: var(--text-on-brand, #ffffff);
+  color: var(--text-on-brand);
 }
 .perps-search input {
   background: var(--bg-secondary, transparent);
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   color: var(--text-primary, inherit);
   font-size: 0.95rem;
@@ -62,12 +62,12 @@
   gap: 0.5rem;
 }
 .perps-sort-label {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.82rem;
 }
 .perps-sort select {
   background: var(--bg-secondary, transparent);
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   color: var(--text-primary, inherit);
   font-size: 0.85rem;
@@ -85,7 +85,7 @@
 }
 .perps-loading,
 .perps-empty {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   margin: 0;
 }
 .perps-unavailable {
@@ -116,7 +116,7 @@
   gap: 0.45rem;
 }
 .perps-table-legend {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   display: flex;
   flex-wrap: wrap;
   font-size: 0.76rem;
@@ -129,7 +129,7 @@
   gap: 0.25rem;
 }
 .perps-table-scroll {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow-x: auto;
 }
@@ -141,7 +141,7 @@
 }
 .perps-table th,
 .perps-table td {
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--border-color);
   padding: 0.5rem 0.4rem;
   text-align: left;
   white-space: nowrap;
@@ -155,8 +155,8 @@
   padding-right: 0.75rem;
 }
 .perps-table thead th {
-  background: var(--bg-secondary, #f9fafb);
-  color: var(--text-secondary, #6b7280);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 600;
   position: sticky;
@@ -178,13 +178,13 @@
   font-weight: 600;
 }
 .perps-pair-variant {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   display: block;
   font-size: 0.72rem;
   font-weight: 400;
 }
 .perps-funding-positive {
-  color: var(--semantic-win, #16a34a);
+  color: var(--semantic-win);
 }
 .perps-funding-negative {
   color: var(--semantic-loss);
@@ -203,7 +203,7 @@
   background: var(--brand-primary);
   border: 1px solid var(--brand-primary);
   border-radius: 999px;
-  color: var(--text-on-brand, #ffffff);
+  color: var(--text-on-brand);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 600;
@@ -235,22 +235,22 @@
   /* Border + inherited text, NOT a bg-tertiary pill: the tertiary surface is light in the dark
      theme, which rendered light-on-light badge text (caught by the actor-critic screenshot loop). */
   background: transparent;
-  border: 1px solid var(--border-color, #d1d5db);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   padding: 0.08rem 0.38rem;
 }
 .perps-venue-chain {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.72rem;
 }
 
 /* ---- positions ---- */
 .perps-positions {
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -260,7 +260,7 @@
   margin: 0;
 }
 .perps-positions-empty {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   margin: 0;
 }
 .perps-positions-unreadable {
@@ -280,7 +280,7 @@
   padding: 0;
 }
 .perps-position-row {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -298,7 +298,7 @@
 }
 /* The venue's market variant (GMX: "WBTC.b-USDC"), secondary to the pair it qualifies. */
 .perps-position-variant {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.72rem;
   font-weight: 400;
 }
@@ -310,8 +310,8 @@
   text-transform: uppercase;
 }
 .perps-direction-long {
-  background: color-mix(in srgb, var(--semantic-win, #16a34a) 15%, transparent);
-  color: var(--semantic-win, #16a34a);
+  background: color-mix(in srgb, var(--semantic-win) 15%, transparent);
+  color: var(--semantic-win);
 }
 .perps-direction-short {
   background: color-mix(in srgb, var(--semantic-loss) 15%, transparent);
@@ -324,7 +324,7 @@
   margin: 0;
 }
 .perps-position-stats dt {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.72rem;
 }
 .perps-position-stats dd {
@@ -332,7 +332,7 @@
   margin: 0;
 }
 .perps-pnl-up {
-  color: var(--semantic-win, #16a34a);
+  color: var(--semantic-win);
 }
 .perps-pnl-down {
   color: var(--semantic-loss);
@@ -350,7 +350,7 @@
   background: var(--brand-primary);
   border: 1px solid var(--brand-primary);
   border-radius: 999px;
-  color: var(--text-on-brand, #ffffff);
+  color: var(--text-on-brand);
   cursor: pointer;
   font-size: 0.82rem;
   font-weight: 600;
@@ -363,7 +363,7 @@
 }
 
 .perps-positions-note {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.78rem;
   margin: 0;
 }
@@ -373,8 +373,8 @@
 
 /* ---- footnotes ---- */
 .perps-footnotes {
-  border-top: 1px solid var(--border-color, #e5e7eb);
-  color: var(--text-secondary, #6b7280);
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
   display: flex;
   flex-direction: column;
   font-size: 0.78rem;
@@ -385,7 +385,7 @@
   margin: 0;
 }
 .perps-fee-note {
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -396,7 +396,7 @@
   gap: 0.9rem;
 }
 .trade-section-tabs {
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   gap: 0.25rem;
 }
@@ -405,7 +405,7 @@
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 600;
@@ -413,5 +413,5 @@
 }
 .trade-section-tab.active {
   border-bottom-color: var(--brand-primary);
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
 }

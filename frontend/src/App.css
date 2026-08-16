@@ -158,13 +158,13 @@ body {
 }
 
 .disconnect-button {
-  background-color: rgba(239, 68, 68, 0.2);
+  background-color: rgba(var(--danger-color-rgb), 0.2);
   color: white;
   padding: 0.5rem 1rem;
 }
 
 .disconnect-button:hover {
-  background-color: rgba(239, 68, 68, 0.4);
+  background-color: rgba(var(--danger-color-rgb), 0.4);
 }
 
 .main-content {
@@ -282,12 +282,12 @@ input[aria-invalid="true"],
 textarea[aria-invalid="true"],
 select[aria-invalid="true"] {
   border-color: var(--danger-color);
-  background-color: rgba(220, 38, 38, 0.05);
+  background-color: rgba(var(--danger-color-rgb), 0.05);
 }
 
 .bond-notice {
   padding: 1rem;
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(var(--warning-color-rgb), 0.1);
   border: 1px solid var(--warning-color);
   border-radius: var(--radius-md);
   color: var(--warning-color);
@@ -575,12 +575,12 @@ select[aria-invalid="true"] {
 }
 
 .price-item.pass {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(var(--success-color-rgb), 0.1);
   border: 1px solid var(--success-color);
 }
 
 .price-item.fail {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(var(--danger-color-rgb), 0.1);
   border: 1px solid var(--danger-color);
 }
 

@@ -495,6 +495,28 @@ artifacts live under `specs/<feature>/`.
   `docs/developer-guide/infrastructure-as-code.md` + `docs/runbooks/infrastructure-operations.md`
   + `specs/087-infrastructure-as-code/`.
 
+- **Styling follows the Chippr Robotics Brand Guidelines v1.0 (spec 089), and `theme.css` is the
+  ONLY file that states a colour.** The palette is a three-step teal ladder (Teal 700 / Chippr Teal
+  `#2E7D8C` / Teal 300) on Gunmetal/Cloud neutrals; type is Space Grotesk display / Inter text /
+  JetBrains Mono code, self-hosted so the PWA works offline (never add a Google Fonts link). Five
+  rules, each of which already went wrong here: (1) **Chippr Teal is a LARGE-TEXT AND FILL colour**
+  — the guidelines' own table puts it at 4.7:1 on white, annotated "18px+/bold 14px+", so links and
+  any text under 18px use **`--accent-color`** (Teal 700, 7.8:1); never "fix" a failing
+  `--brand-primary` contrast row by darkening the token. (2) **Amber is SIGNAL-ONLY** (alerts, live
+  states, one CTA per view, never a large fill) and is 2.1:1 on white — amber-toned *text* is
+  `--warning-text`, never `--warning-color`. (3) **Status surfaces are OPAQUE**: an alpha tint's
+  contrast depends on what is behind it, and the dark amber chip measured 5.89:1 over the page and
+  4.10:1 over a raised panel — a test asserts opacity. (4) **`var(--undefined-token, #hex)` is
+  hardcoded colour in a costume** — the fallback always renders. There were 177 such references
+  across 90 names (`--color-primary` alone ×109) and they are why green survived the first sweep;
+  define the name in `theme.css` instead, and `noUndefinedTokens.test.js` fails on the next one.
+  (5) **Never restate a `font-family` in a component** — it overrides the root and the brand face
+  silently does not apply. The **FairWins clover mark stays independent of the Chippr brandmark**
+  (the guidelines' endorsement model: master brand owns colour and type, products own their marks)
+  — do not modify the logo assets or build a co-branded lockup. Retired and CI-failing: `#2FA043`,
+  `#36B37E`, `#4C9AFF`, `#7BDCB5`. `tenants/fairwins/manifest.json` must declare the same values as
+  `theme.css` (the manifest wins at runtime). Three guards gate CI in `frontend/src/test/brand/`.
+  See `docs/developer-guide/brand-tokens.md` + `specs/089-chippr-brand-alignment/`.
 - **The repo is an npm WORKSPACE (spec 075): one root lockfile, 8 members, `contracts/` deliberately
   NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
   detail — **`monorepo-workspace`** (dependencies, adding a package, recovering a broken install)

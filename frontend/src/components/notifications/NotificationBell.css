@@ -88,7 +88,7 @@
   height: 9px;
   border-radius: 50%;
   background: var(--warning-color);
-  border: 1.5px solid var(--bg-primary, #fff);
+  border: 1.5px solid var(--bg-primary);
   pointer-events: none;
 }
 

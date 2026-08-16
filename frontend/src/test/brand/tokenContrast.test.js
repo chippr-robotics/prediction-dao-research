@@ -163,7 +163,16 @@ const OBLIGATIONS = [
   ['--success-color', CARD_SURFACES, 4.5, 'status text'],
   ['--danger-color', CARD_SURFACES, 4.5, 'status text'],
   ['--info-color', CARD_SURFACES, 4.5, 'status text'],
-  ['--warning-text', ['--warning-bg'], 4.5, 'warning banner text'],
+  // Status chips. The screenshot round caught the dark amber chip at 4.10:1 on a
+  // raised panel while this audit read 5.89 — because the token was an ALPHA
+  // TINT and the audit composited it over the page background only. The tokens
+  // are opaque now, so these hold wherever the chip is placed; the surface list
+  // stays broad so a future alpha tint cannot pass by being measured on the one
+  // background that flatters it.
+  ['--success-text', ['--success-bg'], 4.5, 'success chip label'],
+  ['--warning-text', ['--warning-bg'], 4.5, 'warning chip label'],
+  ['--danger-text', ['--danger-bg'], 4.5, 'danger chip label'],
+  ['--info-text', ['--info-bg'], 4.5, 'info chip label'],
   // Chippr Teal is a LARGE-TEXT and FILL color by the guidelines' own
   // annotation — 3.0 is the UI-component / large-text threshold. Anything
   // needing 4.5 uses --accent-color instead. Do not "fix" this to 4.5 by
@@ -217,6 +226,25 @@ describe('shipped color tokens meet WCAG 2.1 AA (spec 089)', () => {
       }
     })
   }
+
+  it('defines status surfaces opaquely, so their contrast does not depend on placement', () => {
+    // The lesson from round 1 of the screenshot loop, encoded. An alpha tint's
+    // measured contrast is a property of whatever sits behind it, which is not
+    // knowable where the token is defined — the same chip read 5.89:1 on the page
+    // background and 4.10:1 on a raised panel. Assert the tokens are opaque
+    // rather than trying to enumerate every surface a chip might land on.
+    for (const { name, selectors } of THEMES) {
+      const tokens = themeTokens(css, selectors)
+      for (const surface of ['--success-bg', '--warning-bg', '--danger-bg', '--info-bg']) {
+        const value = tokens[surface]
+        expect(value, `${name}: ${surface} undefined`).toBeDefined()
+        expect(
+          alphaOf(value),
+          `${name}: ${surface} is a translucent tint (${value}). Its contrast then depends on the surface behind it — use an opaque value.`
+        ).toBe(1)
+      }
+    }
+  })
 
   it('does not define a brand token as a retired hue', () => {
     // Belt-and-braces with noLegacyBrandColors: that guard scans text, this one

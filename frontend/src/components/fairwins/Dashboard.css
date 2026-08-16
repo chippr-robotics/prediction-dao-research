@@ -114,7 +114,7 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 0.25rem 0;
-  background: linear-gradient(135deg, var(--brand-primary, #00b894) 0%, #00cec9 100%);
+  background: linear-gradient(135deg, var(--brand-primary) 0%, #00cec9 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -165,8 +165,8 @@
   min-width: 24px;
   height: 24px;
   padding: 0 0.5rem;
-  background: rgba(0, 184, 148, 0.15);
-  color: var(--brand-primary, #00b894);
+  background: rgba(var(--success-color-rgb), 0.15);
+  color: var(--brand-primary);
   border-radius: 12px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -212,7 +212,7 @@
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--brand-primary, #00b894);
+  color: var(--brand-primary);
 }
 
 .qa-group-sub {
@@ -271,12 +271,12 @@
 }
 
 .quick-action-card:focus-visible {
-  outline: 2px solid var(--qa-accent, var(--brand-primary, #00b894));
+  outline: 2px solid var(--qa-accent, var(--brand-primary));
   outline-offset: 2px;
 }
 
 .quick-action-icon {
-  color: var(--qa-accent, var(--brand-primary, #00b894));
+  color: var(--qa-accent, var(--brand-primary));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -305,7 +305,7 @@
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--qa-accent, var(--brand-primary, #00b894));
+  color: var(--qa-accent, var(--brand-primary));
   margin-bottom: 0.2rem;
 }
 
@@ -329,7 +329,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--qa-accent, var(--brand-primary, #00b894));
+  color: var(--qa-accent, var(--brand-primary));
   opacity: 0.35;
   transform: translateX(-3px);
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -385,11 +385,11 @@
 .wager-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border-color: rgba(0, 184, 148, 0.3);
+  border-color: rgba(var(--success-color-rgb), 0.3);
 }
 
 .wager-card:focus-visible {
-  outline: 2px solid var(--brand-primary, #00b894);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -450,7 +450,7 @@
   display: inline-flex;
   align-items: center;
   padding: 0.2rem 0.6rem;
-  background: rgba(0, 184, 148, 0.1);
+  background: rgba(var(--success-color-rgb), 0.1);
   border-radius: 12px;
   font-size: 0.7rem;
   font-family: var(--font-mono);
@@ -478,7 +478,7 @@
 }
 
 .status-active {
-  background: rgba(0, 184, 148, 0.2);
+  background: rgba(var(--success-color-rgb), 0.2);
   color: #00b894;
 }
 
@@ -558,7 +558,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--brand-primary, #00b894);
+  background: var(--brand-primary);
   color: white;
   border-radius: 50%;
   font-size: 0.8rem;
@@ -622,12 +622,12 @@
 }
 
 .dashboard-container::-webkit-scrollbar-thumb {
-  background: rgba(0, 184, 148, 0.3);
+  background: rgba(var(--success-color-rgb), 0.3);
   border-radius: 3px;
 }
 
 .dashboard-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 184, 148, 0.5);
+  background: rgba(var(--success-color-rgb), 0.5);
 }
 
 /* ============================================================================
