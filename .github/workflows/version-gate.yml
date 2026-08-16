@@ -99,7 +99,21 @@ jobs:
           # THIS repository already requires write access, which is the bar that makes the name
           # mean something. A fork can still take the backfill path — that one is verified by
           # CONTENT, so it needs no trust. Reported by review on #1088.
-          LATEST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
+          # PRE-RELEASE TAGS ARE EXCLUDED, and that is the whole point of the match/exclude pair.
+          #
+          # `sync-manifest-versions.js` only ever writes a RELEASE version (it rejects anything that
+          # is not vX.Y.Z), so a manifest can never equal an `-rc.N` tag. A bare
+          # `git describe --tags` returns the nearest tag of ANY kind, and the Staging Candidate
+          # workflow tags `vX.Y.Z-rc.N` on staging — so on any staging-based branch the nearest tag
+          # is an rc, EXPECTED becomes something no manifest can hold, and the backfill exemption
+          # silently cannot fire. Measured 2026-08-16 on the release back-merge (#1196): describe
+          # returned v1.9.1-rc.1 against manifests correctly set to 1.9.0, and all seven were
+          # reported as hand-edited.
+          #
+          # This does not weaken the check. The exemption still requires every manifest to match a
+          # tag that already exists, which is what makes it a record of a release that happened
+          # rather than a version somebody invented.
+          LATEST_TAG="$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || echo '')"
           EXPECTED="${LATEST_TAG#v}"
           exempt=no
           if [ "$HEAD_REPO" = "$THIS_REPO" ]; then
