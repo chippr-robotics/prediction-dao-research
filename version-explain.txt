@@ -1,93 +1,37 @@
-previous: v1.8.0
-commits:  88
-  [unclassified] Merge pull request #1192 from chippr-robotics/staging
-  [unclassified] Merge pull request #1191 from chippr-robotics/claude/pools-search-cleanup-ic6eao
-  [test -> patch] assert the switching claim, not its old phrasing
-  [refactor -> patch] cut the narrative intros from the major member views
-  [unclassified] Merge pull request #1190 from chippr-robotics/claude/transfer-view-wrap-section-mu5l9f
-  [unclassified] Merge pull request #1189 from chippr-robotics/claude/pools-search-cleanup-ic6eao
-  [unclassified] Merge pull request #1188 from chippr-robotics/claude/hardware-wallet-protect-ojldc1
-  [fix -> patch] tolerate non-promise switchNetwork returns in switch buttons
-  [feat -> minor] add a Wrap view, drop the intro copy and Activity tab
-  [fix -> patch] handle now-real switchNetwork rejections (spec 088 follow-through)
-  [fix -> patch] address review on Supply search, and validate the screens
-  [feat -> minor] search and filter the Supply pool list, trim its explainer text
-  [test -> patch] locked recovered account routes through submit (spec 088)
-  [feat -> minor] instant address-only switching, deferred signing, acting-account balances (spec 088)
-  [unclassified] Merge pull request #1185 from chippr-robotics/claude/security-graphcli-transitives
-  [fix -> patch] patch the graph-cli/gluegun transitives, re-resolved on merged staging
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/security-graphcli-transitives
-  [unclassified] Merge origin/staging into claude/security-graphcli-transitives
-  [unclassified] Merge pull request #1184 from chippr-robotics/claude/security-drop-pinata-sdk
-  [unclassified] Merge origin/staging into claude/security-drop-pinata-sdk
-  [unclassified] Merge pull request #1183 from chippr-robotics/claude/security-drop-dead-semaphore
-  [unclassified] Merge pull request #1182 from chippr-robotics/claude/security-axios-browser-bundle
-  [unclassified] Merge pull request #1186 from chippr-robotics/claude/hardware-wallet-protect-ojldc1
-  [fix -> patch] hardware wallets could not connect in staging — Node globals + Trezor interop
-  [fix -> patch] pin patched transitives in the graph-cli / gluegun closure
-  [fix -> patch] replace the unmaintained @pinata/sdk with the repo's fetch seam
-  [chore -> patch] drop the dead Semaphore dependency closure
-  [fix -> patch] dedupe browser-shipped axios off the vulnerable 1.13.5 pin
-  [unclassified] Merge pull request #1178 from chippr-robotics/claude/infrastructure-as-code-setup-w3cb7o
-  [unclassified] Merge staging: three features now coexist in the nav
-  [unclassified] Renumber 086 -> 087: spec 086 was taken by the merged account-cards PR
-  [unclassified] Merge pull request #1180 from chippr-robotics/claude/hardware-wallet-protect-ojldc1
-  [fix -> patch] stop checkout's persisted credential overriding the module token
-  [ci -> patch] triage the module token via the API so the failure names itself
-  [ci -> patch] re-run with the module token scoped to chippr-tf-modules
-  [feat -> minor] customize entry is an ellipsis on the card itself
-  [unclassified] Merge staging; renumber this feature 085 -> 086 to resolve a spec collision
-  [feat -> minor] unified, customizable glass account cards (spec 086)
-  [ci -> patch] re-trigger — the revert commit produced no workflow run
-  [unclassified] Revert "ci(085): fetch the shared modules with a read-only deploy key, not a PAT"
-  [spec -> patch] unified, customizable account cards (spec 086)
-  [unclassified] Merge pull request #1179 from chippr-robotics/claude/hardware-wallet-protect-ojldc1
-  [feat -> minor] actor-critic screenshot pass, capture harness and skill
-  [ci -> patch] fetch the shared modules with a read-only deploy key, not a PAT
-  [ci -> patch] try each credential form before blaming the token's access
-  [test -> patch] hardware wallet coverage — lib, components, e2e
-  [ci -> patch] re-run with the org-owned module token
-  [docs -> patch] hardware wallet developer guide + staging validation runbook
-  [feat -> minor] hardware wallet cold storage for Off chain (spec 085)
-  [ci -> patch] re-run after the org fine-grained PAT policy was fixed
-  [docs -> patch] refresh the task-status banner after the module extraction
-  [fix -> patch] drop the bare `exit 0` from the module-access gate
-  [ci -> patch] preflight the module credential and classify why it failed
-  [fix -> patch] pass TF_MODULES_TOKEN through env and strip stray whitespace
-  [ci -> patch] re-run the infra checks now TF_MODULES_TOKEN exists
-  [fix -> patch] make terraform validate degrade honestly without module access
-  [refactor -> patch] move the five modules to the org-wide chippr-tf-modules
-  [fix -> patch] invert G-10 from a deny-list to an allow-list
-  [fix -> patch] install Ansible collections where ansible.cfg looks for them
-  [fix -> patch] drop an unused data source, and stop the infra jobs claiming results they have not produced
-  [docs -> patch] record task status and the operator-required remainder
-  [docs -> patch] operations runbook, module guide, and source-of-truth re-scoping
-  [feat -> minor] Ansible node configuration, CI workflows, developer guide
-  [feat -> minor] Terraform layer + IaC guardrail gate
-  [spec -> patch] Infrastructure as Code (Terraform + Ansible) for issue #1177
-  [unclassified] Merge pull request #1176 from chippr-robotics/claude/purchase-membership-z-order-jtr1g8
-  [test -> patch] normalise CSS paths in the modal-backdrop guard
-  [fix -> patch] stop AdminPanel CSS sinking every modal below the nav
-  [unclassified] Merge pull request #1156 from chippr-robotics/dependabot/npm_and_yarn/staging/scure/bip39-2.3.0
-  [unclassified] Merge pull request #1175 from chippr-robotics/claude/side-panel-search-protocols-v4cqn6
-  [fix -> patch] tokenize queries like the index, and compare focus ids as values
-  [feat -> minor] search protocols, services and preference cards from the drawer
-  [unclassified] Merge pull request #1167 from chippr-robotics/release/v1.8.0-changelog
-  [unclassified] Merge pull request #1174 from chippr-robotics/claude/subgraph-validation-updates-71ybia
-  [test -> patch] widen subgraph-url guard to catch bracket access and destructuring
-  [fix -> patch] route draw-proposal scan and site stats through per-chain subgraph URL
-  [unclassified] Merge pull request #1171 from chippr-robotics/claude/activity-refresh-error-hfdvp7
-  [fix -> patch] honour an explicit toBlock, and clear "still reading" on error
-  [fix -> patch] stop the false "Couldn't refresh some activity" banner
-  [unclassified] Merge pull request #1170 from chippr-robotics/claude/message-signing-verification-ax4xbc
-  [docs -> patch] realign the Verify acceptance scenarios with the offline model
-  [unclassified] Merge pull request #1169 from chippr-robotics/claude/message-signing-verification-ax4xbc
-  [fix -> patch] lead the unsettled result with what is certain
-  [refactor -> patch] make signature checking offline by construction
-  [unclassified] Merge pull request #1166 from chippr-robotics/claude/message-signing-verification-ax4xbc
-  [skipped] chore(release): v1.8.0 [skip release]
-  [fix -> patch] never assume a network the member has not stated
-  [chore -> patch] Bump @scure/bip39 from 2.2.0 to 2.3.0
+previous: v1.9.0
+commits:  32
+  [unclassified] Merge pull request #1203 from chippr-robotics/staging
+  [unclassified] Merge pull request #1202 from chippr-robotics/claude/activity-stats-wager-messages-n4ul0r
+  [test -> patch] assert full explorer URL prefixes, not host substrings
+  [feat -> minor] merge activity and stats across the cohort (spec 092)
+  [docs -> patch] task breakdown for 092 multi-chain activity
+  [docs -> patch] plan + design artifacts for 092 multi-chain activity
+  [docs -> patch] renumber multi-chain activity to 092 (091 double-booked)
+  [unclassified] Merge pull request #1201 from chippr-robotics/claude/fairwins-neutral-tokens-doqie6
+  [unclassified] Merge pull request #1200 from chippr-robotics/claude/activity-stats-wager-messages-n4ul0r
+  [refactor -> patch] consolidate the remaining colour literals onto tokens
+  [unclassified] Merge origin/staging: renumber spec to 091, adopt brand tokens
+  [unclassified] Merge pull request #1199 from chippr-robotics/claude/fairwins-chippr-branding-doqie6
+  [unclassified] Merge pull request #1198 from chippr-robotics/claude/finops-grafana-dashboard-pjfc8z
+  [docs -> patch] draft spec 090 — multi-chain activity ledger
+  [feat -> minor] estate-wide stats and account-aware empty states
+  [fix -> patch] restore finops spec references clobbered by the brand spec renumber
+  [feat -> minor] show the wager's message on wager activity entries
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/fairwins-chippr-branding-doqie6
+  [fix -> patch] resolve the four findings from the actor-critic screenshot loop
+  [fix -> patch] staleness alerts fired for every not-configured source
+  [feat -> minor] align app styling defaults with Chippr Brand Guidelines v1.0
+  [unclassified] Merge pull request #1195 from chippr-robotics/claude/finops-grafana-dashboard-pjfc8z
+  [unclassified] Merge pull request #1196 from chippr-robotics/chore/backmerge-main-into-staging
+  [unclassified] Merge pull request #1197 from chippr-robotics/chore/backmerge-automation
+  [fix -> patch] unblock and automate the main-into-staging back-merge
+  [fix -> patch] six honesty defects found in review
+  [fix -> patch] let the release set the new manifests' versions
+  [feat -> minor] real-time revenue and cost observability (spec 089)
+  [unclassified] Merge pull request #1194 from chippr-robotics/claude/side-panel-quick-access-labels-3i3xeh
+  [fix -> patch] rename drawer Quick Access labels to Payments and Accounts
+  [unclassified] Merge pull request #1193 from chippr-robotics/release/v1.9.0-changelog
+  [skipped] chore(release): v1.9.0 [skip release]
 bump:     minor
 reason:   computed
-next:     v1.9.0
+next:     v1.10.0

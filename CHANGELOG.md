@@ -14,6 +14,56 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.10.0 — 2026-08-16
+
+Promoted from: v1.10.0-rc.6
+Previous release: v1.9.0 · Range: `v1.9.0..v1.10.0` (32 commits)
+
+### 🚀 Features
+
+- feat(account): merge activity and stats across the cohort (spec 092)
+- feat(account): estate-wide stats and account-aware empty states
+- feat(account): show the wager's message on wager activity entries
+- feat(brand): align app styling defaults with Chippr Brand Guidelines v1.0
+- feat(finops): real-time revenue and cost observability (spec 089)
+
+### 🐛 Bug Fixes
+
+- fix: restore finops spec references clobbered by the brand spec renumber
+- fix(brand): resolve the four findings from the actor-critic screenshot loop
+- fix(finops): staleness alerts fired for every not-configured source
+- fix(ci): unblock and automate the main-into-staging back-merge
+- fix(finops): six honesty defects found in review
+- fix(finops): let the release set the new manifests' versions
+- fix(nav): rename drawer Quick Access labels to Payments and Accounts
+
+### ♻️ Refactoring
+
+- refactor(brand): consolidate the remaining colour literals onto tokens
+
+### 📚 Documentation
+
+- docs(spec): task breakdown for 092 multi-chain activity
+- docs(spec): plan + design artifacts for 092 multi-chain activity
+- docs(spec): renumber multi-chain activity to 092 (091 double-booked)
+- docs(spec): draft spec 090 — multi-chain activity ledger
+
+### 🧪 Tests
+
+- test(account): assert full explorer URL prefixes, not host substrings
+
+### Artifacts
+
+Range: `v1.9.0..v1.10.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.9.0 — 2026-08-15
 
 Promoted from: v1.9.0-rc.15

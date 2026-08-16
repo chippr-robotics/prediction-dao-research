@@ -23,5 +23,6 @@
   "devDependencies": {
     "supertest": "^7.0.0",
     "vitest": "^4.1.10"
-  }
+  },
+  "version": "1.10.0"
 }
