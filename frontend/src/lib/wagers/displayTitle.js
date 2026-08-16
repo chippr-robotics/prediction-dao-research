@@ -12,8 +12,10 @@ const ZERO_ADDRESS_RE = /^0x0{40}$/i
 
 /**
  * True if and only if a wager is an open challenge (feature 024): created with no named opponent.
- * Named-opponent wagers always have a non-zero opponent at creation, so an absent/zero opponent uniquely
- * identifies an open challenge (until a taker accepts, after which the opponent is bound and this returns false).
+ * Named-opponent wagers always have a non-zero opponent at creation, so the LITERAL zero address
+ * uniquely identifies an open challenge (until a taker accepts, after which the opponent is bound
+ * and this returns false). A merely-missing `opponent` field is deliberately NOT treated as open —
+ * see the comment in the body.
  */
 export function isOpenChallengeMarket(market) {
   if (!market) return false

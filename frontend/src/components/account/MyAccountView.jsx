@@ -10,6 +10,7 @@ import PortfolioPanel from '../wallet/PortfolioPanel'
 import SummaryTiles from './SummaryTiles'
 import PnlChart from './PnlChart'
 import ActivityBreakdowns from './ActivityBreakdowns'
+import EstateBreakdown from './EstateBreakdown'
 import RecentActivityFeed from './RecentActivityFeed'
 import FreshnessIndicator from './FreshnessIndicator'
 import WalletUtilitiesPanel from './WalletUtilitiesPanel'
@@ -85,23 +86,32 @@ function MyAccountView() {
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  // The Activity and Stats views share the honest unsupported/empty states the
-  // dashboard always had; Portfolio keeps its own (it reads every supported
-  // network, so "network not supported" does not apply to it).
-  const renderHonestState = () => {
+  // Honest unsupported/empty states, per view. The old blanket state pitched
+  // "Create a wager" at every account — for an imported/recovered account
+  // holding a real estate that notice was useless (post-launch feedback). Copy
+  // is account-aware: acting accounts (vault/recovered/hardware) get neutral
+  // wording and no wager CTA; only the personal wallet is invited to wager.
+  // Portfolio keeps its own states (it reads every supported network, so
+  // "network not supported" does not apply to it).
+  const activityHonestState = () => {
     if (!isSupportedNetwork) {
       return (
         <EmptyState
           title="Network not supported"
-          message="Switch to a supported network to see your account stats. Wager data is scoped to the active network."
+          message="Activity is recorded per network, and this one isn't supported yet. Balances across all networks are in Portfolio."
         />
       )
     }
     if (isEmpty) {
-      return (
+      return isActingAccount ? (
+        <EmptyState
+          title="No activity recorded yet"
+          message="No wagers, transfers, or other FairWins activity has been recorded for this account yet. Its balances across all networks are in Portfolio."
+        />
+      ) : (
         <EmptyState
           title="No activity yet"
-          message="Create or accept your first wager to start building your stats. Your performance, balances, and history will appear here."
+          message="Your wagers, transfers, earn, pool, and membership activity will appear here."
           ctaLabel="Create a wager"
           onCta={goCreate}
         />
@@ -110,7 +120,41 @@ function MyAccountView() {
     return null
   }
 
-  const honestState = renderHonestState()
+  // Stats never blanks wholesale: the estate overview (fed by the portfolio's
+  // cross-network scan) renders regardless, and only the WAGER sections get an
+  // honest compact note when there is nothing to compute them from.
+  const wagerStatsHonestState = () => {
+    if (!isSupportedNetwork) {
+      return (
+        <EmptyState
+          compact
+          title="Wager stats unavailable here"
+          message="Wager data is scoped to the active network, and this one isn't supported yet."
+        />
+      )
+    }
+    if (isEmpty) {
+      return isActingAccount ? (
+        <EmptyState
+          compact
+          title="No wager activity for this account"
+          message="Performance charts appear once this account has wager history."
+        />
+      ) : (
+        <EmptyState
+          compact
+          title="No wager activity yet"
+          message="Create or accept your first wager to start building your performance stats."
+          ctaLabel="Create a wager"
+          onCta={goCreate}
+        />
+      )
+    }
+    return null
+  }
+
+  const activityState = activityHonestState()
+  const wagerStatsState = wagerStatsHonestState()
 
   return (
     <div className="my-account">
@@ -146,7 +190,7 @@ function MyAccountView() {
           <div className="my-account-freshness">
             <FreshnessIndicator state={freshness?.summary} onRefresh={refresh} />
           </div>
-          {honestState || (
+          {activityState || (
             <RecentActivityFeed
               entries={activity}
               chainId={chainId}
@@ -162,7 +206,16 @@ function MyAccountView() {
           <div className="my-account-freshness">
             <FreshnessIndicator state={freshness?.summary} onRefresh={refresh} />
           </div>
-          {honestState || (
+          {wagerStatsState ? (
+            <>
+              {/* Estate first when there are no wager stats: the account's
+                  cross-network holdings ARE its stats (the screenshot case —
+                  a recovered account holding real value saw only a wager
+                  pitch). The wager note follows, compact. */}
+              <EstateBreakdown portfolio={portfolio} />
+              {wagerStatsState}
+            </>
+          ) : (
             <>
               <SummaryTiles summary={summary} isEmpty={isLoading && !summary} />
               <PnlChart series={series} onRangeChange={setRange} onCreateWager={goCreate} />
@@ -170,6 +223,9 @@ function MyAccountView() {
                   not a transaction log — they live here beside the tiles and
                   chart (post-launch feedback), keeping Activity a clean feed. */}
               <ActivityBreakdowns breakdowns={breakdowns} />
+              {/* The whole estate, beyond the active network's wager data
+                  (spec 044's scan, already loaded for the Portfolio view). */}
+              <EstateBreakdown portfolio={portfolio} />
             </>
           )}
         </div>
