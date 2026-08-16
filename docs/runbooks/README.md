@@ -13,6 +13,7 @@ This directory contains step-by-step operational guides, integration procedures,
 - **[perps-operations.md](./perps-operations.md)** - Perps fee rails (spec 083): the GMX UI fee on Arbitrum and the Hyperliquid builder fee on the Polygon FeeRouter, the Gains referral, the management feature flag and its legal prerequisite, venue/stuck-order incident playbook
 - **[miniapp-registry-operations.md](./miniapp-registry-operations.md)** - Mini-app catalog curation (spec 073): verifying a submitted package before approval, the content-committed `approveApp`, suspend/reinstate/deprecate, gateway config, curator-role handoff, diagnostics
 - **[contract-upgrades.md](./contract-upgrades.md)** - UUPS proxy upgrade procedure: storage-layout gate, in-place upgrades, rollback
+- **[credential-rotation.md](./credential-rotation.md)** - Every credential the estate holds and what breaks when it is wrong: the rotation matrix, the two version-pinned secrets that need a code change, the connected-systems inventory, and why a new secret version does nothing until the stack restarts
 
 ### Deploy
 - **[relayer-mordor-deploy.md](./relayer-mordor-deploy.md)** - First bring-up of the relayer stack on Mordor: GCP prerequisites, KMS keys, Cloud Run, origin lock, validation
