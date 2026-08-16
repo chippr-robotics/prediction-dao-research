@@ -1,0 +1,399 @@
+/**
+ * THE catalogue: every FairWins revenue and cost source, declared exactly once (spec 089, FR-001).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ *  IF YOU ADD A REVENUE OR COST SOURCE TO THE PLATFORM, ADD IT HERE. `npm run check:finops` fails
+ *  until you do, and the failure names this file. That gate is the whole reason this file exists:
+ *  "remember to update the dashboard" is a convention, and conventions decay; a red build does not.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Three consumers read this list and must never disagree about it:
+ *   services/finops-exporter        emits the metrics
+ *   scripts/finops/generate-dashboards.js   builds the panels
+ *   scripts/finops/check-finops-coverage.js the gate
+ *
+ * What does NOT belong here: endpoints, account ids, zone tags, project names, and above all
+ * credentials. `credential` names a Secret Manager secret; it never carries one (FR-003). This file
+ * is world-readable in the repository.
+ */
+
+/** Chain ids, spelled out so a reader does not have to know that 137 is Polygon. */
+const POLYGON = 137
+const MORDOR = 63
+
+// Poll intervals. Matched to how fast the source actually CHANGES, not to how fresh we wish it were
+// (FR-009). Querying the billing export more often does not make it fresher, and it is billable.
+const FAST = 60 // on-chain balances: cheap, and runway alerts are only as good as this
+const CHAIN_EVENTS = 120 // log scans over a confirmed window
+const VENDOR = 3600 // vendor APIs with hourly-or-worse granularity
+const DAILY_ISH = 6 * 3600 // BigQuery billing export: lags hours, is billable to query
+
+/**
+ * The 8 FeeRouter services (spec 060). These are generated rather than hand-listed so that the id,
+ * the label and the on-chain service id cannot drift apart — the gate cross-checks this set against
+ * the contracts and against the frontend FEE_SERVICES table.
+ *
+ * `serviceLabel` IS the keccak preimage. It is the join key to the chain.
+ */
+const FEE_SERVICES = [
+  { id: 'fee-earn-lend', serviceLabel: 'earn.lend', label: 'Earn — lending fee', chains: [POLYGON] },
+  { id: 'fee-polymarket-taker', serviceLabel: 'polymarket.taker', label: 'Predict — Polymarket taker (builder fee)', chains: [POLYGON] },
+  { id: 'fee-polymarket-maker', serviceLabel: 'polymarket.maker', label: 'Predict — Polymarket maker (builder fee)', chains: [POLYGON] },
+  { id: 'fee-stake-lido', serviceLabel: 'stake.lido', label: 'Stake — Lido liquid staking', chains: [POLYGON] },
+  { id: 'fee-stake-polygon', serviceLabel: 'stake.polygon', label: 'Stake — Polygon liquid staking', chains: [POLYGON] },
+  { id: 'fee-bridge-transfer', serviceLabel: 'bridge.transfer', label: 'Bridge — transfer fee', chains: [POLYGON] },
+  { id: 'fee-liquidity-deposit', serviceLabel: 'liquidity.deposit', label: 'Supply — liquidity deposit fee', chains: [POLYGON] },
+  { id: 'fee-perps-hl-builder', serviceLabel: 'perps.hyperliquid.builder', label: 'Perps — Hyperliquid builder fee', chains: [POLYGON] },
+]
+
+const feeSources = FEE_SERVICES.map(({ id, serviceLabel, label, chains }) => ({
+  id,
+  kind: 'revenue',
+  status: 'live',
+  label,
+  metric: 'fairwins_finops_revenue_total',
+  unit: 'USDC',
+  collector: 'feeRouter',
+  chains,
+  serviceLabel,
+  interval: CHAIN_EVENTS,
+  credential: null,
+  docs: 'finops-operations.md#fee-revenue',
+  meaning:
+    `Gross platform fee actually charged for \`${serviceLabel}\`, summed from FeeRouter FeeCharged events over finalized blocks. ` +
+    `It is what the treasury RECEIVED, not what was quoted and not what was billed to a member elsewhere. ` +
+    `Several of these services ship at a rate of 0 bps, so a genuine 0 here is expected and is NOT the same as an unread source.`,
+}))
+
+/**
+ * Fee revenue we did NOT earn because no treasury was set. Invisible in every other view, and the
+ * only signal that a fee path is live but misconfigured. Worth a panel of its own.
+ */
+const feeWaived = {
+  id: 'fee-waived-no-treasury',
+  kind: 'revenue',
+  status: 'live',
+  label: 'Fees waived (no treasury configured)',
+  metric: 'fairwins_finops_revenue_waived_total',
+  unit: 'USDC',
+  collector: 'feeRouter',
+  chains: [POLYGON],
+  interval: CHAIN_EVENTS,
+  credential: null,
+  docs: 'finops-operations.md#fees-waived',
+  meaning:
+    'Fee amounts skipped because the FeeRouter had no treasury set (FeeSkippedNoTreasury). This is revenue ' +
+    'forgone for a fixable configuration reason. It is NOT earned revenue and is never added to any revenue total — ' +
+    'it is displayed so that a silently misconfigured fee path stops looking like a quiet day.',
+}
+
+/** Membership (spec 071 home chain). Accrued and received are two numbers and are never summed. */
+const membership = [
+  {
+    id: 'membership-received',
+    kind: 'revenue',
+    status: 'live',
+    label: 'Membership — received by treasury',
+    metric: 'fairwins_finops_revenue_total',
+    unit: 'USDC',
+    collector: 'membership',
+    chains: [POLYGON],
+    interval: CHAIN_EVENTS,
+    credential: null,
+    docs: 'finops-operations.md#membership-revenue',
+    meaning:
+      'Membership fees WITHDRAWN to the treasury (FeesWithdrawn). This is money that has arrived. ' +
+      'It is deliberately not the same number as membership-accrued, and the two are never summed (spec 071).',
+  },
+  {
+    id: 'membership-accrued',
+    kind: 'revenue',
+    status: 'live',
+    label: 'Membership — accrued, not yet withdrawn',
+    metric: 'fairwins_finops_revenue_accrued',
+    unit: 'USDC',
+    collector: 'membership',
+    chains: [POLYGON],
+    interval: CHAIN_EVENTS,
+    credential: null,
+    docs: 'finops-operations.md#membership-revenue',
+    meaning:
+      'Membership fees earned (MembershipPurchased/Upgraded/Extended) and still sitting in the contract. ' +
+      'Earned but NOT received. Adding this to membership-received would double-count every fee that has since ' +
+      'been withdrawn, which is exactly why they are separate metric families.',
+  },
+]
+
+/**
+ * Venue-paid referral. Research R7: OpenSea's referral address and the Gains/GMX codes are
+ * deliberately UNSET in production today, so these collect `not-configured` — which says "we have
+ * not wired this up" (actionable) rather than "$0" (untrue).
+ */
+const referral = [
+  {
+    id: 'referral-opensea',
+    kind: 'revenue',
+    status: 'live',
+    label: 'Collect — OpenSea referral',
+    metric: 'fairwins_finops_revenue_total',
+    unit: 'USD',
+    collector: 'referral',
+    interval: VENDOR,
+    credential: null,
+    docs: 'finops-operations.md#referral-revenue',
+    meaning:
+      'Referral share attributable to FairWins-routed OpenSea volume. OPENSEA_REFERRAL_ADDRESS is unset in ' +
+      'production, so this reports not-configured rather than zero: no code is registered, so there is nothing to earn.',
+  },
+  {
+    id: 'referral-gains',
+    kind: 'revenue',
+    status: 'live',
+    label: 'Perps — Gains referral',
+    metric: 'fairwins_finops_revenue_total',
+    unit: 'USD',
+    collector: 'referral',
+    interval: VENDOR,
+    credential: null,
+    docs: 'finops-operations.md#referral-revenue',
+    meaning:
+      'Venue-paid referral share from Gains Network. Gains has not whitelisted a referrer, so link-outs go ' +
+      'unattributed and this reports not-configured.',
+  },
+  {
+    id: 'referral-gmx',
+    kind: 'revenue',
+    status: 'live',
+    label: 'Perps — GMX referral',
+    metric: 'fairwins_finops_revenue_total',
+    unit: 'USD',
+    collector: 'referral',
+    interval: VENDOR,
+    credential: null,
+    docs: 'finops-operations.md#referral-revenue',
+    meaning:
+      'Venue-paid GMX referral share (which also discounts the trader). No ref code is registered, so this ' +
+      'reports not-configured.',
+  },
+  {
+    id: 'referral-polymarket-rewards',
+    kind: 'revenue',
+    status: 'live',
+    label: 'Predict — Polymarket weekly builder rewards',
+    metric: 'fairwins_finops_revenue_total',
+    unit: 'USD',
+    collector: 'referral',
+    interval: VENDOR,
+    credential: 'polymarket-api-key',
+    docs: 'finops-operations.md#referral-revenue',
+    meaning:
+      'Weekly rewards from the Polymarket builder-code programme, separate from the per-order builder fee ' +
+      'captured by fee-polymarket-taker/maker. The builder code IS registered, so unlike the other referral ' +
+      'sources this one is expected to report a real value once the credential is provisioned.',
+  },
+]
+
+/**
+ * Named in the brief as revenue streams; neither exists on chain (research R8). MiniAppRegistry has
+ * no fee, no price and no payable function; WagerRegistry takes no platform cut.
+ *
+ * They are catalogued so they are VISIBLE as not-yet-live and so the gate already knows their names
+ * the day they ship. They declare no metric and emit no value: a `planned` source showing $0 is
+ * indistinguishable from a shipped source earning nothing (FR-014).
+ */
+const planned = [
+  {
+    id: 'miniapp-licenses',
+    kind: 'revenue',
+    status: 'planned',
+    label: 'Mini-app licenses',
+    metric: null,
+    collector: 'none',
+    interval: DAILY_ISH,
+    credential: null,
+    docs: 'finops-operations.md#planned-sources',
+    meaning:
+      'PLANNED, NOT LIVE. contracts/apps/MiniAppRegistry.sol has no fee, price or payable function as of spec 089, ' +
+      'so there is no licensing revenue to read. Shown as not-yet-live and excluded from every total.',
+  },
+  {
+    id: 'wager-platform-fee',
+    kind: 'revenue',
+    status: 'planned',
+    label: 'Wager platform fee',
+    metric: null,
+    collector: 'none',
+    interval: DAILY_ISH,
+    credential: null,
+    docs: 'finops-operations.md#planned-sources',
+    meaning:
+      'PLANNED, NOT LIVE. WagerRegistry escrows stakes and takes no platform cut, so wagers currently generate ' +
+      'volume but no direct revenue. Shown as not-yet-live and excluded from every total.',
+  },
+]
+
+/** Prepaid gas pools. These are costs AND the runway alerts (FR-015) — the estate's sharpest edge. */
+const gasPools = [
+  {
+    id: 'paymaster-gas',
+    kind: 'cost',
+    status: 'live',
+    label: 'Paymaster — sponsored gas',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'POL',
+    basis: 'modelled',
+    collector: 'pools',
+    chains: [POLYGON],
+    pool: 'paymaster-137',
+    interval: FAST,
+    credential: null,
+    docs: 'finops-operations.md#prepaid-pools',
+    meaning:
+      'Gas spent sponsoring member UserOps, measured as drawdown of the paymaster EntryPoint deposit. ' +
+      'The USD figure is MODELLED: the chain charges POL, and converting needs a price. The POL drawdown itself ' +
+      'is exact. When this deposit empties, sponsorship stops and members see failures — which is why its runway, ' +
+      'not its balance, is what alerts.',
+  },
+  {
+    id: 'relayer-gas-polygon',
+    kind: 'cost',
+    status: 'live',
+    label: 'Relayer gas — Polygon',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'POL',
+    basis: 'modelled',
+    collector: 'pools',
+    chains: [POLYGON],
+    pool: 'relayer-137',
+    interval: FAST,
+    credential: null,
+    docs: 'finops-operations.md#prepaid-pools',
+    meaning: 'Gas spent relaying intents on Polygon, measured as executor EOA balance drawdown. USD is modelled from a POL price.',
+  },
+  {
+    id: 'relayer-gas-mordor',
+    kind: 'cost',
+    status: 'live',
+    label: 'Relayer gas — Mordor',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'ETC',
+    basis: 'modelled',
+    collector: 'pools',
+    chains: [MORDOR],
+    pool: 'relayer-63',
+    interval: FAST,
+    credential: null,
+    docs: 'finops-operations.md#prepaid-pools',
+    meaning:
+      'Gas spent relaying intents on Mordor, in native units. NO USD figure is produced: there is no ETC price ' +
+      'feed, and valuing it at 0 would both understate a real cost and mean that Ethereum Classic MAINNET gas ' +
+      'was priced at nothing too. Only the native drawdown and the runway are meaningful here — which is all that ' +
+      'was ever needed, since running out still breaks the testnet cohort.',
+  },
+  {
+    id: 'bundler-gas-polygon',
+    kind: 'cost',
+    status: 'live',
+    label: 'Bundler gas — Polygon',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'POL',
+    basis: 'modelled',
+    collector: 'pools',
+    chains: [POLYGON],
+    pool: 'bundler-137',
+    interval: FAST,
+    credential: null,
+    docs: 'finops-operations.md#prepaid-pools',
+    meaning: 'Gas spent by the alto bundler executor EOA submitting bundles. USD is modelled from a POL price.',
+  },
+]
+
+/** Vendor infrastructure. Only GCP can tell us what we were actually charged (research R1). */
+const vendors = [
+  {
+    id: 'gcp',
+    kind: 'cost',
+    status: 'live',
+    label: 'GCP',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'billed',
+    collector: 'gcpBilling',
+    interval: DAILY_ISH,
+    credential: null, // Workload identity on the node's service account, not a stored token.
+    docs: 'finops-operations.md#gcp-cost',
+    meaning:
+      'Actual charged GCP cost, per service, from the BigQuery billing export. The ONLY billed (as opposed to ' +
+      'modelled) cost source we have. It LAGS by hours and holds nothing from before the export was enabled, ' +
+      'so its panels state the lag rather than sitting next to a 60-second-old chain read as if equally fresh.',
+  },
+  {
+    id: 'cloudflare',
+    kind: 'cost',
+    status: 'live',
+    label: 'Cloudflare',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'modelled',
+    collector: 'cloudflare',
+    interval: VENDOR,
+    credential: 'cloudflare-analytics-token',
+    docs: 'finops-operations.md#cloudflare-cost',
+    meaning:
+      'Cloudflare spend MODELLED from the declared plan subscription. Research R1: the GraphQL Analytics API ' +
+      'returns requests and bytes but no dollar figure, and there is no public billing API for the plan. ' +
+      'The usage it DOES return is exported separately as vendor usage, which is a fact; this dollar figure is our arithmetic.',
+  },
+  {
+    id: 'quicknode',
+    kind: 'cost',
+    status: 'live',
+    label: 'QuickNode',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'modelled',
+    collector: 'quicknode',
+    interval: VENDOR,
+    credential: 'quicknode-api-key',
+    docs: 'finops-operations.md#quicknode-cost',
+    meaning:
+      'QuickNode spend MODELLED from API-credit consumption times the declared plan rate. Research R1: the Admin ' +
+      'API reports credits, not dollars, and a Flat Rate RPS plan decouples spend from usage entirely — under that ' +
+      'plan the modelled figure is the flat subscription and credit usage is informational only.',
+  },
+  {
+    id: 'grafana-cloud',
+    kind: 'cost',
+    status: 'live',
+    label: 'Grafana Cloud (this system)',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'modelled',
+    collector: 'quicknode', // shares the flat-subscription modeller; no vendor API is polled
+    interval: VENDOR,
+    credential: null,
+    docs: 'finops-operations.md#self-cost',
+    meaning:
+      'What the FinOps system itself costs: the Grafana Cloud plan plus the BigQuery query spend this exporter ' +
+      'incurs reading the billing export. FR-029 — a FinOps system that hides its own cost is not credible. ' +
+      'The free tier really is $0, but assert that by setting FINOPS_GRAFANA_PLAN_USD=0: unset reports ' +
+      'not-configured, because "we are on the free tier" and "nobody set this" are different facts.',
+  },
+]
+
+/** The catalogue. Order is display order on the overview dashboard. */
+export const SOURCES = [
+  ...feeSources,
+  feeWaived,
+  ...membership,
+  ...referral,
+  ...planned,
+  ...gasPools,
+  ...vendors,
+]
+
+/** Prepaid pools, derived from the catalogue so a pool cannot exist without a catalogued cost. */
+export const POOLS = gasPools.map((s) => ({ id: s.pool, sourceId: s.id, unit: s.unit, chain: s.chains[0] }))
+
+/** The keccak preimages of the on-chain fee services, for the gate's contract cross-check. */
+export const FEE_SERVICE_LABELS = FEE_SERVICES.map((s) => s.serviceLabel)

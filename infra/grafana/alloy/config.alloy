@@ -1,0 +1,89 @@
+// Grafana Alloy — scrape the FinOps exporter and remote_write to Grafana Cloud (spec 089).
+//
+// WHY AN AGENT AT ALL (research R10). Prometheus remote_write is snappy-compressed protobuf, with a
+// WAL and retry/backoff semantics. Implementing that inside the exporter means owning a wire format;
+// Alloy is the vendor's own agent and keeps the exporter's contract at "expose /metrics on
+// loopback" — which is also exactly what a unit test can assert against.
+//
+// NETWORK MODEL. This container joins the gateway's network namespace
+// (`network_mode: "service:gateway"` in infra/vm/gateway/docker-compose.yml), so `localhost:9464`
+// reaches the exporter VERBATIM — the same property that makes the engine/redis/gateway couplings
+// correct without rewriting. The exporter publishes nothing outside loopback and nginx does not
+// proxy it (FR-027).
+//
+// CREDENTIALS. Both come from Secret Manager via /run/fairwins/alloy.env (tmpfs, per-container).
+// Nothing in this file is a secret and nothing here may become one.
+
+logging {
+  level  = "warn"
+  format = "logfmt"
+}
+
+// ── scrape the exporter ────────────────────────────────────────────────────────────────────────
+
+prometheus.scrape "finops" {
+  targets = [
+    { __address__ = "localhost:9464", job = "finops-exporter" },
+  ]
+
+  // 60s matches the FASTEST catalogue interval (the on-chain pool balances). Scraping faster cannot
+  // make a value fresher — the exporter serves its last reading — and every extra sample is billable
+  // series volume in the tier this whole system is trying not to outgrow.
+  scrape_interval = "60s"
+  scrape_timeout  = "30s"
+
+  forward_to = [prometheus.relabel.finops.receiver]
+}
+
+// ── cardinality guard (FR-028) ─────────────────────────────────────────────────────────────────
+//
+// A LAST LINE OF DEFENCE, not the primary one. The primary is that the exporter only ever emits
+// labels drawn from the catalogue's bounded enumerations, and `check:finops` rejects an undeclared
+// label. This exists because a cardinality mistake is discovered by the bill, weeks later, and by
+// then the series are already stored.
+
+prometheus.relabel "finops" {
+  // Drop anything carrying an address-shaped or hash-shaped label value. No catalogued label can
+  // ever look like this, so a match means a bug shipped — and dropping the sample is strictly
+  // better than silently ingesting one series per member.
+  rule {
+    source_labels = ["source", "pool", "gcp_service", "metric"]
+    separator     = ";"
+    regex         = ".*0x[0-9a-fA-F]{20,}.*"
+    action        = "drop"
+  }
+
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// ── ship to Grafana Cloud ──────────────────────────────────────────────────────────────────────
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROM_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROM_USER")
+      password = sys.env("GRAFANA_CLOUD_PROM_TOKEN")
+    }
+
+    // The exporter is a cheap, constant-time read, so a long backlog is never useful: on a long
+    // outage the fresher samples matter and the stale ones do not. This bounds the WAL rather than
+    // letting a multi-day outage replay a flood of obsolete points on recovery.
+    queue_config {
+      capacity          = 2500
+      max_shards        = 3
+      max_samples_per_send = 500
+      batch_send_deadline  = "10s"
+    }
+  }
+
+  // The whole estate's FinOps series carry these, so a query can always tell which build produced a
+  // number. `cohort` is the testnet/mainnet boundary made visible in the data itself — constitution
+  // III forbids the two mixing, and a label is how a violation would be spotted after the fact.
+  external_labels = {
+    service = "fairwins-finops",
+    cohort  = sys.env("FINOPS_COHORT"),
+    node    = sys.env("FW_NODE_NAME"),
+  }
+}
