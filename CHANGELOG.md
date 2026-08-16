@@ -14,6 +14,187 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.9.0 — 2026-08-15
+
+Promoted from: v1.9.0-rc.15
+Previous release: v1.8.0 · Range: `v1.8.0..v1.9.0` (88 commits)
+
+### 🚀 Features
+
+- feat(transfer): add a Wrap view, drop the intro copy and Activity tab
+- feat(earn): search and filter the Supply pool list, trim its explainer text
+- feat(account): instant address-only switching, deferred signing, acting-account balances (spec 088)
+- feat(account): customize entry is an ellipsis on the card itself
+- feat(account): unified, customizable glass account cards (spec 086)
+- feat(protect): actor-critic screenshot pass, capture harness and skill
+- feat(protect): hardware wallet cold storage for Off chain (spec 085)
+- feat(085): Ansible node configuration, CI workflows, developer guide
+- feat(085): Terraform layer + IaC guardrail gate
+- feat(nav): search protocols, services and preference cards from the drawer
+
+### 🐛 Bug Fixes
+
+- fix(app): tolerate non-promise switchNetwork returns in switch buttons
+- fix(app): handle now-real switchNetwork rejections (spec 088 follow-through)
+- fix(earn): address review on Supply search, and validate the screens
+- fix(deps): patch the graph-cli/gluegun transitives, re-resolved on merged staging
+- fix(protect): hardware wallets could not connect in staging — Node globals + Trezor interop
+- fix(deps): pin patched transitives in the graph-cli / gluegun closure
+- fix(deps): replace the unmaintained @pinata/sdk with the repo's fetch seam
+- fix(deps): dedupe browser-shipped axios off the vulnerable 1.13.5 pin
+- fix(086): stop checkout's persisted credential overriding the module token
+- fix(085): drop the bare `exit 0` from the module-access gate
+- fix(085): pass TF_MODULES_TOKEN through env and strip stray whitespace
+- fix(085): make terraform validate degrade honestly without module access
+- fix(085): invert G-10 from a deny-list to an allow-list
+- fix(085): install Ansible collections where ansible.cfg looks for them
+- fix(085): drop an unused data source, and stop the infra jobs claiming results they have not produced
+- fix(ui): stop AdminPanel CSS sinking every modal below the nav
+- fix(nav): tokenize queries like the index, and compare focus ids as values
+- fix: route draw-proposal scan and site stats through per-chain subgraph URL
+- fix(activity): honour an explicit toBlock, and clear "still reading" on error
+- fix(activity): stop the false "Couldn't refresh some activity" banner
+- fix(protect): lead the unsettled result with what is certain
+- fix(protect): never assume a network the member has not stated
+
+### ♻️ Refactoring
+
+- refactor(ui): cut the narrative intros from the major member views
+- refactor(085): move the five modules to the org-wide chippr-tf-modules
+- refactor(protect): make signature checking offline by construction
+
+### 📚 Documentation
+
+- spec(account-cards): unified, customizable account cards (spec 086)
+- docs(protect): hardware wallet developer guide + staging validation runbook
+- docs(085): refresh the task-status banner after the module extraction
+- docs(085): record task status and the operator-required remainder
+- docs(085): operations runbook, module guide, and source-of-truth re-scoping
+- spec(085): Infrastructure as Code (Terraform + Ansible) for issue #1177
+- docs(protect): realign the Verify acceptance scenarios with the offline model
+
+### 🧪 Tests
+
+- test(network): assert the switching claim, not its old phrasing
+- test(miniapps): locked recovered account routes through submit (spec 088)
+- test(protect): hardware wallet coverage — lib, components, e2e
+- test(ui): normalise CSS paths in the modal-backdrop guard
+- test: widen subgraph-url guard to catch bracket access and destructuring
+
+### 🏗️ Infrastructure
+
+- ci(086): triage the module token via the API so the failure names itself
+- ci(086): re-run with the module token scoped to chippr-tf-modules
+- ci(085): re-trigger — the revert commit produced no workflow run
+- ci(085): fetch the shared modules with a read-only deploy key, not a PAT
+- ci(085): try each credential form before blaming the token's access
+- ci(085): re-run with the org-owned module token
+- ci(085): re-run after the org fine-grained PAT policy was fixed
+- ci(085): preflight the module credential and classify why it failed
+- ci(085): re-run the infra checks now TF_MODULES_TOKEN exists
+
+### 🧹 Maintenance
+
+- chore(deps): drop the dead Semaphore dependency closure
+- chore(deps): Bump @scure/bip39 from 2.2.0 to 2.3.0
+
+### Artifacts
+
+Range: `v1.8.0..v1.9.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
+## v1.8.0 — 2026-08-12
+
+Promoted from: v1.8.0-rc.5
+Previous release: v1.7.0 · Range: `v1.7.0..v1.8.0` (18 commits)
+
+### 🚀 Features
+
+- feat(protect): add message signing and verification
+- feat(perps): venue fees, HIP-3 dex coverage, and the Hyperliquid go/no-go
+
+### 🐛 Bug Fixes
+
+- fix(protect): make the verify seam fail loudly instead of silently
+- fix(protect): reject odd-length signature hex and gate Check on parse errors
+- fix(test): pin the activity-feed clock — it was red for ~2 minutes every midnight
+
+### ♻️ Refactoring
+
+- refactor(frontend): remove the Trade ticket's account selector
+
+### 📚 Documentation
+
+- docs(protect): add the Spec Kit artifacts for message signing and verify
+
+### 🧹 Maintenance
+
+- chore(deps): Bump @scure/base from 2.2.0 to 2.3.0
+- chore(deps): Bump @scure/bip32 from 2.2.0 to 2.3.0
+
+### Artifacts
+
+Range: `v1.7.0..v1.8.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.2.0` |
+
+## v1.7.0 — 2026-08-12
+
+Promoted from: v1.7.0-rc.5
+Previous release: v1.6.0 · Range: `v1.6.0..v1.7.0` (23 commits)
+
+### 🚀 Features
+
+- feat(083): perps entry, admin fees, activity — and three more dead paths closed
+- feat(083): perps exits — position sheet, stuck-order recovery, protection (phases 3+4)
+- feat(083): perps foundations — venue calldata, order state machine, fee units, guards
+- feat(ops): GMX UI-fee-factor script — the perps fee rail GMX itself enforces (spec 083)
+- feat(perps): visual polish via actor-critic loop, e2e, docs, capture harness (spec 082)
+- feat(frontend): Perps view inside Trade — cross-venue pairs, positions, fees, link-outs (spec 082)
+- feat(gateway): /v1/perps/* read proxy — Gains, GMX, Hyperliquid market data (spec 082)
+
+### 🐛 Bug Fixes
+
+- fix(infra): enable the perps read proxy, and stop the ops skill reporting a migrated gateway as scaled-to-zero (#1158)
+- fix(theme): define missing dark-mode tokens breaking Predict/Perps unavailable banners
+- fix(perps): enforce module killswitch, 502 on total venue outage, contract-doc alignment
+
+### 📚 Documentation
+
+- docs(083): record the standing decision to keep the deploy wallet as UI-fee receiver
+- docs(083): disclose how the platform is actually funded, and name leveraged derivatives
+- spec(083): perps position management — spec, plan, research, calldata/state/fee contracts, tasks
+- spec(082): perps trade view — spec, plan, research, gateway API contract, tasks
+
+### 🧪 Tests
+
+- test(083): e2e coverage + actor-critic visual review, and the four defects it found
+
+### Artifacts
+
+Range: `v1.6.0..v1.7.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.2.0` |
+
 ## v1.6.0 — 2026-08-11
 
 Promoted from: v1.6.0-rc.8
