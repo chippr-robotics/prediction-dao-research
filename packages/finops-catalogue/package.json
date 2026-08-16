@@ -1,6 +1,5 @@
 {
   "name": "@fairwins/finops-catalogue",
-  "version": "1.9.0",
   "private": true,
   "type": "module",
   "description": "The single declaration of every FairWins revenue and cost source (spec 089). Read by the finops exporter, the Grafana dashboard generator, and the check:finops CI gate. Zero runtime dependencies; resolvable by plain Node.",

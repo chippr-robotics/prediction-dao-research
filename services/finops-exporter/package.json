@@ -1,6 +1,5 @@
 {
   "name": "fairwins-finops-exporter",
-  "version": "1.9.0",
   "private": true,
   "description": "FairWins FinOps exporter (spec 089): polls every catalogued revenue and cost source and exposes them as Prometheus metrics on loopback. Read-only by construction — no signer, no write route, no public surface.",
   "type": "module",
