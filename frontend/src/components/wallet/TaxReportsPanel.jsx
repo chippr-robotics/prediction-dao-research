@@ -218,7 +218,11 @@ export default function TaxReportsPanel({ hookOptions, previewOpenSheet = false 
           disabled={generating}
         >
           <NavIcon name="plus" size={17} />
-          New statement
+          {/* Wrapped so the icon is not `svg:only-child` — the global icon-only
+              padding reset in index.css counts element children only, and would
+              otherwise strip this button's padding and push the label outside
+              its own pill (spec 090 screenshot round 2). */}
+          <span>New statement</span>
         </button>
       </header>
 

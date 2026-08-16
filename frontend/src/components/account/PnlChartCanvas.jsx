@@ -35,9 +35,9 @@ function PnlChartCanvas({ points }) {
   const end = points.length ? points[points.length - 1].cumulativeUsd : 0
   const positive = end >= 0
   const stroke = positive
-    ? readVar('--semantic-win', '#2ECC71')
-    : readVar('--semantic-loss', '#E5533D')
-  const seriesFill = readVar('--chart-series-a', '#36B37E')
+    ? readVar('--semantic-win', '#1E7A4F')
+    : readVar('--semantic-loss', '#C0392B')
+  const seriesFill = readVar('--chart-series-a', '#2E7D8C')
 
   return (
     <ResponsiveContainer width="100%" height={220}>

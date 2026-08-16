@@ -19,11 +19,11 @@
   position: absolute;
 }
 .collectible-sheet {
-  background: var(--surface-color, var(--bg-secondary, #fff));
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--surface-color, var(--bg-secondary));
+  border: 1px solid var(--border-color);
   border-bottom: none;
   border-radius: 16px 16px 0 0;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
@@ -36,11 +36,11 @@
   width: 100%;
 }
 .collectible-sheet:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: -2px;
 }
 .collectible-sheet-grabber {
-  background: var(--border-color, #e5e7eb);
+  background: var(--border-color);
   border-radius: 999px;
   height: 4px;
   margin: 0 auto 0.2rem;
@@ -60,21 +60,21 @@
   margin: 0;
 }
 .collectible-sheet-collection {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.85rem;
   margin: 0.15rem 0 0;
 }
 .collectible-sheet-close {
   background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   cursor: pointer;
   padding: 0.35rem 0.75rem;
 }
 
 .collectible-sheet-media {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 12px;
   overflow: hidden;
   position: relative;
@@ -110,7 +110,7 @@
   margin: 0;
 }
 .collectible-sheet-market dt {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   text-transform: uppercase;
 }
@@ -119,14 +119,14 @@
   margin: 0.15rem 0 0;
 }
 .collectible-sheet-muted {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-weight: 400;
 }
 .collectible-sheet-stale {
-  background: var(--warning-bg, #fef3c7);
-  border: 1px solid var(--warning-border, #f59e0b);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border, var(--warning-color));
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.8rem;
   margin: 0;
   padding: 0.4rem 0.6rem;
@@ -144,7 +144,7 @@
   padding: 0;
 }
 .collectible-sheet-traits li {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -152,7 +152,7 @@
   padding: 0.35rem 0.6rem;
 }
 .collectible-sheet-trait-type {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.7rem;
   text-transform: uppercase;
 }
@@ -161,13 +161,13 @@
 }
 
 .collectible-sheet-description {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   margin: 0;
 }
 
 .collectible-sheet-opensea-link {
-  background: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
   border-radius: 10px;
   color: #fff;
   display: block;
@@ -177,11 +177,11 @@
   text-decoration: none;
 }
 .collectible-sheet-opensea-link:focus-visible {
-  outline: 2px solid var(--text-primary, #111827);
+  outline: 2px solid var(--text-primary);
   outline-offset: 2px;
 }
 .collectible-sheet-note {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   margin: 0;
   text-align: center;
@@ -201,7 +201,7 @@
 .collectible-sheet-sell,
 .collectible-sheet-accept,
 .collectible-sheet-cancel-listing {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   flex: 1;
@@ -209,18 +209,18 @@
   padding: 0.55rem 0.9rem;
 }
 .collectible-sheet-sell {
-  background: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
   border-color: transparent;
   color: #fff;
   font-weight: 600;
 }
 .collectible-sheet-accept {
   background: transparent;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
 }
 .collectible-sheet-cancel-listing {
   background: transparent;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 .collectible-sheet-sell:disabled,
 .collectible-sheet-accept:disabled,
@@ -229,7 +229,7 @@
   opacity: 0.6;
 }
 .collectible-sheet-confirm {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 10px;
   padding: 0.6rem 0.75rem;
 }
@@ -242,7 +242,7 @@
   justify-content: flex-end;
 }
 .collectible-sheet-confirm-actions button {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   padding: 0.4rem 0.9rem;
@@ -254,8 +254,8 @@
   margin: 0;
 }
 .collectible-sheet-sell-unavailable {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 .collectible-sheet-sell-error {
-  color: var(--danger-text, #b91c1c);
+  color: var(--danger-text);
 }

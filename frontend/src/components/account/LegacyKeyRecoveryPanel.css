@@ -26,10 +26,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
-  border-left: 4px solid var(--semantic-warning, #f5a623);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
+  border-left: 4px solid var(--semantic-warning);
   border-radius: 10px;
-  background: var(--bg-primary, #f7f9fa);
+  background: var(--bg-primary);
   box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
 }
 
@@ -37,13 +37,13 @@
   align-self: flex-start;
   padding: 2px 8px;
   border-radius: var(--radius-full, 9999px);
-  background: var(--bg-secondary, #ffffff);
-  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .lkr-stored__row {
@@ -68,19 +68,19 @@
 .lkr-stored__name {
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   overflow-wrap: anywhere;
 }
 
 .lkr-stored__addr {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
   font-size: 0.85rem;
 }
 
 .lkr-stored__sub {
   font-size: 0.76rem;
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
 }
 
 .lkr-stored__actions {
@@ -94,9 +94,9 @@
   align-items: center;
   gap: 0.3rem;
   cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
   background: transparent;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   border-radius: 999px;
   padding: 0.32rem;
   font-size: 0.76rem;
@@ -107,9 +107,9 @@
 
 .lkr-action-btn:hover,
 .lkr-action-btn:focus-visible {
-  color: var(--brand-primary, #36b37e);
-  border-color: var(--brand-primary, #36b37e);
-  background: color-mix(in srgb, var(--brand-primary, #36b37e) 10%, transparent);
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
   outline: none;
 }
 
@@ -135,14 +135,14 @@
 }
 
 .lkr-action-btn--danger {
-  color: var(--danger-color, #dc2626);
+  color: var(--danger-color);
 }
 
 .lkr-action-btn--danger:hover,
 .lkr-action-btn--danger:focus-visible {
-  color: var(--danger-color, #dc2626);
-  border-color: var(--danger-color, #dc2626);
-  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
+  color: var(--danger-color);
+  border-color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color) 10%, transparent);
 }
 
 /* --- Secret entry --- */
@@ -152,10 +152,10 @@
   resize: vertical;
   min-height: 64px;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
   border-radius: 8px;
-  background: var(--bg-primary, #f7f9fa);
-  color: var(--text-primary, #1f2933);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.9rem;
   line-height: 1.4;
@@ -164,7 +164,7 @@
 
 .lkr-secret-input:focus {
   outline: none;
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
 }
 
 /* --- BIP-39 word suggestions --- */
@@ -180,15 +180,15 @@
   font-size: 0.82rem;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
-  background: var(--bg-primary, #f7f9fa);
-  color: var(--text-primary, #1f2933);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .lkr-suggest__chip:hover {
-  border-color: var(--brand-primary, #36b37e);
-  color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 /* --- Protection fallback link --- */
@@ -201,7 +201,7 @@
   background: none;
   border: none;
   padding: 0;
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
@@ -221,21 +221,21 @@
 
 .lkr-field span {
   font-size: 0.82rem;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .lkr-field input {
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
   border-radius: 8px;
-  background: var(--bg-primary, #f7f9fa);
-  color: var(--text-primary, #1f2933);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-size: 0.95rem;
 }
 
 .lkr-field input:focus {
   outline: none;
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
 }
 
 /* --- Notices --- */
@@ -247,20 +247,20 @@
 }
 
 .lkr-notice--error {
-  border: 1px solid var(--danger-color, #dc2626);
-  color: var(--danger-color, #dc2626);
-  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
+  border: 1px solid var(--danger-color);
+  color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color) 10%, transparent);
 }
 
 .lkr-notice--warn {
-  border: 1px solid var(--warning-color, #f59e0b);
-  color: var(--text-primary, #1f2933);
-  background: color-mix(in srgb, var(--warning-color, #f59e0b) 12%, transparent);
+  border: 1px solid var(--warning-color);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--warning-color) 12%, transparent);
 }
 
 /* --- Balance quote --- */
 .lkr-quote {
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
   border-radius: 10px;
   padding: 10px 12px;
   margin: 12px 0;
@@ -278,28 +278,28 @@
 }
 
 .lkr-quote span {
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .lkr-quote strong {
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 }
 
 .lkr-quote__empty {
-  color: var(--warning-color, #b7791f) !important;
+  color: var(--warning-color) !important;
   font-size: 0.82rem !important;
   margin: 4px 0 0 !important;
 }
 
 .lkr-quote__fee {
-  border-top: 1px solid var(--border-color, #e3e7eb);
+  border-top: 1px solid var(--border-color);
   padding-top: 6px;
   margin-top: 2px;
 }
 
 .lkr-quote__fee span {
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
 }
 
 /* --- SAVED screen optional actions --- */
@@ -307,8 +307,8 @@
    these optional-action cards vanished. Lift them with a faint fill + a
    text-derived border that stays visible in both themes. */
 .lkr-saved-action {
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 16%, transparent);
-  background: color-mix(in srgb, var(--text-primary, #1f2933) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 16%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
   border-radius: 10px;
   padding: 12px;
   margin: 10px 0;
@@ -317,13 +317,13 @@
 .lkr-saved-action__title {
   margin: 0 0 2px !important;
   font-weight: 600;
-  color: var(--text-primary, #1f2933) !important;
+  color: var(--text-primary) !important;
   font-size: 0.9rem !important;
 }
 
 .lkr-saved-action__hint {
   margin: 0 !important;
-  color: var(--text-secondary, #5a6772) !important;
+  color: var(--text-secondary) !important;
   font-size: 0.82rem !important;
 }
 
@@ -337,16 +337,16 @@
   flex: 1;
   min-width: 0;
   padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
   border-radius: 8px;
-  background: var(--bg-primary, #f7f9fa);
-  color: var(--text-primary, #1f2933);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-size: 0.9rem;
 }
 
 .lkr-book-name:focus {
   outline: none;
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
 }
 
 /* --- Per-asset transfer outcomes --- */
@@ -370,19 +370,19 @@
 
 .lkr-outcome__sym {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
 }
 
 .lkr-outcome--sent .lkr-outcome__status {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
 }
 
 .lkr-outcome--skipped .lkr-outcome__status {
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
 }
 
 .lkr-outcome--failed .lkr-outcome__status {
-  color: var(--danger-color, #dc2626);
+  color: var(--danger-color);
 }
 
 /* Spec 063 — cross-chain recovery ("Other chains") panel. */
@@ -390,13 +390,13 @@
   margin-top: 12px;
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 14%, transparent);
-  background: color-mix(in srgb, var(--text-primary, #1f2933) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 .lkr-crosschain h4 {
   margin: 0 0 4px;
   font-size: 0.9rem;
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
 }
 .lkr-crosschain__results { display: flex; flex-direction: column; gap: 10px; }
 .lkr-asset-row {
@@ -405,15 +405,15 @@
   justify-content: space-between;
   gap: 10px;
   padding: 8px 0;
-  border-top: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 10%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
 }
-.lkr-asset-row__chain { font-weight: 600; color: var(--text-primary, #1f2933); }
-.lkr-asset-row__amount { color: var(--text-primary, #1f2933); font-variant-numeric: tabular-nums; }
-.lkr-asset-row__muted { color: var(--text-muted, #8a959e); font-size: 0.85rem; }
+.lkr-asset-row__chain { font-weight: 600; color: var(--text-primary); }
+.lkr-asset-row__amount { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.lkr-asset-row__muted { color: var(--text-muted); font-size: 0.85rem; }
 .lkr-asset-row__addr {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.78rem;
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
   margin: 0 8px;
 }
 .lkr-asset-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

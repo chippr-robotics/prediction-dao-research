@@ -1399,7 +1399,7 @@ function MyMarketsModal({
       {/* Confirmation toast (spec 017 FR-015) */}
       {toast && (
         <div className="mm-toast" role="status" aria-live="polite">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#36B37E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--success-color)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5"></path>
           </svg>
           {toast}

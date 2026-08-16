@@ -25,7 +25,7 @@ const ASSET_GLYPHS = {
   USDC: { bg: '#2775CA', glyph: '$', fg: '#ffffff' },
   USDT: { bg: '#26A17B', glyph: 'T', fg: '#ffffff' },
   USC: { bg: '#0F8A5F', glyph: '$', fg: '#ffffff' },
-  FWMV: { bg: '#36B37E', glyph: 'clover', fg: '#ffffff' },
+  FWMV: { bg: '#2E7D8C', glyph: 'clover', fg: '#ffffff' },
   GRT: { bg: '#6747ED', glyph: 'G', fg: '#ffffff' },
   ENS: { bg: '#5284FF', glyph: 'E', fg: '#ffffff' },
   BAT: { bg: '#FF5000', glyph: 'B', fg: '#ffffff' },

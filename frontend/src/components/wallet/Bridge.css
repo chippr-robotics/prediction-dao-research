@@ -15,7 +15,7 @@
 }
 
 .bridge-intro {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.95rem;
   margin: 0;
 }
@@ -38,7 +38,7 @@
 .bridge-hint,
 .bridge-asof {
   align-items: center;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   display: flex;
   flex-wrap: wrap;
   font-size: 0.82rem;
@@ -52,7 +52,7 @@
 }
 
 .bridge-state {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -61,7 +61,7 @@
    Boxing every fact on the screen is what read as narrative clutter; a card is
    reserved for a state that actually blocks the member (below). */
 .bridge-note {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.82rem;
   margin: 0;
 }
@@ -72,9 +72,9 @@
 .bridge-switch-note,
 .bridge-gas-warning,
 .bridge-submitted {
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 10px;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   display: flex;
   flex-direction: column;
   font-size: 0.88rem;
@@ -94,17 +94,17 @@
 }
 
 .bridge-switch-note {
-  border-color: var(--brand-primary, #6d28d9);
+  border-color: var(--brand-primary);
 }
 
 .bridge-submitted {
-  border-color: rgba(34, 197, 94, 0.4);
+  border-color: rgba(var(--success-color-rgb), 0.4);
 }
 
 /* ── Quote card ────────────────────────────────────────────────────────────────── */
 
 .bridge-quote {
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -136,7 +136,7 @@
 .bridge-quote-headline dt,
 .bridge-quote-lines dt {
   align-items: center;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   display: flex;
   font-size: 0.86rem;
   gap: 0.25rem;
@@ -155,7 +155,7 @@
 }
 
 .bridge-quote-total {
-  border-top: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-top: 1px solid var(--border-color);
   padding-top: 0.4rem;
 }
 
@@ -166,7 +166,7 @@
 
 /* A figure the protocol did not give us. Never a zero. */
 .bridge-unknown {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -189,11 +189,11 @@
 }
 
 .bridge-quote-fresh {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 
 .bridge-quote-stale {
-  color: var(--danger-color, #c0392b);
+  color: var(--danger-color);
 }
 
 .bridge-attribution,

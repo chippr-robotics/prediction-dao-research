@@ -1,0 +1,31 @@
+/**
+ * Brand typefaces — Chippr Robotics Brand Guidelines v1.0, slide 12 (spec 090).
+ *
+ *   Space Grotesk  — display: headlines, hero copy, the wordmark
+ *   Inter          — text & UI: body copy, interfaces, documentation
+ *   JetBrains Mono — code: code samples, addresses, hashes, terminal UI
+ *
+ * All three are Open Font License, as the guidelines note for each.
+ *
+ * WHY SELF-HOSTED RATHER THAN GOOGLE FONTS
+ * The CSP already permits fonts.googleapis.com/fonts.gstatic.com, so either
+ * route would pass. Self-hosting wins because this is an installable PWA and a
+ * self-custody wallet: fonts fetched from a third party do not work offline and
+ * disclose app usage to that third party on every cold load. Serving from our
+ * own origin needs no CSP change at all (`font-src 'self'` is already granted)
+ * and leaves the Google origins REMOVABLE later — a tightening the CDN route
+ * blocks. See specs/090-chippr-brand-alignment/research.md R7.
+ *
+ * Variable fonts: one file per family covers the whole weight range, so the
+ * three faces cost three requests rather than one per weight. @fontsource sets
+ * font-display: swap, so text paints immediately in the fallback stack and
+ * never renders invisible while a face loads (FR-013).
+ *
+ * The family stacks that reference these live in theme.css as --font-display /
+ * --font-sans / --font-mono. Import this file once, from main.jsx — never from
+ * a component.
+ */
+
+@import '@fontsource-variable/space-grotesk';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';

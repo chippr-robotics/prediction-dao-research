@@ -108,7 +108,7 @@
 }
 
 .home-button:hover {
-  background: #f3f4f6;
+  background: var(--bg-tertiary);
 }
 
 .reset-button:focus-visible,

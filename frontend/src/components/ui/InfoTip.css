@@ -20,7 +20,7 @@
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted);
   opacity: 0.75;
   cursor: pointer;
   transition: color 0.15s ease, opacity 0.15s ease;
@@ -28,17 +28,17 @@
 
 .infotip-btn:hover,
 .infotip-btn:focus-visible {
-  color: var(--accent-color, #2563eb);
+  color: var(--accent-color);
   opacity: 1;
 }
 
 .infotip-btn[aria-expanded='true'] {
-  color: var(--accent-color, #2563eb);
+  color: var(--accent-color);
   opacity: 1;
 }
 
 .infotip-btn:focus-visible {
-  outline: 2px solid var(--accent-color, #2563eb);
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
 
@@ -61,8 +61,8 @@
   left: -6px;
   border: 6px solid transparent;
   border-top-width: 0;
-  border-bottom-color: var(--surface-color, var(--bg-secondary, #fff));
-  filter: drop-shadow(0 -1px 0 var(--border-color, #cbd5e1));
+  border-bottom-color: var(--surface-color, var(--bg-secondary));
+  filter: drop-shadow(0 -1px 0 var(--border-color));
 }
 
 .infotip-region:has(.infotip-bubble-above)::before {
@@ -72,8 +72,8 @@
   left: -6px;
   border: 6px solid transparent;
   border-bottom-width: 0;
-  border-top-color: var(--surface-color, var(--bg-secondary, #fff));
-  filter: drop-shadow(0 1px 0 var(--border-color, #cbd5e1));
+  border-top-color: var(--surface-color, var(--bg-secondary));
+  filter: drop-shadow(0 1px 0 var(--border-color));
 }
 
 .infotip-bubble {
@@ -86,10 +86,10 @@
   width: max-content;
   max-width: min(20rem, calc(100vw - 2rem));
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border-color, #cbd5e1);
+  border: 1px solid var(--border-color);
   border-radius: 0.5rem;
-  background: var(--surface-color, var(--bg-secondary, #fff));
-  color: var(--text-primary, #1e293b);
+  background: var(--surface-color, var(--bg-secondary));
+  color: var(--text-primary);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
   font-size: 0.8rem;
   font-weight: 400;

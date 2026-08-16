@@ -14,7 +14,7 @@
 
 /* --- Step content --- */
 .recover-step p {
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   font-size: 0.92rem;
   line-height: 1.5;
   margin: 0 0 12px;
@@ -23,7 +23,7 @@
 .recover-step__list {
   margin: 0 0 14px;
   padding-left: 1.2rem;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -41,16 +41,16 @@
 
 .recover-step__chip {
   font-size: 0.78rem;
-  color: var(--text-secondary, #5a6772);
-  background: var(--bg-primary, #f7f9fa);
-  border: 1px solid var(--border-color, #e3e7eb);
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 999px;
   padding: 4px 10px;
 }
 
 .recover-step__meta-line {
   font-size: 0.8rem !important;
-  color: var(--text-muted, #8a959e) !important;
+  color: var(--text-muted) !important;
 }
 
 .recover-step__meta-line code {
@@ -58,7 +58,7 @@
 }
 
 .recover-step__ok {
-  color: var(--brand-primary, #36b37e) !important;
+  color: var(--brand-primary) !important;
   font-weight: 600;
 }
 
@@ -67,16 +67,16 @@
 }
 
 .recover-step__warn {
-  border: 1px solid var(--warning-color, #f59e0b);
+  border: 1px solid var(--warning-color);
   border-radius: 10px;
   padding: 10px 12px;
-  color: var(--text-primary, #1f2933) !important;
-  background: color-mix(in srgb, var(--warning-color, #f59e0b) 14%, transparent);
+  color: var(--text-primary) !important;
+  background: color-mix(in srgb, var(--warning-color) 14%, transparent);
   font-size: 0.86rem !important;
 }
 
 .recover-step__progress {
-  color: var(--brand-primary, #36b37e) !important;
+  color: var(--brand-primary) !important;
   font-size: 0.88rem !important;
 }
 
@@ -86,7 +86,7 @@
 
 .recover-step__hint a,
 .recover-account-panel a {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
 }
 
 .recover-step__notice {
@@ -97,9 +97,9 @@
 }
 
 .recover-step__notice--error {
-  border: 1px solid var(--danger-color, #dc2626);
-  color: var(--danger-color, #dc2626) !important;
-  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
+  border: 1px solid var(--danger-color);
+  color: var(--danger-color) !important;
+  background: color-mix(in srgb, var(--danger-color) 10%, transparent);
 }
 
 /* --- Address entry (matches the controllers panel link row) --- */
@@ -124,15 +124,15 @@
   min-width: 42px;
   height: 42px;
   border-radius: 8px;
-  border: 1px solid var(--border-color, #e3e7eb);
-  background: var(--bg-primary, #f7f9fa);
-  color: var(--text-primary, #1f2933);
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .recover-step__scan-btn:hover:not(:disabled) {
-  border-color: var(--brand-primary, #36b37e);
-  color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .recover-step__scan-btn:disabled {
@@ -147,7 +147,7 @@
   gap: 8px;
   margin-bottom: 12px;
   font-size: 0.82rem;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 /* --- Actions --- */
@@ -167,14 +167,14 @@
    which has no base rule — looks identical to the secondary. Give both a clear
    affordance that works in light and dark. Shared by both recovery panels. */
 .recover-step .btn {
-  background: color-mix(in srgb, var(--text-primary, #1f2933) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 26%, transparent);
-  color: var(--text-primary, #1f2933);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 26%, transparent);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .recover-step .btn:hover:not(:disabled) {
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
 }
 
 .recover-step .btn:disabled {
@@ -183,12 +183,12 @@
 }
 
 .recover-step .btn-primary {
-  background: var(--brand-primary, #36b37e);
-  border-color: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
   color: #fff;
 }
 
 .recover-step .btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--brand-primary, #36b37e) 88%, #000);
-  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 88%, #000);
+  background: color-mix(in srgb, var(--brand-primary) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand-primary) 88%, #000);
 }

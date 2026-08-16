@@ -8,8 +8,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
-  "background_color": "#0E141B",
-  "theme_color": "#36B37E",
+  "background_color": "#122126",
+  "theme_color": "#2E7D8C",
   "categories": ["finance", "social"],
   "icons": [
     {

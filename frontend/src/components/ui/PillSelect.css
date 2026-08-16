@@ -31,7 +31,7 @@
 /* Subtle square outline around the options — used where the label is
    visually hidden and the box itself needs to read as one control. */
 .pill-select-bordered {
-  border: 1px solid var(--border-color, #23303D);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 0.6rem;
 }
@@ -41,10 +41,10 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.5rem 0.85rem;
-  background: var(--bg-primary, #0E141B);
-  border: 1px solid var(--border-color, #23303D);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 999px;
-  color: var(--text-primary, #1F2933);
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 0.85rem;
   cursor: pointer;
@@ -52,18 +52,18 @@
 }
 
 .pill-select-option:hover:not(:disabled) {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
 }
 
 .pill-select-option:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
 .pill-select-option.active {
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.12);
-  color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.12);
+  color: var(--brand-primary);
 }
 
 .pill-select-option.locked {

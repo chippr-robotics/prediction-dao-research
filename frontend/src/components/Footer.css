@@ -76,11 +76,11 @@
  */
 .app-footer-build {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.6875rem;
   line-height: 1.2;
   letter-spacing: 0.01em;
-  color: var(--text-tertiary, var(--text-muted, #8b8b8b));
+  color: var(--text-tertiary, var(--text-muted));
   opacity: 0.75;
 }
 

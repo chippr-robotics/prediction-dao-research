@@ -17,8 +17,8 @@
   max-width: 420px;
   max-height: 85vh;
   overflow-y: auto;
-  background: var(--surface-color, #1a1a1a);
-  border: 1px solid var(--border-color, #333);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   padding: 0 0 0.75rem;
@@ -30,19 +30,19 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem 0.75rem;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .connect-modal__header h3 {
   margin: 0;
   font-size: 1.05rem;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
 }
 
 .connect-modal__close {
   background: none;
   border: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -52,8 +52,8 @@
 
 .connect-modal__close:hover,
 .connect-modal__close:focus-visible {
-  color: var(--text-primary, #fff);
-  background: var(--surface-hover, #262626);
+  color: var(--text-primary);
+  background: var(--surface-hover);
 }
 
 .connect-modal__list {
@@ -70,9 +70,9 @@
   width: 100%;
   padding: 0.875rem 1rem;
   background: none;
-  border: 1px solid var(--border-color, #333);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   font-size: 0.95rem;
   cursor: pointer;
   text-align: left;
@@ -81,8 +81,8 @@
 
 .connect-modal__option:hover:not(:disabled),
 .connect-modal__option:focus-visible {
-  background: var(--surface-hover, #262626);
-  border-color: var(--border-hover, #4a4a4a);
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
 }
 
 .connect-modal__option:disabled {
@@ -95,7 +95,7 @@
 
 .connect-modal__option--secondary {
   border-style: dashed;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .connect-modal__option-name {
@@ -104,11 +104,11 @@
 
 .connect-modal__status {
   font-size: 0.75rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .connect-modal__status.connecting {
-  color: var(--primary-color, #3b82f6);
+  color: var(--primary-color);
 }
 
 .connect-modal__badge {
@@ -116,8 +116,8 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--success-color, #22c55e);
-  background: color-mix(in srgb, var(--success-color, #22c55e) 12%, transparent);
+  color: var(--success-color);
+  background: color-mix(in srgb, var(--success-color) 12%, transparent);
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
 }
@@ -127,39 +127,39 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .connect-modal__loading,
 .connect-modal__hint {
   padding: 0.5rem 0.25rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
 .connect-modal__error {
   margin: 0.75rem 1rem 0;
   padding: 0.625rem 0.875rem;
-  border: 1px solid var(--danger-color, #ef4444);
+  border: 1px solid var(--danger-color);
   border-radius: 10px;
-  color: var(--danger-color, #ef4444);
+  color: var(--danger-color);
   font-size: 0.85rem;
 }
 
 .connect-modal__footer {
   padding: 0.625rem 1.25rem 0.25rem;
-  border-top: 1px solid var(--border-color, #333);
+  border-top: 1px solid var(--border-color);
   margin-top: 0.5rem;
 }
 
 .connect-modal__footer p {
   margin: 0.25rem 0;
   font-size: 0.8rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .connect-modal__footer a {
-  color: var(--primary-color, #3b82f6);
+  color: var(--primary-color);
 }
 
 .connect-modal__account-row {
@@ -174,14 +174,14 @@
 
 .connect-modal__address {
   font-size: 0.8rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .connect-modal__forget,
 .connect-modal__back {
   background: none;
   border: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
@@ -191,14 +191,14 @@
 
 .connect-modal__forget:hover,
 .connect-modal__back:hover {
-  color: var(--text-primary, #fff);
-  background: var(--surface-hover, #262626);
+  color: var(--text-primary);
+  background: var(--surface-hover);
 }
 
 /* Explainer step */
 .passkey-explainer {
   padding: 1rem 1.25rem 0.5rem;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
 }
 
 .passkey-explainer h4 {
@@ -207,7 +207,7 @@
 
 .passkey-explainer p,
 .passkey-explainer li {
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.45;
 }

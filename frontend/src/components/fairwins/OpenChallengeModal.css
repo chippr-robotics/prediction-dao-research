@@ -4,8 +4,8 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--fm-surface-2, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--fm-accent, #2fbf71);
+  background: var(--fm-surface-2);
+  border: 1px solid var(--fm-accent);
   border-radius: 10px;
   padding: 0.75rem 0.9rem;
   margin: 0.75rem 0;
@@ -16,7 +16,7 @@
   font-size: 1.3rem;
   letter-spacing: 0.04em;
   word-spacing: 0.18em;
-  color: var(--fm-accent, #2fbf71);
+  color: var(--fm-accent);
   user-select: all;
 }
 
@@ -30,21 +30,21 @@
   flex-shrink: 0;
   padding: 0;
   background: transparent;
-  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.2));
+  border: 1px solid var(--fm-border);
   border-radius: 8px;
-  color: var(--fm-accent, #2fbf71);
+  color: var(--fm-accent);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .oc-copy-btn:hover {
   background: rgba(47, 191, 113, 0.12);
-  border-color: var(--fm-accent, #2fbf71);
+  border-color: var(--fm-accent);
 }
 
 .oc-terms-body {
-  background: var(--fm-surface-2, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.12));
+  background: var(--fm-surface-2);
+  border: 1px solid var(--fm-border);
   border-radius: 8px;
   padding: 0.7rem;
   font-size: 0.85rem;
@@ -103,7 +103,7 @@
   padding: 0.35rem 0 0.35rem 2rem;
   font-size: 0.88rem;
   line-height: 1.4;
-  color: var(--fm-text-muted, rgba(255, 255, 255, 0.6));
+  color: var(--fm-text-muted);
 }
 
 .oc-step::before {
@@ -119,28 +119,28 @@
   font-size: 0.78rem;
   font-weight: 600;
   border-radius: 50%;
-  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.2));
+  border: 1px solid var(--fm-border);
   color: inherit;
 }
 
 .oc-step--active {
-  color: var(--fm-accent, #2fbf71);
+  color: var(--fm-accent);
   font-weight: 600;
 }
 
 .oc-step--active::before {
-  border-color: var(--fm-accent, #2fbf71);
-  color: var(--fm-accent, #2fbf71);
+  border-color: var(--fm-accent);
+  color: var(--fm-accent);
 }
 
 .oc-step--done {
-  color: var(--fm-text, rgba(255, 255, 255, 0.85));
+  color: var(--fm-text);
 }
 
 .oc-step--done::before {
   content: '\2713';
-  background: var(--fm-accent, #2fbf71);
-  border-color: var(--fm-accent, #2fbf71);
+  background: var(--fm-accent);
+  border-color: var(--fm-accent);
   color: #0a0a0a;
 }
 
@@ -191,7 +191,7 @@
 .oc-tile-edit {
   margin-top: 0.125rem;
   font-size: 0.62rem;
-  color: var(--text-muted, #7A8590);
+  color: var(--text-muted);
   text-decoration: underline;
   text-decoration-style: dotted;
 }
@@ -215,8 +215,8 @@
   gap: 0.5rem 1.25rem;
   margin: 0.25rem 0 0.75rem;
   padding: 0.5rem 0.7rem;
-  background: var(--fm-surface-2, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.12));
+  background: var(--fm-surface-2);
+  border: 1px solid var(--fm-border);
   border-radius: 8px;
 }
 
@@ -230,12 +230,12 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--fm-text-muted, rgba(255, 255, 255, 0.55));
+  color: var(--fm-text-muted);
 }
 
 .oc-deadline-value {
   font-size: 0.88rem;
-  color: var(--fm-text, rgba(255, 255, 255, 0.9));
+  color: var(--fm-text);
 }
 
 /* Subtle post-accept transaction footnote (feature 024 feedback): de-emphasized,
@@ -244,7 +244,7 @@
   margin: 0.85rem 0 0;
   text-align: center;
   font-size: 0.74rem;
-  color: var(--fm-text-muted, rgba(255, 255, 255, 0.45));
+  color: var(--fm-text-muted);
 }
 
 .oc-tx-hash {
@@ -268,7 +268,7 @@
 .oc-backup-ok {
   margin: 0;
   font-size: 0.86rem;
-  color: var(--fm-accent, #2fbf71);
+  color: var(--fm-accent);
   line-height: 1.4;
 }
 
@@ -283,7 +283,7 @@
 }
 
 .oc-recover-item {
-  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--fm-border);
   border-radius: 10px;
   padding: 0.6rem 0.7rem;
 }
@@ -297,13 +297,13 @@
 
 .oc-recover-title {
   font-size: 0.9rem;
-  color: var(--fm-text, rgba(255, 255, 255, 0.9));
+  color: var(--fm-text);
   word-break: break-word;
 }
 
 .oc-recover-sub {
   font-size: 0.74rem;
-  color: var(--fm-text-muted, rgba(255, 255, 255, 0.55));
+  color: var(--fm-text-muted);
 }
 
 .oc-recover-code {
