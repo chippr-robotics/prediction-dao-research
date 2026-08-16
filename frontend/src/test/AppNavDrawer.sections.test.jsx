@@ -61,8 +61,9 @@ describe('AppNavDrawer — collapsible sections (spec 081 US1)', () => {
     // of the accessibility tree and the tab order too.
     expect(screen.queryByRole('button', { name: 'Protect' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Address Book' })).not.toBeInTheDocument()
-    // The mini-app catalog lives in Tools now, so it folds with the rest of them.
-    expect(screen.queryByRole('button', { name: 'Apps' })).not.toBeInTheDocument()
+    // The mini-app catalog is hoisted into Quick Access (spec 093 — the door to the whole
+    // platform must not be buried in a folded section), so it does NOT fold with Tools.
+    expect(screen.getByRole('button', { name: 'Apps' })).toBeInTheDocument()
 
     expect(header('Finance')).toHaveAttribute('aria-expanded', 'true')
     expect(header('Tools')).toHaveAttribute('aria-expanded', 'false')

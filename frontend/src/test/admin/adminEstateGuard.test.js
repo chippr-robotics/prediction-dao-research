@@ -13,7 +13,7 @@
  * this fails too — so the baseline stays honest rather than drifting upward.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -38,8 +38,20 @@ const UNCONVERTED = {
   // file exists to make awkward.
 }
 
-function adminFiles() {
-  return readdirSync(ADMIN_DIR).filter((f) => f.endsWith('.jsx') || f.endsWith('.js'))
+// Spec 093 moved the views into per-app screens under `admin/apps/` (plus the
+// chart kit under `admin/charts/`), so the scan recurses — a new app screen
+// must obey the same rules the flat directory did.
+function adminFiles(dir = ADMIN_DIR, prefix = '') {
+  const out = []
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) {
+      out.push(...adminFiles(full, `${prefix}${entry}/`))
+    } else if (entry.endsWith('.jsx') || entry.endsWith('.js')) {
+      out.push(`${prefix}${entry}`)
+    }
+  }
+  return out
 }
 
 describe('admin views resolve contracts against an explicit chain, not the wallet by habit', () => {

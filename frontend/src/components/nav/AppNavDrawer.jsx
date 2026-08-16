@@ -76,9 +76,28 @@ const TAB_TO_MINIAPP = { tokens: 'apps', clearpath: 'apps' }
 // Transfer entry NAV_GROUPS already carries, and gated by PayTransferPanel on the same `wagers`
 // tenant feature. One fewer place for the menu and the routes to disagree.
 function buildDrawerGroups(visibility) {
+  // The Apps catalog entry is the door to the whole mini-app platform, and sitting at the
+  // bottom of Tools it read as an afterthought. The DRAWER hoists it into Quick Access;
+  // NAV_GROUPS still carries it under Tools for every other consumer (sibling icon nav,
+  // search index, WalletPage), so this is drawer presentation, not nav structure — and the
+  // tenant filter has already run by the time we look for it, so a build without the
+  // mini-app platform hoists nothing.
+  let appsItem = null
+  const sectionGroups = visibleNavGroups(visibility, NAV_GROUPS)
+    .map((group) => {
+      const items = group.items.filter((item) => {
+        if (item.id === 'apps') {
+          appsItem = item
+          return false
+        }
+        return true
+      })
+      return { ...group, items }
+    })
+    .filter((group) => group.items.length > 0)
   return [
-    { label: 'Quick Access', items: [HOME_ITEM, PORTFOLIO_ITEM] },
-    ...visibleNavGroups(visibility, NAV_GROUPS),
+    { label: 'Quick Access', items: [HOME_ITEM, PORTFOLIO_ITEM, ...(appsItem ? [appsItem] : [])] },
+    ...sectionGroups,
   ]
 }
 
