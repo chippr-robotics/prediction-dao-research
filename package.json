@@ -7,6 +7,7 @@
     "frontend",
     "frontend/miniapps/*",
     "services/relay-gateway",
+    "services/finops-exporter",
     "subgraph",
     "tools/miniapp-build",
     "packages/*"
@@ -60,6 +61,10 @@
     "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor",
     "check:deps": "node scripts/deps/check-dependency-hygiene.js",
     "check:iac": "node scripts/infra/check-iac-guardrails.js",
+    "check:finops": "node scripts/finops/check-finops-coverage.js",
+    "finops:generate": "node scripts/finops/generate-dashboards.js",
+    "finops:provision": "node scripts/finops/provision-grafana.js",
+    "test:finops": "npm test --workspace fairwins-finops-exporter",
     "test:iac-guardrails": "node --test \"scripts/infra/__tests__/*.test.js\"",
     "build:miniapps": "npm run build --workspace @fairwins/miniapp-token-mint && npm run build --workspace @fairwins/miniapp-clearpath",
     "deps:reinstall": "bash scripts/deps/reinstall.sh",

@@ -108,3 +108,15 @@ variable "vm_alert_policies" {
   }))
   default = {}
 }
+
+/**
+ * The BigQuery billing-export dataset the FinOps exporter reads (spec 089).
+ *
+ * Null disables the grant entirely, and the exporter then reports the GCP cost source as
+ * `not-configured` — an honest state saying "not wired up", not an outage and not a $0.
+ */
+variable "billing_export_dataset" {
+  description = "BigQuery dataset holding the GCP billing export, read by the FinOps exporter. Null to grant no BigQuery data access."
+  type        = string
+  default     = null
+}

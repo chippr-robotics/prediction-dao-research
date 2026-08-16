@@ -18,6 +18,11 @@ gateway_secret_ids = [
   "origin-lock-secret",
   "relay-webhook-secret",
   "relay-engine-api-key",
+  # FinOps exporter + Alloy (spec 089). All OPTIONAL: an absent vendor credential makes that source
+  # `not-configured`, which is a first-class honest state, never a fabricated zero (FR-006).
+  "finops-cloudflare-token",
+  "finops-quicknode-key",
+  "finops-grafana-cloud-token",
 ]
 
 # Secret CONTAINERS under management. Versions and payloads are never declared (guardrail G-04).
@@ -26,7 +31,16 @@ managed_secret_ids = [
   "alto-executor-key-137",
   "relay-webhook-secret",
   "relay-engine-api-key",
+  # spec 089. Containers only — payloads are created out of band (guardrail G-04). Every one holds a
+  # READ-only vendor credential; the exporter must never hold anything that can move value (FR-026).
+  "finops-cloudflare-token",
+  "finops-quicknode-key",
+  "finops-grafana-cloud-token",
 ]
+
+# The billing export the FinOps exporter reads. It is the ONLY source of `billed` (as opposed to
+# modelled) cost in the estate — Cloudflare and QuickNode publish no dollar figure at all.
+billing_export_dataset = "billing_export"
 
 notification_emails = ["cody.w.burns@gmail.com"]
 
