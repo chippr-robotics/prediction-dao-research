@@ -1,113 +1,177 @@
 /**
- * Theme Variables - FairWins Color Palette
+ * Theme Variables — Chippr Robotics Brand Guidelines v1.0 (spec 089)
  *
- * This file defines all color variables for light and dark modes.
- * The default theme is light mode.
+ * This file is the ONLY place a color value is stated. Everything else asks for
+ * a token. That is what makes the palette changeable from one place — and it is
+ * only true for as long as nobody restates a value inline, which is what
+ * src/test/brand/noLegacyBrandColors.test.js enforces.
+ *
+ * Contract: specs/089-chippr-brand-alignment/contracts/color-tokens.md
+ *           specs/089-chippr-brand-alignment/contracts/type-tokens.md
+ * Audit:    src/test/brand/tokenContrast.test.js asserts every declared
+ *           foreground/background pairing against WCAG 2.1 AA in BOTH themes.
+ *
+ * Two rules that are easy to get wrong:
+ *
+ *  1. CHIPPR TEAL IS A LARGE-TEXT AND FILL COLOR. The guidelines' own measured
+ *     table puts it at 4.7:1 on white — AA, annotated "18px+ / bold 14px+".
+ *     Small teal text and links use --accent-color (Teal 700, 7.8:1) instead.
+ *  2. AMBER IS A SIGNAL COLOR ONLY — alerts, live states, one CTA per view. It
+ *     never fills a large area and never touches the FairWins mark.
+ *
+ * The FairWins clover mark stays independent of the Chippr brandmark: the
+ * guidelines' endorsement model gives the master brand color and type across
+ * the estate, and leaves product marks with their products.
  */
 
 /* ===================================
-   BASE/SHARED NEUTRAL COLORS
+   CHIPPR CORE PALETTE (slide 10)
+   The source values. Everything below is one of these or a documented mix.
    =================================== */
 
 :root {
-  /* Light Mode Neutrals (Default) */
-  --bg-primary: #F7F9FA;        /* Porcelain - Background */
-  --bg-secondary: #FFFFFF;      /* White Sand - Surface/Card */
-  --surface-color: #FFFFFF;     /* Surface/Card - Same as bg-secondary */
-  --bg-tertiary: #F3F4F6;       /* Tertiary surface - inline panels/degraded-state banners */
-  --text-primary: #1F2933;      /* Deep Slate - Primary text */
-  --text-secondary: #5A6772;    /* Steel Gray - Secondary text */
-  --text-muted: #8A959E;        /* Muted text - lighter than secondary */
-  --border-color: #E3E7EB;      /* Soft Gray - Borders/Dividers */
-}
-
-.theme-dark {
-  /* Dark Mode Neutrals */
-  --bg-primary: #0E141B;        /* Midnight Slate - Background */
-  --bg-secondary: #141C24;      /* Charcoal - Surface/Card */
-  --surface-color: #1F2933;     /* Surface/Card - Slightly lighter than bg-secondary */
-  --bg-tertiary: #26323D;       /* Tertiary surface - raised panel, distinct from surface-color */
-  --text-primary: #E6EDF3;      /* Cloud White - Primary text */
-  --text-secondary: #AAB6C2;    /* Cool Gray - Secondary text */
-  --text-muted: #7A8590;        /* Muted text - darker than secondary */
-  --border-color: #23303D;      /* Graphite - Borders/Dividers */
+  --chippr-teal: #2E7D8C;
+  --chippr-gunmetal: #1C333B;
+  --chippr-cloud: #F4F6F7;
+  --chippr-teal-700: #1F5966;
+  --chippr-teal-300: #6FAEBB;
+  --chippr-teal-100: #D9E9EC;
+  --chippr-steel: #5E6B70;
+  --chippr-amber: #F2A33C;
 }
 
 /* ===================================
-   FAIRWINS THEME COLORS
+   NEUTRALS — LIGHT (default)
+   60/30/10: Cloud and white surfaces dominate; Gunmetal anchors text.
+   =================================== */
+
+:root {
+  --bg-primary: #F4F6F7;        /* Cloud */
+  --bg-secondary: #FFFFFF;      /* Surface/Card */
+  --surface-color: #FFFFFF;
+  --bg-tertiary: #EDF3F4;       /* Cloud → Teal 100; raised inline panels */
+  --text-primary: #1C333B;      /* Gunmetal — 13.2:1 on white */
+  --text-secondary: #5E6B70;    /* Steel — 5.5:1 on white */
+  --text-muted: #636F74;        /* Steel, one step lighter; still clears AA */
+  --border-color: #D9DDDF;      /* Cloud → Steel 18% */
+}
+
+.theme-dark {
+  /* Derived from Gunmetal, which the guidelines name as the anchor for dark
+     sections. Raised surfaces lift toward Teal 300 rather than toward white,
+     so panels carry a faint brand cast instead of reading as neutral grey. */
+  --bg-primary: #122126;        /* Gunmetal → black 35% */
+  --bg-secondary: #182B32;      /* Gunmetal → black 15% */
+  --surface-color: #1C333B;     /* Gunmetal */
+  --bg-tertiary: #243F48;       /* Gunmetal → Teal 300 10% */
+  --text-primary: #F4F6F7;      /* Cloud */
+  --text-secondary: #ABCED6;    /* Teal 300 → Cloud 45% */
+  --text-muted: #93B6BE;
+  --border-color: #2B4952;      /* Gunmetal → Teal 300 18% */
+}
+
+/* ===================================
+   BRAND — the three-step teal ladder
+   Token NAMES are unchanged from the outgoing green/blue/mint system so the
+   tenant manifest contract and every consuming surface keep working; only the
+   values move. Distinction moved from hue to luminance, which is what a
+   monochromatic palette gives you.
    =================================== */
 
 .platform-fairwins {
-  /* FairWins Brand Colors */
-  --brand-primary: #36B37E;     /* Winning Green */
-  --brand-primary-rgb: 54, 179, 126; /* RGB values for rgba usage */
-  --brand-secondary: #4C9AFF;   /* Odds Blue */
-  --brand-secondary-rgb: 76, 154, 255; /* RGB values for rgba usage */
-  --brand-accent: #7BDCB5;      /* Momentum Mint */
-  --brand-accent-rgb: 123, 220, 181; /* RGB values for rgba usage */
+  --brand-primary: #2E7D8C;          /* Chippr Teal — the default everywhere */
+  --brand-primary-rgb: 46, 125, 140;
+  --brand-secondary: #1F5966;        /* Teal 700 — the deep anchor */
+  --brand-secondary-rgb: 31, 89, 102;
+  --brand-accent: #6FAEBB;           /* Teal 300 — the light lift */
+  --brand-accent-rgb: 111, 174, 187;
 
-  /* FairWins Semantic Colors */
-  --semantic-win: #2ECC71;      /* Win/Success */
-  --semantic-active: #4C9AFF;   /* Active Bet */
-  --semantic-warning: #F5A623;  /* Risk/Warning */
-  --semantic-loss: #E5533D;     /* Loss/Error */
+  /* Semantic aliases retained for existing consumers. */
+  --semantic-win: var(--success-color);
+  --semantic-active: var(--info-color);
+  --semantic-warning: var(--warning-color);
+  --semantic-loss: var(--danger-color);
 
-  /* FairWins Chart Colors */
-  --chart-series-a: #36B37E;
-  --chart-series-b: #4C9AFF;
-  --chart-series-c: #7BDCB5;
-  --chart-series-d: #F5A623;
-  --chart-series-e: #9AA6B2;
+  /* Categorical series. Adjacent pairs differ strongly in hue (teal↔amber sits
+     on the blue–yellow axis, so it survives red-green CVD) or in luminance.
+     Color is never the only channel — see FR-009. */
+  --chart-series-a: #2E7D8C;  /* Chippr Teal   L 0.171 */
+  --chart-series-b: #F2A33C;  /* Amber         L 0.454 */
+  --chart-series-c: #6FAEBB;  /* Teal 300      L 0.372 */
+  --chart-series-d: #1F5966;  /* Teal 700      L 0.084 */
+  --chart-series-e: #5E6B70;  /* Steel         L 0.141 */
 }
 
-/* FairWins Light Mode */
-.theme-light.platform-fairwins {
-  --primary-button: #36B37E;    /* Winning Green */
-  --primary-button-hover: #2F9E6E; /* Deep Green */
-  --primary-button-text: #FFFFFF;
-  --accent-color: #4C9AFF;
-  --highlight-color: #7BDCB5;
-}
-
-/* FairWins Dark Mode */
 .theme-dark.platform-fairwins {
-  --primary-button: #45C492;    /* Bright Green */
-  --primary-button-hover: #5ED6A6; /* Neon Mint */
-  --primary-button-text: #0E141B;
-  --accent-color: #4C9AFF;
-  --highlight-color: #7BDCB5;
+  /* Chippr Teal scores 2.26–3.52 on the dark ladder — it fails AA on every
+     dark surface. The guidelines anticipate this with the REVERSED logo
+     variant; the same reasoning applies to UI color. */
+  --brand-primary: #83B9C4;          /* Teal 300 → Cloud 15% */
+  --brand-primary-rgb: 131, 185, 196;
+  --brand-secondary: #6FAEBB;        /* Teal 300 */
+  --brand-secondary-rgb: 111, 174, 187;
+  --brand-accent: #D9E9EC;           /* Teal 100 */
+  --brand-accent-rgb: 217, 233, 236;
+
+  --chart-series-a: #83B9C4;
+  --chart-series-b: #F2A33C;
+  --chart-series-c: #D9E9EC;
+  --chart-series-d: #4E93A2;
+  --chart-series-e: #8FA0A6;
+}
+
+/* Interactive — light */
+.theme-light.platform-fairwins {
+  --primary-button: #2E7D8C;         /* Chippr Teal; white label = 4.7:1 */
+  --primary-button-hover: #1F5966;   /* Teal 700 */
+  --primary-button-text: #FFFFFF;
+  --accent-color: #1F5966;           /* Teal 700 — links are BODY sized (FR-017) */
+  --highlight-color: #D9E9EC;        /* Teal 100 */
+}
+
+/* Interactive — dark */
+.theme-dark.platform-fairwins {
+  --primary-button: #6FAEBB;         /* Teal 300; Gunmetal label = 5.3:1 */
+  --primary-button-hover: #87BBC6;
+  --primary-button-text: #1C333B;    /* Gunmetal */
+  --accent-color: #83B9C4;
+  --highlight-color: #243F48;
 }
 
 /* ===================================
-   SHARED SEMANTIC COLORS
+   STATUS
+   An intentional extension: the Chippr palette defines no success or error
+   color, and Amber alone cannot express succeeded / failed / warning /
+   destructive. A member acts differently on each of those, so collapsing them
+   would be a constitution-III (honest state) failure at the color layer.
+   Rationale: specs/089-chippr-brand-alignment/research.md R5.
    =================================== */
 
 :root {
-  --success-color: #22c55e;
-  --warning-color: #f59e0b;
-  --danger-color: #dc2626;
-  --info-color: #3b82f6;
-  --warning-bg: #FEF3C7;        /* Warning banner surface (stale-data/degraded notices) */
-  --warning-text: #78350F;      /* Text on --warning-bg */
+  --success-color: #1E7A4F;     /* 5.3:1 on white; ~150° — clearly not teal */
+  --warning-color: #F2A33C;     /* Amber — SIGNAL ONLY, fills and borders */
+  --danger-color: #C0392B;      /* 5.4:1 on white */
+  --info-color: #1F5966;        /* Teal 700 — info is brand-neutral */
+  --warning-bg: #FDF2E4;        /* Amber over white; banner surface */
+  --warning-text: #7A4A00;      /* 7.5:1 on white — Amber itself is 2.1:1 and
+                                   must never be small text on a light field */
 }
 
-/* Adjust semantic colors for dark mode if needed */
 .theme-dark {
-  --success-color: #2ECC71;
-  --warning-color: #F5A623;
-  --danger-color: #E5533D;
-  --info-color: #4C9AFF;
-  --warning-bg: rgba(245, 166, 35, 0.16);  /* Warning tint over dark surfaces */
-  --warning-text: #F5C77E;                 /* Legible amber against --warning-bg */
+  --success-color: #57C795;
+  --warning-color: #F2A33C;     /* Amber on Gunmetal is 6.4:1 — the pairing the
+                                   guidelines measure and endorse */
+  --danger-color: #F58A7E;
+  --info-color: #83B9C4;
+  --warning-bg: rgba(242, 163, 60, 0.16);
+  --warning-text: #F2A33C;
 }
 
 /* ===================================
    LEGACY SUPPORT
-   (For backward compatibility during transition)
    =================================== */
 
 :root {
-  /* Legacy variables mapped to new theme system */
   --primary-color: var(--brand-primary);
   --secondary-color: var(--brand-secondary);
   --bg-dark: var(--bg-primary);
@@ -116,23 +180,57 @@
 }
 
 /* ===================================
-   TIMELINE PHASE TOKENS
-   (spec 038 — deadline timelines use brand colors, not the legacy orange)
+   TIMELINE PHASE TOKENS (spec 038)
+   The outgoing tokens used three unrelated hues. The teal ladder replaces them
+   with a deepening progression, which reads as a timeline rather than as three
+   arbitrary colors.
    =================================== */
 
 :root {
-  --timeline-accept: var(--brand-secondary, #4C9AFF);   /* accept/join window */
-  --timeline-active: var(--brand-primary, #36B37E);      /* active wager window */
-  --timeline-resolve: #8C7CF0;                            /* resolve window */
-  --timeline-resolve-rgb: 140, 124, 240;                  /* for rgba() tile tints */
+  --timeline-accept: #6FAEBB;    /* Teal 300  — accept/join window */
+  --timeline-active: #2E7D8C;    /* Chippr Teal — active wager window */
+  --timeline-resolve: #1F5966;   /* Teal 700  — resolve window */
+  --timeline-resolve-rgb: 31, 89, 102;
 }
 
 .theme-dark {
-  /* Same hues read fine on dark surfaces; kept explicit for future tuning. */
-  --timeline-accept: var(--brand-secondary, #4C9AFF);
-  --timeline-active: var(--brand-primary, #36B37E);
-  --timeline-resolve: #9D8FF5;
-  --timeline-resolve-rgb: 157, 143, 245;
+  --timeline-accept: #D9E9EC;
+  --timeline-active: #83B9C4;
+  --timeline-resolve: #4E93A2;
+  --timeline-resolve-rgb: 78, 147, 162;
+}
+
+/* ===================================
+   TYPOGRAPHY (slides 12–14)
+   Space Grotesk display · Inter text/UI · JetBrains Mono code.
+   Self-hosted from this origin (src/styles/fonts.css) — no external font
+   origin is contacted, so the CSP is unchanged. Every stack ends in a platform
+   fallback so a failed font load degrades rather than blanks.
+   =================================== */
+
+:root {
+  --font-display: 'Space Grotesk Variable', 'Space Grotesk', system-ui, -apple-system,
+    'Segoe UI', sans-serif;
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular,
+    Menlo, Consolas, monospace;
+  /* Alias: two components already referenced var(--font-family, …) against a
+     variable that was never defined. */
+  --font-family: var(--font-sans);
+
+  /* Web hierarchy — 1.25 major third from a 16px base. Sizes in rem,
+     line-heights unitless so they scale with the size they are applied to. */
+  --text-h1: 3rem;         --leading-h1: 1.1667;  --weight-h1: 700;  --tracking-h1: -0.01em;
+  --text-h2: 2.25rem;      --leading-h2: 1.2222;  --weight-h2: 700;
+  --text-h3: 1.75rem;      --leading-h3: 1.2857;  --weight-h3: 500;
+  --text-h4: 1.375rem;     --leading-h4: 1.3636;  --weight-h4: 600;
+  --text-body: 1rem;       --leading-body: 1.625; --weight-body: 400;
+  --text-small: 0.875rem;  --leading-small: 1.5714;
+  --text-caption: 0.8125rem; --leading-caption: 1.3846;
+  --text-code: 0.875rem;   --leading-code: 1.5714;
+
+  --measure-body: 72ch;
 }
 
 /* ===================================
@@ -140,49 +238,57 @@
    =================================== */
 
 :root {
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-  
-  /* Border radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* Shadows — tinted with Gunmetal rather than pure black, so elevation reads
+     as part of the palette. */
+  --shadow-sm: 0 1px 2px rgba(28, 51, 59, 0.06);
+  --shadow-md: 0 4px 6px rgba(28, 51, 59, 0.10);
+  --shadow-lg: 0 10px 15px rgba(28, 51, 59, 0.12);
+
+  /* Border radius — the guidelines' container language is rounded rectangles
+     at r = 18–22% of height (slide 15), matching the mark's own 56/300 corner
+     ratio. A percentage radius can't be one fixed token, so the fixed steps are
+     set so typical control and card heights land in that band: a 44px control
+     at 10px is 23%. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
   --radius-full: 9999px;
-  
+
   /* Transitions */
   --transition-fast: 0.15s ease;
   --transition-base: 0.3s ease;
   --transition-slow: 0.5s ease;
 
-  /* Glass surfaces (spec 086) — account cards render as their own translucent layer. */
+  /* Glass surfaces (spec 086) */
   --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-bg-solid: rgba(255, 255, 255, 0.92); /* fallback when backdrop-filter is unsupported */
+  --glass-bg-solid: rgba(255, 255, 255, 0.92);
   --glass-border: rgba(255, 255, 255, 0.65);
   --glass-highlight: rgba(255, 255, 255, 0.85);
   --glass-blur: 14px;
-  --glass-shadow: 0 8px 32px rgba(31, 41, 51, 0.14);
+  --glass-shadow: 0 8px 32px rgba(28, 51, 59, 0.14);
 
-  /* Account-card tint palette (spec 086) — rgb triples so cards can mix their own alphas.
-     Ids are stored in the profile store; only this file says what a tint looks like. */
-  --card-tint-mint: 54, 179, 126;
-  --card-tint-sky: 76, 154, 255;
+  /* Account-card tint palette (spec 086) — rgb triples so cards mix their own
+     alphas. Ids are stored in the profile store; only this file says what a
+     tint looks like. Violet and rose have no palette equivalent and are kept
+     deliberately: their entire purpose is letting a member tell their own cards
+     apart, which a monochromatic set cannot do. */
+  --card-tint-teal: 46, 125, 140;     /* Chippr Teal */
+  --card-tint-mint: 46, 125, 140;     /* alias — stored profiles say "mint" */
+  --card-tint-deep: 31, 89, 102;      /* Teal 700 */
+  --card-tint-sky: 111, 174, 187;     /* Teal 300 */
+  --card-tint-amber: 242, 163, 60;    /* Amber */
+  --card-tint-slate: 94, 107, 112;    /* Steel */
   --card-tint-violet: 139, 92, 246;
-  --card-tint-amber: 245, 166, 35;
   --card-tint-rose: 244, 114, 182;
-  --card-tint-slate: 100, 116, 139;
 }
 
 .theme-dark {
-  /* Stronger shadows for dark mode */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
 
-  /* Glass surfaces (spec 086) */
-  --glass-bg: rgba(20, 28, 36, 0.55);
-  --glass-bg-solid: rgba(20, 28, 36, 0.94);
+  --glass-bg: rgba(28, 51, 59, 0.55);
+  --glass-bg-solid: rgba(28, 51, 59, 0.94);
   --glass-border: rgba(255, 255, 255, 0.12);
   --glass-highlight: rgba(255, 255, 255, 0.18);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);

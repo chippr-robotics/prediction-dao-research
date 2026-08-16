@@ -35,9 +35,9 @@
 }
 
 .predict-stale-banner {
-  background: var(--warning-bg, #fef3c7);
+  background: var(--warning-bg);
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.82rem;
   margin: 0;
   padding: 0.45rem 0.6rem;
@@ -48,7 +48,7 @@
 }
 
 .predict-degraded {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 10px;
   padding: 0.75rem 0.9rem;
 }
@@ -61,7 +61,7 @@
 }
 .predict-degraded-actions button,
 .predict-degraded-actions a {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   cursor: pointer;
 }
 .predict-degraded-actions button {
@@ -94,10 +94,10 @@
   width: 100%;
 }
 .predict-card-button:hover {
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
 }
 .predict-card-button:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 .predict-card-question {
@@ -118,7 +118,7 @@
   letter-spacing: 0.03em;
 }
 .predict-card-price {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 6px;
   color: var(--text-primary, #111827);
   font-weight: 600;
@@ -126,7 +126,7 @@
   padding: 0.1rem 0.45rem;
 }
 .predict-card-closed {
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
 }
 
 .predict-load-more {

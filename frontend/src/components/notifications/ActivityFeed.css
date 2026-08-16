@@ -98,15 +98,15 @@
 }
 
 .activity-feed-entry.severity-success {
-  border-left-color: #22c55e;
+  border-left-color: var(--success-color);
 }
 
 .activity-feed-entry.severity-warning {
-  border-left-color: #f59e0b;
+  border-left-color: var(--warning-color);
 }
 
 .activity-feed-entry.severity-error {
-  border-left-color: #dc2626;
+  border-left-color: var(--danger-color);
 }
 
 .activity-feed-entry.severity-info {

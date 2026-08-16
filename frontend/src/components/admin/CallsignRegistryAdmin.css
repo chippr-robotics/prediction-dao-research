@@ -83,7 +83,7 @@
   font-size: 0.78rem;
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.15);
-  font-family: 'SF Mono', 'Consolas', monospace;
+  font-family: var(--font-mono);
 }
 
 /* Lookup */

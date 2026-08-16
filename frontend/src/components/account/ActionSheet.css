@@ -27,8 +27,8 @@
   max-height: 85vh;
   overflow-y: auto;
   background: var(--surface-color, #ffffff);
-  color: var(--text-primary, #1f2933);
-  border: 1px solid var(--border-color, #e3e7eb);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
   box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.1));
   outline: none;
@@ -61,19 +61,19 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border-color, #e3e7eb);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .action-sheet__header h3 {
   margin: 0;
   font-size: 1.1rem;
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
 }
 
 .action-sheet__close {
   background: none;
   border: none;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -83,8 +83,8 @@
 
 .action-sheet__close:hover:not(:disabled),
 .action-sheet__close:focus-visible {
-  color: var(--text-primary, #1f2933);
-  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary);
+  background: var(--bg-primary);
 }
 
 .action-sheet__close:disabled {
@@ -98,7 +98,7 @@
 
 /* --- Shared content helpers --- */
 .action-sheet__text {
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   font-size: 0.92rem;
   line-height: 1.5;
   margin: 0 0 12px;
@@ -107,7 +107,7 @@
 .action-sheet__list {
   margin: 0 0 14px;
   padding-left: 1.2rem;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -117,11 +117,11 @@
 }
 
 .action-sheet__warn {
-  border: 1px solid var(--warning-color, #f59e0b);
+  border: 1px solid var(--warning-color);
   border-radius: 10px;
   padding: 10px 12px;
-  color: var(--text-primary, #1f2933);
-  background: color-mix(in srgb, var(--warning-color, #f59e0b) 14%, transparent);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--warning-color) 14%, transparent);
   font-size: 0.88rem;
   line-height: 1.5;
   margin: 0 0 12px;
@@ -131,9 +131,9 @@
   display: block;
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.85rem;
-  color: var(--text-primary, #1f2933);
-  background: var(--bg-primary, #f7f9fa);
-  border: 1px solid var(--border-color, #e3e7eb);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 8px 10px;
   margin: 0 0 12px;
@@ -142,7 +142,7 @@
 }
 
 .action-sheet__progress {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   font-size: 0.88rem;
   margin: 0 0 12px;
 }
@@ -156,15 +156,15 @@
 }
 
 .action-sheet__notice--error {
-  border: 1px solid var(--danger-color, #dc2626);
-  color: var(--danger-color, #dc2626);
-  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
+  border: 1px solid var(--danger-color);
+  color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color) 10%, transparent);
 }
 
 .action-sheet__notice--info {
-  border: 1px solid var(--accent-color, #4c9aff);
-  color: var(--text-primary, #1f2933);
-  background: color-mix(in srgb, var(--accent-color, #4c9aff) 10%, transparent);
+  border: 1px solid var(--accent-color);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
 }
 
 .action-sheet__actions {
@@ -184,16 +184,16 @@
 .action-sheet .btn {
   padding: 0.55rem 0.9rem;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--text-primary, #1f2933) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 26%, transparent);
-  color: var(--text-primary, #1f2933);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 26%, transparent);
+  color: var(--text-primary);
   font-weight: 600;
   cursor: pointer;
   transition: background-color var(--transition-fast, 0.15s ease), border-color var(--transition-fast, 0.15s ease);
 }
 
 .action-sheet .btn:hover:not(:disabled) {
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
 }
 
 .action-sheet .btn:disabled {
@@ -202,25 +202,25 @@
 }
 
 .action-sheet .btn-primary {
-  background: var(--brand-primary, #36b37e);
-  border-color: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
   color: #fff;
 }
 
 .action-sheet .btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--brand-primary, #36b37e) 88%, #000);
-  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 88%, #000);
+  background: color-mix(in srgb, var(--brand-primary) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand-primary) 88%, #000);
 }
 
 .action-sheet .btn-danger {
-  background: var(--semantic-loss, #e5533d);
-  border-color: var(--semantic-loss, #e5533d);
+  background: var(--semantic-loss);
+  border-color: var(--semantic-loss);
   color: #fff;
 }
 
 .action-sheet .btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--semantic-loss, #e5533d) 88%, #000);
-  border-color: color-mix(in srgb, var(--semantic-loss, #e5533d) 88%, #000);
+  background: color-mix(in srgb, var(--semantic-loss) 88%, #000);
+  border-color: color-mix(in srgb, var(--semantic-loss) 88%, #000);
 }
 
 /* Bottom sheet on mobile, like the connect surface. */
@@ -245,7 +245,7 @@
     width: 36px;
     height: 4px;
     border-radius: 999px;
-    background: var(--border-color, #e3e7eb);
+    background: var(--border-color);
     margin: 8px auto 0;
   }
 }

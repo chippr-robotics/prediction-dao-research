@@ -32,7 +32,7 @@
   width: 100%;
 }
 .trade-confirm:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: -2px;
 }
 .trade-confirm-header {
@@ -115,9 +115,9 @@
 }
 
 .trade-confirm-warn {
-  background: var(--warning-bg, #fef3c7);
+  background: var(--warning-bg);
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.85rem;
   margin: 0;
   padding: 0.45rem 0.6rem;
@@ -141,7 +141,7 @@
   padding: 0.5rem 1rem;
 }
 .trade-confirm-submit {
-  background: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
   border: 0;
   border-radius: 8px;
   color: #fff;
@@ -156,7 +156,7 @@
 
 .trade-confirm-blocked,
 .trade-confirm-error {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 8px;
   padding: 0.6rem 0.75rem;
 }

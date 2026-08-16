@@ -42,7 +42,7 @@
 
 .fwum-avatar {
   border-radius: 50%;
-  border: 3px solid var(--brand-primary, #36B37E);
+  border: 3px solid var(--brand-primary);
   box-shadow: 0 0 0 2px var(--bg-primary, #f8fafc);
 }
 
@@ -55,13 +55,13 @@
 .fwum-address {
   font-size: 1rem;
   font-weight: 600;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
   color: var(--text-primary, #1a202c);
 }
 
 .fwum-address-full {
   font-size: 0.75rem;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
   color: var(--text-tertiary, #a0aec0);
   word-break: break-all;
   max-width: 200px;
@@ -170,13 +170,13 @@
 }
 
 .fwum-tab.active {
-  color: var(--brand-primary, #36B37E);
-  border-bottom-color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
+  border-bottom-color: var(--brand-primary);
   background: var(--bg-primary, #f8fafc);
 }
 
 .fwum-tab:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: -2px;
 }
 
@@ -275,7 +275,7 @@
 }
 
 .fwum-monospace {
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
 .fwum-status-row {
@@ -354,7 +354,7 @@
   font-size: 0.875rem;
   font-weight: 600;
   color: white;
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
@@ -362,9 +362,9 @@
 }
 
 .fwum-action-btn:hover {
-  background: var(--primary-button-hover, #2f9e6e);
+  background: var(--primary-button-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(54, 179, 126, 0.3);
+  box-shadow: 0 4px 12px rgba(var(--brand-primary-rgb), 0.3);
 }
 
 .fwum-action-btn:active {
@@ -378,13 +378,13 @@
 }
 
 .fwum-action-btn.secondary:hover {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
   background: var(--bg-primary, #f8fafc);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .fwum-action-btn.primary {
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
 }
 
 .fwum-action-btn.danger {
@@ -415,7 +415,7 @@
 }
 
 .fwum-role-card:hover {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
 }
 
 .fwum-role-header {
@@ -431,9 +431,9 @@
   padding: 0.25rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.1);
-  border: 1px solid var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.1);
+  border: 1px solid var(--brand-primary);
   border-radius: 12px;
 }
 
@@ -488,7 +488,7 @@
   font-size: 0.875rem;
   font-weight: 600;
   color: white;
-  background: linear-gradient(135deg, var(--brand-primary, #36B37E), var(--accent-color, #4C9AFF));
+  background: linear-gradient(135deg, var(--brand-primary), var(--accent-color));
   border: none;
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
@@ -497,7 +497,7 @@
 
 .fwum-premium-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(54, 179, 126, 0.4);
+  box-shadow: 0 6px 16px rgba(var(--brand-primary-rgb), 0.4);
 }
 
 /* Special Sections */
@@ -537,7 +537,7 @@
 .fwum-stat-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
 }
 
 /* ===========================
@@ -561,7 +561,7 @@
 }
 
 .fwum-setting-item:hover {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
 }
 
 .fwum-setting-info {
@@ -618,7 +618,7 @@
 }
 
 .fwum-toggle-btn:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -632,7 +632,7 @@
 }
 
 .fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track {
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
 }
 
 .fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.platform {
@@ -716,7 +716,7 @@
 
 .fwum-wallet-address {
   font-size: 0.75rem;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
   color: var(--text-secondary, #718096);
 }
 
@@ -762,8 +762,8 @@
 }
 
 .fwum-search-input:focus {
-  border-color: var(--brand-primary, #36B37E);
-  box-shadow: 0 0 0 3px rgba(54, 179, 126, 0.15);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.15);
 }
 
 .fwum-search-input::placeholder {
@@ -778,7 +778,7 @@
   font-size: 0.9375rem;
   font-weight: 600;
   color: white;
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
@@ -787,7 +787,7 @@
 }
 
 .fwum-search-btn:hover {
-  background: var(--primary-button-hover, #2f9e6e);
+  background: var(--primary-button-hover);
 }
 
 .fwum-recent-searches {
@@ -829,7 +829,7 @@
 }
 
 .fwum-search-item:hover {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
   background: var(--bg-secondary, #ffffff);
 }
 
@@ -904,7 +904,7 @@
   font-size: 1rem;
   font-weight: 600;
   color: white;
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
@@ -913,9 +913,9 @@
 }
 
 .fwum-launch-btn:hover {
-  background: var(--primary-button-hover, #2f9e6e);
+  background: var(--primary-button-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(54, 179, 126, 0.4);
+  box-shadow: 0 6px 16px rgba(var(--brand-primary-rgb), 0.4);
 }
 
 .fwum-launch-requirements {
@@ -964,9 +964,9 @@
   padding: 0.625rem 1rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.1);
-  border: 1px solid var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.1);
+  border: 1px solid var(--brand-primary);
   border-radius: 20px;
 }
 
@@ -1199,13 +1199,13 @@
 .fwum-mode-chain {
   margin-left: 0.5rem;
   font-size: 0.8rem;
-  color: var(--text-secondary, #5A6772);
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .fwum-error-text {
   margin-top: 0.5rem;
-  color: var(--danger-color, #dc2626);
+  color: var(--danger-color);
 }
 
 /* Build identity (spec 076, FR-029) ------------------------------------------------------------
@@ -1219,7 +1219,7 @@
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--border-color, #E2E8F0);
   font-size: 0.75rem;
-  color: var(--text-secondary, #5A6772);
+  color: var(--text-secondary);
 }
 
 .fwum-build-label {
@@ -1229,7 +1229,7 @@
 }
 
 .fwum-build-value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   color: var(--text-primary, #1A202C);
 }
 
@@ -1237,7 +1237,7 @@
 .fwum-build-note {
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
-  background: var(--warning-bg, #FEF3C7);
+  background: var(--warning-bg);
   color: var(--warning-text, #92400E);
   font-weight: 600;
 }

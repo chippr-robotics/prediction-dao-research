@@ -54,7 +54,7 @@
   padding: 0.5rem 0.7rem;
 }
 .pos-status-pending {
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
   color: var(--text-primary, #111827);
 }
 .pos-status-done {
@@ -62,8 +62,8 @@
   color: var(--semantic-win, #16a34a);
 }
 .pos-status-attention {
-  border-color: var(--semantic-loss, #dc2626);
-  color: var(--semantic-loss, #dc2626);
+  border-color: var(--semantic-loss);
+  color: var(--semantic-loss);
 }
 
 /* Sections ------------------------------------------------------------------------------------ */
@@ -96,7 +96,7 @@
   margin: 0;
 }
 .pos-error {
-  color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss);
   font-size: 0.8rem;
   margin: 0;
 }
@@ -142,13 +142,13 @@
   padding: 0.35rem 0.75rem;
 }
 .pos-choice.selected {
-  border-color: var(--brand-primary, #36b37e);
-  color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
   font-weight: 600;
 }
 /* The radio stays in the accessibility tree and keeps its own focus ring — it is only shrunk. */
 .pos-choice input {
-  accent-color: var(--brand-primary, #36b37e);
+  accent-color: var(--brand-primary);
   margin: 0;
 }
 
@@ -176,7 +176,7 @@
 }
 .pos-field input:focus-visible,
 .pos-field select:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 1px;
 }
 .pos-impact {
@@ -218,8 +218,8 @@
 
 .pos-primary {
   appearance: none;
-  background: var(--brand-primary, #36b37e);
-  border: 1px solid var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
   border-radius: 10px;
   color: var(--text-on-brand, #fff);
   cursor: pointer;
@@ -233,7 +233,7 @@
   opacity: 0.55;
 }
 .pos-primary:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -245,6 +245,6 @@
   margin: 0;
 }
 .pos-venue-link {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   white-space: nowrap;
 }

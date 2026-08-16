@@ -42,7 +42,7 @@
 }
 
 .opponent-name-full {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.85em;
   opacity: 0.85;
 }

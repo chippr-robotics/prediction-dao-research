@@ -180,7 +180,7 @@
      the whole shorthand invalid and take the border with it, leaving a borderless
      row. This way the accent can only lose its colour, never the row its edge. */
   border-left-width: 3px;
-  border-left-color: var(--brand-primary, #36b37e);
+  border-left-color: var(--brand-primary);
   border-radius: 10px;
   background: var(--bg-secondary, transparent);
   color: var(--text-primary, inherit);

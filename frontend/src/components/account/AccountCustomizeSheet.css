@@ -47,7 +47,7 @@
 
 .acs-preview__hint {
   font-size: 0.78rem;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .acs-row {
@@ -61,7 +61,7 @@
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .acs-row__controls {
@@ -89,14 +89,14 @@
   height: 40px;
   padding: 0;
   border-radius: var(--radius-md, 8px);
-  border: 2px solid var(--border-color, #e3e7eb);
-  background: var(--bg-tertiary, #f3f4f6);
+  border: 2px solid var(--border-color);
+  background: var(--bg-tertiary);
   cursor: pointer;
 }
 
 .action-sheet .acs-swatch[aria-checked='true'] {
-  border-color: var(--brand-primary, #36b37e);
-  box-shadow: 0 0 0 2px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.35);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px rgba(var(--brand-primary-rgb), 0.35);
 }
 
 /* Tint swatches show their actual shade. */
@@ -116,7 +116,7 @@
 .acs-error {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--semantic-loss, #e5533d);
+  color: var(--semantic-loss);
 }
 
 .acs-actions {

@@ -76,7 +76,7 @@
  */
 .app-footer-build {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.6875rem;
   line-height: 1.2;
   letter-spacing: 0.01em;

@@ -191,7 +191,7 @@
 .oc-tile-edit {
   margin-top: 0.125rem;
   font-size: 0.62rem;
-  color: var(--text-muted, #7A8590);
+  color: var(--text-muted);
   text-decoration: underline;
   text-decoration-style: dotted;
 }

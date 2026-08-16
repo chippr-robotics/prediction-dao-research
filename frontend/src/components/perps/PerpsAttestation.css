@@ -66,14 +66,14 @@
   gap: 0.55rem;
 }
 .perps-attest-item input {
-  accent-color: var(--brand-primary, #36b37e);
+  accent-color: var(--brand-primary);
   flex: 0 0 auto;
   height: 1rem;
   margin: 0.15rem 0 0;
   width: 1rem;
 }
 .perps-attest-item input:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 .perps-attest-item label {
@@ -94,7 +94,7 @@
   margin: 0;
 }
 .perps-attest-error {
-  color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss);
   font-size: 0.8rem;
   margin: 0;
 }
@@ -103,8 +103,8 @@
 
 .perps-attest-confirm {
   appearance: none;
-  background: var(--brand-primary, #36b37e);
-  border: 1px solid var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
   border-radius: 10px;
   color: var(--text-on-brand, #fff);
   cursor: pointer;
@@ -118,6 +118,6 @@
   opacity: 0.55;
 }
 .perps-attest-confirm:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }

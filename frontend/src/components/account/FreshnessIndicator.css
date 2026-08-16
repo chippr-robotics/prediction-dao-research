@@ -7,7 +7,7 @@
 }
 
 .account-freshness-badge.stale {
-  color: var(--semantic-warning, #F5A623);
+  color: var(--semantic-warning);
   font-weight: 600;
 }
 
@@ -24,8 +24,8 @@
 }
 
 .account-freshness-refresh:hover:not(:disabled) {
-  color: var(--brand-primary, #36B37E);
-  border-color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
 }
 
 .account-freshness-refresh:disabled {
@@ -34,6 +34,6 @@
 }
 
 .account-freshness-refresh:focus-visible {
-  outline: 2px solid var(--brand-secondary, #4C9AFF);
+  outline: 2px solid var(--brand-secondary);
   outline-offset: 1px;
 }

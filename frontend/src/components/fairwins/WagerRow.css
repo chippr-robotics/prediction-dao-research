@@ -1,6 +1,6 @@
 /* My Wagers row presentation (spec 017/018; single table view, spec 078)
    Shared `wc-*` presentation for the My Wagers table rows and the wager detail
-   view, on the app's dark theme tokens (--bg-*, --text-*, accent #4C9AFF).
+   view, on the app's dark theme tokens (--bg-*, --text-*, accent var(--brand-secondary)).
    The expandable card grid these styles were written for is gone — My Wagers has
    one list view (WagerTable) at every viewport — so only the pieces the table and
    the detail panel still render survive here. The row layout itself lives in
@@ -10,9 +10,9 @@
   font-size: 0.8rem;
   font-weight: 700;
 }
-.wc-outcome.positive { color: #36B37E; }
-.wc-outcome.negative { color: #E5533D; }
-.wc-outcome.neutral { color: var(--text-secondary, #AAB6C2); }
+.wc-outcome.positive { color: var(--brand-primary); }
+.wc-outcome.negative { color: var(--danger-color); }
+.wc-outcome.neutral { color: var(--text-secondary); }
 
 /* Padlock next to a private wager's title. */
 .wc-privacy-icon {
@@ -37,7 +37,7 @@
 
 /* ── Decrypted private terms (spec 018 FR-002), rendered in the detail view ── */
 .wc-terms {
-  background: var(--bg-primary, #0E141B);
+  background: var(--bg-primary);
   border-radius: 12px;
   padding: 13px 15px;
   margin-bottom: 14px;
@@ -57,9 +57,9 @@
   gap: 0.3rem;
   padding: 0.2rem 0.5rem;
   background: transparent;
-  border: 1px solid var(--border-color, #23303D);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  color: var(--text-secondary, #AAB6C2);
+  color: var(--text-secondary);
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
@@ -67,13 +67,13 @@
 }
 
 .wc-terms-toggle:hover {
-  border-color: #4C9AFF;
-  color: #4C9AFF;
+  border-color: var(--brand-secondary);
+  color: var(--brand-secondary);
 }
 
 .wc-terms-concealed {
   letter-spacing: 0.15em;
-  color: var(--text-muted, #7A8590);
+  color: var(--text-muted);
   user-select: none;
 }
 
@@ -81,13 +81,13 @@
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.05em;
-  color: var(--text-muted, #7A8590);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .wc-terms-text {
   font-size: 0.9rem;
-  color: var(--text-primary, #E6EDF3);
+  color: var(--text-primary);
   margin-top: 4px;
   font-weight: 500;
 }
@@ -110,27 +110,27 @@
   cursor: not-allowed;
 }
 
-.wc-action-primary { color: #fff; background: #4C9AFF; }
+.wc-action-primary { color: #fff; background: var(--brand-secondary); }
 .wc-action-primary:hover:not(:disabled) { filter: brightness(1.08); }
 
 .wc-action-success { color: #fff; background: #16a34a; }
 .wc-action-success:hover:not(:disabled) { filter: brightness(1.08); }
 
-.wc-action-danger { color: #E5533D; background: transparent; border-color: rgba(229, 83, 61, 0.5); }
+.wc-action-danger { color: var(--danger-color); background: transparent; border-color: rgba(229, 83, 61, 0.5); }
 .wc-action-danger:hover:not(:disabled) { background: rgba(229, 83, 61, 0.1); }
 
-.wc-action-warning { color: #F5A623; background: transparent; border-color: rgba(245, 166, 35, 0.5); }
+.wc-action-warning { color: var(--warning-color); background: transparent; border-color: rgba(245, 166, 35, 0.5); }
 .wc-action-warning:hover:not(:disabled) { background: rgba(245, 166, 35, 0.1); }
 
 .wc-action-ghost {
-  color: var(--text-primary, #E6EDF3);
+  color: var(--text-primary);
   background: transparent;
-  border-color: var(--border-color, #23303D);
+  border-color: var(--border-color);
 }
-.wc-action-ghost:hover:not(:disabled) { background: rgba(76, 154, 255, 0.08); }
+.wc-action-ghost:hover:not(:disabled) { background: rgba(var(--brand-secondary-rgb), 0.08); }
 
 .wc-action-error {
-  color: #E5533D;
+  color: var(--danger-color);
   font-size: 0.75rem;
   margin-top: 8px;
   width: 100%;
@@ -156,5 +156,5 @@
 
 .wc-table-amount {
   white-space: nowrap;
-  color: var(--text-primary, #E6EDF3);
+  color: var(--text-primary);
 }

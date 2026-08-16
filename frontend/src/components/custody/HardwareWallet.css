@@ -78,7 +78,7 @@
 .hw-list__remove,
 .hw-list__confirm button,
 .hw-load-more {
-  border-color: var(--border-color, #e3e7eb);
+  border-color: var(--border-color);
 }
 
 .hw-list__remove {
@@ -250,7 +250,7 @@
 }
 
 .hw-account-row__address {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.88rem;
 }
 

@@ -108,7 +108,7 @@
 }
 
 .connect-modal__status.connecting {
-  color: var(--primary-color, #3b82f6);
+  color: var(--primary-color);
 }
 
 .connect-modal__badge {
@@ -116,8 +116,8 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--success-color, #22c55e);
-  background: color-mix(in srgb, var(--success-color, #22c55e) 12%, transparent);
+  color: var(--success-color);
+  background: color-mix(in srgb, var(--success-color) 12%, transparent);
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
 }
@@ -159,7 +159,7 @@
 }
 
 .connect-modal__footer a {
-  color: var(--primary-color, #3b82f6);
+  color: var(--primary-color);
 }
 
 .connect-modal__account-row {

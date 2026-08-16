@@ -37,7 +37,7 @@
   width: 100%;
 }
 .asset-sheet:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: -2px;
 }
 .asset-sheet-grabber {
@@ -68,7 +68,7 @@
   margin: 0.15rem 0 0;
 }
 .asset-sheet-usd {
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
 }
 .asset-sheet-price {
   color: var(--text-secondary, #6b7280);
@@ -92,7 +92,7 @@
 .asset-sheet-close:focus-visible,
 .asset-sheet-action:focus-visible,
 .asset-sheet-instance input:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -120,7 +120,7 @@
   padding: 0.45rem 0.4rem;
 }
 .asset-sheet-instance.selected {
-  background: var(--bg-primary, rgba(54, 179, 126, 0.08));
+  background: var(--bg-primary);
 }
 .asset-sheet-instance-text {
   display: flex;
@@ -171,8 +171,8 @@
   padding: 0.55rem 0;
 }
 .asset-sheet-action.primary {
-  background: var(--primary-button, var(--brand-primary, #36B37E));
-  border-color: var(--primary-button, var(--brand-primary, #36B37E));
+  background: var(--primary-button, var(--brand-primary));
+  border-color: var(--primary-button, var(--brand-primary));
   color: var(--primary-button-text, #fff);
 }
 .asset-sheet-action:disabled {

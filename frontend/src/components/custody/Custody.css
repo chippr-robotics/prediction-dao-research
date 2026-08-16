@@ -50,11 +50,11 @@
    on the card's own surface the global button chrome (--bg-secondary, transparent border) is
    invisible in light mode, so they carry a real border here. */
 .custody-actions button {
-  border-color: var(--border-color, #e3e7eb);
+  border-color: var(--border-color);
 }
 
 .custody-actions button:hover:not(:disabled) {
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
 }
 
 .custody-field {
@@ -85,15 +85,15 @@
    accent border, active-state ring) from AccountCardsCarousel.css so a vault reads as the same
    "account" everywhere it appears, while the collapsible mechanics stay the shared `.acc` ones. */
 .custody-vault-card {
-  border-left: 4px solid var(--brand-secondary, #4c9aff);
+  border-left: 4px solid var(--brand-secondary);
 }
 
 .custody-vault-card.is-testnet {
-  border-left-color: var(--semantic-warning, #f5a623);
+  border-left-color: var(--semantic-warning);
 }
 
 .custody-vault-card[data-open='true'] {
-  box-shadow: 0 0 0 2px var(--brand-primary, #36b37e);
+  box-shadow: 0 0 0 2px var(--brand-primary);
 }
 
 .custody-vault-card__title {
@@ -107,19 +107,19 @@
 .custody-vault-card__kind {
   padding: 2px 8px;
   border-radius: var(--radius-full, 9999px);
-  background: var(--bg-primary, #f7f9fa);
-  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   flex: none;
 }
 
 .custody-vault-card__label {
   font-weight: 600;
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -128,7 +128,7 @@
 .custody-vault-card__addr {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.8125rem;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .custody-vault-meta {
@@ -163,7 +163,7 @@
 }
 
 .custody-error {
-  color: var(--error-color, #dc2626);
+  color: var(--error-color, var(--danger-color));
   font-size: 0.875rem;
 }
 

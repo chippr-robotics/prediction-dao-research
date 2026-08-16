@@ -150,8 +150,8 @@
 }
 
 .ppm-step.active {
-  color: var(--brand-primary, #36B37E);
-  border-bottom-color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
+  border-bottom-color: var(--brand-primary);
 }
 
 .ppm-step.completed {
@@ -176,8 +176,8 @@
 }
 
 .ppm-step.active .ppm-step-icon {
-  background: rgba(54, 179, 126, 0.1);
-  color: var(--brand-primary, #36B37E);
+  background: rgba(var(--brand-primary-rgb), 0.1);
+  color: var(--brand-primary);
 }
 
 .ppm-step.completed .ppm-step-icon {
@@ -262,14 +262,14 @@
 }
 
 .ppm-role-card:hover:not(.owned) {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .ppm-role-card.selected {
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.03);
-  box-shadow: 0 4px 16px rgba(54, 179, 126, 0.15);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.03);
+  box-shadow: 0 4px 16px rgba(var(--brand-primary-rgb), 0.15);
 }
 
 .ppm-role-card.owned {
@@ -293,7 +293,7 @@
   right: 1.25rem;
   width: 22px;
   height: 22px;
-  accent-color: var(--brand-primary, #36B37E);
+  accent-color: var(--brand-primary);
   cursor: pointer;
 }
 
@@ -342,7 +342,7 @@
 .ppm-role-price {
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
   white-space: nowrap;
 }
 
@@ -438,8 +438,8 @@
   display: flex;
   gap: 0.875rem;
   padding: 1rem 1.25rem;
-  background: linear-gradient(135deg, rgba(54, 179, 126, 0.08), rgba(102, 126, 234, 0.08));
-  border: 1px solid rgba(54, 179, 126, 0.2);
+  background: linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.08), rgba(102, 126, 234, 0.08));
+  border: 1px solid rgba(var(--brand-primary-rgb), 0.2);
   border-radius: var(--radius-md, 8px);
   margin-top: 1.25rem;
 }
@@ -520,17 +520,17 @@
 }
 
 .ppm-recipient-card:hover {
-  border-color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
 }
 
 .ppm-recipient-card.selected {
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.03);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.03);
 }
 
 .ppm-recipient-card input[type="radio"] {
   margin-top: 0.25rem;
-  accent-color: var(--brand-primary, #36B37E);
+  accent-color: var(--brand-primary);
 }
 
 .ppm-recipient-content {
@@ -564,7 +564,7 @@
   margin-top: 0.5rem;
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
   background: var(--bg-secondary, #ffffff);
   border-radius: var(--radius-sm, 4px);
   color: var(--text-secondary, #718096);
@@ -610,8 +610,8 @@
 
 .ppm-field input:focus,
 .ppm-field textarea:focus {
-  border-color: var(--brand-primary, #36B37E);
-  box-shadow: 0 0 0 3px rgba(54, 179, 126, 0.15);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.15);
 }
 
 .ppm-field input.error,
@@ -628,7 +628,7 @@
 .ppm-field textarea {
   resize: vertical;
   min-height: 80px;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
 .ppm-hint {
@@ -789,7 +789,7 @@
 }
 
 .ppm-review-value code {
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.8125rem;
   color: var(--text-secondary, #718096);
 }
@@ -798,8 +798,8 @@
   padding: 0.25rem 0.5rem;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.1);
+  color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   border-radius: 4px;
   text-transform: uppercase;
 }
@@ -898,7 +898,7 @@
   align-items: flex-start;
   gap: 0.625rem;
   padding: 1rem 1.25rem;
-  background: rgba(54, 179, 126, 0.05);
+  background: rgba(var(--brand-primary-rgb), 0.05);
 }
 
 .ppm-funds-icon {
@@ -928,7 +928,7 @@
   align-items: flex-start;
   padding: 1rem;
   background: rgba(245, 158, 11, 0.08);
-  border: 1px solid #f59e0b;
+  border: 1px solid var(--warning-color);
   border-radius: var(--radius-md, 8px);
   margin-top: 1rem;
 }
@@ -958,7 +958,7 @@
   font-size: 0.875rem;
   font-weight: 600;
   color: #000;
-  background: #f59e0b;
+  background: var(--warning-color);
   border: none;
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
@@ -1066,7 +1066,7 @@
 .ppm-tx-link {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
   text-decoration: none;
 }
 
@@ -1157,7 +1157,7 @@
   font-size: 0.9375rem;
   font-weight: 600;
   color: white;
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md, 8px);
   cursor: pointer;
@@ -1165,9 +1165,9 @@
 }
 
 .ppm-btn-primary:hover:not(:disabled) {
-  background: var(--primary-button-hover, #2f9e6e);
+  background: var(--primary-button-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(54, 179, 126, 0.3);
+  box-shadow: 0 4px 12px rgba(var(--brand-primary-rgb), 0.3);
 }
 
 .ppm-btn-primary:active:not(:disabled) {
@@ -1218,7 +1218,7 @@
   height: 32px;
   border-width: 3px;
   border-color: var(--border-color, #e2e8f0);
-  border-top-color: var(--brand-primary, #36b37e);
+  border-top-color: var(--brand-primary);
 }
 
 .ppm-loading-tiers p {
@@ -1234,7 +1234,7 @@
      illegible. Text colour keeps flowing from the theme-aware `.ppm-info-card`
      rules. */
   background: rgba(59, 130, 246, 0.1);
-  border-color: var(--info-color, #3b82f6);
+  border-color: var(--info-color);
 }
 
 .ppm-current-tier-info .ppm-tier-badge {
@@ -1653,7 +1653,7 @@
 
 .ppm-key-reg-warn {
   background: rgba(245, 158, 11, 0.08);
-  border-left-color: var(--warning-color, #f59e0b);
+  border-left-color: var(--warning-color);
 }
 
 @media print {
@@ -1708,7 +1708,7 @@
 .ppm-progress-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   transition: width 0.3s ease;
 }
 
@@ -1734,8 +1734,8 @@
 
 .ppm-progress-step--active,
 .ppm-progress-step--confirming {
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.06);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.06);
 }
 
 .ppm-progress-step--completed {
@@ -1792,7 +1792,7 @@
 }
 
 .ppm-progress-step-kind--signature {
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
 }
 
 .ppm-progress-step-detail {
@@ -1802,7 +1802,7 @@
 
 .ppm-progress-step-status {
   font-size: 0.8rem;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
 }
 
 .ppm-progress-step-error {

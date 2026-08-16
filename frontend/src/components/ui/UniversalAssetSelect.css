@@ -20,10 +20,10 @@
   width: 100%;
 }
 .uas-trigger:hover:not(:disabled) {
-  border-color: var(--accent-color, #36b37e);
+  border-color: var(--accent-color);
 }
 .uas-trigger:focus-visible {
-  outline: 2px solid var(--accent-color, #36b37e);
+  outline: 2px solid var(--accent-color);
   outline-offset: 1px;
 }
 .uas-trigger:disabled {
@@ -88,8 +88,8 @@
   width: 100%;
 }
 .uas-search:focus-visible {
-  border-color: var(--accent-color, #36b37e);
-  outline: 2px solid var(--accent-color, #36b37e);
+  border-color: var(--accent-color);
+  outline: 2px solid var(--accent-color);
   outline-offset: 1px;
 }
 .uas-search::-webkit-search-cancel-button {
@@ -133,11 +133,11 @@
 }
 .uas-option:hover,
 .uas-option:focus-visible {
-  background: var(--hover-bg, rgba(54, 179, 126, 0.1));
+  background: var(--hover-bg, rgba(var(--brand-primary-rgb), 0.1));
   outline: none;
 }
 .uas-option.active {
-  background: var(--accent-soft, rgba(54, 179, 126, 0.16));
+  background: var(--accent-soft, rgba(var(--brand-primary-rgb), 0.16));
 }
 .uas-option-body {
   display: flex;
@@ -166,6 +166,6 @@
   flex: none;
 }
 .uas-gasless {
-  color: var(--accent-color, #36b37e);
+  color: var(--accent-color);
   font-size: 0.85rem;
 }

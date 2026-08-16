@@ -13,12 +13,12 @@
 }
 
 .role-card-compact:hover {
-  border-color: var(--brand-primary, var(--primary-color, #4a9eff));
+  border-color: var(--brand-primary, var(--primary-color));
   box-shadow: var(--shadow-sm);
 }
 
 .role-card-compact.needs-attention {
-  border-color: var(--warning-color, #f59e0b);
+  border-color: var(--warning-color);
 }
 
 .role-card-compact .role-card-header {
@@ -54,17 +54,17 @@
 
 .role-status.expired {
   background: rgba(220, 38, 38, 0.15);
-  color: var(--danger-color, #dc2626);
+  color: var(--danger-color);
 }
 
 .role-status.at-limit {
   background: rgba(245, 158, 11, 0.15);
-  color: var(--warning-color, #f59e0b);
+  color: var(--warning-color);
 }
 
 .role-status.expiring-soon {
   background: rgba(245, 158, 11, 0.1);
-  color: var(--warning-color, #f59e0b);
+  color: var(--warning-color);
 }
 
 .expand-icon {
@@ -103,11 +103,11 @@
 }
 
 .detail-value.expired {
-  color: var(--danger-color, #dc2626);
+  color: var(--danger-color);
 }
 
 .detail-value.at-limit {
-  color: var(--warning-color, #f59e0b);
+  color: var(--warning-color);
 }
 
 /* Action buttons in compact view */
@@ -130,7 +130,7 @@
 }
 
 .role-action-btn.upgrade {
-  background: var(--brand-secondary, var(--info-color, #4C9AFF));
+  background: var(--brand-secondary, var(--info-color));
 }
 
 .role-action-btn.upgrade:hover {
@@ -139,7 +139,7 @@
 }
 
 .role-action-btn.extend {
-  background: var(--success-color, #22c55e);
+  background: var(--success-color);
 }
 
 .role-action-btn.extend:hover {
@@ -157,7 +157,7 @@
 }
 
 .role-card.needs-attention {
-  border-color: var(--warning-color, #f59e0b);
+  border-color: var(--warning-color);
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.1);
 }
 
@@ -217,15 +217,15 @@
 }
 
 .stat-value.expired {
-  color: var(--danger-color, #dc2626);
+  color: var(--danger-color);
 }
 
 .stat-value.warning {
-  color: var(--warning-color, #f59e0b);
+  color: var(--warning-color);
 }
 
 .stat-value.at-limit {
-  color: var(--warning-color, #f59e0b);
+  color: var(--warning-color);
 }
 
 .stat-sublabel {
@@ -234,7 +234,7 @@
 }
 
 .stat-sublabel.warning {
-  color: var(--warning-color, #f59e0b);
+  color: var(--warning-color);
 }
 
 /* Usage bar */
@@ -248,13 +248,13 @@
 
 .usage-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--success-color, #22c55e), var(--brand-secondary, #4C9AFF));
+  background: linear-gradient(90deg, var(--success-color), var(--brand-secondary));
   border-radius: 3px;
   transition: width 0.3s ease;
 }
 
 .usage-bar.at-limit {
-  background: linear-gradient(90deg, var(--warning-color, #f59e0b), var(--danger-color, #dc2626));
+  background: linear-gradient(90deg, var(--warning-color), var(--danger-color));
 }
 
 /* Alert messages */
@@ -268,19 +268,19 @@
 .role-alert.expired {
   background: rgba(220, 38, 38, 0.1);
   border: 1px solid rgba(220, 38, 38, 0.25);
-  color: var(--danger-color, #dc2626);
+  color: var(--danger-color);
 }
 
 .role-alert.at-limit {
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid rgba(245, 158, 11, 0.25);
-  color: var(--warning-color, #f59e0b);
+  color: var(--warning-color);
 }
 
 .role-alert.expiring-soon {
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.2);
-  color: var(--warning-color, #f59e0b);
+  color: var(--warning-color);
 }
 
 /* Full card actions */
@@ -335,8 +335,8 @@
 }
 
 .role-details-section .refresh-btn:hover {
-  border-color: var(--brand-primary, var(--primary-color, #4a9eff));
-  color: var(--brand-primary, var(--primary-color, #4a9eff));
+  border-color: var(--brand-primary, var(--primary-color));
+  color: var(--brand-primary, var(--primary-color));
 }
 
 .role-details-section .roles-list {
@@ -357,7 +357,7 @@
 }
 
 .purchase-roles-btn {
-  background: var(--brand-primary, var(--primary-color, #4a9eff));
+  background: var(--brand-primary, var(--primary-color));
   color: #fff;
   border: none;
   padding: 10px 20px;
@@ -388,7 +388,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid var(--border-color);
-  border-top-color: var(--brand-primary, var(--primary-color, #4a9eff));
+  border-top-color: var(--brand-primary, var(--primary-color));
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

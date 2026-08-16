@@ -33,7 +33,7 @@
 }
 
 .wallet-connect-button:focus-visible {
-  outline: 2px solid var(--primary-color, #4a9eff);
+  outline: 2px solid var(--primary-color);
   outline-offset: 0px;
 }
 
@@ -71,12 +71,12 @@
 }
 
 .wallet-account-button:focus-visible {
-  outline: 2px solid var(--primary-color, #4a9eff);
+  outline: 2px solid var(--primary-color);
   outline-offset: 0px;
   }
 
 .account-address {
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 1rem;
 }
 
@@ -143,7 +143,7 @@
   cursor: default;
 }
 .account-identity-trigger:not(:disabled):hover .account-caret {
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
 }
 .account-caret {
   position: absolute;
@@ -158,7 +158,7 @@
   line-height: 1;
   border-radius: 999px;
   color: var(--text-primary, #fff);
-  background: var(--surface-color, #1f2933);
+  background: var(--surface-color);
   border: 1px solid color-mix(in srgb, var(--text-primary, #fff) 30%, transparent);
 }
 
@@ -175,7 +175,7 @@
   max-height: 280px;
   overflow-y: auto;
   border-radius: 10px;
-  background: var(--surface-color, #1f2933);
+  background: var(--surface-color);
   border: 1px solid color-mix(in srgb, var(--text-primary, #fff) 16%, transparent);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
@@ -213,18 +213,18 @@
   letter-spacing: 0.03em;
   padding: 1px 6px;
   border-radius: 999px;
-  color: var(--brand-secondary, #4c9aff);
-  background: color-mix(in srgb, var(--brand-secondary, #4c9aff) 18%, transparent);
+  color: var(--brand-secondary);
+  background: color-mix(in srgb, var(--brand-secondary) 18%, transparent);
   flex-shrink: 0;
 }
 .account-switch-addr {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.72rem;
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 .account-switch-check {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   flex-shrink: 0;
 }
 
@@ -257,17 +257,17 @@
 
 .account-qr-btn:hover {
   background: var(--surface-hover, #2a2a2a);
-  border-color: var(--brand-primary, #36B37E);
-  color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .account-qr-btn:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 1px;
 }
 
 .account-address-full {
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var( --text-primary, #ffffff);
   font-weight: 500;
@@ -289,16 +289,16 @@
 }
 
 .account-address-copy:hover {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.14);
+  background: rgba(var(--brand-primary-rgb), 0.14);
 }
 
 .account-address-copy:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 1px;
 }
 
 .account-address-copy-icon {
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
   opacity: 0.7;
   transition: opacity 0.15s ease;
 }
@@ -325,7 +325,7 @@
 
 .get-usc-link {
   font-size: 0.75rem;
-  color: var(--primary-color, #4a9eff);
+  color: var(--primary-color);
   text-decoration: none;
   transition: color 0.2s ease;
 }
@@ -350,8 +350,8 @@
   letter-spacing: 0.04em;
   padding: 1px 7px;
   border-radius: 999px;
-  color: var(--brand-secondary, #4c9aff);
-  background: color-mix(in srgb, var(--brand-secondary, #4c9aff) 18%, transparent);
+  color: var(--brand-secondary);
+  background: color-mix(in srgb, var(--brand-secondary) 18%, transparent);
 }
 
 /* Extended Dropdown */
@@ -401,7 +401,7 @@
 
 .role-badge {
   font-size: 0.75rem;
-  color: var(--primary-color, #4a9eff);
+  color: var(--primary-color);
   background: rgba(74, 158, 255, 0.1);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
@@ -447,8 +447,8 @@
 
 .roles-refresh-btn:hover:not(:disabled) {
   background: var(--surface-hover, #2a2a2a);
-  border-color: var(--primary-color, #4a9eff);
-  color: var(--primary-color, #4a9eff);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .roles-refresh-btn:disabled {
@@ -478,23 +478,23 @@
 .my-markets-btn {
   width: 100%;
   justify-content: center;
-  background: linear-gradient(135deg, #4C9AFF 0%, #3A7FD5 100%);
+  background: linear-gradient(135deg, var(--brand-secondary) 0%, #3A7FD5 100%);
   border: none;
   color: white;
 }
 
 .my-markets-btn:hover {
-  background: linear-gradient(135deg, #5CA9FF 0%, #4C9AFF 100%);
+  background: linear-gradient(135deg, #5CA9FF 0%, var(--brand-secondary) 100%);
   border: none;
-  box-shadow: 0 2px 8px rgba(76, 154, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(var(--brand-secondary-rgb), 0.3);
 }
 
 /* Friend Markets Section */
 .friend-market-btn {
   width: 100%;
   justify-content: center;
-  background: var(--primary-color, #4a9eff);
-  border-color: var(--primary-color, #4a9eff);
+  background: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .friend-market-btn:hover {
@@ -529,7 +529,7 @@
 .purchase-access-btn {
   width: 100%;
   justify-content: center;
-  background: linear-gradient(135deg, var(--primary-color, #4a9eff), var(--success-color, #4caf50));
+  background: linear-gradient(135deg, var(--primary-color), var(--success-color, #4caf50));
   border: none;
 }
 
@@ -545,7 +545,7 @@
   padding: 0.25rem;
   background: none;
   border: none;
-  color: var(--primary-color, #4a9eff);
+  color: var(--primary-color);
   font-size: 0.85rem;
   text-align: center;
   cursor: pointer;
@@ -633,7 +633,7 @@
 }
 
 .connector-option:focus-visible {
-  outline: 2px solid var(--primary-color, #4a9eff);
+  outline: 2px solid var(--primary-color);
   outline-offset: -2px;
 }
 
@@ -648,7 +648,7 @@
 
 .connector-badge {
   font-size: 0.625rem;
-  color: var(--primary-color, #4a9eff);
+  color: var(--primary-color);
   background: rgba(74, 158, 255, 0.1);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
@@ -677,7 +677,7 @@
 }
 
 .connector-status.connecting {
-  color: var(--primary-color, #4a9eff);
+  color: var(--primary-color);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -762,7 +762,7 @@
 }
 
 .help-text a {
-  color: var(--primary-color, #4a9eff);
+  color: var(--primary-color);
   text-decoration: none;
   transition: color 0.2s ease;
 }

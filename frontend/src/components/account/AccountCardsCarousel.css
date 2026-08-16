@@ -54,15 +54,15 @@
   font-size: 1.05rem;
   line-height: 1;
   border-radius: var(--radius-full, 9999px);
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid var(--border-color);
   background: var(--glass-bg, rgba(255, 255, 255, 0.55));
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   z-index: 2;
 }
 
 .account-cards-viewport .account-card-menu:hover {
-  border-color: var(--brand-primary, #36b37e);
-  color: var(--text-primary, #1f2933);
+  border-color: var(--brand-primary);
+  color: var(--text-primary);
 }
 
 /* Arrows — desktop/keyboard affordance; hidden on touch-first small screens
@@ -74,10 +74,10 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-full, 9999px);
   background: var(--bg-secondary, #ffffff);
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
@@ -125,7 +125,7 @@
   padding: 8px;
   border: none;
   border-radius: 50%;
-  background: var(--border-color, #e3e7eb);
+  background: var(--border-color);
   background-clip: content-box;
   font-size: 0;
   line-height: 0;
@@ -138,7 +138,7 @@
 }
 
 .account-cards-dots .account-cards-dot.is-current {
-  background: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
   background-clip: content-box;
   padding: 7px;
 }

@@ -87,7 +87,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--bg-secondary, #141C24);
+  background: var(--bg-secondary);
   border-radius: 20px 20px 0 0;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
   z-index: 1000;
@@ -113,18 +113,18 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-color, #23303D);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .kebab-dropdown-header span {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary, #E6EDF3);
+  color: var(--text-primary);
 }
 
 .kebab-close-btn {
   background: transparent;
-  border: 1px solid var(--border-color, #23303D);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   width: 32px;
   height: 32px;
@@ -132,15 +132,15 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text-secondary, #AAB6C2);
+  color: var(--text-secondary);
   font-size: 1.25rem;
   transition: all 0.2s;
 }
 
 .kebab-close-btn:hover {
   background: rgba(255, 255, 255, 0.1);
-  border-color: var(--text-secondary, #AAB6C2);
-  color: var(--text-primary, #E6EDF3);
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 /* Dropdown content */
@@ -158,8 +158,8 @@
   align-items: center;
   gap: 1rem;
   padding: 0.75rem;
-  background: var(--bg-primary, #0E141B);
-  border: 1px solid var(--border-color, #23303D);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   transition: all 0.2s;
   position: relative;
@@ -169,24 +169,24 @@
 }
 
 .kebab-menu-item:hover {
-  background: rgba(76, 154, 255, 0.08);
-  border-color: rgba(76, 154, 255, 0.3);
+  background: rgba(var(--brand-secondary-rgb), 0.08);
+  border-color: rgba(var(--brand-secondary-rgb), 0.3);
 }
 
 .kebab-menu-item:focus {
-  outline: 2px solid rgba(76, 154, 255, 0.5);
+  outline: 2px solid rgba(var(--brand-secondary-rgb), 0.5);
   outline-offset: 2px;
 }
 
 .kebab-menu-item:active {
-  background: rgba(76, 154, 255, 0.15);
+  background: rgba(var(--brand-secondary-rgb), 0.15);
   transform: scale(0.98);
 }
 
 .kebab-item-label {
   font-size: 0.95rem;
   font-weight: 500;
-  color: var(--text-primary, #E6EDF3);
+  color: var(--text-primary);
   flex: 1;
   pointer-events: none;
 }
@@ -198,7 +198,7 @@
 }
 
 .theme-light .kebab-menu-item {
-  background: var(--bg-primary, #F7F9FA);
+  background: var(--bg-primary);
 }
 
 /* Reduced motion support */

@@ -36,7 +36,7 @@
   width: 100%;
 }
 .collectible-sheet:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: -2px;
 }
 .collectible-sheet-grabber {
@@ -74,7 +74,7 @@
 }
 
 .collectible-sheet-media {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 12px;
   overflow: hidden;
   position: relative;
@@ -123,10 +123,10 @@
   font-weight: 400;
 }
 .collectible-sheet-stale {
-  background: var(--warning-bg, #fef3c7);
-  border: 1px solid var(--warning-border, #f59e0b);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border, var(--warning-color));
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.8rem;
   margin: 0;
   padding: 0.4rem 0.6rem;
@@ -144,7 +144,7 @@
   padding: 0;
 }
 .collectible-sheet-traits li {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -167,7 +167,7 @@
 }
 
 .collectible-sheet-opensea-link {
-  background: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
   border-radius: 10px;
   color: #fff;
   display: block;
@@ -209,7 +209,7 @@
   padding: 0.55rem 0.9rem;
 }
 .collectible-sheet-sell {
-  background: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
   border-color: transparent;
   color: #fff;
   font-weight: 600;
@@ -229,7 +229,7 @@
   opacity: 0.6;
 }
 .collectible-sheet-confirm {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 10px;
   padding: 0.6rem 0.75rem;
 }

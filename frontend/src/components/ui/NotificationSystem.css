@@ -67,12 +67,12 @@
 
 /* Notification types */
 .notification-info {
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid var(--info-color);
   color: #1e40af;
 }
 
 .notification-info .notification-icon {
-  color: #3b82f6;
+  color: var(--info-color);
 }
 
 .notification-success {
@@ -85,12 +85,12 @@
 }
 
 .notification-warning {
-  border-left: 4px solid #f59e0b;
+  border-left: 4px solid var(--warning-color);
   color: #92400e;
 }
 
 .notification-warning .notification-icon {
-  color: #f59e0b;
+  color: var(--warning-color);
 }
 
 .notification-error {

@@ -71,8 +71,8 @@
 
 .ab-scan-btn:hover,
 .ab-scan-btn:focus-visible {
-  border-color: var(--brand-primary, #36b37e);
-  color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .ab-panel-head {
@@ -100,7 +100,7 @@
 .ab-addresses-fieldset legend {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .ab-field input,
@@ -117,8 +117,8 @@
 .ab-field input:focus-visible,
 .ab-field select:focus-visible {
   outline: none;
-  border-color: var(--brand-primary, #36b37e);
-  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.18);
 }
 
 /* Large rounded search input with a leading icon (issue #1023). */
@@ -133,7 +133,7 @@
   left: 1rem;
   width: 1.05rem;
   height: 1.05rem;
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
   pointer-events: none;
 }
 
@@ -151,13 +151,13 @@
 }
 
 .ab-search-box input::placeholder {
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
 }
 
 .ab-search-box input:focus-visible {
   outline: none;
-  border-color: var(--brand-primary, #36b37e);
-  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.18);
 }
 
 /* Search + round green add button on one line (design 3a). */
@@ -208,7 +208,7 @@
 }
 
 .ab-meta-count {
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
 }
 
 .ab-meta-review {
@@ -273,8 +273,8 @@
   justify-content: center;
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--brand-primary, #36b37e);
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.14);
+  color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb), 0.14);
 }
 
 .ab-contact-name {
@@ -302,9 +302,9 @@
   line-height: 1;
   padding: 0.26rem 0.55rem;
   border-radius: 999px;
-  color: var(--brand-secondary, #4c9aff);
-  background: rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.14);
-  border: 1px solid rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.35);
+  color: var(--brand-secondary);
+  background: rgba(var(--brand-secondary-rgb), 0.14);
+  border: 1px solid rgba(var(--brand-secondary-rgb), 0.35);
   white-space: nowrap;
 }
 
@@ -331,7 +331,7 @@
 .ab-contact-netcount {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -345,19 +345,19 @@
   font: inherit;
   font-size: 0.82rem;
   font-weight: 700;
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   line-height: 1;
   border-radius: 0.55rem;
 }
 
 .ab-details-btn:hover,
 .ab-details-btn:focus-visible {
-  color: var(--primary-button-hover, #2f9e6e);
+  color: var(--primary-button-hover);
   outline: none;
 }
 
 .ab-details-btn:focus-visible {
-  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.3);
 }
 
 /* Expanded details: per-network addresses, notes, then Edit / Delete. */
@@ -399,7 +399,7 @@
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .ab-address-main {
@@ -411,7 +411,7 @@
 
 .ab-address-value,
 .ab-address-full {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   padding: 0.3rem 0.55rem;
   border-radius: 0.5rem;
@@ -522,7 +522,7 @@
 }
 
 .ab-btn-primary {
-  background: var(--primary-button, var(--brand-primary, #36b37e));
+  background: var(--primary-button, var(--brand-primary));
   color: var(--primary-button-text, #fff);
   padding: 0.5rem 1rem;
   border-radius: 999px;
@@ -531,12 +531,12 @@
 
 .ab-btn-primary:hover,
 .ab-btn-primary:focus-visible {
-  background: var(--primary-button-hover, #2f9e6e);
+  background: var(--primary-button-hover);
   color: var(--primary-button-text, #fff);
 }
 
 .ab-btn-primary:focus-visible {
-  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.3);
 }
 
 .ab-btn-danger {

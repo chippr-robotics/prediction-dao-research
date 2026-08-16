@@ -40,7 +40,7 @@
 
 /* A definite answer: there is no contract here. Muted, but never absent. */
 .chain-state-absent {
-  color: var(--text-secondary, var(--color-text-secondary, #5A6772));
+  color: var(--text-secondary, var(--color-text-secondary, var(--text-secondary)));
   font-style: italic;
 }
 
@@ -66,7 +66,7 @@
 }
 
 .chain-state-retry:focus-visible {
-  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
+  outline: 2px solid var(--brand-primary, var(--color-primary, var(--brand-primary)));
   outline-offset: 2px;
 }
 
@@ -80,7 +80,7 @@
 }
 
 .chain-state-total-scope {
-  color: var(--text-secondary, var(--color-text-secondary, #5A6772));
+  color: var(--text-secondary, var(--color-text-secondary, var(--text-secondary)));
   font-size: 0.8125rem;
 }
 

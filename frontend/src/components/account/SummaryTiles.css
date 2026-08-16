@@ -36,11 +36,11 @@
 }
 
 .account-tile-value.tone-win {
-  color: var(--semantic-win, #2ECC71);
+  color: var(--semantic-win);
 }
 
 .account-tile-value.tone-loss {
-  color: var(--semantic-loss, #E5533D);
+  color: var(--semantic-loss);
 }
 
 .account-tile-cue {

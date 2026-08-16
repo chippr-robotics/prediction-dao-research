@@ -128,7 +128,7 @@
 }
 
 :root.theme-dark .ab-net-pill--other {
-  color: var(--text-secondary, #aab6c2);
+  color: var(--text-secondary);
   background: rgba(122, 133, 144, 0.18);
-  border-color: var(--border-color, #23303d);
+  border-color: var(--border-color);
 }

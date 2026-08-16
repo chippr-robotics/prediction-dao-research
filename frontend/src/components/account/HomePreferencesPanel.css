@@ -9,7 +9,7 @@
 .home-preferences-note {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--text-muted, #7A8590);
+  color: var(--text-muted);
 }
 
 .home-preferences-group {
@@ -38,17 +38,17 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.4rem 0.8rem;
-  border: 1px solid var(--border-color, #23303D);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-full, 9999px);
   cursor: pointer;
   font-size: 0.9rem;
 }
 
 .home-preferences-option.active {
-  border-color: var(--brand-primary, #36B37E);
-  color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .home-preferences-option input {
-  accent-color: var(--brand-primary, #36B37E);
+  accent-color: var(--brand-primary);
 }

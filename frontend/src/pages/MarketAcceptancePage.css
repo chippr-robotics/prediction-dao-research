@@ -19,7 +19,7 @@
   width: 48px;
   height: 48px;
   border: 3px solid var(--border-color, #333);
-  border-top-color: var(--color-primary, #4C9AFF);
+  border-top-color: var(--color-primary, var(--brand-secondary));
   border-radius: 50%;
   margin-bottom: 1.5rem;
   animation: spin 1s linear infinite;
@@ -66,7 +66,7 @@
 
 .map-btn {
   padding: 0.875rem 2rem;
-  background: linear-gradient(135deg, #4C9AFF 0%, #36B37E 100%);
+  background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
   border: none;
   border-radius: 8px;
   color: white;

@@ -1,6 +1,9 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  /* Inter is the brand's text/UI face (Chippr Brand Guidelines v1.0 slide 12).
+     The stack ends in a platform fallback so a failed font load degrades
+     rather than blanks — see src/styles/fonts.css. */
+  font-family: var(--font-sans);
+  line-height: var(--leading-body, 1.625);
   font-weight: 400;
 
   font-synthesis: none;
@@ -48,7 +51,10 @@ body {
 
 a {
   font-weight: 500;
-  color: var(--brand-primary);
+  /* Teal 700, NOT Chippr Teal. The guidelines' own measured table puts Chippr
+     Teal at 4.7:1 on white and annotates it "18px+ / bold 14px+" — links are
+     body-sized, so they take the 7.8:1 anchor instead (spec 089 FR-017). */
+  color: var(--accent-color);
   text-decoration: inherit;
 }
 a:hover {
@@ -65,9 +71,43 @@ body {
   color: var(--text-primary);
 }
 
+/* Web type hierarchy — Chippr Brand Guidelines v1.0 slide 13.
+   1.25 major third from a 16px base; rem sizes, unitless line-heights.
+   Headings take the display face; H4 is already Inter per the guidelines. */
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  font-family: var(--font-display);
+  font-size: var(--text-h1);
+  line-height: var(--leading-h1);
+  font-weight: var(--weight-h1);
+  letter-spacing: var(--tracking-h1);
+}
+
+h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: var(--weight-h2);
+}
+
+h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  line-height: var(--leading-h3);
+  font-weight: var(--weight-h3);
+}
+
+h4 {
+  font-family: var(--font-sans);
+  font-size: var(--text-h4);
+  line-height: var(--leading-h4);
+  font-weight: var(--weight-h4);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
 }
 
 button {

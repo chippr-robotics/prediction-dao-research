@@ -46,9 +46,9 @@
 }
 .device-loss-warning .btn-primary {
   border-color: transparent;
-  background: var(--primary-button, var(--brand-primary, #36B37E));
+  background: var(--primary-button, var(--brand-primary));
   color: var(--primary-button-text, #fff);
 }
 .device-loss-warning .btn-primary:hover {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
 }

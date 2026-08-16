@@ -15,8 +15,8 @@
    variables the header consumes keeps nav links, the hamburger and the mobile
    nav consistently dark regardless of the active light/dark theme. */
 .landing-page .site-header {
-  --bg-secondary: #0a0f1a;
-  --text-primary: #E6EDF3;
+  --bg-secondary: var(--chippr-gunmetal);
+  --text-primary: var(--chippr-cloud);
   --border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
@@ -50,7 +50,7 @@
 }
 
 .header-logo:focus-visible {
-  outline: 2px solid var(--color-primary, #36B37E);
+  outline: 2px solid var(--color-primary, var(--brand-primary));
   outline-offset: 4px;
   border-radius: 6px;
 }
@@ -177,7 +177,7 @@
   font-weight: 600;
   color: #2D7A4F;
   font-size: 0.95rem;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
 .disconnect-button {
@@ -385,7 +385,7 @@
 }
 
 .wallet-btn:hover {
-  background: var(--color-surface-hover, rgba(54, 179, 126, 0.05));
+  background: var(--color-surface-hover, rgba(var(--brand-primary-rgb), 0.05));
   border-color: var(--color-primary);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -397,7 +397,7 @@
 
 .wallet-btn.connected {
   border-color: var(--color-primary);
-  background: var(--color-primary-alpha, rgba(54, 179, 126, 0.1));
+  background: var(--color-primary-alpha, rgba(var(--brand-primary-rgb), 0.1));
 }
 
 .wallet-icon-img {
@@ -407,7 +407,7 @@
 }
 
 .wallet-address-badge {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text);

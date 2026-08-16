@@ -303,7 +303,7 @@ describe('AddressQRModal — quick variant', () => {
 
   it('V1 guard: the full (default) variant still renders the color options', () => {
     renderModal()
-    expect(screen.getAllByRole('radio')).toHaveLength(4)
+    expect(screen.getAllByRole('radio')).toHaveLength(5)
     expect(screen.getByText(ADDRESS)).toBeInTheDocument()
   })
 })
@@ -314,10 +314,10 @@ describe('AddressQRModal — quick variant', () => {
 // (verified manually per quickstart); here we assert real radio semantics,
 // names, indicator, and persistence.
 describe('AddressQRModal — color customization (US3)', () => {
-  it('M8: offers exactly the four named options as a radio group', () => {
+  it('M8: offers exactly the five named options as a radio group', () => {
     renderModal()
     const radios = screen.getAllByRole('radio')
-    expect(radios).toHaveLength(4)
+    expect(radios).toHaveLength(5)
     expect(screen.getByRole('radio', { name: /midnight/i })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /forest/i })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /ocean/i })).toBeInTheDocument()

@@ -16,13 +16,13 @@
   padding: 0.9rem 1rem;
   border-radius: var(--radius-lg, 12px);
   border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.65));
-  border-left: 4px solid var(--card-accent, var(--brand-primary, #36b37e));
+  border-left: 4px solid var(--card-accent, var(--brand-primary));
   background:
     linear-gradient(135deg, rgba(var(--card-tint, 127, 127, 127), var(--card-tint-alpha, 0)) 0%, transparent 65%),
     var(--card-pattern, none),
     var(--glass-bg-solid, rgba(255, 255, 255, 0.92));
   box-shadow: var(--glass-shadow, 0 8px 32px rgba(31, 41, 51, 0.14));
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
   overflow: hidden;
   cursor: pointer;
   transition:
@@ -37,7 +37,7 @@
 }
 
 .account-card[data-tint]:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -64,14 +64,14 @@
 }
 
 /* --- kind accent (left edge) --- */
-.account-card--vault[data-tint] { --card-accent: var(--brand-secondary, #4c9aff); }
-.account-card--legacy[data-tint] { --card-accent: var(--semantic-warning, #f5a623); }
-.account-card--hardware[data-tint] { --card-accent: var(--brand-accent, #7bdcb5); }
+.account-card--vault[data-tint] { --card-accent: var(--brand-secondary); }
+.account-card--legacy[data-tint] { --card-accent: var(--semantic-warning); }
+.account-card--hardware[data-tint] { --card-accent: var(--brand-accent); }
 
 .account-card[data-tint].is-active {
-  border-color: var(--brand-primary, #36b37e);
-  border-left-color: var(--brand-primary, #36b37e);
-  box-shadow: 0 0 0 2px var(--brand-primary, #36b37e), var(--glass-shadow, 0 8px 32px rgba(31, 41, 51, 0.14));
+  border-color: var(--brand-primary);
+  border-left-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px var(--brand-primary), var(--glass-shadow, 0 8px 32px rgba(31, 41, 51, 0.14));
 }
 
 /* --- member tints (ids from accountProfilesStore; colors from theme.css) --- */
@@ -122,9 +122,9 @@
   text-transform: uppercase;
   padding: 0.18rem 0.55rem;
   border-radius: var(--radius-full, 9999px);
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid var(--border-color);
   background: var(--glass-bg, rgba(255, 255, 255, 0.55));
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .account-card-label {
@@ -147,7 +147,7 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .account-card-balance-value {
@@ -162,16 +162,16 @@
   width: 100%;
   gap: 0.5rem;
   font-size: 0.8rem;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
 }
 
 .account-card-address {
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .account-card-network {
   font-size: 0.75rem;
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
 }
 
 .account-card-state {
@@ -179,10 +179,10 @@
   align-items: center;
   gap: 0.3rem;
   font-size: 0.78rem;
-  color: var(--text-muted, #8a959e);
+  color: var(--text-muted);
 }
 
 .account-card-state.is-active {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   font-weight: 600;
 }

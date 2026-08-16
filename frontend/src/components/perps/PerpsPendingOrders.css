@@ -28,7 +28,7 @@
 .perps-orders-refresh {
   background: transparent;
   border: 0;
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   cursor: pointer;
   font-size: 0.82rem;
   padding: 0;
@@ -39,9 +39,9 @@
 }
 
 .perps-orders-unreadable {
-  background: var(--warning-bg, #fef3c7);
+  background: var(--warning-bg);
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.82rem;
   margin: 0;
   padding: 0.45rem 0.6rem;
@@ -80,8 +80,8 @@
 }
 /* A stuck order is not a loss — it is something the member has to act on. Warning, not error. */
 .perps-orders-row-attention {
-  border-color: var(--semantic-warning, #f5a623);
-  box-shadow: inset 3px 0 0 0 var(--semantic-warning, #f5a623);
+  border-color: var(--semantic-warning);
+  box-shadow: inset 3px 0 0 0 var(--semantic-warning);
 }
 
 .perps-orders-row-head {
@@ -105,13 +105,13 @@
   color: var(--semantic-win, #16a34a);
 }
 .perps-orders-direction-short {
-  background: color-mix(in srgb, var(--semantic-loss, #dc2626) 15%, transparent);
-  color: var(--semantic-loss, #dc2626);
+  background: color-mix(in srgb, var(--semantic-loss) 15%, transparent);
+  color: var(--semantic-loss);
 }
 .perps-orders-flag {
-  background: var(--warning-bg, #fef3c7);
+  background: var(--warning-bg);
   border-radius: 999px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.72rem;
   font-weight: 600;
   margin-left: auto;
@@ -185,8 +185,8 @@
 }
 /* The primary action on this surface: the member should never have to hunt for it. */
 .perps-orders-recover {
-  background: var(--brand-primary, #36b37e);
-  border: 1px solid var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
   border-radius: 10px;
   color: var(--text-on-brand, #ffffff);
   cursor: pointer;
@@ -196,7 +196,7 @@
   white-space: nowrap;
 }
 .perps-orders-recover:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 .perps-orders-recover:disabled {
@@ -213,11 +213,11 @@
 }
 /* A refusal is the one thing here that is an error; every other state is progress or a wait. */
 .perps-orders-progress[data-state='rejected'] {
-  color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss);
 }
 
 .perps-orders-venue-link {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;

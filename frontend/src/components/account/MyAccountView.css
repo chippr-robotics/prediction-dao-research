@@ -27,7 +27,7 @@
      cleanly under the frozen block instead of peeking out beside it. */
   margin: calc(-1 * var(--my-account-bleed)) calc(-1 * var(--my-account-bleed)) 0;
   padding: 16px var(--my-account-bleed) 8px;
-  border-bottom: 1px solid var(--border-color, #e3e7eb);
+  border-bottom: 1px solid var(--border-color);
 }
 
 @media (max-width: 768px) {
@@ -51,7 +51,7 @@
   display: flex;
   gap: 6px;
   padding: 4px;
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md, 8px);
   background: var(--bg-secondary, #ffffff);
   width: fit-content;
@@ -62,7 +62,7 @@
   border: none;
   border-radius: var(--radius-sm, 4px);
   background: transparent;
-  color: var(--text-secondary, #5a6772);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -70,16 +70,16 @@
 }
 
 .my-account-tab:hover {
-  color: var(--text-primary, #1f2933);
+  color: var(--text-primary);
 }
 
 .my-account-tab.active {
-  background: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
   color: #ffffff;
 }
 
 .my-account-tab:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 

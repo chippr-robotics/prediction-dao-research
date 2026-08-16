@@ -36,7 +36,7 @@
 .pool-create-form input:focus-visible,
 .pool-join-form input:focus-visible,
 .wordlist-lang-selector select:focus-visible {
-  outline: 2px solid var(--brand, #36b37e);
+  outline: 2px solid var(--brand, var(--brand-primary));
   outline-offset: 1px;
 }
 

@@ -56,7 +56,7 @@
   color: var(--semantic-win, #16a34a);
 }
 .pps-pnl-down {
-  color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss);
 }
 .pps-attrib {
   color: var(--text-muted, #9ca3af);
@@ -83,7 +83,7 @@
   padding: 0.5rem 0.7rem;
 }
 .pps-status-pending {
-  border-color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
   color: var(--text-primary, #111827);
 }
 .pps-status-done {
@@ -91,8 +91,8 @@
   color: var(--semantic-win, #16a34a);
 }
 .pps-status-attention {
-  border-color: var(--semantic-loss, #dc2626);
-  color: var(--semantic-loss, #dc2626);
+  border-color: var(--semantic-loss);
+  color: var(--semantic-loss);
 }
 
 /* Sections ----------------------------------------------------------------------------------- */
@@ -114,7 +114,7 @@
   margin: 0;
 }
 .pps-error {
-  color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss);
   font-size: 0.8rem;
   margin: 0;
 }
@@ -155,13 +155,13 @@
   padding: 0.35rem 0.75rem;
 }
 .pps-preset.selected {
-  border-color: var(--brand-primary, #36b37e);
-  color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
   font-weight: 600;
 }
 /* The radio stays in the accessibility tree and keeps its own focus ring — it is only shrunk. */
 .pps-preset input {
-  accent-color: var(--brand-primary, #36b37e);
+  accent-color: var(--brand-primary);
   margin: 0;
 }
 
@@ -216,7 +216,7 @@
   width: 100%;
 }
 .pps-field input:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 1px;
 }
 .pps-impact {
@@ -229,8 +229,8 @@
 
 .pps-primary {
   appearance: none;
-  background: var(--brand-primary, #36b37e);
-  border: 1px solid var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
   border-radius: 10px;
   color: var(--text-on-brand, #fff);
   cursor: pointer;
@@ -241,7 +241,7 @@
 }
 .pps-primary-secondary {
   background: transparent;
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
 }
 .pps-secondary {
   appearance: none;
@@ -261,7 +261,7 @@
 }
 .pps-primary:focus-visible,
 .pps-secondary:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -273,6 +273,6 @@
   margin: 0;
 }
 .pps-venue-link {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   white-space: nowrap;
 }

@@ -43,8 +43,8 @@
   padding: 0.3rem 0.8rem;
 }
 .perps-filter-pill.active {
-  background: var(--brand-primary, #36b37e);
-  border-color: var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
   color: var(--text-on-brand, #ffffff);
 }
 .perps-search input {
@@ -76,9 +76,9 @@
 
 /* ---- notices ---- */
 .perps-degraded-banner {
-  background: var(--warning-bg, #fef3c7);
+  background: var(--warning-bg);
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.82rem;
   margin: 0;
   padding: 0.45rem 0.6rem;
@@ -89,7 +89,7 @@
   margin: 0;
 }
 .perps-unavailable {
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   border-radius: 10px;
   color: var(--text-primary, inherit);
   margin: 0;
@@ -104,7 +104,7 @@
 .perps-retry {
   background: transparent;
   border: 0;
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   cursor: pointer;
   padding: 0;
 }
@@ -187,7 +187,7 @@
   color: var(--semantic-win, #16a34a);
 }
 .perps-funding-negative {
-  color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss);
 }
 .perps-trade-cell {
   /* Two actions now (spec 083): the in-app open, where this build can build the order, and the
@@ -200,8 +200,8 @@
   text-align: right;
 }
 .perps-open-btn {
-  background: var(--brand-primary, #36b37e);
-  border: 1px solid var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
   border-radius: 999px;
   color: var(--text-on-brand, #ffffff);
   cursor: pointer;
@@ -215,7 +215,7 @@
   filter: brightness(0.95);
 }
 .perps-trade-link {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
@@ -264,9 +264,9 @@
   margin: 0;
 }
 .perps-positions-unreadable {
-  background: var(--warning-bg, #fef3c7);
+  background: var(--warning-bg);
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.82rem;
   margin: 0;
   padding: 0.45rem 0.6rem;
@@ -314,8 +314,8 @@
   color: var(--semantic-win, #16a34a);
 }
 .perps-direction-short {
-  background: color-mix(in srgb, var(--semantic-loss, #dc2626) 15%, transparent);
-  color: var(--semantic-loss, #dc2626);
+  background: color-mix(in srgb, var(--semantic-loss) 15%, transparent);
+  color: var(--semantic-loss);
 }
 .perps-position-stats {
   display: grid;
@@ -335,7 +335,7 @@
   color: var(--semantic-win, #16a34a);
 }
 .perps-pnl-down {
-  color: var(--semantic-loss, #dc2626);
+  color: var(--semantic-loss);
 }
 /* Row actions (spec 083): the in-app sheet first, the venue link-out beside it. The link-out is
    never removed — it is the never-stranded path — so the two always share a row and wrap together
@@ -347,8 +347,8 @@
   gap: 0.5rem 0.9rem;
 }
 .perps-position-manage {
-  background: var(--brand-primary, #36b37e);
-  border: 1px solid var(--brand-primary, #36b37e);
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
   border-radius: 999px;
   color: var(--text-on-brand, #ffffff);
   cursor: pointer;
@@ -368,7 +368,7 @@
   margin: 0;
 }
 .perps-positions-note a {
-  color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary);
 }
 
 /* ---- footnotes ---- */
@@ -412,6 +412,6 @@
   padding: 0.5rem 0.9rem;
 }
 .trade-section-tab.active {
-  border-bottom-color: var(--brand-primary, #36b37e);
+  border-bottom-color: var(--brand-primary);
   color: var(--text-primary, #111827);
 }

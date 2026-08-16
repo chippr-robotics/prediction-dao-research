@@ -21,9 +21,9 @@
 /* Amber Unscreened badge — deliberately high-contrast so the state is hard to
    miss (issue #1023). */
 .ab-tag-uncertain {
-  color: #78350f;
-  background: #fef3c7;
-  border-color: #f59e0b;
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border-color: var(--warning-color);
 }
 
 .ab-tag-loading {

@@ -58,7 +58,7 @@
 }
 
 .toggle-btn:hover {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   transform: scale(1.1);
 }
 
@@ -136,12 +136,12 @@
 }
 
 .category-item:hover {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   color: var(--text-primary);
 }
 
 .category-item.active {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
+  background: rgba(var(--brand-primary-rgb), 0.2);
   color: var(--brand-primary);
   font-weight: 600;
 }
@@ -267,12 +267,12 @@
 }
 
 .bottom-nav-item:hover {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
   color: var(--text-primary);
 }
 
 .bottom-nav-item.active {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
+  background: rgba(var(--brand-primary-rgb), 0.2);
   color: var(--brand-primary);
   font-weight: 600;
 }

@@ -55,7 +55,7 @@
 
 .entry-gate-warning {
   padding: 0.75rem 1rem;
-  border-left: 3px solid var(--warning-color, #f59e0b);
+  border-left: 3px solid var(--warning-color);
   background: rgba(245, 166, 35, 0.08);
   color: var(--text-secondary);
 }

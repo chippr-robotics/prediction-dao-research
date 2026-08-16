@@ -170,7 +170,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-family: var(--tm-mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   color: var(--color-text-secondary, var(--text-secondary, #6b7280));
   font-size: 0.9rem;
 }
@@ -189,8 +189,8 @@
   letter-spacing: 0.03em;
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--brand-secondary, #4C9AFF) 18%, transparent);
-  color: var(--brand-secondary, #4C9AFF);
+  background: color-mix(in srgb, var(--brand-secondary) 18%, transparent);
+  color: var(--brand-secondary);
 }
 .pt-from-addr {
   color: var(--color-text-secondary, var(--text-secondary, #6b7280));
@@ -222,10 +222,10 @@
   font: inherit;
 }
 .pt-select-trigger:hover:not(:disabled) {
-  border-color: var(--color-primary, var(--brand-primary, #36B37E));
+  border-color: var(--color-primary, var(--brand-primary));
 }
 .pt-select-trigger:focus-visible {
-  outline: 2px solid var(--color-primary, var(--brand-primary, #36B37E));
+  outline: 2px solid var(--color-primary, var(--brand-primary));
   outline-offset: -1px;
 }
 .pt-select-trigger:disabled {
@@ -287,7 +287,7 @@
   outline: none;
 }
 .pt-select-option.active {
-  box-shadow: 0 0 0 1px var(--color-primary, var(--brand-primary, #36B37E)) inset;
+  box-shadow: 0 0 0 1px var(--color-primary, var(--brand-primary)) inset;
 }
 .pt-select-option-meta {
   display: inline-flex;
@@ -334,7 +334,7 @@
   color: var(--color-success, #16a34a);
 }
 .pt-badge-fee {
-  background: var(--color-surface-secondary, var(--bg-primary, #f3f4f6));
+  background: var(--color-surface-secondary, var(--bg-primary));
   color: var(--color-text-secondary, var(--text-secondary, #6b7280));
 }
 
@@ -345,8 +345,8 @@
   font-size: 0.9rem;
 }
 .pt-notice-error {
-  background: color-mix(in srgb, var(--color-error, #dc2626) 12%, transparent);
-  color: var(--color-error, #dc2626);
+  background: color-mix(in srgb, var(--color-error, var(--danger-color)) 12%, transparent);
+  color: var(--color-error, var(--danger-color));
 }
 .pt-notice-warn {
   background: color-mix(in srgb, #d97706 14%, transparent);
@@ -441,7 +441,7 @@
 }
 .pt-wrap-dir.active {
   border-color: var(--color-primary, var(--brand-primary, #6d28d9));
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   color: var(--color-primary, var(--brand-primary, #6d28d9));
 }
 .pt-wrap-dir:disabled {

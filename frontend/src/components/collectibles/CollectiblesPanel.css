@@ -33,15 +33,15 @@
   white-space: nowrap;
 }
 .collectibles-refresh:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
 .collectibles-stale-banner {
-  background: var(--warning-bg, #fef3c7);
-  border: 1px solid var(--warning-border, #f59e0b);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border, var(--warning-color));
   border-radius: 8px;
-  color: var(--warning-text, #78350f);
+  color: var(--warning-text);
   font-size: 0.85rem;
   margin: 0;
   padding: 0.5rem 0.75rem;
@@ -101,12 +101,12 @@
   width: 100%;
 }
 .collectible-card-button:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 .collectible-card-media {
   aspect-ratio: 1;
-  background: var(--bg-tertiary, #f3f4f6);
+  background: var(--bg-tertiary);
   display: block;
   position: relative;
   width: 100%;

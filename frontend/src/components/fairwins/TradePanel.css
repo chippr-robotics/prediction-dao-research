@@ -9,11 +9,11 @@
   --trade-text-2: var(--text-secondary, #6b7280);
   --trade-text-3: var(--text-muted, #9ca3af);
   --trade-border: var(--border-color, #e5e7eb);
-  --trade-accent: var(--brand-primary, #36b37e);
+  --trade-accent: var(--brand-primary);
   --trade-accent-hover: var(--primary-button-hover, var(--brand-secondary, #2e9e6b));
   --trade-success: var(--success-color, #48bb78);
   --trade-warning: var(--warning-color, #d69e2e);
-  --trade-danger: var(--danger-color, #e5533d);
+  --trade-danger: var(--danger-color);
 
   /* The panel is a frameless layout container — its parent tab already supplies
      the page padding, and the inner blocks (account, legs, summary) carry their
