@@ -20,5 +20,6 @@
     "them — all outside this directory. The gate that does that is:",
     "  scripts/finops/check-finops-coverage.js   (npm run check:finops)",
     "Schema validity IS checked in isolation, but by that same gate, so there is one place to look."
-  ]
+  ],
+  "version": "1.10.0"
 }
