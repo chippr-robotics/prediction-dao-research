@@ -72,8 +72,13 @@ const baseStats = () => ({
     },
   ],
   staleClasses: [],
-  prunedBefore: null,
-  isConnected: true, isSupportedNetwork: true, chainId: 137,
+  prunedByChain: [],
+  partialChains: [],
+  networkStates: [
+    { chainId: 137, state: 'read', entryCount: 1 },
+    { chainId: 1, state: 'read', entryCount: 0 },
+  ],
+  isConnected: true, chainId: 137,
   isLoading: false, isEmpty: false, error: null,
   freshness: { summary: { lastUpdated: Date.now(), status: 'fresh' } },
   refresh: vi.fn(),
@@ -222,13 +227,27 @@ describe('MyAccountView — unified account experience (spec 074)', () => {
     })
   })
 
-  it('keeps the honest unsupported-network state on Activity and Stats (V1, V3)', () => {
+  it('discloses partial figures by network name on Stats (spec 092)', () => {
     useAccountStatsMock.mockImplementation(() => ({
       ...baseStats(),
-      isSupportedNetwork: false,
+      partialChains: ['Ethereum'],
+    }))
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/figures exclude ethereum/i)).toBeInTheDocument()
+    // Figures from readable chains still render.
+    expect(screen.getByText(/wallet balance/i)).toBeInTheDocument()
+  })
+
+  it('all networks unreachable ⇒ honest failure state, never a fabricated empty record (FR-009)', () => {
+    useAccountStatsMock.mockImplementation(() => ({
+      ...baseStats(),
+      activity: [],
+      partialChains: ['Polygon', 'Ethereum'],
+      error: 'None of your networks could be read right now.',
     }))
     renderView('/wallet?tab=account&view=activity')
-    expect(screen.getByText(/network not supported/i)).toBeInTheDocument()
+    expect(screen.getByText(/your networks could not be read/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no activity yet/i)).not.toBeInTheDocument()
   })
 
   it('keeps the honest empty state with the create CTA (V1)', () => {
@@ -295,12 +314,17 @@ describe('MyAccountView — imported/acting accounts get useful stats, not a wag
     expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
   })
 
-  it('still shows the estate on Stats when the active network is unsupported', () => {
+  it('still shows the estate on Stats when every network failed, beside the honest failure note', () => {
     actAsRecovered()
-    useAccountStatsMock.mockImplementation(() => ({ ...baseStats(), isSupportedNetwork: false }))
+    useAccountStatsMock.mockImplementation(() => ({
+      ...baseStats(),
+      activity: [],
+      partialChains: ['Polygon', 'Ethereum'],
+      error: 'None of your networks could be read right now.',
+    }))
     usePortfolioMock.mockImplementation(() => estatePortfolio())
     renderView('/wallet?tab=account&view=stats')
     expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
-    expect(screen.getByText(/wager stats unavailable here/i)).toBeInTheDocument()
+    expect(screen.getByText(/your networks could not be read/i)).toBeInTheDocument()
   })
 })

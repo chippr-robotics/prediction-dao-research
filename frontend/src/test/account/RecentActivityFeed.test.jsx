@@ -218,16 +218,97 @@ describe('RecentActivityFeed (spec 051 US1)', () => {
     expect(screen.getByText('Undated')).toBeInTheDocument()
   })
 
-  it('discloses stale classes and the pruning marker', () => {
+  it('discloses stale classes and the per-network pruning marker', () => {
     render(
       <RecentActivityFeed
         entries={entries}
         chainId={80002}
-        staleClasses={['earn']}
-        prunedBefore={Date.UTC(2024, 0, 1)}
+        staleClasses={['earn on Polygon Amoy']}
+        prunedByChain={[{ chainId: 80002, network: 'Polygon Amoy', before: Date.UTC(2024, 0, 1) }]}
       />,
     )
     expect(screen.getByText(/could not be refreshed/i)).toBeInTheDocument()
-    expect(screen.getByText(/pruned from device history/i)).toBeInTheDocument()
+    expect(screen.getByText(/entries on polygon amoy before .* pruned from device history/i)).toBeInTheDocument()
+  })
+})
+
+describe('RecentActivityFeed — merged multi-network record (spec 092)', () => {
+  const TX_C = '0x' + 'cc'.repeat(32)
+  const mordorEntry = {
+    entryId: `oc:63:wt:${TX_C}-9-payout`,
+    chainId: 63,
+    class: 'wager',
+    kind: 'payout',
+    direction: 'in',
+    status: 'settled',
+    tokenSymbol: 'CUSD',
+    amount: 40,
+    valueUsd: 40,
+    valuationStatus: 'valued',
+    timestamp: NOW - 30_000,
+    timestampProvenance: 'chain',
+    txHash: TX_C,
+    refs: { wagerId: '9' },
+  }
+  const merged = [mordorEntry, ...entries]
+
+  it('tags every row with its own network', () => {
+    render(<RecentActivityFeed entries={merged} chainId={80002} />)
+    expect(screen.getByText('Ethereum Classic Mordor')).toBeInTheDocument()
+    expect(screen.getAllByText('Polygon Amoy').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("explorer links target the entry's own network, not the active one", () => {
+    render(<RecentActivityFeed entries={merged} chainId={80002} />)
+    const links = screen.getAllByRole('link', { name: /view tx/i })
+    const hrefs = links.map((l) => l.getAttribute('href'))
+    // Full-prefix assertions (not substring checks): the entry's explorer, exactly.
+    expect(hrefs).toContain(`https://etc-mordor.blockscout.com/tx/${TX_C}`)
+    expect(hrefs.some((h) => h.startsWith('https://amoy.polygonscan.com/tx/'))).toBe(true)
+  })
+
+  it('discloses unreachable networks by name, distinct from class staleness', () => {
+    render(
+      <RecentActivityFeed entries={merged} chainId={80002} partialChains={['Ethereum Classic']} />,
+    )
+    expect(
+      screen.getByText(/some networks could not be read: ethereum classic/i),
+    ).toBeInTheDocument()
+  })
+
+  it('offers a network filter only for multi-network records, composing with class filter and search', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(<RecentActivityFeed entries={entries} chainId={80002} />)
+    // Single-network record: no network control.
+    expect(screen.queryByRole('button', { name: /filter activity by network/i })).not.toBeInTheDocument()
+
+    rerender(<RecentActivityFeed entries={merged} chainId={80002} />)
+    await user.click(screen.getByRole('button', { name: /filter activity by network/i }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Ethereum Classic Mordor' }))
+    // Only the Mordor payout remains.
+    expect(screen.getByText('Payout')).toBeInTheDocument()
+    expect(screen.queryByText('Deposit')).not.toBeInTheDocument()
+    expect(screen.queryByText('Transfer')).not.toBeInTheDocument()
+
+    // Composes with search: a query that only matches the filtered-out chain
+    // yields the honest no-match state.
+    await user.click(screen.getByRole('button', { name: /search activity/i }))
+    await user.type(screen.getByRole('searchbox', { name: /search activity/i }), 'pizza bet')
+    expect(screen.getByText(/no matching activity/i)).toBeInTheDocument()
+
+    // Back to all networks restores the merged record.
+    await user.click(screen.getByRole('button', { name: /hide activity search/i }))
+    await user.click(screen.getByRole('button', { name: /filter activity by network/i }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'All networks' }))
+    expect(screen.getByText('Deposit')).toBeInTheDocument()
+  })
+
+  it('finds entries by network name through search', async () => {
+    const user = userEvent.setup()
+    render(<RecentActivityFeed entries={merged} chainId={80002} />)
+    await user.click(screen.getByRole('button', { name: /search activity/i }))
+    await user.type(screen.getByRole('searchbox', { name: /search activity/i }), 'mordor')
+    expect(screen.getByText('Payout')).toBeInTheDocument()
+    expect(screen.queryByText('Deposit')).not.toBeInTheDocument()
   })
 })

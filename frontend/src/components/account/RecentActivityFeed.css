@@ -269,6 +269,15 @@
   font-style: italic;
 }
 
+/* Which network the entry happened on (spec 092) — text, never color-alone. */
+.account-feed-network {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-secondary));
+}
+
 .account-feed-stale,
 .account-feed-pruned {
   font-size: 0.75rem;

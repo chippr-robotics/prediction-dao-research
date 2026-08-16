@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { wagerTitlesById, annotateWagerEntries } from '../../lib/account/ledgerAdapters'
+import {
+  wagerTitlesById,
+  wagerTitlesByChain,
+  annotateWagerEntries,
+  wagerTransfersFromLedger,
+} from '../../lib/account/ledgerAdapters'
 
 const wagerEntry = (wagerId, extra = {}) => ({
   entryId: `e-${wagerId}`,
@@ -49,5 +54,33 @@ describe('annotateWagerEntries', () => {
     const out = annotateWagerEntries([unknown, transfer], titles)
     expect(out[0]).toBe(unknown)
     expect(out[1]).toBe(transfer)
+  })
+
+  it('with per-chain titles, an entry resolves only against its own chain (spec 092)', () => {
+    const byChain = wagerTitlesByChain([
+      { id: 12, chainId: 137, metadata: { name: 'Polygon pizza bet' } },
+      { id: 12, chainId: 63, metadata: { name: 'Mordor pizza bet' } },
+    ])
+    const out = annotateWagerEntries(
+      [
+        { ...wagerEntry(12), chainId: 137 },
+        { ...wagerEntry(12), entryId: 'e-12-63', chainId: 63 },
+        { ...wagerEntry(12), entryId: 'e-12-1', chainId: 1 }, // no titles for chain 1
+      ],
+      byChain,
+    )
+    expect(out[0].wagerTitle).toBe('Polygon pizza bet')
+    expect(out[1].wagerTitle).toBe('Mordor pizza bet')
+    expect(out[2].wagerTitle).toBeUndefined()
+  })
+})
+
+describe('wagerTransfersFromLedger (spec 092)', () => {
+  it('keeps each transfer row chain-tagged', () => {
+    const rows = wagerTransfersFromLedger([
+      { class: 'wager', kind: 'deposit', chainId: 137, refs: { wagerId: '12' }, amount: 5, valueUsd: 5 },
+      { class: 'wager', kind: 'payout', chainId: 63, refs: { wagerId: '12' }, amount: 9, valueUsd: 9 },
+    ])
+    expect(rows.map((r) => `${r.chainId}:${r.wagerId}`)).toEqual(['137:12', '63:12'])
   })
 })

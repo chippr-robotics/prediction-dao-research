@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { getNetwork } from '../../config/networks'
+import { networkName } from '../../lib/chains/estate'
 import { formatUsd, formatRelativeTime, dayGroupLabel, weekGroupLabel } from '../../lib/account/format'
 import SensitiveValue from '../common/SensitiveValue'
 import NavIcon from '../nav/NavIcon'
@@ -80,6 +81,7 @@ function entryMatchesQuery(e, meta, query) {
     e.class,
     e.wagerTitle,
     e.refs?.wagerId != null ? `#${e.refs.wagerId}` : null,
+    e.chainId != null ? networkName(e.chainId) : null,
     e.tokenSymbol,
     e.amount != null ? String(e.amount) : null,
     e.valueUsd != null ? formatUsd(e.valueUsd) : null,
@@ -101,28 +103,44 @@ function entryMatchesQuery(e, meta, query) {
  * with the transactions themselves, and the tools appear on demand. A Group
  * button (dropdown, default "By day") interleaves subtle date-bucket headers
  * ahead of the rows they cover.
+ *
+ * Spec 092: the record is merged across the cohort. Every row shows its own
+ * network (text, from the entry's chainId), a network filter composes with
+ * the class filter and search, unreachable networks are disclosed by name
+ * (`partialChains`), and the pruning marker is per network (`prunedByChain`).
  */
-function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBefore = null }) {
+function RecentActivityFeed({
+  entries = [],
+  chainId,
+  staleClasses = [],
+  partialChains = [],
+  prunedByChain = [],
+}) {
   const [classFilter, setClassFilter] = useState(null)
+  const [networkFilter, setNetworkFilter] = useState(null)
+  const [networkOpen, setNetworkOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [groupBy, setGroupBy] = useState('day')
   const [groupOpen, setGroupOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const filterRef = useRef(null)
+  const networkRef = useRef(null)
   const groupRef = useRef(null)
   const searchInputRef = useRef(null)
 
-  // Close the filter/group dropdowns on outside click / Escape.
+  // Close the filter/network/group dropdowns on outside click / Escape.
   useEffect(() => {
-    if (!filterOpen && !groupOpen) return undefined
+    if (!filterOpen && !groupOpen && !networkOpen) return undefined
     const onDown = (event) => {
       if (filterOpen && filterRef.current && !filterRef.current.contains(event.target)) setFilterOpen(false)
+      if (networkOpen && networkRef.current && !networkRef.current.contains(event.target)) setNetworkOpen(false)
       if (groupOpen && groupRef.current && !groupRef.current.contains(event.target)) setGroupOpen(false)
     }
     const onKey = (event) => {
       if (event.key === 'Escape') {
         setFilterOpen(false)
+        setNetworkOpen(false)
         setGroupOpen(false)
       }
     }
@@ -132,24 +150,36 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [filterOpen, groupOpen])
+  }, [filterOpen, groupOpen, networkOpen])
 
   // Opening search focuses the field so "icon → type" is one motion.
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus()
   }, [searchOpen])
 
+  // Networks present in the record (spec 092): derived from the entries, so
+  // the filter offers exactly what the member can actually narrow to.
+  const networkOptions = useMemo(() => {
+    const ids = [...new Set(entries.map((e) => e.chainId).filter((id) => id != null))]
+    return [
+      { key: null, label: 'All networks' },
+      ...ids.map((id) => ({ key: id, label: networkName(id) })),
+    ]
+  }, [entries])
+
   const rows = useMemo(() => {
-    const byClass = classFilter ? entries.filter((e) => e.class === classFilter) : entries
+    const byNetwork = networkFilter != null ? entries.filter((e) => e.chainId === networkFilter) : entries
+    const byClass = classFilter ? byNetwork.filter((e) => e.class === classFilter) : byNetwork
     if (!query.trim()) return byClass
     return byClass.filter((e) =>
       entryMatchesQuery(e, KIND_META[e.kind] || { label: e.kind }, query),
     )
-  }, [entries, classFilter, query])
+  }, [entries, classFilter, networkFilter, query])
 
   const activeFilter = CLASS_FILTERS.find((f) => f.key === classFilter) || CLASS_FILTERS[0]
+  const activeNetwork = networkOptions.find((n) => n.key === networkFilter) || networkOptions[0]
   const activeGroup = GROUP_OPTIONS.find((g) => g.key === groupBy) || GROUP_OPTIONS[0]
-  const isFiltering = classFilter != null || query.trim() !== ''
+  const isFiltering = classFilter != null || networkFilter != null || query.trim() !== ''
 
   // Interleave date-group headers (default: by day) ahead of the rows they
   // cover. Entries arrive newest-first, so same-bucket rows are always
@@ -240,6 +270,46 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
               </ul>
             )}
           </div>
+          {networkOptions.length > 2 && (
+            <div className="account-feed-filter-wrap" ref={networkRef}>
+              <button
+                type="button"
+                className={`account-feed-tool${networkFilter != null ? ' active' : ''}`}
+                aria-label="Filter activity by network"
+                aria-haspopup="menu"
+                aria-expanded={networkOpen}
+                onClick={() => setNetworkOpen((o) => !o)}
+              >
+                <NavIcon name="globe" size={16} />
+                {networkFilter != null && (
+                  <span className="account-feed-tool-badge">{activeNetwork.label}</span>
+                )}
+              </button>
+              {networkOpen && (
+                <ul className="account-feed-filter-menu" role="menu" aria-label="Filter activity by network">
+                  {networkOptions.map((n) => (
+                    <li key={n.label} role="none">
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={networkFilter === n.key}
+                        className={`account-feed-filter-option${networkFilter === n.key ? ' active' : ''}`}
+                        onClick={() => {
+                          setNetworkFilter(n.key)
+                          setNetworkOpen(false)
+                        }}
+                      >
+                        <span className="account-feed-filter-check" aria-hidden="true">
+                          {networkFilter === n.key ? <NavIcon name="check" size={14} /> : null}
+                        </span>
+                        {n.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <div className="account-feed-filter-wrap" ref={groupRef}>
             <button
               type="button"
@@ -295,6 +365,12 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
         </div>
       )}
 
+      {partialChains.length > 0 && (
+        <p className="account-feed-stale" role="status">
+          Some networks could not be read: {partialChains.join(', ')}. Their activity is not
+          included below.
+        </p>
+      )}
       {staleClasses.length > 0 && (
         <p className="account-feed-stale" role="status">
           Some activity may be out of date: {staleClasses.join(', ')} could not be refreshed.
@@ -358,6 +434,9 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
                   )}
                 </span>
                 <span className="account-feed-meta">
+                  {e.chainId != null && (
+                    <span className="account-feed-network">{networkName(e.chainId)}</span>
+                  )}
                   {relative != null ? (
                     <time>{relative}</time>
                   ) : (
@@ -377,12 +456,12 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
           ))}
         </div>
       )}
-      {prunedBefore != null && (
-        <p className="account-feed-pruned">
-          Entries before {new Date(prunedBefore).toLocaleDateString()} were pruned from device history; on-chain
-          activity remains recoverable.
+      {prunedByChain.map((p) => (
+        <p className="account-feed-pruned" key={p.chainId}>
+          Entries on {p.network} before {new Date(p.before).toLocaleDateString()} were pruned from
+          device history; on-chain activity remains recoverable.
         </p>
-      )}
+      ))}
     </section>
   )
 }

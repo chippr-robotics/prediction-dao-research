@@ -58,8 +58,8 @@ function MyAccountView() {
   const portfolio = usePortfolio(isActingAccount ? { accountAddress: actingAddress } : undefined)
   const activeTotalUsd = portfolio.status === 'ready' ? portfolio.totalUsd : null
   const {
-    summary, series, setRange, breakdowns, activity, staleClasses, prunedBefore,
-    isSupportedNetwork, chainId, isLoading, isEmpty, freshness, refresh,
+    summary, series, setRange, breakdowns, activity, staleClasses, prunedByChain,
+    partialChains, chainId, isLoading, isEmpty, error, freshness, refresh,
   } = stats
 
   const handleDisconnect = () => {
@@ -86,19 +86,20 @@ function MyAccountView() {
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  // Honest unsupported/empty states, per view. The old blanket state pitched
-  // "Create a wager" at every account — for an imported/recovered account
-  // holding a real estate that notice was useless (post-launch feedback). Copy
-  // is account-aware: acting accounts (vault/recovered/hardware) get neutral
-  // wording and no wager CTA; only the personal wallet is invited to wager.
-  // Portfolio keeps its own states (it reads every supported network, so
-  // "network not supported" does not apply to it).
+  // Honest empty states, per view and account-aware (spec 091's PR): acting
+  // accounts (vault/recovered/hardware) get neutral wording and no wager CTA;
+  // only the personal wallet is invited to wager. Spec 092 retired the
+  // "network not supported" state: history now merges the whole cohort, so
+  // the record no longer depends on where the wallet points — a chain that
+  // could not be read is disclosed by name instead (`partialChains`), and an
+  // all-chains failure surfaces the hook's error with last-known data kept.
+  const allNetworksFailed = Boolean(error) && partialChains.length > 0 && activity.length === 0
   const activityHonestState = () => {
-    if (!isSupportedNetwork) {
+    if (allNetworksFailed) {
       return (
         <EmptyState
-          title="Network not supported"
-          message="Activity is recorded per network, and this one isn't supported yet. Balances across all networks are in Portfolio."
+          title="Your networks could not be read"
+          message={`None of your networks answered: ${partialChains.join(', ')}. Nothing is shown rather than an empty history that isn't true.`}
         />
       )
     }
@@ -124,12 +125,12 @@ function MyAccountView() {
   // cross-network scan) renders regardless, and only the WAGER sections get an
   // honest compact note when there is nothing to compute them from.
   const wagerStatsHonestState = () => {
-    if (!isSupportedNetwork) {
+    if (allNetworksFailed) {
       return (
         <EmptyState
           compact
-          title="Wager stats unavailable here"
-          message="Wager data is scoped to the active network, and this one isn't supported yet."
+          title="Your networks could not be read"
+          message={`None of your networks answered: ${partialChains.join(', ')}. Figures are withheld rather than shown as zeros.`}
         />
       )
     }
@@ -195,7 +196,8 @@ function MyAccountView() {
               entries={activity}
               chainId={chainId}
               staleClasses={staleClasses}
-              prunedBefore={prunedBefore}
+              partialChains={partialChains}
+              prunedByChain={prunedByChain}
             />
           )}
         </div>
@@ -217,6 +219,12 @@ function MyAccountView() {
             </>
           ) : (
             <>
+              {partialChains.length > 0 && (
+                <p className="my-account-partial" role="status">
+                  Figures exclude {partialChains.join(', ')} — could not be read. Totals are
+                  partial.
+                </p>
+              )}
               <SummaryTiles summary={summary} isEmpty={isLoading && !summary} />
               <PnlChart series={series} onRangeChange={setRange} onCreateWager={goCreate} />
               {/* The by-status / by-token / by-resolution breakdowns are stats,

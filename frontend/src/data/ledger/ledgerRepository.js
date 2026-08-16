@@ -88,8 +88,10 @@ function inPeriod(entry, period) {
   return true
 }
 
-/** Newest first; entries with no real timestamp sort after all dated ones. */
-function compareEntries(a, b) {
+/** Newest first; entries with no real timestamp sort after all dated ones.
+ * Exported so the estate merge (spec 092) orders its merged stream with the
+ * exact same semantics — one comparator, two consumers. */
+export function compareEntries(a, b) {
   const at = a.timestamp
   const bt = b.timestamp
   if (at != null && bt != null) return bt - at
