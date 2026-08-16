@@ -174,6 +174,40 @@ git checkout staging && git merge origin/main && git push
 lacks, and closes it when the drift clears. Do not close it by hand — closing it without merging
 just removes the reminder.
 
+### Back-merging (`main` → `staging`)
+
+Two flows exist and they are not interchangeable:
+
+| | Direction | What it carries |
+|---|---|---|
+| **Promotion** | `staging` → `main` | product changes reaching production |
+| **Back-merge** | `main` → `staging` | release records and hotfixes returning |
+
+**Release records are born on `main`** — the release workflow tags, then opens a
+`release/*-changelog` PR against `main` — so a back-merge is the only route by which they reach
+`staging`. A hotfix is the same by definition.
+
+It is now automated: when `branch-policy.yml` detects drift it *also* points
+`chore/auto-backmerge-main-into-staging` at `main`'s tip and opens a PR into `staging`. Review and
+merge it; there is nothing to edit. Filing an issue alone was not enough — the drift only hurts
+later, on somebody else's pull request, and the first one sat open for three days and cost PR #1195
+a rebase.
+
+**Merge it with a merge commit, never a squash.** A squash copies the content but not the ancestry:
+`git log staging..main` stays non-empty, the drift issue reopens on the next run, and the problem
+looks fixed while persisting.
+
+Verify afterwards — this is what distinguishes a merge from a squash:
+
+```bash
+git fetch origin main staging
+git log --oneline origin/staging..origin/main   # must print NOTHING
+```
+
+Left unmerged, drift does not lose work, but it does two things: every PR into `staging` that
+touches a manifest trips the version gate for bumps its author never made, and `staging` reports an
+older version than the code it is running, so a bug found there cannot be traced to a release.
+
 ---
 
 ## When something goes wrong
