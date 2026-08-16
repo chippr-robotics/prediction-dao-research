@@ -26,16 +26,16 @@
 
 /* Mainnet staging: real funds. #7F1D1D on #FEE2E2 is ~9.9:1. */
 .staging-banner--danger {
-  background: #FEE2E2;
-  color: #7F1D1D;
-  border-bottom: 3px solid #B91C1C;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-bottom: 3px solid var(--danger-text);
 }
 
 /* Testnet staging: no funds at risk. #1E3A8A on #DBEAFE is ~9.7:1. */
 .staging-banner--info {
-  background: #DBEAFE;
-  color: #1E3A8A;
-  border-bottom: 3px solid #1D4ED8;
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-bottom: 3px solid var(--info-text);
 }
 
 @media (max-width: 640px) {

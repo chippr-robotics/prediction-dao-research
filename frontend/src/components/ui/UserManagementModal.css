@@ -28,7 +28,7 @@
 }
 
 .wallet-address-display {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   color: var(--color-text-secondary);
 }
@@ -40,7 +40,7 @@
 }
 
 .wallet-address-full {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-text-tertiary);
   opacity: 0.8;
@@ -92,7 +92,7 @@
   font-size: 16px;
   font-weight: 600;
   color: var(--primary-button-text, white);
-  background: var(--primary-button, #36B37E);
+  background: var(--primary-button);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -105,7 +105,7 @@
 }
 
 .connect-wallet-btn-large:hover:not(:disabled) {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
   transform: translateY(-1px);
 }
 
@@ -125,11 +125,11 @@
   gap: 10px;
   padding: 12px 16px;
   margin: 16px 0;
-  background: var(--semantic-loss, #E5533D);
-  background: rgba(229, 83, 61, 0.1);
-  border: 1px solid var(--semantic-loss, #E5533D);
+  background: var(--semantic-loss);
+  background: rgba(var(--danger-color-rgb), 0.1);
+  border: 1px solid var(--semantic-loss);
   border-radius: 8px;
-  color: var(--semantic-loss, #E5533D);
+  color: var(--semantic-loss);
 }
 
 /* Connector Options */
@@ -159,8 +159,8 @@
 .wallet-help {
   margin-top: 24px;
   padding: 16px;
-  background: rgba(76, 154, 255, 0.1);
-  border-left: 3px solid var(--semantic-active, #4C9AFF);
+  background: rgba(var(--brand-secondary-rgb), 0.1);
+  border-left: 3px solid var(--semantic-active);
   border-radius: 6px;
   text-align: left;
 }
@@ -168,7 +168,7 @@
 .wallet-help p {
   margin: 0 0 8px;
   font-size: 14px;
-  color: var(--text-secondary, #5A6772);
+  color: var(--text-secondary);
 }
 
 .install-wallet-link {
@@ -177,13 +177,13 @@
   gap: 4px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--primary-button, #36B37E);
+  color: var(--primary-button);
   text-decoration: none;
   transition: all 0.2s ease;
 }
 
 .install-wallet-link:hover {
-  color: var(--primary-button-hover, #2F9E6E);
+  color: var(--primary-button-hover);
   text-decoration: underline;
 }
 
@@ -292,7 +292,7 @@
 }
 
 .detail-row .value {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   color: var(--color-text);
   word-break: break-all;
@@ -302,8 +302,8 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--primary-button-text, #ffffff);
-  background: var(--danger-color, #dc2626);
+  color: var(--primary-button-text);
+  background: var(--danger-color);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -311,7 +311,7 @@
 }
 
 .disconnect-btn:hover {
-  background: var(--danger-color-hover, #b91c1c);
+  background: var(--danger-color-hover);
 }
 
 /* Network toggle (Testnet/Mainnet) */
@@ -328,8 +328,8 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--primary-button-text, #ffffff);
-  background: var(--primary-button, #36B37E);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -338,7 +338,7 @@
 }
 
 .toggle-network-btn:hover {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
 }
 
 .network-toggle-description {
@@ -349,12 +349,12 @@
 }
 
 .status-badge.demo {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-brand);
   color: white;
 }
 
 .status-badge.live {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: var(--gradient-brand-soft);
   color: white;
 }
 
@@ -420,8 +420,8 @@
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--primary-button-text, #ffffff);
-  background: var(--primary-button, #36B37E);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -429,7 +429,7 @@
 }
 
 .search-btn:hover {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
 }
 
 .recent-searches {
@@ -474,8 +474,8 @@
 
 .search-help {
   padding: 16px;
-  background: var(--color-info-bg, rgba(66, 153, 225, 0.1));
-  border-left: 3px solid var(--color-info, #4299e1);
+  background: var(--color-info-bg);
+  border-left: 3px solid var(--color-info);
   border-radius: 6px;
 }
 
@@ -519,8 +519,8 @@
   padding: 14px 32px;
   font-size: 16px;
   font-weight: 600;
-  color: var(--primary-button-text, #ffffff);
-  background: var(--primary-button, #36B37E);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -529,7 +529,7 @@
 }
 
 .launch-market-btn:hover {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
   transform: translateY(-1px);
 }
 
@@ -651,7 +651,7 @@
 
 .theme-toggle-btn:hover {
   border-color: var(--color-primary);
-  background: var(--color-primary-alpha, rgba(54, 179, 126, 0.1));
+  background: var(--color-primary-alpha, rgba(var(--brand-primary-rgb), 0.1));
 }
 
 .theme-icon {
@@ -758,7 +758,7 @@
   font-size: 13px;
   font-weight: 600;
   border-radius: 12px;
-  background: var(--color-primary-alpha, rgba(54, 179, 126, 0.1));
+  background: var(--color-primary-alpha, rgba(var(--brand-primary-rgb), 0.1));
   color: var(--color-primary);
   border: 1px solid var(--color-primary);
 }
@@ -770,7 +770,7 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: 8px;
-  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  background: var(--gradient-gold);
   color: #000;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -801,8 +801,8 @@
   padding: 10px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--primary-button-text, #ffffff);
-  background: linear-gradient(135deg, var(--primary-button, #36B37E), var(--accent-color, #4C9AFF));
+  color: var(--primary-button-text);
+  background: linear-gradient(135deg, var(--primary-button), var(--accent-color));
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -826,15 +826,15 @@
   background: linear-gradient(135deg, rgba(237, 100, 166, 0.05), rgba(255, 77, 77, 0.05));
   padding: 20px !important;
   border-radius: 8px;
-  border: 1px solid var(--color-error, #f56565);
+  border: 1px solid var(--color-error);
 }
 
 .admin-panel-btn {
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--primary-button-text, #ffffff);
-  background: var(--danger-color, #dc2626);
+  color: var(--primary-button-text);
+  background: var(--danger-color);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -842,7 +842,7 @@
 }
 
 .admin-panel-btn:hover {
-  background: var(--danger-color-hover, #b91c1c);
+  background: var(--danger-color-hover);
   transform: translateY(-1px);
 }
 

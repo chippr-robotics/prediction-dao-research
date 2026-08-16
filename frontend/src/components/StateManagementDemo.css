@@ -12,14 +12,14 @@
 .demo-header h1 {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-brand);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .demo-header p {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 1.1rem;
 }
 
@@ -34,7 +34,7 @@
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-color);
 }
 
 .demo-card.full-width {
@@ -42,13 +42,13 @@
 }
 
 .demo-card.info-card {
-  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  background: linear-gradient(135deg, var(--brand-primary)15 0%, var(--brand-secondary)15 100%);
 }
 
 .demo-card h2 {
   margin: 0 0 1.5rem 0;
   font-size: 1.5rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .state-info {
@@ -60,7 +60,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .state-item:last-child {
@@ -69,26 +69,26 @@
 
 .state-label {
   font-weight: 600;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .state-value {
   font-size: 0.95rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .state-value.monospace {
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
 }
 
 .state-value.connected {
-  color: #10b981;
+  color: var(--success-color);
   font-weight: 600;
 }
 
 .state-value.disconnected {
-  color: #ef4444;
+  color: var(--danger-color);
   font-weight: 600;
 }
 
@@ -117,7 +117,7 @@
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-brand);
   color: white;
 }
 
@@ -128,23 +128,23 @@
 
 .secondary-button {
   background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
+  color: var(--brand-primary);
+  border: 2px solid var(--brand-primary);
 }
 
 .secondary-button:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--bg-tertiary);
 }
 
 .action-button {
-  background: #f9fafb;
-  color: #374151;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 
 .action-button:hover:not(:disabled) {
-  background: #f3f4f6;
-  border-color: #d1d5db;
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
 }
 
 .primary-button:disabled,
@@ -158,25 +158,25 @@
 .error-display {
   margin-top: 1.5rem;
   padding: 1rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-bg);
   border-radius: 8px;
 }
 
 .error-display h3 {
   margin: 0 0 0.5rem 0;
-  color: #991b1b;
+  color: var(--danger-text);
   font-size: 1rem;
 }
 
 .error-display p {
   margin: 0 0 1rem 0;
-  color: #7f1d1d;
+  color: var(--danger-text);
 }
 
 .event-log {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
   max-height: 300px;
@@ -186,7 +186,7 @@
 
 .empty-log {
   text-align: center;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 2rem;
   margin: 0;
 }
@@ -195,7 +195,7 @@
   display: flex;
   gap: 1rem;
   padding: 0.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-color);
   animation: slideIn 0.3s ease-out;
 }
 
@@ -215,14 +215,14 @@
 }
 
 .log-time {
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   min-width: 80px;
 }
 
 .log-message {
-  color: #374151;
+  color: var(--text-secondary);
   flex: 1;
 }
 
@@ -234,13 +234,13 @@
 
 .info-item h3 {
   margin: 0 0 0.5rem 0;
-  color: #667eea;
+  color: var(--brand-primary);
   font-size: 1.1rem;
 }
 
 .info-item p {
   margin: 0 0 0.75rem 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.5;
 }
@@ -251,9 +251,9 @@
   padding: 0.5rem;
   border-radius: 4px;
   font-size: 0.85rem;
-  color: #667eea;
-  font-family: 'Courier New', monospace;
-  border: 1px solid #e5e7eb;
+  color: var(--brand-primary);
+  font-family: var(--font-mono);
+  border: 1px solid var(--border-color);
 }
 
 .network-error-banner {
@@ -261,11 +261,11 @@
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--danger-bg);
+  color: var(--danger-text);
   padding: 1rem 2rem;
   border-radius: 8px;
-  border: 2px solid #fecaca;
+  border: 2px solid var(--danger-bg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   max-width: 600px;
   text-align: center;
@@ -290,7 +290,7 @@
 
 .demo-modal-content p {
   margin: 0 0 1rem 0;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .modal-actions {

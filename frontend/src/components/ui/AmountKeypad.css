@@ -28,7 +28,7 @@
   max-width: 100%;
   /* The stake is the hero — big and brand-green ("Winning Green"), like a
      payments app's amount read-out. */
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
   font-weight: 700;
   line-height: 1;
   /* Scales down on narrow screens; stays large and glanceable on wide ones. */
@@ -38,7 +38,7 @@
 }
 
 .amount-keypad-prefix {
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
   opacity: 0.8;
   font-weight: 600;
   font-size: 0.62em;
@@ -55,11 +55,11 @@
 /* Zero state — a faded tint of the same green so it reads as "nothing entered
    yet" without losing the brand color (FR-016). */
 .amount-keypad-hero.is-zero {
-  color: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.5);
+  color: rgba(var(--brand-primary-rgb), 0.5);
 }
 
 .amount-keypad-hero.is-zero .amount-keypad-prefix {
-  color: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.5);
+  color: rgba(var(--brand-primary-rgb), 0.5);
   opacity: 1;
 }
 
@@ -68,10 +68,10 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.1rem 0.55rem;
-  border: 1px solid var(--border-color, #23303D);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-full, 9999px);
-  background: var(--bg-secondary, #141C24);
-  color: var(--text-secondary, #AAB6C2);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -96,7 +96,7 @@
   min-width: 0;
   width: auto;
   padding: 0.1rem 1.35rem 0.1rem 0.5rem;
-  color: var(--text-secondary, #7A8590);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -106,11 +106,11 @@
 }
 
 .amount-keypad .amount-keypad-token-slot select:hover:not(:disabled) {
-  color: var(--text-primary, #E6EDF3);
+  color: var(--text-primary);
 }
 
 .amount-keypad .amount-keypad-token-slot select:focus-visible {
-  outline: 2px solid var(--brand-primary, #36B37E);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -137,7 +137,7 @@
   background: transparent;
   border: none;
   border-radius: var(--radius-full, 9999px);
-  color: var(--text-primary, #E6EDF3);
+  color: var(--text-primary);
   font-family: inherit;
   font-size: 2.3rem;
   font-weight: 600;
@@ -149,17 +149,17 @@
 }
 
 .amount-keypad-key:hover:not(:disabled) {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  background: rgba(var(--brand-primary-rgb), 0.1);
 }
 
 .amount-keypad-key:active:not(:disabled) {
   transform: scale(0.97);
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+  background: rgba(var(--brand-primary-rgb), 0.18);
 }
 
 .amount-keypad-key:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.35);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.35);
 }
 
 .amount-keypad-key:disabled {
@@ -168,7 +168,7 @@
 }
 
 .amount-keypad-key--fn {
-  color: var(--text-secondary, #AAB6C2);
+  color: var(--text-secondary);
 }
 
 .amount-keypad-key--fn svg {

@@ -21,7 +21,7 @@
 
 .vch-privacy {
   border: 1px solid var(--border-color);
-  border-left: 4px solid var(--brand-primary, #6c8cff);
+  border-left: 4px solid var(--brand-primary);
   border-radius: var(--radius-md, 8px);
   background: var(--bg-secondary);
   padding: 0.85rem 1rem;
@@ -43,10 +43,10 @@
   color: var(--text-secondary);
 }
 .vch-error {
-  color: #d9534f;
+  color: var(--danger-color);
 }
 .vch-tx {
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .vch-card {
@@ -88,14 +88,14 @@
   transition: var(--transition-base, all 0.15s ease);
 }
 .vch-tier.is-selected {
-  border-color: var(--brand-primary, #6c8cff);
-  box-shadow: 0 0 0 1px var(--brand-primary, #6c8cff);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 1px var(--brand-primary);
 }
 .vch-tier-badge {
   display: inline-block;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  color: #1a1a1a;
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 0.85rem;
 }
@@ -150,10 +150,10 @@
 
 .vch-success,
 .vch-ok {
-  color: #3c9a5f;
+  color: var(--success-color);
 }
 .vch-warn {
-  color: #c77d11;
+  color: var(--warning-text);
 }
 
 /* Buy row: quantity + optional gift address (spec 026) */
@@ -182,7 +182,7 @@
   flex: 0 0 auto;
 }
 .vch-input-error {
-  border-color: #c77d11;
+  border-color: var(--warning-text);
 }
 
 /* Gift / transfer address fields take the full row (single line) with the
@@ -228,7 +228,7 @@
 .vch-refresh {
   background: none;
   border: none;
-  color: var(--brand-primary, #6c8cff);
+  color: var(--brand-primary);
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -270,8 +270,8 @@
   cursor: pointer;
 }
 .vch-voucher-item.is-selected {
-  border-color: var(--brand-primary, #6c8cff);
-  box-shadow: 0 0 0 1px var(--brand-primary, #6c8cff);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 1px var(--brand-primary);
 }
 .vch-voucher-meta {
   color: var(--text-secondary);

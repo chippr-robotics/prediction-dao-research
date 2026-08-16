@@ -158,7 +158,7 @@
 .wallet-info-compact .status-dot {
   width: 8px;
   height: 8px;
-  background: #22c55e;
+  background: var(--success-color);
   border-radius: 50%;
   display: inline-block;
   animation: pulse-dot 2s ease-in-out infinite;
@@ -222,7 +222,7 @@
 .status-dot {
   width: 8px;
   height: 8px;
-  background: #22c55e;
+  background: var(--success-color);
   border-radius: 50%;
   display: inline-block;
   animation: pulse-dot 2s ease-in-out infinite;
@@ -244,10 +244,10 @@
 }
 
 .disconnect-btn {
-  background-color: rgba(239, 68, 68, 0.2);
+  background-color: rgba(var(--danger-color-rgb), 0.2);
   color: white;
   padding: 0.5rem 0.875rem;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(var(--danger-color-rgb), 0.3);
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85rem;
@@ -257,15 +257,15 @@
 }
 
 .disconnect-btn:hover {
-  background-color: rgba(239, 68, 68, 0.4);
-  border-color: rgba(239, 68, 68, 0.5);
+  background-color: rgba(var(--danger-color-rgb), 0.4);
+  border-color: rgba(var(--danger-color-rgb), 0.5);
 }
 
 .connect-btn {
-  background-color: rgba(34, 197, 94, 0.2);
+  background-color: rgba(var(--success-color-rgb), 0.2);
   color: white;
   padding: 0.625rem 1.25rem;
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  border: 1px solid rgba(var(--success-color-rgb), 0.3);
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.95rem;
@@ -275,10 +275,10 @@
 }
 
 .connect-btn:hover {
-  background-color: rgba(34, 197, 94, 0.4);
-  border-color: rgba(34, 197, 94, 0.5);
+  background-color: rgba(var(--success-color-rgb), 0.4);
+  border-color: rgba(var(--success-color-rgb), 0.5);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  box-shadow: 0 4px 12px rgba(var(--success-color-rgb), 0.3);
 }
 
 .scan-qr-btn {

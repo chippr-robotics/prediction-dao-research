@@ -19,9 +19,9 @@
   max-width: 460px;
   max-height: 92vh;
   overflow-y: auto;
-  background: var(--bg-primary, #fff);
-  color: var(--text-primary, #111);
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg, 14px);
   padding: 1.25rem 1.25rem 1.4rem;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
@@ -46,11 +46,11 @@
   justify-content: center;
   border: none;
   border-radius: 999px;
-  background: var(--bg-secondary, rgba(0, 0, 0, 0.05));
-  color: var(--text-secondary, #555);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   cursor: pointer;
 }
-.pwa-install-close:hover { background: var(--bg-tertiary, rgba(0, 0, 0, 0.1)); }
+.pwa-install-close:hover { background: var(--bg-tertiary); }
 
 .pwa-install-head {
   display: flex;
@@ -67,7 +67,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--brand-primary, #36B37E) 14%, transparent);
+  background: color-mix(in srgb, var(--brand-primary) 14%, transparent);
   overflow: hidden;
 }
 .pwa-install-icon img { display: block; width: 40px; height: 40px; }
@@ -82,7 +82,7 @@
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.4;
-  color: var(--text-secondary, #555);
+  color: var(--text-secondary);
 }
 
 /* iOS manual steps */
@@ -93,7 +93,7 @@
   flex-direction: column;
   gap: 0.5rem;
   font-size: 0.9rem;
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
 }
 .pwa-install-ios-steps li { line-height: 1.5; }
 .pwa-install-ios-share {
@@ -102,7 +102,7 @@
   justify-content: center;
   vertical-align: middle;
   margin: 0 0.3rem;
-  color: var(--brand-primary, #36B37E);
+  color: var(--brand-primary);
 }
 
 /* Primary install CTA (Chromium / desktop) */
@@ -112,7 +112,7 @@
   margin-bottom: 0.85rem;
   border: none;
   border-radius: 10px;
-  background: var(--brand-primary, #36B37E);
+  background: var(--brand-primary);
   color: #fff;
   font-size: 0.98rem;
   font-weight: 600;
@@ -138,10 +138,10 @@
   font-size: 0.85rem;
   cursor: pointer;
 }
-.pwa-install-secondary { color: var(--text-primary, #111); font-weight: 500; }
+.pwa-install-secondary { color: var(--text-primary); font-weight: 500; }
 .pwa-install-secondary:hover { text-decoration: underline; }
-.pwa-install-dont-show { color: var(--text-secondary, #777); }
-.pwa-install-dont-show:hover { color: var(--text-primary, #111); text-decoration: underline; }
+.pwa-install-dont-show { color: var(--text-secondary); }
+.pwa-install-dont-show:hover { color: var(--text-primary); text-decoration: underline; }
 
 /* Mobile: dock to the bottom as a sheet with a grab handle. */
 @media (max-width: 768px) {
@@ -160,7 +160,7 @@
     width: 40px;
     height: 4px;
     border-radius: 999px;
-    background: var(--border-color, rgba(0, 0, 0, 0.2));
+    background: var(--border-color);
     margin: 0 auto 0.9rem;
   }
 }

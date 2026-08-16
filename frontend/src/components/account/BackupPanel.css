@@ -28,7 +28,7 @@
 .backup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .backup-btn:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 1px; }
 .backup-btn-primary { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
-.backup-btn-danger { color: var(--semantic-loss, #c0492f); border-color: var(--semantic-loss, #c0492f); background: transparent; }
+.backup-btn-danger { color: var(--semantic-loss); border-color: var(--semantic-loss); background: transparent; }
 
 .backup-cost { color: var(--text-muted, var(--text-secondary)); font-size: 0.78rem; margin: 0.3rem 0 0; }
 
@@ -36,7 +36,7 @@
 .backup-radio { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.35rem 0; font-size: 0.85rem; line-height: 1.4; }
 .backup-radio input { margin-top: 0.2rem; }
 .backup-warn {
-  color: var(--semantic-warning, #b8860b);
-  background: color-mix(in srgb, var(--semantic-warning, #b8860b) 12%, transparent);
+  color: var(--semantic-warning);
+  background: color-mix(in srgb, var(--semantic-warning) 12%, transparent);
   border-radius: 8px; padding: 0.5rem 0.7rem; margin: 0.5rem 0; font-size: 0.83rem;
 }

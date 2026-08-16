@@ -77,7 +77,7 @@ whole point; do not reintroduce pins as full-width rows.
 - The visible label is clamped to two lines and is `aria-hidden`; the **full** app name is the
   button's accessible name and `title`.
 - Zero pins ⇒ the strip does not render at all.
-- Home and Portfolio stay as labelled rows under Quick Access. They are destinations the product
+- Payments and Accounts stay as labelled rows under Quick Access. They are destinations the product
   ships, not shortcuts the member chose.
 
 ## Filter
@@ -135,7 +135,12 @@ already made for `miniapp_favorites` (spec 073) and `network_endpoints` (spec 06
 ## Groups
 
 `frontend/src/config/appNav.js` remains the one source of truth. Since spec 081 there are three:
-**Quick Access** (Home, Portfolio), **Finance**, **Tools**.
+**Quick Access** (Payments, Accounts), **Finance**, **Tools**.
+
+Those two items' **ids are `home` and `portfolio`** — route identity, not copy. The labels were
+renamed to "Payments" and "Accounts"; the ids stayed so `/app`, `?tab=account&view=portfolio`, the
+landing-view preference and every saved deep link keep resolving. `navSearchIndex.js` carries the
+former names as search terms, so a member who types "home" or "portfolio" still lands on them.
 
 The mini-app catalog entry lives **inside Tools**. Spec 073 had already collapsed the Apps group to
 that single entry — which apps exist is decided by the on-chain registry, so the nav can only name

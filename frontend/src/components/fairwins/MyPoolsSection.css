@@ -26,16 +26,16 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+  border: 1px solid var(--border-color);
   border-radius: 10px;
-  background: var(--surface-2, rgba(0, 0, 0, 0.02));
+  background: var(--surface-2);
   cursor: pointer;
   text-align: left;
   font: inherit;
 }
 
 .mm-pool-link:hover {
-  border-color: var(--accent, #3b9c78);
+  border-color: var(--accent);
 }
 
 .mm-pool-type {
@@ -44,8 +44,8 @@
   text-transform: uppercase;
   padding: 0.1rem 0.4rem;
   border-radius: 6px;
-  background: var(--accent-soft, rgba(59, 156, 120, 0.15));
-  color: var(--accent, #3b9c78);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .mm-pool-title {
@@ -65,8 +65,8 @@
 }
 
 .mm-pool-bucket--active {
-  background: rgba(59, 156, 120, 0.15);
-  color: #3b9c78;
+  background: rgba(var(--success-color-rgb), 0.15);
+  color: var(--success-color);
 }
 
 .mm-pool-bucket--history {

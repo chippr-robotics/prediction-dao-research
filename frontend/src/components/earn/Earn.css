@@ -21,7 +21,7 @@
 
 .earn-switch-note,
 .earn-unavailable {
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 0.75rem 1rem;
   color: var(--text-secondary);
@@ -49,7 +49,7 @@
   gap: 0.35rem;
   text-align: left;
   padding: 1rem;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--bg-secondary, transparent);
   color: var(--text-primary, inherit);
@@ -82,7 +82,7 @@
 .earn-area-flag {
   font-size: 0.75rem;
   color: var(--text-muted, var(--text-secondary));
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 999px;
   padding: 0.1rem 0.55rem;
 }
@@ -155,7 +155,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   background: var(--bg-secondary, transparent);
   color: var(--text-primary, inherit);
@@ -216,7 +216,7 @@
 }
 
 .earn-position-pnl.down {
-  color: var(--danger-color, #c0392b);
+  color: var(--danger-color);
   font-size: 0.8rem;
 }
 
@@ -240,7 +240,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 10px;
 }
 
@@ -285,7 +285,7 @@
   padding: 0.55rem 1.1rem;
   font-size: 0.95rem;
   cursor: pointer;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   background: var(--bg-secondary, transparent);
   color: var(--text-primary, inherit);
 }
@@ -327,7 +327,7 @@
 .earn-mode-tab {
   flex: 1;
   padding: 0.5rem;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   background: none;
   color: var(--text-primary, inherit);
@@ -386,7 +386,7 @@
 .earn-amount-input input {
   flex: 1;
   padding: 0.55rem 0.75rem;
-  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-secondary, transparent);
   color: var(--text-primary, inherit);
@@ -394,7 +394,7 @@
 }
 
 .earn-input-error {
-  color: var(--danger-color, #c0392b);
+  color: var(--danger-color);
   font-size: 0.85rem;
   margin: 0;
 }
@@ -438,7 +438,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  border-top: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-top: 1px solid var(--border-color);
   padding-top: 0.75rem;
   margin-top: 0.5rem;
 }
@@ -469,23 +469,23 @@
   margin-left: 0.35rem;
 }
 .staking-badge.liquid {
-  background: rgba(34, 197, 94, 0.15);
-  color: #15803d;
+  background: rgba(var(--success-color-rgb), 0.15);
+  color: var(--success-color);
 }
 .staking-badge.delegated {
-  background: rgba(59, 130, 246, 0.15);
-  color: #1d4ed8;
+  background: rgba(var(--info-color-rgb), 0.15);
+  color: var(--info-text);
 }
 .staking-ready-flag {
   display: inline-block;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #15803d;
+  color: var(--success-color);
 }
 .staking-unbonding-flag {
   display: inline-block;
   font-size: 0.72rem;
-  color: #92700e;
+  color: var(--warning-text);
 }
 .earn-disclosure {
   font-size: 0.78rem;
@@ -495,7 +495,7 @@
 }
 
 .staking-ready-box {
-  border: 1px solid rgba(34, 197, 94, 0.35);
+  border: 1px solid rgba(var(--success-color-rgb), 0.35);
   border-radius: 10px;
   padding: 0.6rem 0.75rem;
   margin: 0.5rem 0;

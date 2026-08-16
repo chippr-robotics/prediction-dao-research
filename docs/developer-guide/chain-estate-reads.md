@@ -138,3 +138,27 @@ saying why; the guard also fails when a listed count drops, so a baseline cannot
 
 `frontend/src/test/admin/adminViewScope.test.jsx` covers the views themselves: two rendered end
 to end (deny-list, paymaster) across every per-chain state, and the rest structurally.
+
+## Member activity: the estate ledger (spec 092)
+
+The estate pattern above also carries the MEMBER's activity record. The Account tab's Activity
+feed and Stats merge the spec-051 per-chain ledger across the cohort via
+`frontend/src/data/ledger/estateLedger.js` (`getDefaultEstateLedger()` in `data/ledger/index.js`
+wires the default repository and providers). The full contract is
+`specs/092-multi-chain-activity/contracts/estate-activity.md`; the short version:
+
+- The merge sits **above** the per-chain `listEntries` boundary, so normalize's G5 guard (an
+  entry's chainId must match its query scope) stays in force; the merge never re-tags an entry.
+- **Two disclosure layers, deliberately distinct.** A CHAIN resolves `read`/`unreachable`
+  (`chainStates`, with unreachable chains named via `partialChains`); within a `read` chain,
+  individual SOURCES keep the existing `staleClasses` degradation, labelled per network in the
+  UI ("earn on Polygon"). Don't collapse one into the other: a dead endpoint is not "earn is
+  stale", and a broken subgraph is not "Polygon unreachable".
+- **Empty ≠ failed.** A chain that read fine and found nothing is `read` with `entryCount: 0`;
+  gate "no activity" language on state, never on count.
+- Dedup is by `entryId` (identity embeds chainId), which also collapses reference-chain sources
+  (membership) answering from several scopes.
+- Wager lookups downstream are keyed `(chainId, wagerId)` — wager #12 exists independently on
+  two chains.
+
+`frontend/src/test/ledger/estateLedger.test.js` pins one case per contract guarantee.

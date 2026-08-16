@@ -2,8 +2,8 @@
 
 .component-examples {
   min-height: 100vh;
-  background: #0f1810;
-  color: #f1f5f9;
+  background: var(--chippr-gunmetal);
+  color: var(--bg-tertiary);
   padding: 2rem;
 }
 
@@ -14,13 +14,13 @@
 
 .component-examples h1 {
   font-size: 2.5rem;
-  color: #2D7A4F;
+  color: var(--brand-primary);
   margin-bottom: 0.5rem;
 }
 
 .intro {
   font-size: 1.125rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 3rem;
 }
 
@@ -30,21 +30,21 @@
 
 .example-section h2 {
   font-size: 2rem;
-  color: #34A853;
+  color: var(--brand-primary);
   margin-bottom: 1.5rem;
-  border-bottom: 2px solid #2D7A4F;
+  border-bottom: 2px solid var(--brand-primary);
   padding-bottom: 0.5rem;
 }
 
 .example-section h3 {
   font-size: 1.25rem;
-  color: #f1f5f9;
+  color: var(--bg-tertiary);
   margin-bottom: 1rem;
 }
 
 .example-section h4 {
   font-size: 1.125rem;
-  color: #f1f5f9;
+  color: var(--bg-tertiary);
   margin-bottom: 0.5rem;
 }
 
@@ -82,12 +82,12 @@
 .accessibility-list li {
   padding: 0.5rem 0;
   font-size: 1rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .usage-code {
-  background: #1a2820;
-  border: 1px solid #2D7A4F;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--brand-primary);
   border-radius: 8px;
   padding: 1.5rem;
   overflow-x: auto;
@@ -96,8 +96,8 @@
 
 .usage-code pre {
   margin: 0;
-  color: #f1f5f9;
-  font-family: 'Courier New', monospace;
+  color: var(--bg-tertiary);
+  font-family: var(--font-mono);
   font-size: 0.875rem;
   line-height: 1.6;
 }

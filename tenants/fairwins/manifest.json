@@ -2,26 +2,32 @@
   "schemaVersion": 1,
   "id": "fairwins",
   "lifecycle": "live",
-
   "identity": {
     "displayName": "FairWins",
     "legalName": "FairWins",
     "tagline": "Enterprise-grade digital asset infrastructure — self-custody, multi-chain, white-label.",
     "metaDescription": "FairWins is self-custody digital asset infrastructure: embedded wallets, policy-governed custody, payments and settlement, markets connectivity, and built-in compliance screening across major networks — available white-label under your own brand.",
-    "domains": ["fairwins.app"],
+    "domains": [
+      "fairwins.app"
+    ],
     "appUrl": "https://fairwins.app",
     "docsUrl": "https://docs.FairWins.app",
     "copyrightNotice": "ChipprRobotics LLC. Apache License 2.0",
-    "support": { "email": "Howdy@FairWins.App" },
+    "support": {
+      "email": "Howdy@FairWins.App"
+    },
     "social": {
       "x": "https://x.com/fairwins_app",
       "discord": "https://discord.gg/rkYvPFdRRr",
       "github": "https://github.com/chippr-robotics/prediction-dao-research",
       "instagram": "https://instagram.com/fairwinsapp"
     },
-    "legal": { "termsPath": "/terms", "privacyPath": "/privacy", "riskPath": "/risk" }
+    "legal": {
+      "termsPath": "/terms",
+      "privacyPath": "/privacy",
+      "riskPath": "/risk"
+    }
   },
-
   "brand": {
     "logo": "/assets/logo_fairwins.svg",
     "logoMark": "/assets/fairwins_no-text_logo.svg",
@@ -32,44 +38,54 @@
       "name": "🍀FairWins",
       "shortName": "FairWins",
       "appleTitle": "🍀FairWins",
-      "themeColor": "#36B37E",
-      "backgroundColor": "#0E141B"
+      "themeColor": "#2E7D8C",
+      "backgroundColor": "#122126"
     },
     "theme": {
       "base": {
-        "--brand-primary": "#36B37E",
-        "--brand-primary-rgb": "54, 179, 126",
-        "--brand-secondary": "#4C9AFF",
-        "--brand-secondary-rgb": "76, 154, 255",
-        "--brand-accent": "#7BDCB5",
-        "--brand-accent-rgb": "123, 220, 181",
-        "--semantic-win": "#2ECC71",
-        "--semantic-active": "#4C9AFF",
-        "--semantic-warning": "#F5A623",
-        "--semantic-loss": "#E5533D",
-        "--chart-series-a": "#36B37E",
-        "--chart-series-b": "#4C9AFF",
-        "--chart-series-c": "#7BDCB5",
-        "--chart-series-d": "#F5A623",
-        "--chart-series-e": "#9AA6B2"
+        "--brand-primary": "#2E7D8C",
+        "--brand-primary-rgb": "46, 125, 140",
+        "--brand-secondary": "#1F5966",
+        "--brand-secondary-rgb": "31, 89, 102",
+        "--brand-accent": "#6FAEBB",
+        "--brand-accent-rgb": "111, 174, 187",
+        "--semantic-win": "var(--success-color)",
+        "--semantic-active": "var(--info-color)",
+        "--semantic-warning": "var(--warning-color)",
+        "--semantic-loss": "var(--danger-color)",
+        "--chart-series-a": "#2E7D8C",
+        "--chart-series-b": "#F2A33C",
+        "--chart-series-c": "#6FAEBB",
+        "--chart-series-d": "#1F5966",
+        "--chart-series-e": "#5E6B70"
       },
       "light": {
-        "--primary-button": "#36B37E",
-        "--primary-button-hover": "#2F9E6E",
+        "--primary-button": "#2E7D8C",
+        "--primary-button-hover": "#1F5966",
         "--primary-button-text": "#FFFFFF",
-        "--accent-color": "#4C9AFF",
-        "--highlight-color": "#7BDCB5"
+        "--accent-color": "#1F5966",
+        "--highlight-color": "#D9E9EC"
       },
       "dark": {
-        "--primary-button": "#45C492",
-        "--primary-button-hover": "#5ED6A6",
-        "--primary-button-text": "#0E141B",
-        "--accent-color": "#4C9AFF",
-        "--highlight-color": "#7BDCB5"
+        "--brand-primary": "#83B9C4",
+        "--brand-primary-rgb": "131, 185, 196",
+        "--brand-secondary": "#6FAEBB",
+        "--brand-secondary-rgb": "111, 174, 187",
+        "--brand-accent": "#D9E9EC",
+        "--brand-accent-rgb": "217, 233, 236",
+        "--chart-series-a": "#83B9C4",
+        "--chart-series-b": "#F2A33C",
+        "--chart-series-c": "#D9E9EC",
+        "--chart-series-d": "#4E93A2",
+        "--chart-series-e": "#8FA0A6",
+        "--primary-button": "#6FAEBB",
+        "--primary-button-hover": "#87BBC6",
+        "--primary-button-text": "#1C333B",
+        "--accent-color": "#83B9C4",
+        "--highlight-color": "#243F48"
       }
     }
   },
-
   "settings": {
     "features": [
       "wagers",
@@ -89,11 +105,26 @@
       "recovery"
     ],
     "chains": {
-      "mainnet": [137, 1, 10, 8453, 42161, 61],
-      "testnet": [80002, 63]
+      "mainnet": [
+        137,
+        1,
+        10,
+        8453,
+        42161,
+        61
+      ],
+      "testnet": [
+        80002,
+        63
+      ]
     },
     "membership": {
-      "tiers": { "bronze": 2, "silver": 8, "gold": 25, "platinum": 100 }
+      "tiers": {
+        "bronze": 2,
+        "silver": 8,
+        "gold": 25,
+        "platinum": 100
+      }
     },
     "fees": {
       "polymarket.taker": 50,
@@ -104,9 +135,10 @@
       "bundlerUrls": {},
       "paymaster": {}
     },
-    "subgraph": { "urls": {} }
+    "subgraph": {
+      "urls": {}
+    }
   },
-
   "contractSet": {
     "mode": "shared",
     "saltPrefix": null

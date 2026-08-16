@@ -72,8 +72,13 @@ const baseStats = () => ({
     },
   ],
   staleClasses: [],
-  prunedBefore: null,
-  isConnected: true, isSupportedNetwork: true, chainId: 137,
+  prunedByChain: [],
+  partialChains: [],
+  networkStates: [
+    { chainId: 137, state: 'read', entryCount: 1 },
+    { chainId: 1, state: 'read', entryCount: 0 },
+  ],
+  isConnected: true, chainId: 137,
   isLoading: false, isEmpty: false, error: null,
   freshness: { summary: { lastUpdated: Date.now(), status: 'fresh' } },
   refresh: vi.fn(),
@@ -222,13 +227,27 @@ describe('MyAccountView — unified account experience (spec 074)', () => {
     })
   })
 
-  it('keeps the honest unsupported-network state on Activity and Stats (V1, V3)', () => {
+  it('discloses partial figures by network name on Stats (spec 092)', () => {
     useAccountStatsMock.mockImplementation(() => ({
       ...baseStats(),
-      isSupportedNetwork: false,
+      partialChains: ['Ethereum'],
+    }))
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/figures exclude ethereum/i)).toBeInTheDocument()
+    // Figures from readable chains still render.
+    expect(screen.getByText(/wallet balance/i)).toBeInTheDocument()
+  })
+
+  it('all networks unreachable ⇒ honest failure state, never a fabricated empty record (FR-009)', () => {
+    useAccountStatsMock.mockImplementation(() => ({
+      ...baseStats(),
+      activity: [],
+      partialChains: ['Polygon', 'Ethereum'],
+      error: 'None of your networks could be read right now.',
     }))
     renderView('/wallet?tab=account&view=activity')
-    expect(screen.getByText(/network not supported/i)).toBeInTheDocument()
+    expect(screen.getByText(/your networks could not be read/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no activity yet/i)).not.toBeInTheDocument()
   })
 
   it('keeps the honest empty state with the create CTA (V1)', () => {
@@ -239,5 +258,73 @@ describe('MyAccountView — unified account experience (spec 074)', () => {
     renderView('/wallet?tab=account&view=activity')
     expect(screen.getByText(/no activity yet/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /create a wager/i })).toBeInTheDocument()
+  })
+})
+
+describe('MyAccountView — imported/acting accounts get useful stats, not a wager pitch', () => {
+  const actAsRecovered = () => {
+    effectiveAccount = {
+      ...effectiveAccount,
+      type: 'legacy',
+      address: '0x5250000000000000000000000000000000000000',
+      label: 'Mordor Hot',
+      isActingAccount: true,
+    }
+  }
+  const estatePortfolio = () => ({
+    ...readyPortfolio(),
+    holdings: [{ network: 'Mordor Testnet', balance: 5000, usd: 11555.68, asset: { id: 'metc' } }],
+    categories: [
+      { category: { id: 'network-assets', label: 'Network Assets' }, aggregates: [{ balance: 5000 }], subtotalUsd: 11555.68 },
+    ],
+    totalUsd: 11555.68,
+  })
+
+  it('never pitches "Create a wager" at an acting account with no activity', () => {
+    actAsRecovered()
+    useAccountStatsMock.mockImplementation(() => ({ ...baseStats(), isEmpty: true }))
+    renderView('/wallet?tab=account&view=activity')
+    expect(screen.getByText(/no activity recorded yet/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create a wager/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the estate breakdown on Stats for an empty acting account instead of a blanket empty state', () => {
+    actAsRecovered()
+    useAccountStatsMock.mockImplementation(() => ({ ...baseStats(), isEmpty: true }))
+    usePortfolioMock.mockImplementation(() => estatePortfolio())
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
+    expect(screen.getByText('Mordor Testnet')).toBeInTheDocument()
+    expect(screen.getByText(/no wager activity for this account/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create a wager/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps the create CTA on Stats for an empty PERSONAL account, alongside the estate', () => {
+    useAccountStatsMock.mockImplementation(() => ({ ...baseStats(), isEmpty: true }))
+    usePortfolioMock.mockImplementation(() => estatePortfolio())
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create a wager/i })).toBeInTheDocument()
+  })
+
+  it('renders the estate breakdown beside the wager stats when wager data exists', () => {
+    usePortfolioMock.mockImplementation(() => estatePortfolio())
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/wallet balance/i)).toBeInTheDocument()
+    expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
+  })
+
+  it('still shows the estate on Stats when every network failed, beside the honest failure note', () => {
+    actAsRecovered()
+    useAccountStatsMock.mockImplementation(() => ({
+      ...baseStats(),
+      activity: [],
+      partialChains: ['Polygon', 'Ethereum'],
+      error: 'None of your networks could be read right now.',
+    }))
+    usePortfolioMock.mockImplementation(() => estatePortfolio())
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByText(/across your estate/i)).toBeInTheDocument()
+    expect(screen.getByText(/your networks could not be read/i)).toBeInTheDocument()
   })
 })

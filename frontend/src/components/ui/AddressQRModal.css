@@ -131,7 +131,7 @@
 
 .address-qr-address {
   margin: 0;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   word-break: break-all;
   user-select: all;
@@ -334,7 +334,7 @@
 
 .address-qr-network-badge--bitcoin {
   border-color: #f7931a;
-  color: #b36400;
+  color: var(--warning-text);
   background: rgba(247, 147, 26, 0.12);
 }
 

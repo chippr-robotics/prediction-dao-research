@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-brand);
 }
 
 .error-boundary-content {
@@ -25,11 +25,11 @@
 .error-boundary h1 {
   margin: 0 0 1rem 0;
   font-size: 2rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .error-boundary p {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 1.1rem;
   margin: 0 0 2rem 0;
 }
@@ -37,8 +37,8 @@
 .error-details {
   text-align: left;
   margin: 2rem 0;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
 }
@@ -46,12 +46,12 @@
 .error-details summary {
   cursor: pointer;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-secondary);
   user-select: none;
 }
 
 .error-details summary:hover {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .error-message,
@@ -59,17 +59,17 @@
   margin: 1rem 0 0 0;
   padding: 1rem;
   background: white;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 0.875rem;
   overflow-x: auto;
-  color: #991b1b;
+  color: var(--danger-text);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .error-stack {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.8rem;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .reset-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-brand);
   color: white;
 }
 
@@ -103,17 +103,17 @@
 
 .home-button {
   background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
+  color: var(--brand-primary);
+  border: 2px solid var(--brand-primary);
 }
 
 .home-button:hover {
-  background: #f3f4f6;
+  background: var(--bg-tertiary);
 }
 
 .reset-button:focus-visible,
 .home-button:focus-visible {
-  outline: 2px solid #667eea;
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 

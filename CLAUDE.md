@@ -495,7 +495,66 @@ artifacts live under `specs/<feature>/`.
   `docs/developer-guide/infrastructure-as-code.md` + `docs/runbooks/infrastructure-operations.md`
   + `specs/087-infrastructure-as-code/`.
 
-- **The repo is an npm WORKSPACE (spec 075): one root lockfile, 8 members, `contracts/` deliberately
+- **Styling follows the Chippr Robotics Brand Guidelines v1.0 (spec 090), and `theme.css` is the
+  ONLY file that states a colour.** The palette is a three-step teal ladder (Teal 700 / Chippr Teal
+  `#2E7D8C` / Teal 300) on Gunmetal/Cloud neutrals; type is Space Grotesk display / Inter text /
+  JetBrains Mono code, self-hosted so the PWA works offline (never add a Google Fonts link). Five
+  rules, each of which already went wrong here: (1) **Chippr Teal is a LARGE-TEXT AND FILL colour**
+  — the guidelines' own table puts it at 4.7:1 on white, annotated "18px+/bold 14px+", so links and
+  any text under 18px use **`--accent-color`** (Teal 700, 7.8:1); never "fix" a failing
+  `--brand-primary` contrast row by darkening the token. (2) **Amber is SIGNAL-ONLY** (alerts, live
+  states, one CTA per view, never a large fill) and is 2.1:1 on white — amber-toned *text* is
+  `--warning-text`, never `--warning-color`. (3) **Status surfaces are OPAQUE**: an alpha tint's
+  contrast depends on what is behind it, and the dark amber chip measured 5.89:1 over the page and
+  4.10:1 over a raised panel — a test asserts opacity. (4) **`var(--undefined-token, #hex)` is
+  hardcoded colour in a costume** — the fallback always renders. There were 177 such references
+  across 90 names (`--color-primary` alone ×109) and they are why green survived the first sweep;
+  define the name in `theme.css` instead, and `noUndefinedTokens.test.js` fails on the next one.
+  (5) **Never restate a `font-family` in a component** — it overrides the root and the brand face
+  silently does not apply. The **FairWins clover mark stays independent of the Chippr brandmark**
+  (the guidelines' endorsement model: master brand owns colour and type, products own their marks)
+  — do not modify the logo assets or build a co-branded lockup. Retired and CI-failing: `#2FA043`,
+  `#36B37E`, `#4C9AFF`, `#7BDCB5`. `tenants/fairwins/manifest.json` must declare the same values as
+  `theme.css` (the manifest wins at runtime). **Spec 091 finished the job: `theme.css` is now the
+  ONLY file in shipped styling that may state a colour**, enforced by `noHardcodedColors.test.js`
+  with two reasoned exemptions — white/black (absolutes, not palette colours) and third-party
+  identity (`NetworkPill.css`, Bitcoin `#F7931A`), where teal would be *wrong* rather than merely
+  off-brand. 091 also added tier metals (gold = Amber, so the estate keeps one yellow) and
+  `--gradient-brand`; **a gradient built from two different semantic tokens is a bug** — a
+  `--brand-primary → --success-color` button says something untrue about what it does, which is
+  exactly what the 091 screenshot round caught. FOUR guards now gate CI in
+  `frontend/src/test/brand/`. See `docs/developer-guide/brand-tokens.md` +
+  `specs/090-chippr-brand-alignment/` + `specs/091-neutral-token-consolidation/`.
+- **FinOps (spec 089): the CATALOGUE is the source of truth, and a zero is never an absence.**
+  `packages/finops-catalogue` declares every revenue and cost source exactly once; the exporter
+  (`services/finops-exporter`), the dashboard generator (`scripts/finops/generate-dashboards.js`)
+  and the CI gate (`npm run check:finops`) all derive from it. **Adding a revenue or cost source to
+  the platform without a catalogue entry FAILS CI** — that gate is the feature, because "remember to
+  update the dashboard" is a convention and conventions decay. Five rules:
+  (1) **A VALUE EXISTS ONLY IN STATE `read`.** Every source resolves `read` / `not-configured` /
+  `unreadable` and `reading.js` has three constructors of which only one takes a number, so "zero
+  because the read failed" has no code path. `not-configured` is first-class and does NOT alert or
+  make a total partial — it says "not wired up" (the OpenSea/Gains/GMX attribution ids genuinely are
+  unset), where `$0` would say "wired up and earning nothing". A total missing a live source is
+  labelled partial and NAMES it. (2) **`basis` IS MANDATORY ON EVERY COST**: `billed` came from a
+  billing record (**GCP only** — Cloudflare and QuickNode publish no dollar figure at all on our
+  plan, research R1), `modelled` is our arithmetic over a declared plan rate. Never collapse them;
+  vendor *usage* is exported separately because usage is a fact even when the dollar figure is a
+  model. (3) **PREPAID POOLS ALERT ON RUNWAY, NEVER A BALANCE FLOOR** (a floor is only right at one
+  burn rate). Burn counts **decreases only** (a top-up would otherwise read as negative burn ⇒
+  infinite runway), and runway is **`null`/absent when unknowable — never `+Inf`**, which every alert
+  rule reads as perfect health. Staleness alerts are separate and NEVER resolve a value alert.
+  (4) **LABELS COME FROM BOUNDED ENUMERATIONS** (`schema.js`) — never a member address, wager id or
+  tx hash, which makes series count a function of usage and outgrows the tier in days.
+  (5) **`infra/grafana/` IS GENERATED AND COMMITTED** — never hand-edit it (C5 regenerate-and-diff),
+  and a dashboard edited in the Grafana UI is drift that the next provision overwrites. `miniapp
+  licenses` and `wager platform fee` are catalogued `planned`: neither exists on chain, so they show
+  as NOT YET LIVE, declare no metric, and contribute nothing to any total. The exporter is
+  **read-only by construction** (no signer, no write route), binds loopback only, and
+  `fetch-secrets.sh` refuses to boot if key material reaches its env. See
+  `docs/developer-guide/finops.md` + `docs/runbooks/finops-operations.md` + `specs/089-finops-dashboard/`.
+
+- **The repo is an npm WORKSPACE (spec 075): one root lockfile, 10 members, `contracts/` deliberately
   NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
   detail — **`monorepo-workspace`** (dependencies, adding a package, recovering a broken install)
   and **`monorepo-verify`** (the gate suite and what each gate proves). Three rules are absolute,
@@ -543,5 +602,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/087-infrastructure-as-code/plan.md
+at specs/092-multi-chain-activity/plan.md
 <!-- SPECKIT END -->

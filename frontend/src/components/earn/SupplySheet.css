@@ -21,7 +21,7 @@
 .supply-sheet .supply-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -31,7 +31,7 @@
   margin: 0;
   font-size: 0.82rem;
   line-height: 1.45;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 
 .supply-sheet .supply-note,
@@ -44,13 +44,13 @@
 }
 
 .supply-sheet .supply-note {
-  background: var(--surface-muted, rgba(120, 120, 140, 0.1));
-  color: var(--text-primary, #111827);
+  background: var(--surface-muted);
+  color: var(--text-primary);
 }
 
 .supply-sheet .supply-unavailable {
   background: rgba(217, 119, 6, 0.1);
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   border: 1px solid rgba(217, 119, 6, 0.35);
 }
 
@@ -58,7 +58,7 @@
   margin: 0.75rem 0;
   font-size: 0.86rem;
   line-height: 1.5;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 
 /* Pool kind, said in a word — trading and bridge pools carry different risks and
@@ -75,12 +75,12 @@
 
 .supply-sheet .supply-kind-badge.trading {
   background: rgba(37, 99, 235, 0.14);
-  color: #1d4ed8;
+  color: var(--info-text);
 }
 
 .supply-sheet .supply-kind-badge.bridge {
   background: rgba(13, 148, 136, 0.14);
-  color: #0f766e;
+  color: var(--brand-secondary);
 }
 
 /* The fee block states a RATE and what it applies to. There is deliberately no room in this
@@ -94,16 +94,16 @@
   margin: 0.45rem 0 0;
   font-size: 0.84rem;
   line-height: 1.5;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 
 /* The GATE. Visible, inline, and sized like body copy — never a tooltip and never fine print. */
 .supply-sheet .supply-disclosure {
   margin: 1rem 0 0.6rem;
   padding: 0.85rem 0.95rem;
-  border: 1px solid var(--border-strong, rgba(120, 120, 140, 0.45));
+  border: 1px solid var(--border-strong);
   border-radius: 0.65rem;
-  background: var(--surface-raised, rgba(120, 120, 140, 0.06));
+  background: var(--surface-raised);
 }
 
 .supply-sheet .supply-disclosure h4 {
@@ -149,7 +149,7 @@
 }
 
 .supply-sheet .supply-percent-row .earn-btn.active {
-  outline: 2px solid var(--accent, #2563eb);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -158,17 +158,17 @@
 .supply-sheet .supply-estimate {
   font-size: 0.78rem;
   font-weight: 400;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 
 @media (prefers-color-scheme: dark) {
   .supply-sheet .supply-kind-badge.trading {
     background: rgba(96, 165, 250, 0.18);
-    color: #93c5fd;
+    color: var(--info-color);
   }
 
   .supply-sheet .supply-kind-badge.bridge {
     background: rgba(45, 212, 191, 0.18);
-    color: #5eead4;
+    color: var(--brand-accent);
   }
 }

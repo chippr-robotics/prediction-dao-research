@@ -122,12 +122,37 @@ module "gateway" {
   secret_accessor_secrets      = var.gateway_secret_ids
   artifact_registry_repository = var.artifact_registry_repository
 
+  # spec 089 adds `bigquery.jobUser` so the FinOps exporter can RUN a query against the billing
+  # export. It is deliberately the only BigQuery role granted at project level: jobUser permits
+  # running jobs and conveys NO data access on its own. Project-level `bigquery.dataViewer` would
+  # read every dataset in this SHARED project — including the clearpath-*, fukuii-* and kings-edge-*
+  # workloads' data — so the data grant is dataset-scoped below instead.
   project_roles = [
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
+    "roles/bigquery.jobUser",
   ]
 
   startup_script = file("${path.module}/../../../vm/startup.sh")
+}
+
+/**
+ * The FinOps exporter's read access to the billing export (spec 089, FR-005 / FR-026).
+ *
+ * DATASET-SCOPED, and additive (`_iam_member`). This is the whole of the exporter's data access:
+ * it reports on money and can move none. There is no write role here and there must never be one.
+ *
+ * `count` on var.billing_export_dataset keeps this optional — the exporter reports the GCP cost
+ * source as `not-configured` when the export is absent, which is an honest state rather than an
+ * outage (FR-006).
+ */
+resource "google_bigquery_dataset_iam_member" "finops_billing_reader" {
+  count = var.billing_export_dataset == null ? 0 : 1
+
+  project    = var.project_id
+  dataset_id = var.billing_export_dataset
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${var.gateway_service_account_email}"
 }
 
 # ── secret containers ─────────────────────────────────────────────────────────────────────────

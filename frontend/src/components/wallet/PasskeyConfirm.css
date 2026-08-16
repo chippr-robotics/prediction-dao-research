@@ -9,17 +9,17 @@
   gap: 0.9rem;
   padding: 1.25rem;
   border-radius: var(--radius-lg, 12px);
-  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
-  background: var(--color-surface, var(--surface-color, #fff));
+  border: 1px solid var(--color-border, var(--border-color));
+  background: var(--color-surface, var(--surface-color));
   box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
 }
 
 .passkey-confirm__title {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
 }
 
 .passkey-confirm__details {
@@ -29,13 +29,13 @@
   margin: 0;
 }
 .passkey-confirm__details dt {
-  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  color: var(--color-text-secondary, var(--text-secondary));
   font-size: 0.85rem;
   font-weight: 600;
 }
 .passkey-confirm__details dd {
   margin: 0;
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
   font-size: 0.95rem;
   text-align: right;
   word-break: break-all;
@@ -48,12 +48,12 @@
   font-size: 0.9rem;
 }
 .passkey-confirm__insufficient {
-  background: color-mix(in srgb, var(--color-error, var(--danger-color, #dc2626)) 12%, transparent);
-  color: var(--color-error, var(--danger-color, #dc2626));
+  background: color-mix(in srgb, var(--color-error, var(--danger-color)) 12%, transparent);
+  color: var(--color-error, var(--danger-color));
 }
 .passkey-confirm__fallback {
-  background: color-mix(in srgb, #d97706 14%, transparent);
-  color: #b45309;
+  background: color-mix(in srgb, var(--warning-text) 14%, transparent);
+  color: var(--warning-text);
 }
 .passkey-confirm__fallback p {
   margin: 0 0 0.5rem;
@@ -75,9 +75,9 @@
 .passkey-confirm .btn {
   appearance: none;
   border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
+  border: 1px solid var(--color-border, var(--border-color));
   background: transparent;
-  color: var(--color-text, var(--text-primary, #111827));
+  color: var(--color-text, var(--text-primary));
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 600;
@@ -87,14 +87,14 @@
 }
 .passkey-confirm .btn-primary {
   border-color: transparent;
-  background: var(--primary-button, var(--brand-primary, #36B37E));
-  color: var(--primary-button-text, #fff);
+  background: var(--primary-button, var(--brand-primary));
+  color: var(--primary-button-text);
 }
 .passkey-confirm .btn-primary:hover:not(:disabled) {
-  background: var(--primary-button-hover, #2F9E6E);
+  background: var(--primary-button-hover);
 }
 .passkey-confirm .btn:hover:not(:disabled):not(.btn-primary) {
-  border-color: var(--color-primary, var(--brand-primary, #36B37E));
+  border-color: var(--color-primary, var(--brand-primary));
 }
 .passkey-confirm .btn:disabled {
   opacity: 0.5;

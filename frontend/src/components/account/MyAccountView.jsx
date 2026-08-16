@@ -10,6 +10,7 @@ import PortfolioPanel from '../wallet/PortfolioPanel'
 import SummaryTiles from './SummaryTiles'
 import PnlChart from './PnlChart'
 import ActivityBreakdowns from './ActivityBreakdowns'
+import EstateBreakdown from './EstateBreakdown'
 import RecentActivityFeed from './RecentActivityFeed'
 import FreshnessIndicator from './FreshnessIndicator'
 import WalletUtilitiesPanel from './WalletUtilitiesPanel'
@@ -57,8 +58,8 @@ function MyAccountView() {
   const portfolio = usePortfolio(isActingAccount ? { accountAddress: actingAddress } : undefined)
   const activeTotalUsd = portfolio.status === 'ready' ? portfolio.totalUsd : null
   const {
-    summary, series, setRange, breakdowns, activity, staleClasses, prunedBefore,
-    isSupportedNetwork, chainId, isLoading, isEmpty, freshness, refresh,
+    summary, series, setRange, breakdowns, activity, staleClasses, prunedByChain,
+    partialChains, chainId, isLoading, isEmpty, error, freshness, refresh,
   } = stats
 
   const handleDisconnect = () => {
@@ -85,23 +86,33 @@ function MyAccountView() {
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  // The Activity and Stats views share the honest unsupported/empty states the
-  // dashboard always had; Portfolio keeps its own (it reads every supported
-  // network, so "network not supported" does not apply to it).
-  const renderHonestState = () => {
-    if (!isSupportedNetwork) {
+  // Honest empty states, per view and account-aware (spec 091's PR): acting
+  // accounts (vault/recovered/hardware) get neutral wording and no wager CTA;
+  // only the personal wallet is invited to wager. Spec 092 retired the
+  // "network not supported" state: history now merges the whole cohort, so
+  // the record no longer depends on where the wallet points — a chain that
+  // could not be read is disclosed by name instead (`partialChains`), and an
+  // all-chains failure surfaces the hook's error with last-known data kept.
+  const allNetworksFailed = Boolean(error) && partialChains.length > 0 && activity.length === 0
+  const activityHonestState = () => {
+    if (allNetworksFailed) {
       return (
         <EmptyState
-          title="Network not supported"
-          message="Switch to a supported network to see your account stats. Wager data is scoped to the active network."
+          title="Your networks could not be read"
+          message={`None of your networks answered: ${partialChains.join(', ')}. Nothing is shown rather than an empty history that isn't true.`}
         />
       )
     }
     if (isEmpty) {
-      return (
+      return isActingAccount ? (
+        <EmptyState
+          title="No activity recorded yet"
+          message="No wagers, transfers, or other FairWins activity has been recorded for this account yet. Its balances across all networks are in Portfolio."
+        />
+      ) : (
         <EmptyState
           title="No activity yet"
-          message="Create or accept your first wager to start building your stats. Your performance, balances, and history will appear here."
+          message="Your wagers, transfers, earn, pool, and membership activity will appear here."
           ctaLabel="Create a wager"
           onCta={goCreate}
         />
@@ -110,7 +121,41 @@ function MyAccountView() {
     return null
   }
 
-  const honestState = renderHonestState()
+  // Stats never blanks wholesale: the estate overview (fed by the portfolio's
+  // cross-network scan) renders regardless, and only the WAGER sections get an
+  // honest compact note when there is nothing to compute them from.
+  const wagerStatsHonestState = () => {
+    if (allNetworksFailed) {
+      return (
+        <EmptyState
+          compact
+          title="Your networks could not be read"
+          message={`None of your networks answered: ${partialChains.join(', ')}. Figures are withheld rather than shown as zeros.`}
+        />
+      )
+    }
+    if (isEmpty) {
+      return isActingAccount ? (
+        <EmptyState
+          compact
+          title="No wager activity for this account"
+          message="Performance charts appear once this account has wager history."
+        />
+      ) : (
+        <EmptyState
+          compact
+          title="No wager activity yet"
+          message="Create or accept your first wager to start building your performance stats."
+          ctaLabel="Create a wager"
+          onCta={goCreate}
+        />
+      )
+    }
+    return null
+  }
+
+  const activityState = activityHonestState()
+  const wagerStatsState = wagerStatsHonestState()
 
   return (
     <div className="my-account">
@@ -146,12 +191,13 @@ function MyAccountView() {
           <div className="my-account-freshness">
             <FreshnessIndicator state={freshness?.summary} onRefresh={refresh} />
           </div>
-          {honestState || (
+          {activityState || (
             <RecentActivityFeed
               entries={activity}
               chainId={chainId}
               staleClasses={staleClasses}
-              prunedBefore={prunedBefore}
+              partialChains={partialChains}
+              prunedByChain={prunedByChain}
             />
           )}
         </div>
@@ -162,14 +208,32 @@ function MyAccountView() {
           <div className="my-account-freshness">
             <FreshnessIndicator state={freshness?.summary} onRefresh={refresh} />
           </div>
-          {honestState || (
+          {wagerStatsState ? (
             <>
+              {/* Estate first when there are no wager stats: the account's
+                  cross-network holdings ARE its stats (the screenshot case —
+                  a recovered account holding real value saw only a wager
+                  pitch). The wager note follows, compact. */}
+              <EstateBreakdown portfolio={portfolio} />
+              {wagerStatsState}
+            </>
+          ) : (
+            <>
+              {partialChains.length > 0 && (
+                <p className="my-account-partial" role="status">
+                  Figures exclude {partialChains.join(', ')} — could not be read. Totals are
+                  partial.
+                </p>
+              )}
               <SummaryTiles summary={summary} isEmpty={isLoading && !summary} />
               <PnlChart series={series} onRangeChange={setRange} onCreateWager={goCreate} />
               {/* The by-status / by-token / by-resolution breakdowns are stats,
                   not a transaction log — they live here beside the tiles and
                   chart (post-launch feedback), keeping Activity a clean feed. */}
               <ActivityBreakdowns breakdowns={breakdowns} />
+              {/* The whole estate, beyond the active network's wager data
+                  (spec 044's scan, already loaded for the Portfolio view). */}
+              <EstateBreakdown portfolio={portfolio} />
             </>
           )}
         </div>

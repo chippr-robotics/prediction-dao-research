@@ -72,12 +72,12 @@ describe('AppNavDrawer (global nav drawer)', () => {
     __resetNavPreferencesForTests()
   })
 
-  it('lists Home plus the Finance and Tools sections', () => {
+  it('lists Payments plus the Finance and Tools sections', () => {
     const { container } = renderDrawer()
 
     // Drawer entries navigate between routes, so they use navigation (button)
     // semantics with aria-current — not tablist/tab.
-    expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Payments' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Trade' })).toBeInTheDocument()
     // Custody is surfaced as "Protect"; the Backup & Security section is now "Recovery".
     // Both live in Tools, which defaults to collapsed since spec 081.
@@ -103,32 +103,35 @@ describe('AppNavDrawer (global nav drawer)', () => {
     expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
   })
 
-  it('lists Portfolio under Quick Access with Home, not under Finance', () => {
+  it('lists Accounts under Quick Access with Payments, not under Finance', () => {
     const { container } = renderDrawer()
 
-    expect(screen.getByRole('button', { name: 'Portfolio' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Accounts' })).toBeInTheDocument()
 
-    // Portfolio sits between the Quick Access and Finance group labels, i.e.
+    // Accounts sits between the Quick Access and Finance group labels, i.e.
     // it belongs to Quick Access rather than Finance's item list.
     const labels = Array.from(
       container.querySelectorAll('.portal-nav-group-label, .portal-nav-item-label')
     ).map((el) => el.textContent)
     const quickAccessIdx = labels.indexOf('Quick Access')
     const financeIdx = labels.indexOf('Finance')
-    const portfolioIdx = labels.indexOf('Portfolio')
-    expect(portfolioIdx).toBeGreaterThan(quickAccessIdx)
-    expect(portfolioIdx).toBeLessThan(financeIdx)
+    const accountsIdx = labels.indexOf('Accounts')
+    expect(accountsIdx).toBeGreaterThan(quickAccessIdx)
+    expect(accountsIdx).toBeLessThan(financeIdx)
   })
 
-  it('routes Portfolio to the unified My Account view (spec 074)', () => {
+  // The two Quick Access labels were renamed (Home → Payments, Portfolio → Accounts) while their
+  // ids — and therefore their routes — stayed put. These assert the pairing directly, because a
+  // rename that also moved the destination would be a broken link, not a copy change.
+  it('routes Accounts to the unified My Account view (spec 074)', () => {
     renderDrawer()
-    fireEvent.click(screen.getByRole('button', { name: 'Portfolio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Accounts' }))
     expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=account&view=portfolio')
   })
 
-  it('routes Home to the dashboard', () => {
+  it('routes Payments to the dashboard', () => {
     renderDrawer('/wallet?tab=trade')
-    fireEvent.click(screen.getByRole('button', { name: /home/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Payments' }))
     expect(screen.getByTestId('loc')).toHaveTextContent('/app')
   })
 
@@ -236,7 +239,7 @@ describe('AppNavDrawer (desktop icon gutter)', () => {
 })
 
 // Favorited mini-apps (App Store Quick Access). A favorite is a device-scoped shortcut
-// (lib/miniapps/favorites.js) into `/apps/<slug>`, surfaced alongside Home/Portfolio.
+// (lib/miniapps/favorites.js) into `/apps/<slug>`, surfaced alongside Payments/Accounts.
 describe('AppNavDrawer (favorited mini-apps / Quick Access)', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -262,14 +265,14 @@ describe('AppNavDrawer (favorited mini-apps / Quick Access)', () => {
     expect(screen.getByTestId('loc')).toHaveTextContent('/apps/token-mint')
   })
 
-  it('lists only Home and Portfolio under Quick Access, and no strip, when nothing is favorited', () => {
+  it('lists only Payments and Accounts under Quick Access, and no strip, when nothing is favorited', () => {
     const { container } = renderDrawer()
     const labels = Array.from(
       container.querySelectorAll('.portal-nav-group-label, .portal-nav-item-label')
     ).map((el) => el.textContent)
     const quickAccessIdx = labels.indexOf('Quick Access')
     const financeIdx = labels.indexOf('Finance')
-    expect(labels.slice(quickAccessIdx + 1, financeIdx)).toEqual(['Home', 'Portfolio'])
+    expect(labels.slice(quickAccessIdx + 1, financeIdx)).toEqual(['Payments', 'Accounts'])
     // An empty shortcuts region is a label with nothing behind it — it does not render at all.
     expect(container.querySelector('.pinned-apps-strip')).toBeNull()
   })

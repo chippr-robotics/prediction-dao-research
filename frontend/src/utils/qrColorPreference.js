@@ -6,16 +6,21 @@
  * Every palette entry is a dark foreground rendered on a fixed #FFFFFF
  * background with a WCAG contrast ratio >= 7:1 (the contract floor is 4.5:1,
  * enforced by qrColorPreference.test.js), so any selectable option produces a
- * scannable code by construction. The flagship brand green #36B37E measures
- * only 2.66:1 on white and is deliberately excluded; Forest is the
- * brand-adjacent substitute. Inverted (light-on-dark) options are excluded —
- * many scanners cannot read them.
+ * scannable code by construction. Inverted (light-on-dark) options are
+ * excluded — many scanners cannot read them.
+ *
+ * Brand note (spec 090): Chippr Teal #2E7D8C measures only 4.74:1 on white and
+ * so cannot be offered here. Teal 700 #1F5966 — the palette's deep anchor, and
+ * the same colour the app uses for links — measures 7.84:1 and IS offered, so
+ * a member can put the brand colour on their code without picking one that
+ * scans badly.
  */
 
 const QR_COLOR_PREF_KEY = 'fairwins_qrcolor_v1'
 
 export const QR_COLOR_PALETTE = [
   { id: 'midnight', name: 'Midnight', fg: '#0E141B' },
+  { id: 'teal', name: 'Teal', fg: '#1F5966' },
   { id: 'forest', name: 'Forest', fg: '#14532D' },
   { id: 'ocean', name: 'Ocean', fg: '#1E3A8A' },
   { id: 'plum', name: 'Plum', fg: '#581C87' },

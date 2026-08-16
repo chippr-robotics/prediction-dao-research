@@ -47,11 +47,11 @@
 }
 
 .account-utilities-btn.danger {
-  color: var(--semantic-loss, #E5533D);
-  border-color: var(--semantic-loss, #E5533D);
+  color: var(--semantic-loss);
+  border-color: var(--semantic-loss);
 }
 
 .account-utilities-btn:focus-visible {
-  outline: 2px solid var(--brand-secondary, #4C9AFF);
+  outline: 2px solid var(--brand-secondary);
   outline-offset: 1px;
 }

@@ -82,6 +82,28 @@ jobs:
       - name: Check dependency hygiene
         run: npm run check:deps
 
+  # Gate (spec 089, FR-019…FR-023): a revenue or cost source that reaches production without a
+  # dashboard entry is money moving that nobody is watching. The brief stated updating the dashboard
+  # as a MUST; every comparable invariant in this repo that survived was made a gate, because a prose
+  # rule with no enforcement is the one rule that gets broken.
+  #
+  # Dependency-free (the catalogue has zero runtime deps), so no npm ci — same reasoning as the job
+  # above. Must fail loudly; do NOT add continue-on-error (Constitution IV).
+  finops-coverage:
+    name: FinOps Dashboard Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Check FinOps source coverage
+        run: npm run check:finops
 
   smart-contract-tests:
     name: Smart Contract Tests
@@ -330,6 +352,35 @@ jobs:
 
       - name: Install gateway dependencies
         run: npm ci --workspace fairwins-relay-gateway --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
+
+      - name: Run tests
+        run: npm test
+
+  # FinOps exporter tests (spec 089). The honesty suite is the load-bearing one: it asserts that a
+  # source which could not be read never renders as a zero, in any state, under any failure mode.
+  # Gating like every other test job — no continue-on-error (Constitution IV).
+  finops-exporter-tests:
+    name: FinOps Exporter Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: services/finops-exporter
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
+
+      - name: Install exporter dependencies
+        run: npm ci --workspace fairwins-finops-exporter --include-workspace-root=false
         working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Run tests

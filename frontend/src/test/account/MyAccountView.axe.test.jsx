@@ -81,6 +81,9 @@ const stats = {
     byToken: [{ tokenAddress: '0xusdc', symbol: 'USDC', count: 10, ownStakeUsd: 5000 }],
     byOracle: [{ resolutionType: 1, label: 'Polymarket', count: 10 }],
   },
+  // Spec 092: a merged two-network record with a named partial disclosure, so
+  // the axe gate covers the network badges, the network filter control, and
+  // the partial notices on every view.
   activity: [
     {
       entryId: 'oc:80002:wt:0xabc-1-payout', chainId: 80002, class: 'wager', kind: 'payout',
@@ -88,10 +91,22 @@ const stats = {
       valuationStatus: 'valued', timestamp: Date.now() - 60_000, timestampProvenance: 'chain',
       txHash: '0x' + 'ab'.repeat(32), refs: { wagerId: '1' },
     },
+    {
+      entryId: 'oc:63:wt:0xdef-9-deposit', chainId: 63, class: 'wager', kind: 'deposit',
+      direction: 'out', status: 'settled', tokenSymbol: 'CUSD', amount: 40, valueUsd: 40,
+      valuationStatus: 'valued', timestamp: Date.now() - 120_000, timestampProvenance: 'chain',
+      txHash: '0x' + 'cd'.repeat(32), refs: { wagerId: '9' },
+    },
   ],
   staleClasses: [],
-  prunedBefore: null,
-  isConnected: true, isSupportedNetwork: true, chainId: 80002,
+  prunedByChain: [],
+  partialChains: ['Ethereum Classic'],
+  networkStates: [
+    { chainId: 80002, state: 'read', entryCount: 1 },
+    { chainId: 63, state: 'read', entryCount: 1 },
+    { chainId: 61, state: 'unreachable', reason: 'rpc down', entryCount: 0 },
+  ],
+  isConnected: true, chainId: 80002,
   isLoading: false, isEmpty: false, error: null,
   freshness: { summary: { lastUpdated: Date.now(), status: 'fresh' } },
   refresh: vi.fn(),

@@ -26,24 +26,24 @@
 .pool-join-form input,
 .wordlist-lang-selector select {
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border-color, #ccd2da);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 1rem;
-  background: var(--input-bg, #fff);
+  background: var(--input-bg);
   color: inherit;
 }
 
 .pool-create-form input:focus-visible,
 .pool-join-form input:focus-visible,
 .wordlist-lang-selector select:focus-visible {
-  outline: 2px solid var(--brand, #36b37e);
+  outline: 2px solid var(--brand, var(--brand-primary));
   outline-offset: 1px;
 }
 
 .pool-phrase {
   text-align: center;
   letter-spacing: 0.02em;
-  background: var(--surface-2, #f1f5f3);
+  background: var(--surface-2);
   border-radius: 10px;
   padding: 1rem;
   margin: 1rem 0;
@@ -52,7 +52,7 @@
 
 /* Pool details: collapsed by default (tester feedback) — a one-line digest, expandable for the rest. */
 .pool-summary {
-  background: var(--surface-2, #f6f8fa);
+  background: var(--surface-2);
   border-radius: 10px;
   padding: 0.75rem 1.25rem;
   margin: 1rem 0;
@@ -71,8 +71,8 @@
   padding: 0.1rem 0.55rem;
   border-radius: 999px;
   font-size: 0.85rem;
-  background: var(--accent-soft, rgba(59, 156, 120, 0.15));
-  color: var(--accent, #3b9c78);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .pool-summary-sep { opacity: 0.4; }
@@ -88,7 +88,7 @@
 
 .pool-summary dt {
   font-weight: 600;
-  color: var(--text-muted, #5a6472);
+  color: var(--text-muted);
 }
 
 .pool-summary dd {
@@ -108,18 +108,18 @@
 .pool-notfound,
 .pool-closed-note,
 .form-error {
-  color: var(--danger, #b42318);
+  color: var(--danger);
 }
 
 .pool-closed-note {
-  color: var(--text-muted, #5a6472);
+  color: var(--text-muted);
 }
 
 /* Small inline hints + text-link buttons used across the resolution flow. */
 .pool-hint { font-size: 0.8rem; opacity: 0.72; margin: 0.35rem 0 0; }
 .pool-link-btn {
   background: none; border: none; padding: 0; margin: 0.5rem 0 0;
-  color: var(--accent, #3b9c78); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline;
+  color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline;
 }
 
 /* Unified roster + standings (UX round 3): anonymous alias cards, creator rank arrangement, and
@@ -130,15 +130,15 @@
 .pool-participants-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .pool-participant-card {
   display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.5rem 0.75rem; border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
-  border-radius: 10px; background: var(--surface-2, rgba(0, 0, 0, 0.02));
+  padding: 0.5rem 0.75rem; border: 1px solid var(--border-color);
+  border-radius: 10px; background: var(--surface-2);
 }
 .pool-participant-card.dragging { opacity: 0.5; border-style: dashed; }
 .pool-participant-card[draggable='true'] { cursor: grab; }
 .pool-participant-rank {
   min-width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%; font-size: 0.75rem; font-weight: 700;
-  background: var(--accent-soft, rgba(59, 156, 120, 0.15)); color: var(--accent, #3b9c78);
+  background: var(--accent-soft); color: var(--accent);
 }
 .pool-participant-alias { flex: 1; font-weight: 600; }
 .pool-participant-suffix { margin-left: 0.35rem; font-size: 0.7rem; font-weight: 400; opacity: 0.55; }
@@ -147,9 +147,9 @@
    the medal emoji for the top three. */
 .pool-participant-card.in-money {
   padding: 0.75rem 1rem;
-  border-color: var(--accent, #3b9c78);
-  background: var(--accent-soft, rgba(59, 156, 120, 0.12));
-  box-shadow: 0 1px 6px rgba(59, 156, 120, 0.15);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 1px 6px rgba(var(--success-color-rgb), 0.15);
 }
 .pool-participant-card.in-money .pool-participant-alias { font-size: 1.05rem; }
 .pool-participant-card.no-payout { opacity: 0.62; }
@@ -157,12 +157,12 @@
   background: transparent; font-size: 1.15rem;
 }
 .pool-participant-payout {
-  font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent, #3b9c78);
+  font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent);
 }
-.pool-participant-card.no-payout .pool-participant-payout { color: var(--text-muted, #5a6472); font-weight: 500; }
+.pool-participant-card.no-payout .pool-participant-payout { color: var(--text-muted); font-weight: 500; }
 .pool-participant-controls { display: inline-flex; gap: 0.25rem; }
 .pool-participant-controls button {
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15)); background: none;
+  border: 1px solid var(--border-color); background: none;
   border-radius: 6px; padding: 0.1rem 0.5rem; cursor: pointer; font: inherit;
 }
 .pool-participant-controls button:disabled { opacity: 0.35; cursor: default; }
@@ -171,13 +171,13 @@
 .pool-proposal-details { margin: 1rem 0; }
 .pool-proposal-table { border-collapse: collapse; width: 100%; max-width: 32rem; }
 .pool-proposal-table th, .pool-proposal-table td {
-  text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+  text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border-color);
 }
-.pool-proposal-table tr.is-you td { background: var(--accent-soft, rgba(59, 156, 120, 0.12)); font-weight: 600; }
+.pool-proposal-table tr.is-you td { background: var(--accent-soft); font-weight: 600; }
 .pool-propose-nick {
   display: inline-flex; align-items: center; min-width: 9rem;
   font-size: 0.85rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 8px;
-  background: var(--accent-soft, rgba(59, 156, 120, 0.12));
+  background: var(--accent-soft);
 }
 .pool-propose-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.4rem 0; }
 .pool-propose-row input { flex: 1; min-width: 7rem; }
@@ -188,8 +188,8 @@
 .pool-receive textarea, .pool-claim textarea, .pool-claim-advanced textarea,
 .pool-claim-advanced input {
   width: 100%; box-sizing: border-box; padding: 0.5rem 0.65rem;
-  border: 1px solid var(--border-color, #ccd2da); border-radius: 8px; font: inherit;
+  border: 1px solid var(--border-color); border-radius: 8px; font: inherit;
 }
-.pool-claim-advanced { padding-top: 0.5rem; border-top: 1px dashed var(--border-color, rgba(0, 0, 0, 0.12)); }
+.pool-claim-advanced { padding-top: 0.5rem; border-top: 1px dashed var(--border-color); }
 .pool-claim-code { margin: 1rem 0; }
 .pool-resolution-notice { margin-top: 0.75rem; }

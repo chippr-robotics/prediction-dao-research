@@ -2,16 +2,15 @@
 .helper-text {
   display: block;
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-top: 0.25rem;
   line-height: 1.4;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* Error Variant */
 .helper-text-error {
-  color: #dc2626;
+  color: var(--danger-color);
   font-weight: 500;
 }
 

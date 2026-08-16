@@ -67,9 +67,9 @@
 }
 
 .ab-net-pill--other {
-  color: var(--text-secondary, #475569);
-  background: var(--bg-primary, #f1f5f9);
-  border-color: var(--border-color, #e2e8f0);
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
 }
 
 /* Dark theme (class-based, matching the app's .theme-dark toggle). */
@@ -94,7 +94,7 @@
 :root.theme-dark .ab-net-pill--etc {
   color: #6ee7b7;
   background: rgba(4, 120, 87, 0.24);
-  border-color: rgba(16, 185, 129, 0.45);
+  border-color: rgba(var(--success-color-rgb), 0.45);
 }
 
 :root.theme-dark .ab-net-pill--mordor {
@@ -112,13 +112,13 @@
 :root.theme-dark .ab-net-pill--base {
   color: #93c5fd;
   background: rgba(29, 78, 216, 0.26);
-  border-color: rgba(59, 130, 246, 0.45);
+  border-color: rgba(var(--info-color-rgb), 0.45);
 }
 
 :root.theme-dark .ab-net-pill--op {
   color: #fca5a5;
   background: rgba(185, 28, 28, 0.26);
-  border-color: rgba(239, 68, 68, 0.45);
+  border-color: rgba(var(--danger-color-rgb), 0.45);
 }
 
 :root.theme-dark .ab-net-pill--btc {
@@ -128,7 +128,7 @@
 }
 
 :root.theme-dark .ab-net-pill--other {
-  color: var(--text-secondary, #aab6c2);
+  color: var(--text-secondary);
   background: rgba(122, 133, 144, 0.18);
-  border-color: var(--border-color, #23303d);
+  border-color: var(--border-color);
 }

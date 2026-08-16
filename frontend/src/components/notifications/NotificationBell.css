@@ -69,7 +69,7 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: #dc2626;
+  background: var(--danger-color);
   color: #fff;
   font-size: 0.6875rem;
   font-weight: 700;
@@ -87,11 +87,11 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #f59e0b;
-  border: 1.5px solid var(--bg-primary, #fff);
+  background: var(--warning-color);
+  border: 1.5px solid var(--bg-primary);
   pointer-events: none;
 }
 
 .notification-bell.has-action {
-  border-color: #f59e0b;
+  border-color: var(--warning-color);
 }
