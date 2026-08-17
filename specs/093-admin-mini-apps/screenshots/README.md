@@ -60,3 +60,15 @@ bar on top. Moved to its own `<p.miniapp-admin-tools-note>`; the heading now mat
 group titles exactly. **Round 2 → no findings** (both themes, both viewports; the fixed StoreBar
 appearing mid-list in full-height element captures is a screenshot artifact — it is
 viewport-fixed in use).
+
+## Section rails follow-up (bounded store sections)
+
+Two scenarios added: `store-section-rail` (a 13-app category as a horizontal card rail capped at
+10, "More Trade Settlement apps (+3)" below the rail, the sections after it staying on screen)
+and `store-section-modal` (the full-list dialog: title, "All 13 apps" count, internally-scrolling
+list, dimmed backdrop — viewport capture, since the modal is viewport-fixed).
+
+**Round 1 → no findings** in both themes and both viewports: cards keep the store row anatomy
+with a visible boundary, the partially-clipped last card is the scroll affordance, the More
+control sits below the rail (the PinnedAppsStrip rule), and single-app sections render one card
+with no disclosure chrome.

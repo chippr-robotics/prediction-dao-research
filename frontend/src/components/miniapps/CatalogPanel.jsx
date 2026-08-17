@@ -40,6 +40,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import './miniapps.css'
 import AppSheet from './AppSheet'
+import CatalogSection from './CatalogSection'
 import SubmitAppPanel from './SubmitAppPanel'
 import StoreBar from './StoreBar'
 import { STORE_VIEWS, resolveStoreView } from './storeViews'
@@ -595,23 +596,25 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
           registry records, and the distinction is the trust story. Rendered regardless of
           registry status (an unreachable registry does not take the operator's own tools down). */}
       {visibleAdminTools.length > 0 && (
-        <section className="miniapp-catalog-group miniapp-catalog-group--admin" aria-labelledby="miniapp-admin-tools-title">
-          <h4 className="miniapp-catalog-group-title" id="miniapp-admin-tools-title">
-            Operator tools
-          </h4>
-          <p className="miniapp-admin-tools-note">
-            Built into this app and shown only to operators — your roles unlock{' '}
-            {visibleAdminTools.length === adminTools.length
-              ? `${adminTools.length} tool${adminTools.length === 1 ? '' : 's'}`
-              : `${visibleAdminTools.length} of ${adminTools.length}`}
-            . Pin one to Quick Access with the star.
-          </p>
-          <ul className="miniapp-catalog-grid">
-            {visibleAdminTools.map((tool) => (
-              <AdminToolRow key={tool.favoriteId} tool={tool} isFavorite={favoriteIds.has(tool.favoriteId)} />
-            ))}
-          </ul>
-        </section>
+        <CatalogSection
+          headingId="miniapp-admin-tools-title"
+          title="Operator tools"
+          itemNoun="tools"
+          dismissLocked={sheetAppId !== null}
+          note={
+            <p className="miniapp-admin-tools-note">
+              Built into this app and shown only to operators — your roles unlock{' '}
+              {visibleAdminTools.length === adminTools.length
+                ? `${adminTools.length} tool${adminTools.length === 1 ? '' : 's'}`
+                : `${visibleAdminTools.length} of ${adminTools.length}`}
+              . Pin one to Quick Access with the star.
+            </p>
+          }
+          items={visibleAdminTools}
+          renderItem={(tool) => (
+            <AdminToolRow key={tool.favoriteId} tool={tool} isFavorite={favoriteIds.has(tool.favoriteId)} />
+          )}
+        />
       )}
 
       {/* The genuinely-empty catalog: the registry answered, and it holds nothing launchable. Gated on
@@ -645,25 +648,21 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
       )}
 
       {groupedVisible.map((group) => (
-        <section
+        <CatalogSection
           key={group.key}
-          className="miniapp-catalog-group"
-          aria-labelledby={`miniapp-catalog-group-${group.key}`}
-        >
-          <h4 className="miniapp-catalog-group-title" id={`miniapp-catalog-group-${group.key}`}>
-            {group.label}
-          </h4>
-          <ul className="miniapp-catalog-grid">
-            {group.apps.map((app) => (
-              <AppRow
-                key={app.id}
-                app={app}
-                isFavorite={favoriteIds.has(app.id)}
-                onOpen={handleOpenSheet}
-              />
-            ))}
-          </ul>
-        </section>
+          headingId={`miniapp-catalog-group-${group.key}`}
+          title={group.label}
+          dismissLocked={sheetAppId !== null}
+          items={group.apps}
+          renderItem={(app) => (
+            <AppRow
+              key={app.id}
+              app={app}
+              isFavorite={favoriteIds.has(app.id)}
+              onOpen={handleOpenSheet}
+            />
+          )}
+        />
       ))}
 
       {/* The app-details sheet (iteration 2, FR-017). `listing` is non-null whenever a row

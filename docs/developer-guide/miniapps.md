@@ -92,6 +92,14 @@ The catalog's visual layer. Three rules keep it from becoming a trust surface:
   fetched listing: My Apps is favorites ∩ the launchable-filtered list and inherits the market's
   launch rules; nothing refetches on a view switch. The host's global navigation (spec 069)
   is untouched.
+- **Sections are BOUNDED rails (spec 093 follow-up).** Each category (and the Operator tools
+  section) renders through `CatalogSection.jsx`: one horizontal rail of fixed-width cards capped
+  at `SECTION_VISIBLE_CAP` (10), so a long category can never push the sections below it off the
+  screen — the PinnedAppsStrip rule at store scale. Past the cap, a "More <section> apps (+N)"
+  control BELOW the rail (never a trailing card inside the scroller — it would be the first
+  thing the scroll hides) opens a full-list modal with AppSheet's dialog mechanics. A details
+  sheet opened from inside that modal owns the next Escape (`dismissLocked`), so one press never
+  closes both layers. `catalogSection.test.jsx` pins the cap, the disclosure, and the layering.
 
 ## The registry **[host]**
 
