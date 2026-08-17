@@ -253,7 +253,12 @@ describe('the GCP fallback does not refresh the success timestamp', () => {
     const r = await collect({ id: 'gcp' })
     expect(r.state).toBe('not-configured')
     expect(r.value).toBeNull()
-    expect(r.reason).toMatch(/no tables yet/i)
+    // The reason must name BOTH causes: a just-enabled export, and a wrong prefix for the export
+    // type. They produce the identical error, but only one of them ends on its own — so a reason
+    // mentioning only the delay sends the reader off to wait out a misconfiguration.
+    expect(r.reason).toMatch(/matched no table/i)
+    expect(r.reason).toMatch(/gcp_billing_export_resource_v1_/)
+    expect(r.reason).toMatch(/prefix/i)
   })
 
   it('still reports a genuine query failure as unreadable', async () => {

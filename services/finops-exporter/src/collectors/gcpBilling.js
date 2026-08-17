@@ -8,8 +8,11 @@
  * Two properties must reach the dashboard rather than being smoothed over:
  *   - IT LAGS. Rows land hours after the spend. A panel showing it beside a 60-second-old chain read
  *     must say so, or the two look equally fresh. The lag is exported as its own metric.
- *   - IT IS NOT RETROACTIVE. It holds nothing from before the export was enabled. There is no
- *     backfill to write and none is faked.
+ *   - IT ARRIVES LATE AND OUT OF ORDER. The first table appears hours after the export is enabled,
+ *     and GCP then backfills history into it — measured here: created 2026-08-16T22:11Z, 43,389 rows
+ *     spanning 2026-06-01 onward loaded by the next morning, still being written. So "no rows in the
+ *     last 30 days" does NOT mean "no spend": it can mean the backfill has not reached the present
+ *     yet. That is why an empty result is never reported as a cost of zero.
  *
  * Querying it is itself billable, which is why the interval is hours and why `maximumBytesBilled` is
  * set: an unbounded scan over a wildcard table is how a cost dashboard becomes a cost centre (FR-029).
@@ -57,20 +60,36 @@ export function createGcpBillingCollector({ config, bigQuery, log = console.warn
       // A missing dataset is a CONFIGURATION fact, not an outage: the export has not been enabled.
       // Reporting it as unreadable would page somebody about a thing that has never existed.
       //
-      // `does not match any table` is the SAME fact wearing different words, and it is the one a
-      // freshly-enabled export actually returns: the dataset exists, the wildcard resolves to
-      // nothing, and it stays that way for HOURS because Google populates the first table on its own
-      // schedule and never backfills. Measured 2026-08-16, minutes after enabling the export:
+      // `does not match any table` is the SAME fact wearing different words, and it has TWO causes
+      // that are indistinguishable from the error alone:
+      //
+      //   1. the export was enabled minutes ago and Google has not created the table yet;
+      //   2. the table exists under a DIFFERENT PREFIX than we are querying — GCP writes the
+      //      detailed (resource-level) export to `gcp_billing_export_resource_v1_*` and the standard
+      //      one to `gcp_billing_export_v1_*`, and picking the wrong one produces this exact message
+      //      forever rather than for a few hours.
+      //
+      // Both were observed here. Measured 2026-08-16 minutes after enabling:
       //
       //   chippr-bots-site-wp:billing_export.gcp_billing_export_v1_* does not match any table.
       //
-      // That message matches none of the patterns above, so it fell through to `unreadable` — which
-      // is `configured=1, up=0`, which fires the staleness alert 15 minutes later. Paging an
-      // operator overnight because Google has not written the first row yet is exactly the
-      // false-alarm class that gets an alert channel muted.
+      // and measured again 2026-08-17, 17h later, with the SAME message — because the only table
+      // that exists is the resource-level one. Cause 2 is a misconfiguration a human must fix, and
+      // the reason string names it so nobody waits out a delay that will never end.
+      //
+      // NOT `unreadable`, either way. That is `configured=1, up=0`, which fires the staleness alert
+      // 15 minutes later; paging overnight because Google has not written the first row — or because
+      // a prefix is wrong, which no amount of waiting fixes — is the false-alarm class that gets an
+      // alert channel muted. It is a configuration fact, like the missing dataset above.
+      //
+      // Correcting an earlier claim in this file: the export DOES backfill. This account's
+      // resource-level table was created 2026-08-16T22:11Z and had loaded 43,389 rows spanning
+      // 2026-06-01 onward by the next morning, still being written. "Never backfilled" was wrong.
       if (/not found|does not exist|Not found: Dataset|Not found: Table|does not match any table/i.test(message)) {
         return notConfigured(
-          `billing export ${billingDataset} has no tables yet — a newly enabled export takes hours to appear, and is never backfilled`,
+          `billing export ${billingDataset}.${billingTablePrefix}* matched no table — either the export was ` +
+            `just enabled (the first table takes hours) or FINOPS_BILLING_TABLE_PREFIX is wrong for this ` +
+            `export type (detailed writes gcp_billing_export_resource_v1_, standard writes gcp_billing_export_v1_)`,
         )
       }
       /**

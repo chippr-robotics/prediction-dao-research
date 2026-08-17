@@ -42,7 +42,8 @@ describe('staleness rules never fire for a not-configured source (FR-006)', () =
       const expr = rule.data[0].model.expr
       expect(expr).toContain('fairwins_finops_source_configured')
       expect(expr).toContain('fairwins_finops_source_up')
-      expect(expr).toMatch(/\*\s*\(1 -/)
+      // `* on(source) (1 - …)` — the join is asserted separately below.
+      expect(expr).toMatch(/\*\s*on\(source\)\s*\(1 -/)
     }
   })
 
@@ -55,13 +56,90 @@ describe('staleness rules never fire for a not-configured source (FR-006)', () =
   })
 })
 
-describe('NoData is Alerting everywhere, deliberately', () => {
-  it('never silently treats a vanished series as healthy', () => {
-    // With the expression fixed to always sample, NoData now means the exporter stopped being
-    // scraped at all — which is the one case that genuinely should page.
+describe('alert rules never carry a dashboard template variable as their datasource', () => {
+  it('uses the resolvable sentinel, not ${datasource}', () => {
+    // `${datasource}` is a DASHBOARD variable: correct on a panel, meaningless in an alert rule,
+    // which has no variable scope. A rule provisioned with it resolves no datasource, returns
+    // nothing, and noDataState: Alerting escalates that into a firing alert.
+    //
+    // Measured 2026-08-17, 17h after the first provision: ALL 29 rules were firing, every one a
+    // false alarm — including both runway rules, for pools that were healthy.
     for (const rule of rules) {
-      expect(rule.noDataState, `${rule.uid}`).toBe('Alerting')
+      for (const stage of rule.data) {
+        const uid = stage.datasourceUid
+        expect(uid, `${rule.uid} stage ${stage.refId}`).not.toMatch(/^\$\{.*\}$/)
+        // Expression stages legitimately use the built-in expression datasource.
+        if (uid !== '__expr__') {
+          expect(uid, `${rule.uid} stage ${stage.refId}`).toBe('__PROM_DATASOURCE_UID__')
+        }
+      }
+    }
+  })
+
+  it('leaves a sentinel the provisioner can actually find', () => {
+    // The provisioner refuses to push if the sentinel is absent, so a rename that misses one side
+    // fails loudly instead of provisioning rules guaranteed to fire.
+    const serialized = JSON.stringify(rules)
+    expect(serialized).toContain('__PROM_DATASOURCE_UID__')
+    expect(serialized).not.toContain('${datasource}')
+  })
+})
+
+describe('NoData semantics are chosen per rule, not blanket', () => {
+  /**
+   * Two kinds of rule must NOT alert on NoData, and both were found firing on a healthy estate:
+   *
+   *   runway   — the exporter deliberately omits an unknowable runway (zero burn). On an idle estate
+   *              that is a healthy pool, not a lost one.
+   *   baseline — a rule defined by a 7d/14d comparison cannot judge anything before that history
+   *              exists. Absence of a baseline is not evidence of an anomaly.
+   *
+   * In both cases "we have lost sight of this source" is covered by its own staleness rule, which
+   * has independent data and fires on its own.
+   */
+  const NO_DATA_OK = ['runway', 'revenue-stall', 'cost-anomaly']
+  const exempt = (uid) => NO_DATA_OK.some((k) => uid.includes(k))
+
+  it('alerts on NoData except where absent data means "cannot judge"', () => {
+    for (const rule of rules) {
+      expect(rule.noDataState, `${rule.uid}`).toBe(exempt(rule.uid) ? 'OK' : 'Alerting')
+      // An execution ERROR is always worth knowing — that is a broken rule, not absent data.
       expect(rule.execErrState, `${rule.uid}`).toBe('Alerting')
+    }
+  })
+
+  it('the exemption list is not vacuous — every key matches a real rule', () => {
+    for (const key of NO_DATA_OK) {
+      expect(rules.some((r) => r.uid.includes(key)), `no rule matches '${key}'`).toBe(true)
+    }
+  })
+
+  it('most rules still alert on NoData', () => {
+    // Guards against the exemption quietly growing to cover everything.
+    const alerting = rules.filter((r) => r.noDataState === 'Alerting').length
+    expect(alerting).toBeGreaterThan(rules.length / 2)
+  })
+})
+
+describe('baseline comparisons normalise over available history', () => {
+  it('the cost anomaly rule does not divide by a hardcoded 7', () => {
+    // `increase(...[7d]) / 7` assumes seven days exist. At 17h uptime it produced a baseline of
+    // 17h/7, which any full day trivially exceeds — a guaranteed cold-start false positive.
+    const rule = rules.find((r) => r.uid.includes('cost-anomaly'))
+    const expr = rule.data[0].model.expr
+    expect(expr).not.toMatch(/\[7d\]\)\s*\/\s*7/)
+    expect(expr).toContain('avg_over_time')
+    expect(expr).toContain('[7d:1d]')
+  })
+})
+
+describe('vector matching is explicit where label sets differ', () => {
+  it('joins the two honesty gauges with on(source)', () => {
+    // configured{source,kind,status} vs up{source,kind}: a bare multiply matches NOTHING and returns
+    // no series, which noDataState escalates. Measured 2026-08-17: bare form 0 series, on(source) 23.
+    for (const rule of staleness) {
+      const expr = rule.data[0].model.expr
+      expect(expr, `${rule.uid} must join on(source)`).toContain('* on(source)')
     }
   })
 })
