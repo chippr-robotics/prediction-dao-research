@@ -179,11 +179,32 @@ describe('usePredictTrade', () => {
     await act(async () => { await result.current.loadFee(TOKEN) })
     await act(async () => { await result.current.submit(BUY, {}) })
     expect(result.current.status).toBe('done')
-    expect(sendCalls).toHaveBeenCalledWith([
-      { target: '0xUSDC', data: '0xapprove1' },
-      { target: '0xCTF', data: '0xapprove2' },
-    ])
+    expect(sendCalls).toHaveBeenCalledWith(
+      [
+        { target: '0xUSDC', data: '0xapprove1' },
+        { target: '0xCTF', data: '0xapprove2' },
+      ],
+      { chainId: 137 } // pinned by parameter — a stale session chain must never retarget the batch
+    )
     expect(order).toEqual(['approvals-check', 'sendCalls', 'creds'])
+  })
+
+  it('enableTrading enforces Polygon BEFORE any approvals ceremony (FR-021)', async () => {
+    useChainId.mockReturnValue(1)
+    const deps = passkeyDeps({ missingApprovals: vi.fn().mockResolvedValue([{ target: '0xUSDC', data: '0x1' }]) })
+    const sendCalls = vi.fn()
+    const switchChain = vi.fn().mockRejectedValue(new Error('declined'))
+    const { result } = renderHook(() => usePredictTrade({ deps }), {
+      wrapper: wrapperFor({ loginMethod: 'passkey', sendCalls, switchChain }),
+    })
+    await act(async () => { await result.current.loadFee(TOKEN) })
+    let ok
+    await act(async () => { ok = await result.current.enableTrading() })
+    expect(ok).toBe(false)
+    expect(result.current.status).toBe('error')
+    expect(result.current.reason).toMatch(/Polygon/)
+    expect(sendCalls).not.toHaveBeenCalled()
+    expect(deps.ensureCreds).not.toHaveBeenCalled()
   })
 
   it('a failed approvals batch surfaces as an honest error with the link-out path — never a submit', async () => {

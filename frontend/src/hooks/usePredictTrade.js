@@ -79,15 +79,20 @@ export function usePredictTrade(options = {}) {
 
   const onWrongNetwork = Number(activeChainId) !== POLYGON
 
+  // Read fresh every render (a cheap storage read): the session credential can change WITHOUT the
+  // address changing (re-sign-in with a different controller of the same account), and a memo keyed
+  // on the address would keep signing ceremonies pinned to the stale credential.
+  const sessionCredentialId = wallet.loginMethod === 'passkey' ? (deps.readSession()?.credentialId ?? null) : null
+
   const signer = useMemo(
     () =>
       deps.resolveTradeSigner({
         loginMethod: wallet.loginMethod,
         walletClient,
         address: wallet.address,
-        credentialId: wallet.loginMethod === 'passkey' ? deps.readSession()?.credentialId : null,
+        credentialId: sessionCredentialId,
       }),
-    [wallet.loginMethod, wallet.address, walletClient, deps]
+    [wallet.loginMethod, wallet.address, walletClient, sessionCredentialId, deps]
   )
 
   const tradingEnabled = useMemo(
@@ -165,8 +170,13 @@ export function usePredictTrade(options = {}) {
     if (signer.kind !== 'passkey') return
     const missing = await deps.missingApprovals({ address: wallet.address, chainId: POLYGON })
     if (!missing.length) return
-    // sendCalls resolves at an honest terminal state (inclusion) — spec 041 FR-017.
-    await wallet.sendCalls(missing.map(({ target, data }) => ({ target, data })))
+    // Pinned to Polygon by parameter, not by session state: these approvals are only correct on the
+    // chain the CLOB settles on, and a just-completed ensureNetwork() switch is React state a
+    // running closure cannot yet see. sendCalls resolves at an honest terminal state (FR-017).
+    await wallet.sendCalls(
+      missing.map(({ target, data }) => ({ target, data })),
+      { chainId: POLYGON }
+    )
   }, [signer, wallet, deps])
 
   /** Derive (or reuse) the member's own CLOB creds — one gasless signature, cached per session. */
@@ -182,6 +192,13 @@ export function usePredictTrade(options = {}) {
       setReason(signer.reason)
       return false
     }
+    // Same Polygon gate as submit() (FR-021): the wallet ends up where the trade will be signed,
+    // and the approvals ceremony is never offered from the wrong chain's context.
+    if (!(await ensureNetwork())) {
+      setStatus('error')
+      setReason('Switch your wallet to Polygon to trade on Polymarket.')
+      return false
+    }
     setStatus('enabling')
     setReason(null)
     try {
@@ -194,7 +211,7 @@ export function usePredictTrade(options = {}) {
       setReason(e?.message || 'Could not enable trading. You can still trade on Polymarket directly.')
       return false
     }
-  }, [signer, ensureApprovals, ensureCreds])
+  }, [signer, ensureNetwork, ensureApprovals, ensureCreds])
 
   /** Build + sign + submit an order (the SDK does all three; attribution rides on the builder config). */
   const submit = useCallback(

@@ -132,11 +132,18 @@ export function WalletProvider({ children }) {
    * - Classic wallets: sequential signer transactions (existing behavior,
    *   unchanged for existing users — SC-004).
    * Each call: { target, data, value? }.
+   *
+   * `chainId` option (passkey rail only): pins the batch to a NAMED chain instead of the session's
+   * current one. A UserOp is chain-targeted by parameter, and a caller whose batch is only correct
+   * on one chain (Predict approvals → Polygon) must say so — the session's chain state is React
+   * state, so a just-completed switchChain is not yet visible to the closures already running.
+   * Classic wallets ignore it: an injected signer is bound to whatever chain the wallet is on.
    */
   const sendCalls = useCallback(
-    async (calls, { onState } = {}) => {
+    async (calls, { onState, chainId: chainOverride } = {}) => {
       if (!calls?.length) throw new Error('sendCalls: empty batch')
       if (loginMethod === 'passkey') {
+        const batchChainId = chainOverride ?? chainId
         const [{ sendPasskeyBatch }, { readSession }] = await Promise.all([
           import('../lib/passkey/sendBatch'),
           import('../connectors/passkey'),
@@ -146,7 +153,7 @@ export function WalletProvider({ children }) {
         // shows a signature → submission → confirmation walk-through instead of a
         // frozen "Sending…". The caller's own `onState` (if any) still fires — the
         // bus is additive, and a broken listener never breaks the batch.
-        beginTx({ chainId })
+        beginTx({ chainId: batchChainId })
         const observe = (s) => {
           try {
             publishLifecycle(s)
@@ -164,7 +171,7 @@ export function WalletProvider({ children }) {
           // never a different passkey that happens to share the address book
           // (spec 045 US3/FR-008).
           return await sendPasskeyBatch({
-            chainId,
+            chainId: batchChainId,
             address,
             calls,
             credentialId: readSession()?.credentialId,
