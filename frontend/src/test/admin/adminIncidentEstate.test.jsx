@@ -12,7 +12,9 @@
  * this checks the source.
  */
 import { describe, it, expect } from 'vitest'
-import adminPanelSource from '../../components/AdminPanel.jsx?raw'
+// Spec 093: the incident views live in their own admin mini-app now; the
+// invariants are unchanged and keep being asserted against the source.
+import adminPanelSource from '../../components/admin/apps/IncidentResponseApp.jsx?raw'
 
 describe('the pause acts on one named chain (T066, FR-017/FR-018)', () => {
   it('writes to the SCOPED registry, not the wallet chain\'s', () => {

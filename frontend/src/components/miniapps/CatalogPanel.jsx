@@ -40,6 +40,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import './miniapps.css'
 import AppSheet from './AppSheet'
+import CatalogSection from './CatalogSection'
 import SubmitAppPanel from './SubmitAppPanel'
 import StoreBar from './StoreBar'
 import { STORE_VIEWS, resolveStoreView } from './storeViews'
@@ -56,6 +57,8 @@ import {
   fetchCatalog,
 } from '../../lib/miniapps/registryClient'
 import { loadFavoriteApps, subscribeFavoriteApps, toggleFavoriteApp } from '../../lib/miniapps/favorites'
+import { adminToolEntries } from '../admin/adminToolCatalog'
+import { useOperatorFlags } from '../admin/useOperatorFlags'
 
 /**
  * Where a developer goes to submit an app or a version update (FR-021).
@@ -154,6 +157,52 @@ function AppRow({ app, isFavorite, onOpen }) {
   )
 }
 
+/**
+ * One operator tool as a store row (spec 093 follow-up). These are the admin
+ * mini-apps — FIRST-PARTY, host-bundled, role-gated — surfaced in the store so
+ * an operator can find and pin the tools they reach for. Deliberately NOT
+ * registry records: no version chip, no vendor, never under the "On-chain
+ * verified market" badge, and never rendered for an account whose roles derive
+ * no tools. The row opens the tool at its /admin address (where the real gate
+ * lives); the star pins it to Quick Access exactly like a registry app.
+ */
+function AdminToolRow({ tool, isFavorite }) {
+  return (
+    <li className="miniapp-row miniapp-row--admin-tool">
+      <div className="miniapp-row-art miniapp-row-art--glyph" aria-hidden="true">
+        <NavIcon name={tool.icon} size={26} />
+      </div>
+      <div className="miniapp-row-body">
+        <h5 className="miniapp-row-name">{tool.name}</h5>
+        <p className="miniapp-row-meta">{tool.description}</p>
+        <p className="miniapp-row-chips">
+          <span className="miniapp-row-chip">
+            {tool.permissionless ? 'Operator tool' : 'Operator tool · role-gated'}
+          </span>
+          {isFavorite && (
+            <span className="miniapp-row-chip is-favorite">
+              <NavIcon name="star" size={12} />
+              Pinned
+            </span>
+          )}
+        </p>
+      </div>
+      <Link className="miniapp-row-tap" to={tool.path}>
+        <span className="sr-only">Open {tool.name}</span>
+      </Link>
+      <button
+        type="button"
+        className={`miniapp-admin-pin${isFavorite ? ' is-pinned' : ''}`}
+        aria-pressed={isFavorite}
+        aria-label={isFavorite ? `Unpin ${tool.name} from Quick Access` : `Pin ${tool.name} to Quick Access`}
+        onClick={() => toggleFavoriteApp({ id: tool.favoriteId, name: tool.name })}
+      >
+        <NavIcon name="star" size={16} />
+      </button>
+    </li>
+  )
+}
+
 function CatalogView({ view = STORE_VIEWS.MARKET }) {
   /**
    * The last completed read, tagged with the request it answered.
@@ -172,6 +221,22 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
   // The category chip row starts collapsed behind the Filter button — see the module header.
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [favoriteIds, setFavoriteIds] = useState(() => new Set(loadFavoriteApps().map((fav) => fav.id)))
+
+  /**
+   * Operator tools (spec 093 follow-up): derived from the SAME matrix the
+   * Control Room reads, from the app-wide role flags already loaded in
+   * WalletContext — no extra network read runs for members, and an account
+   * with no qualifying role derives an empty list (the section then never
+   * renders). Deliberately WITHOUT the curator authority read: that is a
+   * registry round-trip the store must not add for everyone, so a
+   * curator-holding-nothing-else reaches curation via /admin (which asks the
+   * registry properly) rather than via this listing.
+   */
+  const { isOperator, flags } = useOperatorFlags()
+  const adminTools = useMemo(
+    () => (isOperator ? adminToolEntries(flags) : []),
+    [isOperator, flags],
+  )
 
   const outcome = catalogRead.outcome
   const refreshing = catalogRead.key !== reloadKey
@@ -303,10 +368,29 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
     })
   }
 
+  /**
+   * The operator tools this view shows. My Apps is the member's shelf, so
+   * there it is pinned tools only; Market/Search list every entitled tool.
+   * The search term narrows them the same way it narrows registry rows.
+   */
+  const visibleAdminTools = useMemo(() => {
+    const base =
+      view === STORE_VIEWS.MINE
+        ? adminTools.filter((tool) => favoriteIds.has(tool.favoriteId))
+        : adminTools
+    const term = query.trim().toLowerCase()
+    if (!term) return base
+    return base.filter(
+      (tool) =>
+        tool.name.toLowerCase().includes(term) || tool.description.toLowerCase().includes(term),
+    )
+  }, [adminTools, view, favoriteIds, query])
+
   const totalCount = storeApps.length
   // Controls appear only when there is something to narrow. A search box over a list that is empty —
-  // or that we could not read at all — is an affordance that cannot do anything.
-  const showControls = totalCount > 0
+  // or that we could not read at all — is an affordance that cannot do anything. Operator tools
+  // count: an operator with tools but an empty registry still needs the search box.
+  const showControls = totalCount > 0 || adminTools.length > 0
 
   /**
    * The Search sub-view is the market with search emphasized: same listing, same filters — the
@@ -494,13 +578,43 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
           )}
 
           {/* Polite live region: a filter or search term changes the grid silently for a screen-reader
-              user, so the resulting count is announced rather than left to be discovered. */}
-          <p className="miniapp-catalog-count" role="status">
-            {visible.length === totalCount
-              ? `Showing all ${totalCount} app${totalCount === 1 ? '' : 's'}.`
-              : `Showing ${visible.length} of ${totalCount} apps.`}
-          </p>
+              user, so the resulting count is announced rather than left to be discovered. Registry
+              apps only — the operator section below carries its own heading and count. */}
+          {totalCount > 0 && (
+            <p className="miniapp-catalog-count" role="status">
+              {visible.length === totalCount
+                ? `Showing all ${totalCount} app${totalCount === 1 ? '' : 's'}.`
+                : `Showing ${visible.length} of ${totalCount} apps.`}
+            </p>
+          )}
         </div>
+      )}
+
+      {/* Operator tools (spec 093 follow-up): host-bundled admin mini-apps, listed ONLY for an
+          account whose roles derive at least one. A separate section with its own explanation —
+          never mixed into the registry groups, never under the verified badge: these are not
+          registry records, and the distinction is the trust story. Rendered regardless of
+          registry status (an unreachable registry does not take the operator's own tools down). */}
+      {visibleAdminTools.length > 0 && (
+        <CatalogSection
+          headingId="miniapp-admin-tools-title"
+          title="Operator tools"
+          itemNoun="tools"
+          dismissLocked={sheetAppId !== null}
+          note={
+            <p className="miniapp-admin-tools-note">
+              Built into this app and shown only to operators — your roles unlock{' '}
+              {visibleAdminTools.length === adminTools.length
+                ? `${adminTools.length} tool${adminTools.length === 1 ? '' : 's'}`
+                : `${visibleAdminTools.length} of ${adminTools.length}`}
+              . Pin one to Quick Access with the star.
+            </p>
+          }
+          items={visibleAdminTools}
+          renderItem={(tool) => (
+            <AdminToolRow key={tool.favoriteId} tool={tool} isFavorite={favoriteIds.has(tool.favoriteId)} />
+          )}
+        />
       )}
 
       {/* The genuinely-empty catalog: the registry answered, and it holds nothing launchable. Gated on
@@ -514,15 +628,19 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
       )}
 
       {/* My Apps with nothing favorited: the member's empty shelf, never confusable with an empty
-          registry. The listing exists (verified or stale) — there is simply nothing starred. */}
-      {view === STORE_VIEWS.MINE && listing && totalCount === 0 && (
+          registry. The listing exists (verified or stale) — there is simply nothing starred. An
+          operator whose shelf holds pinned tools is not on an empty shelf. */}
+      {view === STORE_VIEWS.MINE && listing && totalCount === 0 && visibleAdminTools.length === 0 && (
         <EmptyState
           title="Nothing in My Apps yet"
           message="Star an app in the Market and it will appear here for quick access."
         />
       )}
 
-      {showControls && visible.length === 0 && (
+      {/* "No apps match" is about the REGISTRY list a filter narrowed — it renders only when there
+          were registry apps to narrow, so it can never sit under a populated operator section
+          claiming nothing matched. */}
+      {totalCount > 0 && visible.length === 0 && (
         <EmptyState
           title="No apps match"
           message="No approved app matches your search term or the categories you picked. Clear a filter or try a different term."
@@ -530,25 +648,21 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
       )}
 
       {groupedVisible.map((group) => (
-        <section
+        <CatalogSection
           key={group.key}
-          className="miniapp-catalog-group"
-          aria-labelledby={`miniapp-catalog-group-${group.key}`}
-        >
-          <h4 className="miniapp-catalog-group-title" id={`miniapp-catalog-group-${group.key}`}>
-            {group.label}
-          </h4>
-          <ul className="miniapp-catalog-grid">
-            {group.apps.map((app) => (
-              <AppRow
-                key={app.id}
-                app={app}
-                isFavorite={favoriteIds.has(app.id)}
-                onOpen={handleOpenSheet}
-              />
-            ))}
-          </ul>
-        </section>
+          headingId={`miniapp-catalog-group-${group.key}`}
+          title={group.label}
+          dismissLocked={sheetAppId !== null}
+          items={group.apps}
+          renderItem={(app) => (
+            <AppRow
+              key={app.id}
+              app={app}
+              isFavorite={favoriteIds.has(app.id)}
+              onOpen={handleOpenSheet}
+            />
+          )}
+        />
       ))}
 
       {/* The app-details sheet (iteration 2, FR-017). `listing` is non-null whenever a row

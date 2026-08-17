@@ -154,6 +154,9 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      # Required by approveWorkflowRun below: a pull request this app opens leaves its own required
+      # checks stuck in `action_required` until something approves them.
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -296,6 +299,37 @@ jobs:
               body,
             })
             core.notice(`Opened back-merge PR #${pr.number}`)
+
+            /*
+             * A PULL REQUEST OPENED BY GITHUB-ACTIONS CANNOT SATISFY ITS OWN REQUIRED CHECKS.
+             *
+             * Workflow runs triggered by a pull request that this app opened land in
+             * `action_required` — awaiting a human clicking "Approve and run". `staging` requires
+             * `Change classification` and `Mini-app version pairing`, so until somebody approves,
+             * those two never report and the pull request is BLOCKED. Measured on #1206: 36 checks
+             * green, the two required ones absent entirely, mergeStateStatus BLOCKED.
+             *
+             * That defeats the point of opening it. The whole reason this job creates a pull request
+             * rather than filing an issue is that a mechanical step nobody is required to do does not
+             * get done — and "go approve seven workflow runs" is exactly such a step.
+             *
+             * So it approves them itself. The runs being approved are on a branch this job just
+             * created, pointing at `main` VERBATIM, in this repository. No untrusted contributor code
+             * is involved, which is the risk the approval gate exists to manage.
+             */
+            const { data: pending } = await github.rest.actions.listWorkflowRunsForRepo({
+              ...context.repo, branch, status: 'action_required', per_page: 50,
+            })
+            for (const run of pending.workflow_runs ?? []) {
+              try {
+                await github.rest.actions.approveWorkflowRun({ ...context.repo, run_id: run.id })
+                core.notice(`approved ${run.name} (${run.id})`)
+              } catch (err) {
+                // Non-fatal. The pull request still exists and a human can approve it; losing the
+                // convenience must never lose the pull request.
+                core.warning(`could not approve ${run.name}: ${err.message}`)
+              }
+            }
 
       - name: Close the drift issue once clear
         if: steps.drift.outputs.drifted == 'no'

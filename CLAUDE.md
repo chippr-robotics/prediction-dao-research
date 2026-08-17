@@ -385,6 +385,28 @@ artifacts live under `specs/<feature>/`.
   redirects there. See the FR-030 amendment in `specs/073-miniapp-platform/spec.md`.
   See `docs/developer-guide/miniapps.md` + `docs/runbooks/miniapp-registry-operations.md` +
   `specs/073-miniapp-platform/`.
+- **The admin console is NINE HOST-BUNDLED MINI-APPS behind a Control Room (spec 093), and
+  `adminApps.js` is the ONLY app/view/role matrix.** `/admin` is the launcher; each group of
+  admin controls is a lazily-loaded app at `/admin/<appId>` with `?view=` addressing
+  (`components/admin/adminApps.js`, `AdminAppShell`, `AdminAppRoute`). Five rules: (1) never
+  introduce a second app→view→gate mapping — the Control Room tiles, per-app rails, route guard
+  and least-privilege tests all read `adminApps.js`, and its gates are the retired
+  `buildAdminNavGroups` matrix verbatim (changing one is a role-model change, not a nav tweak);
+  (2) these are FIRST-PARTY, host-bundled screens — do NOT convert them to spec-073 registry
+  packages (no role gating exists anywhere in that catalog, the host object carries no
+  authority, and admin code's file closure lives in `frontend/src`); (3) Maintenance stays its
+  own PERMISSIONLESS app (any entrant, no elevated-status styling) — folding it into another
+  app either hides it or drags that app's tile onto everyone; (4) dashboards obey the estate
+  rules — `AdminStatTile`/`AdminBarList`/`AdminSparkline` take three-state inputs, a failed read
+  never renders as a zero, zero bars render no fill, partial totals name what is missing;
+  (5) entry keeps the three-way granted / denied / "Could Not Verify Access" distinction
+  (`useAdminAccess`), all data hooks mount BEHIND the gate, and write plumbing (`useAdminTx`,
+  `useScopedChain`, membership reference-chain pinning, single-chain incident controls) moved
+  unchanged. Discovery: the Apps store lists the operator's own tools ("Operator tools",
+  `adminToolCatalog.js` + `useOperatorFlags` — role-derived client-side, NEVER a registry
+  record, never under the verified badge, no curator read added to the member path) and they
+  pin to Quick Access under the reserved `admin-tool:<appId>` favorite namespace. See
+  `docs/developer-guide/admin-mini-apps.md` + `specs/093-admin-mini-apps/`.
 - **The nav drawer's height is BOUNDED BY DESIGN (spec 081), and the rail it uses is shared.**
   `components/ui/PortalNav.jsx` renders the Admin Panel's and My Account's rails as well as the
   drawer, so the accordion behaviour is **opt-in via `collapsibleGroups`** — absent, the component
@@ -408,8 +430,11 @@ artifacts live under `specs/<feature>/`.
   which the other two rails read — with a hard 36×36 CSS px floor per interactive target. Note
   `src/index.css` carries a global `button { padding: 0.6em 1.2em }`: new drawer button classes
   MUST be written `.app-nav-drawer .<class>` or their content box silently collapses. The Apps
-  group is GONE — the catalog entry lives in **Tools** (tab id `apps` and `/apps/<slug>`
-  unchanged). The desktop 64px gutter renders none of this. See
+  group is GONE — the catalog entry lives in **Tools** in `NAV_GROUPS` (tab id `apps` and
+  `/apps/<slug>` unchanged), but the DRAWER hoists that one item into Quick Access (spec 093:
+  the door to the platform must not sit in a folded section; the hoist in `buildDrawerGroups`
+  is drawer presentation, not nav structure — sibling icon nav and the search index still read
+  Tools). The desktop 64px gutter renders none of this. See
   `docs/developer-guide/nav-drawer.md` + `specs/081-nav-drawer-density/`.
 - **The drawer's search field searches the APP, and `config/navSearchIndex.js` is what makes that
   true.** Members type protocol names, not menu labels: "morpho" is Earn ▸ Lend, "opensea" is
@@ -602,5 +627,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/092-multi-chain-activity/plan.md
+at specs/093-admin-mini-apps/plan.md
 <!-- SPECKIT END -->
