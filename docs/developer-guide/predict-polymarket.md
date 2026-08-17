@@ -42,8 +42,10 @@ in the confirm UI, never hidden and never described as free (`TradeConfirm.jsx`)
 | **Per-user CLOB session** | `frontend/src/lib/predict/clobSession.js` — derive creds + build/sign/post orders via `@polymarket/clob-client` |
 | Region gate | `frontend/src/lib/predict/geoblock.js` — geoblock check + Polymarket link-out for restricted regions |
 | Cost math (honest fee lines) | `frontend/src/lib/predict/clobOrder.js` `computeCost` (additive builder fee; **not** the order struct) |
-| Signer capability | `frontend/src/lib/predict/tradeSigner.js` — EOA can sign; passkey deferred (`PASSKEY_PREDICT_ENABLED = false`) |
-| State machine | `frontend/src/hooks/usePredictTrade.js` (region → fee → derive creds → submit) |
+| Signer capability | `frontend/src/lib/predict/tradeSigner.js` — EOA signs via walletClient; passkey signs via the ERC-1271 rail (`PASSKEY_PREDICT_ENABLED = true`, kill seam) |
+| **Passkey ERC-1271 signer** | `frontend/src/lib/predict/passkeyClobSigner.js` — clob-client signer shim over `lib/passkey/intentSigner` (replaySafeHash → WebAuthn → SignatureWrapper) |
+| **Passkey first-trade approvals** | `frontend/src/lib/predict/passkeyApprovals.js` — missing USDC/CTF approvals for the three settlement contracts, batched through `sendCalls` (one ceremony; deploys a counterfactual account) |
+| State machine | `frontend/src/hooks/usePredictTrade.js` (region → fee → [passkey: approvals] → derive creds → submit) |
 | Browse / positions / orders | `usePredictMarkets.js`, `usePredictPortfolio.js` + `components/predict/*` |
 
 ### Upstream hosts
@@ -67,9 +69,14 @@ Read hosts are configurable via `POLYMARKET_GAMMA_URL` / `POLYMARKET_DATA_URL` /
   one **L1 EIP-712 signature** (a wallet prompt, no gas). Result `{ key, secret, passphrase }` is cached
   in `sessionStorage` per address, so the member signs at most once per session. Creds are session-local
   and **never** sent to a FairWins server.
-- `makeClobClient(walletClient, creds, { builderConfig })` — an authed client bound to the member's
-  wallet + their creds, signatureType **0 (EOA)** (maker == signer == funder). Passkey/Safe types stay
-  deferred behind `PASSKEY_PREDICT_ENABLED`.
+- `makeClobClient(walletClient, creds, { builderConfig, signatureType, funderAddress })` — an authed
+  client bound to the member's signer + their creds. EOAs use signatureType **0** (maker == signer ==
+  funder, the default). Passkey smart accounts use signatureType **3 (POLY_1271)** with
+  `funderAddress` = the account: maker == signer == funder == the smart account, every signature the
+  account's ERC-1271 WebAuthn envelope, and the API key registered against the **account** address
+  (satisfying CLOB V2's signer-binding rule). The pinned SDK (5.8.1, archived) predates `POLY_1271` in
+  its `SignatureType` enum, but forwards the raw number into the signed order unvalidated —
+  `SIG_TYPE_POLY_1271` in `clobSession.js` is the one place the value lives.
 - `submitOrder` / `cancelOrder` / `fetchOpenOrders` — `createAndPostOrder` builds, signs, and posts in
   one call (the SDK resolves tick size, fee rate, and negRisk). **The order struct and its EIP-712
   signing are owned by the SDK** — we don't hand-roll it (the real struct is 12 fields, domain
@@ -107,7 +114,9 @@ no builder fee.
 
 Every path degrades gracefully: no builder code / gateway ⇒ orders post **unattributed**; killswitch or
 outage ⇒ honest message + a Polymarket link; fees unconfirmable ⇒ signing is **blocked** (never a guessed
-fee); restricted region ⇒ honest notice + link-out; passkey session ⇒ honest "not available yet".
+fee); restricted region ⇒ honest notice + link-out; a passkey account whose signatures the CLOB rejects ⇒
+honest per-account error + the Polymarket link-out (FR-019's per-account fallback, not a blanket
+exclusion); a passkey session that lost its credential record ⇒ an actionable "sign in again".
 
 ## Configuration
 
@@ -129,9 +138,15 @@ fee. Comparable to Kalshi (~≤1.75%) and mid-pack among third-party builders (0
 - **Allowed-region E2E**: a live end-to-end trade (derive creds → submit → fill) must be verified from a
   **non-restricted** region — the sandbox/dev region is geoblocked, so live submit currently reaches the
   region gate. Everything up to that point is validated live.
-- **Passkey path**: Polymarket's ERC-1271 validation of our passkey (smart-account) signatures is **not**
-  wired — `PASSKEY_PREDICT_ENABLED = false`. Passkey users see an honest "not available yet". Enabling it
-  needs signatureType 1/2 order binding confirmed end-to-end.
+- **Passkey path — live E2E confirmation still open**: the full POLY_1271 rail is wired
+  (`PASSKEY_PREDICT_ENABLED = true`) — signatureType 3, maker == signer == funder == the account, L1
+  auth + orders signed as the account's ERC-1271 envelope, first-trade settlement approvals batched
+  via `sendCalls`. What is NOT yet confirmed against the live CLOB (the dev region is geoblocked): (a)
+  that the CLOB's POLY_1271 validation accepts an **arbitrary** ERC-1271 account rather than only
+  Polymarket-factory deposit wallets, and (b) that the pinned 5.8.1 client's order shape is accepted
+  for type-3 orders (POLY_1271 is documented as "V2 orders"). If either fails, passkey members get the
+  honest per-account error + Polymarket link-out — never a stuck flow — and the one-line kill seam
+  (`PASSKEY_PREDICT_ENABLED = false`) restores the "not available yet" notice.
 - **Deploys**: the feature needs a **gateway redeploy** (builder-sign endpoint) and an **SPA
   rebuild/redeploy** (trade code + CSP). Merging main does not auto-deploy.
 

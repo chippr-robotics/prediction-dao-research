@@ -132,7 +132,10 @@ export function createGcpBillingCollector({ config, bigQuery, log = console.warn
     }
 
     const total = lastGood.rows.reduce((a, r) => a + r.cost, 0)
-    return read(total, 'USD', { labels: { basis: 'billed' } })
+    // Same clock read as the cache: `read()` would otherwise stamp its own Date.now(), and a
+    // millisecond tick between the two makes the served-stale `at` disagree with what the live
+    // reading reported for the SAME data.
+    return read(total, 'USD', { labels: { basis: 'billed' }, at: lastGood.at })
   }
 
   // The per-service breakdown and the export lag ride alongside the aggregate Reading rather than
