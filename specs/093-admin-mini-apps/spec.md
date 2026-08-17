@@ -187,9 +187,23 @@ experience.
   panel uses today (on-chain roles, per-contract authority reads); this feature MUST NOT introduce
   a new authorization store, and UI gating MUST NOT be treated as a security boundary — contracts
   remain the enforcement layer.
-- **FR-004**: Admin mini-apps are host-bundled, first-party surfaces. They MUST NOT be published
-  to the public mini-app registry or IPFS, MUST NOT appear in the member-facing Apps catalog, and
-  MUST NOT be executable or discoverable by accounts without a qualifying role.
+- **FR-004** *(amended by the store-surfacing follow-up, 2026-08-17)*: Admin mini-apps are
+  host-bundled, first-party surfaces. They MUST NOT be published to the public mini-app registry
+  or IPFS, and MUST NOT be discoverable by accounts without a qualifying role. They MAY appear in
+  the member-facing Apps catalog **only** for entitled operators, as a clearly separated
+  first-party section that never claims registry provenance (never under the on-chain-verified
+  badge). The original blanket "not in the catalog" wording protected against public exposure and
+  provenance confusion; the amendment preserves both protections while making the tools
+  discoverable where operators already look for apps.
+- **FR-013** *(follow-up)*: Entitled operators MUST be able to find their admin apps in the Apps
+  store (listed, searchable) with the same role derivation the launcher uses — the store never
+  offers a tool the Control Room would not — and the section's availability MUST NOT depend on
+  the on-chain registry being reachable.
+- **FR-014** *(follow-up)*: Operators MUST be able to pin admin apps to the same Quick Access
+  shortcuts members pin registry apps to, within the existing bounded-height rules (one capped
+  strip). A pin is a device-scoped shortcut; if the underlying role is later revoked the
+  destination's access gate remains the authority (the shortcut may remain, the tool refuses
+  honestly).
 - **FR-005**: Every control, read, and disclosure present in the monolithic panel MUST exist in
   exactly one admin app with unchanged role gating, chain scoping, and write semantics (one
   transaction, one named chain, authority read from the enforcing contract).

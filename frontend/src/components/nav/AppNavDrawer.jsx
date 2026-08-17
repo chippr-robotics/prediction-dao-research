@@ -20,6 +20,7 @@ import { useChainTokens } from '../../hooks/useChainTokens'
 import { collectiblesGatewayUrl } from '../../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../../lib/predict/predictClient'
 import { loadFavoriteApps, subscribeFavoriteApps } from '../../lib/miniapps/favorites'
+import { adminAppIdFromFavoriteId, adminToolGlyph } from '../admin/adminToolCatalog'
 import { filterNavGroups, filterNavItems } from '../../lib/nav/filterNav'
 import {
   NAV_ITEM_TERMS,
@@ -107,7 +108,23 @@ function buildDrawerGroups(visibility) {
 // recognisable at a glance in the EXPANDED menu too, not just the icon-only gutter.
 // `slug` rides along so the pinned strip can look up the SAME curated store artwork the catalog
 // card shows (spec 077 `artworkFor`) — a shortcut should look like the thing it launches.
+//
+// Pinned ADMIN TOOLS (spec 093 follow-up) ride the same strip: their id names the admin app, the
+// destination is its /admin address, and the tile shows the tool's own NavIcon glyph rather than
+// store artwork (there is no registry record to have artwork). Only an operator could ever have
+// pinned one — the store's pin control derives from role flags — and if the role is later revoked
+// the shortcut still lands on the /admin gate's honest denial, exactly like a typed URL.
 function favoriteToNavItem(favorite) {
+  const adminAppId = adminAppIdFromFavoriteId(favorite.id)
+  if (adminAppId) {
+    return {
+      id: `favorite-${favorite.id}`,
+      label: favorite.name,
+      glyph: adminToolGlyph(favorite.id),
+      to: `/admin/${adminAppId}`,
+      showIcon: true,
+    }
+  }
   return {
     id: `favorite-${favorite.id}`,
     label: favorite.name,
@@ -145,6 +162,13 @@ function resolveActiveId(location, favoriteItems) {
     const favoriteMatch = favoriteItems.find((item) => item.to === `/apps/${slug}`)
     return favoriteMatch ? favoriteMatch.id : 'apps'
   }
+  // An open admin tool highlights its own pinned shortcut (spec 093 follow-up) — and only that:
+  // the operations area is deliberately not a nav section, so with no matching pin nothing in
+  // this menu claims it.
+  if (pathname.startsWith('/admin')) {
+    const favoriteMatch = favoriteItems.find((item) => item.to === pathname)
+    return favoriteMatch ? favoriteMatch.id : null
+  }
   return null
 }
 
@@ -180,15 +204,19 @@ export default function AppNavDrawer() {
   const isMobile = useIsMobile()
   const drawerRef = useRef(null)
 
-  // Favorited mini-apps (App Store quick-access). Gated on the `apps` tenant feature so a build
-  // that has disabled the mini-app platform never surfaces a shortcut into it, even if a favorite
-  // was saved on this device before the tenant config changed.
+  // Favorited mini-apps (App Store quick-access). REGISTRY pins are gated on the `apps` tenant
+  // feature so a build that has disabled the mini-app platform never surfaces a shortcut into it,
+  // even if a favorite was saved on this device before the tenant config changed. ADMIN TOOL pins
+  // (spec 093 follow-up) are deliberately NOT behind that feature: the operations console exists
+  // on every tenant, and only an operator's own pinning ever created one.
   const [favorites, setFavorites] = useState(() => loadFavoriteApps())
   useEffect(() => subscribeFavoriteApps(() => setFavorites(loadFavoriteApps())), [])
-  const favoriteItems = useMemo(
-    () => (isNavItemEnabledForTenant('apps') ? favorites.map(favoriteToNavItem) : []),
-    [favorites],
-  )
+  const favoriteItems = useMemo(() => {
+    const registryEnabled = isNavItemEnabledForTenant('apps')
+    return favorites
+      .filter((fav) => registryEnabled || adminAppIdFromFavoriteId(fav.id))
+      .map(favoriteToNavItem)
+  }, [favorites])
 
   // Section folds and row density are device-scoped preferences that can also be changed from
   // the Preferences panel, so the drawer re-reads them on every store commit rather than owning

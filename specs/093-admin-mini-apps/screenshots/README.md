@@ -46,3 +46,17 @@ where they exist, their own screenshot records (e.g. spec 067).
 and unverified states render their distinct sentences, dashboards show real posed data with
 partial totals named, zero rows honest, forms stacked and readable, mobile stacks without
 horizontal scroll, collapsed rail keeps every section reachable.
+
+## Store-surfacing follow-up (Operator tools in the Apps catalog)
+
+Three scenarios added to the matrix: `store-operator-tools` (all roles — 9 tools above the
+registry groups), `store-feeadmin-pinned` (2 tools, one pinned, "★ Pinned" chip + pinned star
+state), `store-member-control` (no roles — no operator section at all, the unchanged member
+store).
+
+**Round 1 → 1 finding, fixed:** the section's explainer was nested inside the group-title `<h4>`,
+inheriting its uppercase/accent styling and rendering the whole heading centered with the accent
+bar on top. Moved to its own `<p.miniapp-admin-tools-note>`; the heading now matches the registry
+group titles exactly. **Round 2 → no findings** (both themes, both viewports; the fixed StoreBar
+appearing mid-list in full-height element captures is a screenshot artifact — it is
+viewport-fixed in use).

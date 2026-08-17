@@ -402,7 +402,11 @@ artifacts live under `specs/<feature>/`.
   (5) entry keeps the three-way granted / denied / "Could Not Verify Access" distinction
   (`useAdminAccess`), all data hooks mount BEHIND the gate, and write plumbing (`useAdminTx`,
   `useScopedChain`, membership reference-chain pinning, single-chain incident controls) moved
-  unchanged. See `docs/developer-guide/admin-mini-apps.md` + `specs/093-admin-mini-apps/`.
+  unchanged. Discovery: the Apps store lists the operator's own tools ("Operator tools",
+  `adminToolCatalog.js` + `useOperatorFlags` — role-derived client-side, NEVER a registry
+  record, never under the verified badge, no curator read added to the member path) and they
+  pin to Quick Access under the reserved `admin-tool:<appId>` favorite namespace. See
+  `docs/developer-guide/admin-mini-apps.md` + `specs/093-admin-mini-apps/`.
 - **The nav drawer's height is BOUNDED BY DESIGN (spec 081), and the rail it uses is shared.**
   `components/ui/PortalNav.jsx` renders the Admin Panel's and My Account's rails as well as the
   drawer, so the accordion behaviour is **opt-in via `collapsibleGroups`** — absent, the component

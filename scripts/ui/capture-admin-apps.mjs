@@ -167,23 +167,50 @@ export const UNREACHABLE_REASON = Object.freeze({ RPC: 'rpc', BAD_RESPONSE: 'bad
 export const appNamespaceKey = (chainId, id) => 'app-' + chainId + '-' + id
 export const appSlug = (name) => String(name || '').toLowerCase().replace(/\\s+/g, '-')
 export const registryLocation = () => ({ chainId: 63, registryAddress: '0xFEd626025225A3B1aB3BA72D429B8c9C74cb5058' })
-const app = (id, name, status, launchable, proposed) => ({
+const app = (id, name, status, launchable, proposed, category, description) => ({
   id, name, status, launchable,
+  category: category ?? 0,
+  description: description || name + ' — a registry mini-app.',
+  vendor: '0x52502d9C7C2d63f7a4f0a612ce1B0e4Bfd80F6e1',
   proposed: { present: Boolean(proposed) },
-  approved: { present: true },
+  approved: { present: true, version: '1.4.2' },
+  submittedAt: 0, approvedAt: 0, updatedAt: 0,
 })
+const ALL = [
+  app(1, 'Token Mint', 1, true, false, 4, 'Deploy and manage ERC-20 tokens.'),
+  app(2, 'ClearPath', 1, true, true, 5, 'DAO transparency and treasury reporting.'),
+  app(3, 'LedgerLens', 0, false, true, 1),
+  app(4, 'OldTool', 3, false, false, 2),
+]
 export const fetchCatalog = async () => ({
   status: 'ok',
   ageMs: 0,
-  apps: [],
-  allApps: [
-    app(1, 'Token Mint', 1, true, false),
-    app(2, 'ClearPath', 1, true, true),
-    app(3, 'LedgerLens', 0, false, true),
-    app(4, 'OldTool', 3, false, false),
-  ],
+  fetchedAt: 1755388800000,
+  apps: ALL.filter((a) => a.launchable),
+  allApps: ALL,
 })
 export const clearCatalogCache = () => {}
+export const fetchApp = async () => ({ status: 'not-found' })
+export const fetchAppByName = async () => ({ status: 'not-found' })
+export const fetchAppBySlug = async () => ({ status: 'not-found' })
+export const fetchVendorApps = async () => ({ status: 'ok', apps: [] })
+export const miniAppRegistryAddress = () => '0xFEd626025225A3B1aB3BA72D429B8c9C74cb5058'
+export const CATALOG_CACHE_TTL_MS = 60000
+export const CATALOG_PAGE_SIZE = 25
+export const MINIAPP_MAX_PAGE_LIMIT = 25
+`
+
+const STUB_OPERATOR_FLAGS = `/* Written by capture-admin-apps.mjs; deleted on exit. */
+const q = new URLSearchParams(window.location.search)
+const roles = (q.get('roles') || '').split(',').filter(Boolean)
+const NAME = {
+  admin: 'isAdmin', guardian: 'isGuardian', moderator: 'isAccountModerator',
+  rolemanager: 'isRoleManager', sanctions: 'isSanctionsAdmin', feeadmin: 'isFeeAdmin',
+  staking: 'isStakingAdmin', liquidity: 'isLiquidityAdmin',
+}
+const flags = {}
+for (const key of roles) if (NAME[key]) flags[NAME[key]] = true
+export const useOperatorFlags = () => ({ isOperator: Object.keys(flags).length > 0, flags })
 `
 
 const STUB_MTO_STATS = `/* Posed membership stats for the treasury sparkline + bars. */
@@ -257,6 +284,7 @@ export default async (env) => {
         { find: /^.*hooks\\/useCallsignRegistryMetrics$/, replacement: '/src/dev/__stubCallsigns.js' },
         { find: /^.*lib\\/miniapps\\/registryAuthority$/, replacement: '/src/dev/__stubAuthority.js' },
         { find: /^.*lib\\/miniapps\\/registryClient$/, replacement: '/src/dev/__stubRegistry.js' },
+        { find: /^.*admin\\/useOperatorFlags$/, replacement: '/src/dev/__stubOperatorFlags.js' },
       ],
     },
   })
@@ -270,18 +298,29 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from '../contexts/ThemeContext.jsx'
 import ControlRoom from '../components/admin/ControlRoom'
 import AdminAppRoute from '../components/admin/AdminAppRoute'
+import CatalogPanel from '../components/miniapps/CatalogPanel'
 import '../theme.css'
 import '../index.css'
 import '../App.css'
 
 const q = new URLSearchParams(window.location.search)
 const entry = q.get('entry') || '/admin'
+// Pre-pinned favorites for store/drawer scenarios, e.g. pins=admin-tool:maintenance
+for (const pin of (q.get('pins') || '').split(',').filter(Boolean)) {
+  const prefsRaw = window.localStorage.getItem('fw_global_prefs')
+  const prefs = prefsRaw ? JSON.parse(prefsRaw) : {}
+  const list = prefs.miniapp_favorites || []
+  list.push({ id: pin, name: pin.replace(/^admin-tool:/, '').replace(/-/g, ' ') })
+  prefs.miniapp_favorites = list
+  window.localStorage.setItem('fw_global_prefs', JSON.stringify(prefs))
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
       <MemoryRouter initialEntries={[entry]}>
         <Routes>
+          <Route path="/wallet" element={<CatalogPanel />} />
           <Route path="/admin" element={<ControlRoom />} />
           <Route path="/admin/:appId" element={<AdminAppRoute />} />
         </Routes>
@@ -306,6 +345,7 @@ const TEMP_FILES = [
   [join(FRONTEND, 'src/dev/__stubCallsigns.js'), STUB_CALLSIGNS],
   [join(FRONTEND, 'src/dev/__stubAuthority.js'), STUB_AUTHORITY],
   [join(FRONTEND, 'src/dev/__stubRegistry.js'), STUB_REGISTRY],
+  [join(FRONTEND, 'src/dev/__stubOperatorFlags.js'), STUB_OPERATOR_FLAGS],
 ]
 
 function writeHarness() {
@@ -353,6 +393,23 @@ const SCENARIOS = [
   { name: 'incident-emergency-view', query: `entry=/admin/incident-response?view=emergency&roles=${ALL_ROLES}` },
   { name: 'access-control-view', query: `entry=/admin/access-control?view=admin-roles&roles=${ALL_ROLES}` },
   { name: 'membership-tiers-view', query: `entry=/admin/membership-revenue?view=tiers&roles=${ALL_ROLES}` },
+  // Store surfacing (spec 093 follow-up): the Operator tools section beside registry rows,
+  // the narrow-role variant with a pinned tool, and the member control (no section at all).
+  {
+    name: 'store-operator-tools',
+    query: `entry=/wallet?tab=apps&roles=${ALL_ROLES}`,
+    waitFor: '.miniapp-catalog',
+  },
+  {
+    name: 'store-feeadmin-pinned',
+    query: 'entry=/wallet?tab=apps&roles=feeadmin&pins=admin-tool:maintenance',
+    waitFor: '.miniapp-catalog',
+  },
+  {
+    name: 'store-member-control',
+    query: 'entry=/wallet?tab=apps&roles=',
+    waitFor: '.miniapp-catalog',
+  },
 ]
 
 writeHarness()
@@ -393,7 +450,7 @@ try {
             await page.goto(`${BASE}/admin-harness.html?${shot.query}`, {
               waitUntil: 'networkidle',
             })
-            await page.waitForSelector('.admin-panel', { timeout: 15_000 })
+            await page.waitForSelector(shot.waitFor || '.admin-panel', { timeout: 15_000 })
             break
           } catch (err) {
             if (attempt >= 1) throw err
@@ -404,7 +461,7 @@ try {
         })
         // Async statuses (curator authority, catalog counts) land a beat later.
         await page.waitForTimeout(600)
-        const target = (await page.$('.admin-panel')) || page
+        const target = (await page.$(shot.waitFor || '.admin-panel')) || page
         await target.screenshot({ path: join(OUT, `${shot.name}-${label}-${theme}.png`) })
         await page.close()
       }
