@@ -4,8 +4,11 @@
  * its signer, so a shared gateway key can't relay orders — each member trades with their OWN derived creds).
  *
  * Flow: check the region (Polymarket geoblock) → verify the account can sign → load the honest fee schedule
- * → enable trading (derive the member's CLOB creds, one gasless signature, cached per session) → submit
- * (the SDK builds/signs/posts the order and stacks FairWins' POLY_BUILDER_* attribution via the gateway).
+ * → enable trading (derive the member's CLOB creds, one gasless signature, cached per session; passkey
+ * sessions first batch the exchange approvals through sendCalls — one ceremony, deploys the account) →
+ * submit (the SDK builds/signs/posts the order and stacks FairWins' POLY_BUILDER_* attribution via the
+ * gateway). EOAs sign with the walletClient (signatureType 0); passkey accounts sign ERC-1271
+ * (signatureType 3, maker == signer == funder == the account) via lib/predict/passkeyClobSigner.
  *
  * Honest-state guarantees: restricted regions get an honest notice + a deep link OUT to Polymarket (we
  * respect Polymarket's regional policy, never bypass it, FR-019); signing is blocked when the fee schedule
@@ -17,10 +20,13 @@ import { useCallback, useContext, useMemo, useRef, useState } from 'react'
 import { useChainId, useWalletClient } from 'wagmi'
 import { WalletContext } from '../contexts/WalletContext.js'
 import { getCurrentChainId } from '../config/networks'
+import { readSession } from '../connectors/passkey'
 import { computeCost as defaultComputeCost } from '../lib/predict/clobOrder'
 import { resolveTradeSigner as defaultResolveTradeSigner } from '../lib/predict/tradeSigner'
 import { fetchFeeRate as defaultFetchFeeRate, predictGatewayUrl } from '../lib/predict/predictClient'
 import { checkGeoblock as defaultCheckGeoblock } from '../lib/predict/geoblock'
+import { makePasskeyClobSigner as defaultMakePasskeySigner } from '../lib/predict/passkeyClobSigner'
+import { missingPredictApprovals as defaultMissingApprovals } from '../lib/predict/passkeyApprovals'
 import {
   ensureClobCreds as defaultEnsureCreds,
   makeClobClient as defaultMakeClient,
@@ -28,6 +34,7 @@ import {
   submitOrder as defaultSubmitOrder,
   cancelOrder as defaultCancelOrder,
   loadCachedCreds as defaultLoadCachedCreds,
+  SIG_TYPE_POLY_1271,
 } from '../lib/predict/clobSession'
 
 const POLYGON = 137
@@ -49,6 +56,9 @@ export function usePredictTrade(options = {}) {
       computeCost: defaultComputeCost,
       resolveTradeSigner: defaultResolveTradeSigner,
       loadCachedCreds: defaultLoadCachedCreds,
+      makePasskeySigner: defaultMakePasskeySigner,
+      missingApprovals: defaultMissingApprovals,
+      readSession,
       gatewayUrl: predictGatewayUrl,
       ...optionDeps,
     }),
@@ -75,6 +85,7 @@ export function usePredictTrade(options = {}) {
         loginMethod: wallet.loginMethod,
         walletClient,
         address: wallet.address,
+        credentialId: wallet.loginMethod === 'passkey' ? deps.readSession()?.credentialId : null,
       }),
     [wallet.loginMethod, wallet.address, walletClient, deps]
   )
@@ -135,12 +146,36 @@ export function usePredictTrade(options = {}) {
   /** Pure preview of the honest total/net (incl. the additive builder fee) — nothing signed. */
   const preview = useCallback((params) => (fee ? deps.computeCost(params, fee) : null), [fee, deps])
 
-  /** Derive (or reuse) the member's own CLOB creds — one gasless wallet signature, cached per session. */
-  const ensureCreds = useCallback(async () => {
-    return deps.ensureCreds(walletClient, { address: wallet.address })
-  }, [deps, walletClient, wallet.address])
+  /**
+   * The signer object handed to the SDK: the viem walletClient for EOAs, or the ERC-1271 shim for
+   * passkey sessions (signatureType 3 — maker == signer == funder == the account).
+   */
+  const buildSdkSigner = useCallback(async () => {
+    if (signer.kind !== 'passkey') return walletClient
+    return deps.makePasskeySigner({ chainId: POLYGON, address: wallet.address, credentialId: signer.credentialId })
+  }, [signer, walletClient, wallet.address, deps])
 
-  /** Explicit "enable trading" step (derive creds up front). Optional — submit() does it lazily too. */
+  /**
+   * Passkey first-trade prerequisite: the CLOB settles on-chain against the MAKER, so the account
+   * must have approved the exchange contracts. One batched ceremony via sendCalls covers every
+   * missing approval (and deploys a counterfactual account, spec 041 FR-007); an already-approved
+   * account skips straight through with reads only. EOAs manage allowances on Polymarket itself.
+   */
+  const ensureApprovals = useCallback(async () => {
+    if (signer.kind !== 'passkey') return
+    const missing = await deps.missingApprovals({ address: wallet.address, chainId: POLYGON })
+    if (!missing.length) return
+    // sendCalls resolves at an honest terminal state (inclusion) — spec 041 FR-017.
+    await wallet.sendCalls(missing.map(({ target, data }) => ({ target, data })))
+  }, [signer, wallet, deps])
+
+  /** Derive (or reuse) the member's own CLOB creds — one gasless signature, cached per session. */
+  const ensureCreds = useCallback(async () => {
+    const sdkSigner = await buildSdkSigner()
+    return deps.ensureCreds(sdkSigner, { address: wallet.address })
+  }, [deps, buildSdkSigner, wallet.address])
+
+  /** Explicit "enable trading" step (approvals + creds up front). Optional — submit() does it lazily too. */
   const enableTrading = useCallback(async () => {
     if (!signer.canSign) {
       setStatus('blocked')
@@ -150,6 +185,7 @@ export function usePredictTrade(options = {}) {
     setStatus('enabling')
     setReason(null)
     try {
+      await ensureApprovals()
       await ensureCreds()
       setStatus('ready')
       return true
@@ -158,7 +194,7 @@ export function usePredictTrade(options = {}) {
       setReason(e?.message || 'Could not enable trading. You can still trade on Polymarket directly.')
       return false
     }
-  }, [signer, ensureCreds])
+  }, [signer, ensureApprovals, ensureCreds])
 
   /** Build + sign + submit an order (the SDK does all three; attribution rides on the builder config). */
   const submit = useCallback(
@@ -177,10 +213,17 @@ export function usePredictTrade(options = {}) {
       setStatus('signing')
       setReason(null)
       try {
+        await ensureApprovals()
         const creds = await ensureCreds()
         if (req !== reqRef.current) return null
         const builderConfig = deps.makeBuilderConfig(deps.gatewayUrl(), POLYGON)
-        const client = deps.makeClient(walletClient, creds, { builderConfig })
+        const sdkSigner = await buildSdkSigner()
+        const client = deps.makeClient(sdkSigner, creds, {
+          builderConfig,
+          ...(signer.kind === 'passkey'
+            ? { signatureType: SIG_TYPE_POLY_1271, funderAddress: wallet.address }
+            : {}),
+        })
         setStatus('submitting')
         const submitted = await deps.submitOrder(client, {
           tokenId: params.tokenId,
@@ -214,7 +257,7 @@ export function usePredictTrade(options = {}) {
         return null
       }
     },
-    [fee, signer, ensureNetwork, ensureCreds, walletClient, deps]
+    [fee, signer, ensureNetwork, ensureApprovals, ensureCreds, buildSdkSigner, wallet.address, deps]
   )
 
   /** Cancel an open order (gas-free CLOB cancel) with the member's own creds. */
@@ -229,8 +272,14 @@ export function usePredictTrade(options = {}) {
       setStatus('submitting')
       setReason(null)
       try {
+        // Cancels need creds only — no approvals (nothing settles on-chain for a cancel).
         const creds = await ensureCreds()
-        const client = deps.makeClient(walletClient, creds, {})
+        const sdkSigner = await buildSdkSigner()
+        const client = deps.makeClient(sdkSigner, creds, {
+          ...(signer.kind === 'passkey'
+            ? { signatureType: SIG_TYPE_POLY_1271, funderAddress: wallet.address }
+            : {}),
+        })
         const res = await deps.cancelOrder(client, order.orderId ?? order.id)
         if (req !== reqRef.current) return null
         setResult({ kind: 'cancelled', ...res })
@@ -243,7 +292,7 @@ export function usePredictTrade(options = {}) {
         return null
       }
     },
-    [signer, ensureCreds, walletClient, deps]
+    [signer, ensureCreds, buildSdkSigner, wallet.address, deps]
   )
 
   const reset = useCallback(() => {
@@ -261,6 +310,7 @@ export function usePredictTrade(options = {}) {
     fee,
     result,
     canTrade: signer.canSign,
+    signerKind: signer.kind,
     unsupportedReason: signer.canSign ? null : signer.reason,
     onWrongNetwork,
     tradingEnabled,
