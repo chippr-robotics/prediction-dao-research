@@ -17,6 +17,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DATASOURCE_PLACEHOLDER } from './lib/alerts.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const DASH_DIR = join(ROOT, 'infra/grafana/dashboards')
@@ -153,7 +154,35 @@ async function main() {
   // reported and the rest continue — a single bad rule must not leave the estate with NO money
   // alerting, which is where it started.
   if (existsSync(ALERT_FILE)) {
-    const { groups } = JSON.parse(readFileSync(ALERT_FILE, 'utf8'))
+    /**
+     * RESOLVE THE DATASOURCE AGAINST THE LIVE STACK.
+     *
+     * An alert rule has no variable scope, so it cannot use `${datasource}` the way a panel can —
+     * and a rule that cannot resolve a datasource returns nothing, which `noDataState: Alerting`
+     * correctly escalates. That combination fired all 29 rules simultaneously on 2026-08-17, every
+     * one a false alarm.
+     *
+     * The uid also differs per stack (`grafanacloud-prom` here), so it cannot live in the committed
+     * JSON. The generator emits a sentinel; this resolves it. Failing loudly beats provisioning
+     * rules that are guaranteed to fire.
+     */
+    const datasources = await api('/api/datasources')
+    const prom =
+      datasources.find((d) => d.type === 'prometheus' && d.isDefault) ??
+      datasources.find((d) => d.type === 'prometheus')
+    if (!prom) {
+      console.error('No Prometheus datasource found on this stack — cannot provision alert rules.')
+      console.error('Every rule would resolve no datasource, return no data, and fire immediately.')
+      process.exit(1)
+    }
+    console.log(`resolving alert datasource -> ${prom.name} (uid=${prom.uid})`)
+
+    const raw = readFileSync(ALERT_FILE, 'utf8')
+    if (!raw.includes(DATASOURCE_PLACEHOLDER)) {
+      console.error(`Alert rules do not contain ${DATASOURCE_PLACEHOLDER}. Regenerate with \`npm run finops:generate\`.`)
+      process.exit(1)
+    }
+    const { groups } = JSON.parse(raw.split(DATASOURCE_PLACEHOLDER).join(prom.uid))
     let applied = 0
     let failed = 0
     for (const group of groups) {

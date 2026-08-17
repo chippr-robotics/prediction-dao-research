@@ -155,6 +155,15 @@ services:
       BUNDLER_EXECUTOR_137: "0x7C6da19ae005D4F13BB8660Ac989c48aCcFE84F6"
       GCP_PROJECT_ID: "chippr-bots-site-wp"
       FINOPS_BILLING_DATASET: "billing_export"
+      # GCP writes the DETAILED (resource-level) export to `gcp_billing_export_resource_v1_*`, and
+      # the standard one to `gcp_billing_export_v1_*`. This account has the detailed export enabled,
+      # so the collector's default prefix matched no table and the source read `unreadable` for 17h
+      # with a message that looked like latency. Measured 2026-08-17: the only table present is
+      # gcp_billing_export_resource_v1_0166E9_FC2238_00E06F.
+      #
+      # The detailed schema is a superset — service.description, cost, usage_start_time and
+      # export_time all carry the same meaning — so the collector's query is unchanged.
+      FINOPS_BILLING_TABLE_PREFIX: "gcp_billing_export_resource_v1_"
       # Cloudflare and QuickNode publish NO dollar figure (spec 089 research R1). These declared plan
       # prices are what the `modelled` cost is computed from, and the dashboard labels it as such.
       # Unset ⇒ usage is still reported, no dollar figure is invented.
