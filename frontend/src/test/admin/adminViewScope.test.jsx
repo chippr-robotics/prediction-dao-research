@@ -319,20 +319,22 @@ describe('every converted view names the chain its write lands on (T054–T064, 
     )
   })
 
-  it('AdminPanel names the chain for incidents, memberships and role grants alike', async () => {
-    const src = (await import('../../components/AdminPanel.jsx?raw')).default
+  it('the extracted apps name the chain for incidents, memberships and role grants alike (spec 093)', async () => {
     // Incidents and roles are per chain and scoped; memberships are PINNED to the reference chain,
     // which is why they name a different variable — there is no choice to offer.
-    expect(src).toMatch(/networkName\(incidentChainId\)/)
-    expect(src).toMatch(/networkName\(roleChainId\)/)
-    expect(src).toMatch(/networkName\(membershipAdminChainId\)/)
+    const incident = (await import('../../components/admin/apps/IncidentResponseApp.jsx?raw')).default
+    const membership = (await import('../../components/admin/apps/MembershipRevenueApp.jsx?raw')).default
+    const roles = (await import('../../components/admin/apps/AccessControlApp.jsx?raw')).default
+    expect(incident).toMatch(/networkName\(incidentChainId\)/)
+    expect(roles).toMatch(/networkName\(roleChainId\)/)
+    expect(membership).toMatch(/networkName\(membershipAdminChainId\)/)
     // Each family re-checks the chain before sending, not only in the disabled button.
-    expect(src).toMatch(/const requireIncidentChain = \(\) => \{/)
-    expect(src).toMatch(/const requireMembershipChain = \(\) => \{/)
+    expect(incident).toMatch(/const requireIncidentChain = \(\) => \{/)
+    expect(membership).toMatch(/const requireMembershipChain = \(\) => \{/)
   })
 
   it('membership admin is PINNED, not scoped — a picker there would offer a wrong choice', async () => {
-    const src = (await import('../../components/AdminPanel.jsx?raw')).default
+    const src = (await import('../../components/admin/apps/MembershipRevenueApp.jsx?raw')).default
     // Tiers and Members resolve the reference chain, never a picked one: a tier ladder configured
     // elsewhere is one no purchase consults, and a membership granted elsewhere is never read.
     expect(src).toMatch(/const membershipAdminChainId = membershipChainId\(\)/)

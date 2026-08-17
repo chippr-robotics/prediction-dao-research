@@ -1,10 +1,14 @@
 # Runbook: The Operations Control Plane (`/admin`)
 
-The operations control plane is the grouped operator console at `/admin`
-(`frontend/src/components/AdminPanel.jsx`). It is where platform controls are
-performed, metrics read, and positive control demonstrated. Every view is
-gated by the on-chain role its actions require — a view (and its group) only
-renders if the connected wallet holds that role.
+The operations control plane is a set of **admin mini-apps behind a Control Room launcher**
+(spec 093). `/admin` lists exactly the apps your on-chain roles unlock; each app lives at
+`/admin/<appId>` and opens on a dashboard, with its views addressed by `?view=<viewId>`
+(the view ids below — shareable, bookmarkable). The app/view/role matrix has one source:
+`frontend/src/components/admin/adminApps.js`. Every view is gated by the on-chain role its
+actions require — a view (and its app's tile) only renders if the connected wallet holds it.
+
+Where an older runbook says "AdminPanel → **X** tab", read "the **X** view — open it at the
+address in the map below".
 
 All writes are **plain signer transactions** (operator actions are never
 gasless). Addresses resolve per-chain via `getContractAddressForChain`; a view
@@ -15,23 +19,28 @@ Related: [operator onboarding](operator-onboarding.md) ·
 [control-surface audit](../system-overview/control-surface-audit.md) ·
 [roles overview](../system-overview/roles-and-tiers.md)
 
-## Map: groups, views, and gates
+## Map: apps, views, and gates
 
-| Group | View | Requires | Acts on |
+| App (`/admin/<appId>`) | View (`?view=`) | Requires | Acts on |
 |---|---|---|---|
-| Control Room | Overview | any operator role | read-only |
-| Incident Response | Emergency | `GUARDIAN_ROLE` | WagerRegistry |
-| Incident Response | Account Moderation | `ACCOUNT_MODERATOR_ROLE` | WagerRegistry |
-| Compliance | Deny-list | `SANCTIONS_ADMIN_ROLE` (or admin) | SanctionsGuard |
-| Membership & Revenue | Tiers | `DEFAULT_ADMIN_ROLE` | MembershipManager |
-| Membership & Revenue | Members | `ROLE_MANAGER_ROLE` | MembershipManager |
-| Membership & Revenue | Treasury | `DEFAULT_ADMIN_ROLE` | MembershipManager |
-| Protocol Config | Wiring & Tokens | `DEFAULT_ADMIN_ROLE` | WagerRegistry, MembershipManager, SanctionsGuard |
-| Protocol Config | Oracle Adapters | adapter `owner` | the three oracle adapters |
-| Protocol Config | Maintenance | none (permissionless calls) | WagerRegistry (intents facet) |
-| Identity | Callsigns | callsign registry roles | CallsignRegistry |
-| Access Control | Admin Roles | `DEFAULT_ADMIN_ROLE` | role-defining contracts |
-| Infrastructure | Services | admin or guardian | read-only + paymaster |
+| Control Room (`/admin`) | — | any operator role | read-only launcher + permissions card |
+| `incident-response` | `emergency` | `GUARDIAN_ROLE` | WagerRegistry |
+| `incident-response` | `moderation` | `ACCOUNT_MODERATOR_ROLE` | WagerRegistry |
+| `compliance` | `deny-list` | `SANCTIONS_ADMIN_ROLE` (or admin) | SanctionsGuard |
+| `compliance` | `miniapp-review` | `APP_CURATOR_ROLE` (admin read-only) | MiniAppRegistry |
+| `membership-revenue` | `tiers` | `DEFAULT_ADMIN_ROLE` | MembershipManager |
+| `membership-revenue` | `members` | `ROLE_MANAGER_ROLE` | MembershipManager |
+| `membership-revenue` | `treasury` | `DEFAULT_ADMIN_ROLE` | MembershipManager |
+| `membership-revenue` | `fees` | `FEE_ADMIN_ROLE` (or admin) | FeeRouter |
+| `membership-revenue` | `perps-fees` | `FEE_ADMIN_ROLE` (or admin) | FeeRouter + GMX DataStore |
+| `liquidity` | `bridge` / `supply` | liquidity admin / guardian / admin | BridgeRouter / LiquidityRouter |
+| `protocol-config` | `staking` | staking admin / guardian / admin | StakingRouter |
+| `protocol-config` | `protocol-config` | `DEFAULT_ADMIN_ROLE` | WagerRegistry, MembershipManager, SanctionsGuard |
+| `protocol-config` | `oracle-adapters` | adapter `owner` | the three oracle adapters |
+| `maintenance` | `maintenance` | none (permissionless calls) | WagerRegistry (intents facet) |
+| `identity` | `callsigns` | callsign registry roles | CallsignRegistry |
+| `access-control` | `admin-roles` | `DEFAULT_ADMIN_ROLE` | role-defining contracts |
+| `infrastructure` | `services` | admin or guardian | read-only + paymaster |
 
 ## Reading the estate: what "per network" means here (spec 071)
 

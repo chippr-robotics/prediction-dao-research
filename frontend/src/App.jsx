@@ -34,7 +34,8 @@ import AppNavDrawer from './components/nav/AppNavDrawer'
 import AttentionFocus from './components/nav/AttentionFocus'
 
 //admin
-import AdminPanel from './components/AdminPanel'
+import ControlRoom from './components/admin/ControlRoom'
+import AdminAppRoute from './components/admin/AdminAppRoute'
 
 // dev
 import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
@@ -188,7 +189,12 @@ function AppContent() {
               re-reads that record from the chain on every launch — a catalog card
               is never what decides that something may run. */}
           <Route path="/apps/:slug" element={<MiniAppWorkspace />} />
-          <Route path="/admin" element={<AdminPanel />} />
+          {/* Operations (spec 093): /admin is the Control Room launcher; each admin
+              group is its own lazily-loaded mini-app at /admin/:appId, with ?view=
+              addressing the interior view. Access gating lives in the shared shell,
+              so every depth shows the same honest denied/unverified screens. */}
+          <Route path="/admin" element={<ControlRoom />} />
+          <Route path="/admin/:appId" element={<AdminAppRoute />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

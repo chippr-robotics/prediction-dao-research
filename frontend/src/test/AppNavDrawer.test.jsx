@@ -265,14 +265,16 @@ describe('AppNavDrawer (favorited mini-apps / Quick Access)', () => {
     expect(screen.getByTestId('loc')).toHaveTextContent('/apps/token-mint')
   })
 
-  it('lists only Payments and Accounts under Quick Access, and no strip, when nothing is favorited', () => {
+  it('lists Payments, Accounts and Apps under Quick Access, and no strip, when nothing is favorited', () => {
     const { container } = renderDrawer()
     const labels = Array.from(
       container.querySelectorAll('.portal-nav-group-label, .portal-nav-item-label')
     ).map((el) => el.textContent)
     const quickAccessIdx = labels.indexOf('Quick Access')
     const financeIdx = labels.indexOf('Finance')
-    expect(labels.slice(quickAccessIdx + 1, financeIdx)).toEqual(['Payments', 'Accounts'])
+    // Apps rides Quick Access since spec 093 — the catalog entry is the door to the whole
+    // mini-app platform and must not be buried at the bottom of a folded Tools section.
+    expect(labels.slice(quickAccessIdx + 1, financeIdx)).toEqual(['Payments', 'Accounts', 'Apps'])
     // An empty shortcuts region is a label with nothing behind it — it does not render at all.
     expect(container.querySelector('.pinned-apps-strip')).toBeNull()
   })

@@ -17,7 +17,7 @@ import ChainStateTable from '../../components/admin/ChainStateTable'
 import { readOk, notDeployed, unreadable, aggregate } from '../../lib/chains/chainReadResult'
 import { feeUnitFor } from '../../hooks/useFeeEstate'
 import { cohortChainIds, NETWORKS } from '../../config/networks'
-import adminPanelSource from '../../components/AdminPanel.jsx?raw'
+import adminPanelSource from '../../components/admin/apps/MembershipRevenueApp.jsx?raw'
 
 const USDC = { symbol: 'USDC', decimals: 6 }
 const USC = { symbol: 'USC', decimals: 6 }

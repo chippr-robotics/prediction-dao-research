@@ -1,0 +1,264 @@
+/**
+ * Access Control admin mini-app (spec 093) — the monolithic AdminPanel's
+ * `admin-roles` view, extracted verbatim.
+ *
+ * ── ROLE GRANTS ARE PER CONTRACT *PER CHAIN* (spec 071 T064/FR-017) ──
+ * GUARDIAN_ROLE on Polygon's registry is not GUARDIAN_ROLE on Base's. The
+ * view is scoped and named so an operator can see which network they are
+ * handing authority on. Each grantable role lives on a specific contract;
+ * grants are sent to the contract that defines the role, never blanket-sent
+ * to the registry.
+ *
+ * The dashboard shows where each role target actually exists on the scoped
+ * network — deployment is config (the address book), not a chain read, so
+ * the table is exact and needs no three-state hedging.
+ */
+import { useMemo, useState } from 'react'
+import { ethers } from 'ethers'
+import AdminAppShell from '../AdminAppShell'
+import { NetworkScopeCard } from '../scopeControls'
+import { useScopedChain } from '../scopeGate'
+import { adminAppById } from '../adminApps'
+import { useAdminAccess } from '../useAdminAccess'
+import { useAdminTx } from '../useAdminTx'
+import { useWeb3 } from '../../../hooks/useWeb3'
+import { useNotification } from '../../../hooks/useUI'
+import { useEnsResolution } from '../../../hooks/useEnsResolution'
+import { isValidEthereumAddress } from '../../../utils/validation'
+import { getContractAddressForChain } from '../../../config/contracts'
+import { membershipChainId } from '../../../config/networks'
+import { networkName, estateNetworks } from '../../../lib/chains/estate'
+
+const APP = adminAppById('access-control')
+
+const ROLE_HASHES = {
+  GUARDIAN: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
+  ACCOUNT_MODERATOR: ethers.keccak256(ethers.toUtf8Bytes('ACCOUNT_MODERATOR_ROLE')),
+  ROLE_MANAGER: ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
+  SANCTIONS_ADMIN: ethers.keccak256(ethers.toUtf8Bytes('SANCTIONS_ADMIN_ROLE')),
+  TOKEN_ISSUER: ethers.keccak256(ethers.toUtf8Bytes('TOKEN_ISSUER_ROLE')),
+  STAKING_ADMIN: ethers.keccak256(ethers.toUtf8Bytes('STAKING_ADMIN_ROLE')),
+  // LIQUIDITY_ADMIN_ROLE (spec 067) is the same role id on two separate
+  // AccessControl contracts — the BridgeRouter and the LiquidityRouter — so it
+  // is granted/revoked once per router. The picker offers the two targets
+  // explicitly instead of one option that would quietly authorize only half
+  // of what the operator asked for.
+  LIQUIDITY_ADMIN_BRIDGE: ethers.keccak256(ethers.toUtf8Bytes('LIQUIDITY_ADMIN_ROLE')),
+  LIQUIDITY_ADMIN_LIQUIDITY: ethers.keccak256(ethers.toUtf8Bytes('LIQUIDITY_ADMIN_ROLE')),
+  // GUARDIAN_ROLE is per-contract for the same reason, and the spec-067 routers
+  // were unreachable: the bare `GUARDIAN` option grants on the WagerRegistry, so
+  // there was NO in-app way to give anyone the routers' killswitch.
+  GUARDIAN_BRIDGE: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
+  GUARDIAN_LIQUIDITY: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
+  DEFAULT_ADMIN: ethers.ZeroHash,
+}
+
+const ACCESS_CONTROL_ABI = [
+  'function grantRole(bytes32 role, address account)',
+  'function revokeRole(bytes32 role, address account)',
+]
+
+function shortAddr(address) {
+  return address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : ''
+}
+
+export default function AccessControlApp() {
+  const access = useAdminAccess()
+  const { signer, chainId } = useWeb3()
+  const { showNotification } = useNotification()
+  const { runTx, pendingTx } = useAdminTx()
+
+  const roleNetworks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId: roleChainId, setScopeChainId: setRoleChainId } =
+    useScopedChain(roleNetworks, chainId)
+  const onRoleChain = Number(roleChainId) === Number(chainId)
+
+  // ROLE_MANAGER lives on the MembershipManager, which is reference-chain
+  // pinned like the membership it manages — deliberately NOT scope-following.
+  const membershipManagerAddr = getContractAddressForChain('membershipManager', membershipChainId())
+  const sanctionsGuardAddr = getContractAddressForChain('sanctionsGuard', roleChainId)
+  const tokenFactoryAddr = getContractAddressForChain('tokenFactory', roleChainId)
+  const stakingRouterAddr = getContractAddressForChain('stakingRouter', roleChainId)
+  const bridgeRouterAddr = getContractAddressForChain('bridgeRouter', roleChainId)
+  const liquidityRouterAddr = getContractAddressForChain('liquidityRouter', roleChainId)
+  const roleRegistryAddr = getContractAddressForChain('wagerRegistry', roleChainId)
+
+  const roleHomeContract = (role) => {
+    if (role === 'ROLE_MANAGER') return membershipManagerAddr
+    if (role === 'SANCTIONS_ADMIN') return sanctionsGuardAddr
+    if (role === 'TOKEN_ISSUER') return tokenFactoryAddr
+    if (role === 'STAKING_ADMIN') return stakingRouterAddr
+    if (role === 'LIQUIDITY_ADMIN_BRIDGE' || role === 'GUARDIAN_BRIDGE') return bridgeRouterAddr
+    if (role === 'LIQUIDITY_ADMIN_LIQUIDITY' || role === 'GUARDIAN_LIQUIDITY') return liquidityRouterAddr
+    return roleRegistryAddr
+  }
+
+  const [adminRoleForm, setAdminRoleForm] = useState({ address: '', role: 'GUARDIAN' })
+  const adminRoleEns = useEnsResolution(adminRoleForm.address || '')
+
+  const handleGrantAdminRole = () => {
+    const target = adminRoleEns.resolvedAddress || adminRoleForm.address
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    const roleHash = ROLE_HASHES[adminRoleForm.role]
+    const addr = roleHomeContract(adminRoleForm.role)
+    if (!addr) return showNotification('Role contract not deployed on this network', 'error')
+    return runTx(
+      () => new ethers.Contract(addr, ACCESS_CONTROL_ABI, signer).grantRole(roleHash, target),
+      `Granted ${adminRoleForm.role} to ${shortAddr(target)} on ${networkName(roleChainId)}`,
+    )
+  }
+
+  const handleRevokeAdminRole = () => {
+    const target = adminRoleEns.resolvedAddress || adminRoleForm.address
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    const roleHash = ROLE_HASHES[adminRoleForm.role]
+    const addr = roleHomeContract(adminRoleForm.role)
+    if (!addr) return showNotification('Role contract not deployed on this network', 'error')
+    return runTx(
+      () => new ethers.Contract(addr, ACCESS_CONTROL_ABI, signer).revokeRole(roleHash, target),
+      `Revoked ${adminRoleForm.role} from ${shortAddr(target)} on ${networkName(roleChainId)}`,
+    )
+  }
+
+  // Dashboard: where each grantable role's home contract exists on the scoped
+  // network. Deployment comes from the address book (config), so this table
+  // is definite — the write view still refuses per contract at grant time.
+  const roleTargets = [
+    { role: 'GUARDIAN', label: 'Guardian (WagerRegistry)', addr: roleRegistryAddr },
+    { role: 'ACCOUNT_MODERATOR', label: 'Account Moderator (WagerRegistry)', addr: roleRegistryAddr },
+    { role: 'ROLE_MANAGER', label: `Role Manager (MembershipManager, ${networkName(membershipChainId())})`, addr: membershipManagerAddr },
+    { role: 'SANCTIONS_ADMIN', label: 'Compliance Officer (SanctionsGuard)', addr: sanctionsGuardAddr },
+    { role: 'TOKEN_ISSUER', label: 'Token Issuer (TokenFactory)', addr: tokenFactoryAddr },
+    { role: 'STAKING_ADMIN', label: 'Staking Administrator (StakingRouter)', addr: stakingRouterAddr },
+    { role: 'LIQUIDITY_ADMIN_BRIDGE', label: 'Liquidity Administrator (BridgeRouter)', addr: bridgeRouterAddr },
+    { role: 'LIQUIDITY_ADMIN_LIQUIDITY', label: 'Liquidity Administrator (LiquidityRouter)', addr: liquidityRouterAddr },
+    { role: 'GUARDIAN_BRIDGE', label: 'Guardian (BridgeRouter)', addr: bridgeRouterAddr },
+    { role: 'GUARDIAN_LIQUIDITY', label: 'Guardian (LiquidityRouter)', addr: liquidityRouterAddr },
+    { role: 'DEFAULT_ADMIN', label: 'Default Admin (WagerRegistry)', addr: roleRegistryAddr },
+  ]
+  const deployedCount = roleTargets.filter((t) => Boolean(t.addr)).length
+
+  const dashboard = (
+    <div className="overview-grid">
+      <div className="admin-card full-width">
+        <div className="admin-card-header"><h3>Role targets on {networkName(roleChainId)}</h3></div>
+        <p className="card-info">
+          {deployedCount} of {roleTargets.length} role home contracts exist on{' '}
+          {networkName(roleChainId)}. A role can only be granted where its contract exists —
+          and a grant here gives no authority anywhere else.
+        </p>
+        <div className="admin-table-scroll">
+          <table className="admin-table">
+            <caption className="sr-only">Grantable roles and their home contracts on the scoped network</caption>
+            <thead>
+              <tr>
+                <th scope="col">Role</th>
+                <th scope="col">Home contract</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roleTargets.map((t) => (
+                <tr key={t.role}>
+                  <td>{t.label}</td>
+                  <td>
+                    {t.addr ? (
+                      <code title={t.addr}>{shortAddr(t.addr)}</code>
+                    ) : (
+                      <span className="admin-table-absent">not deployed here</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderView = (viewId) => {
+    if (viewId !== 'admin-roles') return null
+    return (
+      <div className="admin-tab-content" role="tabpanel">
+        <NetworkScopeCard
+          title="Admin Roles"
+          description="Roles are granted per contract per network. A grant on one network gives no authority on another, so pick the network you mean."
+          networks={roleNetworks}
+          scopeChainId={roleChainId}
+          onScopeChange={setRoleChainId}
+          isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+          walletChainId={chainId}
+          onRefresh={() => {}}
+          lastReadAt={null}
+          notDeployedLabel="no wager registry"
+        />
+        <div className="admin-card">
+          <h3>Grant / Revoke Admin Roles on {networkName(roleChainId)}</h3>
+          {!onRoleChain && (
+            <p className="card-info warning-text" role="status">
+              This grant is signed on {networkName(roleChainId)}. Your wallet is on{' '}
+              {networkName(chainId)} — switch it there to grant or revoke.
+            </p>
+          )}
+          <p>
+            Only the holder of <code>DEFAULT_ADMIN_ROLE</code> can grant other admin roles.
+            Grant sparingly: each role is a distinct privilege and a foothold.
+          </p>
+          <p>
+            <strong>Liquidity Administrator is per-router.</strong> The bridge and
+            liquidity routers each carry their own <code>LIQUIDITY_ADMIN_ROLE</code>;
+            granting one does not grant the other. Grant both if the operator is meant
+            to curate bridge routes <em>and</em> supplied pools.
+          </p>
+          <p>
+            <strong>So is Guardian.</strong> The plain “Guardian” option above grants on the
+            WagerRegistry and does <em>not</em> carry to the bridge or liquidity routers — those
+            check their own role registry, so an on-call operator needs the router-specific
+            Guardian grant to reach the Bridge or Supply killswitch. Note also that the routers
+            keep protocol-wiring changes (SpokePool, position manager, FeeRouter, sanctions guard)
+            at <code>DEFAULT_ADMIN_ROLE</code>: those addresses decide where member funds go, so
+            curating routes and pools does not carry the power to redirect them.
+          </p>
+          <div className="admin-form">
+            <label>
+              Account (address or ENS)
+              <input type="text" value={adminRoleForm.address}
+                placeholder="0x… or name.eth"
+                onChange={(e) => setAdminRoleForm({ ...adminRoleForm, address: e.target.value })} />
+              {adminRoleEns.resolvedAddress && adminRoleEns.isEns && (
+                <span className="hint">→ {shortAddr(adminRoleEns.resolvedAddress)}</span>
+              )}
+            </label>
+            <label>
+              Role
+              <select value={adminRoleForm.role}
+                onChange={(e) => setAdminRoleForm({ ...adminRoleForm, role: e.target.value })}>
+                <option value="GUARDIAN">Guardian — pause/unpause (WagerRegistry)</option>
+                <option value="ACCOUNT_MODERATOR">Account Moderator — freeze/unfreeze</option>
+                <option value="ROLE_MANAGER">Role Manager — grant/revoke memberships</option>
+                <option value="SANCTIONS_ADMIN">Compliance Officer — deny-list (SanctionsGuard)</option>
+                <option value="TOKEN_ISSUER">Token Issuer — token creation (TokenFactory)</option>
+                <option value="STAKING_ADMIN">Staking Administrator — provider addrs + validator allowlist (StakingRouter)</option>
+                <option value="LIQUIDITY_ADMIN_BRIDGE">Liquidity Administrator — bridge routes + limits (BridgeRouter only)</option>
+                <option value="LIQUIDITY_ADMIN_LIQUIDITY">Liquidity Administrator — curated pools + caps (LiquidityRouter only)</option>
+                <option value="GUARDIAN_BRIDGE">Guardian — pause new bridges (BridgeRouter only)</option>
+                <option value="GUARDIAN_LIQUIDITY">Guardian — pause new Uniswap supplies (LiquidityRouter only)</option>
+                <option value="DEFAULT_ADMIN">Default Admin — full control (rare)</option>
+              </select>
+            </label>
+            <div className="emergency-actions">
+              <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx || !onRoleChain}>
+                {pendingTx ? 'Processing...' : 'Grant Role'}
+              </button>
+              <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx || !onRoleChain}>
+                {pendingTx ? 'Processing...' : 'Revoke Role'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return <AdminAppShell app={APP} access={access} dashboard={dashboard} renderView={renderView} />
+}

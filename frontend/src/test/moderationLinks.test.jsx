@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { ACCOUNT_MODERATION_PATH } from '../constants/legalLinks'
 import modalSource from '../components/ui/PremiumPurchaseModal.jsx?raw'
-import adminSource from '../components/AdminPanel.jsx?raw'
+import adminSource from '../components/admin/apps/IncidentResponseApp.jsx?raw'
 import roleSource from '../components/wallet/RoleDetailsCard.jsx?raw'
 
 /**
@@ -11,7 +11,7 @@ import roleSource from '../components/wallet/RoleDetailsCard.jsx?raw'
  */
 const SURFACES = [
   ['PremiumPurchaseModal', modalSource],
-  ['AdminPanel', adminSource],
+  ['IncidentResponseApp', adminSource],
   ['RoleDetailsCard', roleSource],
 ]
 
