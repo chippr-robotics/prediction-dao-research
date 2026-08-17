@@ -115,3 +115,43 @@ describe('favorites — persistence', () => {
     expect(loadFavoriteApps()).toHaveLength(1)
   })
 })
+
+/*
+ * Spec 093 follow-up — admin-tool pins share this store under a disjoint
+ * string-id namespace (`admin-tool:<appId>`), with no slug: the destination
+ * derives from the id, not from a registry record.
+ */
+describe('admin-tool favorites (spec 093 follow-up)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    __resetFavoriteAppsForTests()
+  })
+
+  it('round-trips an admin-tool entry, slug-less', () => {
+    addFavoriteApp({ id: 'admin-tool:incident-response', name: 'Incident Response' })
+    expect(loadFavoriteApps()).toEqual([
+      { id: 'admin-tool:incident-response', slug: '', name: 'Incident Response' },
+    ])
+    expect(isFavoriteApp('admin-tool:incident-response')).toBe(true)
+
+    removeFavoriteApp('admin-tool:incident-response')
+    expect(loadFavoriteApps()).toEqual([])
+  })
+
+  it('coexists with registry entries and never collides with their numeric ids', () => {
+    addFavoriteApp({ id: 7, slug: 'token-mint', name: 'Token Mint' })
+    addFavoriteApp({ id: 'admin-tool:maintenance', name: 'Maintenance' })
+
+    expect(loadFavoriteApps()).toHaveLength(2)
+    expect(isFavoriteApp(7)).toBe(true)
+    expect(isFavoriteApp('admin-tool:maintenance')).toBe(true)
+    removeFavoriteApp(7)
+    expect(isFavoriteApp('admin-tool:maintenance')).toBe(true)
+  })
+
+  it('refuses a string id outside the reserved namespace', () => {
+    addFavoriteApp({ id: 'not-a-tool', name: 'Nope' })
+    addFavoriteApp({ id: 'admin-tool:INVALID CHARS', name: 'Nope' })
+    expect(loadFavoriteApps()).toEqual([])
+  })
+})

@@ -15,17 +15,34 @@
  * render a link and a label without re-reading the registry. A vendor rename after the fact leaves
  * a stale label/slug until the member re-favorites; that is an acceptable staleness for a shortcut,
  * not a trust boundary the way the catalog listing itself is.
+ *
+ * Spec 093 follow-up: ADMIN TOOLS pin here too, so operators get the same Quick Access strip for
+ * the tools they reach for. Their ids live in a disjoint string namespace (`admin-tool:<appId>` —
+ * see `components/admin/adminToolCatalog.js`) so they can never collide with a registry id, and
+ * they carry no slug: their destination is derived from the id (`/admin/<appId>`), not from a
+ * registry record. A pin is a device-scoped shortcut the member chose — if the role behind a tool
+ * is later revoked, the pin still renders and the /admin gate refuses honestly at the destination.
  */
 import { getGlobalPreference, saveGlobalPreference } from '../../utils/userStorage'
 
 /** Global-preference key holding the favorited app list. */
 export const FAVORITES_PREF_KEY = 'miniapp_favorites'
 
+/** Mirrors adminToolCatalog.js (which imports from the components tree; this module must not). */
+const ADMIN_TOOL_ID_RE = /^admin-tool:[a-z][a-z0-9-]{1,40}$/
+
 function normalizeEntry(raw) {
+  const name = typeof raw?.name === 'string' ? raw.name : ''
+  if (!name) return null
+  // Admin-tool pins: string id in the reserved namespace, no slug.
+  if (typeof raw?.id === 'string') {
+    if (!ADMIN_TOOL_ID_RE.test(raw.id)) return null
+    return { id: raw.id, slug: '', name }
+  }
+  // Registry pins: positive integer id + the slug the launch route needs.
   const id = Number(raw?.id)
   const slug = typeof raw?.slug === 'string' ? raw.slug : ''
-  const name = typeof raw?.name === 'string' ? raw.name : ''
-  if (!Number.isInteger(id) || id <= 0 || !slug || !name) return null
+  if (!Number.isInteger(id) || id <= 0 || !slug) return null
   return { id, slug, name }
 }
 
@@ -55,9 +72,14 @@ export function loadFavoriteApps() {
   return snapshot
 }
 
+/** Registry ids compare numerically; admin-tool ids compare as their string form. */
+function favoriteKey(id) {
+  return typeof id === 'string' && ADMIN_TOOL_ID_RE.test(id) ? id : Number(id)
+}
+
 export function isFavoriteApp(id) {
-  const numericId = Number(id)
-  return loadFavoriteApps().some((fav) => fav.id === numericId)
+  const key = favoriteKey(id)
+  return loadFavoriteApps().some((fav) => fav.id === key)
 }
 
 /** Monotonic counter that changes whenever the favorites list changes. */
@@ -98,9 +120,9 @@ export function addFavoriteApp({ id, slug, name } = {}) {
 
 /** Drop an app from Quick Access. A no-op when it wasn't favorited. */
 export function removeFavoriteApp(id) {
-  const numericId = Number(id)
+  const key = favoriteKey(id)
   const current = loadFavoriteApps()
-  const next = current.filter((fav) => fav.id !== numericId)
+  const next = current.filter((fav) => fav.id !== key)
   if (next.length === current.length) return
   commit(next)
 }

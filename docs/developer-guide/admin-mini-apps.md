@@ -69,6 +69,26 @@ permissive" for killswitches; membership writes stay pinned to `membershipChainI
 controls act on exactly one named chain, refused at the call site as well as the button, and
 there is deliberately no control that acts on several chains at once.
 
+## Discovery: the store's "Operator tools" section and Quick Access pins
+
+Admin apps also surface in the Apps store (FR-013/FR-014 follow-up) so operators can find and pin
+them — **derived client-side, never from the registry**:
+
+- `components/admin/adminToolCatalog.js` adapts `buildAdminApps(flags)` into store entries and
+  owns the favorite-id namespace (`admin-tool:<appId>`, disjoint from registry integer ids; the
+  appId is recoverable from the id alone).
+- `components/admin/useOperatorFlags.js` reads the role flags tolerantly (no provider / no roles
+  ⇒ no section) and deliberately WITHOUT the curator registry read — the store must not add a
+  network round-trip for every member. A curator holding nothing else reaches curation via
+  `/admin`, which asks the registry properly.
+- The section renders only when at least one tool is derived, never under the verified-market
+  badge, and independently of registry status (an unreachable registry does not take the
+  operator's own tools down).
+- Pins ride the existing favorites store (`lib/miniapps/favorites.js`) and the drawer's capped
+  pinned strip; admin tiles show their NavIcon glyph (no registry record ⇒ no store artwork) and
+  route to `/admin/<appId>`. A pin is a device-scoped shortcut: revoking the role later leaves
+  the pin pointing at the access gate's honest refusal, exactly like a typed URL.
+
 ## Tests that gate this surface
 
 - `test/admin/adminApps.test.js` — matrix totality + per-flag gating (replaces `adminNav.test.js`).

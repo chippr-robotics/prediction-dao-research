@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { artworkFor } from '../miniapps/appArtwork'
+import NavIcon from './NavIcon'
 
 /**
  * PinnedAppsStrip (spec 081) — the member's pinned mini-apps as one horizontal row of icon
@@ -50,7 +51,9 @@ export default function PinnedAppsStrip({ items, activeId, onSelect }) {
           // slug the launch route uses — a shortcut should look like the thing it launches. It is
           // TOTAL, so an app the host has no art for gets the generic illustration rather than a
           // broken image; the label underneath is what separates two generics, which is exactly
-          // how the store's own rows behave.
+          // how the store's own rows behave. A pinned ADMIN TOOL (spec 093 follow-up) has no
+          // registry slug to key artwork by; its tile shows the tool's own NavIcon glyph — the
+          // same mark its Control Room tile and store row carry.
           const { Art } = artworkFor(item.slug)
           return (
             <button
@@ -66,7 +69,7 @@ export default function PinnedAppsStrip({ items, activeId, onSelect }) {
               onClick={() => onSelect(item.id)}
             >
               <span className="pinned-app-tile-icon" aria-hidden="true">
-                <Art />
+                {item.glyph ? <NavIcon name={item.glyph} size={22} /> : <Art />}
               </span>
               <span className="pinned-app-tile-label" aria-hidden="true">
                 {item.label}

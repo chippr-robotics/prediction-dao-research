@@ -1215,3 +1215,50 @@
   cursor: default;
   opacity: 0.6;
 }
+
+/* ---- Operator tools in the store (spec 093 follow-up) ------------------- */
+/* First-party admin mini-apps, listed only for entitled operators. The rows
+   reuse the store row shell; the glyph tile and the pin control are theirs. */
+
+.miniapp-row-art--glyph {
+  color: var(--brand-primary);
+  display: inline-flex;
+  justify-content: center;
+}
+
+.miniapp-admin-tools-note {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.5;
+  margin: 0.25rem 0 0.75rem;
+}
+
+/* Sits above the row's stretched tap overlay so the star is clickable. */
+.miniapp-admin-pin {
+  align-items: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full, 999px);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 36px;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+  width: 36px;
+  z-index: 1;
+}
+
+.miniapp-admin-pin:hover,
+.miniapp-admin-pin:focus-visible {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.miniapp-admin-pin.is-pinned {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
