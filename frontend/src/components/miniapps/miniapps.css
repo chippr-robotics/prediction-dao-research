@@ -1262,3 +1262,61 @@
   border-color: var(--brand-primary);
   color: var(--brand-primary);
 }
+
+/* ---- Section rails + the full-list modal (store follow-up) ------------- */
+/* A section is ONE rail of fixed-width cards, so its height is constant
+   whatever the app count — the PinnedAppsStrip rule at store scale. The
+   "More" disclosure sits BELOW the rail, never inside it (a trailing card
+   is the first thing the scroll hides). */
+
+.miniapp-catalog-rail {
+  display: grid;
+  grid-auto-columns: minmax(260px, 300px);
+  grid-auto-flow: column;
+  gap: 0.6rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 0.125rem 0.125rem 0.625rem;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.miniapp-catalog-rail > .miniapp-row {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  height: 100%;
+  scroll-snap-align: start;
+}
+
+.miniapp-catalog-more {
+  align-self: flex-start;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full, 999px);
+  color: var(--accent-color);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-top: 0.375rem;
+  padding: 0.375rem 0.875rem;
+}
+
+.miniapp-catalog-more:hover,
+.miniapp-catalog-more:focus-visible {
+  border-color: var(--brand-primary);
+}
+
+/* The full-list modal reuses the sheet chrome; it is taller and its list
+   scrolls internally so the head (title, count, close) never leaves view. */
+.miniapp-section-modal {
+  max-width: 640px;
+}
+
+.miniapp-section-modal-list {
+  gap: 0.25rem;
+  overflow-y: auto;
+}
+
+.miniapp-section-modal-list > .miniapp-row {
+  border: 1px solid var(--border-color);
+}

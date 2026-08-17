@@ -176,11 +176,16 @@ const app = (id, name, status, launchable, proposed, category, description) => (
   approved: { present: true, version: '1.4.2' },
   submittedAt: 0, approvedAt: 0, updatedAt: 0,
 })
+const q0 = new URLSearchParams(window.location.search)
+const MANY = q0.get('many') === '1'
+  ? Array.from({ length: 13 }, (_, i) => app(100 + i, 'Settle ' + String(i + 1).padStart(2, '0'), 1, true, false, 0, 'Settlement helper number ' + (i + 1) + '.'))
+  : []
 const ALL = [
   app(1, 'Token Mint', 1, true, false, 4, 'Deploy and manage ERC-20 tokens.'),
   app(2, 'ClearPath', 1, true, true, 5, 'DAO transparency and treasury reporting.'),
   app(3, 'LedgerLens', 0, false, true, 1),
   app(4, 'OldTool', 3, false, false, 2),
+  ...MANY,
 ]
 export const fetchCatalog = async () => ({
   status: 'ok',
@@ -410,6 +415,24 @@ const SCENARIOS = [
     query: 'entry=/wallet?tab=apps&roles=',
     waitFor: '.miniapp-catalog',
   },
+  // Section rails (store follow-up): a 13-app category capped at 10 cards with the
+  // "More" disclosure below the rail, and the full-list modal it opens.
+  {
+    name: 'store-section-rail',
+    query: 'entry=/wallet?tab=apps&roles=&many=1',
+    waitFor: '.miniapp-catalog',
+  },
+  {
+    name: 'store-section-modal',
+    query: 'entry=/wallet?tab=apps&roles=&many=1',
+    waitFor: '.miniapp-catalog',
+    act: async (page) => {
+      await page.getByRole('button', { name: /^More Trade Settlement/ }).click()
+      await page.waitForSelector('.miniapp-section-modal')
+    },
+    // The modal is viewport-fixed; capture the viewport, not the full panel height.
+    fullPage: true,
+  },
 ]
 
 writeHarness()
@@ -459,9 +482,10 @@ try {
         await page.addStyleTag({
           content: '.dev-warning-banner, .notification { display: none !important; }',
         })
+        if (shot.act) await shot.act(page)
         // Async statuses (curator authority, catalog counts) land a beat later.
         await page.waitForTimeout(600)
-        const target = (await page.$(shot.waitFor || '.admin-panel')) || page
+        const target = shot.fullPage ? page : (await page.$(shot.waitFor || '.admin-panel')) || page
         await target.screenshot({ path: join(OUT, `${shot.name}-${label}-${theme}.png`) })
         await page.close()
       }
