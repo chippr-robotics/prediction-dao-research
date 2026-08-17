@@ -78,7 +78,7 @@ state, never a fabricated zero.
 | Secret | Consumer | Rotate when | Breaks if wrong |
 |---|---|---|---|
 | `finops-grafana-cloud-token` | Alloy → Grafana Cloud | on exposure | **Must be a `glc_` Cloud Access Policy token with `metrics:write`.** A `glsa_` stack token returns 401 and Alloy ships nothing while looking healthy. |
-| `finops-cloudflare-token` | exporter | on exposure | **Needs Zone → Analytics → Read** on the zone. Without that exact permission the GraphQL call fails `authz` even though the token authenticates. |
+| `finops-cloudflare-token` | exporter | on exposure | **Needs Zone → Analytics → Read** on the zone. Without that exact permission the GraphQL call fails `authz` even though the token authenticates — and `/user/tokens/verify` misleads you by returning "Invalid API Token" for a token that is merely narrowly scoped. **Diagnose with the GraphQL call, not verify.** |
 | `finops-quicknode-key` | exporter | when the plan is upgraded | Container exists with **no enabled version** — deliberately. That is the correct "not configured yet"; a placeholder string like `null` would be truthy and produce a 401 that alerts. |
 | `GAFANA_SERVICE_ACCOUNT` | `npm run finops:provision` (**ops only, never on the VM**) | on exposure | **Must be a `glsa_` stack service-account token.** A `glc_` token cannot provision — `/api/folders` returns 401. |
 
@@ -154,6 +154,54 @@ reversible; destroying is not.
 ```bash
 gcloud secrets versions disable <old-version> --secret=<secret-name> --project=chippr-bots-site-wp
 ```
+
+---
+
+## Secret hygiene — two rules learned the hard way
+
+**1. ONE credential lives in exactly ONE secret.**
+
+A working Cloudflare token was created as `FINOPS-CLOUDFLARE` while `fetch-secrets.sh` reads
+`finops-cloudflare-token`. The result was three days of "the token lacks a permission" — a correct
+statement about the wrong secret. Meanwhile the real token sat unused, with **no IAM bindings at
+all**, so nothing could have read it even if the name had matched.
+
+The failure is not the typo, it is the duplication: two secrets holding one credential means
+rotating either leaves the other stale, and nothing reports the divergence. When you find a
+duplicate, copy the value into the canonical name and **disable** the other — the canonical name is
+whichever one appears in `gateway_secret_ids` and `fetch-secrets.sh`.
+
+```bash
+# Copy between secrets without the value touching a variable, a file, or argv
+gcloud secrets versions access latest --secret=<wrong-name> --project=chippr-bots-site-wp \
+  | gcloud secrets versions add <canonical-name> --project=chippr-bots-site-wp --data-file=-
+```
+
+**2. Disable superseded versions. `latest` is not the only thing that reads them.**
+
+A pinned consumer (rule 2 above) fetches an explicit version, and a rollback re-reads whatever is
+enabled. Leaving a known-bad version enabled means a future restart can silently pick it up.
+
+```bash
+# What is enabled right now, per secret
+for s in finops-cloudflare-token finops-quicknode-key finops-grafana-cloud-token; do
+  echo "$s:"; gcloud secrets versions list "$s" --project=chippr-bots-site-wp \
+    --format='value(name,state)' | sed 's/^/  v/'
+done
+```
+
+**Never `destroy` a version to tidy up.** Disabled is reversible and costs nothing; destroyed is
+gone, and the one time it matters is the incident where you need the previous value back.
+
+### Known duplicates and strays — 2026-08-17
+
+| Secret | State | Why |
+|---|---|---|
+| `FINOPS-CLOUDFLARE` | **disabled** | Held the working token under a non-canonical name. Value copied to `finops-cloudflare-token` v2. Container kept; nothing references it. |
+| `finops-cloudflare-token` v1 | **disabled** | The token without `analytics.read`. Disabled so a rollback cannot resurrect it. v2 is live. |
+| `chippr_cloudflare_ApiToken` | in use elsewhere | A **different** Cloudflare token: authenticates but has no `analytics.read`. Not ours to rotate — audited 2026-08-17 while hunting for the analytics token. |
+| `chippr_cloudflare_s3_api`, `_access_key_id`, `chippr-cloudflare-secrect-access-key` | in use elsewhere | R2/S3 credentials, not API tokens. |
+| `GRAFANA_PROM_*` (5), `GRAFANA_GRAFANA_ALLOWLIST_API_ENDPOINT` | unused by this repo | Endpoint/identifier values that now live in `docker-compose.yml` as plain config. Candidates for removal once confirmed unused by other workloads. |
 
 ---
 
