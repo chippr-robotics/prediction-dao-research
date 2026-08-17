@@ -74,7 +74,8 @@ function usePauseEstate() {
       }),
     )
     setResults(all)
-    setReadAt(Date.now())
+    // NetworkScopeCard renders this via toLocaleTimeString — it is a Date, not epoch ms.
+    setReadAt(new Date())
   }, [provider, chainId])
 
   useEffect(() => {

@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-16
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "The user admin screens are currently a monolithic view with grouped
 sections. We need to transition these groups to mini apps so we can provide more granular access

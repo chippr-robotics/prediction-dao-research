@@ -14,7 +14,8 @@ import './adminCharts.css'
 
 const W = 320
 const H = 64
-const PAD = 4
+// Pad clears the end dot's radius + stroke; 4 let it clip at the frame edge.
+const PAD = 6
 
 export default function AdminSparkline({
   points,

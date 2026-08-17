@@ -35,7 +35,8 @@ export default function AdminBarList({
             <div className="admin-bar-row" key={item.label}>
               <span className="admin-bar-label">{item.label}</span>
               <span className="admin-bar-track">
-                <span className="admin-bar-fill" style={{ width: `${pct}%` }} />
+                {/* A zero renders NO fill — the min-width sliver read as "a little". */}
+                {value > 0 && <span className="admin-bar-fill" style={{ width: `${pct}%` }} />}
               </span>
               <span className="admin-bar-value">{item.display ?? String(item.value)}</span>
             </div>
