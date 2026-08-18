@@ -265,7 +265,9 @@ artifacts live under `specs/<feature>/`.
 - **Bridging + supplied liquidity (spec 067) route through TWO UUPS routers that never take custody.**
   `BridgeRouter` (`bridgeRouter`/`bridgeRouterImpl`, Across Protocol V3) powers the **Bridge** tab inside
   **Transfer**; `LiquidityRouter` (`liquidityRouter`/`liquidityRouterImpl`, Uniswap V3 + Across HubPool)
-  powers the **Supply** section inside **Earn**. Neither is deployed on any network yet (issue #966).
+  powers the **Supply** section inside **Earn**. Both are now deployed and recorded on all five EVM
+  mainnets (1/10/137/8453/42161); the admin handoff off the deployer EOA is still outstanding (issue
+  #966), so treat `DEFAULT_ADMIN_ROLE` on these routers as held by a single hot key until that lands.
   Four rules govern every change here:
   (1) **THE MEMBER IS THE DEPOSITOR.** `depositV3` is passed `msg.sender`, never `address(this)`, so an
   unfilled Across deposit refunds to the MEMBER. That is why `IBridgeRouter` has **no rescue or
