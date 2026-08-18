@@ -185,8 +185,16 @@ function acceptPendingWager() {
       return poll(60)
     })
 
-    // Close acceptance modal
-    cy.contains('button', /done|close/i).click({ force: true })
+    /*
+     * Close by the modal's own control. `cy.contains('button', /done|close/i)` matched nothing:
+     * the acceptance modal closes via an icon button (`.ma-close-btn`, aria-label "Close modal"),
+     * whose accessible name carries the word but whose TEXT does not — and cy.contains matches
+     * text. Scoped to the modal either way, since an unscoped search here would happily find a
+     * "Close" on the page behind it.
+     */
+    cy.get('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]')
+      .first()
+      .click({ force: true })
   })
 
   // Close My Wagers modal
