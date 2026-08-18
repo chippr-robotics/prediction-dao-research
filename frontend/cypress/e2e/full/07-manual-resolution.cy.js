@@ -110,84 +110,9 @@ function acceptPendingWager() {
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).should('exist')
   cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
     .click({ force: true })
-  cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-  /*
-   * Encryption is mandatory, so every wager this spec creates is private and the acceptance
-   * modal gates the terms behind "Decrypt Wager Details" — a signature — before it will show
-   * an Accept control. Conditional because the modal skips the gate once the details are
-   * already decrypted in session; written with jQuery find() rather than cy.get, which fails
-   * the command when the gate is absent instead of skipping it.
-   */
-  cy.get('.ma-modal', { timeout: 10000 }).then(($m) => {
-    if ($m.find('button:contains("Decrypt")').length === 0) return
-    cy.get('.ma-modal').contains('button', /decrypt/i).click({ force: true })
-    /*
-     * Report the app's own reason. A failed decrypt leaves the button in place and renders
-     * `.ma-decrypt-error`, so waiting for the button to disappear times out 20s later
-     * saying only "continuously found it" — true, and useless. Settle on either terminal
-     * state and name the error when that is the one that arrives.
-     */
-    /*
-     * Re-query rather than searching the wrapped snapshot: decrypting re-renders the modal,
-     * so `$m`'s nodes are detached by the time the result lands and the search finds nothing
-     * (RES-04 failed here having queried a stale my-markets-modal-backdrop). Scoped to
-     * `.ma-modal` — the union with [role="dialog"] also matches the My Wagers dialog behind.
-     */
-    cy.get('.ma-modal')
-      .find('.ma-description, .ma-decrypt-error', { timeout: 20000 })
-      .should('exist')
-      .then(($r) => {
-        if ($r.hasClass('ma-decrypt-error')) {
-          throw new Error(`decrypt failed: ${$r.text().trim()}`)
-        }
-      })
-  })
-  cy.contains('.ma-modal, [role="dialog"]', /accept offer/i).within(() => {
-    cy.contains('button', /accept offer/i).click()
-  })
-  /*
-   * The "Confirm Offer Acceptance" dialog SCROLLS inside a fixed overlay and its confirm
-   * button sits below the fold — the fixed-ancestor family again. Scroll it into view;
-   * deliberately not {force: true}.
-   *
-   * SCOPE THE LOOKUP TO THE DIALOG. Unscoped, `cy.contains('button', /…|accept/i)` matched
-   * the BACKGROUND page: the Scan QR quick-action card is described "Accept a wager from a
-   * friend" (Dashboard.jsx), it sits earlier in the DOM than the portalled dialog, and it is
-   * genuinely visible — so the chain scrolled to that card, passed the visibility assert, and
-   * died clicking an element whose center the overlay covers. Eight RES tests failed on a
-   * quick-action card rather than on the button under test.
-   */
-  cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
-    cy.contains('button', /i understand|confirm|accept/i)
-      .scrollIntoView()
-      .should('be.visible')
-      .click()
-  })
+  cy.acceptOfferInModal()
 
-  /*
-   * Success is the wager being ACTIVE ON CHAIN, not a word in the modal.
-   *
-   * The text check timed out against a modal reading "Processing… Please confirm the
-   * transaction in your wallet" — a state that says nothing about whether the acceptance
-   * failed or was merely slow. The same screenshot showed a 429 from the public Amoy subgraph
-   * (this harness impersonates chain 80002, so app reads reach the real endpoint and get rate
-   * limited under a full-suite run), which is exactly the kind of delay that has nothing to do
-   * with what the test is about.
-   *
-   * Poll the registry instead. Status 2 is Active; anything else and the tests that follow
-   * would be resolving a wager nobody accepted.
-   */
-  cy.lastWagerId().then((id) => {
-    const poll = (tries) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
-      if (i.status === 2) return undefined
-      if (tries <= 0) {
-        throw new Error(`wager ${id} never became Active after acceptance (status=${i.status})`)
-      }
-      cy.wait(1000)
-      return poll(tries - 1)
-    })
-    return poll(60)
-  })
+  cy.lastWagerId().then((id) => cy.waitForWagerActive(id))
 
   /*
    * Close by the modal's own control. `cy.contains('button', /done|close/i)` matched nothing:

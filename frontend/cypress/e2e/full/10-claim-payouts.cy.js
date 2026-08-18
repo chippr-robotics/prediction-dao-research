@@ -103,28 +103,10 @@ function createAcceptAndResolve(config = {}) {
    */
   cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
     .click({ force: true })
-  cy.get('.ma-modal', { timeout: 10000 }).then(($m) => {
-    if ($m.find('button:contains("Decrypt")').length === 0) return
-    cy.get('.ma-modal').contains('button', /decrypt/i).click({ force: true })
-    cy.get('.ma-modal').find('.ma-description, .ma-decrypt-error', { timeout: 20000 }).should('exist')
-  })
-  cy.get('.ma-modal').contains('button', /accept offer/i, { timeout: 10000 }).click()
-  cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
-    cy.contains('button', /i understand|confirm|accept/i)
-      .scrollIntoView()
-      .should('be.visible')
-      .click()
-  })
+  cy.acceptOfferInModal()
+
   // Success is the wager reaching Active on chain, not a word in the dialog.
-  cy.lastWagerId().then((id) => {
-    const poll = (tries) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
-      if (i.status === 2) return undefined
-      if (tries <= 0) throw new Error(`wager ${id} never became Active after acceptance (status=${i.status})`)
-      cy.wait(1000)
-      return poll(tries - 1)
-    })
-    return poll(60)
-  })
+  cy.lastWagerId().then((id) => cy.waitForWagerActive(id))
   cy.get('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]')
     .first()
     .click({ force: true })

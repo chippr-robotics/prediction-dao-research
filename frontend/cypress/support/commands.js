@@ -1102,6 +1102,66 @@ Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
 })
 
 /**
+ * Drive the acceptance modal: through the decrypt gate if there is one, then Accept Offer and
+ * the confirmation. Leaves the modal open so callers can assert on the result.
+ *
+ * WAIT FOR THE MODAL TO DECIDE before branching. `$m.find('button:contains("Decrypt")')` inside
+ * .then() reads the DOM once, and the modal renders before it knows whether the wager is private
+ * — so the check ran too early, found no gate, skipped it, and then "Accept Offer" was never
+ * found because it sits BEHIND that gate. The screenshot showed the Decrypt button plainly on
+ * screen. Waiting for one of the modal's terminal states first is what makes the branch honest.
+ *
+ * Also scopes every lookup to the dialog: unscoped, /accept/i matches Dashboard's Scan QR card
+ * ("Accept a wager from a friend") sitting behind the overlay, which is visible and un-clickable.
+ */
+Cypress.Commands.add('acceptOfferInModal', () => {
+  cy.get('.ma-modal', { timeout: 10000 }).should('be.visible')
+  // One of: the decrypt gate, the decrypted terms, or a decrypt failure.
+  cy.get('.ma-modal')
+    .find('.ma-decrypt-prompt, .ma-description, .ma-decrypt-error', { timeout: 20000 })
+    .should('exist')
+
+  cy.get('.ma-modal').then(($m) => {
+    if ($m.find('.ma-decrypt-prompt button').length === 0) return
+    cy.get('.ma-modal').contains('button', /decrypt/i).click({ force: true })
+    // Re-query: decrypting re-renders the modal, so $m's nodes are detached by the time it lands.
+    cy.get('.ma-modal')
+      .find('.ma-description, .ma-decrypt-error', { timeout: 20000 })
+      .should('exist')
+      .then(($r) => {
+        if ($r.hasClass('ma-decrypt-error')) {
+          throw new Error(`decrypt failed: ${$r.text().trim()}`)
+        }
+      })
+  })
+
+  cy.get('.ma-modal').contains('button', /accept offer/i, { timeout: 10000 }).click()
+  cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
+    cy.contains('button', /i understand|confirm|accept/i)
+      .scrollIntoView()
+      .should('be.visible')
+      .click()
+  })
+})
+
+/**
+ * Poll the registry until `wagerId` is Active (status 2). Success is a fact about the chain, not
+ * a word in a dialog — the acceptance modal sits on "Processing…" for as long as the tx takes,
+ * and a public-subgraph 429 can stretch that well past any fixed wait.
+ */
+Cypress.Commands.add('waitForWagerActive', (wagerId, tries = 60) => {
+  const poll = (remaining) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+    if (i.status === 2) return undefined
+    if (remaining <= 0) {
+      throw new Error(`wager ${wagerId} never became Active after acceptance (status=${i.status})`)
+    }
+    cy.wait(1000)
+    return poll(remaining - 1)
+  })
+  return poll(tries)
+})
+
+/**
  * Mock the IPFS (Pinata) boundary: store uploaded JSON in-memory and serve it back
  * on fetch, so the app's real encrypt → store → retrieve → decrypt round-trip runs
  * without a network. Call BEFORE cy.visit. `{ failFetch:true }` makes gateway reads

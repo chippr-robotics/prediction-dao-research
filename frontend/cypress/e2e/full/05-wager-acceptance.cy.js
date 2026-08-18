@@ -77,33 +77,11 @@ function createSimpleWager(config = {}) {
 }
 
 /*
- * Drive the acceptance modal from "Accept Offer" through the confirmation.
- *
- * Two traps, both already paid for in 07:
- *
- * 1. SCOPE TO THE DIALOG. Unscoped, `cy.contains('button', /…|accept/i)` matches the BACKGROUND
- *    page: Dashboard's Scan QR quick-action card is described "Accept a wager from a friend", it
- *    sits earlier in the DOM than the portalled dialog, and it is genuinely visible — so the
- *    chain scrolls to that card, passes the visibility assert, and dies clicking an element the
- *    overlay covers. ACC-01 failed on that card, not on the button under test.
- * 2. THE DECRYPT GATE. Encryption is mandatory, so these wagers are private and the modal hides
- *    the terms — and the Accept control — behind "Decrypt Wager Details" until a signature lands.
- *    Conditional via jQuery find(), which skips when the gate is absent; cy.get would fail.
+ * Thin alias for the shared command — the real logic lives in cy.acceptOfferInModal(), which
+ * three specs now share. Kept as a name because the call sites read better with it.
  */
 function acceptThroughModal() {
-  cy.get('.ma-modal', { timeout: 10000 }).then(($m) => {
-    if ($m.find('button:contains("Decrypt")').length === 0) return
-    cy.get('.ma-modal').contains('button', /decrypt/i).click({ force: true })
-    // Re-query: decrypting re-renders the modal, so $m's nodes are detached by then.
-    cy.get('.ma-modal').find('.ma-description, .ma-decrypt-error', { timeout: 20000 }).should('exist')
-  })
-  cy.get('.ma-modal').contains('button', /accept offer/i, { timeout: 10000 }).click()
-  cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
-    cy.contains('button', /i understand|confirm|accept/i)
-      .scrollIntoView()
-      .should('be.visible')
-      .click()
-  })
+  cy.acceptOfferInModal()
 }
 
 describe('Wager Acceptance', () => {
