@@ -144,25 +144,8 @@ function createAcceptAndResolve(config = {}) {
    * whole resolution meant a modal that had not rendered yet was read as "no modal", and the
    * test carried on without resolving anything.
    */
-  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 15000 }).should('exist')
-  cy.get('.mm-sub-modal').within(() => {
-    cy.contains(opts.winnerIsCreator ? /creator wins/i : /opponent wins/i).click()
-    cy.contains('button', /confirm|submit|resolve/i).click()
-  })
-  /*
-   * Judge the resolution ON CHAIN (status 3 = Resolved). The old check accepted any of
-   * success/proposed/resolved/error in the modal's text — broad enough to pass on failure —
-   * and the modal closes itself once the transaction lands anyway.
-   */
-  cy.lastWagerId().then((id) => {
-    const poll = (tries) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
-      if (i.status === 3) return undefined
-      if (tries <= 0) throw new Error(`wager ${id} never reached Resolved (status=${i.status})`)
-      cy.wait(1000)
-      return poll(tries - 1)
-    })
-    return poll(45)
-  })
+  cy.resolveWagerInModal(opts.winnerIsCreator ? /creator wins/i : /opponent wins/i)
+  cy.lastWagerId().then((id) => cy.waitForWagerResolved(id))
 }
 
 describe('Claim Payouts', () => {

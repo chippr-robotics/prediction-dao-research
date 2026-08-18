@@ -158,34 +158,8 @@ const OUTCOME_PATTERNS = {
 }
 
 function resolveWithOutcome(outcome = 'Pass') {
-  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).should('be.visible')
-
-  // Select outcome
-  cy.get('.mm-sub-modal').within(() => {
-    cy.contains(OUTCOME_PATTERNS[outcome] || outcome).click()
-  })
-
-  // Submit resolution
-  cy.get('.mm-sub-modal').within(() => {
-    cy.contains('button', /confirm|submit|resolve/i).click()
-  })
-
-  // Wait for TX
-  /*
-   * Judge the resolution ON CHAIN. The old check read the sub-modal's text and accepted any of
-   * success/proposed/resolved/error/failed — a list broad enough to pass on failure, and it
-   * still failed, because the modal closes itself once the transaction lands and there was no
-   * text left to match. Status 3 is Resolved.
-   */
-  cy.lastWagerId().then((id) => {
-    const poll = (tries) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
-      if (i.status === 3) return undefined
-      if (tries <= 0) throw new Error(`wager ${id} never reached Resolved (status=${i.status})`)
-      cy.wait(1000)
-      return poll(tries - 1)
-    })
-    return poll(45)
-  })
+  cy.resolveWagerInModal(OUTCOME_PATTERNS[outcome] || outcome)
+  cy.lastWagerId().then((id) => cy.waitForWagerResolved(id))
 }
 
 import { resetChainBetweenTests } from '../../support/e2e'

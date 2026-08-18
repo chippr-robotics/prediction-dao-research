@@ -1145,6 +1145,40 @@ Cypress.Commands.add('acceptOfferInModal', () => {
 })
 
 /**
+ * Resolve a wager through the My Wagers sub-modal.
+ *
+ * THE FLOW HAS THREE STEPS, not two: pick an outcome, "Continue" to a confirmation step, then
+ * "Confirm Resolution" — the only button wired to handleSubmit. Both specs clicked once and
+ * stopped at the confirmation screen, so no transaction was ever sent and the wager sat at
+ * Active while the test waited for Resolved. The old text assertion hid that by accepting the
+ * word "resolve" from a modal that was merely offering to.
+ *
+ * Outcomes are labelled by PARTY — "Creator wins — <name>", "Opponent wins — <name>", "Draw —
+ * both parties refunded" — never Pass/Fail, so callers pass a pattern.
+ *
+ * @param {RegExp} outcomePattern which outcome to select
+ */
+Cypress.Commands.add('resolveWagerInModal', (outcomePattern = /creator wins/i) => {
+  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 15000 }).should('exist')
+  cy.get('.mm-sub-modal').contains(outcomePattern).click()
+  cy.get('.mm-sub-modal').contains('button', /^continue$/i).should('not.be.disabled').click()
+  cy.get('.mm-sub-modal').contains('button', /confirm resolution/i, { timeout: 10000 }).click()
+})
+
+/**
+ * Poll the registry until `wagerId` is Resolved (status 3).
+ */
+Cypress.Commands.add('waitForWagerResolved', (wagerId, tries = 45) => {
+  const poll = (remaining) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+    if (i.status === 3) return undefined
+    if (remaining <= 0) throw new Error(`wager ${wagerId} never reached Resolved (status=${i.status})`)
+    cy.wait(1000)
+    return poll(remaining - 1)
+  })
+  return poll(tries)
+})
+
+/**
  * Dismiss the acceptance modal if it is still open.
  *
  * It CLOSES ITSELF once the acceptance lands, so an unconditional close failed with "expected
