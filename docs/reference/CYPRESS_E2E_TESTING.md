@@ -31,12 +31,35 @@ The full tier needs a chain, a deploy and a seed before Cypress starts:
 
 ```bash
 npx hardhat compile
-npx hardhat node &                 # chain 1337; wait for it to answer eth_chainId
-npm run setup:local                # deploy + sync:frontend-contracts + seed
+npm run node:e2e &                 # hardhat AS chainId 80002; wait for eth_chainId
+npm run setup:e2e                  # deploy + seed (no frontend-contracts sync — see below)
 cd frontend
-npx start-server-and-test dev:e2e http://localhost:5173 \
+CYPRESS_NETWORK_ID=80002 npx start-server-and-test dev:e2e http://localhost:5173 \
   'cypress run --spec "cypress/e2e/full/**/*.cy.js"'
 ```
+
+**The node is AMOY-SHAPED (chainId 80002), deliberately.** Spec 071 pins membership reads and
+purchase settlement to `membershipChainId()` — Amoy on a testnet cohort — and that constant is
+deliberately not runtime-configurable ("a wrong value sends a member's USDC to a chain where
+their membership could never be read"). Against a 1337 node the app therefore treats every
+seeded member as a non-member and hard-disables the purchase button (`!onPurchaseChain`), so
+the membership money path cannot be tested at all. Rather than teach the app to trust a
+different chain, the NODE impersonates the membership home:
+
+- `HARDHAT_LOCAL_CHAIN_ID=80002` boots hardhat claiming Amoy's id (`node:e2e`)
+- local deploys are **deterministic by deployer + nonce — chain-id-independent** — so the
+  deployed addresses are byte-identical to the committed `HARDHAT_CONTRACTS` set (verified:
+  8/8 addresses match across chain ids)
+- `VITE_E2E_AMOY_LOCAL=1` (carried by `dev:e2e`) maps chain 80002 to that hardhat set, behind
+  an `import.meta.env.DEV` guard — dead code in any production bundle, same precedent as the
+  spec-085 hardware test adapter
+- `VITE_RPC_URL_AMOY=http://localhost:8545` (also `dev:e2e`) points the app's 80002 reads and
+  writes at the local node
+- `setup:e2e` = deploy + seed **without** the frontend-contracts sync: the sync would rewrite
+  the REAL Amoy address table with local values; the seam above makes it unnecessary. The
+  seed's local-chain guard accepts 80002 only under an explicit `E2E_AMOY_LOCAL=1` — without
+  it, a chainId-80002 target still refuses, because 80002 is also real Amoy and the guard
+  exists precisely to keep a seed off a real chain.
 
 **Use `dev:e2e`, not `dev`.** Encryption is mandatory on the create path, so
 `useFriendMarketCreation` always calls `uploadEncryptedEnvelope` — and

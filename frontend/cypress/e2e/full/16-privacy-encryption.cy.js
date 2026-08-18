@@ -70,7 +70,13 @@ describe('Privacy & Encryption (E2E)', () => {
     cy.get('.ma-modal').contains(/created by|1v1|usdc|stake/i, { timeout: 10000 }).should('exist')
     // ...but the private cleartext is NOT exposed (description stays the placeholder).
     cy.get('.ma-modal').contains(DESC).should('not.exist')
-    cy.get('.ma-description').should('contain.text', 'Encrypted')
+    /*
+     * `.ma-description` does not exist until a decrypt SUCCEEDS — it is the element that holds
+     * the decrypted text (MarketAcceptanceModal.jsx:648). Undecrypted, the modal renders the
+     * decrypt gate instead, and that gate is precisely what keeps the cleartext out of reach.
+     * Assert the gate, not a placeholder the app never renders.
+     */
+    cy.get('.ma-modal').find('.ma-decrypt-prompt, .ma-decrypt-error').should('exist')
   })
 
   it('[PRV-03] a non-participant cannot reach the private wager', () => {

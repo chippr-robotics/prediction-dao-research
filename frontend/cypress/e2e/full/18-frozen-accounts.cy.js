@@ -14,8 +14,13 @@ const OPP = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'  // #0 — opponent
 
 function connectAsUser() {
   cy.mockWeb3Provider({ account: USER })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  /*
+   * visitWagers, not /fairwins: spec 073 moved the quick-action cards to
+   * Finance > Transfer > Wagers, and /fairwins (still routed, still rendering HomeScreen)
+   * stopped hosting them. Both FRZ tests died in openCreateWagerModal looking for a card
+   * the page it was on no longer renders.
+   */
+  cy.visitWagers()
   cy.connectWallet()
 }
 
@@ -36,6 +41,13 @@ describe('Frozen Accounts', () => {
     cy.fundAccount(USER)
     cy.task('chainTx', { action: 'approve', args: { index: 1 } })
     cy.grantMembershipFor(USER, { tier: 4, durationDays: 365 })
+    /*
+     * Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose OPPONENT has
+     * no key in KeyRegistry, and says so only in a console error. Without this the create the
+     * spec expects to SUCCEED failed for a reason unrelated to what it tests, reported as
+     * "wager 1 not created".
+     */
+    cy.ensureEncryptionKeys([0, 1])
   })
 
   afterEach(() => {

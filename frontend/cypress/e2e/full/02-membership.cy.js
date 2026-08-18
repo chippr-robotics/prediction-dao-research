@@ -87,9 +87,22 @@ function selectTier(tierName) {
 /** Drive the modal steps to completion. Assumes a tier is selected. */
 function completePurchase() {
   cy.contains('button', /next|continue/i).click()
-  cy.get('.ppm-panel', { timeout: 10000 }).should('be.visible')
-  cy.get('input[type="checkbox"]', { timeout: 10000 }).check({ force: true })
-  cy.contains('button', /purchase|confirm|pay/i).click()
+  /*
+   * The Review panel scrolls inside a position:fixed overlay, so a bare
+   * should('be.visible') on .ppm-panel fails on a perfectly rendered modal
+   * ("ancestor has position: fixed ... overflowed"). Target the step's
+   * CONTROLS instead: the spec-007 attestations are discrete, un-pre-ticked
+   * checkboxes and EVERY one must be ticked — allTicked is what enables the
+   * confirm button (PremiumPurchaseModal.jsx:850).
+   */
+  cy.get('.ppm-panel input[type="checkbox"]', { timeout: 10000 })
+    .should('have.length.gte', 1)
+    .check({ force: true })
+  // Asserting not-disabled BEFORE clicking turns "wrong chain / unticked box"
+  // into a legible failure here rather than a mystery timeout later.
+  cy.contains('button', /confirm purchase|purchase|confirm|pay/i, { timeout: 10000 })
+    .should('not.be.disabled')
+    .click({ force: true })
   // The modal reaches its Complete step only after the real tx mines.
   cy.get('.ppm-step.completed', { timeout: 60000 }).should('have.length.gte', 2)
 }
@@ -168,10 +181,19 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     assertPurchaseSuccess()
     cy.get('.ppm-close-btn, button[aria-label="Close modal"]').click({ force: true })
 
-    // Now a Bronze member: the upgrade path is RoleDetailsSection's "Upgrade"
-    // in the account dropdown (tier < 4), which opens the modal in upgrade mode.
-    openAccountDropdown()
-    cy.contains('button', /^upgrade$/i, { timeout: 10000 }).click()
+    /*
+     * Upgrade via the Membership tab's "Renew / Upgrade" — the deterministic
+     * member entry. (The dropdown's compact role card also carries an Upgrade
+     * button, but it renders from role state loaded at CONNECT time, which
+     * predates the purchase this test just made.) The reload forces a fresh
+     * roles read so the tab sees the new Bronze membership.
+     */
+    cy.reload()
+    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.connectWallet()
+    cy.visit('/wallet?tab=membership')
+    cy.get('.membership-status-badge.active', { timeout: 15000 }).should('be.visible')
+    cy.get('.renew-btn', { timeout: 10000 }).click()
     cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
     selectTier('Silver')
     completePurchase()
@@ -179,38 +201,48 @@ describe('Membership Purchase / Upgrade / Extend', () => {
   })
 
   it('[MEM-07] View membership status', () => {
-    // Members view status on the Membership tab, not in the purchase modal.
+    /*
+     * Members view status on the Membership tab. The tab renders ROLE badges
+     * ("Wager Participant"), an "Active" status badge, and a Renew / Upgrade
+     * entry — it never names a tier, so asserting "Platinum" was asserting a
+     * UI that does not exist (this test's own first failure mode).
+     */
     connectAs(TEST_ACCOUNTS[0])
     cy.visit('/wallet?tab=membership')
     cy.get('body', { timeout: 10000 }).should('be.visible')
-    // ensureWagerCapacity pinned #0 at tier 4 (Platinum), 365 days.
-    cy.contains(/platinum/i, { timeout: 10000 }).should('exist')
-    cy.contains(/active|expires|days/i, { timeout: 10000 }).should('exist')
+    cy.contains('.role-badge', /wager participant/i, { timeout: 15000 }).should('be.visible')
+    cy.get('.membership-status-badge.active', { timeout: 10000 }).should('be.visible')
+    cy.get('.renew-btn').should('be.visible')
   })
 
   it('[MEM-10] Purchase when already active shows current tier', () => {
     // The dropdown never shows the buy upsell to a member — the manage entry
-    // replaces it ("Never show both at once", WalletButton.jsx).
+    // replaces it ("Never show both at once", WalletButton.jsx) — and the
+    // manage surface reports the ACTIVE state.
     connectAs(TEST_ACCOUNTS[0])
     openAccountDropdown()
+    cy.contains('button', /^membership$/i, { timeout: 10000 }).should('be.visible')
     cy.get('.purchase-access-btn').should('not.exist')
-    cy.contains('button', /^membership$/i, { timeout: 10000 }).should('be.visible').click()
+    cy.contains('button', /^membership$/i).click()
     cy.url({ timeout: 10000 }).should('include', 'tab=membership')
-    cy.contains(/platinum/i, { timeout: 10000 }).should('exist')
+    cy.get('.membership-status-badge.active', { timeout: 15000 }).should('be.visible')
   })
 
   it('[MEM-11] Downgrade attempt blocked', () => {
     // A Silver member's upgrade modal must not offer Bronze. Grant the tier
-    // directly (this test is about the modal, not the purchase).
+    // directly (this test is about the modal, not the purchase) BEFORE the
+    // page loads, so the connect-time roles read already sees Silver.
     cy.grantMembershipFor(BUYERS.downgrade, { tier: 2, durationDays: 365 })
     cy.fundAccount(BUYERS.downgrade)
     connectAs(BUYERS.downgrade)
-    openAccountDropdown()
-    cy.contains('button', /^upgrade$/i, { timeout: 10000 }).click()
+    cy.visit('/wallet?tab=membership')
+    cy.get('.membership-status-badge.active', { timeout: 15000 }).should('be.visible')
+    cy.get('.renew-btn', { timeout: 10000 }).click()
     cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
     cy.get('.ppm-tier-card', { timeout: 10000 }).should('have.length.gte', 1)
-    // The concrete claim: no offered card is Bronze (or Silver — same tier is
-    // an extend, not an upgrade).
+    // The concrete claim: no offered card is Bronze — a lower tier is not an
+    // upgrade, and rendering it would be the downgrade path this test exists
+    // to rule out.
     cy.get('.ppm-tier-card').each(($card) => {
       expect($card.text().toLowerCase()).to.not.match(/bronze/)
     })
@@ -234,14 +266,38 @@ describe('Membership Purchase / Upgrade / Extend', () => {
 
   it('[MEM-12] Reject USDC approval aborts purchase', () => {
     cy.fundAccount(BUYERS.reject)
-    cy.mockWeb3Provider({ account: BUYERS.reject })
-    // Wrap the mock AFTER it installs (handlers run in registration order):
-    // every eth_sendTransaction becomes a user rejection.
-    cy.on('window:before:load', (win) => {
+    /*
+     * Reject every way a member can authorize a SPEND — not just eth_sendTransaction.
+     *
+     * Rejecting only eth_sendTransaction let the purchase complete: the flow rides the spec-035
+     * intent rail, where the authorization a member gives is a SIGNATURE (EIP-3009 / typed data)
+     * and the transaction is submitted by someone else. The test then asserted on a modal reading
+     * "Purchase Complete!" — it was rejecting a request the purchase never made.
+     *
+     * personal_sign is deliberately left alone: it derives the encryption key, which is identity,
+     * not spend authorization, and rejecting it would fail this test somewhere else entirely.
+     * Record what was asked for so a future failure can say which rail ran.
+     */
+    const SPEND_AUTH = ['eth_sendTransaction', 'eth_signTypedData', 'eth_signTypedData_v4', 'wallet_sendCalls']
+    /*
+     * Register the wrapper INSIDE .then(), so it lands after the mock's own handler.
+     *
+     * `cy.on(...)` at the top level of a test registers SYNCHRONOUSLY, while
+     * `cy.mockWeb3Provider()` only enqueues a command that registers its handler when the queue
+     * runs. So a wrapper written "after" the mock in source order actually ran BEFORE it: at that
+     * point `win.ethereum` did not exist yet, `win.ethereum && win.ethereum.request` was
+     * undefined, and the wrapper installed nothing at all. The mock then created a clean
+     * provider and every request went through unwrapped — which is why the purchase this test
+     * expects to be refused ran to "Purchase Complete!".
+     */
+    cy.mockWeb3Provider({ account: BUYERS.reject }).then(() => {
+      cy.on('window:before:load', (win) => {
       const original = win.ethereum && win.ethereum.request
       if (original) {
+        win.__cySeenMethods = []
         win.ethereum.request = ({ method, params }) => {
-          if (method === 'eth_sendTransaction') {
+          win.__cySeenMethods.push(method)
+          if (SPEND_AUTH.includes(method)) {
             const err = new Error('User rejected the request.')
             err.code = 4001
             return Promise.reject(err)
@@ -249,6 +305,7 @@ describe('Membership Purchase / Upgrade / Extend', () => {
           return original({ method, params })
         }
       }
+      })
     })
     cy.visit('/fairwins')
     cy.get('body', { timeout: 10000 }).should('be.visible')
@@ -261,6 +318,10 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     cy.get('.ppm-overlay', { timeout: 15000 })
       .invoke('text')
       .should('match', /rejected|cancelled|failed|denied|error/i)
+    // Nothing was purchased: the tier stays whatever it was before the attempt.
+    cy.window().then((win) => {
+      cy.log(`provider methods seen: ${(win.__cySeenMethods || []).join(', ')}`)
+    })
   })
 
   // ── Clock-advancing tests — LAST, deliberately (see header) ────────────────
@@ -281,7 +342,18 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     cy.get('body', { timeout: 10000 }).should('be.visible')
     cy.connectWallet()
     openAccountDropdown()
-    cy.contains('button', /^extend$|^renew$/i, { timeout: 10000 }).click()
+    /*
+     * The membership row in the dropdown is a COLLAPSED RoleDetailsCard — the "2d left" chip is
+     * visible in the header, but Extend lives in `role-card-details`, which renders only while
+     * `isExpanded`. Clicking the card toggles it. The old assertion looked straight for the
+     * button and read its absence as "the app is not offering an extend", when the app was
+     * offering one behind a disclosure the test never opened.
+     *
+     * Two wordings exist across the compact and expanded renderings ("Extend"/"Renew" and
+     * "Extend Membership"/"Renew Access"), so match on the verb rather than the whole label.
+     */
+    cy.get('.role-card-compact', { timeout: 10000 }).click()
+    cy.contains('button', /extend|renew/i, { timeout: 10000 }).click()
     cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
     cy.get('.ppm-overlay').invoke('text').should('match', /extend|renew|bronze/i)
   })

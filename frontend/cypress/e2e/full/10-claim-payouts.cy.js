@@ -90,20 +90,24 @@ function createAcceptAndResolve(config = {}) {
   cy.switchAccount(1)
 
   cy.openMyWagers('participating')
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-    if (viewBtn.length > 0) {
-      cy.wrap(viewBtn.first()).click({ force: true })
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-      cy.contains('button', /accept offer/i).click()
-      cy.contains('button', /i understand|confirm|accept/i).click()
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('accepted') || lower.includes('success') || lower.includes('done')).to.be.true
-      })
-      cy.contains('button', /done|close/i).click({ force: true })
-    }
-  })
+  /*
+   * Same acceptance shape 05 and 07 arrived at, for the same three reasons:
+   *
+   * - WAIT for the accept control rather than snapshotting with $panel.find(): the row renders
+   *   before its action column does, so a one-shot read sees no button and the `if` silently
+   *   skipped the entire acceptance — leaving CLM-01 to fail later on a wager nobody accepted.
+   * - The wagers are PRIVATE (encryption is mandatory), so the modal gates the terms, and the
+   *   Accept control, behind "Decrypt Wager Details" until a signature lands.
+   * - SCOPE to the dialog: unscoped, /accept/i matches Dashboard's Scan QR card behind the
+   *   modal ("Accept a wager from a friend"), which is visible and un-clickable.
+   */
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
+    .click({ force: true })
+  cy.acceptOfferInModal()
+
+  // Success is the wager reaching Active on chain, not a word in the dialog.
+  cy.lastWagerId().then((id) => cy.waitForWagerActive(id))
+  cy.dismissAcceptanceModal()
   cy.get('.mm-close-btn, button[aria-label="Close modal"]').first().click({ force: true })
 
   // Step 3: Advance time past end date
@@ -131,18 +135,17 @@ function createAcceptAndResolve(config = {}) {
   })
 
   // Select outcome based on who should win
-  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-    if ($modal.length > 0) {
-      cy.get('.mm-sub-modal').within(() => {
-        cy.contains(opts.winnerIsCreator ? 'Pass' : 'Fail').click()
-        cy.contains('button', /confirm|submit|resolve/i).click()
-      })
-      cy.get('.mm-sub-modal', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('success') || lower.includes('proposed') || lower.includes('resolved') || lower.includes('error')).to.be.true
-      })
-    }
-  })
+  /*
+   * The sub-modal labels outcomes by PARTY — "Creator wins — <name>", "Opponent wins — <name>"
+   * (MyMarketsModal's outcomeLabels/labelFor) — not Pass/Fail, so the old strings matched
+   * nothing. Match a pattern: each label carries a name or shortened address after the title.
+   *
+   * And wait for the modal rather than snapshotting for it: `if ($modal.length > 0)` around the
+   * whole resolution meant a modal that had not rendered yet was read as "no modal", and the
+   * test carried on without resolving anything.
+   */
+  cy.resolveWagerInModal(opts.winnerIsCreator ? /creator wins/i : /opponent wins/i)
+  cy.lastWagerId().then((id) => cy.waitForWagerResolved(id))
 }
 
 describe('Claim Payouts', () => {
@@ -157,6 +160,13 @@ describe('Claim Payouts', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. Same misclassification
+     * as 07: the interceptIpfs sweep grepped for the shared create helpers and this file's
+     * local createAcceptAndResolve matched nothing — but it opens the create modal, and its
+     * mandatory metadata upload died unstubbed (CLM-01's "Wager Created" timeout).
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------

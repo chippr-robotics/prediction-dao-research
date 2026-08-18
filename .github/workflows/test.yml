@@ -739,9 +739,17 @@ jobs:
       # report success it did not earn, and a reader cannot tell an early return from a swallowed
       # failure by looking. Recording readiness in a variable and failing on its absence says the
       # same thing without the pattern — and falls through to failure by default.
+      # AMOY-SHAPED, deliberately (spec 071 collision): membership reads and purchase settlement
+      # are pinned to membershipChainId() — Amoy on a testnet cohort — and that constant is
+      # deliberately not runtime-configurable. A 1337 node therefore cannot host the membership
+      # money path at all (the purchase button is hard-disabled off the membership home). The
+      # node impersonates Amoy instead: local deploys are deterministic by deployer+nonce
+      # (chain-id-independent), so addresses match the committed hardhat set, and the app maps
+      # 80002 to that set through a DEV-only seam (VITE_E2E_AMOY_LOCAL, dead code in any
+      # production bundle).
       - name: Start local chain
         run: |
-          npx hardhat node > /tmp/hardhat-node.log 2>&1 &
+          HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node > /tmp/hardhat-node.log 2>&1 &
           ready=""
           for i in $(seq 1 60); do
             if curl -s -X POST http://127.0.0.1:8545 \
@@ -763,8 +771,11 @@ jobs:
       # deploy + sync-frontend-contracts + seed. The seed is what makes the specs' preconditions
       # true (two funded accounts, membership granted, registry approved), so a failure here must
       # stop the job rather than let 95 specs fail one by one for the same reason.
+      # setup:e2e, not setup:local: same deploy + seed, minus the frontend-contracts sync — the
+      # 80002 mapping comes from the seam above, and the sync would try to rewrite the REAL Amoy
+      # address table with local values.
       - name: Deploy and seed the local chain
-        run: npm run setup:local
+        run: npm run setup:e2e
 
       # Constitution IV: this step MUST fail the pipeline on error — no `continue-on-error`.
       # `set -o pipefail` is load-bearing for the same reason it is in cypress-fast-e2e: the
@@ -779,7 +790,7 @@ jobs:
         working-directory: frontend
         run: |
           set -o pipefail
-          npx start-server-and-test dev:e2e http://localhost:5173 \
+          CYPRESS_NETWORK_ID=80002 npx start-server-and-test dev:e2e http://localhost:5173 \
             'cypress run --spec "cypress/e2e/full/**/*.cy.js"' 2>&1 | tee cypress-full-output.txt
 
       - name: Summarize E2E results

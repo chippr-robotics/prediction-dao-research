@@ -76,6 +76,14 @@ function createSimpleWager(config = {}) {
   cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 }
 
+/*
+ * Thin alias for the shared command — the real logic lives in cy.acceptOfferInModal(), which
+ * three specs now share. Kept as a name because the call sites read better with it.
+ */
+function acceptThroughModal() {
+  cy.acceptOfferInModal()
+}
+
 describe('Wager Acceptance', () => {
   before(() => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
@@ -128,8 +136,7 @@ describe('Wager Acceptance', () => {
         cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
 
         // Click Accept Offer → Confirm
-        cy.contains('button', /accept offer/i).click()
-        cy.contains('button', /i understand|confirm|accept/i).click()
+        acceptThroughModal()
 
         // Wait for TX
         cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
@@ -177,8 +184,7 @@ describe('Wager Acceptance', () => {
           expect(lower.includes('stake') || lower.includes('token') || lower.includes('usdc')).to.be.true
         })
 
-        cy.contains('button', /accept offer/i).click()
-        cy.contains('button', /i understand|confirm|accept/i).click()
+        acceptThroughModal()
 
         cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
           const lower = text.toLowerCase()
@@ -477,22 +483,40 @@ describe('Wager Acceptance', () => {
       .click({ force: true })
 
     // Switch to opponent with rejection-patched provider
-    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[1] })
-    cy.on('window:before:load', (win) => {
-      const originalRequest = win.ethereum?.request
-      if (originalRequest) {
-        let callCount = 0
-        win.ethereum.request = ({ method, params }) => {
-          // Reject the second eth_sendTransaction (the approval TX)
-          if (method === 'eth_sendTransaction') {
-            callCount++
-            if (callCount <= 1) {
-              return Promise.reject(new Error('User rejected the request'))
+    /*
+     * Reject every way a member can authorize a SPEND, decided by METHOD rather than by ordinal.
+     *
+     * This used to reject "the second eth_sendTransaction (the approval TX)". Acceptance rides
+     * the spec-035 intent rail, where the member's authorization is a SIGNATURE and someone else
+     * submits the transaction — so the rejected request was one the flow never makes, and
+     * counting transactions described a sequence that no longer exists. (MEM-12 had the same
+     * defect, and its purchase ran to "Purchase Complete!" while the test waited for a refusal.)
+     *
+     * personal_sign is left alone deliberately: it derives the encryption key, which is identity,
+     * not spend authorization.
+     */
+    const SPEND_AUTH = ['eth_sendTransaction', 'eth_signTypedData', 'eth_signTypedData_v4', 'wallet_sendCalls']
+    /*
+     * Register the wrapper INSIDE .then(), so it lands after the mock's own handler. `cy.on(...)`
+     * at the top level of a test registers SYNCHRONOUSLY, while cy.mockWeb3Provider() only
+     * enqueues a command that registers its handler when the queue runs — so a wrapper written
+     * "after" the mock in source order actually ran BEFORE it, found no win.ethereum to wrap, and
+     * installed nothing.
+     */
+    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[1] }).then(() => {
+      cy.on('window:before:load', (win) => {
+        const originalRequest = win.ethereum?.request
+        if (originalRequest) {
+          win.ethereum.request = ({ method, params }) => {
+            if (SPEND_AUTH.includes(method)) {
+              const err = new Error('User rejected the request')
+              err.code = 4001
+              return Promise.reject(err)
             }
+            return originalRequest({ method, params })
           }
-          return originalRequest({ method, params })
         }
-      }
+      })
     })
 
     cy.visitWagers()
@@ -501,29 +525,29 @@ describe('Wager Acceptance', () => {
 
     cy.openMyWagers('participating')
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-      if (viewBtn.length > 0) {
-        cy.wrap(viewBtn.first()).click({ force: true })
+    cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
+      .click({ force: true })
 
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
+    acceptThroughModal()
 
-        cy.contains('button', /accept offer/i).click()
-        cy.contains('button', /i understand|confirm|accept/i).click()
-
-        // Should show rejection error
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 15000 }).invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const hasRejection = lower.includes('rejected') ||
-                              lower.includes('cancelled') ||
-                              lower.includes('failed') ||
-                              lower.includes('error') ||
-                              lower.includes('try again')
-          expect(hasRejection).to.be.true
-        })
-      } else {
-        expect(true).to.be.true
-      }
+    /*
+     * ASSERT THE INVARIANT, not the wording: a refused authorization must leave the wager
+     * unaccepted. Status 1 is Open — anything else and the rejection did not abort the flow.
+     *
+     * The old check scanned the modal for rejected/cancelled/failed/error/try again. That is a
+     * list broad enough to pass on almost anything the modal might say, yet specific enough to
+     * fail when it says nothing at all, which is what happens here — and it tested the copy
+     * rather than the outcome. Whether the UI apologises well is a separate question from
+     * whether the member's stake stayed put.
+     *
+     * The `else { expect(true).to.be.true }` this replaces meant a missing offer silently
+     * PASSED the test.
+     */
+    cy.lastWagerId().then((id) => {
+      cy.wait(3000)
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        expect(i.status, `wager ${id} stays Open after a refused authorization`).to.equal(1)
+      })
     })
   })
 })

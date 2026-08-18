@@ -65,10 +65,14 @@ function createWager(config = {}) {
   }
 
   if (opts.arbitrator) {
-    cy.get('[role="dialog"]').within(() => {
-      cy.get('input[placeholder*="0x"]').last().clear().type(opts.arbitrator)
-    })
-    cy.wait(500)
+    /*
+     * `#fm-arbitrator`, not `input[placeholder*="0x"].last()` — the arbitrator input only
+     * renders once ThirdParty is selected, so before that `.last()` IS the opponent field and
+     * the helper overwrote the opponent with the arbitrator (04's helper documented and fixed
+     * the same trap). Wait for resolution, not a fixed 500ms.
+     */
+    cy.get('#fm-arbitrator', { timeout: 10000 }).clear().type(opts.arbitrator)
+    cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('have.length.greaterThan', 1)
   }
 
   // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
@@ -90,24 +94,27 @@ function createWager(config = {}) {
 function acceptPendingWager() {
   cy.openMyWagers('participating')
 
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-    if (viewBtn.length > 0) {
-      cy.wrap(viewBtn.first()).click({ force: true })
+  /*
+   * WAIT for the accept control; do not snapshot for it.
+   *
+   * `$panel.find(...)` inside .then() reads the DOM once, at whatever instant the panel first
+   * exists. The row renders before its action column does — the accept control is gated on
+   * canAccept, which depends on data that arrives async — so the snapshot saw a row with no
+   * button and reported "no offer is listed" while the screenshot plainly showed one, pending
+   * acceptance with 11h 58m left. That is why this spec's score oscillated between runs with no
+   * code change: pure timing, read as a state.
+   *
+   * A retryable cy.contains fails only if the control never appears, which is the thing worth
+   * failing on. Scoped to the panel so nothing behind the modal can satisfy it.
+   */
+  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).should('exist')
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
+    .click({ force: true })
+  cy.acceptOfferInModal()
 
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-      cy.contains('button', /accept offer/i).click()
-      cy.contains('button', /i understand|confirm|accept/i).click()
+  cy.lastWagerId().then((id) => cy.waitForWagerActive(id))
 
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('accepted') || lower.includes('success') || lower.includes('done')).to.be.true
-      })
-
-      // Close acceptance modal
-      cy.contains('button', /done|close/i).click({ force: true })
-    }
-  })
+  cy.dismissAcceptanceModal()
 
   // Close My Wagers modal
   cy.get('.mm-close-btn, button[aria-label="Close modal"]').first().click({ force: true })
@@ -119,68 +126,81 @@ function acceptPendingWager() {
 function openResolutionForFirstWager() {
   cy.openMyWagers('created')
 
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    // Look for Resolve button or click into detail
-    const resolveBtn = $panel.find('.mm-action-resolve, button:contains("Resolve")')
-    if (resolveBtn.length > 0) {
-      cy.wrap(resolveBtn.first()).click({ force: true })
-    } else {
-      // Click into first wager to get detail view with resolve option
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-        cy.get('.mm-detail').then(($detail) => {
-          const resolveDetailBtn = $detail.find('button:contains("Resolve")')
-          if (resolveDetailBtn.length > 0) {
-            cy.wrap(resolveDetailBtn.first()).click()
-          }
-        })
-      }
-    }
-  })
+  /*
+   * WAIT for the Resolve control; do not snapshot for it, and do not fall through when it is
+   * missing. The row's action column renders after the row, so the old $panel.find() read
+   * nothing, took the else branch, found no rows either, and returned having done NOTHING —
+   * leaving the caller to fail on "the resolve sub-modal never appeared" (RES-03, RES-10). Both
+   * branches were silent, so the report named a symptom three commands downstream of the cause.
+   *
+   * Retryable, and scoped to the panel so nothing behind the modal can satisfy it.
+   */
+  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).should('exist')
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /^resolve$|resolve wager/i, { timeout: 20000 })
+    .click({ force: true })
 }
 
 /**
  * Resolve a wager by selecting an outcome in the resolution modal.
  */
-function resolveWithOutcome(outcome = 'Pass') {
-  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).should('be.visible')
-
-  // Select outcome
-  cy.get('.mm-sub-modal').within(() => {
-    cy.contains(outcome).click()
-  })
-
-  // Submit resolution
-  cy.get('.mm-sub-modal').within(() => {
-    cy.contains('button', /confirm|submit|resolve/i).click()
-  })
-
-  // Wait for TX
-  cy.get('.mm-sub-modal', { timeout: 30000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    const validOutcome = lower.includes('success') ||
-                        lower.includes('proposed') ||
-                        lower.includes('resolved') ||
-                        lower.includes('error') ||
-                        lower.includes('failed')
-    expect(validOutcome).to.be.true
-  })
+/*
+ * The resolve sub-modal labels outcomes by PARTY, not by Pass/Fail: MyMarketsModal builds
+ * "Creator wins — <name>", "Opponent wins — <name>" and "Draw — both parties refunded"
+ * (outcomeLabels/labelFor). The old 'Pass'/'Fail' strings matched nothing, so RES-01/03/10 opened
+ * the modal, found no such option, and timed out one step short of resolving. Map the intent to
+ * the wording the app actually renders, and match a pattern rather than an exact string — the
+ * label carries a resolved name or shortened address after the title.
+ */
+const OUTCOME_PATTERNS = {
+  Pass: /creator wins/i,
+  Fail: /opponent wins/i,
+  Draw: /draw/i,
 }
+
+function resolveWithOutcome(outcome = 'Pass') {
+  cy.resolveWagerInModal(OUTCOME_PATTERNS[outcome] || outcome)
+  cy.lastWagerId().then((id) => cy.waitForWagerResolved(id))
+}
+
+import { resetChainBetweenTests } from '../../support/e2e'
 
 describe('Manual Resolution', () => {
   before(() => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
     // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
     // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
-    cy.ensureWagerCapacity([0, 1])
-    cy.ensureEncryptionKeys([0, 1])
+    /*
+     * Account #2 is included because RES-05 names it as ARBITRATOR, and FriendMarketsModal
+     * refuses to create a third-party wager whose arbitrator has no key in KeyRegistry — the
+     * creator encrypts the private terms to them. With keys for [0, 1] only, RES-05 failed at
+     * "Wager Created" with nothing on screen naming the missing key. (04's helper hit and
+     * documented the same requirement.)
+     */
+    cy.ensureWagerCapacity([0, 1, 2])
+    cy.ensureEncryptionKeys([0, 1, 2])
   })
+
+  /*
+   * EVERY test here advances the chain by 25h+ to get past an end date, and the create form
+   * computes deadlines from BROWSER time — so from the second test on, the registry rejected
+   * the create with BadDeadlines and the failure surfaced as "Wager Created" never appearing,
+   * nowhere near its cause. Reset the chain between tests. Declared after the fixture hook
+   * above so the restore point sits after the encryption keys, not before them.
+   */
+  resetChainBetweenTests()
 
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. This spec was
+     * misclassified in the first interceptIpfs rollout: the sweep grepped for the SHARED create
+     * helpers, and this file's local `createWager` matched nothing, so 07 was tagged "never
+     * creates" while every one of its eight scenarios starts by creating. Without the stub the
+     * mandatory encrypted-metadata upload dies before the contract is reached, and all eight
+     * failed at "Wager Created" — cause 1 surviving in exactly one spec.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------
@@ -206,14 +226,7 @@ describe('Manual Resolution', () => {
 
     openResolutionForFirstWager()
 
-    cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-      if ($modal.length > 0) {
-        resolveWithOutcome('Pass')
-      } else {
-        // Resolution modal might not open if no resolvable wagers
-        expect(true).to.be.true
-      }
-    })
+    resolveWithOutcome('Pass')
   })
 
   // ---------------------------------------------------------------------------
@@ -481,31 +494,33 @@ describe('Manual Resolution', () => {
   // RES-10: Resolve with invalid outcome reverts
   // ---------------------------------------------------------------------------
   it('[RES-10] Resolve must select a valid outcome', () => {
+    /*
+     * ESTABLISH THE PRECONDITION. This test used to connect and hope a resolvable wager was
+     * lying around from an earlier test — and its `else { expect(true).to.be.true }` meant that
+     * when none was, it PASSED without testing anything. Per-test chain isolation removed the
+     * leftovers and turned that silent pass into an honest failure, so the wager is created here.
+     */
     connectAndVisit(0)
+    createWager({ description: 'RES-10: Outcome selection is required', resolutionType: 0 })
+
+    cy.switchAccount(1)
+    acceptPendingWager()
+    cy.advanceTime(25 * 60 * 60)
+    cy.switchAccount(0)
 
     openResolutionForFirstWager()
 
-    cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-      if ($modal.length > 0) {
-        // Try to submit without selecting an outcome
-        cy.get('.mm-sub-modal').within(() => {
-          cy.contains('button', /confirm|submit|resolve/i).click()
-        })
+    /*
+     * The app does not let you submit an unresolved choice and then complain — "Continue" is
+     * DISABLED until an outcome is selected (MyMarketsModal: `disabled={!selectedOutcome || …}`).
+     * Assert the guard that exists rather than scanning for error copy that never appears.
+     */
+    cy.get('.mm-sub-modal', { timeout: 15000 }).should('be.visible')
+    cy.get('.mm-sub-modal').contains('button', /^continue$/i).should('be.disabled')
 
-        // Should show error about missing outcome selection
-        cy.get('.mm-sub-modal').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const hasError = lower.includes('select') ||
-                          lower.includes('outcome') ||
-                          lower.includes('required') ||
-                          lower.includes('error')
-          expect(hasError).to.be.true
-        })
-      } else {
-        // No resolvable wagers
-        expect(true).to.be.true
-      }
-    })
+    // Choosing an outcome is what unlocks it.
+    cy.get('.mm-sub-modal').contains(/creator wins/i).click()
+    cy.get('.mm-sub-modal').contains('button', /^continue$/i).should('not.be.disabled')
   })
 
   // ---------------------------------------------------------------------------
