@@ -968,9 +968,11 @@ Cypress.Commands.add('connectAs', (account) => {
 })
 
 /**
- * Open the create modal, fill it, disable privacy, and submit — WITHOUT asserting
- * success. Use for "blocked" cases (paused / frozen / expired membership) where
- * the create should NOT produce a wager; assert lastWagerId is unchanged after.
+ * Open the create modal, fill it, and submit — WITHOUT asserting success. Use for
+ * "blocked" cases (paused / frozen / expired membership) where the create should NOT
+ * produce a wager; assert lastWagerId is unchanged after. Requires `interceptIpfs()`:
+ * encryption is mandatory, so the metadata upload happens before the contract call
+ * even on a create that is meant to be refused.
  */
 Cypress.Commands.add('attemptCreateWager', (cfg = {}) => {
   const o = { description: 'E2E automated wager flow', opponent: TEST_ACCOUNTS[1], stake: 2, ...cfg }
@@ -979,9 +981,10 @@ Cypress.Commands.add('attemptCreateWager', (cfg = {}) => {
   cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
   cy.wait(300)
   cy.enterAmountViaKeypad('fm-stake', o.stake)
-  cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
-    if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
-  })
+  // No encryption toggle to clear — encryption is mandatory and FriendMarketsModal renders
+  // no `.fm-encryption-toggle`, so this cy.get failed the command rather than skipping the
+  // step. The two-space copy of this block escaped the first sweep, which matched only the
+  // four-space one inside createWagerViaUI.
   cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
 })
 
