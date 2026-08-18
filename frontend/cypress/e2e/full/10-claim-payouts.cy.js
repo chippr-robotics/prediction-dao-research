@@ -492,42 +492,48 @@ describe('Claim Payouts', () => {
   // ---------------------------------------------------------------------------
   // CLM-10: Frozen winner cannot claim
   // ---------------------------------------------------------------------------
-  it('[CLM-10] Frozen winner cannot claim payout', () => {
-    // If the winner's account is frozen, claimPayout should revert
-    connectAndVisit(0)
+  it('[CLM-10] a frozen winner cannot claim, and can once unfrozen', () => {
+    /*
+     * This test never froze anything.
+     *
+     * It opened History, clicked whatever row happened to be first, and accepted any of
+     * frozen | claimed | success | error | payout in the detail text — five words common enough
+     * that it passed on almost any state, including states with nothing to do with freezing. It
+     * finally failed on CI when the panel happened to contain none of them, which is the only
+     * reason anyone looked at it. Two `expect(true).to.be.true` fall-throughs meant a missing row
+     * or a missing button passed as well.
+     *
+     * The rule it is named for is worth having: a frozen account cannot take money out, and the
+     * freeze is reversible. Drive it on chain, where the answer is a fact — `paid` on the wager —
+     * rather than a word in a panel.
+     */
+    const winner = TEST_ACCOUNTS[0]
 
-    cy.openMyWagers('history')
+    createAcceptAndResolve({ description: 'CLM-10: frozen winner', winnerIsCreator: true })
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+    cy.lastWagerId().then((wagerId) => {
+      cy.task('chainTx', { action: 'freeze', args: { address: winner } }).then((r) => {
+        expect(r.ok, `freeze the winner (${r.error || ''})`).to.be.true
+      })
 
-        // If account is frozen, any claim attempt should show AccountFrozenError
-        cy.get('.mm-detail').then(($detail) => {
-          const claimBtn = $detail.find('button:contains("Claim")')
-          if (claimBtn.length > 0) {
-            cy.wrap(claimBtn.first()).click()
+      // Blocked while frozen — and the wager stays unpaid, which is the part that matters.
+      cy.task('chainTx', { action: 'claimPayout', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'a frozen winner is refused the payout').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.paid, 'nothing was paid out while frozen').to.equal(false)
+      })
 
-            cy.get('.mm-detail', { timeout: 15000 }).invoke('text').then((text) => {
-              const lower = text.toLowerCase()
-              // Either frozen error or normal claim (if account isn't frozen)
-              const validOutcome = lower.includes('frozen') ||
-                                  lower.includes('claimed') ||
-                                  lower.includes('success') ||
-                                  lower.includes('error') ||
-                                  lower.includes('payout')
-              expect(validOutcome).to.be.true
-            })
-          } else {
-            // No claim button — already claimed or not winner
-            expect(true).to.be.true
-          }
-        })
-      } else {
-        expect(true).to.be.true
-      }
+      // Reversible: unfreezing restores the claim.
+      cy.task('chainTx', { action: 'unfreeze', args: { address: winner } }).then((r) => {
+        expect(r.ok, `unfreeze the winner (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'claimPayout', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, `claim after unfreeze (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.paid, 'paid once the freeze is lifted').to.equal(true)
+      })
     })
   })
 })
