@@ -266,10 +266,8 @@ describe('Membership Purchase / Upgrade / Extend', () => {
 
   it('[MEM-12] Reject USDC approval aborts purchase', () => {
     cy.fundAccount(BUYERS.reject)
-    cy.mockWeb3Provider({ account: BUYERS.reject })
     /*
-     * Wrap the mock AFTER it installs (handlers run in registration order) and reject every way
-     * a member can authorize a SPEND — not just eth_sendTransaction.
+     * Reject every way a member can authorize a SPEND — not just eth_sendTransaction.
      *
      * Rejecting only eth_sendTransaction let the purchase complete: the flow rides the spec-035
      * intent rail, where the authorization a member gives is a SIGNATURE (EIP-3009 / typed data)
@@ -281,7 +279,19 @@ describe('Membership Purchase / Upgrade / Extend', () => {
      * Record what was asked for so a future failure can say which rail ran.
      */
     const SPEND_AUTH = ['eth_sendTransaction', 'eth_signTypedData', 'eth_signTypedData_v4', 'wallet_sendCalls']
-    cy.on('window:before:load', (win) => {
+    /*
+     * Register the wrapper INSIDE .then(), so it lands after the mock's own handler.
+     *
+     * `cy.on(...)` at the top level of a test registers SYNCHRONOUSLY, while
+     * `cy.mockWeb3Provider()` only enqueues a command that registers its handler when the queue
+     * runs. So a wrapper written "after" the mock in source order actually ran BEFORE it: at that
+     * point `win.ethereum` did not exist yet, `win.ethereum && win.ethereum.request` was
+     * undefined, and the wrapper installed nothing at all. The mock then created a clean
+     * provider and every request went through unwrapped — which is why the purchase this test
+     * expects to be refused ran to "Purchase Complete!".
+     */
+    cy.mockWeb3Provider({ account: BUYERS.reject }).then(() => {
+      cy.on('window:before:load', (win) => {
       const original = win.ethereum && win.ethereum.request
       if (original) {
         win.__cySeenMethods = []
@@ -295,6 +305,7 @@ describe('Membership Purchase / Upgrade / Extend', () => {
           return original({ method, params })
         }
       }
+      })
     })
     cy.visit('/fairwins')
     cy.get('body', { timeout: 10000 }).should('be.visible')
@@ -332,10 +343,16 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     cy.connectWallet()
     openAccountDropdown()
     /*
-     * RoleDetailsCard renders this control two ways — compact ("Extend"/"Renew") and expanded
-     * ("Extend Membership"/"Renew Access"). Anchoring to the compact wording made a layout
-     * choice decide whether the test could find its control.
+     * The membership row in the dropdown is a COLLAPSED RoleDetailsCard — the "2d left" chip is
+     * visible in the header, but Extend lives in `role-card-details`, which renders only while
+     * `isExpanded`. Clicking the card toggles it. The old assertion looked straight for the
+     * button and read its absence as "the app is not offering an extend", when the app was
+     * offering one behind a disclosure the test never opened.
+     *
+     * Two wordings exist across the compact and expanded renderings ("Extend"/"Renew" and
+     * "Extend Membership"/"Renew Access"), so match on the verb rather than the whole label.
      */
+    cy.get('.role-card-compact', { timeout: 10000 }).click()
     cy.contains('button', /extend|renew/i, { timeout: 10000 }).click()
     cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
     cy.get('.ppm-overlay').invoke('text').should('match', /extend|renew|bronze/i)

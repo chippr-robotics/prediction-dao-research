@@ -477,7 +477,6 @@ describe('Wager Acceptance', () => {
       .click({ force: true })
 
     // Switch to opponent with rejection-patched provider
-    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[1] })
     /*
      * Reject every way a member can authorize a SPEND, decided by METHOD rather than by ordinal.
      *
@@ -491,18 +490,27 @@ describe('Wager Acceptance', () => {
      * not spend authorization.
      */
     const SPEND_AUTH = ['eth_sendTransaction', 'eth_signTypedData', 'eth_signTypedData_v4', 'wallet_sendCalls']
-    cy.on('window:before:load', (win) => {
-      const originalRequest = win.ethereum?.request
-      if (originalRequest) {
-        win.ethereum.request = ({ method, params }) => {
-          if (SPEND_AUTH.includes(method)) {
-            const err = new Error('User rejected the request')
-            err.code = 4001
-            return Promise.reject(err)
+    /*
+     * Register the wrapper INSIDE .then(), so it lands after the mock's own handler. `cy.on(...)`
+     * at the top level of a test registers SYNCHRONOUSLY, while cy.mockWeb3Provider() only
+     * enqueues a command that registers its handler when the queue runs — so a wrapper written
+     * "after" the mock in source order actually ran BEFORE it, found no win.ethereum to wrap, and
+     * installed nothing.
+     */
+    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[1] }).then(() => {
+      cy.on('window:before:load', (win) => {
+        const originalRequest = win.ethereum?.request
+        if (originalRequest) {
+          win.ethereum.request = ({ method, params }) => {
+            if (SPEND_AUTH.includes(method)) {
+              const err = new Error('User rejected the request')
+              err.code = 4001
+              return Promise.reject(err)
+            }
+            return originalRequest({ method, params })
           }
-          return originalRequest({ method, params })
         }
-      }
+      })
     })
 
     cy.visitWagers()
