@@ -110,7 +110,17 @@ function openAndFillWagerForm(config = {}) {
 function submitWagerForm() {
   cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
-  // Wait for transaction to be submitted and confirmed.
+  /*
+   * Report a blocked submit instead of timing out blind. validateForm can refuse silently — the
+   * button stays enabled, nothing is sent, and the only sign is a `.fm-error` span on the field
+   * at fault. Waiting 60s for "Wager Created" then said only that it never appeared, which is
+   * true of a rejected form and of a failed transaction alike.
+   */
+  cy.get('body').then(($b) => {
+    const errs = $b.find('.fm-error').toArray().map((el) => el.textContent.trim()).filter(Boolean)
+    if (errs.length) throw new Error(`create form refused the submit: ${errs.join(' | ')}`)
+  })
+
   // The form transitions through verify → approve → create → complete.
   cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 }
@@ -495,6 +505,15 @@ describe('Wager Creation with Real Transactions', () => {
         .first().clear().type(TEST_ACCOUNTS[1])
       cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('exist')
       cy.enterAmountViaKeypad('fm-stake', '5')
+
+      /*
+       * PICK A SIDE. A wager pegged to a Polymarket condition is meaningless until the creator
+       * says which outcome they are taking, and FriendMarketsModal enforces it — validateForm
+       * sets errors.creatorSide ("Pick which side of the linked market you are taking") and the
+       * submit does nothing. The test clicked Create and waited 60s for a success screen that
+       * was never coming, with the reason sitting on screen in a `.fm-error` span.
+       */
+      cy.contains('button', /i'm taking/i, { timeout: 10000 }).first().click()
 
       submitWagerForm()
       assertWagerCreated()
