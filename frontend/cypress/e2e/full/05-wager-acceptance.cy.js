@@ -76,6 +76,36 @@ function createSimpleWager(config = {}) {
   cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 }
 
+/*
+ * Drive the acceptance modal from "Accept Offer" through the confirmation.
+ *
+ * Two traps, both already paid for in 07:
+ *
+ * 1. SCOPE TO THE DIALOG. Unscoped, `cy.contains('button', /…|accept/i)` matches the BACKGROUND
+ *    page: Dashboard's Scan QR quick-action card is described "Accept a wager from a friend", it
+ *    sits earlier in the DOM than the portalled dialog, and it is genuinely visible — so the
+ *    chain scrolls to that card, passes the visibility assert, and dies clicking an element the
+ *    overlay covers. ACC-01 failed on that card, not on the button under test.
+ * 2. THE DECRYPT GATE. Encryption is mandatory, so these wagers are private and the modal hides
+ *    the terms — and the Accept control — behind "Decrypt Wager Details" until a signature lands.
+ *    Conditional via jQuery find(), which skips when the gate is absent; cy.get would fail.
+ */
+function acceptThroughModal() {
+  cy.get('.ma-modal', { timeout: 10000 }).then(($m) => {
+    if ($m.find('button:contains("Decrypt")').length === 0) return
+    cy.get('.ma-modal').contains('button', /decrypt/i).click({ force: true })
+    // Re-query: decrypting re-renders the modal, so $m's nodes are detached by then.
+    cy.get('.ma-modal').find('.ma-description, .ma-decrypt-error', { timeout: 20000 }).should('exist')
+  })
+  cy.get('.ma-modal').contains('button', /accept offer/i, { timeout: 10000 }).click()
+  cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
+    cy.contains('button', /i understand|confirm|accept/i)
+      .scrollIntoView()
+      .should('be.visible')
+      .click()
+  })
+}
+
 describe('Wager Acceptance', () => {
   before(() => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
@@ -128,8 +158,7 @@ describe('Wager Acceptance', () => {
         cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
 
         // Click Accept Offer → Confirm
-        cy.contains('button', /accept offer/i).click()
-        cy.contains('button', /i understand|confirm|accept/i).click()
+        acceptThroughModal()
 
         // Wait for TX
         cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
@@ -177,8 +206,7 @@ describe('Wager Acceptance', () => {
           expect(lower.includes('stake') || lower.includes('token') || lower.includes('usdc')).to.be.true
         })
 
-        cy.contains('button', /accept offer/i).click()
-        cy.contains('button', /i understand|confirm|accept/i).click()
+        acceptThroughModal()
 
         cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
           const lower = text.toLowerCase()
@@ -526,8 +554,7 @@ describe('Wager Acceptance', () => {
 
         cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
 
-        cy.contains('button', /accept offer/i).click()
-        cy.contains('button', /i understand|confirm|accept/i).click()
+        acceptThroughModal()
 
         // Should show rejection error
         cy.get('.ma-modal, [role="dialog"]', { timeout: 15000 }).invoke('text').then((text) => {
