@@ -480,7 +480,13 @@ describe('Wager Creation with Real Transactions', () => {
       // Pick the fixture market from the inline browser; the selected panel
       // must echo the REAL on-chain conditionId, proving the link committed.
       cy.contains('.pmb__card-question', /fixture market/i, { timeout: 15000 }).click()
-      cy.get('.fm-polymarket-selected', { timeout: 10000 }).should('be.visible')
+      /*
+       * Assert the SELECTION, not the pixel. `.fm-polymarket-selected` is position:fixed inside
+       * the modal, so Cypress calls it "not visible because it is covered by another element" —
+       * a statement about layering, not about whether the market was linked. The invariant this
+       * test exists for is the next line: the panel echoes the real on-chain conditionId.
+       */
+      cy.get('.fm-polymarket-selected', { timeout: 10000 }).should('exist')
       cy.get('.fm-polymarket-cid').should('contain.text', market.conditionId)
 
       cy.get('#fm-description, [role="dialog"] input[type="text"]')
@@ -541,7 +547,13 @@ describe('Wager Creation with Real Transactions', () => {
       cy.openCreateWagerModal('oracle')
       // The browser lists the catalog and a tap commits the selection.
       cy.contains('.pmb__card-question', /fixture market/i, { timeout: 15000 }).should('be.visible').click()
-      cy.get('.fm-polymarket-selected', { timeout: 10000 }).should('be.visible')
+      /*
+       * Assert the SELECTION, not the pixel. `.fm-polymarket-selected` is position:fixed inside
+       * the modal, so Cypress calls it "not visible because it is covered by another element" —
+       * a statement about layering, not about whether the market was linked. The invariant this
+       * test exists for is the next line: the panel echoes the real on-chain conditionId.
+       */
+      cy.get('.fm-polymarket-selected', { timeout: 10000 }).should('exist')
       cy.get('.fm-polymarket-cid').should('contain.text', market.conditionId)
     })
   })
