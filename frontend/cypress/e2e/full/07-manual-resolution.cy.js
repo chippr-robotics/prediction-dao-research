@@ -110,7 +110,20 @@ function acceptPendingWager() {
       cy.get('.ma-modal, [role="dialog"]').then(($m) => {
         if ($m.find('button:contains("Decrypt")').length === 0) return
         cy.wrap($m).contains('button', /decrypt/i).click({ force: true })
-        cy.wrap($m).contains('button', /decrypt/i, { timeout: 20000 }).should('not.exist')
+        /*
+         * Report the app's own reason. A failed decrypt leaves the button in place and renders
+         * `.ma-decrypt-error`, so waiting for the button to disappear times out 20s later
+         * saying only "continuously found it" — true, and useless. Settle on either terminal
+         * state and name the error when that is the one that arrives.
+         */
+        cy.wrap($m)
+          .find('.ma-description, .ma-decrypt-error', { timeout: 20000 })
+          .should('exist')
+          .then(($r) => {
+            if ($r.hasClass('ma-decrypt-error')) {
+              throw new Error(`decrypt failed: ${$r.text().trim()}`)
+            }
+          })
       })
       cy.contains('.ma-modal, [role="dialog"]', /accept offer/i).within(() => {
         cy.contains('button', /accept offer/i).click()
@@ -211,8 +224,15 @@ describe('Manual Resolution', () => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
     // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
     // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
-    cy.ensureWagerCapacity([0, 1])
-    cy.ensureEncryptionKeys([0, 1])
+    /*
+     * Account #2 is included because RES-05 names it as ARBITRATOR, and FriendMarketsModal
+     * refuses to create a third-party wager whose arbitrator has no key in KeyRegistry — the
+     * creator encrypts the private terms to them. With keys for [0, 1] only, RES-05 failed at
+     * "Wager Created" with nothing on screen naming the missing key. (04's helper hit and
+     * documented the same requirement.)
+     */
+    cy.ensureWagerCapacity([0, 1, 2])
+    cy.ensureEncryptionKeys([0, 1, 2])
   })
 
   /*
