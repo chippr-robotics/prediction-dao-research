@@ -93,38 +93,44 @@ describe('Decline and Cancel Wagers', () => {
     connectAndVisit(0)
     createWagerForTest('DEC-01: Opponent will decline this')
 
-    // Switch to opponent
-    cy.switchAccount(1)
+    cy.lastWagerId().then((wagerId) => {
+      // Switch to opponent
+      cy.switchAccount(1)
 
-    cy.openMyWagers('participating')
+      cy.openMyWagers('participating')
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-      if (viewBtn.length > 0) {
-        cy.wrap(viewBtn.first()).click({ force: true })
+      // The offer MUST be here — this test just created it addressed to #1.
+      // (The old guard's else-branch swallowed "offer missing" as a pass.)
+      cy.contains('button', /view offer/i, { timeout: 15000 }).click({ force: true })
+      cy.get('.ma-modal, [role="dialog"]', { timeout: 10000 }).should('be.visible')
 
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
+      cy.contains('button', /decline/i).click()
+      cy.contains('button', /confirm decline/i).click()
 
-        // Click Decline Offer
-        cy.contains('button', /decline/i).click()
-
-        // Confirm decline
-        cy.contains('button', /confirm decline/i).click()
-
-        // Wait for TX
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const validOutcome = lower.includes('declined') ||
-                              lower.includes('returned') ||
-                              lower.includes('success') ||
-                              lower.includes('removed') ||
-                              lower.includes('error')
-          expect(validOutcome).to.be.true
+      /*
+       * The acceptance modal CLOSES on a successful decline, so asserting its
+       * text re-matched whichever dialog remained (MyMarketsModal) — a surface
+       * that never says "declined", which made this test fail against a
+       * correct app. Assert the OUTCOME instead: the contract has no Declined
+       * status — a declined offer lands in Cancelled (4), stake released back
+       * to the creator — and the offer stops being actionable in the list.
+       */
+      const pollStatus = (n) =>
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((info) => {
+          if (info.ok && Number(info.status) === 4) return cy.wrap(info.status)
+          if (n <= 0) throw new Error(`wager ${wagerId} never reached Cancelled; last status ${info.status}`)
+          cy.wait(1000)
+          return pollStatus(n - 1)
         })
-      } else {
-        // No pending offers visible
-        cy.get('.mm-empty-state, .mm-panel').should('exist')
-      }
+      pollStatus(30)
+
+      // The list no longer offers the declined wager for acceptance.
+      cy.get('body').then(($b) => {
+        if ($b.find('.ma-modal').length) {
+          cy.get('.ma-modal [aria-label="Close modal"], .ma-modal .ma-close-btn').click({ force: true })
+        }
+      })
+      cy.contains('button', /view offer/i).should('not.exist')
     })
   })
 
