@@ -126,9 +126,14 @@ describe('Wager Creation with Real Transactions', () => {
   before(() => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
     // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
-    // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    // The chain checkpoint reverts state per spec, so this runs once per spec.
+    //
+    // #2 (the arbitrator) is in the list because CRE-06's ThirdParty wager encrypts the
+    // private terms TO THE ARBITRATOR as well (FriendMarketsModal.jsx:936-943) — without
+    // #2's key the create dies with "The arbitrator has not registered their encryption
+    // key yet", 60 seconds after the submit, looking like a transaction failure.
     cy.ensureWagerCapacity([0, 1])
-    cy.ensureEncryptionKeys([0, 1])
+    cy.ensureEncryptionKeys([0, 1, 2])
   })
 
   beforeEach(() => {
@@ -341,16 +346,25 @@ describe('Wager Creation with Real Transactions', () => {
 
     cy.enterAmountViaKeypad('fm-stake', '5')
 
-    // Set a custom end date (7 days from now)
-    const futureDate = new Date()
-    futureDate.setDate(futureDate.getDate() + 7)
-    const formattedDate = futureDate.toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm
-    cy.get('#fm-end-date, [role="dialog"] input[type="datetime-local"]')
-      .first()
-      .clear()
-      .type(formattedDate)
-
-    // Encryption is ON by default and no longer optional (see note above).
+    /*
+     * The end date is NOT a form input. Spec 038 replaced `#fm-end-date` with the
+     * DeadlineTimeline: milestones on a shared track, where tapping the editable
+     * ENDS tile (a <button>, "Tap to set") opens SetTimeModal — the single exact
+     * date-and-time entry point — whose datetime-local input is `.stm-input` and
+     * whose confirm button is "Set". The old selector matched nothing.
+     *
+     * +5 days, formatted LOCAL (toISOString is UTC and can be off by a day at
+     * midnight boundaries); the flow bounds the end time at min 1h / max 21d.
+     */
+    const futureDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+    const pad = (n) => String(n).padStart(2, '0')
+    const localStamp = `${futureDate.getFullYear()}-${pad(futureDate.getMonth() + 1)}-${pad(futureDate.getDate())}T${pad(futureDate.getHours())}:${pad(futureDate.getMinutes())}`
+    cy.get('.fm-stat-tiles', { timeout: 10000 }).contains('button', /ends/i).click()
+    cy.get('.stm-input', { timeout: 10000 }).clear().type(localStamp)
+    cy.get('.stm-dialog').contains('button', /^set$/i).click()
+    // The tile reflects the chosen day — proof the modal actually applied it.
+    cy.get('.fm-stat-tiles').contains('button', /ends/i)
+      .should('contain.text', String(futureDate.getDate()))
 
     submitWagerForm()
     assertWagerCreated()
@@ -417,157 +431,118 @@ describe('Wager Creation with Real Transactions', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // CRE-12: Oracle-pegged wager — Polymarket
+  // CRE-12..16: the ORACLE flow ("Oracle Settles" card), rewritten (#1028).
+  //
+  // The old tests drove `#fm-resolution-type, .fm-select` — a dropdown that has
+  // not existed in any .jsx for a long time. The real flow: the Dashboard's
+  // "Oracle Settles" card opens the modal in its oracle category, where (with
+  // the default Polymarket-only exposure) the tab strip is HIDDEN and the
+  // Polymarket picker renders directly — an inline PolymarketBrowser whose
+  // market cards commit a conditionId on click (.fm-polymarket-selected).
+  //
+  // The browser's data comes from Polymarket's Gamma API — an EXTERNAL service
+  // the local tier must not depend on — so the tests intercept it and serve a
+  // fixture whose conditionId is a REAL condition prepared on the local mock
+  // CTF (cy.task prepareCondition). The intercept fakes only the CATALOG; the
+  // wager itself settles against a condition the chain actually holds.
   // ---------------------------------------------------------------------------
+
+  /** Serve both Gamma endpoints (search + top events) from one fixture. */
+  function interceptGamma(conditionId, { question = 'E2E: will the fixture market resolve YES?' } = {}) {
+    const market = {
+      id: 'e2e-m1',
+      question,
+      conditionId,
+      endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      active: true,
+      closed: false,
+      volume: 1000000,
+      liquidity: 50000,
+      // Gamma serialises these as JSON STRINGS (parseJsonArray in the hook).
+      outcomes: JSON.stringify(['Yes', 'No']),
+      outcomePrices: JSON.stringify(['0.55', '0.45']),
+    }
+    const event = { id: 'e2e-ev1', title: question, slug: 'e2e-fixture', tags: [], volume: 1000000, markets: [market] }
+    cy.intercept('GET', '**/public-search*', { body: { events: [event] } }).as('gammaSearch')
+    cy.intercept('GET', '**/events?*', { body: [event] }).as('gammaTop')
+    cy.intercept('GET', '**/tags/slug/*', { body: {} })
+    return market
+  }
+
   it('[CRE-12] Create Polymarket-pegged wager', () => {
-    connectWalletAndVisit(0)
+    cy.task('chainTx', { action: 'prepareCondition', args: { question: 'CRE-12 fixture' } }).then((prep) => {
+      expect(prep.ok, 'prepareCondition').to.be.true
+      const market = interceptGamma(prep.conditionId)
 
-    cy.openCreateWagerModal('oneVsOne')
+      connectWalletAndVisit(0)
+      cy.openCreateWagerModal('oracle')
 
-    // Select Polymarket resolution type
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select').then(($select) => {
-      // Find the Polymarket option
-      const polyOption = $select.find('option').filter((_, el) => {
-        return el.textContent.toLowerCase().includes('polymarket') ||
-               el.textContent.toLowerCase().includes('linked market')
-      })
+      // Pick the fixture market from the inline browser; the selected panel
+      // must echo the REAL on-chain conditionId, proving the link committed.
+      cy.contains('.pmb__card-question', /fixture market/i, { timeout: 15000 }).click()
+      cy.get('.fm-polymarket-selected', { timeout: 10000 }).should('be.visible')
+      cy.get('.fm-polymarket-cid').should('contain.text', market.conditionId)
 
-      if (polyOption.length > 0) {
-        cy.selectResolutionType(polyOption.val())
+      cy.get('#fm-description, [role="dialog"] input[type="text"]')
+        .first().clear().type('CRE-12: Polymarket-pegged wager')
+      cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]')
+        .first().clear().type(TEST_ACCOUNTS[1])
+      cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('exist')
+      cy.enterAmountViaKeypad('fm-stake', '5')
 
-        // The Polymarket browser should appear
-        cy.get('[role="dialog"]').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          expect(lower.includes('polymarket') || lower.includes('linked') || lower.includes('market')).to.be.true
-        })
-      } else {
-        // Polymarket not available on this chain — verify option is absent
-        expect(polyOption.length).to.equal(0)
-      }
+      submitWagerForm()
+      assertWagerCreated()
     })
   })
 
-  // ---------------------------------------------------------------------------
-  // CRE-13: Oracle-pegged wager — Chainlink Data Feed
-  // ---------------------------------------------------------------------------
-  it('[CRE-13] Create Chainlink Data Feed wager', () => {
-    connectWalletAndVisit(0)
+  // The default cohort exposes POLYMARKET ONLY (VITE_ORACLE_MODELS unset ⇒
+  // 'polymarket'; FriendMarketsModal: "Hidden models are not selectable by any
+  // path"). Driving the Chainlink/UMA creates would test a configuration the
+  // shipped product does not offer — so these three assert the default
+  // honestly: the hidden oracles are absent, while the Polymarket flow (the
+  // positive control) is present. A VITE_ORACLE_MODELS=all variant job is the
+  // place to drive the hidden flows, with its own fixtures per adapter.
 
-    cy.openCreateWagerModal('oneVsOne')
-
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select').then(($select) => {
-      const clOption = $select.find('option').filter((_, el) => {
-        return el.textContent.toLowerCase().includes('chainlink data feed') ||
-               el.textContent.toLowerCase().includes('price condition')
-      })
-
-      if (clOption.length > 0) {
-        cy.selectResolutionType(clOption.val())
-
-        // Oracle condition picker should appear
-        cy.get('[role="dialog"]').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          expect(lower.includes('chainlink') || lower.includes('data feed') || lower.includes('price')).to.be.true
-        })
-      } else {
-        // Adapter not deployed on this chain
-        expect(clOption.length).to.equal(0)
-      }
+  it('[CRE-13] Chainlink Data Feed is not offered under default exposure', () => {
+    cy.task('chainTx', { action: 'prepareCondition', args: { question: 'CRE-13 fixture' } }).then((prep) => {
+      interceptGamma(prep.conditionId)
+      connectWalletAndVisit(0)
+      cy.openCreateWagerModal('oracle')
+      // Positive control first — a broken modal must not pass this test.
+      cy.contains('.pmb__card-question', /fixture market/i, { timeout: 15000 }).should('be.visible')
+      cy.get('[role="dialog"]').invoke('text').should('not.match', /chainlink data feed/i)
     })
   })
 
-  // ---------------------------------------------------------------------------
-  // CRE-14: Oracle-pegged wager — Chainlink Functions
-  // ---------------------------------------------------------------------------
-  it('[CRE-14] Create Chainlink Functions wager', () => {
-    connectWalletAndVisit(0)
-
-    cy.openCreateWagerModal('oneVsOne')
-
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select').then(($select) => {
-      const cfOption = $select.find('option').filter((_, el) => {
-        return el.textContent.toLowerCase().includes('chainlink functions') ||
-               el.textContent.toLowerCase().includes('custom request')
-      })
-
-      if (cfOption.length > 0) {
-        cy.selectResolutionType(cfOption.val())
-
-        cy.get('[role="dialog"]').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          expect(lower.includes('chainlink') || lower.includes('functions')).to.be.true
-        })
-      } else {
-        expect(cfOption.length).to.equal(0)
-      }
+  it('[CRE-14] Chainlink Functions is not offered under default exposure', () => {
+    cy.task('chainTx', { action: 'prepareCondition', args: { question: 'CRE-14 fixture' } }).then((prep) => {
+      interceptGamma(prep.conditionId)
+      connectWalletAndVisit(0)
+      cy.openCreateWagerModal('oracle')
+      cy.contains('.pmb__card-question', /fixture market/i, { timeout: 15000 }).should('be.visible')
+      cy.get('[role="dialog"]').invoke('text').should('not.match', /chainlink functions/i)
     })
   })
 
-  // ---------------------------------------------------------------------------
-  // CRE-15: Oracle-pegged wager — UMA
-  // ---------------------------------------------------------------------------
-  it('[CRE-15] Create UMA Optimistic Oracle wager', () => {
-    connectWalletAndVisit(0)
-
-    cy.openCreateWagerModal('oneVsOne')
-
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select').then(($select) => {
-      const umaOption = $select.find('option').filter((_, el) => {
-        return el.textContent.toLowerCase().includes('uma') ||
-               el.textContent.toLowerCase().includes('optimistic oracle')
-      })
-
-      if (umaOption.length > 0) {
-        cy.selectResolutionType(umaOption.val())
-
-        cy.get('[role="dialog"]').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          expect(lower.includes('uma') || lower.includes('optimistic')).to.be.true
-        })
-      } else {
-        expect(umaOption.length).to.equal(0)
-      }
+  it('[CRE-15] UMA Optimistic Oracle is not offered under default exposure', () => {
+    cy.task('chainTx', { action: 'prepareCondition', args: { question: 'CRE-15 fixture' } }).then((prep) => {
+      interceptGamma(prep.conditionId)
+      connectWalletAndVisit(0)
+      cy.openCreateWagerModal('oracle')
+      cy.contains('.pmb__card-question', /fixture market/i, { timeout: 15000 }).should('be.visible')
+      cy.get('[role="dialog"]').invoke('text').should('not.match', /uma optimistic/i)
     })
   })
 
-  // ---------------------------------------------------------------------------
-  // CRE-16: Browse Polymarket markets in picker
-  // ---------------------------------------------------------------------------
   it('[CRE-16] Browse Polymarket markets in picker', () => {
-    connectWalletAndVisit(0)
-
-    cy.openCreateWagerModal('oneVsOne')
-
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select').then(($select) => {
-      const polyOption = $select.find('option').filter((_, el) => {
-        return el.textContent.toLowerCase().includes('polymarket') ||
-               el.textContent.toLowerCase().includes('linked market')
-      })
-
-      if (polyOption.length > 0) {
-        cy.selectResolutionType(polyOption.val())
-
-        // The PolymarketBrowser component should render inside the form
-        cy.get('[role="dialog"]').then(($modal) => {
-          const hasBrowser = $modal.find('.polymarket-browser, [class*="polymarket"]').length > 0
-          const hasSearch = $modal.find('input[type="search"], input[placeholder*="search"], input[placeholder*="Search"]').length > 0
-
-          // Either the browser is visible or search input is present
-          const modalText = $modal.text().toLowerCase()
-          const hasPolyRef = modalText.includes('polymarket') ||
-                            modalText.includes('search') ||
-                            modalText.includes('browse') ||
-                            modalText.includes('market')
-
-          expect(hasBrowser || hasSearch || hasPolyRef).to.be.true
-        })
-      } else {
-        // Polymarket not supported on this chain
-        cy.get('[role="dialog"]').invoke('text').then((text) => {
-          // Verify the hint about needing Polygon for linked markets
-          expect(text.toLowerCase()).to.not.include('polymarket')
-        })
-      }
+    cy.task('chainTx', { action: 'prepareCondition', args: { question: 'CRE-16 fixture' } }).then((prep) => {
+      const market = interceptGamma(prep.conditionId)
+      connectWalletAndVisit(0)
+      cy.openCreateWagerModal('oracle')
+      // The browser lists the catalog and a tap commits the selection.
+      cy.contains('.pmb__card-question', /fixture market/i, { timeout: 15000 }).should('be.visible').click()
+      cy.get('.fm-polymarket-selected', { timeout: 10000 }).should('be.visible')
+      cy.get('.fm-polymarket-cid').should('contain.text', market.conditionId)
     })
   })
 })

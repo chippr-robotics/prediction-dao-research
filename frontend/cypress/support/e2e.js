@@ -16,6 +16,21 @@
 // Import commands.js using ES2015 syntax:
 import './commands'
 
+/*
+ * FULL-TIER CHAIN ISOLATION. Before each full/** spec, revert the local chain to the post-seed
+ * checkpoint and re-snapshot (see chainCheckpoint in cypress.config.js). Eight full specs move
+ * the chain clock forward and chain time cannot move back, so without this the specs that pass
+ * are a function of run order, not of the product. Guarded by path: the fast and passkey tiers
+ * run with no chain at all, and a task probing :8545 there would fail runs that are correct.
+ */
+before(() => {
+  if (Cypress.spec.relative.includes('e2e/full/')) {
+    cy.task('chainCheckpoint').then(({ reverted }) => {
+      cy.log(`chain checkpoint (reverted previous state: ${reverted})`)
+    })
+  }
+})
+
 // Alternatively you can use CommonJS syntax:
 // require('./commands')
 
