@@ -34,9 +34,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
    * So the default is now honestly disconnected. Pass `{ preAuthorized: true }` for a spec that
    * wants a restored session.
    */
-  let authorized = options.preAuthorized === true
 
-  let activeAccount = initialAccount
 
   /*
    * The chain is MUTABLE, because a real wallet's chain is. `wallet_switchEthereumChain` used to
@@ -48,8 +46,6 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
    * `rejectChainSwitch: true` models the other honest wallet behaviour: the member declines, or the
    * wallet has no such chain. That is the ONLY path that raises the network error banner.
    */
-  let activeChainId = Number(networkId)
-  const rejectChainSwitch = options.rejectChainSwitch === true
 
   cy.on('window:before:load', (win) => {
     // Suppress the dev banner so its fixed-position overlay doesn't cover
@@ -58,9 +54,41 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
       win.localStorage.setItem('dev_warning_banner_dismissed', 'true')
     } catch { /* localStorage may be unavailable; ignore */ }
 
+    /*
+     * ONE provider object per page load, whatever the handler count.
+     *
+     * cy.on('window:before:load') handlers registered in a `before` hook are bound to the FIRST
+     * test, so that test's page load runs the hook's handler AND its own. Each used to build its
+     * own provider object and announce it — and mipd keeps the FIRST announce per uuid, so wagmi
+     * connected to the HOOK's provider, whose closure account was whatever ensureEncryptionKeys
+     * touched last (an account with a key and NO membership). The spec's first create then failed
+     * the contract's membership gate while every later test passed: CRE-01 / ACC-01 / DEC-01, and
+     * only ever test #1.
+     *
+     * Handlers now share ONE state object on the window and run in registration order, so the
+     * LAST caller's options win deterministically, and exactly one provider is ever announced.
+     */
+    if (win.__cyMockWeb3) {
+      const st = win.__cyMockWeb3
+      st.activeAccount = initialAccount
+      st.activeChainId = Number(networkId)
+      st.authorized = options.preAuthorized === true
+      st.rejectChainSwitch = options.rejectChainSwitch === true
+      win.ethereum.selectedAddress = st.activeAccount
+      win.ethereum.chainId = `0x${st.activeChainId.toString(16)}`
+      win.ethereum.networkVersion = String(st.activeChainId)
+      return
+    }
+    const st = (win.__cyMockWeb3 = {
+      activeAccount: initialAccount,
+      activeChainId: Number(networkId),
+      authorized: options.preAuthorized === true,
+      rejectChainSwitch: options.rejectChainSwitch === true,
+    })
+
     win.ethereum = {
       isMetaMask: true,
-      selectedAddress: activeAccount,
+      selectedAddress: st.activeAccount,
       networkVersion: networkId.toString(),
       chainId: `0x${networkId.toString(16)}`,
 
@@ -69,18 +97,18 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
           switch (method) {
             case 'eth_requestAccounts':
               // The user pressing Connect. Grants access for the rest of this page load.
-              authorized = true
-              resolve([activeAccount])
+              st.authorized = true
+              resolve([st.activeAccount])
               break
             case 'eth_accounts':
               // Silent probe on load — empty until authorised, exactly like a real wallet.
-              resolve(authorized ? [activeAccount] : [])
+              resolve(st.authorized ? [st.activeAccount] : [])
               break
             case 'eth_chainId':
-              resolve(`0x${activeChainId.toString(16)}`)
+              resolve(`0x${st.activeChainId.toString(16)}`)
               break
             case 'wallet_switchEthereumChain':
-              if (rejectChainSwitch) {
+              if (st.rejectChainSwitch) {
                 // EIP-1193 user-rejection. 4902 (unrecognised chain) is the other realistic
                 // refusal; both leave the wallet on its original chain, which is the point.
                 const err = new Error('User rejected the request.')
@@ -88,14 +116,14 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
                 reject(err)
                 break
               }
-              win.ethereum.__cySetChain(Number(params?.[0]?.chainId ?? activeChainId))
+              win.ethereum.__cySetChain(Number(params?.[0]?.chainId ?? st.activeChainId))
               resolve(null)
               break
             case 'wallet_addEthereumChain':
               resolve(null)
               break
             case 'net_version':
-              resolve(activeChainId.toString())
+              resolve(st.activeChainId.toString())
               break
             case 'eth_getBalance':
               resolve('0x56bc75e2d63100000') // 100 ETH
@@ -107,7 +135,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               // so any account-distinct deterministic value yields per-account keys
               // (a same-for-all value would let a non-participant decrypt). Expand
               // the 40-hex-char account to a 65-byte (130-hex) value.
-              resolve('0x' + activeAccount.slice(2).toLowerCase().repeat(4).slice(0, 130))
+              resolve('0x' + st.activeAccount.slice(2).toLowerCase().repeat(4).slice(0, 130))
               break
             default:
               fetch(rpcUrl, {
@@ -141,7 +169,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         })
       },
 
-      enable: () => Promise.resolve([activeAccount]),
+      enable: () => Promise.resolve([st.activeAccount]),
       send: (method, params) => win.ethereum.request({ method, params }),
 
       /*
@@ -150,16 +178,16 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
        *
        * The old cy.switchAccount called cy.mockWeb3Provider() again and reloaded. That registered a
        * SECOND `window:before:load` handler; both ran on reload, the later one won, and it carried
-       * a fresh `authorized = false`. Probed result: the provider reported `eth_accounts: []` while
+       * a fresh `st.authorized = false`. Probed result: the provider reported `eth_accounts: []` while
        * the UI still displayed account 0 — the app showed a stale account while the provider said
        * disconnected, and every post-switch assertion in 05-wager-acceptance was reading the wrong
        * account. Reloading is also not what a switch does: a real member switches in MetaMask and
        * the live page follows.
        */
       __cySetAccount: (next) => {
-        activeAccount = next
+        st.activeAccount = next
         win.ethereum.selectedAddress = next
-        authorized = true
+        st.authorized = true
         const cbs = (win.ethereum._callbacks && win.ethereum._callbacks.accountsChanged) || []
         cbs.forEach((cb) => cb([next]))
       },
@@ -170,10 +198,10 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
        * re-reading a chain that silently never moved.
        */
       __cySetChain: (next) => {
-        activeChainId = Number(next)
-        const hex = `0x${activeChainId.toString(16)}`
+        st.activeChainId = Number(next)
+        const hex = `0x${st.activeChainId.toString(16)}`
         win.ethereum.chainId = hex
-        win.ethereum.networkVersion = activeChainId.toString()
+        win.ethereum.networkVersion = st.activeChainId.toString()
         const cbs = (win.ethereum._callbacks && win.ethereum._callbacks.chainChanged) || []
         cbs.forEach((cb) => cb(hex))
       },
