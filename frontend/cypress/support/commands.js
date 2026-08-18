@@ -269,6 +269,19 @@ Cypress.Commands.add('switchAccount', (accountIndex) => {
  */
 Cypress.Commands.add('assertActiveAccount', (address) => {
   const short = `${address.slice(0, 6)}`
+  /*
+   * SCROLL TO THE TOP FIRST. The account button lives in a POSITION:FIXED header
+   * (HeaderBar.css:2). Callers routinely arrive here having scrolled — cy.registerEncryptionKeyViaUI
+   * scrollIntoView()s a control far down the Recovery accordion — and Cypress then refuses the
+   * click with "not visible because its ancestor has `position: fixed` CSS property and it is
+   * overflowed by other elements". That is what failed 02-membership's `before all` hook, taking
+   * all 13 of its tests with it, while the thing the hook was actually doing had SUCCEEDED (the
+   * key registered on-chain).
+   *
+   * Deliberately NOT {force: true}: forcing would also sail past a button that is genuinely
+   * unreachable, and this repo has already been bitten by force hiding a real defect.
+   */
+  cy.scrollTo('top', { ensureScrollable: false })
   cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible').click()
   cy.get('.account-address-value', { timeout: 10000 })
     .invoke('text')
@@ -309,6 +322,28 @@ Cypress.Commands.add('connectWallet', () => {
     }
   })
 
+  /*
+   * ALREADY CONNECTED IS A VALID STATE, not a failure.
+   *
+   * The mock's `authorized` flag lives in the COMMAND CLOSURE, not in the page, so it survives
+   * cy.visit() — and __cySetAccount sets it too. A spec whose `before` hook connected once (e.g.
+   * ensureEncryptionKeys, which must connect to register a key) therefore reaches its first test
+   * with the session already restored and NO connect button in the DOM. Insisting on the button
+   * turned that into a 10s timeout and cost 02-membership all 13 of its tests, on a page that was
+   * working correctly and showing the connected account.
+   *
+   * Clearing localStorage/cookies in a beforeEach does not undo it: the flag is not stored there.
+   */
+  cy.get('body').then(($body) => {
+    if ($body.find('.wallet-account-button, button[aria-label="Wallet Account"]').length > 0) {
+      return
+    }
+    cy.connectWalletFresh()
+  })
+})
+
+/** The actual connect ceremony. Split out so connectWallet can skip it when already connected. */
+Cypress.Commands.add('connectWalletFresh', () => {
   cy.contains('button', /connect wallet/i, { timeout: 10000 })
     .should('be.visible')
     .should('not.be.disabled')

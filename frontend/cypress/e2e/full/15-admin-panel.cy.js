@@ -15,9 +15,7 @@ const NON_ADMIN = '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65' // #4 — no role
 function connectThenVisitAdmin(account) {
   cy.mockWeb3Provider({ account })
   cy.visit('/fairwins')
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+  cy.connectWallet()
   cy.visit('/admin')
 }
 

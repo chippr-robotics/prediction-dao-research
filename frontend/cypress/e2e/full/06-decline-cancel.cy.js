@@ -22,11 +22,7 @@ function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
   cy.visitWagers()
 
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-    .click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-    .should('be.visible')
+  cy.connectWallet()
 }
 
 /**
@@ -81,6 +77,12 @@ describe('Decline and Cancel Wagers', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. Both exits from a pending
+     * wager need one CREATED first, and a create that cannot pin its encrypted metadata throws
+     * before it reaches WagerRegistry.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------

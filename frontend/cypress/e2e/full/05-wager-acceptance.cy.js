@@ -22,11 +22,7 @@ function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
   cy.visitWagers()
 
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-    .click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-    .should('be.visible')
+  cy.connectWallet()
 }
 
 /**
@@ -92,6 +88,12 @@ describe('Wager Acceptance', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. Every wager this file
+     * accepts must first be CREATED, and a create that cannot pin its encrypted metadata throws
+     * before it reaches WagerRegistry.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------
@@ -112,9 +114,7 @@ describe('Wager Acceptance', () => {
     cy.switchAccount(1)
 
     // Step 3: Open My Wagers — opponent should see the pending wager
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
+    cy.connectWallet()
 
     cy.openMyWagers('participating')
 
@@ -497,9 +497,7 @@ describe('Wager Acceptance', () => {
 
     cy.visitWagers()
 
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
+    cy.connectWallet()
 
     cy.openMyWagers('participating')
 

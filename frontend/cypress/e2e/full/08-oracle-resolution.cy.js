@@ -32,6 +32,17 @@ function setupOracleWager(question, creatorIsYes, resolveIn = 7200) {
 }
 
 describe('Oracle Resolution (Polymarket)', () => {
+  /*
+   * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`.
+   *
+   * Encryption is mandatory on the create path, so useFriendMarketCreation always calls
+   * uploadEncryptedEnvelope, and a create that cannot pin its metadata throws BEFORE it reaches
+   * WagerRegistry. Registered per-test rather than in `before` because cy.intercept is cleared
+   * between tests.
+   */
+  beforeEach(() => {
+    cy.interceptIpfs()
+  })
   it('[ORC-01] YES outcome settles the creator as winner', () => {
     setupOracleWager('orc-yes', /* creatorIsYes */ true).then(({ wagerId, conditionId }) => {
       cy.resolveMockCondition(conditionId, [1, 0]) // pass(YES) wins

@@ -21,6 +21,17 @@ const CREATOR = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0
 const OPPONENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1
 
 describe('End-to-End Lifecycle Scenarios', () => {
+  /*
+   * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`.
+   *
+   * Encryption is mandatory on the create path, so useFriendMarketCreation always calls
+   * uploadEncryptedEnvelope, and a create that cannot pin its metadata throws BEFORE it reaches
+   * WagerRegistry. Registered per-test rather than in `before` because cy.intercept is cleared
+   * between tests.
+   */
+  beforeEach(() => {
+    cy.interceptIpfs()
+  })
   afterEach(() => {
     cy.restoreGlobalState() // unfreeze anything a journey froze
   })
@@ -47,9 +58,7 @@ describe('End-to-End Lifecycle Scenarios', () => {
       // User-visible: the creator can reach their wagers list (rows render).
       cy.mockWeb3Provider({ account: CREATOR })
       cy.visitWagers()
-      cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-      cy.selectInjectedConnector()
-      cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+      cy.connectWallet()
       cy.openMyWagers('created')
       cy.get('.mm-table-row', { timeout: 15000 }).should('exist')
     })

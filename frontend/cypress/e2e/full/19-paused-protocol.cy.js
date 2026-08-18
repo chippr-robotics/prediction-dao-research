@@ -15,9 +15,7 @@ const OPPONENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1
 function connectAsAdmin() {
   cy.mockWeb3Provider({ account: ADMIN })
   cy.visitWagers()
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+  cy.connectWallet()
 }
 
 // Open the create modal, fill it, and submit — WITHOUT asserting success, so it
@@ -36,6 +34,17 @@ function attemptCreate() {
 }
 
 describe('Paused Protocol', () => {
+  /*
+   * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`.
+   *
+   * Encryption is mandatory on the create path, so useFriendMarketCreation always calls
+   * uploadEncryptedEnvelope, and a create that cannot pin its metadata throws BEFORE it reaches
+   * WagerRegistry. Registered per-test rather than in `before` because cy.intercept is cleared
+   * between tests.
+   */
+  beforeEach(() => {
+    cy.interceptIpfs()
+  })
   before(() => {
     cy.ensureWagerCapacity([0, 1])
     cy.ensureEncryptionKeys([0, 1])

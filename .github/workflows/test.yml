@@ -671,3 +671,193 @@ jobs:
           name: cypress-fast-results
           path: frontend/cypress-output.txt
           retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────────────────────
+  # Cypress Full E2E — the on-chain money paths (#1028).
+  #
+  # This tier is the one that proves the PRODUCT works: create, accept, decline, cancel, resolve,
+  # claim, refund, freeze, pause, expire — every one driven through the real UI against a real
+  # WagerRegistry on a local chain. `fast/**` deliberately never touches a chain, so until this
+  # job existed the merge gate could not tell a working money path from a broken one.
+  #
+  # Why it needs its own job rather than more specs in cypress-fast-e2e: this tier requires a
+  # hardhat node, a full contract deploy and a seed, none of which the fast tier wants to pay for.
+  # Keeping them separate also keeps the failure legible — a red here means the money path broke,
+  # not that a button moved.
+  cypress-full-e2e:
+    name: Cypress Full E2E
+    runs-on: ubuntu-latest
+    # Measured locally at ~35 min for the 15 specs, plus install/compile/deploy. 60 gives real
+    # headroom on a slower runner while still being BOUNDED: a hung run must fail, not occupy a
+    # runner until the workflow-level cap. Most of the wall clock is inherent — these specs mine
+    # real transactions and wait on real receipts.
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
+
+      # RESTORED BEFORE THE INSTALL, deliberately. Cypress's postinstall checks
+      # ~/.cache/Cypress and skips the ~250 MB download when the binary is already there — so a
+      # cache step placed after `npm ci` would restore the cache having just paid the cost it
+      # exists to avoid.
+      - name: Cache Cypress binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: cypress-${{ runner.os }}-
+
+      # ROOT install, unlike cypress-fast-e2e's frontend-only one: this tier drives hardhat
+      # (node, compile, deploy, seed), which lives at the root and is deliberately not a
+      # workspace member.
+      - name: Install dependencies
+        run: npm ci
+
+      # Belt and braces: `npm ci` normally installs the binary via cypress's postinstall, but a
+      # partial cache or a skipped script leaves the package without it, and `cypress run` then
+      # fails deep into the job rather than here.
+      - name: Ensure Cypress binary
+        run: npx cypress install
+
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      # The chain must be ANSWERING before the deploy runs, not merely spawned. Polling
+      # eth_chainId is the only honest readiness signal — a fixed sleep either wastes time or
+      # races, and a race here surfaces as a confusing deploy error rather than "no chain".
+      #
+      # Deliberately NO bare `exit 0` on the success path. test/config/CiGates.test.js rejects one
+      # in any merge-gating step, and it is right to: `exit 0` is the mechanism that lets a step
+      # report success it did not earn, and a reader cannot tell an early return from a swallowed
+      # failure by looking. Recording readiness in a variable and failing on its absence says the
+      # same thing without the pattern — and falls through to failure by default.
+      - name: Start local chain
+        run: |
+          npx hardhat node > /tmp/hardhat-node.log 2>&1 &
+          ready=""
+          for i in $(seq 1 60); do
+            if curl -s -X POST http://127.0.0.1:8545 \
+                 -H 'content-type: application/json' \
+                 --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+                 | grep -q result; then
+              ready="$i"
+              break
+            fi
+            sleep 1
+          done
+          if [ -z "$ready" ]; then
+            echo "::error::Local chain never answered eth_chainId — see the log below."
+            cat /tmp/hardhat-node.log
+            exit 1
+          fi
+          echo "chain up after ${ready}s"
+
+      # deploy + sync-frontend-contracts + seed. The seed is what makes the specs' preconditions
+      # true (two funded accounts, membership granted, registry approved), so a failure here must
+      # stop the job rather than let 95 specs fail one by one for the same reason.
+      - name: Deploy and seed the local chain
+        run: npm run setup:local
+
+      # Constitution IV: this step MUST fail the pipeline on error — no `continue-on-error`.
+      # `set -o pipefail` is load-bearing for the same reason it is in cypress-fast-e2e: the
+      # command is piped into `tee`, so without it the step's status is tee's (always 0).
+      # `dev:e2e`, NOT `dev`. Encryption is mandatory on the create path, and
+      # PINATA_CONFIG.USE_PROXY is false outside a production build — so with no VITE_PINATA_JWT
+      # getPinataAuthHeaders() THROWS and every wager creation dies before it reaches
+      # WagerRegistry. `dev:e2e` supplies a DUMMY value whose only job is to let the request be
+      # issued, so the specs' cy.interceptIpfs() can stub it; no bytes leave the runner. It cannot
+      # leak into a real bundle — pinataSecretGuard() refuses any production build with it set.
+      - name: Run full E2E tests
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          npx start-server-and-test dev:e2e http://localhost:5173 \
+            'cypress run --spec "cypress/e2e/full/**/*.cy.js"' 2>&1 | tee cypress-full-output.txt
+
+      - name: Summarize E2E results
+        if: always()
+        working-directory: frontend
+        run: |
+          echo "### Cypress Full E2E (on-chain money paths)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-full-output.txt > cypress-full-plain.txt
+          TOTALS=$(grep -E "(All specs passed!|[0-9]+ of [0-9]+ failed)" cypress-full-plain.txt | tail -1)
+          if [ -n "$TOTALS" ]; then
+            NUMS=$(echo "$TOTALS" | tr -d '│┌┐└┘─' | sed 's/[✔✖]//g' | grep -oE '[0-9]+|-' | tail -5 | tr '\n' ' ')
+            set -- $NUMS
+            z () { [ "${1:-}" = "-" ] || [ -z "${1:-}" ] && echo 0 || echo "$1"; }
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Tests | ${1:-?} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passing | $(z "${2:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failing | $(z "${3:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Pending | $(z "${4:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`$(echo "$TOTALS" | tr -d '│' | xargs)\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Cypress produced no run-total row — see the job log." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      # Same two-part gate as the fast tier, and for the same reasons documented there: the run
+      # step's exit code is authoritative for pass/fail, but it cannot tell us the run never
+      # started. Both matches run on the DE-COLOURED copy — cypress wraps "Run Finished" and the
+      # totals row in escape codes, so grepping the raw file is a check that cannot fire.
+      - name: Check E2E results
+        if: always()
+        working-directory: frontend
+        run: |
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-full-output.txt > cypress-full-plain.txt
+
+          if ! grep -qE "Run Finished" cypress-full-plain.txt; then
+            echo "::error::Cypress never reached 'Run Finished' — the run died before completing. Failing rather than assuming success."
+            exit 1
+          fi
+
+          if grep -qE "[0-9]+ of [0-9]+ failed" cypress-full-plain.txt; then
+            echo "::error::Cypress reported failing specs in the full (on-chain) tier."
+            grep -E "[0-9]+ of [0-9]+ failed" cypress-full-plain.txt
+            exit 1
+          fi
+
+      - name: Upload chain log
+        uses: actions/upload-artifact@v7
+        # The chain log is how you tell a reverted transaction from a UI failure, and it is
+        # only interesting when something broke.
+        if: failure()
+        with:
+          name: cypress-full-chain-log
+          path: /tmp/hardhat-node.log
+          retention-days: 7
+
+      - name: Upload Cypress screenshots
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: cypress-full-screenshots
+          path: frontend/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload Cypress videos
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: cypress-full-videos
+          path: frontend/cypress/videos
+          retention-days: 7
+
+      - name: Upload Cypress output
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cypress-full-results
+          path: frontend/cypress-full-output.txt
+          retention-days: 7

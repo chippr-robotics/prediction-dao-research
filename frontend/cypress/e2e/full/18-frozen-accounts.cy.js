@@ -16,12 +16,21 @@ function connectAsUser() {
   cy.mockWeb3Provider({ account: USER })
   cy.visit('/fairwins')
   cy.get('body', { timeout: 10000 }).should('be.visible')
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+  cy.connectWallet()
 }
 
 describe('Frozen Accounts', () => {
+  /*
+   * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`.
+   *
+   * Encryption is mandatory on the create path, so useFriendMarketCreation always calls
+   * uploadEncryptedEnvelope, and a create that cannot pin its metadata throws BEFORE it reaches
+   * WagerRegistry. Registered per-test rather than in `before` because cy.intercept is cleared
+   * between tests.
+   */
+  beforeEach(() => {
+    cy.interceptIpfs()
+  })
   before(() => {
     // #1 funded + approved + member, so creation works whenever it is NOT frozen.
     cy.fundAccount(USER)
