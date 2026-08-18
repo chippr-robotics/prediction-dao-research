@@ -94,6 +94,10 @@ describe('Decline and Cancel Wagers', () => {
     createWagerForTest('DEC-01: Opponent will decline this')
 
     cy.lastWagerId().then((wagerId) => {
+      // Pin the precondition: the wager this test just created is Open (1).
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } })
+        .its('status').should('eq', 1)
+
       // Switch to opponent
       cy.switchAccount(1)
 
@@ -111,18 +115,21 @@ describe('Decline and Cancel Wagers', () => {
        * The acceptance modal CLOSES on a successful decline, so asserting its
        * text re-matched whichever dialog remained (MyMarketsModal) — a surface
        * that never says "declined", which made this test fail against a
-       * correct app. Assert the OUTCOME instead: the contract has no Declined
-       * status — a declined offer lands in Cancelled (4), stake released back
-       * to the creator — and the offer stops being actionable in the list.
+       * correct app. Assert the OUTCOME instead — and the outcome is not a
+       * Cancelled status: WagerRegistryCore RELEASES a declined/cancelled Open
+       * wager's storage for reuse (the gas-refund pattern), so the record
+       * reads back as None (0). The Open(1)→None(0) transition, pinned by the
+       * precondition check above, IS the on-chain proof the decline landed
+       * and the escrow was released.
        */
-      const pollStatus = (n) =>
+      const pollCleared = (n) =>
         cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((info) => {
-          if (info.ok && Number(info.status) === 4) return cy.wrap(info.status)
-          if (n <= 0) throw new Error(`wager ${wagerId} never reached Cancelled; last status ${info.status}`)
+          if (info.ok && Number(info.status) === 0) return cy.wrap(info.status)
+          if (n <= 0) throw new Error(`wager ${wagerId} was never released; last status ${info.status}`)
           cy.wait(1000)
-          return pollStatus(n - 1)
+          return pollCleared(n - 1)
         })
-      pollStatus(30)
+      pollCleared(30)
 
       // The list no longer offers the declined wager for acceptance.
       cy.get('body').then(($b) => {
