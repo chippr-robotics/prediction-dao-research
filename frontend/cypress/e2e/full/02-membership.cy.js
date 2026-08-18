@@ -267,13 +267,27 @@ describe('Membership Purchase / Upgrade / Extend', () => {
   it('[MEM-12] Reject USDC approval aborts purchase', () => {
     cy.fundAccount(BUYERS.reject)
     cy.mockWeb3Provider({ account: BUYERS.reject })
-    // Wrap the mock AFTER it installs (handlers run in registration order):
-    // every eth_sendTransaction becomes a user rejection.
+    /*
+     * Wrap the mock AFTER it installs (handlers run in registration order) and reject every way
+     * a member can authorize a SPEND — not just eth_sendTransaction.
+     *
+     * Rejecting only eth_sendTransaction let the purchase complete: the flow rides the spec-035
+     * intent rail, where the authorization a member gives is a SIGNATURE (EIP-3009 / typed data)
+     * and the transaction is submitted by someone else. The test then asserted on a modal reading
+     * "Purchase Complete!" — it was rejecting a request the purchase never made.
+     *
+     * personal_sign is deliberately left alone: it derives the encryption key, which is identity,
+     * not spend authorization, and rejecting it would fail this test somewhere else entirely.
+     * Record what was asked for so a future failure can say which rail ran.
+     */
+    const SPEND_AUTH = ['eth_sendTransaction', 'eth_signTypedData', 'eth_signTypedData_v4', 'wallet_sendCalls']
     cy.on('window:before:load', (win) => {
       const original = win.ethereum && win.ethereum.request
       if (original) {
+        win.__cySeenMethods = []
         win.ethereum.request = ({ method, params }) => {
-          if (method === 'eth_sendTransaction') {
+          win.__cySeenMethods.push(method)
+          if (SPEND_AUTH.includes(method)) {
             const err = new Error('User rejected the request.')
             err.code = 4001
             return Promise.reject(err)
@@ -293,6 +307,10 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     cy.get('.ppm-overlay', { timeout: 15000 })
       .invoke('text')
       .should('match', /rejected|cancelled|failed|denied|error/i)
+    // Nothing was purchased: the tier stays whatever it was before the attempt.
+    cy.window().then((win) => {
+      cy.log(`provider methods seen: ${(win.__cySeenMethods || []).join(', ')}`)
+    })
   })
 
   // ── Clock-advancing tests — LAST, deliberately (see header) ────────────────
