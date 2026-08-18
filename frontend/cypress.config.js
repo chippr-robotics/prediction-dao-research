@@ -257,6 +257,18 @@ export default defineConfig({
           }
         },
 
+        /**
+         * The chain's current timestamp, in ms. The app decides every expiry in BROWSER time
+         * while the registry enforces in CHAIN time, so a deadline test is only meaningful
+         * when the two agree — see cy.syncBrowserClockToChain.
+         */
+        async chainNow() {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const block = await provider.getBlock('latest')
+          return { ok: true, nowMs: Number(block.timestamp) * 1000 }
+        },
+
         /** Read the latest wager id (nextWagerId - 1) for status/winner assertions. */
         async lastWagerId() {
           const provider = new ethers.JsonRpcProvider(config.env.RPC_URL, E2E_CHAIN_ID, { staticNetwork: true })

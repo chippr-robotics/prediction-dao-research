@@ -478,17 +478,27 @@ describe('Wager Acceptance', () => {
 
     // Switch to opponent with rejection-patched provider
     cy.mockWeb3Provider({ account: TEST_ACCOUNTS[1] })
+    /*
+     * Reject every way a member can authorize a SPEND, decided by METHOD rather than by ordinal.
+     *
+     * This used to reject "the second eth_sendTransaction (the approval TX)". Acceptance rides
+     * the spec-035 intent rail, where the member's authorization is a SIGNATURE and someone else
+     * submits the transaction — so the rejected request was one the flow never makes, and
+     * counting transactions described a sequence that no longer exists. (MEM-12 had the same
+     * defect, and its purchase ran to "Purchase Complete!" while the test waited for a refusal.)
+     *
+     * personal_sign is left alone deliberately: it derives the encryption key, which is identity,
+     * not spend authorization.
+     */
+    const SPEND_AUTH = ['eth_sendTransaction', 'eth_signTypedData', 'eth_signTypedData_v4', 'wallet_sendCalls']
     cy.on('window:before:load', (win) => {
       const originalRequest = win.ethereum?.request
       if (originalRequest) {
-        let callCount = 0
         win.ethereum.request = ({ method, params }) => {
-          // Reject the second eth_sendTransaction (the approval TX)
-          if (method === 'eth_sendTransaction') {
-            callCount++
-            if (callCount <= 1) {
-              return Promise.reject(new Error('User rejected the request'))
-            }
+          if (SPEND_AUTH.includes(method)) {
+            const err = new Error('User rejected the request')
+            err.code = 4001
+            return Promise.reject(err)
           }
           return originalRequest({ method, params })
         }

@@ -331,7 +331,12 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     cy.get('body', { timeout: 10000 }).should('be.visible')
     cy.connectWallet()
     openAccountDropdown()
-    cy.contains('button', /^extend$|^renew$/i, { timeout: 10000 }).click()
+    /*
+     * RoleDetailsCard renders this control two ways — compact ("Extend"/"Renew") and expanded
+     * ("Extend Membership"/"Renew Access"). Anchoring to the compact wording made a layout
+     * choice decide whether the test could find its control.
+     */
+    cy.contains('button', /extend|renew/i, { timeout: 10000 }).click()
     cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
     cy.get('.ppm-overlay').invoke('text').should('match', /extend|renew|bronze/i)
   })

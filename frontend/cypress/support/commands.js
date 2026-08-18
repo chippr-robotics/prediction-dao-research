@@ -655,6 +655,49 @@ Cypress.Commands.add('assertToast', (type, message) => {
   }
 })
 
+/*
+ * BROWSER-CLOCK SHIM STATE.
+ *
+ * The offset lives at MODULE level, not on the window: `cy.visit`/`cy.reload` build a new window
+ * and every shim installed on the old one goes with it. MEM-06 advanced 29 days into a 30-day
+ * membership, reloaded, and then looked for the Extend control — which only renders while the
+ * membership is expiring. After the reload the clock had snapped back and the membership looked
+ * fresh, so the button correctly was not there. The test was right about the product and wrong
+ * about its own harness.
+ *
+ * A cumulative offset rather than a frozen clock, so intervals keep firing and the UI re-renders
+ * on its own — cy.clock() would stop them.
+ */
+let __cyTimeOffsetMs = 0
+
+function installTimeShim(win) {
+  if (!win.__cyTimeShim) {
+    const RealDate = win.Date
+    const realNow = RealDate.now.bind(RealDate)
+
+    function ShiftedDate(...args) {
+      if (args.length === 0) return new RealDate(realNow() + win.__cyTimeOffsetMs)
+      return new RealDate(...args)
+    }
+    ShiftedDate.prototype = RealDate.prototype
+    ShiftedDate.now = () => realNow() + win.__cyTimeOffsetMs
+    ShiftedDate.parse = RealDate.parse
+    ShiftedDate.UTC = RealDate.UTC
+    win.Date = ShiftedDate
+    win.__cyTimeShim = true
+  }
+  win.__cyTimeOffsetMs = __cyTimeOffsetMs
+}
+
+/*
+ * Re-install on every navigation, so a shifted clock survives cy.visit and cy.reload. Registered
+ * once at module load via Cypress.on (not cy.on, which binds to the running test). Skipped while
+ * the offset is zero so specs that never move the clock keep the real Date untouched.
+ */
+Cypress.on('window:before:load', (win) => {
+  if (__cyTimeOffsetMs !== 0) installTimeShim(win)
+})
+
 /**
  * Advance Hardhat node time by the specified seconds.
  * Only works when connected to a real Hardhat node.
@@ -697,24 +740,32 @@ Cypress.Commands.add('advanceTime', (seconds) => {
    * Shift Date by the same offset inside the app realm. A cumulative offset rather than a frozen
    * clock, so intervals keep firing and the UI re-renders on its own — cy.clock() would stop them.
    */
+  __cyTimeOffsetMs += seconds * 1000
   cy.window().then((win) => {
-    if (!win.__cyTimeShim) {
-      const RealDate = win.Date
-      const realNow = RealDate.now.bind(RealDate)
-      win.__cyTimeOffsetMs = 0
+    installTimeShim(win)
+  })
+})
 
-      function ShiftedDate(...args) {
-        if (args.length === 0) return new RealDate(realNow() + win.__cyTimeOffsetMs)
-        return new RealDate(...args)
-      }
-      ShiftedDate.prototype = RealDate.prototype
-      ShiftedDate.now = () => realNow() + win.__cyTimeOffsetMs
-      ShiftedDate.parse = RealDate.parse
-      ShiftedDate.UTC = RealDate.UTC
-      win.Date = ShiftedDate
-      win.__cyTimeShim = true
-    }
-    win.__cyTimeOffsetMs += seconds * 1000
+/**
+ * Make the BROWSER clock agree with the CHAIN clock.
+ *
+ * The app decides every expiry in browser time (`computedStatus`, the countdown tiles, the
+ * deadlines the create form computes) while the registry enforces in chain time. Whenever the
+ * two disagree the UI and the contract are answering about different `now`s, and a test about a
+ * deadline stops meaning anything: spec 07 scored 10/14 alone and 6/14 in the suite purely
+ * because earlier specs had moved the chain ~60 days ahead of real time. Its screenshot showed a
+ * row reading "Pending Acceptance · 11h 59m remaining" for an offer whose accept window had
+ * closed on chain two months earlier.
+ *
+ * Call after anything that moves the chain independently of the browser — notably an
+ * evm_revert, which rewinds chain time under a page that never noticed.
+ */
+Cypress.Commands.add('syncBrowserClockToChain', () => {
+  cy.task('chainNow').then(({ nowMs }) => {
+    __cyTimeOffsetMs = nowMs - Date.now()
+    cy.window({ log: false }).then((win) => {
+      installTimeShim(win)
+    })
   })
 })
 

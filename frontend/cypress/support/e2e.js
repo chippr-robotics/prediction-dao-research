@@ -53,6 +53,11 @@ export function resetChainBetweenTests() {
   })
   beforeEach(() => {
     cy.task('chainCheckpoint')
+    /*
+     * The revert rewinds CHAIN time under a browser that never noticed. Re-point the browser
+     * clock at the chain so the app's expiry decisions and the registry's agree.
+     */
+    cy.syncBrowserClockToChain()
   })
 }
 
