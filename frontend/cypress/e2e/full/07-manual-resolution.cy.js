@@ -101,7 +101,16 @@ function acceptPendingWager() {
 
       cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
       cy.contains('button', /accept offer/i).click()
-      cy.contains('button', /i understand|confirm|accept/i).click()
+      /*
+       * The "Confirm Offer Acceptance" dialog SCROLLS inside a fixed overlay and its confirm
+       * button sits below the fold — the fifth appearance of the fixed-ancestor family
+       * (screenshot: the create, switch, and offer-open all succeeded; the click died on a
+       * hidden center). Scroll it into view; deliberately not {force: true}.
+       */
+      cy.contains('button', /i understand|confirm|accept/i)
+        .scrollIntoView()
+        .should('be.visible')
+        .click()
 
       cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
         const lower = text.toLowerCase()
