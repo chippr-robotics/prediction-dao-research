@@ -92,6 +92,12 @@ describe('Wager Acceptance', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. Every wager this file
+     * accepts must first be CREATED, and a create that cannot pin its encrypted metadata throws
+     * before it reaches WagerRegistry.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------

@@ -138,6 +138,17 @@ describe('Wager Creation with Real Transactions', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE. Encryption is mandatory on the create path, so
+     * useFriendMarketCreation always calls uploadEncryptedEnvelope — and a create that cannot
+     * pin its metadata throws BEFORE it reaches WagerRegistry. Without this every test in this
+     * file fails for a reason that has nothing to do with the money path it is testing.
+     *
+     * This is only half of it: the throw is raised in getPinataAuthHeaders() while BUILDING the
+     * request, so an intercept alone never fires. The dev server must also run with a
+     * VITE_PINATA_JWT (see the `dev:e2e` script) or the request is never issued to intercept.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------

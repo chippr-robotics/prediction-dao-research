@@ -81,6 +81,12 @@ describe('Decline and Cancel Wagers', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. Both exits from a pending
+     * wager need one CREATED first, and a create that cannot pin its encrypted metadata throws
+     * before it reaches WagerRegistry.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------

@@ -23,6 +23,17 @@ function connectAsUser() {
 }
 
 describe('Expired Membership', () => {
+  /*
+   * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`.
+   *
+   * Encryption is mandatory on the create path, so useFriendMarketCreation always calls
+   * uploadEncryptedEnvelope, and a create that cannot pin its metadata throws BEFORE it reaches
+   * WagerRegistry. Registered per-test rather than in `before` because cy.intercept is cleared
+   * between tests.
+   */
+  beforeEach(() => {
+    cy.interceptIpfs()
+  })
   before(() => {
     cy.fundAccount(USER)
     cy.task('chainTx', { action: 'approve', args: { index: 4 } })

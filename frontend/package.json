@@ -16,6 +16,8 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "cypress": "cypress open",
+    "_comment:dev:e2e": "Dev server for the full E2E tier. The JWT is a DUMMY and deliberately not a credential: encryption is mandatory on the create path, and PINATA_CONFIG.USE_PROXY is false outside a production build, so getPinataAuthHeaders() THROWS without one and every wager creation dies before reaching WagerRegistry. Its only job is to let the request be issued so cy.interceptIpfs() can stub it — no bytes leave the machine. Safe by construction: pinataSecretGuard() in vite.config.js refuses any production build that has these vars set.",
+    "dev:e2e": "VITE_PINATA_JWT=e2e-not-a-real-credential vite",
     "cypress:headless": "cypress run",
     "cypress:run": "cypress run",
     "test:e2e": "start-server-and-test dev http://localhost:5173 cypress:headless",

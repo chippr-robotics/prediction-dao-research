@@ -769,11 +769,17 @@ jobs:
       # Constitution IV: this step MUST fail the pipeline on error — no `continue-on-error`.
       # `set -o pipefail` is load-bearing for the same reason it is in cypress-fast-e2e: the
       # command is piped into `tee`, so without it the step's status is tee's (always 0).
+      # `dev:e2e`, NOT `dev`. Encryption is mandatory on the create path, and
+      # PINATA_CONFIG.USE_PROXY is false outside a production build — so with no VITE_PINATA_JWT
+      # getPinataAuthHeaders() THROWS and every wager creation dies before it reaches
+      # WagerRegistry. `dev:e2e` supplies a DUMMY value whose only job is to let the request be
+      # issued, so the specs' cy.interceptIpfs() can stub it; no bytes leave the runner. It cannot
+      # leak into a real bundle — pinataSecretGuard() refuses any production build with it set.
       - name: Run full E2E tests
         working-directory: frontend
         run: |
           set -o pipefail
-          npx start-server-and-test dev http://localhost:5173 \
+          npx start-server-and-test dev:e2e http://localhost:5173 \
             'cypress run --spec "cypress/e2e/full/**/*.cy.js"' 2>&1 | tee cypress-full-output.txt
 
       - name: Summarize E2E results

@@ -34,9 +34,24 @@ npx hardhat compile
 npx hardhat node &                 # chain 1337; wait for it to answer eth_chainId
 npm run setup:local                # deploy + sync:frontend-contracts + seed
 cd frontend
-npx start-server-and-test dev http://localhost:5173 \
+npx start-server-and-test dev:e2e http://localhost:5173 \
   'cypress run --spec "cypress/e2e/full/**/*.cy.js"'
 ```
+
+**Use `dev:e2e`, not `dev`.** Encryption is mandatory on the create path, so
+`useFriendMarketCreation` always calls `uploadEncryptedEnvelope` — and
+`PINATA_CONFIG.USE_PROXY` is false outside a production build, so with no `VITE_PINATA_JWT`
+`getPinataAuthHeaders()` **throws** and every wager creation dies before it reaches
+`WagerRegistry`. That single environmental fact accounted for the bulk of this tier's failures:
+it is not a spec problem, and no amount of selector repair fixes it.
+
+`dev:e2e` supplies a **dummy** value whose only job is to let the request be *issued*, so the
+specs' `cy.interceptIpfs()` can stub it — no bytes leave the machine, and nothing is pinned. It
+cannot leak into a real bundle: `pinataSecretGuard()` in `vite.config.js` refuses any production
+build with those vars set.
+
+Every spec that creates a wager therefore calls `cy.interceptIpfs()` in a `beforeEach` —
+per-test, because `cy.intercept` registrations are cleared between tests.
 
 `npm run setup:local` is what makes the specs' preconditions true — two funded accounts
 (1,000,000 USDC each), membership granted, and `WagerRegistry` approved. A spec that fails
