@@ -1145,6 +1145,30 @@ Cypress.Commands.add('acceptOfferInModal', () => {
 })
 
 /**
+ * Dismiss the acceptance modal if it is still open.
+ *
+ * It CLOSES ITSELF once the acceptance lands, so an unconditional close failed with "expected
+ * to find .ma-close-btn" on every test whose acceptance had just succeeded — the harness
+ * complaining that it could not tidy up something that had already tidied itself.
+ *
+ * The `should` settles first — either the modal is gone or its close control has rendered — so
+ * the branch below is reading a decided state rather than racing one.
+ */
+Cypress.Commands.add('dismissAcceptanceModal', () => {
+  cy.get('body', { timeout: 15000 }).should(($b) => {
+    const gone = $b.find('.ma-modal').length === 0
+    const closable = $b.find('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]').length > 0
+    expect(gone || closable, 'acceptance modal settled (closed itself, or offers a close control)').to.be.true
+  })
+  cy.get('body').then(($b) => {
+    if ($b.find('.ma-modal').length === 0) return
+    cy.get('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]')
+      .first()
+      .click({ force: true })
+  })
+})
+
+/**
  * Poll the registry until `wagerId` is Active (status 2). Success is a fact about the chain, not
  * a word in a dialog — the acceptance modal sits on "Processing…" for as long as the tx takes,
  * and a public-subgraph 429 can stretch that well past any fixed wait.

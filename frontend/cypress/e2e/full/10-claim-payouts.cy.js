@@ -107,9 +107,7 @@ function createAcceptAndResolve(config = {}) {
 
   // Success is the wager reaching Active on chain, not a word in the dialog.
   cy.lastWagerId().then((id) => cy.waitForWagerActive(id))
-  cy.get('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]')
-    .first()
-    .click({ force: true })
+  cy.dismissAcceptanceModal()
   cy.get('.mm-close-btn, button[aria-label="Close modal"]').first().click({ force: true })
 
   // Step 3: Advance time past end date

@@ -114,16 +114,7 @@ function acceptPendingWager() {
 
   cy.lastWagerId().then((id) => cy.waitForWagerActive(id))
 
-  /*
-   * Close by the modal's own control. `cy.contains('button', /done|close/i)` matched nothing:
-   * the acceptance modal closes via an icon button (`.ma-close-btn`, aria-label "Close modal"),
-   * whose accessible name carries the word but whose TEXT does not — and cy.contains matches
-   * text. Scoped to the modal either way, since an unscoped search here would happily find a
-   * "Close" on the page behind it.
-   */
-  cy.get('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]')
-    .first()
-    .click({ force: true })
+  cy.dismissAcceptanceModal()
 
   // Close My Wagers modal
   cy.get('.mm-close-btn, button[aria-label="Close modal"]').first().click({ force: true })
@@ -135,26 +126,18 @@ function acceptPendingWager() {
 function openResolutionForFirstWager() {
   cy.openMyWagers('created')
 
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    // Look for Resolve button or click into detail
-    const resolveBtn = $panel.find('.mm-action-resolve, button:contains("Resolve")')
-    if (resolveBtn.length > 0) {
-      cy.wrap(resolveBtn.first()).click({ force: true })
-    } else {
-      // Click into first wager to get detail view with resolve option
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-        cy.get('.mm-detail').then(($detail) => {
-          const resolveDetailBtn = $detail.find('button:contains("Resolve")')
-          if (resolveDetailBtn.length > 0) {
-            cy.wrap(resolveDetailBtn.first()).click()
-          }
-        })
-      }
-    }
-  })
+  /*
+   * WAIT for the Resolve control; do not snapshot for it, and do not fall through when it is
+   * missing. The row's action column renders after the row, so the old $panel.find() read
+   * nothing, took the else branch, found no rows either, and returned having done NOTHING —
+   * leaving the caller to fail on "the resolve sub-modal never appeared" (RES-03, RES-10). Both
+   * branches were silent, so the report named a symptom three commands downstream of the cause.
+   *
+   * Retryable, and scoped to the panel so nothing behind the modal can satisfy it.
+   */
+  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).should('exist')
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /^resolve$|resolve wager/i, { timeout: 20000 })
+    .click({ force: true })
 }
 
 /**
