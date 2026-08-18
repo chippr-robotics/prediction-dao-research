@@ -53,6 +53,18 @@ build with those vars set.
 Every spec that creates a wager therefore calls `cy.interceptIpfs()` in a `beforeEach` —
 per-test, because `cy.intercept` registrations are cleared between tests.
 
+### Known: the full tier is not hermetic
+
+The app performs the spec-071 estate sweep on load, and `config/networks.js` defaults the mainnet
+RPCs to public endpoints — so a full-tier run makes real requests to `polygon-bor-rpc.publicnode.com`,
+`arbitrum-one-rpc.publicnode.com`, `base-rpc.publicnode.com` and friends. Nothing in this tier
+asserts on that data; every spec is about chain 1337.
+
+This does **not** produce false passes: an unreachable chain resolves `unreadable` under the
+three-state read model, never a zero. But it makes the gate depend on third-party availability and
+pays their latency on every page load. Stubbing those origins for this tier would make it hermetic
+and faster; it is not done yet, and is worth doing before anyone blames a red run on "flake".
+
 `npm run setup:local` is what makes the specs' preconditions true — two funded accounts
 (1,000,000 USDC each), membership granted, and `WagerRegistry` approved. A spec that fails
 its `before` hook on a fresh chain is usually missing this step, not broken.
