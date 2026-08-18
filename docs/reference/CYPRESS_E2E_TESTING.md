@@ -1,5 +1,62 @@
 # Cypress E2E Testing Documentation
 
+## Test tiers and the merge gate
+
+The suite is split into three directories, and the split is about **what each tier can prove**,
+not how long it takes.
+
+| tier | directory | chain | gate job |
+|---|---|---|---|
+| fast | `cypress/e2e/fast/**` | none | `Cypress Fast E2E` |
+| passkey | `cypress/e2e/passkey/**` | none | `Cypress Fast E2E` |
+| full | `cypress/e2e/full/**` | local Hardhat 1337 | `Cypress Full E2E` |
+
+**The fast tier never touches a chain.** It renders surfaces against a mocked provider, so it can
+prove a button exists and a form validates — and it cannot prove that money moves. Every wager in
+it is imaginary.
+
+**The full tier drives the real contracts.** It runs against a local Hardhat node with a real
+deploy and seed, so create / accept / decline / cancel / resolve / claim / refund / freeze / pause
+/ expire are exercised as actual transactions against `WagerRegistry`. This is the tier that
+proves the product works, which is why it gates merges (#1028) rather than running on a schedule.
+
+Both jobs live in `.github/workflows/test.yml` and reach the required checks through
+`smart-contract-tests` in `ci-manager.yml`. Neither may carry `continue-on-error` (Constitution IV),
+and both pipe Cypress into `tee` under `set -o pipefail` — without it the step's exit status is
+`tee`'s, which is always 0, and the gate silently passes every failing run.
+
+### Running the full tier locally
+
+The full tier needs a chain, a deploy and a seed before Cypress starts:
+
+```bash
+npx hardhat compile
+npx hardhat node &                 # chain 1337; wait for it to answer eth_chainId
+npm run setup:local                # deploy + sync:frontend-contracts + seed
+cd frontend
+npx start-server-and-test dev http://localhost:5173 \
+  'cypress run --spec "cypress/e2e/full/**/*.cy.js"'
+```
+
+`npm run setup:local` is what makes the specs' preconditions true — two funded accounts
+(1,000,000 USDC each), membership granted, and `WagerRegistry` approved. A spec that fails
+its `before` hook on a fresh chain is usually missing this step, not broken.
+
+Two things about the full tier are easy to get wrong and are handled by shared commands, so use
+them rather than rolling your own:
+
+- **`cy.switchAccount(n)`** switches via `window.ethereum.__cySetAccount`. Calling
+  `cy.mockWeb3Provider()` a second time does *not* switch accounts — it registers another
+  `window:before:load` handler announcing the same EIP-6963 uuid, and mipd keeps the first
+  provider.
+- **`cy.advanceTime(seconds)`** moves the chain clock *and* the browser clock. `evm_increaseTime`
+  alone moves only the chain, while every expiry decision in the UI is browser-time — so a spec
+  that advanced the chain and asserted "Expired" was waiting on a clock nothing had moved.
+
+> **Note:** the per-spec inventory below predates the current suite and names files that no longer
+> exist (`01-onboarding.cy.js`, `02-fairwins-trading.cy.js`, `03-clearpath-governance.cy.js`, …).
+> Treat `cypress/e2e/` on disk as the source of truth for what is covered.
+
 ## Overview
 
 This document describes the Cypress end-to-end (E2E) testing implementation for the ClearPath and FairWins prediction markets platform. These tests ensure that major user flows work correctly and catch functional regressions before deployment.
