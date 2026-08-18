@@ -18,7 +18,24 @@
  *      gets acknowledged and forgotten.
  */
 
-const DATASOURCE_UID = '${datasource}'
+/**
+ * A PLACEHOLDER, resolved by the provisioner against the live stack.
+ *
+ * It must NOT be `${datasource}`. That is a DASHBOARD template variable: correct on a panel, where
+ * the viewer picks a datasource, and meaningless in an alert rule, which has no variable scope. A
+ * rule provisioned with it cannot resolve a datasource at all, so its query returns nothing, and
+ * `noDataState: Alerting` — which is deliberate and stays — turns that into a firing alert.
+ *
+ * Measured 2026-08-17, 17h after provisioning: ALL 29 rules were firing, every one of them a false
+ * alarm, including both runway rules for pools that were perfectly healthy. An alert channel in that
+ * state is worse than none, because the real one is now indistinguishable from the noise.
+ *
+ * It is also not hardcodable: the uid differs per stack (`grafanacloud-prom` here). So the committed
+ * JSON carries this sentinel and `provision-grafana.js` substitutes the stack's real Prometheus uid
+ * at push time, failing loudly if it cannot find one.
+ */
+export const DATASOURCE_PLACEHOLDER = '__PROM_DATASOURCE_UID__'
+const DATASOURCE_UID = DATASOURCE_PLACEHOLDER
 const RUNBOOK_BASE = 'https://github.com/chippr-robotics/prediction-dao-research/blob/main/docs/runbooks/finops-operations.md'
 
 /** A Grafana unified-alerting query stage. */
@@ -46,14 +63,14 @@ function threshold(refId, input, evaluator) {
   }
 }
 
-function rule({ uid, title, expr, evaluator, forDuration, severity, summary, runbookAnchor, labels = {} }) {
+function rule({ uid, title, expr, evaluator, forDuration, severity, summary, runbookAnchor, labels = {}, noData = 'Alerting' }) {
   return {
     uid,
     title,
     condition: 'C',
     // NoData is ALERTING, not OK. A finance alert whose data disappeared is the case we most need to
     // hear about: "the series vanished" and "everything is fine" produce the same silence otherwise.
-    noDataState: 'Alerting',
+    noDataState: noData,
     execErrState: 'Alerting',
     for: forDuration,
     data: [query('A', expr), threshold('C', 'A', evaluator)],
@@ -83,6 +100,21 @@ export function buildAlertRules(sources) {
       evaluator: { type: 'lt', params: [86_400] },
       forDuration: '10m',
       severity: 'critical',
+      /**
+       * THE ONE PLACE NoData MUST NOT ALERT.
+       *
+       * The exporter deliberately omits `pool_runway_seconds` when runway is unknowable — zero burn
+       * or too few samples — rather than emitting `+Inf`. With no gasless traffic the balances do not
+       * move, burn is genuinely 0, and the series is absent for a perfectly healthy pool. Measured
+       * 2026-08-17 after a 17h soak: no pool had a runway series, and both runway rules were firing.
+       *
+       * Escalating that is not conservatism, it is a permanent false alarm on an idle estate. The
+       * genuinely dangerous case — we cannot READ the pool — is already covered by that pool's own
+       * staleness rule (`configured=1, up=0`), which is a different rule with different data and
+       * fires independently. This is the only rule here whose absent data means "nothing is
+       * happening" rather than "we have lost sight of something".
+       */
+      noData: 'OK',
       summary:
         'A prepaid gas pool will be exhausted in under 24 hours at the current burn rate. When it empties, ' +
         'sponsorship or relaying STOPS and members see failures.',
@@ -95,6 +127,9 @@ export function buildAlertRules(sources) {
       evaluator: { type: 'lt', params: [72 * 3600] },
       forDuration: '30m',
       severity: 'warning',
+      // Same reasoning as the critical rule above: absent runway means no measured burn, not a lost
+      // pool. Unreadability is the staleness rule's job.
+      noData: 'OK',
       summary: 'A prepaid gas pool will be exhausted in under 72 hours at the current burn rate. Top it up.',
       runbookAnchor: 'prepaid-pools',
     }),
@@ -131,8 +166,18 @@ export function buildAlertRules(sources) {
          * at all. `for: 15m` supplies the duration that `last_success` used to; the exact age is on
          * the Source health panel and at /status.
          */
+        /**
+         * `on(source)` IS LOAD-BEARING. The two gauges carry different label sets —
+         * `source_configured{source,kind,status}` and `source_up{source,kind}` — so a bare multiply
+         * finds no matching series and returns NOTHING, which noDataState escalates. Measured
+         * 2026-08-17: the bare form returned 0 series where `on(source)` returns 23, correctly
+         * flagging exactly the two unreadable sources.
+         *
+         * The `status` label only exists on `configured` (a `planned` source has no `up`), which is
+         * precisely why the label sets cannot be made identical — so the join must be explicit.
+         */
         expr:
-          `fairwins_finops_source_configured{source="${source.id}"} * ` +
+          `fairwins_finops_source_configured{source="${source.id}"} * on(source) ` +
           `(1 - fairwins_finops_source_up{source="${source.id}"})`,
         evaluator: { type: 'gt', params: [0] },
         forDuration: '15m',
@@ -161,6 +206,18 @@ export function buildAlertRules(sources) {
       evaluator: { type: 'gt', params: [0] },
       forDuration: '1h',
       severity: 'warning',
+      /**
+       * NO BASELINE MEANS "CANNOT JUDGE", NOT "SOMETHING IS WRONG".
+       *
+       * This rule is defined by its 14-day baseline: a source that has never earned cannot have
+       * stalled. Before 14 days of history exist the right-hand side matches nothing, the whole
+       * expression is empty, and Alerting-on-NoData would report a stall for every source on a
+       * brand-new deployment. Measured 2026-08-17 at 17h uptime: 0 series for the 14d baseline, and
+       * this rule pending on NoData.
+       *
+       * Losing sight of a source is the staleness rule's job, and it fires independently.
+       */
+      noData: 'OK',
       summary:
         'A revenue source that earned over the last 14 days has earned nothing for 24 hours. This is what a ' +
         'silently broken fee path looks like — it is indistinguishable from a quiet day without the baseline.',
@@ -173,12 +230,26 @@ export function buildAlertRules(sources) {
     rule({
       uid: 'finops-cost-anomaly',
       title: 'Daily cost above 2x the trailing 7-day mean',
+      /**
+       * THE BASELINE AVERAGES OVER THE DAYS THAT EXIST, not over a hardcoded seven.
+       *
+       * `increase(...[7d]) / 7` assumes seven days of history. On a young deployment it divides
+       * whatever exists by 7, producing a baseline far below the real daily rate — so ANY day's spend
+       * trivially exceeds 2x it. Measured 2026-08-17 at 17h uptime: this rule was pending, comparing
+       * a full day's cost against a "daily average" that was really 17 hours / 7.
+       *
+       * The subquery form takes the daily increase at 1-day steps and averages the samples that
+       * actually exist, so it is self-normalising: correct at 17 hours, and identical to the old form
+       * once a week of history has accumulated.
+       */
       expr:
         'sum by (source) (increase(fairwins_finops_cost_usd_total[24h])) ' +
-        '> 2 * sum by (source) (increase(fairwins_finops_cost_usd_total[7d]) / 7)',
+        '> 2 * sum by (source) (avg_over_time(increase(fairwins_finops_cost_usd_total[24h])[7d:1d]))',
       evaluator: { type: 'gt', params: [0] },
       forDuration: '30m',
       severity: 'warning',
+      // An absent baseline cannot evidence an anomaly. Unreadability is the staleness rule's job.
+      noData: 'OK',
       summary: 'A cost source spent more than twice its trailing daily average in the last 24 hours.',
       runbookAnchor: 'cost-anomaly',
     }),

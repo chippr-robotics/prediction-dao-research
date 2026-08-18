@@ -151,7 +151,9 @@ export default function TradeConfirm({ market, outcome, side = 'BUY', onClose })
 
             {!trade.tradingEnabled && !busy && (
               <p className="trade-confirm-fee-note">
-                First trade only: you&apos;ll sign once (no gas) to enable trading on this device, then confirm the order.
+                {trade.signerKind === 'passkey'
+                  ? 'First trade only: you’ll confirm one transaction letting Polymarket’s exchange settle your trades (network fee applies unless sponsored), then sign once (no gas) to enable trading on this device.'
+                  : 'First trade only: you’ll sign once (no gas) to enable trading on this device, then confirm the order.'}
               </p>
             )}
 

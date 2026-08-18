@@ -1,0 +1,126 @@
+/* ControlRoom (spec 093) — the operations launcher. Tokens only; theme.css owns colour. */
+
+.control-room-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  text-align: right;
+}
+
+.control-room-identity__label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.control-room-identity__value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.control-room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.control-room-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 1.125rem 1.25rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast, 0.15s) ease,
+    transform var(--transition-fast, 0.15s) ease;
+}
+
+.control-room-tile:hover,
+.control-room-tile:focus-visible {
+  border-color: var(--brand-primary);
+  transform: translateY(-1px);
+}
+
+.control-room-tile:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.control-room-tile__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--brand-primary);
+  border: 1px solid var(--border-color);
+}
+
+/* The permissionless Maintenance tile must not read as elevated status
+   (FR-010): its glyph keeps neutral text colour instead of the brand accent. */
+.control-room-tile--plain .control-room-tile__icon {
+  color: var(--text-secondary);
+}
+
+.control-room-tile__name {
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+.control-room-tile__blurb {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.control-room-tile__status {
+  margin-top: 0.375rem;
+  align-self: flex-start;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--border-color);
+}
+
+/* Status chips are OPAQUE (spec 090 rule 3): alpha tints measure differently
+   over every surface they sit on. */
+.control-room-tile__status--ok {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: transparent;
+}
+
+.control-room-tile__status--warn {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: transparent;
+}
+
+.control-room-tile__status--alert {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: transparent;
+}
+
+.control-room-tile__status--unknown {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.control-room-permissions {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .control-room-grid {
+    grid-template-columns: 1fr;
+  }
+}

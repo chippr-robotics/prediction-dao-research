@@ -17,9 +17,13 @@
  * signing at the gateway (POLY_BUILDER_* headers). When that isn't configured, trades still go through
  * UNATTRIBUTED — never stranded (FR-015).
  *
- * NOTE: EOA sessions only (signatureType 0: maker == signer == funder). Passkey/Safe (types 1/2/3) stay
- * deferred behind PASSKEY_PREDICT_ENABLED — CLOB binds the API key to the EOA, and ERC-1271 order validation
- * must be confirmed end-to-end first (see tradeSigner.js).
+ * Two signing rails share this session module (tradeSigner.js decides which):
+ *   - EOA (signatureType 0): maker == signer == funder == the connected EOA, ECDSA via the viem
+ *     walletClient. Unchanged.
+ *   - Passkey smart account (signatureType 3, POLY_1271): maker == signer == funder == the account
+ *     itself; the "signer" handed to the SDK is `passkeyClobSigner.js`, whose signatures are the
+ *     account's ERC-1271 WebAuthn envelope. The API key mints against the ACCOUNT address (the L1
+ *     ClobAuth attestation is signed the same way), satisfying CLOB V2's signer-binding rule.
  */
 import { ClobClient, Side, OrderType } from '@polymarket/clob-client'
 
@@ -28,6 +32,12 @@ export const POLYGON = 137
 
 // signatureType 0 = EOA. The order's maker/signer/funder are all the connected EOA.
 const SIG_TYPE_EOA = 0
+
+// signatureType 3 = POLY_1271: a smart-wallet maker whose order signatures the CLOB validates by
+// calling the wallet's own `isValidSignature` (ERC-1271). The pinned SDK (5.8.1, archived) predates
+// this member of the enum — its SignatureType stops at POLY_GNOSIS_SAFE = 2 — but the value is
+// forwarded into the signed order struct unvalidated, so the raw number is the whole integration.
+export const SIG_TYPE_POLY_1271 = 3
 
 const credsKey = (address) => `predict.clob.creds.${String(address || '').toLowerCase()}`
 const safeStorage = () => {
@@ -55,8 +65,9 @@ export function clearCachedCreds(address, storage = safeStorage()) {
 
 /**
  * Mint (or reuse) the member's own CLOB creds. `createOrDeriveApiKey` is deterministic per wallet —
- * one L1 EIP-712 signature (a wallet prompt, no gas). Cached per address for the session so the member
- * signs at most once. Returns { key, secret, passphrase }.
+ * one L1 EIP-712 signature (a wallet/passkey prompt, no gas). Cached per address for the session so
+ * the member signs at most once. `walletClient` is any signer the SDK accepts: a viem walletClient
+ * (EOA) or the passkey ERC-1271 shim. Returns { key, secret, passphrase }.
  */
 export async function ensureClobCreds(walletClient, { address, storage = safeStorage(), ClobClientImpl = ClobClient } = {}) {
   const addr = address ?? walletClient?.account?.address
@@ -108,19 +119,25 @@ export function makeBuilderConfig(gatewayBaseUrl, chainId = POLYGON, { fetchImpl
 }
 
 /**
- * An authed CLOB client bound to the member's wallet + their creds, with optional builder attribution.
- * @param {object} walletClient  viem WalletClient (wagmi useWalletClient)
+ * An authed CLOB client bound to the member's signer + their creds, with optional builder attribution.
+ * @param {object} walletClient  viem WalletClient (EOA) or the passkey ERC-1271 signer shim
  * @param {{key,secret,passphrase}} creds
- * @param {{ builderConfig?: object, ClobClientImpl?: Function }} [opts]
+ * @param {{ builderConfig?: object, signatureType?: number, funderAddress?: string, ClobClientImpl?: Function }} [opts]
+ *   signatureType defaults to EOA (0); passkey sessions pass SIG_TYPE_POLY_1271 with
+ *   funderAddress = the account (maker == signer == funder).
  */
-export function makeClobClient(walletClient, creds, { builderConfig, ClobClientImpl = ClobClient } = {}) {
+export function makeClobClient(
+  walletClient,
+  creds,
+  { builderConfig, signatureType = SIG_TYPE_EOA, funderAddress, ClobClientImpl = ClobClient } = {}
+) {
   return new ClobClientImpl(
     CLOB_HOST,
     POLYGON,
     walletClient,
     creds,
-    SIG_TYPE_EOA,
-    undefined, // funderAddress = signer (EOA)
+    signatureType,
+    funderAddress, // undefined => funder = signer (EOA)
     undefined, // geoBlockToken
     false, // useServerTime
     builderConfig, // POLY_BUILDER_* attribution (optional)

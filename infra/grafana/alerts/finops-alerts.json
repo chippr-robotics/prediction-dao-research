@@ -10,7 +10,7 @@
           "uid": "finops-pool-runway-critical",
           "title": "Prepaid pool runway under 24h",
           "condition": "C",
-          "noDataState": "Alerting",
+          "noDataState": "OK",
           "execErrState": "Alerting",
           "for": "10m",
           "data": [
@@ -20,14 +20,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
                 "expr": "min by (pool) (fairwins_finops_pool_runway_seconds)",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -75,7 +75,7 @@
           "uid": "finops-pool-runway-warning",
           "title": "Prepaid pool runway under 72h",
           "condition": "C",
-          "noDataState": "Alerting",
+          "noDataState": "OK",
           "execErrState": "Alerting",
           "for": "30m",
           "data": [
@@ -85,14 +85,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
                 "expr": "min by (pool) (fairwins_finops_pool_runway_seconds)",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -150,14 +150,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-earn-lend\"} * (1 - fairwins_finops_source_up{source=\"fee-earn-lend\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-earn-lend\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-earn-lend\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -216,14 +216,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-polymarket-taker\"} * (1 - fairwins_finops_source_up{source=\"fee-polymarket-taker\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-polymarket-taker\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-polymarket-taker\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -282,14 +282,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-polymarket-maker\"} * (1 - fairwins_finops_source_up{source=\"fee-polymarket-maker\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-polymarket-maker\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-polymarket-maker\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -348,14 +348,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-stake-lido\"} * (1 - fairwins_finops_source_up{source=\"fee-stake-lido\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-stake-lido\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-stake-lido\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -414,14 +414,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-stake-polygon\"} * (1 - fairwins_finops_source_up{source=\"fee-stake-polygon\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-stake-polygon\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-stake-polygon\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -480,14 +480,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-bridge-transfer\"} * (1 - fairwins_finops_source_up{source=\"fee-bridge-transfer\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-bridge-transfer\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-bridge-transfer\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -546,14 +546,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-liquidity-deposit\"} * (1 - fairwins_finops_source_up{source=\"fee-liquidity-deposit\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-liquidity-deposit\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-liquidity-deposit\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -612,14 +612,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-perps-hl-builder\"} * (1 - fairwins_finops_source_up{source=\"fee-perps-hl-builder\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-perps-hl-builder\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-perps-hl-builder\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -678,14 +678,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"fee-waived-no-treasury\"} * (1 - fairwins_finops_source_up{source=\"fee-waived-no-treasury\"})",
+                "expr": "fairwins_finops_source_configured{source=\"fee-waived-no-treasury\"} * on(source) (1 - fairwins_finops_source_up{source=\"fee-waived-no-treasury\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -744,14 +744,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"membership-received\"} * (1 - fairwins_finops_source_up{source=\"membership-received\"})",
+                "expr": "fairwins_finops_source_configured{source=\"membership-received\"} * on(source) (1 - fairwins_finops_source_up{source=\"membership-received\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -810,14 +810,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"membership-accrued\"} * (1 - fairwins_finops_source_up{source=\"membership-accrued\"})",
+                "expr": "fairwins_finops_source_configured{source=\"membership-accrued\"} * on(source) (1 - fairwins_finops_source_up{source=\"membership-accrued\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -876,14 +876,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"referral-opensea\"} * (1 - fairwins_finops_source_up{source=\"referral-opensea\"})",
+                "expr": "fairwins_finops_source_configured{source=\"referral-opensea\"} * on(source) (1 - fairwins_finops_source_up{source=\"referral-opensea\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -942,14 +942,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"referral-gains\"} * (1 - fairwins_finops_source_up{source=\"referral-gains\"})",
+                "expr": "fairwins_finops_source_configured{source=\"referral-gains\"} * on(source) (1 - fairwins_finops_source_up{source=\"referral-gains\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1008,14 +1008,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"referral-gmx\"} * (1 - fairwins_finops_source_up{source=\"referral-gmx\"})",
+                "expr": "fairwins_finops_source_configured{source=\"referral-gmx\"} * on(source) (1 - fairwins_finops_source_up{source=\"referral-gmx\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1074,14 +1074,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"referral-polymarket-rewards\"} * (1 - fairwins_finops_source_up{source=\"referral-polymarket-rewards\"})",
+                "expr": "fairwins_finops_source_configured{source=\"referral-polymarket-rewards\"} * on(source) (1 - fairwins_finops_source_up{source=\"referral-polymarket-rewards\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1140,14 +1140,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"paymaster-gas\"} * (1 - fairwins_finops_source_up{source=\"paymaster-gas\"})",
+                "expr": "fairwins_finops_source_configured{source=\"paymaster-gas\"} * on(source) (1 - fairwins_finops_source_up{source=\"paymaster-gas\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1206,14 +1206,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"relayer-gas-polygon\"} * (1 - fairwins_finops_source_up{source=\"relayer-gas-polygon\"})",
+                "expr": "fairwins_finops_source_configured{source=\"relayer-gas-polygon\"} * on(source) (1 - fairwins_finops_source_up{source=\"relayer-gas-polygon\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1272,14 +1272,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"relayer-gas-mordor\"} * (1 - fairwins_finops_source_up{source=\"relayer-gas-mordor\"})",
+                "expr": "fairwins_finops_source_configured{source=\"relayer-gas-mordor\"} * on(source) (1 - fairwins_finops_source_up{source=\"relayer-gas-mordor\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1338,14 +1338,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"bundler-gas-polygon\"} * (1 - fairwins_finops_source_up{source=\"bundler-gas-polygon\"})",
+                "expr": "fairwins_finops_source_configured{source=\"bundler-gas-polygon\"} * on(source) (1 - fairwins_finops_source_up{source=\"bundler-gas-polygon\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1404,14 +1404,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"gcp\"} * (1 - fairwins_finops_source_up{source=\"gcp\"})",
+                "expr": "fairwins_finops_source_configured{source=\"gcp\"} * on(source) (1 - fairwins_finops_source_up{source=\"gcp\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1470,14 +1470,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"cloudflare\"} * (1 - fairwins_finops_source_up{source=\"cloudflare\"})",
+                "expr": "fairwins_finops_source_configured{source=\"cloudflare\"} * on(source) (1 - fairwins_finops_source_up{source=\"cloudflare\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1536,14 +1536,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"quicknode\"} * (1 - fairwins_finops_source_up{source=\"quicknode\"})",
+                "expr": "fairwins_finops_source_configured{source=\"quicknode\"} * on(source) (1 - fairwins_finops_source_up{source=\"quicknode\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1602,14 +1602,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "fairwins_finops_source_configured{source=\"grafana-cloud\"} * (1 - fairwins_finops_source_up{source=\"grafana-cloud\"})",
+                "expr": "fairwins_finops_source_configured{source=\"grafana-cloud\"} * on(source) (1 - fairwins_finops_source_up{source=\"grafana-cloud\"})",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1658,7 +1658,7 @@
           "uid": "finops-revenue-stall",
           "title": "Revenue stalled on a source that normally earns",
           "condition": "C",
-          "noDataState": "Alerting",
+          "noDataState": "OK",
           "execErrState": "Alerting",
           "for": "1h",
           "data": [
@@ -1668,14 +1668,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
                 "expr": "increase(fairwins_finops_revenue_total[24h]) == 0 and on(source) (increase(fairwins_finops_revenue_total[14d]) > 0)",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1723,7 +1723,7 @@
           "uid": "finops-cost-anomaly",
           "title": "Daily cost above 2x the trailing 7-day mean",
           "condition": "C",
-          "noDataState": "Alerting",
+          "noDataState": "OK",
           "execErrState": "Alerting",
           "for": "30m",
           "data": [
@@ -1733,14 +1733,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
-                "expr": "sum by (source) (increase(fairwins_finops_cost_usd_total[24h])) > 2 * sum by (source) (increase(fairwins_finops_cost_usd_total[7d]) / 7)",
+                "expr": "sum by (source) (increase(fairwins_finops_cost_usd_total[24h])) > 2 * sum by (source) (avg_over_time(increase(fairwins_finops_cost_usd_total[24h])[7d:1d]))",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1798,14 +1798,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
                 "expr": "increase(fairwins_finops_revenue_waived_total[1h])",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },
@@ -1863,14 +1863,14 @@
                 "from": 600,
                 "to": 0
               },
-              "datasourceUid": "${datasource}",
+              "datasourceUid": "__PROM_DATASOURCE_UID__",
               "model": {
                 "refId": "A",
                 "expr": "fairwins_finops_fx_age_seconds",
                 "instant": true,
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "${datasource}"
+                  "uid": "__PROM_DATASOURCE_UID__"
                 }
               }
             },

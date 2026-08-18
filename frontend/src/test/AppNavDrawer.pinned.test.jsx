@@ -187,3 +187,58 @@ describe('AppNavDrawer — pinned apps strip (spec 081 US2)', () => {
     expect(strip()).toBeNull()
   })
 })
+
+/*
+ * Spec 093 follow-up — pinned ADMIN TOOLS ride the same strip.
+ *
+ * An operator pins a tool from the store's Operator tools section; the pin is
+ * a favorites entry in the reserved `admin-tool:` namespace, renders as a
+ * glyph tile (no registry record ⇒ no store artwork), routes to the tool's
+ * /admin address, and highlights itself while that tool is open.
+ */
+describe('AppNavDrawer — pinned admin tools (spec 093 follow-up)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    __resetFavoriteAppsForTests()
+    __resetNavPreferencesForTests()
+  })
+
+  it('renders an admin pin as a glyph tile and routes it to /admin/<appId>', () => {
+    addFavoriteApp({ id: 'admin-tool:incident-response', name: 'Incident Response' })
+    renderDrawer()
+
+    const tile = within(strip()).getByRole('button', { name: 'Incident Response' })
+    // Glyph, not store artwork: the tile carries an svg from NavIcon.
+    expect(tile.querySelector('.pinned-app-tile-icon svg')).toBeTruthy()
+
+    fireEvent.click(tile)
+    expect(screen.getByTestId('loc')).toHaveTextContent('/admin/incident-response')
+  })
+
+  it('mixes with registry pins in one strip, in pin order', () => {
+    addFavoriteApp({ id: 7, slug: 'token-mint', name: 'Token Mint' })
+    addFavoriteApp({ id: 'admin-tool:maintenance', name: 'Maintenance' })
+    renderDrawer()
+
+    expect(tiles().map((t) => t.getAttribute('aria-label'))).toEqual(['Token Mint', 'Maintenance'])
+  })
+
+  it('highlights the pinned tool while its /admin screen is open', () => {
+    addFavoriteApp({ id: 'admin-tool:maintenance', name: 'Maintenance' })
+    renderDrawer('/admin/maintenance')
+
+    expect(within(strip()).getByRole('button', { name: 'Maintenance' }))
+      .toHaveAttribute('aria-current', 'page')
+  })
+
+  it('drops a malformed admin-tool favorite rather than rendering a dead tile', () => {
+    // Written straight into storage to simulate a corrupt/stale entry.
+    localStorage.setItem(
+      'fw_global_prefs',
+      JSON.stringify({ miniapp_favorites: [{ id: 'admin-tool:UPPER CASE!', name: 'Bad' }] }),
+    )
+    __resetFavoriteAppsForTests()
+    renderDrawer()
+    expect(strip()).toBeNull()
+  })
+})

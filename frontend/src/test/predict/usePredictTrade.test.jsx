@@ -132,4 +132,101 @@ describe('usePredictTrade', () => {
     await act(async () => { await result.current.loadFee(TOKEN) })
     expect(result.current.status).toBe('blocked')
   })
+
+  // ---- Passkey (ERC-1271 smart account) rail — spec 057 FR-019 ----
+
+  const PASSKEY_SIGNER = { getAddress: async () => TRADER, _signTypedData: async () => '0xenvelope' }
+
+  function passkeyDeps(over = {}) {
+    return makeDeps({
+      resolveTradeSigner: vi.fn(() => ({ canSign: true, kind: 'passkey', address: TRADER, credentialId: 'cred-1' })),
+      makePasskeySigner: vi.fn().mockResolvedValue(PASSKEY_SIGNER),
+      missingApprovals: vi.fn().mockResolvedValue([]),
+      readSession: vi.fn(() => ({ credentialId: 'cred-1' })),
+      ...over,
+    })
+  }
+
+  it('passkey submit signs through the ERC-1271 shim with signatureType 3, maker == funder == the account', async () => {
+    const deps = passkeyDeps()
+    const sendCalls = vi.fn()
+    const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor({ loginMethod: 'passkey', sendCalls }) })
+    await act(async () => { await result.current.loadFee(TOKEN) })
+    await act(async () => { await result.current.submit(BUY, {}) })
+    expect(result.current.status).toBe('done')
+    expect(deps.makePasskeySigner).toHaveBeenCalledWith(
+      expect.objectContaining({ chainId: 137, address: TRADER, credentialId: 'cred-1' })
+    )
+    expect(deps.ensureCreds).toHaveBeenCalledWith(PASSKEY_SIGNER, { address: TRADER })
+    const [signerArg, , opts] = deps.makeClient.mock.calls[0]
+    expect(signerArg).toBe(PASSKEY_SIGNER)
+    expect(opts).toMatchObject({ signatureType: 3, funderAddress: TRADER })
+    expect(sendCalls).not.toHaveBeenCalled() // fully approved account: no ceremony
+  })
+
+  it('passkey first trade batches the missing approvals through sendCalls BEFORE minting creds', async () => {
+    const approvals = [
+      { target: '0xUSDC', data: '0xapprove1' },
+      { target: '0xCTF', data: '0xapprove2' },
+    ]
+    const order = []
+    const deps = passkeyDeps({
+      missingApprovals: vi.fn(async () => { order.push('approvals-check'); return approvals }),
+      ensureCreds: vi.fn(async () => { order.push('creds'); return { key: 'k', secret: 's', passphrase: 'p' } }),
+    })
+    const sendCalls = vi.fn(async () => { order.push('sendCalls') })
+    const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor({ loginMethod: 'passkey', sendCalls }) })
+    await act(async () => { await result.current.loadFee(TOKEN) })
+    await act(async () => { await result.current.submit(BUY, {}) })
+    expect(result.current.status).toBe('done')
+    expect(sendCalls).toHaveBeenCalledWith(
+      [
+        { target: '0xUSDC', data: '0xapprove1' },
+        { target: '0xCTF', data: '0xapprove2' },
+      ],
+      { chainId: 137 } // pinned by parameter — a stale session chain must never retarget the batch
+    )
+    expect(order).toEqual(['approvals-check', 'sendCalls', 'creds'])
+  })
+
+  it('enableTrading enforces Polygon BEFORE any approvals ceremony (FR-021)', async () => {
+    useChainId.mockReturnValue(1)
+    const deps = passkeyDeps({ missingApprovals: vi.fn().mockResolvedValue([{ target: '0xUSDC', data: '0x1' }]) })
+    const sendCalls = vi.fn()
+    const switchChain = vi.fn().mockRejectedValue(new Error('declined'))
+    const { result } = renderHook(() => usePredictTrade({ deps }), {
+      wrapper: wrapperFor({ loginMethod: 'passkey', sendCalls, switchChain }),
+    })
+    await act(async () => { await result.current.loadFee(TOKEN) })
+    let ok
+    await act(async () => { ok = await result.current.enableTrading() })
+    expect(ok).toBe(false)
+    expect(result.current.status).toBe('error')
+    expect(result.current.reason).toMatch(/Polygon/)
+    expect(sendCalls).not.toHaveBeenCalled()
+    expect(deps.ensureCreds).not.toHaveBeenCalled()
+  })
+
+  it('a failed approvals batch surfaces as an honest error with the link-out path — never a submit', async () => {
+    const deps = passkeyDeps({ missingApprovals: vi.fn().mockResolvedValue([{ target: '0xUSDC', data: '0x1' }]) })
+    const sendCalls = vi.fn().mockRejectedValue(new Error('User cancelled the passkey prompt'))
+    const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor({ loginMethod: 'passkey', sendCalls }) })
+    await act(async () => { await result.current.loadFee(TOKEN) })
+    await act(async () => { await result.current.submit(BUY, {}) })
+    expect(result.current.status).toBe('error')
+    expect(result.current.reason).toMatch(/cancelled/i)
+    expect(deps.submitOrder).not.toHaveBeenCalled()
+  })
+
+  it('passkey cancel needs creds only — no approvals read, no ceremony', async () => {
+    const deps = passkeyDeps()
+    const sendCalls = vi.fn()
+    const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor({ loginMethod: 'passkey', sendCalls }) })
+    await act(async () => { await result.current.cancel({ orderId: '0xopen' }) })
+    expect(result.current.status).toBe('done')
+    expect(deps.missingApprovals).not.toHaveBeenCalled()
+    expect(sendCalls).not.toHaveBeenCalled()
+    const [, , opts] = deps.makeClient.mock.calls[0]
+    expect(opts).toMatchObject({ signatureType: 3, funderAddress: TRADER })
+  })
 })
