@@ -20,26 +20,32 @@ function connectThenVisitAdmin(account) {
 }
 
 describe('Admin Panel', () => {
+  /*
+   * Spec 093 replaced the single tabbed panel with a Control Room: `/admin` is a launcher of
+   * app tiles and each group of controls lives at `/admin/<appId>?view=<viewId>`. The old
+   * assertions looked for tab BUTTONS named "Tiers"/"Treasury" on `/admin` itself, which is now
+   * a page of tiles — hence the timeout on /tiers/i. App and view ids come from
+   * components/admin/adminApps.js, the single app/view/role matrix.
+   */
   it('[ADM-01] an admin sees the control sections and the treasury-default withdrawal recipient', () => {
     connectThenVisitAdmin(ADMIN)
 
-    // Tabs / sections render for an admin.
-    cy.contains('button', /tiers/i, { timeout: 15000 }).should('be.visible')
-    cy.contains('button', /account moderation/i).should('be.visible')
-    cy.contains('button', /admin roles/i).should('be.visible')
-    cy.contains('button', /treasury/i).should('be.visible')
+    // The Control Room lists the apps this admin is entitled to.
+    cy.contains(/membership & revenue/i, { timeout: 15000 }).should('be.visible')
+    cy.contains(/incident response/i).should('be.visible')
+    cy.contains(/access control/i).should('be.visible')
 
     // Tier config controls.
-    cy.contains('button', /tiers/i).click()
-    cy.contains(/configure tier/i).should('be.visible')
+    cy.visit('/admin/membership-revenue?view=tiers')
+    cy.contains(/configure tier/i, { timeout: 15000 }).should('be.visible')
 
     // Freeze / unfreeze controls.
-    cy.contains('button', /account moderation/i).click()
-    cy.contains(/freeze\s*\/\s*unfreeze/i).should('be.visible')
+    cy.visit('/admin/incident-response?view=moderation')
+    cy.contains(/freeze\s*\/\s*unfreeze/i, { timeout: 15000 }).should('be.visible')
 
     // Treasury withdrawal: recipient pre-filled with the on-chain treasury address.
-    cy.contains('button', /treasury/i).click()
-    cy.contains(/treasury withdrawal/i).should('be.visible')
+    cy.visit('/admin/membership-revenue?view=treasury')
+    cy.contains(/treasury withdrawal/i, { timeout: 15000 }).should('be.visible')
     cy.get('input[placeholder*="name.eth"]').invoke('val').should('match', /^0x[0-9a-fA-F]{40}$/)
   })
 

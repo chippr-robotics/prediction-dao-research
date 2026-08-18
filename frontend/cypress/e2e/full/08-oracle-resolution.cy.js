@@ -47,7 +47,7 @@ describe('Oracle Resolution (Polymarket)', () => {
     setupOracleWager('orc-yes', /* creatorIsYes */ true).then(({ wagerId, conditionId }) => {
       cy.resolveMockCondition(conditionId, [1, 0]) // pass(YES) wins
       cy.task('chainTx', { action: 'autoResolve', args: { wagerId } }).then((r) => {
-        expect(r.ok, 'autoResolve settles').to.be.true
+        expect(r.ok, `autoResolve settles (${r.error || 'no error reported'})`).to.be.true
       })
       cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
         expect(i.status, 'Resolved').to.equal(3)
@@ -60,7 +60,7 @@ describe('Oracle Resolution (Polymarket)', () => {
     setupOracleWager('orc-no', /* creatorIsYes */ true).then(({ wagerId, conditionId }) => {
       cy.resolveMockCondition(conditionId, [0, 1]) // fail(NO) wins
       cy.task('chainTx', { action: 'autoResolve', args: { wagerId } }).then((r) => {
-        expect(r.ok, 'autoResolve settles').to.be.true
+        expect(r.ok, `autoResolve settles (${r.error || 'no error reported'})`).to.be.true
       })
       cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
         expect(i.status, 'Resolved').to.equal(3)

@@ -100,6 +100,18 @@ function acceptPendingWager() {
       cy.wrap(viewBtn.first()).click({ force: true })
 
       cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
+      /*
+       * Encryption is mandatory, so every wager this spec creates is private and the acceptance
+       * modal gates the terms behind "Decrypt Wager Details" — a signature — before it will show
+       * an Accept control. Conditional because the modal skips the gate once the details are
+       * already decrypted in session; written with jQuery find() rather than cy.get, which fails
+       * the command when the gate is absent instead of skipping it.
+       */
+      cy.get('.ma-modal, [role="dialog"]').then(($m) => {
+        if ($m.find('button:contains("Decrypt")').length === 0) return
+        cy.wrap($m).contains('button', /decrypt/i).click({ force: true })
+        cy.wrap($m).contains('button', /decrypt/i, { timeout: 20000 }).should('not.exist')
+      })
       cy.contains('.ma-modal, [role="dialog"]', /accept offer/i).within(() => {
         cy.contains('button', /accept offer/i).click()
       })
