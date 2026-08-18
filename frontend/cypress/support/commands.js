@@ -1013,19 +1013,35 @@ Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
     cy.wait(300)
     cy.enterAmountViaKeypad('fm-stake', o.stake)
     if (o.resolutionType !== undefined) {
-      cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
+      /*
+       * Resolution type is a radio tab strip, not a <select>: FriendMarketsModal renders
+       * no `#fm-resolution-type` and no `.fm-select`, so the old lookup failed the command
+       * outright (PAU-02 died here). cy.selectResolutionType clicks the pill by its visible
+       * label, which is what the passing CRE specs already use.
+       */
+      cy.selectResolutionType(String(o.resolutionType))
     }
-    // Set a far-future end date (~20 days, within the 21-day max) so acceptDeadline
-    // (the midpoint) stays well ahead of the chain clock even after a spec advances
-    // time — otherwise the UI computes deadlines from browser time and the create
-    // reverts with BadDeadlines once the chain is ahead.
-    const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
+    /*
+     * The end date is NOT a form input. Spec 038 replaced `#fm-end-date` with the
+     * DeadlineTimeline: the editable ENDS tile opens SetTimeModal (`.stm-input`, confirm
+     * "Set"). `cy.get('#fm-end-date')` does not degrade to a no-op — it FAILS the command,
+     * which is why this whole spec died in its before-all hook and skipped five tests.
+     * Same flow CRE-09 uses; 5 days, formatted LOCAL (toISOString is UTC and can land on
+     * the wrong day near midnight), inside the modal's 1h..21d bounds.
+     */
+    const end = new Date(Date.now() + 5 * 24 * 3600 * 1000)
     const p2 = (n) => String(n).padStart(2, '0')
     const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
-    cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
-    cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
-      if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
-    })
+    cy.get('.fm-stat-tiles', { timeout: 10000 }).contains('button', /ends/i).click()
+    cy.get('.stm-input', { timeout: 10000 }).clear().type(dtl)
+    cy.get('.stm-dialog').contains('button', /^set$/i).click()
+    /*
+     * No encryption toggle to clear: encryption is MANDATORY on the create path, so
+     * FriendMarketsModal renders no `.fm-encryption-toggle` and this cy.get failed the
+     * command rather than skipping. Callers that need a public wager cannot get one here;
+     * callers that need a private one should use createPrivateWagerViaUI, which asserts the
+     * `encrypted:ipfs` metadata reference. Either way `interceptIpfs()` must be active.
+     */
     cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
     cy.waitForWagerId(before + 1)
   })
@@ -1071,10 +1087,20 @@ Cypress.Commands.add('createPrivateWagerViaUI', (cfg = {}) => {
     cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
     cy.wait(300)
     cy.enterAmountViaKeypad('fm-stake', o.stake)
-    const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
+    /*
+     * The end date is NOT a form input. Spec 038 replaced `#fm-end-date` with the
+     * DeadlineTimeline: the editable ENDS tile opens SetTimeModal (`.stm-input`, confirm
+     * "Set"). `cy.get('#fm-end-date')` does not degrade to a no-op — it FAILS the command,
+     * which is why this whole spec died in its before-all hook and skipped five tests.
+     * Same flow CRE-09 uses; 5 days, formatted LOCAL (toISOString is UTC and can land on
+     * the wrong day near midnight), inside the modal's 1h..21d bounds.
+     */
+    const end = new Date(Date.now() + 5 * 24 * 3600 * 1000)
     const p2 = (n) => String(n).padStart(2, '0')
     const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
-    cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
+    cy.get('.fm-stat-tiles', { timeout: 10000 }).contains('button', /ends/i).click()
+    cy.get('.stm-input', { timeout: 10000 }).clear().type(dtl)
+    cy.get('.stm-dialog').contains('button', /^set$/i).click()
     // Leave the encryption toggle ON (do NOT uncheck).
     cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
     // The encrypted metadata is uploaded to (mocked) IPFS during create.

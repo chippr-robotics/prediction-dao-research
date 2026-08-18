@@ -15,8 +15,13 @@ const OPP = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'  // #0
 
 function connectAsUser() {
   cy.mockWeb3Provider({ account: USER })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  /*
+   * visitWagers, not /fairwins: spec 073 moved the quick-action cards to
+   * Finance > Transfer > Wagers, and /fairwins (still routed, still rendering HomeScreen)
+   * stopped hosting them. Both EXP tests died in openCreateWagerModal looking for a card
+   * the page it was on no longer renders.
+   */
+  cy.visitWagers()
   cy.connectWallet()
 }
 
