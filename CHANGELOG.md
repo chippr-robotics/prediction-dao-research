@@ -14,6 +14,45 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.11.0 — 2026-08-17
+
+Promoted from: v1.11.0-rc.6
+Previous release: v1.10.1 · Range: `v1.10.1..v1.11.0` (29 commits)
+
+### 🚀 Features
+
+- feat(057): enable passkey smart accounts to trade on Predict via the CLOB's ERC-1271 rail
+- feat(store): bound catalog sections as horizontal rails with a full-list modal
+- feat(093): surface admin mini-apps in the Apps store with Quick Access pinning
+- feat(093): decompose AdminPanel into role-gated admin mini-apps
+
+### 🐛 Bug Fixes
+
+- fix(finops): fold in the billing-export classification, with its premise corrected
+- fix(finops): the alert rules were all firing on a healthy estate
+- fix(057): address review — pin passkey approvals to Polygon, un-stale the session credential
+- fix(finops): stamp the reading and its last-good cache from ONE clock read
+- fix(finops): a freshly enabled billing export is not-configured, not broken
+- fix(ci): the auto back-merge PR could not satisfy its own required checks
+
+### 📚 Documentation
+
+- docs: correct the spec-067 router deployment status in the agent guide
+- spec(093): admin mini-apps — granular operations control
+- docs(runbook): credential rotation and the connected-systems inventory
+
+### Artifacts
+
+Range: `v1.10.1..v1.11.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.10.1 — 2026-08-16
 
 Promoted from: v1.10.1-rc.2
