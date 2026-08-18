@@ -157,6 +157,13 @@ describe('Claim Payouts', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. Same misclassification
+     * as 07: the interceptIpfs sweep grepped for the shared create helpers and this file's
+     * local createAcceptAndResolve matched nothing — but it opens the create modal, and its
+     * mandatory metadata upload died unstubbed (CLM-01's "Wager Created" timeout).
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------

@@ -65,10 +65,14 @@ function createWager(config = {}) {
   }
 
   if (opts.arbitrator) {
-    cy.get('[role="dialog"]').within(() => {
-      cy.get('input[placeholder*="0x"]').last().clear().type(opts.arbitrator)
-    })
-    cy.wait(500)
+    /*
+     * `#fm-arbitrator`, not `input[placeholder*="0x"].last()` — the arbitrator input only
+     * renders once ThirdParty is selected, so before that `.last()` IS the opponent field and
+     * the helper overwrote the opponent with the arbitrator (04's helper documented and fixed
+     * the same trap). Wait for resolution, not a fixed 500ms.
+     */
+    cy.get('#fm-arbitrator', { timeout: 10000 }).clear().type(opts.arbitrator)
+    cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('have.length.greaterThan', 1)
   }
 
   // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
@@ -181,6 +185,15 @@ describe('Manual Resolution', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. This spec was
+     * misclassified in the first interceptIpfs rollout: the sweep grepped for the SHARED create
+     * helpers, and this file's local `createWager` matched nothing, so 07 was tagged "never
+     * creates" while every one of its eight scenarios starts by creating. Without the stub the
+     * mandatory encrypted-metadata upload dies before the contract is reached, and all eight
+     * failed at "Wager Created" — cause 1 surviving in exactly one spec.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------
