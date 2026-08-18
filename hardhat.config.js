@@ -437,7 +437,14 @@ module.exports = {
   },
   networks: {
     hardhat: {
-      chainId: 1337,
+      // Default 1337. The full E2E tier boots the node as HARDHAT_LOCAL_CHAIN_ID=80002 so the
+      // local chain IS the app's membership home: spec 071 pins membership reads AND purchase
+      // settlement to membershipChainId() (Amoy on a testnet cohort), and that constant is
+      // deliberately not runtime-configurable — so the node impersonates Amoy rather than the
+      // app being taught to trust a different chain. Local deploys are deterministic by
+      // (deployer, nonce), which is chain-id-independent, so the deployed addresses are
+      // byte-identical to the committed 1337 set.
+      chainId: Number(process.env.HARDHAT_LOCAL_CHAIN_ID) || 1337,
       allowUnlimitedContractSize: true,
       // Coverage instrumentation balloons the WagerRegistry deploy far past 2**24 gas.
       // Hardhat's default hardfork (osaka) enables EIP-7825, which CAPS per-tx gas at

@@ -366,7 +366,7 @@ Cypress.Commands.add('connectWalletFresh', () => {
 /**
  * Verify the connected network chain ID.
  */
-Cypress.Commands.add('verifyNetwork', (expectedChainId = 1337) => {
+Cypress.Commands.add('verifyNetwork', (expectedChainId = Number(Cypress.env('NETWORK_ID')) || 1337) => {
   cy.window().then((win) => {
     if (win.ethereum) {
       return win.ethereum.request({ method: 'eth_chainId' })

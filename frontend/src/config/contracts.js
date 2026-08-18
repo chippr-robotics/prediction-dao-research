@@ -245,9 +245,24 @@ const ARBITRUM_CONTRACTS = {
   accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
 }
 
+/*
+ * Full-E2E seam (spec 071 collision): the tier's local hardhat node boots AS chainId 80002 so
+ * the local chain is the app's membership home — membershipChainId() is deliberately not
+ * runtime-configurable, so the node impersonates Amoy rather than the app trusting a new chain.
+ * On that node the deployed addresses are byte-identical to HARDHAT_CONTRACTS (local deploys
+ * are deterministic by deployer+nonce, which is chain-id-independent), so 80002 resolves to the
+ * hardhat set.
+ *
+ * DEV-guarded like the spec-085 hardware test adapter: `import.meta.env.DEV &&` makes the whole
+ * branch dead code in any production bundle — a shipped build cannot be pointed at this even
+ * with the variable set.
+ */
+const E2E_AMOY_LOCAL =
+  Boolean(import.meta.env?.DEV) && import.meta.env?.VITE_E2E_AMOY_LOCAL === '1'
+
 const NETWORK_CONTRACTS = {
   63: MORDOR_CONTRACTS,     // Mordor (Ethereum Classic testnet, v2 core-only)
-  80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
+  80002: E2E_AMOY_LOCAL ? HARDHAT_CONTRACTS : AMOY_CONTRACTS, // Polygon Amoy (v2) — or the local impersonation (E2E)
   137: POLYGON_CONTRACTS,   // Polygon mainnet (v2) — LIVE
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
   // Spec 068 — custody only (Protect vaults + policy engine; no wager/membership here).

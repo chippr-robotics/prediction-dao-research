@@ -61,8 +61,16 @@ const KEYREG_ABI = [
  * the same source `sync:frontend-contracts` mirrors into the UI's
  * HARDHAT_CONTRACTS, so the addresses match what the app uses.
  */
+// The chain id this session's mock claims and the tasks target. Default stays 1337 because this
+// config also serves the FAST tier, whose specs assert against the chain the mock claims — a
+// changed default would silently re-cohort them. The FULL tier's entry points (the CI job and
+// scripts that boot hardhat AS Amoy via HARDHAT_LOCAL_CHAIN_ID=80002) pass CYPRESS_NETWORK_ID=80002
+// so the local node is the app's membership home; see hardhat.config.js for why impersonation
+// rather than reconfiguration.
+const E2E_CHAIN_ID = Number(process.env.CYPRESS_NETWORK_ID) || 1337
+
 function loadLocalDeployment() {
-  const path = resolve(__dirname, '..', 'deployments', 'localhost-chain1337-v2.json')
+  const path = resolve(__dirname, '..', 'deployments', `localhost-chain${E2E_CHAIN_ID}-v2.json`)
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
@@ -87,8 +95,9 @@ export default defineConfig({
     responseTimeout: 30000,
 
     env: {
-      // Hardhat local testnet configuration
-      NETWORK_ID: 1337,
+      // Hardhat local testnet configuration (Amoy-shaped when the full tier passes
+      // CYPRESS_NETWORK_ID=80002 — see E2E_CHAIN_ID above)
+      NETWORK_ID: E2E_CHAIN_ID,
       RPC_URL: 'http://localhost:8545',
       // Test wallet private key (Hardhat account #0 — holds all admin roles locally)
       PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
@@ -123,7 +132,7 @@ export default defineConfig({
          */
         async chainTx({ action, args = {} }) {
           const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
-          const provider = new ethers.JsonRpcProvider(rpcUrl, 1337, { staticNetwork: true })
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
           const wallet = new ethers.Wallet(config.env.PRIVATE_KEY, provider)
           const d = loadLocalDeployment()
           const registry = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, wallet)
@@ -250,7 +259,7 @@ export default defineConfig({
 
         /** Read the latest wager id (nextWagerId - 1) for status/winner assertions. */
         async lastWagerId() {
-          const provider = new ethers.JsonRpcProvider(config.env.RPC_URL, 1337, { staticNetwork: true })
+          const provider = new ethers.JsonRpcProvider(config.env.RPC_URL, E2E_CHAIN_ID, { staticNetwork: true })
           const d = loadLocalDeployment()
           const registry = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
           const next = await registry.nextWagerId()
