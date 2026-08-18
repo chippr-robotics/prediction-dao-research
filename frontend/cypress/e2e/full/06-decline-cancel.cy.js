@@ -272,23 +272,28 @@ describe('Decline and Cancel Wagers', () => {
 
     // Look for an active wager
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const activeBadge = $panel.find('.status-active, :contains("Active")')
-      if (activeBadge.length > 0) {
-        // Click on the active wager
-        const rows = $panel.find('.mm-table-row')
-        if (rows.length > 0) {
-          cy.wrap(rows.first()).click()
+      /*
+       * Open the row that is actually ACTIVE.
+       *
+       * This used to ask whether an Active badge existed ANYWHERE in the panel and then open
+       * `rows.first()` — a different wager whenever the newest row was not the active one. A
+       * pending offer legitimately carries a Cancel button, so the assertion below ("an active
+       * wager offers no Cancel") failed against a row it was never meant to inspect. It passed
+       * for as long as ordering happened to put the active wager first.
+       */
+      const activeRows = $panel.find('.mm-table-row').filter((_, el) => /active/i.test(el.textContent || ''))
+      if (activeRows.length > 0) {
+        cy.wrap(activeRows.first()).click()
 
-          cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
 
-          // Active wager should NOT have Withdraw or Cancel button
-          cy.get('.mm-detail').then(($detail) => {
-            const withdrawBtn = $detail.find('button:contains("Withdraw")')
-            const cancelBtn = $detail.find('button:contains("Cancel")')
-            // Either no withdraw/cancel buttons, or they should not be for this wager
-            expect(withdrawBtn.length + cancelBtn.length).to.be.lte(0)
-          })
-        }
+        // Active wager should NOT have Withdraw or Cancel button
+        cy.get('.mm-detail').then(($detail) => {
+          const withdrawBtn = $detail.find('button:contains("Withdraw")')
+          const cancelBtn = $detail.find('button:contains("Cancel")')
+          // Either no withdraw/cancel buttons, or they should not be for this wager
+          expect(withdrawBtn.length + cancelBtn.length).to.be.lte(0)
+        })
       } else {
         // No active wagers — verify at the state level
         cy.get('.mm-panel').invoke('text').then((text) => {
