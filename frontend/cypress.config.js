@@ -67,7 +67,7 @@ const KEYREG_ABI = [
 // scripts that boot hardhat AS Amoy via HARDHAT_LOCAL_CHAIN_ID=80002) pass CYPRESS_NETWORK_ID=80002
 // so the local node is the app's membership home; see hardhat.config.js for why impersonation
 // rather than reconfiguration.
-const E2E_CHAIN_ID = Number(process.env.CYPRESS_NETWORK_ID) || 1337
+const E2E_CHAIN_ID = Number(globalThis.process?.env?.CYPRESS_NETWORK_ID) || 1337
 
 function loadLocalDeployment() {
   const path = resolve(__dirname, '..', 'deployments', `localhost-chain${E2E_CHAIN_ID}-v2.json`)

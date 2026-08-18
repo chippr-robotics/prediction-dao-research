@@ -334,10 +334,20 @@ Cypress.Commands.add('connectWallet', () => {
    *
    * Clearing localStorage/cookies in a beforeEach does not undo it: the flag is not stored there.
    */
-  cy.get('body').then(($body) => {
-    if ($body.find('.wallet-account-button, button[aria-label="Wallet Account"]').length > 0) {
-      return
-    }
+  /*
+   * WAIT for a terminal state before branching — a one-shot jQuery check races wagmi's async
+   * session restore. After cy.reload() the closure's `authorized` flag makes eth_accounts
+   * non-empty, wagmi reconnects a beat later, and a synchronous look at the body sees NEITHER
+   * button yet: the check concluded "not connected", went to the fresh-connect ceremony, and
+   * then waited on a Connect button that never renders on an already-connected page. Waiting
+   * for whichever button appears makes the branch race-free.
+   */
+  cy.get(
+    '.wallet-account-button, button[aria-label="Wallet Account"], .wallet-connect-button, button[aria-label="Connect Wallet"]',
+    { timeout: 10000 }
+  ).then(($el) => {
+    const connected = $el.filter('.wallet-account-button, [aria-label="Wallet Account"]').length > 0
+    if (connected) return
     cy.connectWalletFresh()
   })
 })
