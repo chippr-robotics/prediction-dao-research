@@ -126,9 +126,14 @@ describe('Wager Creation with Real Transactions', () => {
   before(() => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
     // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
-    // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    // The chain checkpoint reverts state per spec, so this runs once per spec.
+    //
+    // #2 (the arbitrator) is in the list because CRE-06's ThirdParty wager encrypts the
+    // private terms TO THE ARBITRATOR as well (FriendMarketsModal.jsx:936-943) — without
+    // #2's key the create dies with "The arbitrator has not registered their encryption
+    // key yet", 60 seconds after the submit, looking like a transaction failure.
     cy.ensureWagerCapacity([0, 1])
-    cy.ensureEncryptionKeys([0, 1])
+    cy.ensureEncryptionKeys([0, 1, 2])
   })
 
   beforeEach(() => {
@@ -341,16 +346,25 @@ describe('Wager Creation with Real Transactions', () => {
 
     cy.enterAmountViaKeypad('fm-stake', '5')
 
-    // Set a custom end date (7 days from now)
-    const futureDate = new Date()
-    futureDate.setDate(futureDate.getDate() + 7)
-    const formattedDate = futureDate.toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm
-    cy.get('#fm-end-date, [role="dialog"] input[type="datetime-local"]')
-      .first()
-      .clear()
-      .type(formattedDate)
-
-    // Encryption is ON by default and no longer optional (see note above).
+    /*
+     * The end date is NOT a form input. Spec 038 replaced `#fm-end-date` with the
+     * DeadlineTimeline: milestones on a shared track, where tapping the editable
+     * ENDS tile (a <button>, "Tap to set") opens SetTimeModal — the single exact
+     * date-and-time entry point — whose datetime-local input is `.stm-input` and
+     * whose confirm button is "Set". The old selector matched nothing.
+     *
+     * +5 days, formatted LOCAL (toISOString is UTC and can be off by a day at
+     * midnight boundaries); the flow bounds the end time at min 1h / max 21d.
+     */
+    const futureDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+    const pad = (n) => String(n).padStart(2, '0')
+    const localStamp = `${futureDate.getFullYear()}-${pad(futureDate.getMonth() + 1)}-${pad(futureDate.getDate())}T${pad(futureDate.getHours())}:${pad(futureDate.getMinutes())}`
+    cy.get('.fm-stat-tiles', { timeout: 10000 }).contains('button', /ends/i).click()
+    cy.get('.stm-input', { timeout: 10000 }).clear().type(localStamp)
+    cy.get('.stm-dialog').contains('button', /^set$/i).click()
+    // The tile reflects the chosen day — proof the modal actually applied it.
+    cy.get('.fm-stat-tiles').contains('button', /ends/i)
+      .should('contain.text', String(futureDate.getDate()))
 
     submitWagerForm()
     assertWagerCreated()

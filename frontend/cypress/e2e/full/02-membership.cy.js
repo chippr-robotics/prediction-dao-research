@@ -2,82 +2,122 @@
  * E2E Tests: Membership Purchase / Upgrade / Extend (Full-tier)
  *
  * Requires a running Hardhat node with deployed contracts (chain 1337).
- * Tests real contract TXs for tier purchase, upgrade, renewal, and edge cases.
+ * Drives real MembershipManager purchases through PremiumPurchaseModal.
+ *
+ * RESTRUCTURED (#1028): the original reached the modal through a
+ * `.cta-banner-btn` that no longer exists on /fairwins (HomeScreen carries no
+ * membership button at all), and re-used one bystander for every purchase —
+ * after the first buy the account was a member, and the non-member entry it
+ * needed is deliberately absent for members ("Never show both at once",
+ * WalletButton.jsx). Three rules govern this version:
+ *
+ *  1. THE ENTRY POINT IS THE ACCOUNT DROPDOWN. Non-members buy via
+ *     `.purchase-access-btn` ("Get Access"); members manage via the
+ *     "Membership" menu item (→ /wallet?tab=membership) and upgrade/extend
+ *     via RoleDetailsSection. Asserting the right entry per state is itself
+ *     part of the test.
+ *  2. EVERY TEST MANUFACTURES ITS OWN FIXTURE at test time — a fresh hardhat
+ *     account per purchase (any of the node's unlocked accounts can sign;
+ *     the mock synthesizes per-account personal_sign), funded with
+ *     cy.fundAccount. No test depends on a previous test's leftovers.
+ *  3. CLOCK-ADVANCING TESTS RUN LAST (MEM-06 extend, MEM-13 expired).
+ *     evm_increaseTime cannot be undone within a spec, so an advance
+ *     mid-file would silently expire every membership bought before it.
+ *     The cross-SPEC reset is the support file's chainCheckpoint.
  *
  * Checklist: MEM-01..MEM-13
  */
 
 const TEST_ACCOUNTS = [
-  '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // #0 Creator / Admin
-  '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', // #1 Opponent
-  '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', // #2 Arbitrator
-  '0x90F79bf6EB2c4f870365E785982E1f101E93b906', // #3 Guardian
-  '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', // #4 Bystander
+  '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // #0 Creator / Admin (seeded member, tier 4)
+  '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', // #1 Opponent (seeded member)
+  '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', // #2 Arbitrator — non-member, NEVER funded (MEM-09/13)
+  '0x90F79bf6EB2c4f870365E785982E1f101E93b906', // #3 Guardian — non-member
+  '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', // #4 Bystander — non-member
 ]
 
-/**
- * Connect wallet and open the PremiumPurchaseModal.
- * The dashboard CTA banner or a direct "Get Membership" button triggers
- * the modal overlay (class .ppm-overlay, role="dialog").
- */
-function connectAndOpenMembershipModal(accountIndex = 0) {
-  cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
+// Fresh buyers: hardhat default accounts #5..#11 — one per purchase test, so
+// every purchase starts from an honest non-member state within the same spec.
+const BUYERS = {
+  bronze: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',   // #5
+  silver: '0x976EA74026E726554dB657fA54763abd0C3a0aa9',   // #6
+  gold: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955',     // #7
+  platinum: '0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f', // #8
+  upgrade: '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720',  // #9
+  reject: '0xBcd4042DE499D14e55001CcbB24a551F3b954096',   // #10
+  extend: '0x71bE63f3384f5fb98995898A86B02Fb2426c5788',   // #11
+  downgrade: '0xFABB0ac9d68B0B445fB7357272Ff202C5651694a',// #12
+}
+
+/** Connect the given address on /fairwins. */
+function connectAs(address) {
+  cy.mockWeb3Provider({ account: address })
   cy.visit('/fairwins')
   cy.get('body', { timeout: 10000 }).should('be.visible')
-
-  // Connect wallet via the header connect button
   cy.connectWallet()
-
-  // Open membership modal via dashboard CTA or quick action
-  cy.get('body').then(($body) => {
-    const ctaBtn = $body.find('.cta-banner-btn.primary')
-    if (ctaBtn.length > 0) {
-      cy.wrap(ctaBtn.first()).click()
-    } else {
-      // Fallback: look for any "Get Membership" or "Get Access" button
-      cy.contains('button', /get membership|get access|membership/i).click()
-    }
-  })
-
-  cy.get('.ppm-overlay, [role="dialog"]', { timeout: 5000 }).should('be.visible')
 }
 
 /**
- * Select a membership tier by name in the PremiumPurchaseModal.
+ * Open the account dropdown. Scroll to the top first — the button lives in a
+ * position:fixed header and is refused as "covered" from a scrolled page
+ * (same trap as cy.assertActiveAccount).
  */
+function openAccountDropdown() {
+  cy.scrollTo('top', { ensureScrollable: false })
+  cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible').click()
+}
+
+/**
+ * Non-member purchase entry: dropdown → "Get Access". The button's PRESENCE
+ * is part of the assertion — it renders only for non-members, so finding it
+ * proves the account state as well as the affordance.
+ */
+function openPurchaseModal() {
+  openAccountDropdown()
+  cy.get('.purchase-access-btn', { timeout: 10000 }).should('be.visible').click()
+  cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
+}
+
 function selectTier(tierName) {
-  cy.get('.ppm-tier-card', { timeout: 5000 }).should('have.length.gte', 1)
+  cy.get('.ppm-tier-card', { timeout: 10000 }).should('have.length.gte', 1)
   cy.contains('.ppm-tier-card', new RegExp(tierName, 'i')).click()
-  cy.contains('.ppm-tier-card', new RegExp(tierName, 'i'))
-    .should('have.class', 'selected')
+  cy.contains('.ppm-tier-card', new RegExp(tierName, 'i')).should('have.class', 'selected')
 }
 
-/**
- * Advance through the purchase modal steps and complete the purchase.
- * Assumes a tier is already selected.
- */
+/** Drive the modal steps to completion. Assumes a tier is selected. */
 function completePurchase() {
-  // Step 1 → Step 2: click Next / Continue
   cy.contains('button', /next|continue/i).click()
-
-  // Step 2 (Review): acknowledge operator-powers notice
-  cy.get('.ppm-panel', { timeout: 5000 }).should('be.visible')
-  cy.get('input[type="checkbox"]', { timeout: 5000 }).check({ force: true })
-
-  // Click Purchase / Confirm
+  cy.get('.ppm-panel', { timeout: 10000 }).should('be.visible')
+  cy.get('input[type="checkbox"]', { timeout: 10000 }).check({ force: true })
   cy.contains('button', /purchase|confirm|pay/i).click()
+  // The modal reaches its Complete step only after the real tx mines.
+  cy.get('.ppm-step.completed', { timeout: 60000 }).should('have.length.gte', 2)
+}
 
-  // Wait for TX completion — the modal moves to step 3 (Complete)
-  cy.get('.ppm-step.completed', { timeout: 30000 }).should('have.length.gte', 2)
+function assertPurchaseSuccess() {
+  cy.get('.ppm-overlay', { timeout: 10000 })
+    .invoke('text')
+    .should('match', /activated|complete|success/i)
+}
+
+/** Fund + buy one tier as a fresh non-member. The shared body of MEM-01..04. */
+function purchaseTierFresh(buyer, tierName) {
+  cy.fundAccount(buyer)
+  connectAs(buyer)
+  openPurchaseModal()
+  selectTier(tierName)
+  cy.get('.ppm-overlay').invoke('text').should('match', new RegExp(tierName, 'i'))
+  cy.get('.ppm-overlay').invoke('text').should('match', /usdc/i)
+  completePurchase()
+  assertPurchaseSuccess()
 }
 
 describe('Membership Purchase / Upgrade / Extend', () => {
   before(() => {
-    // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
-    // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
-    // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    // Deterministic member fixture for the member-path tests (MEM-07/10):
+    // seed-local grants membership, but pinning tier 4 / 365d here means those
+    // tests assert against a KNOWN state rather than whatever the seed did.
     cy.ensureWagerCapacity([0, 1])
-    cy.ensureEncryptionKeys([0, 1])
   })
 
   beforeEach(() => {
@@ -85,404 +125,178 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     cy.clearCookies()
   })
 
-  // ---------------------------------------------------------------------------
-  // MEM-01: Purchase Bronze tier ($2 USDC)
-  // ---------------------------------------------------------------------------
+  // ── Purchases: one fresh, funded buyer per tier ────────────────────────────
+
   it('[MEM-01] Purchase Bronze membership ($2 USDC)', () => {
-    connectAndOpenMembershipModal(4) // Bystander — no existing tier
-
-    selectTier('Bronze')
-
-    // Verify price displayed
-    cy.get('.ppm-overlay').invoke('text').should('match', /bronze/i)
-    cy.get('.ppm-tier-price, .ppm-overlay').invoke('text').then((text) => {
-      expect(text.toLowerCase()).to.include('usdc')
-    })
-
-    completePurchase()
-
-    // Verify success state
-    cy.get('.ppm-overlay').invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const isSuccess = lower.includes('activated') ||
-                       lower.includes('complete') ||
-                       lower.includes('success') ||
-                       lower.includes('bronze')
-      expect(isSuccess).to.be.true
-    })
+    purchaseTierFresh(BUYERS.bronze, 'Bronze')
   })
 
-  // ---------------------------------------------------------------------------
-  // MEM-02: Purchase Silver tier ($8 USDC)
-  // ---------------------------------------------------------------------------
   it('[MEM-02] Purchase Silver membership ($8 USDC)', () => {
-    connectAndOpenMembershipModal(4)
-
-    selectTier('Silver')
-
-    cy.get('.ppm-overlay').invoke('text').should('match', /silver/i)
-
-    completePurchase()
-
-    cy.get('.ppm-overlay').invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      expect(lower.includes('activated') || lower.includes('complete') || lower.includes('success')).to.be.true
-    })
+    purchaseTierFresh(BUYERS.silver, 'Silver')
   })
 
-  // ---------------------------------------------------------------------------
-  // MEM-03: Purchase Gold tier ($25 USDC)
-  // ---------------------------------------------------------------------------
   it('[MEM-03] Purchase Gold membership ($25 USDC)', () => {
-    connectAndOpenMembershipModal(4)
-
-    selectTier('Gold')
-
-    cy.get('.ppm-overlay').invoke('text').should('match', /gold/i)
-
-    completePurchase()
-
-    cy.get('.ppm-overlay').invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      expect(lower.includes('activated') || lower.includes('complete') || lower.includes('success')).to.be.true
-    })
+    purchaseTierFresh(BUYERS.gold, 'Gold')
   })
 
-  // ---------------------------------------------------------------------------
-  // MEM-04: Purchase Platinum tier ($100 USDC)
-  // ---------------------------------------------------------------------------
   it('[MEM-04] Purchase Platinum membership ($100 USDC)', () => {
-    connectAndOpenMembershipModal(4)
-
-    selectTier('Platinum')
-
-    cy.get('.ppm-overlay').invoke('text').should('match', /platinum/i)
-
-    completePurchase()
-
-    cy.get('.ppm-overlay').invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      expect(lower.includes('activated') || lower.includes('complete') || lower.includes('success')).to.be.true
-    })
+    purchaseTierFresh(BUYERS.platinum, 'Platinum')
   })
 
-  // ---------------------------------------------------------------------------
-  // MEM-05: Upgrade from Bronze to Silver (delta charge)
-  // ---------------------------------------------------------------------------
-  it('[MEM-05] Upgrade from Bronze to Silver (delta charge)', () => {
-    // First purchase Bronze
-    connectAndOpenMembershipModal(1) // Opponent account
+  // ── Post-purchase / member paths ───────────────────────────────────────────
 
-    selectTier('Bronze')
-    completePurchase()
-
-    // Close modal and reopen for upgrade
-    cy.get('.ppm-close-btn, button[aria-label="Close modal"]').click()
-
-    // Reopen with upgrade intent — look for upgrade button or CTA
-    cy.get('body').then(($body) => {
-      const upgradeBtn = $body.find('button:contains("Upgrade")')
-      if (upgradeBtn.length > 0) {
-        cy.wrap(upgradeBtn.first()).click()
-      } else {
-        // Reopen membership modal — available tiers should exclude Bronze
-        const ctaBtn = $body.find('.cta-banner-btn.primary, button:contains("Membership")')
-        if (ctaBtn.length > 0) {
-          cy.wrap(ctaBtn.first()).click()
-        }
-      }
-    })
-
-    cy.get('.ppm-overlay, [role="dialog"]', { timeout: 5000 }).then(($overlay) => {
-      if ($overlay.length > 0) {
-        // Should show current tier info
-        cy.get('.ppm-overlay').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          // Should mention current tier or only show higher tiers
-          const showsUpgrade = lower.includes('current') ||
-                              lower.includes('upgrade') ||
-                              lower.includes('bronze') ||
-                              lower.includes('silver')
-          expect(showsUpgrade).to.be.true
-        })
-
-        // Select Silver
-        cy.get('.ppm-tier-card').then(($cards) => {
-          const silverCard = $cards.filter(':contains("Silver")')
-          if (silverCard.length > 0) {
-            cy.wrap(silverCard.first()).click()
-            completePurchase()
-
-            cy.get('.ppm-overlay').invoke('text').then((text) => {
-              const lower = text.toLowerCase()
-              expect(lower.includes('activated') || lower.includes('complete') || lower.includes('success')).to.be.true
-            })
-          } else {
-            // Bronze not yet committed on-chain; this is expected in some flows
-            expect($cards.length).to.be.greaterThan(0)
-          }
-        })
-      }
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // MEM-06: Extend / renew membership
-  // ---------------------------------------------------------------------------
-  it('[MEM-06] Extend / renew membership', () => {
-    connectAndOpenMembershipModal(2) // Arbitrator account
-
-    // Purchase initial tier
-    selectTier('Bronze')
-    completePurchase()
-
-    // Close and look for "Extend" option
-    cy.get('.ppm-close-btn, button[aria-label="Close modal"]').click()
-
-    cy.get('body').then(($body) => {
-      const extendBtn = $body.find('button:contains("Extend"), button:contains("Renew")')
-      if (extendBtn.length > 0) {
-        cy.wrap(extendBtn.first()).click()
-        cy.get('.ppm-overlay, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-
-        // The extend flow should show current tier and allow re-purchase
-        cy.get('.ppm-overlay').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          expect(lower.includes('extend') || lower.includes('renew') || lower.includes('bronze')).to.be.true
-        })
-      } else {
-        // Extension may not be available if tier doesn't persist in mock; verify flow exists
-        expect(true).to.be.true
-      }
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // MEM-07: View membership status
-  // ---------------------------------------------------------------------------
-  it('[MEM-07] View membership status', () => {
-    connectAndOpenMembershipModal(0) // Creator account
-
-    // The modal or dashboard should display the user's current tier info
-    cy.get('.ppm-overlay, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-
-    // Check for tier-related information in the modal
-    cy.get('.ppm-overlay').invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      // Should display tier information, prices, or current membership status
-      const hasTierInfo = lower.includes('bronze') ||
-                         lower.includes('silver') ||
-                         lower.includes('gold') ||
-                         lower.includes('platinum') ||
-                         lower.includes('tier') ||
-                         lower.includes('usdc') ||
-                         lower.includes('membership')
-      expect(hasTierInfo).to.be.true
-    })
-
-    // Verify tier cards display pricing and limits
-    cy.get('.ppm-tier-card').should('have.length.gte', 1)
-    cy.get('.ppm-tier-card').first().within(() => {
-      cy.get('.ppm-tier-price, .ppm-tier-header').should('exist')
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // MEM-08: Auto-register encryption key on purchase
-  // ---------------------------------------------------------------------------
   it('[MEM-08] Auto-register encryption key on purchase', () => {
-    connectAndOpenMembershipModal(3) // Guardian account
-
+    // A fresh buyer has no key in KeyRegistry; the purchase flow derives and
+    // registers one, and the completion screen reports it.
+    cy.hasRegisteredKey(TEST_ACCOUNTS[3]).should('eq', false)
+    cy.fundAccount(TEST_ACCOUNTS[3])
+    connectAs(TEST_ACCOUNTS[3])
+    openPurchaseModal()
     selectTier('Bronze')
     completePurchase()
-
-    // After purchase, the modal shows key registration status
-    // (success, skipped, or failed — all are non-blocking post-purchase steps)
-    cy.get('.ppm-overlay', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const hasKeyInfo = lower.includes('encryption') ||
-                        lower.includes('key') ||
-                        lower.includes('registered') ||
-                        lower.includes('activated') ||
-                        lower.includes('complete')
-      expect(hasKeyInfo).to.be.true
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // MEM-09: Insufficient USDC balance
-  // ---------------------------------------------------------------------------
-  it('[MEM-09] Insufficient USDC balance shows error', () => {
-    // Use an account that may not have been funded with USDC
-    // The mock provider returns 100 ETH but the contract needs USDC
-    connectAndOpenMembershipModal(4) // Bystander
-
-    selectTier('Platinum') // $100 — highest chance of exceeding balance
-
-    // Attempt purchase
-    cy.contains('button', /next|continue/i).click()
-    cy.get('input[type="checkbox"]', { timeout: 5000 }).check({ force: true })
-    cy.contains('button', /purchase|confirm|pay/i).click()
-
-    // Should show an error about insufficient balance or TX failure
-    cy.get('.ppm-overlay', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const hasError = lower.includes('insufficient') ||
-                      lower.includes('balance') ||
-                      lower.includes('failed') ||
-                      lower.includes('error') ||
-                      lower.includes('not enough') ||
-                      lower.includes('activated') // may succeed on funded Hardhat
-      expect(hasError).to.be.true
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // MEM-10: Purchase when already active
-  // ---------------------------------------------------------------------------
-  it('[MEM-10] Purchase when already active shows current tier', () => {
-    connectAndOpenMembershipModal(0) // Creator — may already have a tier
-
-    cy.get('.ppm-overlay', { timeout: 5000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      // If already at max tier, should indicate "Maximum Tier Reached"
-      // If not, should show available tiers above current
-      const validState = lower.includes('maximum tier') ||
-                        lower.includes('current membership') ||
-                        lower.includes('upgrade') ||
-                        lower.includes('tier') ||
-                        lower.includes('bronze') ||
-                        lower.includes('silver') ||
-                        lower.includes('gold') ||
-                        lower.includes('platinum')
-      expect(validState).to.be.true
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // MEM-11: Downgrade attempt (select lower tier than current)
-  // ---------------------------------------------------------------------------
-  it('[MEM-11] Downgrade attempt blocked', () => {
-    connectAndOpenMembershipModal(0)
-
-    // The available tiers grid should only show tiers HIGHER than the
-    // current one (or same-tier for extend). Lower tiers should be absent.
-    cy.get('.ppm-overlay').invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      if (lower.includes('maximum tier')) {
-        // Already Platinum — no upgrades available, downgrade impossible
-        expect(lower).to.include('maximum tier')
-      } else if (lower.includes('current membership')) {
-        // Has a tier — verify only higher tiers are shown
-        cy.get('.ppm-tier-card').each(($card) => {
-          const cardText = $card.text().toLowerCase()
-          // Each displayed card should be a valid upgrade option
-          expect(cardText.length).to.be.greaterThan(0)
-        })
-      } else {
-        // No current tier — all tiers available (no downgrade scenario)
-        cy.get('.ppm-tier-card').should('have.length.gte', 1)
-      }
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // MEM-12: Reject USDC approval
-  // ---------------------------------------------------------------------------
-  it('[MEM-12] Reject USDC approval aborts purchase', () => {
-    // Override mock provider to reject the approval TX
-    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[4] })
-    cy.on('window:before:load', (win) => {
-      // Patch the existing mock to reject personal_sign or eth_sendTransaction
-      const originalRequest = win.ethereum?.request
-      if (originalRequest) {
-        const patched = ({ method, params }) => {
-          if (method === 'eth_sendTransaction') {
-            return Promise.reject(new Error('User rejected the request'))
-          }
-          return originalRequest({ method, params })
-        }
-        win.ethereum.request = patched
-      }
-    })
-
-    cy.visit('/fairwins')
-    cy.get('body', { timeout: 10000 }).should('be.visible')
-
-    // Connect wallet
-    cy.connectWallet()
-
-    // Open membership modal
-    cy.get('body').then(($body) => {
-      const ctaBtn = $body.find('.cta-banner-btn.primary')
-      if (ctaBtn.length > 0) {
-        cy.wrap(ctaBtn.first()).click()
-      } else {
-        cy.contains('button', /get membership|get access|membership/i).click()
-      }
-    })
-
-    cy.get('.ppm-overlay, [role="dialog"]', { timeout: 5000 }).then(($modal) => {
-      if ($modal.length > 0) {
-        selectTier('Bronze')
-        cy.contains('button', /next|continue/i).click()
-        cy.get('input[type="checkbox"]', { timeout: 5000 }).check({ force: true })
-        cy.contains('button', /purchase|confirm|pay/i).click()
-
-        // Should show rejection/error message
-        cy.get('.ppm-overlay', { timeout: 15000 }).invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const hasRejection = lower.includes('rejected') ||
-                              lower.includes('cancelled') ||
-                              lower.includes('failed') ||
-                              lower.includes('error') ||
-                              lower.includes('denied') ||
-                              lower.includes('user rejected')
-          expect(hasRejection).to.be.true
-        })
-      }
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // MEM-13: Expired membership prevents wager creation
-  // ---------------------------------------------------------------------------
-  it('[MEM-13] Expired membership prevents wager creation', () => {
-    // Advance time beyond the 30-day membership period
-    cy.advanceTime(31 * 24 * 60 * 60) // 31 days
-
-    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0] })
-    cy.visit('/fairwins')
-    cy.get('body', { timeout: 10000 }).should('be.visible')
-
-    // Connect wallet
-    cy.connectWallet()
-
-    // Attempt to create a wager
-    cy.openCreateWagerModal('oneVsOne')
-
-    // Fill form and submit
-    cy.fillWagerForm({
-      opponent: TEST_ACCOUNTS[1],
-      description: 'Test wager with expired membership',
-      stake: 10,
-    })
-
-    cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
-
-    // Should show membership error or CTA to renew
-    cy.get('[role="dialog"], .modal, .ppm-overlay, body', { timeout: 15000 })
+    cy.get('.ppm-overlay', { timeout: 30000 })
       .invoke('text')
-      .then((text) => {
-        const lower = text.toLowerCase()
-        const hasMembershipRef = lower.includes('membership') ||
-                                lower.includes('expired') ||
-                                lower.includes('renew') ||
-                                lower.includes('purchase') ||
-                                lower.includes('denied') ||
-                                lower.includes('not authorized') ||
-                                lower.includes('get access')
-        expect(hasMembershipRef).to.be.true
-      })
+      .should('match', /encryption|key|registered|activated|complete/i)
+  })
+
+  it('[MEM-05] Upgrade from Bronze to Silver (delta charge)', () => {
+    cy.fundAccount(BUYERS.upgrade)
+    connectAs(BUYERS.upgrade)
+    openPurchaseModal()
+    selectTier('Bronze')
+    completePurchase()
+    assertPurchaseSuccess()
+    cy.get('.ppm-close-btn, button[aria-label="Close modal"]').click({ force: true })
+
+    // Now a Bronze member: the upgrade path is RoleDetailsSection's "Upgrade"
+    // in the account dropdown (tier < 4), which opens the modal in upgrade mode.
+    openAccountDropdown()
+    cy.contains('button', /^upgrade$/i, { timeout: 10000 }).click()
+    cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
+    selectTier('Silver')
+    completePurchase()
+    assertPurchaseSuccess()
+  })
+
+  it('[MEM-07] View membership status', () => {
+    // Members view status on the Membership tab, not in the purchase modal.
+    connectAs(TEST_ACCOUNTS[0])
+    cy.visit('/wallet?tab=membership')
+    cy.get('body', { timeout: 10000 }).should('be.visible')
+    // ensureWagerCapacity pinned #0 at tier 4 (Platinum), 365 days.
+    cy.contains(/platinum/i, { timeout: 10000 }).should('exist')
+    cy.contains(/active|expires|days/i, { timeout: 10000 }).should('exist')
+  })
+
+  it('[MEM-10] Purchase when already active shows current tier', () => {
+    // The dropdown never shows the buy upsell to a member — the manage entry
+    // replaces it ("Never show both at once", WalletButton.jsx).
+    connectAs(TEST_ACCOUNTS[0])
+    openAccountDropdown()
+    cy.get('.purchase-access-btn').should('not.exist')
+    cy.contains('button', /^membership$/i, { timeout: 10000 }).should('be.visible').click()
+    cy.url({ timeout: 10000 }).should('include', 'tab=membership')
+    cy.contains(/platinum/i, { timeout: 10000 }).should('exist')
+  })
+
+  it('[MEM-11] Downgrade attempt blocked', () => {
+    // A Silver member's upgrade modal must not offer Bronze. Grant the tier
+    // directly (this test is about the modal, not the purchase).
+    cy.grantMembershipFor(BUYERS.downgrade, { tier: 2, durationDays: 365 })
+    cy.fundAccount(BUYERS.downgrade)
+    connectAs(BUYERS.downgrade)
+    openAccountDropdown()
+    cy.contains('button', /^upgrade$/i, { timeout: 10000 }).click()
+    cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
+    cy.get('.ppm-tier-card', { timeout: 10000 }).should('have.length.gte', 1)
+    // The concrete claim: no offered card is Bronze (or Silver — same tier is
+    // an extend, not an upgrade).
+    cy.get('.ppm-tier-card').each(($card) => {
+      expect($card.text().toLowerCase()).to.not.match(/bronze/)
+    })
+  })
+
+  it('[MEM-09] Insufficient USDC balance shows error', () => {
+    // #2 is deliberately never funded. Approval of a zero balance succeeds
+    // (approve needs no balance); the purchase transferFrom reverts, and the
+    // modal must surface that — never the success step.
+    connectAs(TEST_ACCOUNTS[2])
+    openPurchaseModal()
+    selectTier('Bronze')
+    cy.contains('button', /next|continue/i).click()
+    cy.get('input[type="checkbox"]', { timeout: 10000 }).check({ force: true })
+    cy.contains('button', /purchase|confirm|pay/i).click()
+    cy.get('.ppm-overlay', { timeout: 30000 })
+      .invoke('text')
+      .should('match', /insufficient|balance|failed|error|not enough/i)
+    cy.get('.ppm-overlay').invoke('text').should('not.match', /activated/i)
+  })
+
+  it('[MEM-12] Reject USDC approval aborts purchase', () => {
+    cy.fundAccount(BUYERS.reject)
+    cy.mockWeb3Provider({ account: BUYERS.reject })
+    // Wrap the mock AFTER it installs (handlers run in registration order):
+    // every eth_sendTransaction becomes a user rejection.
+    cy.on('window:before:load', (win) => {
+      const original = win.ethereum && win.ethereum.request
+      if (original) {
+        win.ethereum.request = ({ method, params }) => {
+          if (method === 'eth_sendTransaction') {
+            const err = new Error('User rejected the request.')
+            err.code = 4001
+            return Promise.reject(err)
+          }
+          return original({ method, params })
+        }
+      }
+    })
+    cy.visit('/fairwins')
+    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.connectWallet()
+    openPurchaseModal()
+    selectTier('Bronze')
+    cy.contains('button', /next|continue/i).click()
+    cy.get('input[type="checkbox"]', { timeout: 10000 }).check({ force: true })
+    cy.contains('button', /purchase|confirm|pay/i).click()
+    cy.get('.ppm-overlay', { timeout: 15000 })
+      .invoke('text')
+      .should('match', /rejected|cancelled|failed|denied|error/i)
+  })
+
+  // ── Clock-advancing tests — LAST, deliberately (see header) ────────────────
+
+  it('[MEM-06] Extend / renew membership', () => {
+    // RoleDetailsSection only offers Extend when the membership is expiring
+    // (or Renew when expired) — so an extend test REQUIRES moving the clock.
+    cy.fundAccount(BUYERS.extend)
+    connectAs(BUYERS.extend)
+    openPurchaseModal()
+    selectTier('Bronze')
+    completePurchase()
+    assertPurchaseSuccess()
+    cy.get('.ppm-close-btn, button[aria-label="Close modal"]').click({ force: true })
+
+    cy.advanceTime(29 * 24 * 60 * 60) // 29 days: inside the expiring-soon window
+    cy.reload()
+    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.connectWallet()
+    openAccountDropdown()
+    cy.contains('button', /^extend$|^renew$/i, { timeout: 10000 }).click()
+    cy.get('.ppm-overlay, [role="dialog"]', { timeout: 10000 }).should('be.visible')
+    cy.get('.ppm-overlay').invoke('text').should('match', /extend|renew|bronze/i)
+  })
+
+  it('[MEM-13] Expired membership prevents wager creation', () => {
+    // Grant a SHORT membership at test time (the clock already moved +29d in
+    // MEM-06; durations are relative to grant time, so this stays valid),
+    // then advance past it. An expired member is a non-member at the gate:
+    // the dropdown offers the buy upsell again, not the member surface —
+    // which is exactly the state that cannot create a wager.
+    cy.grantMembershipFor(TEST_ACCOUNTS[2], { tier: 1, durationDays: 30 })
+    cy.advanceTime(31 * 24 * 60 * 60) // 31 days: past the grant
+    connectAs(TEST_ACCOUNTS[2])
+    openAccountDropdown()
+    cy.get('.purchase-access-btn', { timeout: 10000 }).should('be.visible')
+    cy.contains('button', /^membership$/i).should('not.exist')
   })
 })

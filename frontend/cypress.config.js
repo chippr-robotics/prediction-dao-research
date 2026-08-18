@@ -266,10 +266,21 @@ export default defineConfig({
          */
         async chainCheckpoint() {
           const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
-          const provider = new ethers.JsonRpcProvider(rpcUrl, 1337, { staticNetwork: true })
+          const chainId = Number(config.env.NETWORK_ID) || 1337
+          const provider = new ethers.JsonRpcProvider(rpcUrl, chainId, { staticNetwork: true })
           let reverted = false
           if (chainSnapshotId !== null) {
             reverted = await provider.send('evm_revert', [chainSnapshotId])
+            if (!reverted) {
+              // FAIL FAST. A false return means the snapshot id was invalid or already
+              // consumed — the next spec would run on a dirty clock/state and this task
+              // would then re-snapshot the contamination as if it were the baseline.
+              // A loud death here is a broken harness; a quiet one is a wrong measurement.
+              throw new Error(
+                `chainCheckpoint: evm_revert(${chainSnapshotId}) returned false — ` +
+                'refusing to re-snapshot a dirty chain. Restart the node and re-seed.'
+              )
+            }
           }
           chainSnapshotId = await provider.send('evm_snapshot', [])
           return { reverted, snapshotId: chainSnapshotId }
