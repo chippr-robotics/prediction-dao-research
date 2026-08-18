@@ -269,6 +269,19 @@ Cypress.Commands.add('switchAccount', (accountIndex) => {
  */
 Cypress.Commands.add('assertActiveAccount', (address) => {
   const short = `${address.slice(0, 6)}`
+  /*
+   * SCROLL TO THE TOP FIRST. The account button lives in a POSITION:FIXED header
+   * (HeaderBar.css:2). Callers routinely arrive here having scrolled — cy.registerEncryptionKeyViaUI
+   * scrollIntoView()s a control far down the Recovery accordion — and Cypress then refuses the
+   * click with "not visible because its ancestor has `position: fixed` CSS property and it is
+   * overflowed by other elements". That is what failed 02-membership's `before all` hook, taking
+   * all 13 of its tests with it, while the thing the hook was actually doing had SUCCEEDED (the
+   * key registered on-chain).
+   *
+   * Deliberately NOT {force: true}: forcing would also sail past a button that is genuinely
+   * unreachable, and this repo has already been bitten by force hiding a real defect.
+   */
+  cy.scrollTo('top', { ensureScrollable: false })
   cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible').click()
   cy.get('.account-address-value', { timeout: 10000 })
     .invoke('text')
