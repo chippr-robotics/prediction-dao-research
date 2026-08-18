@@ -226,14 +226,7 @@ describe('Manual Resolution', () => {
 
     openResolutionForFirstWager()
 
-    cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-      if ($modal.length > 0) {
-        resolveWithOutcome('Pass')
-      } else {
-        // Resolution modal might not open if no resolvable wagers
-        expect(true).to.be.true
-      }
-    })
+    resolveWithOutcome('Pass')
   })
 
   // ---------------------------------------------------------------------------
@@ -501,31 +494,33 @@ describe('Manual Resolution', () => {
   // RES-10: Resolve with invalid outcome reverts
   // ---------------------------------------------------------------------------
   it('[RES-10] Resolve must select a valid outcome', () => {
+    /*
+     * ESTABLISH THE PRECONDITION. This test used to connect and hope a resolvable wager was
+     * lying around from an earlier test — and its `else { expect(true).to.be.true }` meant that
+     * when none was, it PASSED without testing anything. Per-test chain isolation removed the
+     * leftovers and turned that silent pass into an honest failure, so the wager is created here.
+     */
     connectAndVisit(0)
+    createWager({ description: 'RES-10: Outcome selection is required', resolutionType: 0 })
+
+    cy.switchAccount(1)
+    acceptPendingWager()
+    cy.advanceTime(25 * 60 * 60)
+    cy.switchAccount(0)
 
     openResolutionForFirstWager()
 
-    cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-      if ($modal.length > 0) {
-        // Try to submit without selecting an outcome
-        cy.get('.mm-sub-modal').within(() => {
-          cy.contains('button', /confirm|submit|resolve/i).click()
-        })
+    /*
+     * The app does not let you submit an unresolved choice and then complain — "Continue" is
+     * DISABLED until an outcome is selected (MyMarketsModal: `disabled={!selectedOutcome || …}`).
+     * Assert the guard that exists rather than scanning for error copy that never appears.
+     */
+    cy.get('.mm-sub-modal', { timeout: 15000 }).should('be.visible')
+    cy.get('.mm-sub-modal').contains('button', /^continue$/i).should('be.disabled')
 
-        // Should show error about missing outcome selection
-        cy.get('.mm-sub-modal').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const hasError = lower.includes('select') ||
-                          lower.includes('outcome') ||
-                          lower.includes('required') ||
-                          lower.includes('error')
-          expect(hasError).to.be.true
-        })
-      } else {
-        // No resolvable wagers
-        expect(true).to.be.true
-      }
-    })
+    // Choosing an outcome is what unlocks it.
+    cy.get('.mm-sub-modal').contains(/creator wins/i).click()
+    cy.get('.mm-sub-modal').contains('button', /^continue$/i).should('not.be.disabled')
   })
 
   // ---------------------------------------------------------------------------
