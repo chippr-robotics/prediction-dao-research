@@ -87,9 +87,22 @@ function selectTier(tierName) {
 /** Drive the modal steps to completion. Assumes a tier is selected. */
 function completePurchase() {
   cy.contains('button', /next|continue/i).click()
-  cy.get('.ppm-panel', { timeout: 10000 }).should('be.visible')
-  cy.get('input[type="checkbox"]', { timeout: 10000 }).check({ force: true })
-  cy.contains('button', /purchase|confirm|pay/i).click()
+  /*
+   * The Review panel scrolls inside a position:fixed overlay, so a bare
+   * should('be.visible') on .ppm-panel fails on a perfectly rendered modal
+   * ("ancestor has position: fixed ... overflowed"). Target the step's
+   * CONTROLS instead: the spec-007 attestations are discrete, un-pre-ticked
+   * checkboxes and EVERY one must be ticked — allTicked is what enables the
+   * confirm button (PremiumPurchaseModal.jsx:850).
+   */
+  cy.get('.ppm-panel input[type="checkbox"]', { timeout: 10000 })
+    .should('have.length.gte', 1)
+    .check({ force: true })
+  // Asserting not-disabled BEFORE clicking turns "wrong chain / unticked box"
+  // into a legible failure here rather than a mystery timeout later.
+  cy.contains('button', /confirm purchase|purchase|confirm|pay/i, { timeout: 10000 })
+    .should('not.be.disabled')
+    .click({ force: true })
   // The modal reaches its Complete step only after the real tx mines.
   cy.get('.ppm-step.completed', { timeout: 60000 }).should('have.length.gte', 2)
 }
