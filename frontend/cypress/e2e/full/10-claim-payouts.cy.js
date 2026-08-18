@@ -135,17 +135,33 @@ function createAcceptAndResolve(config = {}) {
   })
 
   // Select outcome based on who should win
-  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-    if ($modal.length > 0) {
-      cy.get('.mm-sub-modal').within(() => {
-        cy.contains(opts.winnerIsCreator ? 'Pass' : 'Fail').click()
-        cy.contains('button', /confirm|submit|resolve/i).click()
-      })
-      cy.get('.mm-sub-modal', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('success') || lower.includes('proposed') || lower.includes('resolved') || lower.includes('error')).to.be.true
-      })
-    }
+  /*
+   * The sub-modal labels outcomes by PARTY — "Creator wins — <name>", "Opponent wins — <name>"
+   * (MyMarketsModal's outcomeLabels/labelFor) — not Pass/Fail, so the old strings matched
+   * nothing. Match a pattern: each label carries a name or shortened address after the title.
+   *
+   * And wait for the modal rather than snapshotting for it: `if ($modal.length > 0)` around the
+   * whole resolution meant a modal that had not rendered yet was read as "no modal", and the
+   * test carried on without resolving anything.
+   */
+  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 15000 }).should('exist')
+  cy.get('.mm-sub-modal').within(() => {
+    cy.contains(opts.winnerIsCreator ? /creator wins/i : /opponent wins/i).click()
+    cy.contains('button', /confirm|submit|resolve/i).click()
+  })
+  /*
+   * Judge the resolution ON CHAIN (status 3 = Resolved). The old check accepted any of
+   * success/proposed/resolved/error in the modal's text — broad enough to pass on failure —
+   * and the modal closes itself once the transaction lands anyway.
+   */
+  cy.lastWagerId().then((id) => {
+    const poll = (tries) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+      if (i.status === 3) return undefined
+      if (tries <= 0) throw new Error(`wager ${id} never reached Resolved (status=${i.status})`)
+      cy.wait(1000)
+      return poll(tries - 1)
+    })
+    return poll(45)
   })
 }
 
