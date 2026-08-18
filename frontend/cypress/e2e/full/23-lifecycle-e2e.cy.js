@@ -55,11 +55,19 @@ describe('End-to-End Lifecycle Scenarios', () => {
           expect(BigInt(b2.balance) > BigInt(b1.balance), 'winner received the payout (token balance increased)').to.be.true
         })
       })
-      // User-visible: the creator can reach their wagers list (rows render).
+      /*
+       * User-visible: the creator can reach their wagers list, and the wager this test just
+       * drove to completion is in it.
+       *
+       * Look in HISTORY, not Created. MyMarketsModal routes terminal statuses — resolved,
+       * cancelled, declined, refunded, draw — to the History tab, so after the resolve+claim
+       * above the Created tab is legitimately empty and asserting rows there asserted the
+       * opposite of correct behaviour.
+       */
       cy.mockWeb3Provider({ account: CREATOR })
       cy.visitWagers()
       cy.connectWallet()
-      cy.openMyWagers('created')
+      cy.openMyWagers('history')
       cy.get('.mm-table-row', { timeout: 15000 }).should('exist')
     })
   })
@@ -69,7 +77,7 @@ describe('End-to-End Lifecycle Scenarios', () => {
       cy.createAndAcceptWager({ resolutionType: 4, conditionId: p.conditionId, creatorIsYes: true }).then((wagerId) => {
         cy.resolveMockCondition(p.conditionId, [1, 0]) // YES
         cy.task('chainTx', { action: 'autoResolve', args: { wagerId } })
-          .then((r) => expect(r.ok, 'auto-resolve').to.be.true)
+          .then((r) => expect(r.ok, `auto-resolve (${r.error || 'no error reported'})`).to.be.true)
         cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
           expect(i.status, 'Resolved').to.equal(3)
           expect(i.winner.toLowerCase(), 'YES → creator').to.equal(CREATOR.toLowerCase())

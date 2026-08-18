@@ -90,20 +90,44 @@ function createAcceptAndResolve(config = {}) {
   cy.switchAccount(1)
 
   cy.openMyWagers('participating')
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-    if (viewBtn.length > 0) {
-      cy.wrap(viewBtn.first()).click({ force: true })
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-      cy.contains('button', /accept offer/i).click()
-      cy.contains('button', /i understand|confirm|accept/i).click()
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('accepted') || lower.includes('success') || lower.includes('done')).to.be.true
-      })
-      cy.contains('button', /done|close/i).click({ force: true })
-    }
+  /*
+   * Same acceptance shape 05 and 07 arrived at, for the same three reasons:
+   *
+   * - WAIT for the accept control rather than snapshotting with $panel.find(): the row renders
+   *   before its action column does, so a one-shot read sees no button and the `if` silently
+   *   skipped the entire acceptance — leaving CLM-01 to fail later on a wager nobody accepted.
+   * - The wagers are PRIVATE (encryption is mandatory), so the modal gates the terms, and the
+   *   Accept control, behind "Decrypt Wager Details" until a signature lands.
+   * - SCOPE to the dialog: unscoped, /accept/i matches Dashboard's Scan QR card behind the
+   *   modal ("Accept a wager from a friend"), which is visible and un-clickable.
+   */
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
+    .click({ force: true })
+  cy.get('.ma-modal', { timeout: 10000 }).then(($m) => {
+    if ($m.find('button:contains("Decrypt")').length === 0) return
+    cy.get('.ma-modal').contains('button', /decrypt/i).click({ force: true })
+    cy.get('.ma-modal').find('.ma-description, .ma-decrypt-error', { timeout: 20000 }).should('exist')
   })
+  cy.get('.ma-modal').contains('button', /accept offer/i, { timeout: 10000 }).click()
+  cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
+    cy.contains('button', /i understand|confirm|accept/i)
+      .scrollIntoView()
+      .should('be.visible')
+      .click()
+  })
+  // Success is the wager reaching Active on chain, not a word in the dialog.
+  cy.lastWagerId().then((id) => {
+    const poll = (tries) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+      if (i.status === 2) return undefined
+      if (tries <= 0) throw new Error(`wager ${id} never became Active after acceptance (status=${i.status})`)
+      cy.wait(1000)
+      return poll(tries - 1)
+    })
+    return poll(60)
+  })
+  cy.get('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]')
+    .first()
+    .click({ force: true })
   cy.get('.mm-close-btn, button[aria-label="Close modal"]').first().click({ force: true })
 
   // Step 3: Advance time past end date
