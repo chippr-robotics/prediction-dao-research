@@ -131,12 +131,25 @@ describe('Decline and Cancel Wagers', () => {
         })
       pollCleared(30)
 
-      // The list no longer offers the declined wager for acceptance.
+      /*
+       * The list no longer offers the declined wager — asserted where a member
+       * would actually look. The open MyMarkets list does not re-read the
+       * chain within seconds of the decline (the activity poll's cadence is
+       * ~30s), so asserting on the STALE open list raced the refresh and
+       * failed a correct app. Reopening the list forces a fresh read; that is
+       * also exactly the gesture a member makes.
+       */
       cy.get('body').then(($b) => {
         if ($b.find('.ma-modal').length) {
           cy.get('.ma-modal [aria-label="Close modal"], .ma-modal .ma-close-btn').click({ force: true })
         }
       })
+      cy.get('body').then(($b) => {
+        const close = $b.find('.mm-modal [aria-label="Close modal"], .mm-close-btn')
+        if (close.length) cy.wrap(close.first()).click({ force: true })
+      })
+      cy.openMyWagers('participating')
+      cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).should('be.visible')
       cy.contains('button', /view offer/i).should('not.exist')
     })
   })
