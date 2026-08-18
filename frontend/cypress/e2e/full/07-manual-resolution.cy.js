@@ -96,65 +96,87 @@ function acceptPendingWager() {
 
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
     const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-    if (viewBtn.length > 0) {
-      cy.wrap(viewBtn.first()).click({ force: true })
+    /*
+     * FAIL when there is no offer. This used to fall through silently, so a wager that was
+     * never accepted surfaced three commands later as "the resolve modal did not open" — and
+     * the screenshot showed an EMPTY My Wagers, because an unaccepted offer whose accept
+     * window then lapsed is EXPIRED, and the default "all" filter deliberately hides expired
+     * offers. Two layers of silence between the cause and the report.
+     */
+    expect(viewBtn.length, 'an offer is listed to accept').to.be.greaterThan(0)
+    cy.wrap(viewBtn.first()).click({ force: true })
 
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
+    cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
+    /*
+     * Encryption is mandatory, so every wager this spec creates is private and the acceptance
+     * modal gates the terms behind "Decrypt Wager Details" — a signature — before it will show
+     * an Accept control. Conditional because the modal skips the gate once the details are
+     * already decrypted in session; written with jQuery find() rather than cy.get, which fails
+     * the command when the gate is absent instead of skipping it.
+     */
+    cy.get('.ma-modal', { timeout: 10000 }).then(($m) => {
+      if ($m.find('button:contains("Decrypt")').length === 0) return
+      cy.get('.ma-modal').contains('button', /decrypt/i).click({ force: true })
       /*
-       * Encryption is mandatory, so every wager this spec creates is private and the acceptance
-       * modal gates the terms behind "Decrypt Wager Details" — a signature — before it will show
-       * an Accept control. Conditional because the modal skips the gate once the details are
-       * already decrypted in session; written with jQuery find() rather than cy.get, which fails
-       * the command when the gate is absent instead of skipping it.
+       * Report the app's own reason. A failed decrypt leaves the button in place and renders
+       * `.ma-decrypt-error`, so waiting for the button to disappear times out 20s later
+       * saying only "continuously found it" — true, and useless. Settle on either terminal
+       * state and name the error when that is the one that arrives.
        */
-      cy.get('.ma-modal, [role="dialog"]').then(($m) => {
-        if ($m.find('button:contains("Decrypt")').length === 0) return
-        cy.wrap($m).contains('button', /decrypt/i).click({ force: true })
-        /*
-         * Report the app's own reason. A failed decrypt leaves the button in place and renders
-         * `.ma-decrypt-error`, so waiting for the button to disappear times out 20s later
-         * saying only "continuously found it" — true, and useless. Settle on either terminal
-         * state and name the error when that is the one that arrives.
-         */
-        cy.wrap($m)
-          .find('.ma-description, .ma-decrypt-error', { timeout: 20000 })
-          .should('exist')
-          .then(($r) => {
-            if ($r.hasClass('ma-decrypt-error')) {
-              throw new Error(`decrypt failed: ${$r.text().trim()}`)
-            }
-          })
-      })
-      cy.contains('.ma-modal, [role="dialog"]', /accept offer/i).within(() => {
-        cy.contains('button', /accept offer/i).click()
-      })
       /*
-       * The "Confirm Offer Acceptance" dialog SCROLLS inside a fixed overlay and its confirm
-       * button sits below the fold — the fixed-ancestor family again. Scroll it into view;
-       * deliberately not {force: true}.
-       *
-       * SCOPE THE LOOKUP TO THE DIALOG. Unscoped, `cy.contains('button', /…|accept/i)` matched
-       * the BACKGROUND page: the Scan QR quick-action card is described "Accept a wager from a
-       * friend" (Dashboard.jsx), it sits earlier in the DOM than the portalled dialog, and it is
-       * genuinely visible — so the chain scrolled to that card, passed the visibility assert, and
-       * died clicking an element whose center the overlay covers. Eight RES tests failed on a
-       * quick-action card rather than on the button under test.
+       * Re-query rather than searching the wrapped snapshot: decrypting re-renders the modal,
+       * so `$m`'s nodes are detached by the time the result lands and the search finds nothing
+       * (RES-04 failed here having queried a stale my-markets-modal-backdrop). Scoped to
+       * `.ma-modal` — the union with [role="dialog"] also matches the My Wagers dialog behind.
        */
-      cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
-        cy.contains('button', /i understand|confirm|accept/i)
-          .scrollIntoView()
-          .should('be.visible')
-          .click()
-      })
+      cy.get('.ma-modal')
+        .find('.ma-description, .ma-decrypt-error', { timeout: 20000 })
+        .should('exist')
+        .then(($r) => {
+          if ($r.hasClass('ma-decrypt-error')) {
+            throw new Error(`decrypt failed: ${$r.text().trim()}`)
+          }
+        })
+    })
+    cy.contains('.ma-modal, [role="dialog"]', /accept offer/i).within(() => {
+      cy.contains('button', /accept offer/i).click()
+    })
+    /*
+     * The "Confirm Offer Acceptance" dialog SCROLLS inside a fixed overlay and its confirm
+     * button sits below the fold — the fixed-ancestor family again. Scroll it into view;
+     * deliberately not {force: true}.
+     *
+     * SCOPE THE LOOKUP TO THE DIALOG. Unscoped, `cy.contains('button', /…|accept/i)` matched
+     * the BACKGROUND page: the Scan QR quick-action card is described "Accept a wager from a
+     * friend" (Dashboard.jsx), it sits earlier in the DOM than the portalled dialog, and it is
+     * genuinely visible — so the chain scrolled to that card, passed the visibility assert, and
+     * died clicking an element whose center the overlay covers. Eight RES tests failed on a
+     * quick-action card rather than on the button under test.
+     */
+    cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
+      cy.contains('button', /i understand|confirm|accept/i)
+        .scrollIntoView()
+        .should('be.visible')
+        .click()
+    })
 
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('accepted') || lower.includes('success') || lower.includes('done')).to.be.true
-      })
+    cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
+      const lower = text.toLowerCase()
+      expect(lower.includes('accepted') || lower.includes('success') || lower.includes('done')).to.be.true
+    })
 
-      // Close acceptance modal
-      cy.contains('button', /done|close/i).click({ force: true })
-    }
+    /*
+     * Confirm the acceptance ON CHAIN, not just in the modal's wording. Status 2 is Active;
+     * anything else means the tests that follow are resolving a wager nobody accepted.
+     */
+    cy.lastWagerId().then((id) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        expect(i.status, `wager ${id} is Active after acceptance`).to.equal(2)
+      })
+    })
+
+    // Close acceptance modal
+    cy.contains('button', /done|close/i).click({ force: true })
   })
 
   // Close My Wagers modal
