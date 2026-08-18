@@ -74,6 +74,54 @@ function loadLocalDeployment() {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
+/*
+ * Name the custom error behind a revert.
+ *
+ * The task drives the registry through a minimal human-readable ABI, which carries no error
+ * fragments — so every custom error arrived as the useless "execution reverted (unknown custom
+ * error)". ORC-01/02 reported exactly that. Decode against the compiled artifacts instead;
+ * BOTH facets are needed because the proxy delegates unknown selectors to WagerRegistryIntents,
+ * which is where autoResolveFrom* lives (spec 035/036).
+ *
+ * Best-effort: if the artifacts have not been compiled, fall through to the raw message rather
+ * than failing the task for a diagnostic.
+ */
+let __revertIface = null
+function revertInterface() {
+  if (__revertIface) return __revertIface
+  const fragments = []
+  for (const rel of [
+    '../artifacts/contracts/wagers/WagerRegistry.sol/WagerRegistry.json',
+    '../artifacts/contracts/wagers/WagerRegistryIntents.sol/WagerRegistryIntents.json',
+  ]) {
+    try {
+      fragments.push(...JSON.parse(readFileSync(resolve(__dirname, rel), 'utf8')).abi)
+    } catch {
+      // Not compiled in this environment — decode with whatever else we found.
+    }
+  }
+  __revertIface = new ethers.Interface(fragments)
+  return __revertIface
+}
+
+function describeRevert(e) {
+  const base = e.shortMessage || e.reason || e.message
+  const data = e.data ?? e.info?.error?.data ?? e.error?.data
+  if (typeof data === 'string' && data.length >= 10) {
+    try {
+      const parsed = revertInterface().parseError(data)
+      if (parsed) {
+        const args = parsed.args?.length ? `(${parsed.args.map(String).join(', ')})` : ''
+        return `${parsed.name}${args}`
+      }
+    } catch {
+      // Unknown selector — the raw message plus the selector still beats "unknown custom error".
+    }
+    return `${base} [selector ${data.slice(0, 10)}]`
+  }
+  return base
+}
+
 export default defineConfig({
   e2e: {
     baseUrl: 'http://localhost:5173',
@@ -253,7 +301,7 @@ export default defineConfig({
           } catch (e) {
             // Return a soft failure so specs can assert "blocked" cases (e.g. a
             // premature claimRefund) instead of the task rejecting the test.
-            return { ok: false, error: e.shortMessage || e.reason || e.message }
+            return { ok: false, error: describeRevert(e) }
           }
         },
 

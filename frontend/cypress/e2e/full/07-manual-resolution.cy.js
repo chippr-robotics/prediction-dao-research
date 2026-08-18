@@ -160,19 +160,29 @@ function acceptPendingWager() {
         .click()
     })
 
-    cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      expect(lower.includes('accepted') || lower.includes('success') || lower.includes('done')).to.be.true
-    })
-
     /*
-     * Confirm the acceptance ON CHAIN, not just in the modal's wording. Status 2 is Active;
-     * anything else means the tests that follow are resolving a wager nobody accepted.
+     * Success is the wager being ACTIVE ON CHAIN, not a word in the modal.
+     *
+     * The text check timed out against a modal reading "Processing… Please confirm the
+     * transaction in your wallet" — a state that says nothing about whether the acceptance
+     * failed or was merely slow. The same screenshot showed a 429 from the public Amoy subgraph
+     * (this harness impersonates chain 80002, so app reads reach the real endpoint and get rate
+     * limited under a full-suite run), which is exactly the kind of delay that has nothing to do
+     * with what the test is about.
+     *
+     * Poll the registry instead. Status 2 is Active; anything else and the tests that follow
+     * would be resolving a wager nobody accepted.
      */
     cy.lastWagerId().then((id) => {
-      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
-        expect(i.status, `wager ${id} is Active after acceptance`).to.equal(2)
+      const poll = (tries) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        if (i.status === 2) return undefined
+        if (tries <= 0) {
+          throw new Error(`wager ${id} never became Active after acceptance (status=${i.status})`)
+        }
+        cy.wait(1000)
+        return poll(tries - 1)
       })
+      return poll(60)
     })
 
     // Close acceptance modal
