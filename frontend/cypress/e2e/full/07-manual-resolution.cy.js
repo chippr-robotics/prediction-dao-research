@@ -100,17 +100,27 @@ function acceptPendingWager() {
       cy.wrap(viewBtn.first()).click({ force: true })
 
       cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-      cy.contains('button', /accept offer/i).click()
+      cy.contains('.ma-modal, [role="dialog"]', /accept offer/i).within(() => {
+        cy.contains('button', /accept offer/i).click()
+      })
       /*
        * The "Confirm Offer Acceptance" dialog SCROLLS inside a fixed overlay and its confirm
-       * button sits below the fold — the fifth appearance of the fixed-ancestor family
-       * (screenshot: the create, switch, and offer-open all succeeded; the click died on a
-       * hidden center). Scroll it into view; deliberately not {force: true}.
+       * button sits below the fold — the fixed-ancestor family again. Scroll it into view;
+       * deliberately not {force: true}.
+       *
+       * SCOPE THE LOOKUP TO THE DIALOG. Unscoped, `cy.contains('button', /…|accept/i)` matched
+       * the BACKGROUND page: the Scan QR quick-action card is described "Accept a wager from a
+       * friend" (Dashboard.jsx), it sits earlier in the DOM than the portalled dialog, and it is
+       * genuinely visible — so the chain scrolled to that card, passed the visibility assert, and
+       * died clicking an element whose center the overlay covers. Eight RES tests failed on a
+       * quick-action card rather than on the button under test.
        */
-      cy.contains('button', /i understand|confirm|accept/i)
-        .scrollIntoView()
-        .should('be.visible')
-        .click()
+      cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
+        cy.contains('button', /i understand|confirm|accept/i)
+          .scrollIntoView()
+          .should('be.visible')
+          .click()
+      })
 
       cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
         const lower = text.toLowerCase()
