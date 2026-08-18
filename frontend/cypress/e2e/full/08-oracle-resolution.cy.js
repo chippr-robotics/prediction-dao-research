@@ -19,6 +19,7 @@
 const CREATOR = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0
 const OPPONENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1
 const POLYMARKET = 4 // ResolutionType.Polymarket
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 // Set up an accepted Polymarket wager on a fresh, prepared condition.
 function setupOracleWager(question, creatorIsYes, resolveIn = 7200) {
@@ -69,23 +70,29 @@ describe('Oracle Resolution (Polymarket)', () => {
     })
   })
 
-  it('[ORC-03] a 50/50 tie settles no winner and refunds both after the deadline', () => {
+  /*
+   * A 50/50 tie settles a DRAW IMMEDIATELY — it does not wait for the deadline.
+   *
+   * WagerRegistryIntents disambiguates an unresolved market from a resolved tie: the tie calls
+   * `_settleDraw` (both stakes returned, no winner, Status.Draw), while a genuinely unresolved
+   * one reverts ConditionNotResolved.
+   *
+   * This test used to assert that autoResolve does NOT succeed on a tie, and then that the
+   * wager stayed Active until a post-deadline refund. That passed for the whole life of this
+   * tier for the wrong reason: deploy.js never wired the intents facet, so EVERY autoResolve
+   * reverted UnknownFunction and "does not auto-resolve" was trivially true (#1227). Wiring the
+   * facet is what exposed it — the assertions described a registry with no auto-resolution at
+   * all, not the tie rule.
+   */
+  it('[ORC-03] a 50/50 tie settles a draw with no winner', () => {
     setupOracleWager('orc-tie', /* creatorIsYes */ true, /* resolveIn */ 7200).then(({ wagerId, conditionId }) => {
       cy.resolveMockCondition(conditionId, [1, 1]) // tie
-      // The tie must NOT settle a winner (the fixed behavior).
       cy.task('chainTx', { action: 'autoResolve', args: { wagerId } }).then((r) => {
-        expect(r.ok, 'tie does not auto-resolve').to.not.equal(true)
+        expect(r.ok, `tie settles (${r.error || 'no error reported'})`).to.be.true
       })
       cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
-        expect(i.status, 'still Active after a tie').to.equal(2)
-      })
-      // After the resolve deadline, both stakes are refundable.
-      cy.advanceTime(7300)
-      cy.task('chainTx', { action: 'claimRefund', args: { callerIndex: 0, wagerId } }).then((r) => {
-        expect(r.ok, 'refund after tie').to.be.true
-      })
-      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
-        expect(i.status, 'Refunded after tie + deadline').to.equal(5)
+        expect(i.status, 'Draw after a tie').to.equal(6)
+        expect(i.winner, 'a draw names no winner').to.equal(ZERO_ADDRESS)
       })
     })
   })
