@@ -41,6 +41,13 @@ describe('Frozen Accounts', () => {
     cy.fundAccount(USER)
     cy.task('chainTx', { action: 'approve', args: { index: 1 } })
     cy.grantMembershipFor(USER, { tier: 4, durationDays: 365 })
+    /*
+     * Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose OPPONENT has
+     * no key in KeyRegistry, and says so only in a console error. Without this the create the
+     * spec expects to SUCCEED failed for a reason unrelated to what it tests, reported as
+     * "wager 1 not created".
+     */
+    cy.ensureEncryptionKeys([0, 1])
   })
 
   afterEach(() => {
