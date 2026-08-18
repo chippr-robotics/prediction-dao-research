@@ -733,22 +733,32 @@ jobs:
       # The chain must be ANSWERING before the deploy runs, not merely spawned. Polling
       # eth_chainId is the only honest readiness signal — a fixed sleep either wastes time or
       # races, and a race here surfaces as a confusing deploy error rather than "no chain".
+      #
+      # Deliberately NO bare `exit 0` on the success path. test/config/CiGates.test.js rejects one
+      # in any merge-gating step, and it is right to: `exit 0` is the mechanism that lets a step
+      # report success it did not earn, and a reader cannot tell an early return from a swallowed
+      # failure by looking. Recording readiness in a variable and failing on its absence says the
+      # same thing without the pattern — and falls through to failure by default.
       - name: Start local chain
         run: |
           npx hardhat node > /tmp/hardhat-node.log 2>&1 &
+          ready=""
           for i in $(seq 1 60); do
             if curl -s -X POST http://127.0.0.1:8545 \
                  -H 'content-type: application/json' \
                  --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
                  | grep -q result; then
-              echo "chain up after ${i}s"
-              exit 0
+              ready="$i"
+              break
             fi
             sleep 1
           done
-          echo "::error::Local chain never answered eth_chainId — see the log below."
-          cat /tmp/hardhat-node.log
-          exit 1
+          if [ -z "$ready" ]; then
+            echo "::error::Local chain never answered eth_chainId — see the log below."
+            cat /tmp/hardhat-node.log
+            exit 1
+          fi
+          echo "chain up after ${ready}s"
 
       # deploy + sync-frontend-contracts + seed. The seed is what makes the specs' preconditions
       # true (two funded accounts, membership granted, registry approved), so a failure here must
