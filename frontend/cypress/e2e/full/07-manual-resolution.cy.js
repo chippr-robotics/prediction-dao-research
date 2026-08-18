@@ -192,6 +192,8 @@ function resolveWithOutcome(outcome = 'Pass') {
   })
 }
 
+import { resetChainBetweenTests } from '../../support/e2e'
+
 describe('Manual Resolution', () => {
   before(() => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
@@ -200,6 +202,15 @@ describe('Manual Resolution', () => {
     cy.ensureWagerCapacity([0, 1])
     cy.ensureEncryptionKeys([0, 1])
   })
+
+  /*
+   * EVERY test here advances the chain by 25h+ to get past an end date, and the create form
+   * computes deadlines from BROWSER time — so from the second test on, the registry rejected
+   * the create with BadDeadlines and the failure surfaced as "Wager Created" never appearing,
+   * nowhere near its cause. Reset the chain between tests. Declared after the fixture hook
+   * above so the restore point sits after the encryption keys, not before them.
+   */
+  resetChainBetweenTests()
 
   beforeEach(() => {
     cy.clearLocalStorage()

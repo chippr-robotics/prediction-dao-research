@@ -31,6 +31,31 @@ before(() => {
   }
 })
 
+/*
+ * PER-TEST chain isolation, opt-in. A spec whose every test advances the clock poisons its own
+ * later tests, not just the next spec: the create form computes deadlines from BROWSER time, so
+ * once the chain sits days ahead the registry rejects the create with BadDeadlines and the test
+ * fails somewhere far from the cause ("Wager Created" never appears). A spec-level checkpoint
+ * cannot help — by the second test the damage is already inside the spec.
+ *
+ * Opt in from inside the describe block. Deliberately NOT global: specs that carry state across
+ * tests on purpose (16-privacy creates a private wager in before-all and decrypts it later,
+ * 05 accepts in one test an offer another created) would have that state reverted underneath them.
+ */
+export function resetChainBetweenTests() {
+  /*
+   * CALL THIS AFTER the spec's own `before` hook, not at the top of the describe. Mocha runs
+   * same-level hooks in declaration order, and the rebase has to land AFTER any durable fixture
+   * the spec sets up (encryption keys, capacity) — otherwise every per-test revert wipes it.
+   */
+  before(() => {
+    cy.task('chainRebase')
+  })
+  beforeEach(() => {
+    cy.task('chainCheckpoint')
+  })
+}
+
 // Alternatively you can use CommonJS syntax:
 // require('./commands')
 

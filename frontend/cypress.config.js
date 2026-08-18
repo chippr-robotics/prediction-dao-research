@@ -294,6 +294,21 @@ export default defineConfig({
           chainSnapshotId = await provider.send('evm_snapshot', [])
           return { reverted, snapshotId: chainSnapshotId }
         },
+
+        /*
+         * Move the restore point FORWARD without reverting: drop the held snapshot id and take
+         * a new one at the current state. A spec whose before-hook writes durable fixtures
+         * (encryption keys, membership) calls this after that hook, so per-test reverts land
+         * AFTER the fixtures rather than wiping them — reverting to the spec-start snapshot
+         * would undo the very setup the tests depend on.
+         */
+        async chainRebase() {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const chainId = Number(config.env.NETWORK_ID) || 1337
+          const provider = new ethers.JsonRpcProvider(rpcUrl, chainId, { staticNetwork: true })
+          chainSnapshotId = await provider.send('evm_snapshot', [])
+          return { snapshotId: chainSnapshotId }
+        },
       })
 
       /*
