@@ -235,12 +235,26 @@ function openResolutionForFirstWager() {
 /**
  * Resolve a wager by selecting an outcome in the resolution modal.
  */
+/*
+ * The resolve sub-modal labels outcomes by PARTY, not by Pass/Fail: MyMarketsModal builds
+ * "Creator wins — <name>", "Opponent wins — <name>" and "Draw — both parties refunded"
+ * (outcomeLabels/labelFor). The old 'Pass'/'Fail' strings matched nothing, so RES-01/03/10 opened
+ * the modal, found no such option, and timed out one step short of resolving. Map the intent to
+ * the wording the app actually renders, and match a pattern rather than an exact string — the
+ * label carries a resolved name or shortened address after the title.
+ */
+const OUTCOME_PATTERNS = {
+  Pass: /creator wins/i,
+  Fail: /opponent wins/i,
+  Draw: /draw/i,
+}
+
 function resolveWithOutcome(outcome = 'Pass') {
   cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).should('be.visible')
 
   // Select outcome
   cy.get('.mm-sub-modal').within(() => {
-    cy.contains(outcome).click()
+    cy.contains(OUTCOME_PATTERNS[outcome] || outcome).click()
   })
 
   // Submit resolution
