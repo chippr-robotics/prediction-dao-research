@@ -95,6 +95,21 @@ export default defineConfig({
     },
 
     setupNodeEvents(on, config) {
+      /*
+       * Chain-state checkpoint (full tier only). Eight of the fifteen full specs move the chain
+       * clock with evm_increaseTime — 02-membership alone jumps it 31 days to expire a membership —
+       * and chain time can NEVER move backwards. Without isolation, whichever spec runs first
+       * poisons every later one: create forms compute deadlines from the browser clock, the chain
+       * rejects them as ~a month in its past, and the failure surfaces as "Invalid deadlines" in
+       * specs that did nothing wrong. Which specs pass then depends on RUN ORDER — the definition
+       * of a suite without isolation, and why single-spec experiments kept contradicting full runs.
+       *
+       * The plugin process lives for the whole `cypress run`, so this closure survives across
+       * specs. Each spec reverts to the post-seed snapshot and immediately re-snapshots (hardhat
+       * consumes a snapshot id on revert).
+       */
+      let chainSnapshotId = null
+
       on('task', {
         log(message) {
           console.log(message)
@@ -240,6 +255,24 @@ export default defineConfig({
           const registry = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
           const next = await registry.nextWagerId()
           return Number(next) - 1
+        },
+
+        /**
+         * Revert the chain to the last checkpoint (post-seed state) and take a fresh one.
+         * Called from the support file's `before` at the start of every FULL-tier spec.
+         * Restores the clock AND the state: keys registered or wagers created by a previous
+         * spec are rolled back too, which is why each spec's own `before` hook re-establishes
+         * its preconditions (ensureEncryptionKeys already checks hasKey and re-registers).
+         */
+        async chainCheckpoint() {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, 1337, { staticNetwork: true })
+          let reverted = false
+          if (chainSnapshotId !== null) {
+            reverted = await provider.send('evm_revert', [chainSnapshotId])
+          }
+          chainSnapshotId = await provider.send('evm_snapshot', [])
+          return { reverted, snapshotId: chainSnapshotId }
         },
       })
 
