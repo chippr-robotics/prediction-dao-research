@@ -26,11 +26,7 @@ function connectAndOpenMembershipModal(accountIndex = 0) {
   cy.get('body', { timeout: 10000 }).should('be.visible')
 
   // Connect wallet via the header connect button
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-    .click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-    .should('be.visible')
+  cy.connectWallet()
 
   // Open membership modal via dashboard CTA or quick action
   cy.get('body').then(($body) => {
@@ -414,9 +410,7 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     cy.get('body', { timeout: 10000 }).should('be.visible')
 
     // Connect wallet
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
+    cy.connectWallet()
 
     // Open membership modal
     cy.get('body').then(($body) => {
@@ -462,11 +456,7 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     cy.get('body', { timeout: 10000 }).should('be.visible')
 
     // Connect wallet
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
-    cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-      .should('be.visible')
+    cy.connectWallet()
 
     // Attempt to create a wager
     cy.openCreateWagerModal('oneVsOne')

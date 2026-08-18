@@ -22,11 +22,7 @@ function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
   cy.visitWagers()
 
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-    .click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-    .should('be.visible')
+  cy.connectWallet()
 }
 
 /**
@@ -118,9 +114,7 @@ describe('Wager Acceptance', () => {
     cy.switchAccount(1)
 
     // Step 3: Open My Wagers — opponent should see the pending wager
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
+    cy.connectWallet()
 
     cy.openMyWagers('participating')
 
@@ -503,9 +497,7 @@ describe('Wager Acceptance', () => {
 
     cy.visitWagers()
 
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
+    cy.connectWallet()
 
     cy.openMyWagers('participating')
 

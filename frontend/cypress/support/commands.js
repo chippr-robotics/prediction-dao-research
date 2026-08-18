@@ -322,6 +322,28 @@ Cypress.Commands.add('connectWallet', () => {
     }
   })
 
+  /*
+   * ALREADY CONNECTED IS A VALID STATE, not a failure.
+   *
+   * The mock's `authorized` flag lives in the COMMAND CLOSURE, not in the page, so it survives
+   * cy.visit() — and __cySetAccount sets it too. A spec whose `before` hook connected once (e.g.
+   * ensureEncryptionKeys, which must connect to register a key) therefore reaches its first test
+   * with the session already restored and NO connect button in the DOM. Insisting on the button
+   * turned that into a 10s timeout and cost 02-membership all 13 of its tests, on a page that was
+   * working correctly and showing the connected account.
+   *
+   * Clearing localStorage/cookies in a beforeEach does not undo it: the flag is not stored there.
+   */
+  cy.get('body').then(($body) => {
+    if ($body.find('.wallet-account-button, button[aria-label="Wallet Account"]').length > 0) {
+      return
+    }
+    cy.connectWalletFresh()
+  })
+})
+
+/** The actual connect ceremony. Split out so connectWallet can skip it when already connected. */
+Cypress.Commands.add('connectWalletFresh', () => {
   cy.contains('button', /connect wallet/i, { timeout: 10000 })
     .should('be.visible')
     .should('not.be.disabled')

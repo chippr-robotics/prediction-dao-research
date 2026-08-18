@@ -17,9 +17,7 @@ const UNREG = '0x976EA74026E726554dB657fA54763abd0C3a0aa9'  // #6 — stays unre
 function connectAs(account) {
   cy.mockWeb3Provider({ account })
   cy.visit('/fairwins')
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+  cy.connectWallet()
 }
 
 describe('Encryption Key Registration (On-Chain)', () => {

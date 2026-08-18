@@ -15,9 +15,7 @@ const OPPONENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1
 function connectAsAdmin() {
   cy.mockWeb3Provider({ account: ADMIN })
   cy.visitWagers()
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+  cy.connectWallet()
 }
 
 // Open the create modal, fill it, and submit — WITHOUT asserting success, so it
