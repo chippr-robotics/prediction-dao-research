@@ -12,7 +12,7 @@ carries the anti-patterns that made the current suite report coverage it did not
 | Tier | Directory | Needs | Runs | Budget |
 |---|---|---|---|---|
 | **no-chain** | `frontend/cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile | **< 6 min per leg** |
-| **on-chain** | `frontend/cypress/e2e/full/` | A local chain, a deploy and a seed | Every push, 4 shards in parallel | **< 15 min per shard** |
+| **on-chain** | `frontend/cypress/e2e/full/` | A local chain, a deploy and a seed | Every push, 4 shards in parallel | **< 15 min per shard** (measured: 6:37 / 7:51 / 6:29 / 6:09) |
 | **account-native** | `frontend/cypress/e2e/passkey/` | The WebAuthn harness | Every push, **once** — it rides the no-chain job's desktop leg for a runner, not because it is a viewport question | **< 5 min** |
 
 ## The two admission rules
@@ -33,6 +33,12 @@ coverage.**
 Not "should". The on-chain tier exists because the fast tier cannot tell a working money path from a
 broken one. A money flow with only fast-tier tests is a gap in the coverage matrix no matter how
 thorough those tests are.
+
+It runs on **every push**, which is affordable because it is sharded: the measured legs are
+6:37 / 7:51 / 6:29 / 6:09 against a serial total of ~27 minutes. Deferring it to the release PR was
+considered and rejected once those numbers existed — a money-path regression caught at the release
+PR is caught later and against a much larger diff, and ~7 minutes in parallel is not what a branch
+waits on.
 
 ## What a test must do to count
 

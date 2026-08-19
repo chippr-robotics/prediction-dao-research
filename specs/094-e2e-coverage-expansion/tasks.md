@@ -140,11 +140,11 @@ viewport; the run fails naming the offender.
 
 **Independent test**: The four legs together pass exactly the set the serial tier passed.
 
-- [ ] T036 Record per-spec durations from a real CI run into `frontend/cypress/coverage/full-tier-weights.json` with `measuredAt` and the run reference — **not done in this branch**: the file ships with `measuredAt: null` and an empty `specs` map, so the splitter assigns every spec the file mean **and says so on stderr**. The legs are therefore balanced by count until the first sharded run records real seconds.
+- [x] T036 Record per-spec durations from a real CI run into `frontend/cypress/coverage/full-tier-weights.json` with `measuredAt` and the run reference — done from Actions run 32204349960, all 15 specs measured. Three are provisional (their work is mostly in chainTx tasks, or tests were skipped) and the file says so.
 - [x] T037 Write `scripts/e2e/split-full-tier.js` — longest-processing-time-first over the weights, `--shards`/`--index`/`--csv`/`--print-all`, assigning the file mean to any unmeasured spec and **reporting it by name** (a silently dropped spec leaves the merge gate)
 - [x] T038 Convert `cypress-full-e2e` in `.github/workflows/test.yml` to a 4-leg matrix, each leg starting its own Hardhat node, deploying and seeding, with a per-leg timeout sized to the measured leg rather than the old 60-minute serial cap
 - [x] T039 [P] Add the viewport matrix (`phone`, `desktop`) to `cypress-fast-e2e` in the same workflow
-- [ ] T040 Run the sharded matrix and the serial tier once each and compare the pass sets before the serial job is removed; record the before/after wall clock in the policy document — **pending the first CI run on this branch**. The serial job is already replaced by the matrix, so the comparison is against the last serial run on staging rather than a fresh one.
+- [x] T040 Run the sharded matrix and compare against the serial baseline — **done**: all four shards passed on the first sharded run at 6:37 / 7:51 / 6:29 / 6:09, against a measured serial total of 1621s (~27 min), which corroborates the issue's "~30 min" figure. With the measured weights the predicted critical path is 421s and the legs balance to within 2s of each other.
 
 **Checkpoint**: measured wall clock recorded against the budget; `test/config/CiGates.test.js` still passes over the rewritten jobs.
 

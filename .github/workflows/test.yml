@@ -725,6 +725,11 @@ jobs:
     #
     # 4, not 8: each leg pays a fixed few minutes of install, compile, node start, deploy and seed.
     # Past 4 that setup dominates and runner minutes grow faster than wall clock falls.
+    #
+    # MEASURED on the first sharded run (Actions 32204349960): legs of 6:37 / 7:51 / 6:29 / 6:09
+    # against a serial total of 1621s (~27 min). That is why this stays on every push — at ~7
+    # minutes a leg it is no longer the thing a branch waits on, which was the concern when the
+    # only number available was the serial one.
     name: Cypress Full E2E (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     strategy:

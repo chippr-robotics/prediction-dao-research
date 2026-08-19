@@ -8,7 +8,7 @@ document must say, so a later edit that removes a rule is visible as a spec chan
 | Tier | Directory | Needs | Runs on | Budget |
 |---|---|---|---|---|
 | **no-chain** | `cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile | < 6 min per leg |
-| **on-chain** | `cypress/e2e/full/` | Local chain + deploy + seed | Every push, 4 shards in parallel | < 15 min per shard |
+| **on-chain** | `cypress/e2e/full/` | Local chain + deploy + seed | Every push, 4 shards in parallel | < 15 min per shard (measured 6:37 / 7:51 / 6:29 / 6:09) |
 | **account-native** | `cypress/e2e/passkey/` | The WebAuthn harness | Every push | < 5 min |
 
 ## The two admission rules

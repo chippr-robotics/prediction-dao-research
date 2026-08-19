@@ -642,7 +642,8 @@ artifacts live under `specs/<feature>/`.
   on-chain coverage. The no-chain tier runs twice — `CYPRESS_VIEWPORT_PROFILE` = `desktop` (1280×720)
   and `phone` (390×844), applied from a GLOBAL `beforeEach` so a new spec is covered at both widths
   with no author action; the on-chain tier is **4 shards with a private chain each**
-  (`scripts/e2e/split-full-tier.js`, longest-first). Accessibility uses `cy.a11yScan` — the
+  (`scripts/e2e/split-full-tier.js`, longest-first) — measured at 6:37 / 7:51 / 6:29 / 6:09 a leg
+  against ~27 minutes serial, which is what keeps it affordable on every push. Accessibility uses `cy.a11yScan` — the
   **already-installed `axe-core`, injected by the runner, never imported from `frontend/src`** (adding
   `cypress-axe` would touch the lockfile; see spec 075) — failing on serious/critical, scoped to an
   open modal's root because the app portals its modals, and every suppression names its issue.
