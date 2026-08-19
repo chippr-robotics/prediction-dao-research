@@ -221,7 +221,17 @@ describe('Wager Pools', () => {
         // Advance BEFORE visiting: the app decides refund-eligibility from browser time on page
         // load, and cy.advanceTime() re-applies its Date shim to the next window that loads, so the
         // fresh page already agrees with the chain about the deadline having passed.
+        //
+        // advanceTime()'s browser offset is cumulative on top of whatever this test's beforeEach
+        // last synced it to — and that sync ran at the START of this test, against the chain's
+        // *reverted* timestamp (resetChainBetweenTests() reverts to a checkpoint taken real minutes
+        // earlier). createPool above force-mines a block and reads its real, current timestamp for
+        // the deadline math, so the chain's clock is already back near real time by the time we get
+        // here — but the browser shim is still offset from the stale checkpoint. Adding 650s to a
+        // stale baseline can land short of a deadline anchored to the real one. Re-sync the browser
+        // to the chain's actual (now-advanced) clock instead of trusting the cumulative offset.
         cy.advanceTime(650) // past resolveIn (600s), joining/proposal never happened
+        cy.syncBrowserClockToChain()
 
         connectAndVisitPool(0, poolAddress)
         cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((before) => {
