@@ -4,10 +4,69 @@
   "specs": [
     {
       "id": "001-cypress-e2e-flows",
-      "title": "Cypress E2E flows",
-      "memberFacing": false,
-      "reason": "Defines the end-to-end suite itself; the flows it introduced are recorded against the features they drive.",
-      "flows": []
+      "title": "Core wager lifecycle (create \u2192 accept \u2192 resolve \u2192 claim/refund)",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.claim-payout",
+          "name": "The winner claims the escrowed stakes",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-01",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-10"
+          ],
+          "missing": "CLM-01 checks a balance and CLM-10 now settles on chain, but eight of the ten tests still end in a precondition-guarded branch that proves nothing (annotated ASSERTION-DEBT)",
+          "issue": "#1231"
+        },
+        {
+          "id": "wagers.refund-on-timeout",
+          "name": "An unaccepted or unresolved wager refunds after its deadline",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/11-refund-timeout.cy.js::REF-01",
+            "frontend/cypress/e2e/full/11-refund-timeout.cy.js::REF-02"
+          ]
+        },
+        {
+          "id": "wagers.decline-and-cancel",
+          "name": "Decline an offer, or cancel one you created before it is accepted",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-01",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-02",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-03",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-04",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-05",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-06"
+          ],
+          "missing": "two branches end in a precondition-guarded unconditional truth (annotated ASSERTION-DEBT), so the stake's return is not read back on those paths",
+          "issue": "#1231"
+        },
+        {
+          "id": "wagers.full-lifecycle",
+          "name": "One wager driven end to end, create through settlement",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-01",
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-02",
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-03",
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-04",
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-05"
+          ]
+        }
+      ]
     },
     {
       "id": "002-e2e-encryption-lifecycle",
@@ -154,6 +213,30 @@
           "risk": "access",
           "tests": [],
           "issue": "#1241"
+        },
+        {
+          "id": "compliance.frozen-account-blocked",
+          "name": "A frozen account cannot create a wager, and unfreezing restores it",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/18-frozen-accounts.cy.js::FRZ-01",
+            "frontend/cypress/e2e/full/18-frozen-accounts.cy.js::FRZ-02"
+          ]
+        },
+        {
+          "id": "compliance.paused-protocol-blocked",
+          "name": "A paused protocol refuses new wagers, and unpausing restores them",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/19-paused-protocol.cy.js::PAU-01",
+            "frontend/cypress/e2e/full/19-paused-protocol.cy.js::PAU-02"
+          ]
         }
       ]
     },
@@ -441,6 +524,18 @@
             "frontend/cypress/e2e/full/02-membership.cy.js::MEM-04",
             "frontend/cypress/e2e/full/02-membership.cy.js::MEM-05",
             "frontend/cypress/e2e/full/02-membership.cy.js::MEM-06"
+          ]
+        },
+        {
+          "id": "membership.expired-blocks-participation",
+          "name": "An expired membership blocks wager creation until it is renewed",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/20-expired-membership.cy.js::EXP-01",
+            "frontend/cypress/e2e/full/20-expired-membership.cy.js::EXP-02"
           ]
         }
       ]
@@ -987,6 +1082,19 @@
             "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-09",
             "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-10",
             "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-11"
+          ]
+        },
+        {
+          "id": "connect.first-run-onboarding",
+          "name": "Arrive with nothing set up and be walked to a way in",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/17-onboarding.cy.js::ONB-01",
+            "frontend/cypress/e2e/fast/17-onboarding.cy.js::ONB-02",
+            "frontend/cypress/e2e/fast/17-onboarding.cy.js::ONB-03"
           ]
         }
       ]

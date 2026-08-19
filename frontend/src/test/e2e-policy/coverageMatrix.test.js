@@ -144,6 +144,37 @@ describe('e2e coverage matrix', () => {
     }
   })
 
+  it('cites every spec file in the suite from at least one row', () => {
+    /*
+     * The other direction of the same honesty check as set-equality with `specs/`. Without it the
+     * matrix can describe a feature while omitting the test file that actually drives it — which is
+     * how the claim-payout, refund-timeout, decline/cancel, frozen-account, paused-protocol,
+     * expired-membership and lifecycle specs were all absent from the first draft of this matrix.
+     * Seven on-chain money-path specs, invisible to a reader who trusted the document.
+     */
+    const cited = new Set(
+      allFlows.flatMap((f) => (f.tests || []).map((ref) => ref.split('::')[0]))
+    )
+    const suiteFiles = []
+    for (const tier of ['fast', 'full', 'passkey']) {
+      const dir = resolve(ROOT, 'frontend/cypress/e2e', tier)
+      for (const file of readdirSync(dir)) {
+        if (file.endsWith('.cy.js')) suiteFiles.push(`frontend/cypress/e2e/${tier}/${file}`)
+      }
+    }
+
+    const uncited = suiteFiles.filter((f) => !cited.has(f)).sort()
+    expect(
+      uncited,
+      [
+        'These spec files are not cited by any matrix row, so the coverage they provide is invisible',
+        'to anyone reading the matrix. Add a flow row citing each, or delete the spec:',
+        '',
+        ...uncited,
+      ].join('\n')
+    ).toEqual([])
+  })
+
   it('keeps the generated document current', () => {
     // Regenerate-and-diff, like infra/grafana/. A hand-edited document is drift.
     expect(() =>

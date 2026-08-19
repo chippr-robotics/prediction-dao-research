@@ -65,6 +65,17 @@ const FAILURE_TERMS = /'(error|failed|failure|reverted|rejected|denied)'/
 const EITHER_WAY = /\/\/\s*EITHER-WAY:\s*\S+/
 const DEBT = /\/\/\s*ASSERTION-DEBT:\s*#\d+/
 
+/**
+ * Lines that are prose, not code. Comments explaining the anti-pattern — including the ones in this
+ * repo's own commit messages and file headers — quote it verbatim, and a gate that fires on a
+ * description of the bug rather than the bug is a gate people route around. Caught exactly that way:
+ * staging's CLM-10 rewrite documents the two fall-throughs it removed, and this flagged the prose.
+ */
+const isProse = (line) => {
+  const t = line.trim()
+  return t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')
+}
+
 /** Look back a few lines for an annotation; a comment two lines up still reads as attached. */
 function annotation(lines, index) {
   const preceding = lines.slice(Math.max(0, index - 3), index).join('\n')
@@ -87,6 +98,7 @@ describe('e2e assertion depth', () => {
     for (const file of FILES) {
       const lines = read(file)
       lines.forEach((line, i) => {
+        if (isProse(line)) return
         if (!UNCONDITIONAL.some((re) => re.test(line))) return
         const note = annotation(lines, i)
         if (note === 'either-way') return eitherWay++
@@ -127,11 +139,10 @@ describe('e2e assertion depth', () => {
     for (const file of FILES) {
       const lines = read(file)
       lines.forEach((line, i) => {
-        const trimmed = line.trim()
-        if (trimmed.startsWith('//') || trimmed.startsWith('*')) return
+        if (isProse(line)) return
         if (!(SUCCESS_TERMS.test(line) && FAILURE_TERMS.test(line))) return
         if (annotation(lines, i)) return tracked++
-        offenders.push(`${rel(file)}:${i + 1}  ${trimmed}`)
+        offenders.push(`${rel(file)}:${i + 1}  ${line.trim()}`)
       })
     }
 

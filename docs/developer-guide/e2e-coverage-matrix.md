@@ -27,20 +27,29 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Metric | Count |
 |---|---|
 | Spec directories | 96 |
-| With a member-facing flow | 78 |
-| Member-facing flows | 122 |
-| 🟢 covered | 34 |
-| 🟡 partial | 7 |
+| With a member-facing flow | 79 |
+| Member-facing flows | 130 |
+| 🟢 covered | 40 |
+| 🟡 partial | 9 |
 | 🔴 absent | 75 |
 | ⚪ out of scope | 6 |
-| **Covered but not proven** (status `covered`, depth below `flow`) | **12** |
+| **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
 The last row is the honest read of the suite: those flows have passing tests that do not
 establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-47 flows — 🟢 7 · 🟡 5 · 🔴 29 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 9 · 🟡 7 · 🔴 29 · ⚪ 6 · covered-but-not-proven 0
+
+### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `wagers.claim-payout` | The winner claims the escrowed stakes | 🟡 partial | settled | `on-chain` | `10-claim-payouts.cy.js` (CLM-01, CLM-10) | CLM-01 checks a balance and CLM-10 now settles on chain, but eight of the ten tests still end in a precondition-guarded branch that proves nothing (annotated ASSERTION-DEBT) |
+| `wagers.refund-on-timeout` | An unaccepted or unresolved wager refunds after its deadline | 🟢 covered | settled | `on-chain` | `11-refund-timeout.cy.js` (REF-01, REF-02) |  |
+| `wagers.decline-and-cancel` | Decline an offer, or cancel one you created before it is accepted | 🟡 partial | flow | `on-chain` | `06-decline-cancel.cy.js` (DEC-01, DEC-02, DEC-03, DEC-04, DEC-05, DEC-06) | two branches end in a precondition-guarded unconditional truth (annotated ASSERTION-DEBT), so the stake's return is not read back on those paths |
+| `wagers.full-lifecycle` | One wager driven end to end, create through settlement | 🟢 covered | settled | `on-chain` | `23-lifecycle-e2e.cy.js` (E2E-01, E2E-02, E2E-03, E2E-04, E2E-05) |  |
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -304,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-34 flows — 🟢 11 · 🟡 1 · 🔴 22 · ⚪ 0 · covered-but-not-proven 0
+38 flows — 🟢 15 · 🟡 1 · 🔴 22 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -325,6 +334,8 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `compliance.accept-terms-before-entry` | Read and accept the versioned terms before reaching the app | 🟢 covered | flow | `account-native` | `compliance.cy.js` (CP-01, CP-02, CP-03) |  |
 | `compliance.sanctioned-address-refused` | A screened address is refused before any transaction is offered | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
+| `compliance.frozen-account-blocked` | A frozen account cannot create a wager, and unfreezing restores it | 🟢 covered | settled | `on-chain` | `18-frozen-accounts.cy.js` (FRZ-01, FRZ-02) |  |
+| `compliance.paused-protocol-blocked` | A paused protocol refuses new wagers, and unpausing restores them | 🟢 covered | settled | `on-chain` | `19-paused-protocol.cy.js` (PAU-01, PAU-02) |  |
 
 ### `008-runtime-chain-consistency` — Runtime chain consistency
 
@@ -337,6 +348,12 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `addressbook.save-and-use-contact` | Save a contact and address a wager or transfer to it | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+
+### `022-membership-purchase-progress` — Membership purchase progress
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `membership.expired-blocks-participation` | An expired membership blocks wager creation until it is renewed | 🟢 covered | settled | `on-chain` | `20-expired-membership.cy.js` (EXP-01, EXP-02) |  |
 
 ### `032-encrypted-data-sync` — Encrypted data sync
 
@@ -371,6 +388,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `connect.choose-a-way-in` | Choose between wallet, passkey and recovery from one entry point | 🟢 covered | flow | `no-chain` | `01-wallet-connection.cy.js` (WAL-01, WAL-02, WAL-03, WAL-04) |  |
 | `connect.disconnect-and-switch` | Disconnect, and switch between accounts | 🟢 covered | flow | `no-chain` | `01-wallet-connection.cy.js` (WAL-05, WAL-06, WAL-07, WAL-08, WAL-09, WAL-10, WAL-11) |  |
+| `connect.first-run-onboarding` | Arrive with nothing set up and be walked to a way in | 🟢 covered | smoke | `no-chain` | `17-onboarding.cy.js` (ONB-01, ONB-02, ONB-03) |  |
 
 ### `054-callsign-registry` — Callsigns
 
@@ -632,7 +650,6 @@ Listed so the gate can tell "correctly omitted" from "forgotten".
 
 | Spec | Why there is nothing to drive |
 |---|---|
-| `001-cypress-e2e-flows` — Cypress E2E flows | Defines the end-to-end suite itself; the flows it introduced are recorded against the features they drive. |
 | `002-e2e-encryption-lifecycle` — E2E encryption lifecycle | A test-coverage spec for the encryption feature; its flows are recorded under 005-multi-recipient-encryption. |
 | `006-local-dev-environment` — Local development environment | Developer tooling; there is no member surface to drive. |
 | `015-mordor-network-deployment` — Mordor network deployment | A deployment target; the member-facing surface is network selection, recorded under 069-network-endpoints-user-panel. |
@@ -668,6 +685,7 @@ another test added beside it.
 | `ui.consistent-controls` | `038-ux-consistency` | smoke | `22-accessibility.cy.js` (A11Y-01, A11Y-02, A11Y-03) |
 | `wagers.explanatory-tooltips` | `039-wager-info-tooltips` | smoke | `13-dashboard.cy.js` (DSH-13, DSH-14) |
 | `wagers.my-wagers-tabs` | `040-my-wagers-refinements` | smoke | `13-dashboard.cy.js` (DSH-15, DSH-16, DSH-17, DSH-18) |
+| `connect.first-run-onboarding` | `045-unified-connect-recovery` | smoke | `17-onboarding.cy.js` (ONB-01, ONB-02, ONB-03) |
 | `wagers.single-table-view` | `078-my-wagers-single-table-view` | smoke | `13-dashboard.cy.js` (DSH-05, DSH-06) |
 | `account.cards` | `086-account-cards` | smoke | `26-trade-account.cy.js` |
 
