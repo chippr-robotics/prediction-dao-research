@@ -11,7 +11,7 @@ carries the anti-patterns that made the current suite report coverage it did not
 
 | Tier | Directory | Needs | Runs | Budget |
 |---|---|---|---|---|
-| **no-chain** | `frontend/cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile | **< 6 min per leg** |
+| **no-chain** | `frontend/cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile | **< 6 min per leg** — ⚠️ **currently missed**: measured 11:20 desktop / 11:30 phone (#1249) |
 | **on-chain** | `frontend/cypress/e2e/full/` | A local chain, a deploy and a seed | Every push, 4 shards in parallel | **< 15 min per shard** (measured: 6:37 / 7:51 / 6:29 / 6:09) |
 | **account-native** | `frontend/cypress/e2e/passkey/` | The WebAuthn harness | Every push, **once** — it rides the no-chain job's desktop leg for a runner, not because it is a viewport question | **< 5 min** |
 
@@ -162,6 +162,12 @@ the one it appears to answer.
 Budgets **report**; they do not block. A Lighthouse score on a shared runner moves several points
 run to run, and a gate that mostly reports the runner is a gate people learn to re-run.
 
+That is asserted, not assumed: **only accessibility audits may be set to `error`**, and the configs
+carry no assertion preset — `lighthouse:recommended` marks nearly every audit `error`, which is how
+`non-composited-animations` blocked this job on four routes the first time it measured more than
+one. `frontend/src/test/e2e-policy/lighthouseRoutes.test.js` fails on a re-added preset, or on any
+non-accessibility audit set to `error`.
+
 What does block is a route that produced **no measurement**:
 `scripts/e2e/check-lighthouse-coverage.js` fails when any route × profile is missing. `lhci` asserts
 only over URLs it collected, so a route that failed to load otherwise contributes nothing and leaves
@@ -176,6 +182,14 @@ unchanged — the specs are nowhere near equal.
 
 A tier over budget is a backlog item: split it, trim it, or move flows to a cheaper tier. Raising the
 number is a decision that gets written down with its reason.
+
+**The no-chain tier is over budget today** — 11:20 and 11:30 a leg against the 6 minutes stated
+above. That budget was set from an assumption before this tier had ever run at two profiles, and the
+first measurement contradicted it by roughly a factor of two. It is left as written, with the
+measured value beside it and #1249 tracking the gap, rather than quietly rewritten to match what CI
+happens to produce — a budget edited to fit its measurement is not a budget.
+
+The on-chain tier is inside its budget: 6:37 / 7:51 / 6:29 / 6:09 against 15 minutes a shard.
 
 ## Adding coverage
 

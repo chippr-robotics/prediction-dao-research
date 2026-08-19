@@ -26,24 +26,30 @@
       }
     },
     "assert": {
-      "preset": "lighthouse:recommended",
       "assertions": {
+        "aria-allowed-attr": "error",
+        "aria-allowed-role": "warn",
+        "aria-required-attr": "error",
+        "aria-valid-attr": "error",
+        "aria-valid-attr-value": "error",
+        "bootup-time": "off",
+        "button-name": "error",
         "categories:accessibility": [
           "warn",
           {
             "minScore": 0.9
           }
         ],
-        "categories:performance": [
-          "warn",
-          {
-            "minScore": 0.7
-          }
-        ],
         "categories:best-practices": [
           "warn",
           {
             "minScore": 0.8
+          }
+        ],
+        "categories:performance": [
+          "warn",
+          {
+            "minScore": 0.7
           }
         ],
         "categories:seo": [
@@ -53,23 +59,40 @@
           }
         ],
         "color-contrast": "warn",
-        "meta-viewport": "error",
+        "content-width": "off",
+        "csp-xss": "off",
+        "cumulative-layout-shift": "warn",
         "document-title": "error",
+        "dom-size": "off",
+        "duplicate-id-aria": "error",
+        "efficient-animated-content": "warn",
+        "errors-in-console": "warn",
+        "first-contentful-paint": "warn",
+        "first-meaningful-paint": "warn",
+        "heading-order": "warn",
         "html-has-lang": "error",
         "html-lang-valid": "error",
         "image-alt": "error",
+        "installable-manifest": "off",
+        "interactive": "warn",
         "label": "error",
-        "link-name": "error",
-        "button-name": "error",
-        "aria-allowed-attr": "error",
-        "aria-required-attr": "error",
-        "aria-valid-attr": "error",
-        "aria-valid-attr-value": "error",
-        "aria-allowed-role": "warn",
-        "duplicate-id-aria": "error",
-        "tabindex": "error",
-        "heading-order": "warn",
         "label-content-name-mismatch": "warn",
+        "largest-contentful-paint": "warn",
+        "legacy-javascript": "warn",
+        "link-name": "error",
+        "mainthread-work-breakdown": "off",
+        "maskable-icon": "off",
+        "meta-viewport": "error",
+        "modern-image-formats": "warn",
+        "non-composited-animations": "warn",
+        "render-blocking-resources": "off",
+        "robots-txt": "off",
+        "server-response-time": "off",
+        "speed-index": "warn",
+        "splash-screen": "off",
+        "tabindex": "error",
+        "themed-omnibox": "off",
+        "total-blocking-time": "warn",
         "total-byte-weight": "off",
         "unsized-images": [
           "warn",
@@ -79,21 +102,10 @@
         ],
         "unused-css-rules": "off",
         "unused-javascript": "off",
+        "uses-long-cache-ttl": "warn",
         "uses-rel-preconnect": "off",
-        "valid-source-maps": "off",
-        "bootup-time": "off",
-        "dom-size": "off",
-        "mainthread-work-breakdown": "off",
-        "render-blocking-resources": "off",
-        "server-response-time": "off",
-        "content-width": "off",
-        "csp-xss": "off",
-        "errors-in-console": "warn",
-        "installable-manifest": "off",
-        "maskable-icon": "off",
-        "robots-txt": "off",
-        "splash-screen": "off",
-        "themed-omnibox": "off"
+        "uses-responsive-images": "warn",
+        "valid-source-maps": "off"
       }
     }
   }
