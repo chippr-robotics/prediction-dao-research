@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 42 |
+| 🟢 covered | 45 |
 | 🟡 partial | 7 |
-| 🔴 absent | 75 |
+| 🔴 absent | 72 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -265,7 +265,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Disclosure — a member consents to a cost
 
-9 flows — 🟢 1 · 🟡 0 · 🔴 8 · ⚪ 0 · covered-but-not-proven 0
+9 flows — 🟢 4 · 🟡 0 · 🔴 5 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -295,9 +295,9 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `fees.disclosed-before-signature` | See the live fee rate before signing, and be charged no more than that | 🔴 absent | none | — (proposed: on-chain) | #1233 |  |
-| `fees.zero-rate-shows-no-line` | See no fee line at all when the rate is zero | 🔴 absent | none | — (proposed: no-chain) | #1233 |  |
-| `fees.admin-changes-rate` | An operator changes a service's rate and members see the new one | 🔴 absent | none | — (proposed: on-chain) | #1233 |  |
+| `fees.disclosed-before-signature` | See the live fee rate before signing, and be charged no more than that | 🟢 covered | settled | `on-chain` | `25-platform-fees.cy.js` (FEE-01, FEE-02) |  |
+| `fees.zero-rate-shows-no-line` | See no fee line at all when the rate is zero | 🟢 covered | flow | `no-chain` | `28-platform-fee-disclosure.cy.js` (FEE-04, FEE-05) |  |
+| `fees.admin-changes-rate` | An operator changes a service's rate and members see the new one | 🟢 covered | settled | `on-chain` | `25-platform-fees.cy.js` (FEE-03) |  |
 
 ### `061-bitcoin-transactions` — Bitcoin
 

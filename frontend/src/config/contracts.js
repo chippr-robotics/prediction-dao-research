@@ -101,6 +101,20 @@ const HARDHAT_CONTRACTS = {
   membershipVoucher: '0xF2fc5Ac192E7e48B2EE95D3528870c6ED26908e4',
   voucherBatchMinter: '0xE0b0F625F876f7D78413cc6c402FB92C8E47Ea05',
   tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
+  /*
+   * spec 060 — the platform-fee source of truth. Deployed by `deploy:local:fees` (the real
+   * `deploy-fee-router.js`, not a test double), which `setup:local` and `setup:e2e` run
+   * IMMEDIATELY AFTER `deploy:local`.
+   *
+   * That ordering is load-bearing and this address is the reason: `deployProxy` uses plain
+   * CREATE, so the address is a function of the deployer's NONCE — insert another deploy
+   * before this one and every value here shifts. The full-E2E tier does not sync (that would
+   * overwrite AMOY_CONTRACTS' real addresses with local ones), so the constant is what the app
+   * resolves. `frontend/cypress/e2e/full/25-platform-fees.cy.js` asserts this against the
+   * address the chain actually holds, so a reordering fails with the reason rather than as
+   * "deposits are paused".
+   */
+  feeRouter: '0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E',
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)

@@ -397,6 +397,17 @@ jobs:
           echo "Contract deployment completed"
         continue-on-error: false
 
+      # Spec 060 platform fees: a targeted, append-only deploy on top of the core record above,
+      # in this ORDER (the FeeRouter's address comes from the deployer nonce, and
+      # HARDHAT_CONTRACTS.feeRouter is the constant the app resolves). The mock ERC-4626 vault is
+      # what `depositToVaultWithFee` wraps — there is no Morpho on a local chain, so without it
+      # the full-tier fee spec (#1233) has no charge path to settle against.
+      - name: Deploy the fee router and its local Earn vault
+        run: |
+          npm run deploy:local:fees
+          npm run deploy:local:earn-vault
+        continue-on-error: false
+
       # Constitution IV: must fail the pipeline on error. Do NOT reintroduce `continue-on-error`
       # (spec 075, FR-007/FR-008). `set -o pipefail` is load-bearing — the command pipes into
       # `tee`, so without it the step's status is tee's (always 0).
