@@ -47,9 +47,16 @@ const CTF_ABI = [
 ]
 const TOKEN_ABI = [
   'function mint(address to, uint256 amount)',
+  'function burn(address from, uint256 amount)',
   'function balanceOf(address) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
 ]
+// ReentrantToken (contracts/mocks) — a test-only ERC-20 whose next transfer re-enters an armed
+// target and bubbles that call's revert. The legacy-recovery sweep uses it to model a token that
+// REFUSES a transfer it is perfectly able to make (a blocklisting stablecoin is the real-world
+// case), which is the only way to fail one asset and not the others: the sweep re-reads balances
+// itself, so anything that changes the balance simply drops the asset from the run instead.
+const ARMED_TOKEN_ABI = ['function arm(address target, bytes data)']
 const KEYREG_ABI = [
   'function hasKey(address user) view returns (bool)',
   'function getPublicKey(address user) view returns (bytes)',
@@ -229,6 +236,117 @@ export default defineConfig({
           } catch (e) {
             // Return a soft failure so specs can assert "blocked" cases (e.g. a
             // premature claimRefund) instead of the task rejecting the test.
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+        /**
+         * Fixtures for the legacy account recovery sweep (spec 062).
+         *
+         * The sweep signs with a key the MEMBER pastes in, not with the connected wallet, so a
+         * test needs a real funded EOA whose private key it can hand to the UI. Every run mints
+         * a FRESH one: a fixed key would accumulate balances across runs and make "what moved"
+         * a function of how many times the suite had been run.
+         *
+         * The wrapped-native token on the local chain is a MockERC20 with permissionless
+         * mint/burn, which is what makes `burn` available as a way to force ONE asset to fail
+         * while the others still move — the realistic race the sweep must survive is the
+         * balance changing between the quote and the transfer.
+         *
+         * action ∈ newAccount | fundNative | mintToken | burnToken | balances
+         */
+        async legacyFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, 1337, { staticNetwork: true })
+          /*
+           * NonceManager, not a bare Wallet: several fixture actions send two transactions in a
+           * row (deploy then arm), and ethers caches the nonce lookup for a moment — on a local
+           * chain the second send reuses the first's nonce and is rejected. The fixture's sends
+           * must all land, so tracking the nonce locally is exactly right here.
+           */
+          const funder = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+          /*
+           * WHICH token the sweep sees is decided by the APP, not by this record: the portfolio
+           * registry scans the wrapped native that `config/wrappedNative.js` resolves, which on
+           * 1337 is `HARDHAT_CONTRACTS.wmatic` — a constant in the frontend source. A fresh
+           * `deploy:local` does NOT land the mock there: the mocks are CREATE2-addressed from
+           * their own initcode, so a compiler or OpenZeppelin bump moves them, and the frontend
+           * constant is only refreshed by `npm run sync:frontend-contracts`, which the E2E job
+           * does not run. So the caller passes the address the app will actually read, and
+           * `installTokenAt` copies the freshly deployed mock's runtime code there.
+           *
+           * Placing the code (rather than pointing the test at the real deployment) is what keeps
+           * this spec testing the app's own resolution path instead of a private arrangement
+           * between the test and the chain.
+           */
+          const tokenAddress = args.token || d.wmatic
+          const token = new ethers.Contract(tokenAddress, TOKEN_ABI, funder)
+
+          try {
+            switch (action) {
+              case 'newAccount': {
+                const wallet = ethers.Wallet.createRandom()
+                return { ok: true, address: wallet.address, privateKey: wallet.privateKey, tokenAddress }
+              }
+              case 'installTokenAt': {
+                /*
+                 * Deploy ReentrantToken and copy its RUNTIME code to the address the app scans.
+                 * Storage at that address starts empty, which is fine: the app takes symbol and
+                 * decimals from its own config and only ever calls balanceOf / transfer here.
+                 */
+                const artifactPath = resolve(
+                  __dirname, '..', 'artifacts', 'contracts', 'mocks', 'ReentrantToken.sol', 'ReentrantToken.json',
+                )
+                const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'))
+                const deployed = await new ethers.ContractFactory(
+                  artifact.abi, artifact.bytecode, funder,
+                ).deploy()
+                await deployed.waitForDeployment()
+                const code = await provider.getCode(await deployed.getAddress())
+                await provider.send('hardhat_setCode', [tokenAddress, code])
+                // Leave it in a KNOWN state: armed at address(0) with no data, which is a call
+                // that always succeeds, so an arming left over from a previous test cannot make
+                // an unrelated transfer revert.
+                await (await new ethers.Contract(tokenAddress, ARMED_TOKEN_ABI, funder)
+                  .arm(ethers.ZeroAddress, '0x')).wait(1)
+                return { ok: true, address: tokenAddress }
+              }
+              case 'armTokenToRefuse': {
+                // Arm the next transfer to re-enter the token itself with an unknown selector.
+                // The token has no fallback, so that call reverts and the transfer reverts with
+                // it — one transfer refused, nothing else about the account changed.
+                const rc = await (await new ethers.Contract(tokenAddress, ARMED_TOKEN_ABI, funder)
+                  .arm(tokenAddress, '0xdeadbeef')).wait(1)
+                return { ok: rc.status === 1 }
+              }
+              case 'fundNative': {
+                const tx = await funder.sendTransaction({
+                  to: args.address,
+                  value: BigInt(args.amount ?? String(10n ** 18n)),
+                })
+                const rc = await tx.wait(1)
+                return { ok: rc.status === 1 }
+              }
+              case 'mintToken': {
+                const rc = await (await token.mint(args.address, BigInt(args.amount ?? String(10n ** 18n)))).wait(1)
+                return { ok: rc.status === 1 }
+              }
+              case 'burnToken': {
+                const rc = await (await token.burn(args.address, BigInt(args.amount))).wait(1)
+                return { ok: rc.status === 1 }
+              }
+              case 'balances': {
+                const [native, erc20] = await Promise.all([
+                  provider.getBalance(args.address),
+                  new ethers.Contract(tokenAddress, TOKEN_ABI, provider).balanceOf(args.address),
+                ])
+                return { ok: true, native: native.toString(), token: erc20.toString(), tokenAddress }
+              }
+              default:
+                throw new Error(`legacyFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
             return { ok: false, error: e.shortMessage || e.reason || e.message }
           }
         },
