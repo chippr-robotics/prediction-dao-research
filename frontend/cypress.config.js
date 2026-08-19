@@ -27,6 +27,8 @@ const REGISTRY_ABI = [
   'function declareWinner(uint256 wagerId, address winner)',
   'function claimRefund(uint256 wagerId)',
   'function claimPayout(uint256 wagerId)',
+  'function cancelOpen(uint256 wagerId)',
+  'function declineWager(uint256 wagerId)',
   'function autoResolveFromPolymarket(uint256 wagerId)',
   'function getWager(uint256 wagerId) view returns (tuple(address creator,address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,uint8 status,bool paid,bool creatorIsYes,address winner,bytes32 metadataHash,bytes32 polymarketConditionId,string metadataUri))',
 ]
@@ -292,10 +294,16 @@ export default defineConfig({
               const cw = new ethers.Wallet(ACCOUNT_KEYS[args.creatorIndex ?? 0], provider)
               const creg = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, cw)
               const now = (await provider.getBlock('latest')).timestamp
-              const stake = BigInt(args.stake ?? (10n ** 18n))
+              // creatorStake/opponentStake default to the shared `stake` (the common equal-stakes
+              // case); pass them individually for an asymmetric "offer" wager. Either-party
+              // resolution requires equal stakes on chain (EitherRequiresEqualStakes) — an
+              // asymmetric wager needs resolutionType Creator/Opponent/ThirdParty.
+              const base = BigInt(args.stake ?? (10n ** 18n))
+              const creatorStake = args.creatorStake !== undefined ? BigInt(args.creatorStake) : base
+              const opponentStake = args.opponentStake !== undefined ? BigInt(args.opponentStake) : base
               const sent = await creg.createWager(
                 args.opponent, args.arbitrator || ethers.ZeroAddress, d.paymentToken,
-                stake, stake,
+                creatorStake, opponentStake,
                 now + (args.acceptIn ?? 3600), now + (args.resolveIn ?? 7200),
                 args.resolutionType ?? 0, args.conditionId ?? ethers.ZeroHash,
                 args.creatorIsYes ?? false, ethers.id('e2e-meta'), ''
@@ -326,6 +334,18 @@ export default defineConfig({
               const pw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
               tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, pw)
                 .claimPayout(args.wagerId)
+              break
+            }
+            case 'cancelOpen': {
+              const cow = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, cow)
+                .cancelOpen(args.wagerId)
+              break
+            }
+            case 'declineWager': {
+              const dw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, dw)
+                .declineWager(args.wagerId)
               break
             }
             case 'hasKey': {
@@ -513,7 +533,10 @@ export default defineConfig({
             case 'wagerInfo': {
               const reg2 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
               const w = await reg2.getWager(args.wagerId)
-              return { ok: true, status: Number(w.status), winner: w.winner, paid: w.paid, metadataUri: w.metadataUri }
+              return {
+                ok: true, status: Number(w.status), winner: w.winner, paid: w.paid, metadataUri: w.metadataUri,
+                resolutionType: Number(w.resolutionType), creator: w.creator, opponent: w.opponent,
+              }
             }
             case 'pause':
               if (await registry.paused()) return { ok: true, noop: true }
