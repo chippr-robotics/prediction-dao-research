@@ -16,7 +16,11 @@
  *   POOL-02 pools.settle-payout-matrix       — propose → approve to threshold → winner claims
  *   POOL-03 pools.deadline-refund            — a pool that never resolves refunds after the deadline
  *   POOL-04 pools.join-with-authorization    — join gaslessly via a signed EIP-3009 authorization
+ *
+ * Checklist: POOL-01..POOL-04
  */
+
+import { resetChainBetweenTests } from '../../support/e2e'
 
 const TEST_ACCOUNTS = [
   '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // #0 Creator / Admin
@@ -60,6 +64,10 @@ function poolAddressFromUrl() {
 }
 
 describe('Wager Pools', () => {
+  // POOL-03 advances the chain clock past a resolve deadline; without per-test isolation that
+  // would poison every later test's own deadlines the same way 07-manual-resolution documents.
+  resetChainBetweenTests()
+
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()

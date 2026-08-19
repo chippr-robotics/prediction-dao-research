@@ -721,46 +721,46 @@
         {
           "id": "pools.create-and-join",
           "name": "Create a group pool and have members join with their stake",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1232"
+          "tests": [
+            "frontend/cypress/e2e/full/24-wager-pools.cy.js::POOL-01"
+          ]
         },
         {
           "id": "pools.settle-payout-matrix",
           "name": "Creator proposes a payout matrix, members approve to threshold, the winner claims",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1232"
+          "tests": [
+            "frontend/cypress/e2e/full/24-wager-pools.cy.js::POOL-02"
+          ]
         },
         {
           "id": "pools.deadline-refund",
           "name": "A pool that never resolves returns members' stakes after the deadline",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1232"
+          "tests": [
+            "frontend/cypress/e2e/full/24-wager-pools.cy.js::POOL-03"
+          ]
         },
         {
           "id": "pools.join-with-authorization",
           "name": "Join a pool gaslessly by signing an EIP-3009 authorization",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1232"
+          "tests": [
+            "frontend/cypress/e2e/full/24-wager-pools.cy.js::POOL-04"
+          ]
         }
       ]
     },
