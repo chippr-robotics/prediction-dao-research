@@ -102,6 +102,11 @@ or `'failed'`) and requires every accessibility suppression to name its tracking
   decides expiry in browser time and the contracts enforce chain time; a deadline test is meaningless
   while the two disagree.
 - `chainTx` decodes custom errors, so a reverting precondition says why rather than failing silently.
+- The **development warning banner is dismissed before every test** (`dev_warning_banner_dismissed`,
+  set from `window:before:load` in `cypress/support/e2e.js`). It is a dev-build affordance that never
+  ships, it is `position: fixed`, and it reserves a hardcoded 45px while wrapping to three lines at
+  390px — so at phone width it covers the fixed wallet-connect button (#1248). A spec working around
+  it would be paying attention to something no member ever sees.
 
 ## Viewports
 

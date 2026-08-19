@@ -72,13 +72,25 @@ Cypress.Commands.add('assertReachable', (selector, options = {}) => {
 
       expect(rect.width, `${selector} has width`).to.be.greaterThan(0)
       expect(rect.height, `${selector} has height`).to.be.greaterThan(0)
+
+      /*
+       * HORIZONTAL containment is the assertion that means something. A control wider than the
+       * viewport, or pushed off its right edge, is unreachable — that is the mobile layout bug this
+       * exists to catch, and no amount of scrolling fixes it.
+       *
+       * VERTICALLY we require only that the element INTERSECTS the viewport after scrolling.
+       * Demanding it fit was wrong and CI said so on the first run: `.quick-actions-grid` is a
+       * container 1002px tall, so on a 720px viewport it can never fit — and a member reaches it
+       * perfectly well by scrolling. Vertical extent is what scrolling is for; horizontal overflow
+       * is a bug.
+       */
       expect(
         rect.left >= -EPSILON && rect.right <= vw + EPSILON,
-        `${selector} is within the ${vw}px viewport horizontally (left ${rect.left.toFixed(1)}, right ${rect.right.toFixed(1)})`
+        `${selector} fits the ${vw}px viewport horizontally (left ${rect.left.toFixed(1)}, right ${rect.right.toFixed(1)})`
       ).to.be.true
       expect(
-        rect.top >= -EPSILON && rect.bottom <= vh + EPSILON,
-        `${selector} is within the ${vh}px viewport vertically after scrolling (top ${rect.top.toFixed(1)}, bottom ${rect.bottom.toFixed(1)})`
+        rect.bottom > EPSILON && rect.top < vh - EPSILON,
+        `${selector} is on screen vertically after scrolling (top ${rect.top.toFixed(1)}, bottom ${rect.bottom.toFixed(1)}, viewport ${vh}px)`
       ).to.be.true
     })
   })

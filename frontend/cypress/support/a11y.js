@@ -76,15 +76,24 @@ Cypress.Commands.add('a11yScan', (options = {}) => {
         const blocking = results.violations.filter((v) => BLOCKING_IMPACTS.includes(v.impact))
         const advisory = results.violations.filter((v) => !BLOCKING_IMPACTS.includes(v.impact))
 
+        /*
+         * `Cypress.log`, NOT `cy.log`. `cy.log` enqueues a command, and a `.then()` callback that
+         * invokes a cy command and then returns a value is the "mixing async and sync code" error —
+         * which is exactly how this command failed on its first CI run, in all four of its own
+         * tests. The distinction is invisible until it isn't.
+         */
         if (advisory.length) {
-          cy.log(`a11y (${where}): ${advisory.length} moderate/minor violation(s) — not blocking`)
-          // eslint-disable-next-line no-console
+          Cypress.log({
+            name: 'a11y',
+            message: `${where}: ${advisory.length} moderate/minor violation(s) — not blocking`,
+          })
           console.log(`a11y advisory for ${where}:\n${formatViolations(advisory)}`)
         }
         if (disableRules.length) {
-          cy.log(
-            `a11y (${where}): suppressed ${disableRules.map((d) => `${d.rule} (${d.issue})`).join(', ')}`
-          )
+          Cypress.log({
+            name: 'a11y',
+            message: `${where}: suppressed ${disableRules.map((d) => `${d.rule} (${d.issue})`).join(', ')}`,
+          })
         }
 
         expect(

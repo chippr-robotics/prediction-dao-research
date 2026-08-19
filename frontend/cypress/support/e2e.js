@@ -34,6 +34,32 @@ before(() => {
 beforeEach(() => {
   const { width, height } = VIEWPORTS[activeProfile()]
   cy.viewport(width, height)
+
+  /*
+   * Dismiss the DEV-ONLY development warning banner before every test.
+   *
+   * It is `position: fixed` at the top of the page and reserves space through a HARDCODED
+   * `--dev-banner-height: 45px`. At 390px the text wraps to three lines, the banner becomes far
+   * taller than 45px, and it covers the fixed wallet-connect button — which is how the phone leg
+   * failed seven wallet-connection tests on its first run, with "not visible ... covered by
+   * another element: div.dev-warning-banner".
+   *
+   * Dismissing rather than working around it: the banner never ships to production (it is a dev
+   * build affordance), so a spec that scrolls or waits around it would be paying attention to
+   * something no member ever sees. The banner's own wrap/height bug is real and tracked separately
+   * — this line stops it from being reported as thirteen unrelated test failures.
+   *
+   * Set from `window:before:load`, not `cy.window()`. Before the first `cy.visit()` there is no app
+   * origin to write to, and most specs call `cy.clearLocalStorage()` in their own `beforeEach`,
+   * which runs after this one — either way a value written here would be gone by the time the app
+   * boots. The load hook fires on every visit, on the right origin, before app code runs. It is
+   * registered here (not at file scope) because Cypress clears listeners between tests, and it is
+   * registered BEFORE the visit it needs to affect — the ordering trap that is anti-pattern 4 in
+   * the tiering policy.
+   */
+  cy.on('window:before:load', (win) => {
+    win.localStorage.setItem('dev_warning_banner_dismissed', 'true')
+  })
 })
 
 /*
