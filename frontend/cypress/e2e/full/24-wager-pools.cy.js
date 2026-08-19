@@ -63,6 +63,16 @@ function poolAddressFromUrl() {
     .then((url) => url.match(/0x[0-9a-fA-F]{40}/)[0])
 }
 
+/**
+ * Assert a chainTx result succeeded, surfacing the decoded on-chain error (see `describeRevert` in
+ * cypress.config.js) instead of a bare "expected false to be true" — a failing precondition should
+ * say why.
+ */
+function expectOk(result, label) {
+  expect(result.ok, `${label}: ${result.error || 'no error message returned'}`).to.be.true
+  return result
+}
+
 describe('Wager Pools', () => {
   // POOL-03 advances the chain clock past a resolve deadline; without per-test isolation that
   // would poison every later test's own deadlines the same way 07-manual-resolution documents.
@@ -101,7 +111,7 @@ describe('Wager Pools', () => {
 
       // Judge by chain state, not by the modal.
       cy.task('chainTx', { action: 'poolInfo', args: { pool: poolAddress } }).then((info) => {
-        expect(info.ok, 'poolInfo ok').to.be.true
+        expectOk(info, 'poolInfo')
         expect(info.memberCount, 'two members joined').to.equal(2)
         expect(info.state, 'joining is still open').to.equal(0)
       })
@@ -123,16 +133,16 @@ describe('Wager Pools', () => {
     // propose/approve/claim, driven through the UI.
     cy.task('chainTx', { action: 'createPool', args: { creatorIndex: 0, buyIn: BUY_IN.toString(), maxMembers: 3, thresholdBips: 5100 } })
       .then((created) => {
-        expect(created.ok, 'createPool ok').to.be.true
+        expectOk(created, 'createPool')
         const poolAddress = created.pool
 
         ;[0, 1, 2].forEach((i) => cy.task('chainTx', { action: 'fund', args: { address: TEST_ACCOUNTS[i] } }))
         ;[0, 1, 2].forEach((i) =>
           cy.task('chainTx', { action: 'joinPool', args: { index: i, pool: poolAddress, buyIn: BUY_IN.toString() } })
-            .its('ok').should('be.true')
+            .then((r) => expectOk(r, `joinPool[${i}]`))
         )
         cy.task('chainTx', { action: 'closeJoiningPool', args: { callerIndex: 0, pool: poolAddress } })
-          .its('ok').should('be.true')
+          .then((r) => expectOk(r, 'closeJoiningPool'))
 
         connectAndVisitPool(0, poolAddress)
         cy.get('[data-testid="pool-state"]', { timeout: 10000 }).should('contain.text', 'Closed')
@@ -182,18 +192,23 @@ describe('Wager Pools', () => {
   // POOL-03: pools.deadline-refund — a pool that never resolves refunds after the deadline
   // ---------------------------------------------------------------------------
   it('[POOL-03] A pool that never resolves returns members’ stakes after the deadline', () => {
-    cy.task('chainTx', { action: 'createPool', args: { creatorIndex: 0, buyIn: BUY_IN.toString(), maxMembers: 3, acceptIn: 60, resolveIn: 180 } })
+    // Wide windows deliberately: this is the shard's Nth full-tier spec, and
+    // resetChainBetweenTests() reverts to a checkpoint taken real minutes earlier — createPool's
+    // deadline math anchors to whichever of chain-time/wall-clock is ahead (see cypress.config.js),
+    // but a tight window still leaves less margin for ordinary CI round-trip latency between here
+    // and closeJoiningPool below.
+    cy.task('chainTx', { action: 'createPool', args: { creatorIndex: 0, buyIn: BUY_IN.toString(), maxMembers: 3, acceptIn: 300, resolveIn: 600 } })
       .then((created) => {
-        expect(created.ok, 'createPool ok').to.be.true
+        expectOk(created, 'createPool')
         const poolAddress = created.pool
 
         ;[0, 1].forEach((i) => cy.task('chainTx', { action: 'fund', args: { address: TEST_ACCOUNTS[i] } }))
         ;[0, 1].forEach((i) =>
           cy.task('chainTx', { action: 'joinPool', args: { index: i, pool: poolAddress, buyIn: BUY_IN.toString() } })
-            .its('ok').should('be.true')
+            .then((r) => expectOk(r, `joinPool[${i}]`))
         )
         cy.task('chainTx', { action: 'closeJoiningPool', args: { callerIndex: 0, pool: poolAddress } })
-          .its('ok').should('be.true')
+          .then((r) => expectOk(r, 'closeJoiningPool'))
 
         // Refund is NOT allowed before the resolve deadline.
         cy.task('chainTx', { action: 'refundPool', args: { callerIndex: 0, pool: poolAddress } })
@@ -202,7 +217,7 @@ describe('Wager Pools', () => {
         // Advance BEFORE visiting: the app decides refund-eligibility from browser time on page
         // load, and cy.advanceTime() re-applies its Date shim to the next window that loads, so the
         // fresh page already agrees with the chain about the deadline having passed.
-        cy.advanceTime(200) // past resolveIn (180s), joining/proposal never happened
+        cy.advanceTime(650) // past resolveIn (600s), joining/proposal never happened
 
         connectAndVisitPool(0, poolAddress)
         cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((before) => {
@@ -230,12 +245,12 @@ describe('Wager Pools', () => {
 
     cy.task('chainTx', { action: 'deployMockUSDCPermit', args: { mintTo: TEST_ACCOUNTS[1], amount: (1000n * 10n ** 6n).toString() } })
       .then((minted) => {
-        expect(minted.ok, 'deployMockUSDCPermit ok').to.be.true
+        expectOk(minted, 'deployMockUSDCPermit')
         const token = minted.token
 
         cy.task('chainTx', { action: 'createPool', args: { creatorIndex: 0, token, buyIn: value, maxMembers: 3 } })
           .then((created) => {
-            expect(created.ok, 'createPool ok').to.be.true
+            expectOk(created, 'createPool')
             const poolAddress = created.pool
 
             // Member #1 SIGNS an authorization — no transaction of their own.
@@ -243,16 +258,14 @@ describe('Wager Pools', () => {
               action: 'signPoolJoinAuthorization',
               args: { fromIndex: 1, token, pool: poolAddress, value },
             }).then((signed) => {
-              expect(signed.ok, 'signing ok').to.be.true
+              expectOk(signed, 'signPoolJoinAuthorization')
               expect(signed.from.toLowerCase(), 'signed by the joining member').to.equal(TEST_ACCOUNTS[1].toLowerCase())
 
               // A DIFFERENT account (the relayer, #0) submits it on-chain and pays the gas.
               cy.task('chainTx', {
                 action: 'submitPoolJoinAuthorization',
                 args: { relayerIndex: 0, pool: poolAddress, ...signed },
-              }).then((r) => {
-                expect(r.ok, 'relayed join succeeds').to.be.true
-              })
+              }).then((r) => expectOk(r, 'submitPoolJoinAuthorization'))
 
               cy.task('chainTx', { action: 'poolMemberInfo', args: { pool: poolAddress, address: TEST_ACCOUNTS[1] } })
                 .its('hasJoined').should('be.true')

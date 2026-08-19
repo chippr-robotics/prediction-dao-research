@@ -340,13 +340,21 @@ export default defineConfig({
             case 'deployMockUSDCPermit': {
               // A fresh, isolated 6-dec USDC double with EIP-3009 support, for the gasless-join spec —
               // the local core payment token (18-dec MockERC20) has no `receiveWithAuthorization`.
+              //
+              // Explicit nonce management for the deploy-then-mint pair: two back-to-back sends from
+              // the SAME wallet, each auto-computing its nonce via getTransactionCount('pending'),
+              // intermittently raced under resetChainBetweenTests()' per-test evm_revert (observed in
+              // CI as "Nonce too low. Expected nonce to be N+1 but got N") — the revert leaves the
+              // node's pending-nonce bookkeeping momentarily inconsistent with 'latest'. Fetching once
+              // from 'latest' and incrementing locally sidesteps it.
+              let nonce = await provider.getTransactionCount(wallet.address, 'latest')
               const art = loadArtifact('mocks/MockUSDCPermit.sol', 'MockUSDCPermit')
               const cf = new ethers.ContractFactory(art.abi, art.bytecode, wallet)
-              const c = await cf.deploy()
+              const c = await cf.deploy({ nonce: nonce++ })
               await c.waitForDeployment()
               const tokenAddr = await c.getAddress()
               if (args.mintTo) {
-                await (await c.mint(args.mintTo, BigInt(args.amount ?? 10n ** 12n))).wait(1)
+                await (await c.mint(args.mintTo, BigInt(args.amount ?? 10n ** 12n), { nonce: nonce++ })).wait(1)
               }
               return { ok: true, token: tokenAddr }
             }
@@ -356,7 +364,13 @@ export default defineConfig({
               }
               const cw = new ethers.Wallet(ACCOUNT_KEYS[args.creatorIndex ?? 0], provider)
               const factory = new ethers.Contract(d.contracts.wagerPoolFactory, POOL_FACTORY_ABI, cw)
-              const now = (await provider.getBlock('latest')).timestamp
+              // `resetChainBetweenTests()` reverts to a checkpoint taken once, real minutes before a
+              // later test runs — its stale `block.timestamp` understates when THIS tx will actually
+              // mine (Hardhat mines new blocks at wall-clock time once the chain's clock is behind
+              // it), so a short deadline window computed from it can already be in the past by the
+              // time the tx lands, reverting BadDeadlines(). Anchor to whichever clock is ahead.
+              const chainNow = (await provider.getBlock('latest')).timestamp
+              const now = Math.max(Math.floor(Date.now() / 1000), chainNow)
               const params = {
                 token: args.token || d.paymentToken,
                 buyIn: BigInt(args.buyIn ?? 10n * 10n ** 18n),
@@ -376,14 +390,17 @@ export default defineConfig({
             case 'joinPool': {
               // Approve-then-join as account #index — mirrors the self-submit path usePools.joinPool
               // takes when no relayer is live (the path the mocked-wallet Cypress harness always hits).
+              // Explicit nonce management: see the comment on deployMockUSDCPermit — the same
+              // approve-then-send pattern from one wallet hit the same post-revert nonce race.
               const jw = new ethers.Wallet(ACCOUNT_KEYS[args.index ?? 1], provider)
               const tokenAddr = args.token || d.paymentToken
               const jTok = new ethers.Contract(tokenAddr, TOKEN_ABI, jw)
               const jPool = new ethers.Contract(args.pool, POOL_ABI, jw)
               const buyIn = BigInt(args.buyIn)
+              let nonce = await provider.getTransactionCount(jw.address, 'latest')
               const allowance = await jTok.allowance(jw.address, args.pool)
-              if (allowance < buyIn) await (await jTok.approve(args.pool, buyIn)).wait(1)
-              tx = await jPool.join()
+              if (allowance < buyIn) await (await jTok.approve(args.pool, buyIn, { nonce: nonce++ })).wait(1)
+              tx = await jPool.join({ nonce: nonce++ })
               break
             }
             case 'closeJoiningPool': {
