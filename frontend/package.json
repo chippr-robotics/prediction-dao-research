@@ -37,7 +37,7 @@
     "@noble/ciphers": "^1.0.0",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^2.3.0",
-    "@noble/post-quantum": "^0.6.1",
+    "@noble/post-quantum": "^0.7.0",
     "@polymarket/clob-client": "^5.8.1",
     "@scure/base": "2.3.0",
     "@scure/bip32": "2.3.0",
