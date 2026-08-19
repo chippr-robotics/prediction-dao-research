@@ -28,6 +28,13 @@ const WAGER_POOL_CONFIG = {
     name: 'mordor',
     usdc: process.env.POOL_USDC_63 || null,
   },
+  // Local Hardhat sandbox (`--network localhost`, chainId 1337) — full-tier Cypress e2e (#1232). Not a
+  // MAINNETS entry, so screeningRequired defaults false and no real USDC exists; the local mock payment
+  // token (or a test-only token deployed on the fly) stands in as the buy-in asset.
+  1337: {
+    name: 'localhost',
+    usdc: process.env.POOL_USDC_1337 || null,
+  },
 };
 
 /**

@@ -101,6 +101,12 @@ const HARDHAT_CONTRACTS = {
   membershipVoucher: '0xF2fc5Ac192E7e48B2EE95D3528870c6ED26908e4',
   voucherBatchMinter: '0xE0b0F625F876f7D78413cc6c402FB92C8E47Ea05',
   tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
+  // spec 034 — Wager Pools factory (address-based, no Semaphore). Deterministic via the Safe
+  // Singleton Factory + `deployProxy`'s fixed nonce sequence (`deploy-wager-pool-factory.js`, run
+  // immediately after `deploy:local`) — the E2E tier's `setup:e2e` never syncs (that would
+  // overwrite AMOY_CONTRACTS' real address with a local one), so this is hardcoded like every
+  // other entry in this block, not left for a sync step to fill in.
+  wagerPoolFactory: '0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690',
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)

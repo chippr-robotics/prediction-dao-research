@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 42 |
+| 🟢 covered | 46 |
 | 🟡 partial | 7 |
-| 🔴 absent | 75 |
+| 🔴 absent | 71 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 11 · 🟡 5 · 🔴 29 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 15 · 🟡 5 · 🔴 25 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -104,10 +104,10 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `pools.create-and-join` | Create a group pool and have members join with their stake | 🔴 absent | none | — (proposed: on-chain) | #1232 |  |
-| `pools.settle-payout-matrix` | Creator proposes a payout matrix, members approve to threshold, the winner claims | 🔴 absent | none | — (proposed: on-chain) | #1232 |  |
-| `pools.deadline-refund` | A pool that never resolves returns members' stakes after the deadline | 🔴 absent | none | — (proposed: on-chain) | #1232 |  |
-| `pools.join-with-authorization` | Join a pool gaslessly by signing an EIP-3009 authorization | 🔴 absent | none | — (proposed: on-chain) | #1232 |  |
+| `pools.create-and-join` | Create a group pool and have members join with their stake | 🟢 covered | settled | `on-chain` | `24-wager-pools.cy.js` (POOL-01) |  |
+| `pools.settle-payout-matrix` | Creator proposes a payout matrix, members approve to threshold, the winner claims | 🟢 covered | settled | `on-chain` | `24-wager-pools.cy.js` (POOL-02) |  |
+| `pools.deadline-refund` | A pool that never resolves returns members' stakes after the deadline | 🟢 covered | settled | `on-chain` | `24-wager-pools.cy.js` (POOL-03) |  |
+| `pools.join-with-authorization` | Join a pool gaslessly by signing an EIP-3009 authorization | 🟢 covered | settled | `on-chain` | `24-wager-pools.cy.js` (POOL-04) |  |
 
 ### `035-intent-based-payments` — Gasless intents
 
