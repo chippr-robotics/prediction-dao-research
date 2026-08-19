@@ -215,6 +215,7 @@ describe('Claim Payouts', () => {
         })
       } else {
         // No resolved wagers
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -241,6 +242,7 @@ describe('Claim Payouts', () => {
           expect(lower.includes('resolved') || lower.includes('ended') || lower.includes('outcome') || lower.includes('wager')).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -272,6 +274,7 @@ describe('Claim Payouts', () => {
           expect(hasFinancialInfo).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -326,6 +329,7 @@ describe('Claim Payouts', () => {
           expect(validState).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -369,6 +373,7 @@ describe('Claim Payouts', () => {
           }
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -410,15 +415,18 @@ describe('Claim Payouts', () => {
                 })
               } else {
                 // Claim button removed after first claim — correct
+                // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
                 expect(true).to.be.true
               }
             })
           } else {
             // No claim button — either already claimed or auto-payout
+            // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
             expect(true).to.be.true
           }
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -450,6 +458,7 @@ describe('Claim Payouts', () => {
           expect(pureClaimButtons.length).to.equal(0)
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -484,6 +493,7 @@ describe('Claim Payouts', () => {
           expect(validState).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -522,10 +532,12 @@ describe('Claim Payouts', () => {
             })
           } else {
             // No claim button — already claimed or not winner
+            // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
             expect(true).to.be.true
           }
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })

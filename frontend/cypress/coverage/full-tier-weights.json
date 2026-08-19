@@ -1,0 +1,6 @@
+{
+  "measuredAt": null,
+  "source": "not yet measured — see #1228. Until a CI run records real per-spec seconds, split-full-tier.js assigns the file mean to every spec and reports that it did.",
+  "shards": 4,
+  "specs": {}
+}

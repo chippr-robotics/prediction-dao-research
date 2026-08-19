@@ -1,0 +1,29 @@
+{
+  "baseUrl": "http://localhost:4173",
+  "routes": [
+    {
+      "path": "/",
+      "why": "The landing page \u2014 the first thing anyone sees, and the only route a member reaches before connecting."
+    },
+    {
+      "path": "/app",
+      "why": "The home screen. The busiest member surface and the one most likely to regress as sections are added."
+    },
+    {
+      "path": "/wallet",
+      "why": "The wallet page hosts Transfer, Trade, Earn, Collect, Protect and Recovery behind tabs; a regression in its shell affects all of them."
+    },
+    {
+      "path": "/wallet?tab=apps",
+      "why": "The mini-app catalogue (a WalletPage tab, not its own route \u2014 /apps/<slug> is the workspace). The door to third-party packages, and image-heavy."
+    },
+    {
+      "path": "/admin",
+      "why": "The Control Room. Renders the denied/unverified screens for non-operators, which is what an unauthenticated audit measures."
+    },
+    {
+      "path": "/terms",
+      "why": "A public legal document: mostly text, so it is the control against which the app routes' costs can be read."
+    }
+  ]
+}

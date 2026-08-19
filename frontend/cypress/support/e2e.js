@@ -15,6 +15,26 @@
 
 // Import commands.js using ES2015 syntax:
 import './commands'
+// Spec 094: the shared harness — accessibility scanning and viewport profiles.
+import './a11y'
+import { activeProfile, VIEWPORTS } from './viewports'
+
+/*
+ * VIEWPORT PROFILE, applied globally (spec 094 FR-019). Selected by CYPRESS_VIEWPORT_PROFILE and
+ * defaulting to desktop — the 1280×720 every existing spec was written against, so the desktop leg
+ * is a no-op change. Applied here rather than per spec because a spec that sets its own viewport
+ * inherits desktop forever, and the phone leg then quietly stops growing as specs are added.
+ */
+before(() => {
+  const profile = activeProfile()
+  const { width, height } = VIEWPORTS[profile]
+  cy.log(`viewport profile: ${profile} (${width}×${height})`)
+})
+
+beforeEach(() => {
+  const { width, height } = VIEWPORTS[activeProfile()]
+  cy.viewport(width, height)
+})
 
 /*
  * FULL-TIER CHAIN ISOLATION. Before each full/** spec, revert the local chain to the post-seed

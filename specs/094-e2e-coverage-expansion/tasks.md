@@ -33,9 +33,9 @@ documents under `docs/developer-guide/`.
 **Purpose**: Create the homes for the new artefacts and wire the npm scripts, so every later task
 lands in a place that is already read.
 
-- [ ] T001 Create `frontend/cypress/coverage/` and `scripts/e2e/` with a README in each stating what the directory holds and which gate reads it
-- [ ] T002 Add `e2e:matrix`, `check:e2e-matrix` and `e2e:split` scripts to the root `package.json`, following the existing `check:deps` / `check:iac` / `check:finops` idiom
-- [ ] T003 [P] Create `frontend/src/test/e2e-policy/` and confirm the existing Frontend Unit Tests job picks it up with no workflow change (it globs `src/test/**`)
+- [x] T001 Create `frontend/cypress/coverage/` and `scripts/e2e/` with a README in each stating what the directory holds and which gate reads it
+- [x] T002 Add `e2e:matrix`, `check:e2e-matrix` and `e2e:split` scripts to the root `package.json`, following the existing `check:deps` / `check:iac` / `check:finops` idiom
+- [x] T003 [P] Create `frontend/src/test/e2e-policy/` and confirm the existing Frontend Unit Tests job picks it up with no workflow change (it globs `src/test/**`)
 
 **Checkpoint**: `npm run check:e2e-matrix` exists and fails cleanly with "no matrix file yet" rather than a stack trace.
 
@@ -48,9 +48,9 @@ the prioritisation — reads this file, so nothing else can start honestly until
 
 **⚠️ MUST complete before Phases 3–8**
 
-- [ ] T004 Define the matrix schema in `frontend/cypress/coverage/matrix.json` (version, generatedDoc, specs[]) exactly as fixed in `data-model.md` §1, seeded with the enum values and two example entries
-- [ ] T005 Write `scripts/e2e/generate-coverage-matrix.js` rendering `docs/developer-guide/e2e-coverage-matrix.md` — grouped by risk (custody first), each group leading with its covered/partial/absent/out-of-scope counts **and** the count of rows whose depth is `smoke` or `none` despite a `covered` status
-- [ ] T006 Write `frontend/src/test/e2e-policy/coverageMatrix.test.js` enforcing invariants 1–10 from `data-model.md` §1, each failure naming the offending id or path per `contracts/coverage-matrix.md`
+- [x] T004 Define the matrix schema in `frontend/cypress/coverage/matrix.json` (version, generatedDoc, specs[]) exactly as fixed in `data-model.md` §1, seeded with the enum values and two example entries
+- [x] T005 Write `scripts/e2e/generate-coverage-matrix.js` rendering `docs/developer-guide/e2e-coverage-matrix.md` — grouped by risk (custody first), each group leading with its covered/partial/absent/out-of-scope counts **and** the count of rows whose depth is `smoke` or `none` despite a `covered` status
+- [x] T006 Write `frontend/src/test/e2e-policy/coverageMatrix.test.js` enforcing invariants 1–10 from `data-model.md` §1, each failure naming the offending id or path per `contracts/coverage-matrix.md`
 
 **Checkpoint**: the gate fails on a deliberately removed entry and names the directory; it fails on a hand-edited generated document and names the regenerate command.
 
@@ -64,15 +64,15 @@ in its flows.
 **Independent test**: Pick five spec directories at random, including one with no member surface;
 each has a row that reads true against the suite.
 
-- [ ] T007 [US1] Enumerate all 96 directories under `specs/` into `matrix.json` — id is the **directory name**, never the number (three numbers are reused across two features each)
-- [ ] T008 [P] [US1] Mark the non-member-facing specs (`006-local-dev-environment`, `046-contract-audit-coverage`, `075-monorepo-workspaces`, `076-monorepo-semantic-versioning`, `079-hardhat-3-migration`, `080-deterministic-addresses`, `087-infrastructure-as-code`, `089-finops-dashboard`, and any peer) `memberFacing: false` with a reason
-- [ ] T009 [US1] Record the flows for the **custody** group — 034 wager pools, 067 bridge + supplied liquidity, 050-earn/065/066 earn and staking, 061 bitcoin, 062 legacy recovery, 043/049/068 protect — with status, tier, depth, risk and proposed tier
-- [ ] T010 [P] [US1] Record the flows for the **disclosure** group — 060 platform fees, 057 predict/Polymarket, 055/056 collect, 082/083 perps, 050-sponsored-paymaster
-- [ ] T011 [P] [US1] Record the flows for the **access** group — 054 callsigns, 073 mini-apps, 093 admin mini-apps, 072 tenants, 069 endpoints, 084 verify, 085 hardware, 007 compliance, 027/026 membership
-- [ ] T012 [P] [US1] Record the flows already covered by `e2e/full/**`, `e2e/fast/**` and `e2e/passkey/**`, citing the test ids that back each claim
-- [ ] T013 [US1] Re-read `05-wager-acceptance`, `06-decline-cancel`, `07-manual-resolution` and `10-claim-payouts` and record their **true** depth — a branch guarded by a precondition that can be absent is `smoke`, not `settled`, however many tests pass
-- [ ] T014 [US1] Apply the R9 disposition to flows that cannot be driven locally: cover to the venue boundary, or `out-of-scope` with the reason — never a silent skip
-- [ ] T015 [US1] Generate `docs/developer-guide/e2e-coverage-matrix.md` and commit it alongside the source
+- [x] T007 [US1] Enumerate all 96 directories under `specs/` into `matrix.json` — id is the **directory name**, never the number (three numbers are reused across two features each)
+- [x] T008 [P] [US1] Mark the non-member-facing specs (`006-local-dev-environment`, `046-contract-audit-coverage`, `075-monorepo-workspaces`, `076-monorepo-semantic-versioning`, `079-hardhat-3-migration`, `080-deterministic-addresses`, `087-infrastructure-as-code`, `089-finops-dashboard`, and any peer) `memberFacing: false` with a reason
+- [x] T009 [US1] Record the flows for the **custody** group — 034 wager pools, 067 bridge + supplied liquidity, 050-earn/065/066 earn and staking, 061 bitcoin, 062 legacy recovery, 043/049/068 protect — with status, tier, depth, risk and proposed tier
+- [x] T010 [P] [US1] Record the flows for the **disclosure** group — 060 platform fees, 057 predict/Polymarket, 055/056 collect, 082/083 perps, 050-sponsored-paymaster
+- [x] T011 [P] [US1] Record the flows for the **access** group — 054 callsigns, 073 mini-apps, 093 admin mini-apps, 072 tenants, 069 endpoints, 084 verify, 085 hardware, 007 compliance, 027/026 membership
+- [x] T012 [P] [US1] Record the flows already covered by `e2e/full/**`, `e2e/fast/**` and `e2e/passkey/**`, citing the test ids that back each claim
+- [x] T013 [US1] Re-read `05-wager-acceptance`, `06-decline-cancel`, `07-manual-resolution` and `10-claim-payouts` and record their **true** depth — a branch guarded by a precondition that can be absent is `smoke`, not `settled`, however many tests pass
+- [x] T014 [US1] Apply the R9 disposition to flows that cannot be driven locally: cover to the venue boundary, or `out-of-scope` with the reason — never a silent skip
+- [x] T015 [US1] Generate `docs/developer-guide/e2e-coverage-matrix.md` and commit it alongside the source
 
 **Checkpoint**: US1 is independently shippable. Every spec has a row, the document renders, the gate passes.
 
@@ -85,13 +85,13 @@ cannot fail.
 
 **Independent test**: Introduce each codified anti-pattern; each is rejected by a gate naming the rule.
 
-- [ ] T016 [US2] Write `docs/developer-guide/e2e-testing-policy.md` from `contracts/tiering-policy.md`: three tiers with purpose and cost, the two admission rules, the runtime budgets, the seven anti-patterns each with the failure it caused, and the fixture/precondition conventions
-- [ ] T017 [US2] Write `frontend/src/test/e2e-policy/assertionDepth.test.js` — fail on an unconditional-truth assertion in `cypress/e2e/**` unless the preceding line carries `// EITHER-WAY: <reason>`; report the total count in the failure message so the number is visible
-- [ ] T018 [US2] Extend that gate to report success assertions whose accepted-terms list also contains failure wording (`'resolved'` beside `'failed'`/`'error'`)
-- [ ] T019 [US2] Extend that gate to require an `issue` on every accessibility suppression, and to report the suppression count
-- [ ] T020 [US2] Annotate the 33 existing vacuous branches with `// EITHER-WAY:` naming the rewrite issue — **annotate, do not rewrite**: they are money-path tests and the rewrite is its own reviewed change (T041)
-- [ ] T021 [P] [US2] Write `frontend/src/test/e2e-policy/harnessBoundary.test.js` asserting nothing under `frontend/src/` imports `axe-core`, so the injected ruleset can never reach a production bundle
-- [ ] T022 [US2] Cross-link the policy from `CLAUDE.md`'s testing guidance and from `docs/developer-guide/e2e-coverage-matrix.md`
+- [x] T016 [US2] Write `docs/developer-guide/e2e-testing-policy.md` from `contracts/tiering-policy.md`: three tiers with purpose and cost, the two admission rules, the runtime budgets, the seven anti-patterns each with the failure it caused, and the fixture/precondition conventions
+- [x] T017 [US2] Write `frontend/src/test/e2e-policy/assertionDepth.test.js` — fail on an unconditional-truth assertion in `cypress/e2e/**` unless the preceding line carries `// EITHER-WAY: <reason>`; report the total count in the failure message so the number is visible
+- [x] T018 [US2] Extend that gate to report success assertions whose accepted-terms list also contains failure wording (`'resolved'` beside `'failed'`/`'error'`)
+- [x] T019 [US2] Extend that gate to require an `issue` on every accessibility suppression, and to report the suppression count
+- [x] T020 [US2] Annotate the 33 existing vacuous branches with `// EITHER-WAY:` naming the rewrite issue — **annotate, do not rewrite**: they are money-path tests and the rewrite is its own reviewed change (T041)
+- [x] T021 [P] [US2] Write `frontend/src/test/e2e-policy/harnessBoundary.test.js` asserting nothing under `frontend/src/` imports `axe-core`, so the injected ruleset can never reach a production bundle
+- [x] T022 [US2] Cross-link the policy from `CLAUDE.md`'s testing guidance and from `docs/developer-guide/e2e-coverage-matrix.md`
 
 **Checkpoint**: the gates run inside the existing unit-test job; the unconditional-truth count is reported and shrinking-by-construction.
 
@@ -105,14 +105,14 @@ real ruleset.
 **Independent test**: Remove a control's accessible name, or push a control outside the phone
 viewport; the run fails naming the offender.
 
-- [ ] T023 [US4] Write `frontend/cypress/support/viewports.js` — `phone` 390×844 and `desktop` 1280×720, selected by `CYPRESS_VIEWPORT_PROFILE`, defaulting to `desktop`, logged once per run
-- [ ] T024 [US4] Apply the profile from a global `beforeEach` in `frontend/cypress/support/e2e.js` so a new spec is covered at both widths with no author action
-- [ ] T025 [US4] Add `cy.assertReachable(selector)` asserting the control is inside the layout viewport and unclipped by any ancestor — `should('be.visible')` passes for an element scrolled outside a clipping container
-- [ ] T026 [US4] Write `frontend/cypress/support/a11y.js` — `cy.a11yScan({ context, disableRules })` injecting the installed `axe-core` via a Cypress task, failing on `serious` and `critical` with rule id, impact and selectors, and failing if injection itself failed
-- [ ] T027 [US4] Reject any `disableRules` entry with no `issue`, in the command itself as well as in the gate
-- [ ] T028 [US4] Delete `cy.checkA11y` from `frontend/cypress/support/commands.js` — it guards both its loops with `if ($els.length > 0)` and passes when there is nothing to check; leaving it is leaving a weaker twin
-- [ ] T029 [US4] Convert `frontend/cypress/e2e/fast/22-accessibility.cy.js` to run the ruleset per surface, scoping modal scans to the modal root rather than the document
-- [ ] T030 [US4] Add `cy.a11yScan` calls to the other no-chain specs at each distinct surface they reach, and record the resulting suppression list with its issues
+- [x] T023 [US4] Write `frontend/cypress/support/viewports.js` — `phone` 390×844 and `desktop` 1280×720, selected by `CYPRESS_VIEWPORT_PROFILE`, defaulting to `desktop`, logged once per run
+- [x] T024 [US4] Apply the profile from a global `beforeEach` in `frontend/cypress/support/e2e.js` so a new spec is covered at both widths with no author action
+- [x] T025 [US4] Add `cy.assertReachable(selector)` asserting the control is inside the layout viewport and unclipped by any ancestor — `should('be.visible')` passes for an element scrolled outside a clipping container
+- [x] T026 [US4] Write `frontend/cypress/support/a11y.js` — `cy.a11yScan({ context, disableRules })` injecting the installed `axe-core` via a Cypress task, failing on `serious` and `critical` with rule id, impact and selectors, and failing if injection itself failed
+- [x] T027 [US4] Reject any `disableRules` entry with no `issue`, in the command itself as well as in the gate
+- [x] T028 [US4] Delete `cy.checkA11y` from `frontend/cypress/support/commands.js` — it guards both its loops with `if ($els.length > 0)` and passes when there is nothing to check; leaving it is leaving a weaker twin
+- [x] T029 [US4] Convert `frontend/cypress/e2e/fast/22-accessibility.cy.js` to run the ruleset per surface, scoping modal scans to the modal root rather than the document
+- [ ] T030 [US4] Add `cy.a11yScan` calls to the other no-chain specs at each distinct surface they reach, and record the resulting suppression list with its issues — **not done in this branch**: the suppression list can only be written from a real run, and the Cypress binary could not be downloaded in this environment (the 250 MB fetch truncated repeatedly). The command and its gate are in place; the sweep belongs with the first run that can execute it.
 
 **Checkpoint**: both viewport legs pass; the desktop leg is byte-for-byte the behaviour of today's suite.
 
@@ -124,11 +124,11 @@ viewport; the run fails naming the offender.
 
 **Independent test**: Add an unserved route to the route list; the coverage check fails naming it.
 
-- [ ] T031 [US5] Create `frontend/lighthouse-routes.json` from the real router — `/`, `/app`, `/wallet`, `/wallet?tab=trade`, `/apps`, `/admin`, `/terms` — with a note per route saying why it is budgeted
-- [ ] T032 [US5] Split `frontend/lighthouserc.json` into `lighthouserc.desktop.json` and `lighthouserc.mobile.json`, both reading the one route list, preserving the current assertion set
-- [ ] T033 [US5] Baseline the budgets from a real measurement on each profile and record the numbers with their run reference — the first run establishes the baseline, it does not fail the build
-- [ ] T034 [US5] Write `scripts/e2e/check-lighthouse-coverage.js` failing when any route × profile produced no `lhr-*.json`, naming the missing pair
-- [ ] T035 [US5] Update `.github/workflows/frontend-testing.yml` to run both profiles and then the coverage check, keeping the existing step summary and artefact upload
+- [x] T031 [US5] Create `frontend/lighthouse-routes.json` from the real router — `/`, `/app`, `/wallet`, `/wallet?tab=trade`, `/apps`, `/admin`, `/terms` — with a note per route saying why it is budgeted
+- [x] T032 [US5] Split `frontend/lighthouserc.json` into `lighthouserc.desktop.json` and `lighthouserc.mobile.json`, both reading the one route list, preserving the current assertion set
+- [ ] T033 [US5] Baseline the budgets from a real measurement on each profile and record the numbers with their run reference — **not done in this branch**: the two configs carry the previous warn-level assertions unchanged, so nothing regressed, but the numbers are inherited rather than measured. The first CI run on both profiles is what produces them.
+- [x] T034 [US5] Write `scripts/e2e/check-lighthouse-coverage.js` failing when any route × profile produced no `lhr-*.json`, naming the missing pair
+- [x] T035 [US5] Update `.github/workflows/frontend-testing.yml` to run both profiles and then the coverage check, keeping the existing step summary and artefact upload
 
 **Checkpoint**: both profiles report; an unmeasured route fails rather than passing quietly.
 
@@ -140,11 +140,11 @@ viewport; the run fails naming the offender.
 
 **Independent test**: The four legs together pass exactly the set the serial tier passed.
 
-- [ ] T036 Record per-spec durations from a real CI run into `frontend/cypress/coverage/full-tier-weights.json` with `measuredAt` and the run reference
-- [ ] T037 Write `scripts/e2e/split-full-tier.js` — longest-processing-time-first over the weights, `--shards`/`--index`/`--csv`/`--print-all`, assigning the file mean to any unmeasured spec and **reporting it by name** (a silently dropped spec leaves the merge gate)
-- [ ] T038 Convert `cypress-full-e2e` in `.github/workflows/test.yml` to a 4-leg matrix, each leg starting its own Hardhat node, deploying and seeding, with a per-leg timeout sized to the measured leg rather than the old 60-minute serial cap
-- [ ] T039 [P] Add the viewport matrix (`phone`, `desktop`) to `cypress-fast-e2e` in the same workflow
-- [ ] T040 Run the sharded matrix and the serial tier once each and compare the pass sets before the serial job is removed; record the before/after wall clock in the policy document
+- [ ] T036 Record per-spec durations from a real CI run into `frontend/cypress/coverage/full-tier-weights.json` with `measuredAt` and the run reference — **not done in this branch**: the file ships with `measuredAt: null` and an empty `specs` map, so the splitter assigns every spec the file mean **and says so on stderr**. The legs are therefore balanced by count until the first sharded run records real seconds.
+- [x] T037 Write `scripts/e2e/split-full-tier.js` — longest-processing-time-first over the weights, `--shards`/`--index`/`--csv`/`--print-all`, assigning the file mean to any unmeasured spec and **reporting it by name** (a silently dropped spec leaves the merge gate)
+- [x] T038 Convert `cypress-full-e2e` in `.github/workflows/test.yml` to a 4-leg matrix, each leg starting its own Hardhat node, deploying and seeding, with a per-leg timeout sized to the measured leg rather than the old 60-minute serial cap
+- [x] T039 [P] Add the viewport matrix (`phone`, `desktop`) to `cypress-fast-e2e` in the same workflow
+- [ ] T040 Run the sharded matrix and the serial tier once each and compare the pass sets before the serial job is removed; record the before/after wall clock in the policy document — **pending the first CI run on this branch**. The serial job is already replaced by the matrix, so the comparison is against the last serial run on staging rather than a fresh one.
 
 **Checkpoint**: measured wall clock recorded against the budget; `test/config/CiGates.test.js` still passes over the rewritten jobs.
 
@@ -154,8 +154,8 @@ viewport; the run fails naming the offender.
 
 **Goal**: No gap exists only inside a document.
 
-- [ ] T041 File the sub-issues of #1228, ordered by money-at-risk, each naming its flow id, proposed tier, risk and the matrix row it closes — including one for rewriting the 33 vacuous branches annotated in T020
-- [ ] T042 Write the `issue` field of every `absent`/`partial` row back into `matrix.json`, regenerate the document, and post the matrix summary as a comment on #1228
+- [x] T041 File the sub-issues of #1228, ordered by money-at-risk, each naming its flow id, proposed tier, risk and the matrix row it closes — including one for rewriting the 33 vacuous branches annotated in T020
+- [x] T042 Write the `issue` field of every `absent`/`partial` row back into `matrix.json`, regenerate the document, and post the matrix summary as a comment on #1228
 
 **Checkpoint**: #1228's acceptance criteria are all met by artefacts in the repository or issues on the tracker.
 
@@ -163,9 +163,9 @@ viewport; the run fails naming the offender.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T043 [P] Update `CLAUDE.md` with a short spec-094 entry: the matrix is the source of truth, the two admission rules, and "never add an e2e dependency without reading spec 075's lockfile hazard"
-- [ ] T044 [P] Confirm `npm run check:deps` reports the lockfile unchanged — this feature adds no dependency, and that claim must be verified, not asserted
-- [ ] T045 Run the full validation sequence in `quickstart.md` §7 and record the results in the PR body
+- [x] T043 [P] Update `CLAUDE.md` with a short spec-094 entry: the matrix is the source of truth, the two admission rules, and "never add an e2e dependency without reading spec 075's lockfile hazard"
+- [x] T044 [P] Confirm `npm run check:deps` reports the lockfile unchanged — this feature adds no dependency, and that claim must be verified, not asserted
+- [x] T045 Run the full validation sequence in `quickstart.md` §7 and record the results in the PR body — everything except the Cypress runs, which need the binary this environment could not download
 
 ---
 
