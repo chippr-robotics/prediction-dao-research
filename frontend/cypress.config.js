@@ -52,6 +52,7 @@ const TOKEN_ABI = [
   'function mint(address to, uint256 amount)',
   'function balanceOf(address) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
 ]
 const KEYREG_ABI = [
   'function hasKey(address user) view returns (bool)',
@@ -83,6 +84,56 @@ const VAULT_ABI = [
   'function asset() view returns (address)',
 ]
 
+// Spec 034 Wager Pools — minimal ABIs for the setup/drive transactions the pools e2e suite (#1232)
+// needs to arrange directly (create/join/propose/approve/claim/refund), the same bypass-the-UI
+// pattern the wager helpers above use. Addresses come from the deployment record's
+// `wagerPoolFactory` key, appended by `deploy-wager-pool-factory.js` (never part of `deploy:local`).
+const POOL_FACTORY_ABI = [
+  'function createPool((address token,uint256 buyIn,uint32 maxMembers,uint16 thresholdBips,uint64 acceptDeadline,uint64 resolveDeadline) p) returns (uint256 poolId, address pool)',
+  'event PoolCreated(uint256 indexed poolId, address indexed pool, address indexed creator, uint32[4] wordIndices, address token, uint256 buyIn, uint32 maxMembers, uint16 thresholdBips, uint64 acceptDeadline, uint64 resolveDeadline)',
+]
+const POOL_ABI = [
+  'function join()',
+  'function joinWithAuthorization(address from, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)',
+  'function closeJoining()',
+  'function cancel()',
+  'function proposeOutcome((address winner,uint256 amount)[] entries)',
+  'function approve()',
+  'function claim((address winner,uint256 amount)[] entries, uint256 index, address recipient)',
+  'function refund()',
+  'function state() view returns (uint8)',
+  'function memberCount() view returns (uint32)',
+  'function maxMembers() view returns (uint32)',
+  'function buyIn() view returns (uint256)',
+  'function token() view returns (address)',
+  'function acceptDeadline() view returns (uint64)',
+  'function resolveDeadline() view returns (uint64)',
+  'function frozenDenominator() view returns (uint32)',
+  'function thresholdBips() view returns (uint16)',
+  'function escrowTotal() view returns (uint256)',
+  'function currentProposalId() view returns (bytes32)',
+  'function hasJoined(address) view returns (bool)',
+  'function refunded(address) view returns (bool)',
+  'function claimedIndex(uint256) view returns (bool)',
+  'function proposalApprovals(bytes32) view returns (uint32)',
+  'function approvedBy(bytes32, address) view returns (bool)',
+  'event Joined(address indexed member)',
+]
+// EIP-3009 domain/typehash for MockUSDCPermit (contracts/mocks/MockUSDCPermit.sol) — a 6-decimal USDC
+// double supporting `receiveWithAuthorization`, deployed on demand by the `deployMockUSDCPermit` task
+// since the local core payment token (18-dec MockERC20) has no EIP-3009 support. OZ ERC20Permit domain
+// version is its default "1".
+const RECEIVE_WITH_AUTHORIZATION_TYPES = {
+  ReceiveWithAuthorization: [
+    { name: 'from', type: 'address' },
+    { name: 'to', type: 'address' },
+    { name: 'value', type: 'uint256' },
+    { name: 'validAfter', type: 'uint256' },
+    { name: 'validBefore', type: 'uint256' },
+    { name: 'nonce', type: 'bytes32' },
+  ],
+}
+
 /**
  * Read the local deployment record written by `npm run deploy:local`
  * (`--network localhost` → `deployments/localhost-chain1337-v2.json`). This is
@@ -102,6 +153,12 @@ function loadLocalDeployment() {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
+/** Read a Hardhat-compiled artifact (abi + bytecode) written by `npm run compile` / `deploy:local`. */
+function loadArtifact(contractPath, contractName) {
+  const path = resolve(__dirname, '..', 'artifacts', 'contracts', contractPath, `${contractName}.json`)
+  return JSON.parse(readFileSync(path, 'utf8'))
+}
+
 /*
  * Name the custom error behind a revert.
  *
@@ -109,7 +166,8 @@ function loadLocalDeployment() {
  * fragments — so every custom error arrived as the useless "execution reverted (unknown custom
  * error)". ORC-01/02 reported exactly that. Decode against the compiled artifacts instead;
  * BOTH facets are needed because the proxy delegates unknown selectors to WagerRegistryIntents,
- * which is where autoResolveFrom* lives (spec 035/036).
+ * which is where autoResolveFrom* lives (spec 035/036). The pool contracts (spec 034) are
+ * included too, so a reverting pool precondition names its custom error the same way.
  *
  * Best-effort: if the artifacts have not been compiled, fall through to the raw message rather
  * than failing the task for a diagnostic.
@@ -121,6 +179,8 @@ function revertInterface() {
   for (const rel of [
     '../artifacts/contracts/wagers/WagerRegistry.sol/WagerRegistry.json',
     '../artifacts/contracts/wagers/WagerRegistryIntents.sol/WagerRegistryIntents.json',
+    '../artifacts/contracts/pools/WagerPool.sol/WagerPool.json',
+    '../artifacts/contracts/pools/WagerPoolFactory.sol/WagerPoolFactory.json',
     // Spec 060: `FeeAboveQuoted` and `CapExceeded` are the two reverts the fee specs assert on,
     // and both are custom errors — without the fragments they arrive as "unknown custom error"
     // and a test could not tell the ceiling holding from an unrelated failure.
@@ -322,8 +382,164 @@ export default defineConfig({
               return { ok: true, registered: await kr.hasKey(args.address) }
             }
             case 'tokenBalance': {
-              const t = new ethers.Contract(d.paymentToken, TOKEN_ABI, provider)
+              const t = new ethers.Contract(args.token || d.paymentToken, TOKEN_ABI, provider)
               return { ok: true, balance: (await t.balanceOf(args.address)).toString() }
+            }
+            // ---- Spec 034 Wager Pools (#1232) ----
+            case 'deployMockUSDCPermit': {
+              // A fresh, isolated 6-dec USDC double with EIP-3009 support, for the gasless-join spec —
+              // the local core payment token (18-dec MockERC20) has no `receiveWithAuthorization`.
+              //
+              // Explicit nonce management for the deploy-then-mint pair: two back-to-back sends from
+              // the SAME wallet, each auto-computing its nonce via getTransactionCount('pending'),
+              // intermittently raced under resetChainBetweenTests()' per-test evm_revert (observed in
+              // CI as "Nonce too low. Expected nonce to be N+1 but got N") — the revert leaves the
+              // node's pending-nonce bookkeeping momentarily inconsistent with 'latest'. Fetching once
+              // from 'latest' and incrementing locally sidesteps it.
+              let nonce = await provider.getTransactionCount(wallet.address, 'latest')
+              const art = loadArtifact('mocks/MockUSDCPermit.sol', 'MockUSDCPermit')
+              const cf = new ethers.ContractFactory(art.abi, art.bytecode, wallet)
+              const c = await cf.deploy({ nonce: nonce++ })
+              await c.waitForDeployment()
+              const tokenAddr = await c.getAddress()
+              if (args.mintTo) {
+                await (await c.mint(args.mintTo, BigInt(args.amount ?? 10n ** 12n), { nonce: nonce++ })).wait(1)
+              }
+              return { ok: true, token: tokenAddr }
+            }
+            case 'createPool': {
+              if (!d.contracts.wagerPoolFactory) {
+                return { ok: false, error: 'wagerPoolFactory is not deployed — run deploy-wager-pool-factory.js --network localhost' }
+              }
+              const cw = new ethers.Wallet(ACCOUNT_KEYS[args.creatorIndex ?? 0], provider)
+              const factory = new ethers.Contract(d.contracts.wagerPoolFactory, POOL_FACTORY_ABI, cw)
+              // `resetChainBetweenTests()` reverts to a checkpoint taken once, real minutes before a
+              // later test runs, and a `now` predicted from either `Date.now()` or a mere READ of
+              // 'latest' kept reverting BadDeadlines() in CI regardless of which clock (or their max)
+              // it was anchored to — a short window is exactly what exposes a predicted `now` that's
+              // wrong by any amount. Stop predicting: force-mine an empty block and read what
+              // timestamp Hardhat's automine ACTUALLY assigned it. That is (mechanism-independent of
+              // whatever Hardhat does internally across the revert) the same rule the createPool tx's
+              // own block gets, so anchoring to it is exact rather than estimated.
+              await provider.send('evm_mine', [])
+              const now = (await provider.getBlock('latest')).timestamp
+              const params = {
+                token: args.token || d.paymentToken,
+                buyIn: BigInt(args.buyIn ?? 10n * 10n ** 18n),
+                maxMembers: args.maxMembers ?? 5,
+                thresholdBips: args.thresholdBips ?? 5100,
+                acceptDeadline: now + (args.acceptIn ?? 3600),
+                resolveDeadline: now + (args.resolveIn ?? 7200),
+              }
+              const sent = await factory.createPool(params)
+              const rc = await sent.wait(1)
+              const ev = rc.logs
+                .map((l) => { try { return factory.interface.parseLog(l) } catch { return null } })
+                .find((e) => e && e.name === 'PoolCreated')
+              if (!ev) return { ok: false, error: 'PoolCreated event not found in receipt' }
+              return { ok: rc.status === 1, poolId: Number(ev.args.poolId), pool: ev.args.pool }
+            }
+            case 'joinPool': {
+              // Approve-then-join as account #index — mirrors the self-submit path usePools.joinPool
+              // takes when no relayer is live (the path the mocked-wallet Cypress harness always hits).
+              // Explicit nonce management: see the comment on deployMockUSDCPermit — the same
+              // approve-then-send pattern from one wallet hit the same post-revert nonce race.
+              const jw = new ethers.Wallet(ACCOUNT_KEYS[args.index ?? 1], provider)
+              const tokenAddr = args.token || d.paymentToken
+              const jTok = new ethers.Contract(tokenAddr, TOKEN_ABI, jw)
+              const jPool = new ethers.Contract(args.pool, POOL_ABI, jw)
+              const buyIn = BigInt(args.buyIn)
+              let nonce = await provider.getTransactionCount(jw.address, 'latest')
+              const allowance = await jTok.allowance(jw.address, args.pool)
+              if (allowance < buyIn) await (await jTok.approve(args.pool, buyIn, { nonce: nonce++ })).wait(1)
+              tx = await jPool.join({ nonce: nonce++ })
+              break
+            }
+            case 'closeJoiningPool': {
+              const ccw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(args.pool, POOL_ABI, ccw).closeJoining()
+              break
+            }
+            case 'proposePoolOutcome': {
+              const ppw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              const entries = args.entries.map((e) => ({ winner: e.winner, amount: BigInt(e.amount) }))
+              tx = await new ethers.Contract(args.pool, POOL_ABI, ppw).proposeOutcome(entries)
+              break
+            }
+            case 'approvePoolOutcome': {
+              const apw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(args.pool, POOL_ABI, apw).approve()
+              break
+            }
+            case 'claimPool': {
+              const clw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              const entries = args.entries.map((e) => ({ winner: e.winner, amount: BigInt(e.amount) }))
+              tx = await new ethers.Contract(args.pool, POOL_ABI, clw)
+                .claim(entries, args.index, args.recipient || clw.address)
+              break
+            }
+            case 'refundPool': {
+              const rfw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(args.pool, POOL_ABI, rfw).refund()
+              break
+            }
+            case 'poolInfo': {
+              const piPool = new ethers.Contract(args.pool, POOL_ABI, provider)
+              const [state, memberCount, maxMembers, buyIn, tokenAddr, acceptDeadline, resolveDeadline, frozenDenominator, thresholdBips, currentProposalId] =
+                await Promise.all([
+                  piPool.state(), piPool.memberCount(), piPool.maxMembers(), piPool.buyIn(), piPool.token(),
+                  piPool.acceptDeadline(), piPool.resolveDeadline(), piPool.frozenDenominator(),
+                  piPool.thresholdBips(), piPool.currentProposalId(),
+                ])
+              return {
+                ok: true,
+                state: Number(state),
+                memberCount: Number(memberCount),
+                maxMembers: Number(maxMembers),
+                buyIn: buyIn.toString(),
+                token: tokenAddr,
+                acceptDeadline: Number(acceptDeadline),
+                resolveDeadline: Number(resolveDeadline),
+                frozenDenominator: Number(frozenDenominator),
+                thresholdBips: Number(thresholdBips),
+                currentProposalId,
+              }
+            }
+            case 'poolMemberInfo': {
+              const pmPool = new ethers.Contract(args.pool, POOL_ABI, provider)
+              const hasJoined = await pmPool.hasJoined(args.address)
+              const refunded = await pmPool.refunded(args.address)
+              const approvedBy = args.proposalId ? await pmPool.approvedBy(args.proposalId, args.address) : null
+              return { ok: true, hasJoined, refunded, approvedBy }
+            }
+            case 'signPoolJoinAuthorization': {
+              // Client-side signing only — no transaction. `fromIndex` is the JOINING member; they never
+              // submit anything themselves (see submitPoolJoinAuthorization for the relayer leg).
+              const fromWallet = new ethers.Wallet(ACCOUNT_KEYS[args.fromIndex ?? 1], provider)
+              const value = BigInt(args.value)
+              const nowBlk = (await provider.getBlock('latest')).timestamp
+              const validAfter = args.validAfter ?? 0
+              const validBefore = args.validBefore ?? nowBlk + 3600
+              const nonce = ethers.hexlify(ethers.randomBytes(32))
+              const domain = { name: 'USD Coin', version: '1', chainId: E2E_CHAIN_ID, verifyingContract: args.token }
+              const message = { from: fromWallet.address, to: args.pool, value, validAfter, validBefore, nonce }
+              const sig = await fromWallet.signTypedData(domain, RECEIVE_WITH_AUTHORIZATION_TYPES, message)
+              const { v, r, s } = ethers.Signature.from(sig)
+              return {
+                ok: true, from: fromWallet.address, value: value.toString(), validAfter, validBefore, nonce, v, r, s,
+              }
+            }
+            case 'submitPoolJoinAuthorization': {
+              // Submitted by a DIFFERENT account (the relayer) — proves the joining member never sent a
+              // transaction, only signed one. Resubmitting the same signature must revert — either the
+              // pool's own AlreadyJoined guard or the token's authorization-reuse check, whichever runs
+              // first — never a second join or a second pull of funds.
+              const relayer = new ethers.Wallet(ACCOUNT_KEYS[args.relayerIndex ?? 0], provider)
+              const rPool = new ethers.Contract(args.pool, POOL_ABI, relayer)
+              tx = await rPool.joinWithAuthorization(
+                args.from, BigInt(args.value), args.validAfter, args.validBefore, args.nonce, args.v, args.r, args.s
+              )
+              break
             }
             case 'isFrozen': {
               const reg3 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)

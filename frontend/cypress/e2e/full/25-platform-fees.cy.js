@@ -38,7 +38,7 @@ const MEMBER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1 — seeded wit
  * Asserted against the chain in `before` — see the comment there for why a mismatch has to be
  * named rather than discovered as "deposits are paused".
  */
-const CONFIGURED_FEE_ROUTER = '0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E'
+const CONFIGURED_FEE_ROUTER = '0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9'
 
 const EARN_LEND = 'earn.lend'
 /** keccak256('earn.lend') — the service id, which is also the option value in the admin form. */
