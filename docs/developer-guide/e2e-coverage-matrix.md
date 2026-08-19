@@ -29,8 +29,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 40 |
-| 🟡 partial | 9 |
+| 🟢 covered | 42 |
+| 🟡 partial | 7 |
 | 🔴 absent | 75 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -40,15 +40,15 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 9 · 🟡 7 · 🔴 29 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 11 · 🟡 5 · 🔴 29 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `wagers.claim-payout` | The winner claims the escrowed stakes | 🟡 partial | settled | `on-chain` | `10-claim-payouts.cy.js` (CLM-01, CLM-10) | CLM-01 checks a balance and CLM-10 now settles on chain, but eight of the ten tests still end in a precondition-guarded branch that proves nothing (annotated ASSERTION-DEBT), and the spec's one-shot DOM snapshots make even CLM-01 timing-dependent (#1250) |
+| `wagers.claim-payout` | The winner claims the escrowed stakes | 🟢 covered | settled | `on-chain` | `10-claim-payouts.cy.js` (CLM-01, CLM-02, CLM-03, CLM-04, CLM-05, CLM-06, CLM-07, CLM-08, CLM-09, CLM-10) |  |
 | `wagers.refund-on-timeout` | An unaccepted or unresolved wager refunds after its deadline | 🟢 covered | settled | `on-chain` | `11-refund-timeout.cy.js` (REF-01, REF-02) |  |
-| `wagers.decline-and-cancel` | Decline an offer, or cancel one you created before it is accepted | 🟡 partial | flow | `on-chain` | `06-decline-cancel.cy.js` (DEC-01, DEC-02, DEC-03, DEC-04, DEC-05, DEC-06) | two branches end in a precondition-guarded unconditional truth (annotated ASSERTION-DEBT), so the stake's return is not read back on those paths |
+| `wagers.decline-and-cancel` | Decline an offer, or cancel one you created before it is accepted | 🟢 covered | flow | `on-chain` | `06-decline-cancel.cy.js` (DEC-01, DEC-02, DEC-03, DEC-04, DEC-05, DEC-06) |  |
 | `wagers.full-lifecycle` | One wager driven end to end, create through settlement | 🟢 covered | settled | `on-chain` | `23-lifecycle-e2e.cy.js` (E2E-01, E2E-02, E2E-03, E2E-04, E2E-05) |  |
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI

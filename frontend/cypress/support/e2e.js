@@ -68,12 +68,25 @@ beforeEach(() => {
  * the chain clock forward and chain time cannot move back, so without this the specs that pass
  * are a function of run order, not of the product. Guarded by path: the fast and passkey tiers
  * run with no chain at all, and a task probing :8545 there would fail runs that are correct.
+ *
+ * And resync the BROWSER clock right after: `__cyTimeOffsetMs` (commands.js) lives at module
+ * scope, so it is NOT a per-spec value — it survives for the whole `cypress run` process the
+ * same way the chain snapshot id does, but nothing was rewinding it to match. A spec with no
+ * cy.advanceTime of its own (10-claim-payouts) run after one that made heavy use of it
+ * (07-manual-resolution, which racks up 250+ days across its RES-09/RES-14/etc. jumps) inherited
+ * that offset wholesale: the chain reverted to real time here, the browser stayed 250+ days
+ * "ahead", and a wager created fresh in this spec read back as already past its own end date —
+ * CLM-10 failed exactly this way despite doing nothing wrong itself. `resetChainBetweenTests()`
+ * already re-syncs on every test for specs that opt into it; this is the same fix at the spec
+ * boundary, unconditionally, so a spec that never calls cy.advanceTime never has to think about
+ * a clock some earlier spec left behind.
  */
 before(() => {
   if (Cypress.spec.relative.includes('e2e/full/')) {
     cy.task('chainCheckpoint').then(({ reverted }) => {
       cy.log(`chain checkpoint (reverted previous state: ${reverted})`)
     })
+    cy.syncBrowserClockToChain()
   }
 })
 

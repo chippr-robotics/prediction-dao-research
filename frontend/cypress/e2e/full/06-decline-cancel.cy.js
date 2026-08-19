@@ -229,36 +229,25 @@ describe('Decline and Cancel Wagers', () => {
     connectAndVisit(0)
     createWagerForTest('DEC-04: Non-creator cancel test')
 
-    // Switch to opponent
-    cy.switchAccount(1)
+    cy.lastWagerId().then((wagerId) => {
+      // The chain is the authority here: only the creator may cancelOpen (NotCreator otherwise).
+      cy.task('chainTx', { action: 'cancelOpen', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, 'a non-creator cannot cancel the wager').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is untouched — still Open').to.equal(1)
+      })
 
-    cy.openMyWagers('participating')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-
-        cy.get('.mm-detail, .ma-modal', { timeout: 5000 }).then(($view) => {
-          // Opponent should NOT see "Withdraw Offer" button
-          const withdrawBtn = $view.find('button:contains("Withdraw")')
-          expect(withdrawBtn.length).to.equal(0)
-        })
-      } else {
-        // If opponent sees View Offer instead, that's also correct
-        const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-        if (viewBtn.length > 0) {
-          cy.wrap(viewBtn.first()).click({ force: true })
-          cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).then(($modal) => {
-            // Should not have a cancel/withdraw option, only accept/decline
-            const withdrawBtn = $modal.find('button:contains("Withdraw"), button:contains("Cancel Wager")')
-            expect(withdrawBtn.length).to.equal(0)
-          })
-        } else {
-          // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
-          expect(true).to.be.true
-        }
-      }
+      // And the UI does not offer the control to the opponent either.
+      cy.switchAccount(1)
+      cy.openMyWagers('participating')
+      cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
+        .click({ force: true })
+      cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
+      cy.get('.ma-modal').then(($modal) => {
+        const withdrawBtn = $modal.find('button:contains("Withdraw"), button:contains("Cancel Wager")')
+        expect(withdrawBtn.length, 'no cancel control offered to the opponent').to.equal(0)
+      })
     })
   })
 
@@ -308,65 +297,36 @@ describe('Decline and Cancel Wagers', () => {
   // ---------------------------------------------------------------------------
   // DEC-06: Frozen account cannot decline
   // ---------------------------------------------------------------------------
-  it('[DEC-06] Frozen account cannot decline wager', () => {
+  it('[DEC-06] A frozen account cannot decline a wager, and can once unfrozen', () => {
     // Create a wager where the opponent is account #1
     connectAndVisit(0)
     createWagerForTest('DEC-06: Frozen decline test')
 
-    // Switch to opponent
-    cy.switchAccount(1)
+    cy.lastWagerId().then((wagerId) => {
+      cy.task('chainTx', { action: 'freeze', args: { address: TEST_ACCOUNTS[1] } }).then((r) => {
+        expect(r.ok, `freeze the opponent (${r.error || ''})`).to.be.true
+      })
 
-    cy.openMyWagers('participating')
+      // Blocked while frozen — and the wager stays Open, which is the part that matters.
+      cy.task('chainTx', { action: 'declineWager', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, 'a frozen account cannot decline').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager stays Open while the opponent is frozen').to.equal(1)
+      })
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-      if (viewBtn.length > 0) {
-        cy.wrap(viewBtn.first()).click({ force: true })
-
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-
-        // If account is frozen, the decline action should show an error
-        // from the contract: AccountFrozenError
-        cy.get('.ma-modal').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          // Verify offer review is visible (frozen is enforced at TX level)
-          const hasOfferView = lower.includes('offer') ||
-                              lower.includes('review') ||
-                              lower.includes('decline') ||
-                              lower.includes('accept')
-          expect(hasOfferView).to.be.true
-        })
-
-        // Attempt to decline — the contract may revert with AccountFrozenError
-        cy.get('.ma-modal').then(($modal) => {
-          const declineBtn = $modal.find('button:contains("Decline")')
-          if (declineBtn.length > 0) {
-            cy.wrap(declineBtn.first()).click()
-
-            // Look for confirm decline
-            cy.get('.ma-modal').then(($m) => {
-              const confirmBtn = $m.find('button:contains("Confirm Decline")')
-              if (confirmBtn.length > 0) {
-                cy.wrap(confirmBtn.first()).click()
-
-                // Should get AccountFrozenError or succeed (if not frozen)
-                cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((t) => {
-                  const l = t.toLowerCase()
-                  const validOutcome = l.includes('frozen') ||
-                                      l.includes('declined') ||
-                                      l.includes('returned') ||
-                                      l.includes('error') ||
-                                      l.includes('failed')
-                  expect(validOutcome).to.be.true
-                })
-              }
-            })
-          }
-        })
-      } else {
-        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
-        expect(true).to.be.true
-      }
+      // Reversible, matching CLM-10: unfreezing restores the ability to decline. A declined
+      // Open wager's storage is released for reuse (DEC-01's Open→None pattern), so status
+      // reading back as None (0) IS the on-chain proof the decline landed.
+      cy.task('chainTx', { action: 'unfreeze', args: { address: TEST_ACCOUNTS[1] } }).then((r) => {
+        expect(r.ok, `unfreeze the opponent (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'declineWager', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, `decline succeeds once unfrozen (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is released (None) after the decline').to.equal(0)
+      })
     })
   })
 })

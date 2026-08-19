@@ -169,10 +169,9 @@ describe('Dashboard', () => {
         cy.get('.mm-detail, .mm-back-btn').should('be.visible')
         cy.get('.mm-detail-header, .mm-detail-title-row').should('be.visible')
       } else {
-        // No wagers — the empty state should be visible.
+        // No wagers — the empty state should be visible. This is the real assertion for this
+        // branch; the fast tier runs with no chain, so an empty list is the expected fact here.
         cy.get('.mm-empty-state').should('be.visible')
-        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
-        expect(true).to.be.true
       }
     })
   })
@@ -262,28 +261,23 @@ describe('Dashboard', () => {
   it('[DSH-10] Dashboard without membership shows CTA', () => {
     connectAndVisitDashboard()
 
-    // The CTA banner shows for connected users who lack WAGER_PARTICIPANT role.
-    // With mock provider (no real roles), the banner should appear.
-    cy.get('body').then(($body) => {
-      const banner = $body.find('.dashboard-cta-banner')
-      if (banner.length > 0) {
-        // Banner is visible — verify its content.
-        cy.get('.dashboard-cta-banner').should('be.visible')
-        cy.get('.dashboard-cta-banner')
-          .should('contain.text', 'Get access')
-          .or('contain.text', 'Wager Participant')
-
-        // Verify the "Get Membership" button exists.
-        cy.get('.cta-banner-btn.primary').should('be.visible')
-
-        // Verify the dismiss button exists.
-        cy.get('.cta-banner-dismiss').should('be.visible')
-      } else {
-        // Banner not shown — the user may already have the role. This is OK.
-        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
-        expect(true).to.be.true
-      }
+    /*
+     * This is deterministic in the fast tier, not either-way: RoleContext.syncRolesWithBlockchain
+     * calls hasRoleOnChain for WAGER_PARTICIPANT, which never throws (blockchainService.js
+     * catches every read failure and resolves `unread`/false) — so blockchainSynced flips true
+     * even with no chain running. A freshly cleared localStorage (this file's beforeEach) holds
+     * no local role either, so Dashboard.jsx's gate
+     * (isConnected && blockchainSynced && !bannerDismissed && !hasRole(WAGER_PARTICIPANT))
+     * is satisfied every time. The old `else` branch describing "the user may already have the
+     * role" could not happen here and silently covered for the banner never rendering at all.
+     */
+    cy.get('.dashboard-cta-banner', { timeout: 10000 }).should('be.visible')
+    cy.get('.dashboard-cta-banner').invoke('text').should((text) => {
+      expect(text.includes('Get access') || text.includes('Wager Participant'), text).to.be.true
     })
+
+    cy.get('.cta-banner-btn.primary').should('be.visible')
+    cy.get('.cta-banner-dismiss').should('be.visible')
   })
 
   // ---------------------------------------------------------------------------
