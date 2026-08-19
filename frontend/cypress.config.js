@@ -365,38 +365,30 @@ export default defineConfig({
               const cw = new ethers.Wallet(ACCOUNT_KEYS[args.creatorIndex ?? 0], provider)
               const factory = new ethers.Contract(d.contracts.wagerPoolFactory, POOL_FACTORY_ABI, cw)
               // `resetChainBetweenTests()` reverts to a checkpoint taken once, real minutes before a
-              // later test runs, and observed in CI (shard 1, twice) reverting BadDeadlines() even
-              // after anchoring `now` to max(wall-clock, chain latest) — Hardhat's `eth_estimateGas`
-              // simulation and the transaction's actual mined block don't necessarily agree with a
-              // `now` computed moments earlier from either clock read alone. One retry with FRESH
-              // reads of both clocks, taken immediately before resending, absorbs that gap without
-              // needing to pin down Hardhat's exact internal timestamp bookkeeping across a revert.
-              let lastErr
-              for (let attempt = 0; attempt < 2; attempt++) {
-                const chainNow = (await provider.getBlock('latest')).timestamp
-                const now = Math.max(Math.floor(Date.now() / 1000), chainNow)
-                const params = {
-                  token: args.token || d.paymentToken,
-                  buyIn: BigInt(args.buyIn ?? 10n * 10n ** 18n),
-                  maxMembers: args.maxMembers ?? 5,
-                  thresholdBips: args.thresholdBips ?? 5100,
-                  acceptDeadline: now + (args.acceptIn ?? 3600),
-                  resolveDeadline: now + (args.resolveIn ?? 7200),
-                }
-                try {
-                  const sent = await factory.createPool(params)
-                  const rc = await sent.wait(1)
-                  const ev = rc.logs
-                    .map((l) => { try { return factory.interface.parseLog(l) } catch { return null } })
-                    .find((e) => e && e.name === 'PoolCreated')
-                  if (!ev) return { ok: false, error: 'PoolCreated event not found in receipt' }
-                  return { ok: rc.status === 1, poolId: Number(ev.args.poolId), pool: ev.args.pool }
-                } catch (e) {
-                  lastErr = e
-                  if (describeRevert(e) !== 'BadDeadlines') throw e
-                }
+              // later test runs, and a `now` predicted from either `Date.now()` or a mere READ of
+              // 'latest' kept reverting BadDeadlines() in CI regardless of which clock (or their max)
+              // it was anchored to — a short window is exactly what exposes a predicted `now` that's
+              // wrong by any amount. Stop predicting: force-mine an empty block and read what
+              // timestamp Hardhat's automine ACTUALLY assigned it. That is (mechanism-independent of
+              // whatever Hardhat does internally across the revert) the same rule the createPool tx's
+              // own block gets, so anchoring to it is exact rather than estimated.
+              await provider.send('evm_mine', [])
+              const now = (await provider.getBlock('latest')).timestamp
+              const params = {
+                token: args.token || d.paymentToken,
+                buyIn: BigInt(args.buyIn ?? 10n * 10n ** 18n),
+                maxMembers: args.maxMembers ?? 5,
+                thresholdBips: args.thresholdBips ?? 5100,
+                acceptDeadline: now + (args.acceptIn ?? 3600),
+                resolveDeadline: now + (args.resolveIn ?? 7200),
               }
-              throw lastErr
+              const sent = await factory.createPool(params)
+              const rc = await sent.wait(1)
+              const ev = rc.logs
+                .map((l) => { try { return factory.interface.parseLog(l) } catch { return null } })
+                .find((e) => e && e.name === 'PoolCreated')
+              if (!ev) return { ok: false, error: 'PoolCreated event not found in receipt' }
+              return { ok: rc.status === 1, poolId: Number(ev.args.poolId), pool: ev.args.pool }
             }
             case 'joinPool': {
               // Approve-then-join as account #index — mirrors the self-submit path usePools.joinPool
