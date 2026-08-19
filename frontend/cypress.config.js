@@ -365,27 +365,38 @@ export default defineConfig({
               const cw = new ethers.Wallet(ACCOUNT_KEYS[args.creatorIndex ?? 0], provider)
               const factory = new ethers.Contract(d.contracts.wagerPoolFactory, POOL_FACTORY_ABI, cw)
               // `resetChainBetweenTests()` reverts to a checkpoint taken once, real minutes before a
-              // later test runs — its stale `block.timestamp` understates when THIS tx will actually
-              // mine (Hardhat mines new blocks at wall-clock time once the chain's clock is behind
-              // it), so a short deadline window computed from it can already be in the past by the
-              // time the tx lands, reverting BadDeadlines(). Anchor to whichever clock is ahead.
-              const chainNow = (await provider.getBlock('latest')).timestamp
-              const now = Math.max(Math.floor(Date.now() / 1000), chainNow)
-              const params = {
-                token: args.token || d.paymentToken,
-                buyIn: BigInt(args.buyIn ?? 10n * 10n ** 18n),
-                maxMembers: args.maxMembers ?? 5,
-                thresholdBips: args.thresholdBips ?? 5100,
-                acceptDeadline: now + (args.acceptIn ?? 3600),
-                resolveDeadline: now + (args.resolveIn ?? 7200),
+              // later test runs, and observed in CI (shard 1, twice) reverting BadDeadlines() even
+              // after anchoring `now` to max(wall-clock, chain latest) — Hardhat's `eth_estimateGas`
+              // simulation and the transaction's actual mined block don't necessarily agree with a
+              // `now` computed moments earlier from either clock read alone. One retry with FRESH
+              // reads of both clocks, taken immediately before resending, absorbs that gap without
+              // needing to pin down Hardhat's exact internal timestamp bookkeeping across a revert.
+              let lastErr
+              for (let attempt = 0; attempt < 2; attempt++) {
+                const chainNow = (await provider.getBlock('latest')).timestamp
+                const now = Math.max(Math.floor(Date.now() / 1000), chainNow)
+                const params = {
+                  token: args.token || d.paymentToken,
+                  buyIn: BigInt(args.buyIn ?? 10n * 10n ** 18n),
+                  maxMembers: args.maxMembers ?? 5,
+                  thresholdBips: args.thresholdBips ?? 5100,
+                  acceptDeadline: now + (args.acceptIn ?? 3600),
+                  resolveDeadline: now + (args.resolveIn ?? 7200),
+                }
+                try {
+                  const sent = await factory.createPool(params)
+                  const rc = await sent.wait(1)
+                  const ev = rc.logs
+                    .map((l) => { try { return factory.interface.parseLog(l) } catch { return null } })
+                    .find((e) => e && e.name === 'PoolCreated')
+                  if (!ev) return { ok: false, error: 'PoolCreated event not found in receipt' }
+                  return { ok: rc.status === 1, poolId: Number(ev.args.poolId), pool: ev.args.pool }
+                } catch (e) {
+                  lastErr = e
+                  if (describeRevert(e) !== 'BadDeadlines') throw e
+                }
               }
-              const sent = await factory.createPool(params)
-              const rc = await sent.wait(1)
-              const ev = rc.logs
-                .map((l) => { try { return factory.interface.parseLog(l) } catch { return null } })
-                .find((e) => e && e.name === 'PoolCreated')
-              if (!ev) return { ok: false, error: 'PoolCreated event not found in receipt' }
-              return { ok: rc.status === 1, poolId: Number(ev.args.poolId), pool: ev.args.pool }
+              throw lastErr
             }
             case 'joinPool': {
               // Approve-then-join as account #index — mirrors the self-submit path usePools.joinPool

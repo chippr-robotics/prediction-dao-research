@@ -131,7 +131,11 @@ describe('Wager Pools', () => {
   it('[POOL-02] Creator proposes a payout matrix, members approve to threshold, the winner claims', () => {
     // Setup (create + join 3 + close joining) is bypassed on-chain — the flow under test is
     // propose/approve/claim, driven through the UI.
-    cy.task('chainTx', { action: 'createPool', args: { creatorIndex: 0, buyIn: BUY_IN.toString(), maxMembers: 3, thresholdBips: 5100 } })
+    // maxMembers is deliberately ABOVE the 3 joiners below: WagerPool auto-closes joining once
+    // memberCount reaches maxMembers (WagerPool.sol _maybeAutoClose), and joining exactly 3 into a
+    // 3-member cap would auto-close the pool before the explicit closeJoiningPool call below runs
+    // — which is the flow this test means to exercise — reverting it with WrongState.
+    cy.task('chainTx', { action: 'createPool', args: { creatorIndex: 0, buyIn: BUY_IN.toString(), maxMembers: 5, thresholdBips: 5100 } })
       .then((created) => {
         expectOk(created, 'createPool')
         const poolAddress = created.pool
