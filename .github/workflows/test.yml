@@ -574,6 +574,20 @@ jobs:
       # `set -o pipefail` is load-bearing: the command is piped into `tee`, so without it the
       # step's exit status is tee's (always 0) and cypress's failure is discarded exactly as
       # `continue-on-error` used to discard it.
+      # Only the NO-CHAIN tier is doubled. The account-native (passkey) tier rides this job for its
+      # runner, not because it is a viewport question: it drives the WebAuthn harness, its budget is
+      # a single sub-5-minute run, and running it twice would contradict the policy this feature
+      # just wrote down. It goes in the desktop leg — the width every one of its specs was authored
+      # against.
+      - name: Select this leg's specs
+        id: specs
+        run: |
+          if [ "${{ matrix.viewport }}" = "desktop" ]; then
+            echo 'specs=cypress/e2e/fast/**/*.cy.js,cypress/e2e/passkey/**/*.cy.js' >> $GITHUB_OUTPUT
+          else
+            echo 'specs=cypress/e2e/fast/**/*.cy.js' >> $GITHUB_OUTPUT
+          fi
+
       - name: Run fast E2E tests
         env:
           # Read by cypress/support/viewports.js and applied from a global beforeEach, so a spec
@@ -581,7 +595,7 @@ jobs:
           CYPRESS_VIEWPORT_PROFILE: ${{ matrix.viewport }}
         run: |
           set -o pipefail
-          npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/fast/**/*.cy.js,cypress/e2e/passkey/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
+          npx start-server-and-test dev http://localhost:5173 'cypress run --spec "${{ steps.specs.outputs.specs }}" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
 
       - name: Summarize E2E results
         if: always()

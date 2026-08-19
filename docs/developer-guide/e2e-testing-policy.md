@@ -13,7 +13,7 @@ carries the anti-patterns that made the current suite report coverage it did not
 |---|---|---|---|---|
 | **no-chain** | `frontend/cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile | **< 6 min per leg** |
 | **on-chain** | `frontend/cypress/e2e/full/` | A local chain, a deploy and a seed | Every push, 4 shards in parallel | **< 15 min per shard** |
-| **account-native** | `frontend/cypress/e2e/passkey/` | The WebAuthn harness | Every push | **< 5 min** |
+| **account-native** | `frontend/cypress/e2e/passkey/` | The WebAuthn harness | Every push, **once** — it rides the no-chain job's desktop leg for a runner, not because it is a viewport question | **< 5 min** |
 
 ## The two admission rules
 
@@ -142,7 +142,11 @@ cy.a11yScan({ disableRules: [{ rule: 'color-contrast', issue: '#1019' }] })
 ## Performance
 
 Budgeted routes live in `frontend/lighthouse-routes.json` and are measured on both a desktop and a
-mobile profile (`frontend/lighthouserc.desktop.json`, `frontend/lighthouserc.mobile.json`).
+mobile profile (`frontend/lighthouserc.desktop.json`, `frontend/lighthouserc.mobile.json`). Both
+configs must collect **exactly** that route list — asserted by
+`check-lighthouse-coverage.js --routes-only` and by a unit-job gate, because otherwise the route set
+lives in three files and a disagreement makes the coverage check answer a different question than
+the one it appears to answer.
 
 Budgets **report**; they do not block. A Lighthouse score on a shared runner moves several points
 run to run, and a gate that mostly reports the runner is a gate people learn to re-run.

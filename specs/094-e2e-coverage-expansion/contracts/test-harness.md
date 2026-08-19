@@ -38,15 +38,15 @@ export const VIEWPORTS = {
 |---|---|
 | The profile is selected by `CYPRESS_VIEWPORT_PROFILE` and applied in a global `beforeEach`. | A new spec is covered at both widths the day it lands, with no author action. |
 | Default is `desktop`. | Every existing spec was written against 1280×720; the desktop leg is a no-op change, so a diff there is a real regression. |
-| Only the no-chain tier runs both legs. | Responsive behaviour needs no chain; doubling a 30-minute chain tier to check reachability is what admission rule 1 forbids. |
-| `cy.assertReachable(selector)` asserts the control is inside the layout viewport and not clipped by an ancestor, before it is operated. | `should('be.visible')` passes for an element scrolled outside a clipping container. Present is not reachable. |
+| Only the no-chain tier runs both legs. | Responsive behaviour needs no chain; doubling a 30-minute chain tier to check reachability is what admission rule 1 forbids. The account-native tier shares the job's runner but runs in the desktop leg only — it drives the WebAuthn harness, not a layout. |
+| `cy.assertReachable(selector)` asserts the control is inside the layout viewport and not clipped by an ancestor, before it is operated. | `should('be.visible')` passes for an element scrolled outside a clipping container. Present is not reachable. Bounds carry a 1px tolerance: `getBoundingClientRect` returns fractional values, and failing on layout rounding rather than on reachability is how a check earns a reputation for crying wolf. |
 | The active profile is logged at the top of every run. | A failure screenshot at an unknown width cannot be read. |
 
 ## Lighthouse
 
 | File | Role |
 |---|---|
-| `frontend/lighthouse-routes.json` | The one route list. Both configs read it, so the profiles cannot drift apart. |
+| `frontend/lighthouse-routes.json` | The one route list. Both configs must collect exactly it — enforced, not assumed: `check-lighthouse-coverage.js --routes-only` plus a unit-job gate. |
 | `frontend/lighthouserc.desktop.json` | Desktop preset. |
 | `frontend/lighthouserc.mobile.json` | Mobile preset (emulated device + throttling). |
 | `scripts/e2e/check-lighthouse-coverage.js` | Fails when any route × profile produced no report. |

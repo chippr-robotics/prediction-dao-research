@@ -105,7 +105,10 @@ describe('e2e coverage matrix', () => {
   it('requires a tracking issue on every absent or partial flow', () => {
     // FR-016: no gap exists only inside a document.
     for (const flow of allFlows.filter((f) => f.status === 'absent' || f.status === 'partial')) {
-      expect(flow.issue, `${flow.id}: ${flow.status} flows need a tracking issue`).toMatch(/^#\d+|^#TBD$/)
+      // Anchored across the WHOLE alternation. `/^#\d+|^#TBD$/` binds `^` to each branch but `$`
+      // only to the second, so `#123oops` would have satisfied a gate whose entire job is to make
+      // sure the reference is real.
+      expect(flow.issue, `${flow.id}: ${flow.status} flows need a tracking issue`).toMatch(/^(#\d+|#TBD)$/)
     }
   })
 

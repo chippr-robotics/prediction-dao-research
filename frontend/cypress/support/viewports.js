@@ -61,15 +61,24 @@ Cypress.Commands.add('assertReachable', (selector, options = {}) => {
       const vw = Cypress.config('viewportWidth')
       const vh = Cypress.config('viewportHeight')
 
+      /*
+       * Sub-pixel tolerance. getBoundingClientRect returns fractional values — layout rounding and
+       * device pixel ratio routinely put an edge at vw + 0.5 for an element that is, to any member,
+       * fully on screen. Asserting strict containment would make this fail on rounding rather than
+       * on reachability, and a check that cries wolf gets deleted. One pixel is far below anything
+       * a member could notice and far above the rounding.
+       */
+      const EPSILON = 1
+
       expect(rect.width, `${selector} has width`).to.be.greaterThan(0)
       expect(rect.height, `${selector} has height`).to.be.greaterThan(0)
       expect(
-        rect.left >= 0 && rect.right <= vw,
-        `${selector} is within the ${vw}px viewport horizontally (left ${Math.round(rect.left)}, right ${Math.round(rect.right)})`
+        rect.left >= -EPSILON && rect.right <= vw + EPSILON,
+        `${selector} is within the ${vw}px viewport horizontally (left ${rect.left.toFixed(1)}, right ${rect.right.toFixed(1)})`
       ).to.be.true
       expect(
-        rect.top >= 0 && rect.bottom <= vh,
-        `${selector} is within the ${vh}px viewport vertically after scrolling (top ${Math.round(rect.top)}, bottom ${Math.round(rect.bottom)})`
+        rect.top >= -EPSILON && rect.bottom <= vh + EPSILON,
+        `${selector} is within the ${vh}px viewport vertically after scrolling (top ${rect.top.toFixed(1)}, bottom ${rect.bottom.toFixed(1)})`
       ).to.be.true
     })
   })
