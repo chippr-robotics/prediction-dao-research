@@ -122,6 +122,17 @@ describe('Wager Pools', () => {
       cy.task('chainTx', { action: 'tokenBalance', args: { address: poolAddress } }).then((r) => {
         expect(BigInt(r.balance), 'pool escrow holds both stakes').to.equal(BUY_IN * 2n)
       })
+
+      // Unhappy path: a member who already joined cannot join again (WagerPool.AlreadyJoined()).
+      // Re-joining would double-count their stake and their vote weight, so this is a core safety
+      // property of "join with a stake", not an incidental edge case.
+      cy.task('chainTx', { action: 'joinPool', args: { index: 0, pool: poolAddress, buyIn: BUY_IN.toString() } })
+        .its('ok').should('not.equal', true)
+      cy.task('chainTx', { action: 'poolInfo', args: { pool: poolAddress } })
+        .its('memberCount').should('equal', 2) // unchanged by the rejected re-join
+
+      // The UI itself never offers a joined member the join control again.
+      cy.get('[data-testid="join-pool"]').should('not.exist')
     })
   })
 
@@ -168,6 +179,22 @@ describe('Wager Pools', () => {
         cy.get('[data-testid="approve-outcome"]').click()
         cy.get('[data-testid="approval-progress"]', { timeout: 15000 })
           .should('contain.text', 'Approvals: 1 / 2 needed')
+
+        // Unhappy path: the outcome is proposed but not yet approved to threshold — a joined member
+        // cannot claim yet (WagerPool._claimBy: `state != Resolved` reverts before the entries are
+        // even checked, so any plausible entries array proves the same thing). Claiming early would
+        // let a single approval unlock funds nobody actually agreed to.
+        cy.task('chainTx', {
+          action: 'claimPool',
+          args: {
+            callerIndex: 1,
+            pool: poolAddress,
+            index: 1,
+            entries: [0, 1, 2].map((i) => ({ winner: TEST_ACCOUNTS[i], amount: BUY_IN.toString() })),
+          },
+        }).its('ok').should('not.equal', true)
+        cy.task('chainTx', { action: 'poolInfo', args: { pool: poolAddress } })
+          .its('state').should('equal', 1) // still JoiningClosed, not Resolved
 
         // Second member approves — crosses the threshold and locks the outcome.
         connectAndVisitPool(1, poolAddress)
