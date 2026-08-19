@@ -227,12 +227,18 @@ jobs:
           echo "Budgets report rather than block; an unmeasured route fails the job." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+      # `include-hidden-files` is REQUIRED here and its absence was silent: `.lighthouseci` is a
+      # dot-directory, upload-artifact@v7 excludes hidden paths by default, and the step logged
+      # "No files were found with the provided path" as a WARNING while the job stayed green — so
+      # this artifact has been uploading nothing. The reports are the evidence behind "budgets
+      # report rather than block"; discarding them left the step summary as the only record.
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v7
         if: always()
         with:
           name: lighthouse-results
           path: frontend/.lighthouseci/
+          include-hidden-files: true
           retention-days: 7
 
   axe-audit:
