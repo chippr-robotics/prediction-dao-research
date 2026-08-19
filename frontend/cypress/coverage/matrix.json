@@ -10,16 +10,22 @@
         {
           "id": "wagers.claim-payout",
           "name": "The winner claims the escrowed stakes",
-          "status": "partial",
+          "status": "covered",
           "tier": "on-chain",
           "depth": "settled",
           "risk": "custody",
           "tests": [
             "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-01",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-02",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-03",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-04",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-05",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-06",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-07",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-08",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-09",
             "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-10"
-          ],
-          "missing": "CLM-01 checks a balance and CLM-10 now settles on chain, but eight of the ten tests still end in a precondition-guarded branch that proves nothing (annotated ASSERTION-DEBT), and the spec's one-shot DOM snapshots make even CLM-01 timing-dependent (#1250)",
-          "issue": "#1231"
+          ]
         },
         {
           "id": "wagers.refund-on-timeout",
@@ -36,7 +42,7 @@
         {
           "id": "wagers.decline-and-cancel",
           "name": "Decline an offer, or cancel one you created before it is accepted",
-          "status": "partial",
+          "status": "covered",
           "tier": "on-chain",
           "depth": "flow",
           "risk": "custody",
@@ -47,9 +53,7 @@
             "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-04",
             "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-05",
             "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-06"
-          ],
-          "missing": "two branches end in a precondition-guarded unconditional truth (annotated ASSERTION-DEBT), so the stake's return is not read back on those paths",
-          "issue": "#1231"
+          ]
         },
         {
           "id": "wagers.full-lifecycle",

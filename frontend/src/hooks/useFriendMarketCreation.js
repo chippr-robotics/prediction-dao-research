@@ -203,7 +203,16 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       const stakeWei = ethers.parseUnits(String(stakeAmountRaw), tokenDecimals)
       const isOffer = data.marketType === 'offer'
       const oddsMultiplier = parseInt(data.data.oddsMultiplier, 10) || 100
-      const offerResolutionType = parseInt(data.data.resolutionType, 10) || ResolutionType.Creator
+      /*
+       * NOT `|| ResolutionType.Creator`: Either is 0, and `0 || x` is `x` in JS — that fallback
+       * silently turned every "Either of Us" selection into "Creator Only" the instant the
+       * resolution-type field held a real, valid 0. Caught by 07-manual-resolution's RES-02
+       * (#1231): a UI-created Either-Party wager reverted NotAuthorized when the opponent, who
+       * is supposed to be able to resolve it too, tried to. Preserve a genuine 0; fall back only
+       * when the field is actually missing/unparseable (NaN).
+       */
+      const rawOfferResolutionType = parseInt(data.data.resolutionType, 10)
+      const offerResolutionType = Number.isNaN(rawOfferResolutionType) ? ResolutionType.Creator : rawOfferResolutionType
 
       let creatorStakeWei = stakeWei
       let opponentStakeWei = stakeWei
@@ -293,7 +302,10 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
 
       // Resolution
-      const resolutionType = parseInt(data.data.resolutionType, 10) || ResolutionType.Creator
+      // NOT `|| ResolutionType.Creator` — see the note beside offerResolutionType above; Either
+      // is 0, and `0 || x` discards it.
+      const rawResolutionType = parseInt(data.data.resolutionType, 10)
+      const resolutionType = Number.isNaN(rawResolutionType) ? ResolutionType.Creator : rawResolutionType
       // The form field is `oracleConditionId` (future-proof: same slot serves Polymarket
       // and the upcoming ChainlinkDataFeed / ChainlinkFunctions / UMA adapters). The
       // contract param is still named `polymarketConditionId` for legacy reasons; we

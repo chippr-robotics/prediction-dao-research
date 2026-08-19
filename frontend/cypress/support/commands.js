@@ -1160,6 +1160,21 @@ Cypress.Commands.add('waitForWagerResolved', (wagerId, tries = 45) => {
 })
 
 /**
+ * Poll the registry until `wagerId` is marked paid — the fact a claim actually landed, not a word
+ * in the detail panel (which can render "Claimed" optimistically before the transaction confirms,
+ * or simply repeat text that was already on screen).
+ */
+Cypress.Commands.add('waitForWagerPaid', (wagerId, tries = 45) => {
+  const poll = (remaining) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+    if (i.paid) return undefined
+    if (remaining <= 0) throw new Error(`wager ${wagerId} was never marked paid`)
+    cy.wait(1000)
+    return poll(remaining - 1)
+  })
+  return poll(tries)
+})
+
+/**
  * Dismiss the acceptance modal if it is still open.
  *
  * It CLOSES ITSELF once the acceptance lands, so an unconditional close failed with "expected

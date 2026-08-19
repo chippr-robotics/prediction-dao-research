@@ -156,35 +156,25 @@ describe('Accessibility', () => {
   // A11Y-05: Toast notifications
   // ---------------------------------------------------------------------------
   it('[A11Y-05] Toast notifications', () => {
-    connectAndVisit()
+    /*
+     * ESTABLISH THE PRECONDITION: fire a real toast instead of hoping one happens to be on
+     * screen. Landing on an unsupported chain with a wallet that rejects the switch (same setup
+     * as 01-wallet-connection's WAL-09) reliably drives App.jsx's handleSwitchNetwork into its
+     * catch branch, which calls showNotification(...) — a genuine [role="alert"] toast.
+     */
+    cy.mockWeb3Provider({ account: TEST_ACCOUNT, networkId: 56, rejectChainSwitch: true })
+    cy.visit('/wagers')
+    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
+    cy.selectInjectedConnector()
+
+    cy.get('.network-error-banner .switch-network-button', { timeout: 15000 }).click()
 
     // The NotificationSystem renders with role="alert" and aria-live.
-    // Trigger a notification by interacting with the network switch or other
-    // action. For now, verify the notification component structure.
-    cy.get('body').then(($body) => {
-      // Check if any notifications are already present.
-      const notifications = $body.find('[role="alert"]')
-      if (notifications.length > 0) {
-        // Verify they have aria-live attribute.
-        cy.get('[role="alert"]').first()
-          .should('have.attr', 'aria-live')
-        // Verify close button has aria-label.
-        cy.get('[role="alert"]').first().within(() => {
-          cy.get('button[aria-label]').should('exist')
-        })
-      } else {
-        // No notifications currently — verify the notification mount point exists.
-        // The NotificationSystem is always mounted in AppContent.
-        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
-        expect(true).to.be.true
-      }
-    })
-
-    // Verify that the notification system is mounted (it returns null when empty).
-    // We can check for the component by looking at its CSS class presence in DOM.
-    cy.document().then((doc) => {
-      // The NotificationSystem component is part of the React tree even when hidden.
-      expect(doc.querySelector('body')).to.exist
+    cy.get('[role="alert"]', { timeout: 10000 }).first().should('have.attr', 'aria-live')
+    // Its close button has an aria-label.
+    cy.get('[role="alert"]').first().within(() => {
+      cy.get('button[aria-label]').should('exist')
     })
   })
 
