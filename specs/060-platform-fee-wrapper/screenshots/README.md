@@ -57,20 +57,27 @@ a control in both themes; the shots show real balances and a real disabled state
 placeholders; the blocked state is a stated sentence, not a spinner; nothing is clipped and the
 sheets fit one screen at 390px in every step.
 
-## Open finding — NOT fixed here, and why
+## Open finding — NOT fixed here, and why → #1260
 
 **The primary button's label fails contrast in dark mode, app-wide.** `.earn-btn.primary` fills with
-`var(--brand-primary)` (`#83B9C4` in dark) and hardcodes `color: #fff` — **≈2.16:1**, against 4.5:1
-for a 15px non-bold label. It is most visible on `Deposit USDC`, which is the control a member
-presses to accept a disclosed fee, and it also makes the enabled and disabled states nearly
-indistinguishable in dark mode.
+`var(--brand-primary)` (`#83B9C4` in dark) and hardcodes `color: #fff` — **2.16:1**, against 4.5:1
+for a 15px non-bold label and below even the 3:1 large-text floor. It is most visible on
+`Deposit USDC`, the control a member presses to accept a disclosed fee. Compare
+`fees-deposit-fee-charged-desktop-dark.png` with `fees-deposit-fee-unreadable-desktop-dark.png`: the
+disabled state is only `opacity: 0.55` over the same pale fill, so enabled and disabled are barely
+distinguishable there too.
 
 The design system already carries the right answer and the component bypasses it:
-`--primary-button` / `--primary-button-text` are a matched pair (`#2E7D8C` + white at 4.7:1 in
-light; `#6FAEBB` + Gunmetal `#1C333B` at 5.3:1 in dark). So the fix is to *use the tokens*, never to
-darken one — and `noHardcodedColors.test.js` does not catch it because white is an exempted absolute.
+`--primary-button` / `--primary-button-text` are a matched pair (`#2E7D8C` + white at 4.74:1 in
+light; `#6FAEBB` + Gunmetal `#1C333B` at 5.33:1 in dark). So the fix is to *use the tokens*, never to
+darken one — spec 090 is explicit that Chippr Teal is a large-text-and-fill colour.
 
-It is left open deliberately: **25 other component stylesheets carry the same
-`--brand-primary` + `#fff` pair**, so changing Earn alone would make one surface disagree with its
-neighbours — the structural case the skill says to stop patching pixels for. It wants its own
-change, across the estate, with the brand guards extended so it cannot come back.
+Three guards look adjacent and none of them sees it: `tokenContrast.test.js` audits the palette
+(and the correct pair passes), `noHardcodedColors.test.js` exempts white as an absolute, and
+`cy.a11yScan()` runs one theme. What is missing is a *usage* guard.
+
+It is left open deliberately: **66 rules across 43 stylesheets carry the same brand-token fill +
+white label**, so changing Earn alone would make one surface disagree with its neighbours — the
+structural case the skill says to stop patching pixels for. Tracked as **#1260**, with the
+enumeration script and the triage note (a handful of those rules are decorative badges whose labels
+may legitimately sit under the 3:1 rule).
