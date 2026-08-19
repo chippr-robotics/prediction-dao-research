@@ -46,7 +46,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `wagers.claim-payout` | The winner claims the escrowed stakes | 🟡 partial | settled | `on-chain` | `10-claim-payouts.cy.js` (CLM-01, CLM-10) | CLM-01 checks a balance and CLM-10 now settles on chain, but eight of the ten tests still end in a precondition-guarded branch that proves nothing (annotated ASSERTION-DEBT) |
+| `wagers.claim-payout` | The winner claims the escrowed stakes | 🟡 partial | settled | `on-chain` | `10-claim-payouts.cy.js` (CLM-01, CLM-10) | CLM-01 checks a balance and CLM-10 now settles on chain, but eight of the ten tests still end in a precondition-guarded branch that proves nothing (annotated ASSERTION-DEBT), and the spec's one-shot DOM snapshots make even CLM-01 timing-dependent (#1250) |
 | `wagers.refund-on-timeout` | An unaccepted or unresolved wager refunds after its deadline | 🟢 covered | settled | `on-chain` | `11-refund-timeout.cy.js` (REF-01, REF-02) |  |
 | `wagers.decline-and-cancel` | Decline an offer, or cancel one you created before it is accepted | 🟡 partial | flow | `on-chain` | `06-decline-cancel.cy.js` (DEC-01, DEC-02, DEC-03, DEC-04, DEC-05, DEC-06) | two branches end in a precondition-guarded unconditional truth (annotated ASSERTION-DEBT), so the stake's return is not read back on those paths |
 | `wagers.full-lifecycle` | One wager driven end to end, create through settlement | 🟢 covered | settled | `on-chain` | `23-lifecycle-e2e.cy.js` (E2E-01, E2E-02, E2E-03, E2E-04, E2E-05) |  |

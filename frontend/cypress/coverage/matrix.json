@@ -18,7 +18,7 @@
             "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-01",
             "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-10"
           ],
-          "missing": "CLM-01 checks a balance and CLM-10 now settles on chain, but eight of the ten tests still end in a precondition-guarded branch that proves nothing (annotated ASSERTION-DEBT)",
+          "missing": "CLM-01 checks a balance and CLM-10 now settles on chain, but eight of the ten tests still end in a precondition-guarded branch that proves nothing (annotated ASSERTION-DEBT), and the spec's one-shot DOM snapshots make even CLM-01 timing-dependent (#1250)",
           "issue": "#1231"
         },
         {
