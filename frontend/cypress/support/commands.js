@@ -566,6 +566,32 @@ Cypress.Commands.add('assertToast', (type, message) => {
   }
 })
 
+// Cumulative browser-time offset, in ms. Module-scoped (not window-scoped) so it survives a
+// cy.visit()/cy.reload() that happens AFTER advanceTime — see the window:before:load hook below.
+let __cyCumulativeOffsetMs = 0
+
+/** Install (or re-sync) the Date shim on a window, from the current cumulative offset. */
+function applyTimeShim(win) {
+  if (win.__cyTimeShim) {
+    win.__cyTimeOffsetMs = __cyCumulativeOffsetMs
+    return
+  }
+  const RealDate = win.Date
+  const realNow = RealDate.now.bind(RealDate)
+  win.__cyTimeOffsetMs = __cyCumulativeOffsetMs
+
+  function ShiftedDate(...args) {
+    if (args.length === 0) return new RealDate(realNow() + win.__cyTimeOffsetMs)
+    return new RealDate(...args)
+  }
+  ShiftedDate.prototype = RealDate.prototype
+  ShiftedDate.now = () => realNow() + win.__cyTimeOffsetMs
+  ShiftedDate.parse = RealDate.parse
+  ShiftedDate.UTC = RealDate.UTC
+  win.Date = ShiftedDate
+  win.__cyTimeShim = true
+}
+
 /**
  * Advance Hardhat node time by the specified seconds.
  * Only works when connected to a real Hardhat node.
@@ -608,25 +634,17 @@ Cypress.Commands.add('advanceTime', (seconds) => {
    * Shift Date by the same offset inside the app realm. A cumulative offset rather than a frozen
    * clock, so intervals keep firing and the UI re-renders on its own — cy.clock() would stop them.
    */
-  cy.window().then((win) => {
-    if (!win.__cyTimeShim) {
-      const RealDate = win.Date
-      const realNow = RealDate.now.bind(RealDate)
-      win.__cyTimeOffsetMs = 0
+  __cyCumulativeOffsetMs += seconds * 1000
+  cy.window({ log: false }).then((win) => applyTimeShim(win))
 
-      function ShiftedDate(...args) {
-        if (args.length === 0) return new RealDate(realNow() + win.__cyTimeOffsetMs)
-        return new RealDate(...args)
-      }
-      ShiftedDate.prototype = RealDate.prototype
-      ShiftedDate.now = () => realNow() + win.__cyTimeOffsetMs
-      ShiftedDate.parse = RealDate.parse
-      ShiftedDate.UTC = RealDate.UTC
-      win.Date = ShiftedDate
-      win.__cyTimeShim = true
-    }
-    win.__cyTimeOffsetMs += seconds * 1000
-  })
+  /*
+   * Re-apply on any window that loads AFTER this call, in the SAME test — a spec may advance time
+   * and only THEN cy.visit()/cy.reload() to get a page whose initial read of `summary`/deadlines
+   * already reflects it (e.g. a pool's refund eligibility, computed once on mount). A fresh window
+   * otherwise gets the real, unshifted Date, and the browser and chain clocks silently disagree
+   * about expiry again — exactly the failure mode the shim exists to prevent.
+   */
+  cy.on('window:before:load', applyTimeShim)
 })
 
 /**

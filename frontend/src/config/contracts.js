@@ -101,6 +101,11 @@ const HARDHAT_CONTRACTS = {
   membershipVoucher: '0x4a1d81F8c3cd56b44d09a2abB42EeB7Ed83cfBf4',
   voucherBatchMinter: '0xD238Dd92FdEF481DdFF65B396099EE9FB368684F',
   tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
+  // spec 034 — Wager Pools factory (address-based, no Semaphore). Empty until
+  // `deploy-wager-pool-factory.js --network localhost` runs; `npm run sync:frontend-contracts:local`
+  // populates it. Undeployed ⇒ usePools()/getFactory throws "not available on this network" and the
+  // pools surface hides — never invented availability.
+  wagerPoolFactory: '',
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)
