@@ -104,11 +104,12 @@ describe('entitlement is enforced at every depth', () => {
     expect(await screen.findByText(/Access Restricted/i)).toBeInTheDocument()
   })
 
-  it('shows the unverifiable state when no chain answered — at depth, like the front door', async () => {
-    // Re-mock estateRead through the roles mock: no roles, nothing readable.
-    // (The mock above always reports read:[137]; this case is covered in the
-    // Control Room suite — here we only pin that the DENIED screen renders at
-    // depth. See adminEstateEntry.test.jsx for the three-way distinction.)
+  it('gates a deep link at the same strength as the front door', async () => {
+    // Named for what it asserts. This read as unverifiable-state coverage while
+    // asserting the DENIED screen — the mock always reports read:[137], so no
+    // chain-outage case can arise here. The three-way distinction lives in
+    // adminEstateEntry.test.jsx; what this pins is that arriving at /admin/:appId
+    // directly cannot reach a softer gate than /admin does.
     renderAt('/admin/maintenance')
     expect(await screen.findByText(/Access Restricted/i)).toBeInTheDocument()
     expect(screen.queryByTestId('maintenance-tab')).toBeNull()

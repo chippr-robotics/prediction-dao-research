@@ -626,8 +626,34 @@ artifacts live under `specs/<feature>/`.
   re-recording a baseline, i.e. accepting that deployed bytecode or a published package changed.
   See `specs/075-monorepo-workspaces/`.
 
+- **End-to-end coverage has a source of truth, and assertion depth is a separate fact from coverage
+  (spec 094).** `frontend/cypress/coverage/matrix.json` maps EVERY directory under `specs/` — including
+  the ones with no member surface, which carry a reason instead of flows — to its member-facing flows,
+  each with status, **depth**, tier, money-at-risk and a tracking issue;
+  `docs/developer-guide/e2e-coverage-matrix.md` is GENERATED from it (`npm run e2e:matrix`,
+  regenerate-and-diff gated) and a spec directory with no row fails CI. Depth exists because a flow can
+  be `covered` by a test that cannot fail: 33 branches across four money-path specs end in
+  `expect(true).to.be.true` behind a precondition guard, which reports as coverage while proving
+  nothing. Those are annotated `// ASSERTION-DEBT: #1231` and counted by
+  `frontend/src/test/e2e-policy/assertionDepth.test.js`; a NEW unconditional truth fails the build
+  unless it carries `// EITHER-WAY: <reason>`. Two admission rules bind
+  (`docs/developer-guide/e2e-testing-policy.md`): a flow validatable **without a chain must not** live
+  in the on-chain tier, and a flow where a member signs something that **costs them money must** have
+  on-chain coverage. The no-chain tier runs twice — `CYPRESS_VIEWPORT_PROFILE` = `desktop` (1280×720)
+  and `phone` (390×844), applied from a GLOBAL `beforeEach` so a new spec is covered at both widths
+  with no author action; the on-chain tier is **4 shards with a private chain each**
+  (`scripts/e2e/split-full-tier.js`, longest-first) — measured at 6:37 / 7:51 / 6:29 / 6:09 a leg
+  against ~27 minutes serial, which is what keeps it affordable on every push. Accessibility uses `cy.a11yScan` — the
+  **already-installed `axe-core`, injected by the runner, never imported from `frontend/src`** (adding
+  `cypress-axe` would touch the lockfile; see spec 075) — failing on serious/critical, scoped to an
+  open modal's root because the app portals its modals, and every suppression names its issue.
+  Lighthouse measures six routes on **both** profiles; budgets REPORT, but an **unmeasured route
+  fails** (`scripts/e2e/check-lighthouse-coverage.js`) — `lhci` asserts only over URLs it collected, so
+  a route that never loaded otherwise leaves the job green. Uncovered flows are sub-issues of #1228,
+  not lines in a document. See `specs/094-e2e-coverage-expansion/`.
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/093-admin-mini-apps/plan.md
+at specs/094-e2e-coverage-expansion/plan.md
 <!-- SPECKIT END -->

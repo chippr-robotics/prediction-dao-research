@@ -186,8 +186,13 @@ const NETWORKS = {
     stablecoin: {
       address: import.meta.env?.VITE_AMOY_USDC || '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
       symbol: 'USDC',
+      // Decimals follow the address override: the full-E2E tier points VITE_AMOY_USDC at the
+      // local 18-dec mock (the node impersonates Amoy — see dev:e2e), and an address override
+      // with the real token's 6 hardcoded beside it makes every amount computation wrong by
+      // 10^12 — stakes become dust that still clears on-chain, which is worse than failing.
+      // Unset, this is exactly the literal 6 it always was.
       name: 'USD Coin',
-      decimals: 6,
+      decimals: Number(import.meta.env?.VITE_AMOY_USDC_DECIMALS) || 6,
       // EIP-712 domain version for the EIP-3009 payment leg (spec 035 FR-020):
       // native Circle USDC signs under version '2' (bridged USDC.e would be '1').
       domainVersion: '2',

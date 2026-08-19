@@ -34,9 +34,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
    * So the default is now honestly disconnected. Pass `{ preAuthorized: true }` for a spec that
    * wants a restored session.
    */
-  let authorized = options.preAuthorized === true
 
-  let activeAccount = initialAccount
 
   /*
    * The chain is MUTABLE, because a real wallet's chain is. `wallet_switchEthereumChain` used to
@@ -48,8 +46,19 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
    * `rejectChainSwitch: true` models the other honest wallet behaviour: the member declines, or the
    * wallet has no such chain. That is the ONLY path that raises the network error banner.
    */
-  let activeChainId = Number(networkId)
-  const rejectChainSwitch = options.rejectChainSwitch === true
+
+  /*
+   * This call's wallet state. ONE object per mockWeb3Provider() CALL, closed over by the
+   * handler below — so it SURVIVES page loads (that persistence is load-bearing: connect once,
+   * and every later cy.visit auto-restores the session because `authorized` is still true).
+   * The window only ever holds a POINTER to the currently-winning call's state.
+   */
+  const st = {
+    activeAccount: initialAccount,
+    activeChainId: Number(networkId),
+    authorized: options.preAuthorized === true,
+    rejectChainSwitch: options.rejectChainSwitch === true,
+  }
 
   cy.on('window:before:load', (win) => {
     // Suppress the dev banner so its fixed-position overlay doesn't cover
@@ -58,9 +67,44 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
       win.localStorage.setItem('dev_warning_banner_dismissed', 'true')
     } catch { /* localStorage may be unavailable; ignore */ }
 
+    /*
+     * ONE provider object per page load, whatever the handler count.
+     *
+     * cy.on('window:before:load') handlers registered in a `before` hook are bound to the FIRST
+     * test, so that test's page load runs the hook's handler AND its own. Each used to build its
+     * own provider object and announce it — and mipd keeps the FIRST announce per uuid, so wagmi
+     * connected to the HOOK's provider, whose closure account was whatever ensureEncryptionKeys
+     * touched last (an account with a key and NO membership). The spec's first create then failed
+     * the contract's membership gate while every later test passed: CRE-01 / ACC-01 / DEC-01, and
+     * only ever test #1.
+     *
+     * Handlers run in registration order and each points win.__cyMockActive at ITS call's
+     * closure state, so the LAST caller wins deterministically and exactly one provider is
+     * ever announced. The state itself stays in the closure — NOT on the window — because a
+     * window resets every page load, and `authorized` surviving cy.visit is what lets a
+     * connected session auto-restore on the next page (the first cut of this fix moved the
+     * state onto the window and every post-connect visit woke up logged out).
+     */
+    /*
+     * The window carries a POINTER to the winning call's state, never the state itself.
+     * Handlers run in registration order on every load, so the LAST mockWeb3Provider call's
+     * closure wins deterministically — and because the state object itself lives in that
+     * call's closure, mutations made through the provider (connect, __cySetAccount) persist
+     * across this test's later page loads exactly as they always did.
+     */
+    win.__cyMockActive = st
+    const S = () => win.__cyMockActive
+    if (win.ethereum) {
+      // A provider from an earlier handler on THIS load — just re-point its surface fields.
+      win.ethereum.selectedAddress = st.activeAccount
+      win.ethereum.chainId = `0x${st.activeChainId.toString(16)}`
+      win.ethereum.networkVersion = String(st.activeChainId)
+      return
+    }
+
     win.ethereum = {
       isMetaMask: true,
-      selectedAddress: activeAccount,
+      selectedAddress: S().activeAccount,
       networkVersion: networkId.toString(),
       chainId: `0x${networkId.toString(16)}`,
 
@@ -69,18 +113,18 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
           switch (method) {
             case 'eth_requestAccounts':
               // The user pressing Connect. Grants access for the rest of this page load.
-              authorized = true
-              resolve([activeAccount])
+              S().authorized = true
+              resolve([S().activeAccount])
               break
             case 'eth_accounts':
               // Silent probe on load — empty until authorised, exactly like a real wallet.
-              resolve(authorized ? [activeAccount] : [])
+              resolve(S().authorized ? [S().activeAccount] : [])
               break
             case 'eth_chainId':
-              resolve(`0x${activeChainId.toString(16)}`)
+              resolve(`0x${S().activeChainId.toString(16)}`)
               break
             case 'wallet_switchEthereumChain':
-              if (rejectChainSwitch) {
+              if (S().rejectChainSwitch) {
                 // EIP-1193 user-rejection. 4902 (unrecognised chain) is the other realistic
                 // refusal; both leave the wallet on its original chain, which is the point.
                 const err = new Error('User rejected the request.')
@@ -88,14 +132,14 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
                 reject(err)
                 break
               }
-              win.ethereum.__cySetChain(Number(params?.[0]?.chainId ?? activeChainId))
+              win.ethereum.__cySetChain(Number(params?.[0]?.chainId ?? S().activeChainId))
               resolve(null)
               break
             case 'wallet_addEthereumChain':
               resolve(null)
               break
             case 'net_version':
-              resolve(activeChainId.toString())
+              resolve(S().activeChainId.toString())
               break
             case 'eth_getBalance':
               resolve('0x56bc75e2d63100000') // 100 ETH
@@ -107,7 +151,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               // so any account-distinct deterministic value yields per-account keys
               // (a same-for-all value would let a non-participant decrypt). Expand
               // the 40-hex-char account to a 65-byte (130-hex) value.
-              resolve('0x' + activeAccount.slice(2).toLowerCase().repeat(4).slice(0, 130))
+              resolve('0x' + S().activeAccount.slice(2).toLowerCase().repeat(4).slice(0, 130))
               break
             default:
               fetch(rpcUrl, {
@@ -141,7 +185,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         })
       },
 
-      enable: () => Promise.resolve([activeAccount]),
+      enable: () => Promise.resolve([S().activeAccount]),
       send: (method, params) => win.ethereum.request({ method, params }),
 
       /*
@@ -150,16 +194,16 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
        *
        * The old cy.switchAccount called cy.mockWeb3Provider() again and reloaded. That registered a
        * SECOND `window:before:load` handler; both ran on reload, the later one won, and it carried
-       * a fresh `authorized = false`. Probed result: the provider reported `eth_accounts: []` while
+       * a fresh `S().authorized = false`. Probed result: the provider reported `eth_accounts: []` while
        * the UI still displayed account 0 — the app showed a stale account while the provider said
        * disconnected, and every post-switch assertion in 05-wager-acceptance was reading the wrong
        * account. Reloading is also not what a switch does: a real member switches in MetaMask and
        * the live page follows.
        */
       __cySetAccount: (next) => {
-        activeAccount = next
+        S().activeAccount = next
         win.ethereum.selectedAddress = next
-        authorized = true
+        S().authorized = true
         const cbs = (win.ethereum._callbacks && win.ethereum._callbacks.accountsChanged) || []
         cbs.forEach((cb) => cb([next]))
       },
@@ -170,10 +214,10 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
        * re-reading a chain that silently never moved.
        */
       __cySetChain: (next) => {
-        activeChainId = Number(next)
-        const hex = `0x${activeChainId.toString(16)}`
+        S().activeChainId = Number(next)
+        const hex = `0x${S().activeChainId.toString(16)}`
         win.ethereum.chainId = hex
-        win.ethereum.networkVersion = activeChainId.toString()
+        win.ethereum.networkVersion = S().activeChainId.toString()
         const cbs = (win.ethereum._callbacks && win.ethereum._callbacks.chainChanged) || []
         cbs.forEach((cb) => cb(hex))
       },
@@ -269,6 +313,19 @@ Cypress.Commands.add('switchAccount', (accountIndex) => {
  */
 Cypress.Commands.add('assertActiveAccount', (address) => {
   const short = `${address.slice(0, 6)}`
+  /*
+   * SCROLL TO THE TOP FIRST. The account button lives in a POSITION:FIXED header
+   * (HeaderBar.css:2). Callers routinely arrive here having scrolled — cy.registerEncryptionKeyViaUI
+   * scrollIntoView()s a control far down the Recovery accordion — and Cypress then refuses the
+   * click with "not visible because its ancestor has `position: fixed` CSS property and it is
+   * overflowed by other elements". That is what failed 02-membership's `before all` hook, taking
+   * all 13 of its tests with it, while the thing the hook was actually doing had SUCCEEDED (the
+   * key registered on-chain).
+   *
+   * Deliberately NOT {force: true}: forcing would also sail past a button that is genuinely
+   * unreachable, and this repo has already been bitten by force hiding a real defect.
+   */
+  cy.scrollTo('top', { ensureScrollable: false })
   cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible').click()
   cy.get('.account-address-value', { timeout: 10000 })
     .invoke('text')
@@ -309,6 +366,38 @@ Cypress.Commands.add('connectWallet', () => {
     }
   })
 
+  /*
+   * ALREADY CONNECTED IS A VALID STATE, not a failure.
+   *
+   * The mock's `authorized` flag lives in the COMMAND CLOSURE, not in the page, so it survives
+   * cy.visit() — and __cySetAccount sets it too. A spec whose `before` hook connected once (e.g.
+   * ensureEncryptionKeys, which must connect to register a key) therefore reaches its first test
+   * with the session already restored and NO connect button in the DOM. Insisting on the button
+   * turned that into a 10s timeout and cost 02-membership all 13 of its tests, on a page that was
+   * working correctly and showing the connected account.
+   *
+   * Clearing localStorage/cookies in a beforeEach does not undo it: the flag is not stored there.
+   */
+  /*
+   * WAIT for a terminal state before branching — a one-shot jQuery check races wagmi's async
+   * session restore. After cy.reload() the closure's `authorized` flag makes eth_accounts
+   * non-empty, wagmi reconnects a beat later, and a synchronous look at the body sees NEITHER
+   * button yet: the check concluded "not connected", went to the fresh-connect ceremony, and
+   * then waited on a Connect button that never renders on an already-connected page. Waiting
+   * for whichever button appears makes the branch race-free.
+   */
+  cy.get(
+    '.wallet-account-button, button[aria-label="Wallet Account"], .wallet-connect-button, button[aria-label="Connect Wallet"]',
+    { timeout: 10000 }
+  ).then(($el) => {
+    const connected = $el.filter('.wallet-account-button, [aria-label="Wallet Account"]').length > 0
+    if (connected) return
+    cy.connectWalletFresh()
+  })
+})
+
+/** The actual connect ceremony. Split out so connectWallet can skip it when already connected. */
+Cypress.Commands.add('connectWalletFresh', () => {
   cy.contains('button', /connect wallet/i, { timeout: 10000 })
     .should('be.visible')
     .should('not.be.disabled')
@@ -331,7 +420,7 @@ Cypress.Commands.add('connectWallet', () => {
 /**
  * Verify the connected network chain ID.
  */
-Cypress.Commands.add('verifyNetwork', (expectedChainId = 1337) => {
+Cypress.Commands.add('verifyNetwork', (expectedChainId = Number(Cypress.env('NETWORK_ID')) || 1337) => {
   cy.window().then((win) => {
     if (win.ethereum) {
       return win.ethereum.request({ method: 'eth_chainId' })
@@ -566,31 +655,48 @@ Cypress.Commands.add('assertToast', (type, message) => {
   }
 })
 
-// Cumulative browser-time offset, in ms. Module-scoped (not window-scoped) so it survives a
-// cy.visit()/cy.reload() that happens AFTER advanceTime — see the window:before:load hook below.
-let __cyCumulativeOffsetMs = 0
+/*
+ * BROWSER-CLOCK SHIM STATE.
+ *
+ * The offset lives at MODULE level, not on the window: `cy.visit`/`cy.reload` build a new window
+ * and every shim installed on the old one goes with it. MEM-06 advanced 29 days into a 30-day
+ * membership, reloaded, and then looked for the Extend control — which only renders while the
+ * membership is expiring. After the reload the clock had snapped back and the membership looked
+ * fresh, so the button correctly was not there. The test was right about the product and wrong
+ * about its own harness.
+ *
+ * A cumulative offset rather than a frozen clock, so intervals keep firing and the UI re-renders
+ * on its own — cy.clock() would stop them.
+ */
+let __cyTimeOffsetMs = 0
 
-/** Install (or re-sync) the Date shim on a window, from the current cumulative offset. */
-function applyTimeShim(win) {
-  if (win.__cyTimeShim) {
-    win.__cyTimeOffsetMs = __cyCumulativeOffsetMs
-    return
-  }
-  const RealDate = win.Date
-  const realNow = RealDate.now.bind(RealDate)
-  win.__cyTimeOffsetMs = __cyCumulativeOffsetMs
+function installTimeShim(win) {
+  if (!win.__cyTimeShim) {
+    const RealDate = win.Date
+    const realNow = RealDate.now.bind(RealDate)
 
-  function ShiftedDate(...args) {
-    if (args.length === 0) return new RealDate(realNow() + win.__cyTimeOffsetMs)
-    return new RealDate(...args)
+    function ShiftedDate(...args) {
+      if (args.length === 0) return new RealDate(realNow() + win.__cyTimeOffsetMs)
+      return new RealDate(...args)
+    }
+    ShiftedDate.prototype = RealDate.prototype
+    ShiftedDate.now = () => realNow() + win.__cyTimeOffsetMs
+    ShiftedDate.parse = RealDate.parse
+    ShiftedDate.UTC = RealDate.UTC
+    win.Date = ShiftedDate
+    win.__cyTimeShim = true
   }
-  ShiftedDate.prototype = RealDate.prototype
-  ShiftedDate.now = () => realNow() + win.__cyTimeOffsetMs
-  ShiftedDate.parse = RealDate.parse
-  ShiftedDate.UTC = RealDate.UTC
-  win.Date = ShiftedDate
-  win.__cyTimeShim = true
+  win.__cyTimeOffsetMs = __cyTimeOffsetMs
 }
+
+/*
+ * Re-install on every navigation, so a shifted clock survives cy.visit and cy.reload. Registered
+ * once at module load via Cypress.on (not cy.on, which binds to the running test). Skipped while
+ * the offset is zero so specs that never move the clock keep the real Date untouched.
+ */
+Cypress.on('window:before:load', (win) => {
+  if (__cyTimeOffsetMs !== 0) installTimeShim(win)
+})
 
 /**
  * Advance Hardhat node time by the specified seconds.
@@ -634,48 +740,45 @@ Cypress.Commands.add('advanceTime', (seconds) => {
    * Shift Date by the same offset inside the app realm. A cumulative offset rather than a frozen
    * clock, so intervals keep firing and the UI re-renders on its own — cy.clock() would stop them.
    */
-  __cyCumulativeOffsetMs += seconds * 1000
-  cy.window({ log: false }).then((win) => applyTimeShim(win))
-
-  /*
-   * Re-apply on any window that loads AFTER this call, in the SAME test — a spec may advance time
-   * and only THEN cy.visit()/cy.reload() to get a page whose initial read of `summary`/deadlines
-   * already reflects it (e.g. a pool's refund eligibility, computed once on mount). A fresh window
-   * otherwise gets the real, unshifted Date, and the browser and chain clocks silently disagree
-   * about expiry again — exactly the failure mode the shim exists to prevent.
-   */
-  cy.on('window:before:load', applyTimeShim)
+  __cyTimeOffsetMs += seconds * 1000
+  cy.window().then((win) => {
+    installTimeShim(win)
+  })
 })
 
 /**
- * Basic accessibility checks: img alt text, button labels.
+ * Make the BROWSER clock agree with the CHAIN clock.
+ *
+ * The app decides every expiry in browser time (`computedStatus`, the countdown tiles, the
+ * deadlines the create form computes) while the registry enforces in chain time. Whenever the
+ * two disagree the UI and the contract are answering about different `now`s, and a test about a
+ * deadline stops meaning anything: spec 07 scored 10/14 alone and 6/14 in the suite purely
+ * because earlier specs had moved the chain ~60 days ahead of real time. Its screenshot showed a
+ * row reading "Pending Acceptance · 11h 59m remaining" for an offer whose accept window had
+ * closed on chain two months earlier.
+ *
+ * Call after anything that moves the chain independently of the browser — notably an
+ * evm_revert, which rewinds chain time under a page that never noticed.
  */
-Cypress.Commands.add('checkA11y', () => {
-  cy.get('body').should('be.visible')
-
-  cy.get('img:visible').then(($imgs) => {
-    if ($imgs.length > 0) {
-      $imgs.each((index, img) => {
-        const $img = Cypress.$(img)
-        if ($img.is(':visible')) {
-          expect($img.attr('alt')).to.exist
-        }
-      })
-    }
-  })
-
-  cy.get('button:visible').then(($btns) => {
-    if ($btns.length > 0) {
-      $btns.each((index, btn) => {
-        const $btn = Cypress.$(btn)
-        const hasText = $btn.text().trim().length > 0
-        const hasAriaLabel = $btn.attr('aria-label')
-        const hasAriaLabelledBy = $btn.attr('aria-labelledby')
-        expect(hasText || hasAriaLabel || hasAriaLabelledBy).to.be.true
-      })
-    }
+Cypress.Commands.add('syncBrowserClockToChain', () => {
+  cy.task('chainNow').then(({ nowMs }) => {
+    __cyTimeOffsetMs = nowMs - Date.now()
+    cy.window({ log: false }).then((win) => {
+      installTimeShim(win)
+    })
   })
 })
+
+/*
+ * `cy.checkA11y` was REMOVED by spec 094 and replaced by `cy.a11yScan` (support/a11y.js), which
+ * runs the real axe ruleset.
+ *
+ * The old command hand-checked image alts and button names, and guarded both loops with
+ * `if ($els.length > 0)` — so on a surface with no visible images and no visible buttons it passed
+ * having checked nothing. That is anti-pattern 7 wearing a different hat, in the one command whose
+ * job was to catch problems. Leaving it beside the new scan would leave a weaker way to do the
+ * same thing, which is how a suite ends up with both.
+ */
 
 // ***********************************************
 // Precondition helpers (chain 1337 setup) — see
@@ -897,9 +1000,11 @@ Cypress.Commands.add('connectAs', (account) => {
 })
 
 /**
- * Open the create modal, fill it, disable privacy, and submit — WITHOUT asserting
- * success. Use for "blocked" cases (paused / frozen / expired membership) where
- * the create should NOT produce a wager; assert lastWagerId is unchanged after.
+ * Open the create modal, fill it, and submit — WITHOUT asserting success. Use for
+ * "blocked" cases (paused / frozen / expired membership) where the create should NOT
+ * produce a wager; assert lastWagerId is unchanged after. Requires `interceptIpfs()`:
+ * encryption is mandatory, so the metadata upload happens before the contract call
+ * even on a create that is meant to be refused.
  */
 Cypress.Commands.add('attemptCreateWager', (cfg = {}) => {
   const o = { description: 'E2E automated wager flow', opponent: TEST_ACCOUNTS[1], stake: 2, ...cfg }
@@ -908,9 +1013,10 @@ Cypress.Commands.add('attemptCreateWager', (cfg = {}) => {
   cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
   cy.wait(300)
   cy.enterAmountViaKeypad('fm-stake', o.stake)
-  cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
-    if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
-  })
+  // No encryption toggle to clear — encryption is mandatory and FriendMarketsModal renders
+  // no `.fm-encryption-toggle`, so this cy.get failed the command rather than skipping the
+  // step. The two-space copy of this block escaped the first sweep, which matched only the
+  // four-space one inside createWagerViaUI.
   cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
 })
 
@@ -942,22 +1048,156 @@ Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
     cy.wait(300)
     cy.enterAmountViaKeypad('fm-stake', o.stake)
     if (o.resolutionType !== undefined) {
-      cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
+      /*
+       * Resolution type is a radio tab strip, not a <select>: FriendMarketsModal renders
+       * no `#fm-resolution-type` and no `.fm-select`, so the old lookup failed the command
+       * outright (PAU-02 died here). cy.selectResolutionType clicks the pill by its visible
+       * label, which is what the passing CRE specs already use.
+       */
+      cy.selectResolutionType(String(o.resolutionType))
     }
-    // Set a far-future end date (~20 days, within the 21-day max) so acceptDeadline
-    // (the midpoint) stays well ahead of the chain clock even after a spec advances
-    // time — otherwise the UI computes deadlines from browser time and the create
-    // reverts with BadDeadlines once the chain is ahead.
-    const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
+    /*
+     * The end date is NOT a form input. Spec 038 replaced `#fm-end-date` with the
+     * DeadlineTimeline: the editable ENDS tile opens SetTimeModal (`.stm-input`, confirm
+     * "Set"). `cy.get('#fm-end-date')` does not degrade to a no-op — it FAILS the command,
+     * which is why this whole spec died in its before-all hook and skipped five tests.
+     * Same flow CRE-09 uses; 5 days, formatted LOCAL (toISOString is UTC and can land on
+     * the wrong day near midnight), inside the modal's 1h..21d bounds.
+     */
+    const end = new Date(Date.now() + 5 * 24 * 3600 * 1000)
     const p2 = (n) => String(n).padStart(2, '0')
     const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
-    cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
-    cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
-      if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
-    })
+    cy.get('.fm-stat-tiles', { timeout: 10000 }).contains('button', /ends/i).click()
+    cy.get('.stm-input', { timeout: 10000 }).clear().type(dtl)
+    cy.get('.stm-dialog').contains('button', /^set$/i).click()
+    /*
+     * No encryption toggle to clear: encryption is MANDATORY on the create path, so
+     * FriendMarketsModal renders no `.fm-encryption-toggle` and this cy.get failed the
+     * command rather than skipping. Callers that need a public wager cannot get one here;
+     * callers that need a private one should use createPrivateWagerViaUI, which asserts the
+     * `encrypted:ipfs` metadata reference. Either way `interceptIpfs()` must be active.
+     */
     cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
     cy.waitForWagerId(before + 1)
   })
+})
+
+/**
+ * Drive the acceptance modal: through the decrypt gate if there is one, then Accept Offer and
+ * the confirmation. Leaves the modal open so callers can assert on the result.
+ *
+ * WAIT FOR THE MODAL TO DECIDE before branching. `$m.find('button:contains("Decrypt")')` inside
+ * .then() reads the DOM once, and the modal renders before it knows whether the wager is private
+ * — so the check ran too early, found no gate, skipped it, and then "Accept Offer" was never
+ * found because it sits BEHIND that gate. The screenshot showed the Decrypt button plainly on
+ * screen. Waiting for one of the modal's terminal states first is what makes the branch honest.
+ *
+ * Also scopes every lookup to the dialog: unscoped, /accept/i matches Dashboard's Scan QR card
+ * ("Accept a wager from a friend") sitting behind the overlay, which is visible and un-clickable.
+ */
+Cypress.Commands.add('acceptOfferInModal', () => {
+  cy.get('.ma-modal', { timeout: 10000 }).should('be.visible')
+  // One of: the decrypt gate, the decrypted terms, or a decrypt failure.
+  cy.get('.ma-modal')
+    .find('.ma-decrypt-prompt, .ma-description, .ma-decrypt-error', { timeout: 20000 })
+    .should('exist')
+
+  cy.get('.ma-modal').then(($m) => {
+    if ($m.find('.ma-decrypt-prompt button').length === 0) return
+    cy.get('.ma-modal').contains('button', /decrypt/i).click({ force: true })
+    // Re-query: decrypting re-renders the modal, so $m's nodes are detached by the time it lands.
+    cy.get('.ma-modal')
+      .find('.ma-description, .ma-decrypt-error', { timeout: 20000 })
+      .should('exist')
+      .then(($r) => {
+        if ($r.hasClass('ma-decrypt-error')) {
+          throw new Error(`decrypt failed: ${$r.text().trim()}`)
+        }
+      })
+  })
+
+  cy.get('.ma-modal').contains('button', /accept offer/i, { timeout: 10000 }).click()
+  cy.contains('.ma-modal, [role="dialog"]', /confirm offer acceptance/i).within(() => {
+    cy.contains('button', /i understand|confirm|accept/i)
+      .scrollIntoView()
+      .should('be.visible')
+      .click()
+  })
+})
+
+/**
+ * Resolve a wager through the My Wagers sub-modal.
+ *
+ * THE FLOW HAS THREE STEPS, not two: pick an outcome, "Continue" to a confirmation step, then
+ * "Confirm Resolution" — the only button wired to handleSubmit. Both specs clicked once and
+ * stopped at the confirmation screen, so no transaction was ever sent and the wager sat at
+ * Active while the test waited for Resolved. The old text assertion hid that by accepting the
+ * word "resolve" from a modal that was merely offering to.
+ *
+ * Outcomes are labelled by PARTY — "Creator wins — <name>", "Opponent wins — <name>", "Draw —
+ * both parties refunded" — never Pass/Fail, so callers pass a pattern.
+ *
+ * @param {RegExp} outcomePattern which outcome to select
+ */
+Cypress.Commands.add('resolveWagerInModal', (outcomePattern = /creator wins/i) => {
+  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 15000 }).should('exist')
+  cy.get('.mm-sub-modal').contains(outcomePattern).click()
+  cy.get('.mm-sub-modal').contains('button', /^continue$/i).should('not.be.disabled').click()
+  cy.get('.mm-sub-modal').contains('button', /confirm resolution/i, { timeout: 10000 }).click()
+})
+
+/**
+ * Poll the registry until `wagerId` is Resolved (status 3).
+ */
+Cypress.Commands.add('waitForWagerResolved', (wagerId, tries = 45) => {
+  const poll = (remaining) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+    if (i.status === 3) return undefined
+    if (remaining <= 0) throw new Error(`wager ${wagerId} never reached Resolved (status=${i.status})`)
+    cy.wait(1000)
+    return poll(remaining - 1)
+  })
+  return poll(tries)
+})
+
+/**
+ * Dismiss the acceptance modal if it is still open.
+ *
+ * It CLOSES ITSELF once the acceptance lands, so an unconditional close failed with "expected
+ * to find .ma-close-btn" on every test whose acceptance had just succeeded — the harness
+ * complaining that it could not tidy up something that had already tidied itself.
+ *
+ * The `should` settles first — either the modal is gone or its close control has rendered — so
+ * the branch below is reading a decided state rather than racing one.
+ */
+Cypress.Commands.add('dismissAcceptanceModal', () => {
+  cy.get('body', { timeout: 15000 }).should(($b) => {
+    const gone = $b.find('.ma-modal').length === 0
+    const closable = $b.find('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]').length > 0
+    expect(gone || closable, 'acceptance modal settled (closed itself, or offers a close control)').to.be.true
+  })
+  cy.get('body').then(($b) => {
+    if ($b.find('.ma-modal').length === 0) return
+    cy.get('.ma-modal .ma-close-btn, .ma-modal button[aria-label="Close modal"]')
+      .first()
+      .click({ force: true })
+  })
+})
+
+/**
+ * Poll the registry until `wagerId` is Active (status 2). Success is a fact about the chain, not
+ * a word in a dialog — the acceptance modal sits on "Processing…" for as long as the tx takes,
+ * and a public-subgraph 429 can stretch that well past any fixed wait.
+ */
+Cypress.Commands.add('waitForWagerActive', (wagerId, tries = 60) => {
+  const poll = (remaining) => cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+    if (i.status === 2) return undefined
+    if (remaining <= 0) {
+      throw new Error(`wager ${wagerId} never became Active after acceptance (status=${i.status})`)
+    }
+    cy.wait(1000)
+    return poll(remaining - 1)
+  })
+  return poll(tries)
 })
 
 /**
@@ -1000,10 +1240,20 @@ Cypress.Commands.add('createPrivateWagerViaUI', (cfg = {}) => {
     cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
     cy.wait(300)
     cy.enterAmountViaKeypad('fm-stake', o.stake)
-    const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
+    /*
+     * The end date is NOT a form input. Spec 038 replaced `#fm-end-date` with the
+     * DeadlineTimeline: the editable ENDS tile opens SetTimeModal (`.stm-input`, confirm
+     * "Set"). `cy.get('#fm-end-date')` does not degrade to a no-op — it FAILS the command,
+     * which is why this whole spec died in its before-all hook and skipped five tests.
+     * Same flow CRE-09 uses; 5 days, formatted LOCAL (toISOString is UTC and can land on
+     * the wrong day near midnight), inside the modal's 1h..21d bounds.
+     */
+    const end = new Date(Date.now() + 5 * 24 * 3600 * 1000)
     const p2 = (n) => String(n).padStart(2, '0')
     const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
-    cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
+    cy.get('.fm-stat-tiles', { timeout: 10000 }).contains('button', /ends/i).click()
+    cy.get('.stm-input', { timeout: 10000 }).clear().type(dtl)
+    cy.get('.stm-dialog').contains('button', /^set$/i).click()
     // Leave the encryption toggle ON (do NOT uncheck).
     cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
     // The encrypted metadata is uploaded to (mocked) IPFS during create.

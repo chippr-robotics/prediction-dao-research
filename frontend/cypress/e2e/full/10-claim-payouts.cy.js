@@ -23,11 +23,7 @@ function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
   cy.visitWagers()
 
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-    .click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-    .should('be.visible')
+  cy.connectWallet()
 }
 
 /**
@@ -94,20 +90,24 @@ function createAcceptAndResolve(config = {}) {
   cy.switchAccount(1)
 
   cy.openMyWagers('participating')
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-    if (viewBtn.length > 0) {
-      cy.wrap(viewBtn.first()).click({ force: true })
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-      cy.contains('button', /accept offer/i).click()
-      cy.contains('button', /i understand|confirm|accept/i).click()
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('accepted') || lower.includes('success') || lower.includes('done')).to.be.true
-      })
-      cy.contains('button', /done|close/i).click({ force: true })
-    }
-  })
+  /*
+   * Same acceptance shape 05 and 07 arrived at, for the same three reasons:
+   *
+   * - WAIT for the accept control rather than snapshotting with $panel.find(): the row renders
+   *   before its action column does, so a one-shot read sees no button and the `if` silently
+   *   skipped the entire acceptance — leaving CLM-01 to fail later on a wager nobody accepted.
+   * - The wagers are PRIVATE (encryption is mandatory), so the modal gates the terms, and the
+   *   Accept control, behind "Decrypt Wager Details" until a signature lands.
+   * - SCOPE to the dialog: unscoped, /accept/i matches Dashboard's Scan QR card behind the
+   *   modal ("Accept a wager from a friend"), which is visible and un-clickable.
+   */
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
+    .click({ force: true })
+  cy.acceptOfferInModal()
+
+  // Success is the wager reaching Active on chain, not a word in the dialog.
+  cy.lastWagerId().then((id) => cy.waitForWagerActive(id))
+  cy.dismissAcceptanceModal()
   cy.get('.mm-close-btn, button[aria-label="Close modal"]').first().click({ force: true })
 
   // Step 3: Advance time past end date
@@ -117,7 +117,25 @@ function createAcceptAndResolve(config = {}) {
   cy.switchAccount(0)
 
   cy.openMyWagers('created')
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
+
+  /*
+   * WAIT FOR THE LIST TO POPULATE BEFORE READING IT.
+   *
+   * The `$panel.find(...)` below is a one-shot DOM snapshot (anti-pattern 3 in
+   * docs/developer-guide/e2e-testing-policy.md). Taken before the async-gated rows render, it finds
+   * neither a Resolve button nor a row, so every branch no-ops silently (anti-pattern 6) and the
+   * test walks on to `resolveWagerInModal`, which waits 15s for a sub-modal nothing opened and
+   * fails there — far from the cause. That is the CLM-01 flake seen on this PR: the same commit
+   * passed one run and failed the next purely on whether the list had rendered in time.
+   *
+   * This assertion makes the precondition explicit: the wager this test just created and accepted
+   * MUST be listed with something to act on. If it is not, the test fails HERE, saying so.
+   */
+  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+    .find('.mm-action-resolve, .mm-table-row, button:contains("Resolve")', { timeout: 20000 })
+    .should('have.length.greaterThan', 0)
+
+  cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
     const resolveBtn = $panel.find('.mm-action-resolve, button:contains("Resolve")')
     if (resolveBtn.length > 0) {
       cy.wrap(resolveBtn.first()).click({ force: true })
@@ -135,18 +153,17 @@ function createAcceptAndResolve(config = {}) {
   })
 
   // Select outcome based on who should win
-  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-    if ($modal.length > 0) {
-      cy.get('.mm-sub-modal').within(() => {
-        cy.contains(opts.winnerIsCreator ? 'Pass' : 'Fail').click()
-        cy.contains('button', /confirm|submit|resolve/i).click()
-      })
-      cy.get('.mm-sub-modal', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('success') || lower.includes('proposed') || lower.includes('resolved') || lower.includes('error')).to.be.true
-      })
-    }
-  })
+  /*
+   * The sub-modal labels outcomes by PARTY — "Creator wins — <name>", "Opponent wins — <name>"
+   * (MyMarketsModal's outcomeLabels/labelFor) — not Pass/Fail, so the old strings matched
+   * nothing. Match a pattern: each label carries a name or shortened address after the title.
+   *
+   * And wait for the modal rather than snapshotting for it: `if ($modal.length > 0)` around the
+   * whole resolution meant a modal that had not rendered yet was read as "no modal", and the
+   * test carried on without resolving anything.
+   */
+  cy.resolveWagerInModal(opts.winnerIsCreator ? /creator wins/i : /opponent wins/i)
+  cy.lastWagerId().then((id) => cy.waitForWagerResolved(id))
 }
 
 describe('Claim Payouts', () => {
@@ -161,6 +178,13 @@ describe('Claim Payouts', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. Same misclassification
+     * as 07: the interceptIpfs sweep grepped for the shared create helpers and this file's
+     * local createAcceptAndResolve matched nothing — but it opens the create modal, and its
+     * mandatory metadata upload died unstubbed (CLM-01's "Wager Created" timeout).
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------
@@ -209,6 +233,7 @@ describe('Claim Payouts', () => {
         })
       } else {
         // No resolved wagers
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -235,6 +260,7 @@ describe('Claim Payouts', () => {
           expect(lower.includes('resolved') || lower.includes('ended') || lower.includes('outcome') || lower.includes('wager')).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -266,6 +292,7 @@ describe('Claim Payouts', () => {
           expect(hasFinancialInfo).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -320,6 +347,7 @@ describe('Claim Payouts', () => {
           expect(validState).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -363,6 +391,7 @@ describe('Claim Payouts', () => {
           }
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -404,15 +433,18 @@ describe('Claim Payouts', () => {
                 })
               } else {
                 // Claim button removed after first claim — correct
+                // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
                 expect(true).to.be.true
               }
             })
           } else {
             // No claim button — either already claimed or auto-payout
+            // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
             expect(true).to.be.true
           }
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -444,6 +476,7 @@ describe('Claim Payouts', () => {
           expect(pureClaimButtons.length).to.equal(0)
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -478,6 +511,7 @@ describe('Claim Payouts', () => {
           expect(validState).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -486,42 +520,48 @@ describe('Claim Payouts', () => {
   // ---------------------------------------------------------------------------
   // CLM-10: Frozen winner cannot claim
   // ---------------------------------------------------------------------------
-  it('[CLM-10] Frozen winner cannot claim payout', () => {
-    // If the winner's account is frozen, claimPayout should revert
-    connectAndVisit(0)
+  it('[CLM-10] a frozen winner cannot claim, and can once unfrozen', () => {
+    /*
+     * This test never froze anything.
+     *
+     * It opened History, clicked whatever row happened to be first, and accepted any of
+     * frozen | claimed | success | error | payout in the detail text — five words common enough
+     * that it passed on almost any state, including states with nothing to do with freezing. It
+     * finally failed on CI when the panel happened to contain none of them, which is the only
+     * reason anyone looked at it. Two `expect(true).to.be.true` fall-throughs meant a missing row
+     * or a missing button passed as well.
+     *
+     * The rule it is named for is worth having: a frozen account cannot take money out, and the
+     * freeze is reversible. Drive it on chain, where the answer is a fact — `paid` on the wager —
+     * rather than a word in a panel.
+     */
+    const winner = TEST_ACCOUNTS[0]
 
-    cy.openMyWagers('history')
+    createAcceptAndResolve({ description: 'CLM-10: frozen winner', winnerIsCreator: true })
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+    cy.lastWagerId().then((wagerId) => {
+      cy.task('chainTx', { action: 'freeze', args: { address: winner } }).then((r) => {
+        expect(r.ok, `freeze the winner (${r.error || ''})`).to.be.true
+      })
 
-        // If account is frozen, any claim attempt should show AccountFrozenError
-        cy.get('.mm-detail').then(($detail) => {
-          const claimBtn = $detail.find('button:contains("Claim")')
-          if (claimBtn.length > 0) {
-            cy.wrap(claimBtn.first()).click()
+      // Blocked while frozen — and the wager stays unpaid, which is the part that matters.
+      cy.task('chainTx', { action: 'claimPayout', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'a frozen winner is refused the payout').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.paid, 'nothing was paid out while frozen').to.equal(false)
+      })
 
-            cy.get('.mm-detail', { timeout: 15000 }).invoke('text').then((text) => {
-              const lower = text.toLowerCase()
-              // Either frozen error or normal claim (if account isn't frozen)
-              const validOutcome = lower.includes('frozen') ||
-                                  lower.includes('claimed') ||
-                                  lower.includes('success') ||
-                                  lower.includes('error') ||
-                                  lower.includes('payout')
-              expect(validOutcome).to.be.true
-            })
-          } else {
-            // No claim button — already claimed or not winner
-            expect(true).to.be.true
-          }
-        })
-      } else {
-        expect(true).to.be.true
-      }
+      // Reversible: unfreezing restores the claim.
+      cy.task('chainTx', { action: 'unfreeze', args: { address: winner } }).then((r) => {
+        expect(r.ok, `unfreeze the winner (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'claimPayout', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, `claim after unfreeze (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.paid, 'paid once the freeze is lifted').to.equal(true)
+      })
     })
   })
 })

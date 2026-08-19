@@ -203,3 +203,9 @@ crash.*.log
 # Ansible (spec 085)
 infra/ansible/*.retry
 infra/ansible/collections/
+
+# Local-chain deployment record written by `npm run setup:local` (deploy:local).
+# Ephemeral: the addresses change with every fresh hardhat node, so committing one
+# publishes a snapshot of somebody's throwaway chain. The full E2E tier regenerates
+# it on every run, in CI and locally alike.
+deployments/localhost-chain*-v2.json

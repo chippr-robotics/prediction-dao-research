@@ -322,6 +322,7 @@ describe('Wallet Connection', () => {
   // WAL-09: Switch to correct network from banner — verify banner disappears
   // ---------------------------------------------------------------------------
   /*
+   // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
    * This test was unfalsifiable: its `else` branch was `expect(true).to.be.true`, so when the
    * banner it exists to exercise was ABSENT — the case that actually needed reporting — it passed
    * and said so. With the mock's chain now mutable it can assert the real journey instead: the
@@ -360,6 +361,7 @@ describe('Wallet Connection', () => {
     })
 
     // This wallet keeps refusing, so the banner MUST stay. Clearing it here would be the same lie
+    // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
     // the old version told with `expect(true).to.be.true`.
     cy.get('.network-error-banner').should('be.visible')
 

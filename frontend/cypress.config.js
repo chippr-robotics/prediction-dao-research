@@ -1,6 +1,7 @@
 import { defineConfig } from 'cypress'
 import { ethers } from 'ethers'
 import { readFileSync, unlinkSync } from 'fs'
+import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
@@ -112,8 +113,16 @@ const RECEIVE_WITH_AUTHORIZATION_TYPES = {
  * the same source `sync:frontend-contracts` mirrors into the UI's
  * HARDHAT_CONTRACTS, so the addresses match what the app uses.
  */
+// The chain id this session's mock claims and the tasks target. Default stays 1337 because this
+// config also serves the FAST tier, whose specs assert against the chain the mock claims — a
+// changed default would silently re-cohort them. The FULL tier's entry points (the CI job and
+// scripts that boot hardhat AS Amoy via HARDHAT_LOCAL_CHAIN_ID=80002) pass CYPRESS_NETWORK_ID=80002
+// so the local node is the app's membership home; see hardhat.config.js for why impersonation
+// rather than reconfiguration.
+const E2E_CHAIN_ID = Number(globalThis.process?.env?.CYPRESS_NETWORK_ID) || 1337
+
 function loadLocalDeployment() {
-  const path = resolve(__dirname, '..', 'deployments', 'localhost-chain1337-v2.json')
+  const path = resolve(__dirname, '..', 'deployments', `localhost-chain${E2E_CHAIN_ID}-v2.json`)
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
@@ -121,6 +130,57 @@ function loadLocalDeployment() {
 function loadArtifact(contractPath, contractName) {
   const path = resolve(__dirname, '..', 'artifacts', 'contracts', contractPath, `${contractName}.json`)
   return JSON.parse(readFileSync(path, 'utf8'))
+}
+
+/*
+ * Name the custom error behind a revert.
+ *
+ * The task drives the registry through a minimal human-readable ABI, which carries no error
+ * fragments — so every custom error arrived as the useless "execution reverted (unknown custom
+ * error)". ORC-01/02 reported exactly that. Decode against the compiled artifacts instead;
+ * BOTH facets are needed because the proxy delegates unknown selectors to WagerRegistryIntents,
+ * which is where autoResolveFrom* lives (spec 035/036). The pool contracts (spec 034) are
+ * included too, so a reverting pool precondition names its custom error the same way.
+ *
+ * Best-effort: if the artifacts have not been compiled, fall through to the raw message rather
+ * than failing the task for a diagnostic.
+ */
+let __revertIface = null
+function revertInterface() {
+  if (__revertIface) return __revertIface
+  const fragments = []
+  for (const rel of [
+    '../artifacts/contracts/wagers/WagerRegistry.sol/WagerRegistry.json',
+    '../artifacts/contracts/wagers/WagerRegistryIntents.sol/WagerRegistryIntents.json',
+    '../artifacts/contracts/pools/WagerPool.sol/WagerPool.json',
+    '../artifacts/contracts/pools/WagerPoolFactory.sol/WagerPoolFactory.json',
+  ]) {
+    try {
+      fragments.push(...JSON.parse(readFileSync(resolve(__dirname, rel), 'utf8')).abi)
+    } catch {
+      // Not compiled in this environment — decode with whatever else we found.
+    }
+  }
+  __revertIface = new ethers.Interface(fragments)
+  return __revertIface
+}
+
+function describeRevert(e) {
+  const base = e.shortMessage || e.reason || e.message
+  const data = e.data ?? e.info?.error?.data ?? e.error?.data
+  if (typeof data === 'string' && data.length >= 10) {
+    try {
+      const parsed = revertInterface().parseError(data)
+      if (parsed) {
+        const args = parsed.args?.length ? `(${parsed.args.map(String).join(', ')})` : ''
+        return `${parsed.name}${args}`
+      }
+    } catch {
+      // Unknown selector — the raw message plus the selector still beats "unknown custom error".
+    }
+    return `${base} [selector ${data.slice(0, 10)}]`
+  }
+  return base
 }
 
 export default defineConfig({
@@ -144,18 +204,56 @@ export default defineConfig({
     responseTimeout: 30000,
 
     env: {
-      // Hardhat local testnet configuration
-      NETWORK_ID: 1337,
+      // Spec 094: which viewport profile this run uses — `desktop` (1280×720, what every existing
+      // spec was written against) or `phone` (390×844). CI runs the no-chain tier once per profile.
+      // Override with CYPRESS_VIEWPORT_PROFILE.
+      VIEWPORT_PROFILE: 'desktop',
+      // Hardhat local testnet configuration (Amoy-shaped when the full tier passes
+      // CYPRESS_NETWORK_ID=80002 — see E2E_CHAIN_ID above)
+      NETWORK_ID: E2E_CHAIN_ID,
       RPC_URL: 'http://localhost:8545',
       // Test wallet private key (Hardhat account #0 — holds all admin roles locally)
       PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
     },
 
     setupNodeEvents(on, config) {
+      /*
+       * Chain-state checkpoint (full tier only). Eight of the fifteen full specs move the chain
+       * clock with evm_increaseTime — 02-membership alone jumps it 31 days to expire a membership —
+       * and chain time can NEVER move backwards. Without isolation, whichever spec runs first
+       * poisons every later one: create forms compute deadlines from the browser clock, the chain
+       * rejects them as ~a month in its past, and the failure surfaces as "Invalid deadlines" in
+       * specs that did nothing wrong. Which specs pass then depends on RUN ORDER — the definition
+       * of a suite without isolation, and why single-spec experiments kept contradicting full runs.
+       *
+       * The plugin process lives for the whole `cypress run`, so this closure survives across
+       * specs. Each spec reverts to the post-seed snapshot and immediately re-snapshots (hardhat
+       * consumes a snapshot id on revert).
+       */
+      let chainSnapshotId = null
+
       on('task', {
         log(message) {
           console.log(message)
           return null
+        },
+
+        /*
+         * Spec 094: hand the runner the installed axe-core source so cy.a11yScan can evaluate it
+         * in the app window. Resolved through require.resolve rather than a hardcoded path — the
+         * package hoists to the ROOT node_modules in this workspace (spec 075) but need not, and a
+         * path that silently missed would make every accessibility scan quietly do nothing.
+         *
+         * Returns null on failure rather than throwing, so the command raises the honest error
+         * ("could not load axe-core") instead of a task rejection with no context.
+         */
+        axeSource() {
+          try {
+            return readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8')
+          } catch (e) {
+            console.error('axeSource: could not resolve axe-core —', e.message)
+            return null
+          }
         },
 
         /**
@@ -165,7 +263,7 @@ export default defineConfig({
          */
         async chainTx({ action, args = {} }) {
           const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
-          const provider = new ethers.JsonRpcProvider(rpcUrl, 1337, { staticNetwork: true })
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
           const wallet = new ethers.Wallet(config.env.PRIVATE_KEY, provider)
           const d = loadLocalDeployment()
           const registry = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, wallet)
@@ -354,7 +452,7 @@ export default defineConfig({
               const validAfter = args.validAfter ?? 0
               const validBefore = args.validBefore ?? nowBlk + 3600
               const nonce = ethers.hexlify(ethers.randomBytes(32))
-              const domain = { name: 'USD Coin', version: '1', chainId: 1337, verifyingContract: args.token }
+              const domain = { name: 'USD Coin', version: '1', chainId: E2E_CHAIN_ID, verifyingContract: args.token }
               const message = { from: fromWallet.address, to: args.pool, value, validAfter, validBefore, nonce }
               const sig = await fromWallet.signTypedData(domain, RECEIVE_WITH_AUTHORIZATION_TYPES, message)
               const { v, r, s } = ethers.Signature.from(sig)
@@ -422,17 +520,73 @@ export default defineConfig({
           } catch (e) {
             // Return a soft failure so specs can assert "blocked" cases (e.g. a
             // premature claimRefund) instead of the task rejecting the test.
-            return { ok: false, error: e.shortMessage || e.reason || e.message }
+            return { ok: false, error: describeRevert(e) }
           }
+        },
+
+        /**
+         * The chain's current timestamp, in ms. The app decides every expiry in BROWSER time
+         * while the registry enforces in CHAIN time, so a deadline test is only meaningful
+         * when the two agree — see cy.syncBrowserClockToChain.
+         */
+        async chainNow() {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const block = await provider.getBlock('latest')
+          return { ok: true, nowMs: Number(block.timestamp) * 1000 }
         },
 
         /** Read the latest wager id (nextWagerId - 1) for status/winner assertions. */
         async lastWagerId() {
-          const provider = new ethers.JsonRpcProvider(config.env.RPC_URL, 1337, { staticNetwork: true })
+          const provider = new ethers.JsonRpcProvider(config.env.RPC_URL, E2E_CHAIN_ID, { staticNetwork: true })
           const d = loadLocalDeployment()
           const registry = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
           const next = await registry.nextWagerId()
           return Number(next) - 1
+        },
+
+        /**
+         * Revert the chain to the last checkpoint (post-seed state) and take a fresh one.
+         * Called from the support file's `before` at the start of every FULL-tier spec.
+         * Restores the clock AND the state: keys registered or wagers created by a previous
+         * spec are rolled back too, which is why each spec's own `before` hook re-establishes
+         * its preconditions (ensureEncryptionKeys already checks hasKey and re-registers).
+         */
+        async chainCheckpoint() {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const chainId = Number(config.env.NETWORK_ID) || 1337
+          const provider = new ethers.JsonRpcProvider(rpcUrl, chainId, { staticNetwork: true })
+          let reverted = false
+          if (chainSnapshotId !== null) {
+            reverted = await provider.send('evm_revert', [chainSnapshotId])
+            if (!reverted) {
+              // FAIL FAST. A false return means the snapshot id was invalid or already
+              // consumed — the next spec would run on a dirty clock/state and this task
+              // would then re-snapshot the contamination as if it were the baseline.
+              // A loud death here is a broken harness; a quiet one is a wrong measurement.
+              throw new Error(
+                `chainCheckpoint: evm_revert(${chainSnapshotId}) returned false — ` +
+                'refusing to re-snapshot a dirty chain. Restart the node and re-seed.'
+              )
+            }
+          }
+          chainSnapshotId = await provider.send('evm_snapshot', [])
+          return { reverted, snapshotId: chainSnapshotId }
+        },
+
+        /*
+         * Move the restore point FORWARD without reverting: drop the held snapshot id and take
+         * a new one at the current state. A spec whose before-hook writes durable fixtures
+         * (encryption keys, membership) calls this after that hook, so per-test reverts land
+         * AFTER the fixtures rather than wiping them — reverting to the spec-start snapshot
+         * would undo the very setup the tests depend on.
+         */
+        async chainRebase() {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const chainId = Number(config.env.NETWORK_ID) || 1337
+          const provider = new ethers.JsonRpcProvider(rpcUrl, chainId, { staticNetwork: true })
+          chainSnapshotId = await provider.send('evm_snapshot', [])
+          return { snapshotId: chainSnapshotId }
         },
       })
 
