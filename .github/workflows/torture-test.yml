@@ -408,9 +408,20 @@ jobs:
           echo "WagerPoolFactory deployment completed"
         continue-on-error: false
 
-      # Picks up wagerPoolFactory/poolImpl (and anything else re-resolved) from the deployment record
-      # just written above into the frontend's HARDHAT_CONTRACTS, so `getContractAddressForChain`
-      # resolves the pools factory the Cypress dev server serves.
+      # Spec 060 platform fees, AFTER the pools factory and in exactly the order `setup:e2e` uses:
+      # both are nonce-derived plain-CREATE deploys, so the sequence is what fixes the addresses
+      # hardcoded in HARDHAT_CONTRACTS. The mock ERC-4626 vault is what `depositToVaultWithFee`
+      # wraps — there is no Morpho on a local chain, so without it the full-tier fee spec (#1233)
+      # has no charge path to settle against.
+      - name: Deploy the fee router and its local Earn vault
+        run: |
+          npm run deploy:local:fees
+          npm run deploy:local:earn-vault
+        continue-on-error: false
+
+      # Picks up wagerPoolFactory/poolImpl/feeRouter (and anything else re-resolved) from the
+      # deployment record just written above into the frontend's HARDHAT_CONTRACTS, so
+      # `getContractAddressForChain` resolves them for the Cypress dev server.
       - name: Sync frontend contract addresses
         run: npm run sync:frontend-contracts:local
         continue-on-error: false

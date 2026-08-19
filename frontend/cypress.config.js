@@ -58,6 +58,31 @@ const KEYREG_ABI = [
   'function hasKey(address user) view returns (bool)',
   'function getPublicKey(address user) view returns (bytes)',
 ]
+/*
+ * Spec 060 platform fees (#1233). `Service` is returned as a struct, so the fragment must spell
+ * the tuple out — a bare `returns (uint16,uint16,uint8)` decodes a DIFFERENT calldata shape and
+ * would report a plausible-looking rate that is not the one the router holds.
+ *
+ * `FeeBpsChanged` is here because it is the audit history the third flow reads back: the admin UI
+ * renders it, and a test that only re-read `getService` could not tell a rate that was CHANGED
+ * from one that was always that value.
+ */
+const FEE_ROUTER_ABI = [
+  'function getService(bytes32 serviceId) view returns (tuple(uint16 capBps, uint16 feeBps, uint8 kind))',
+  'function setFeeBps(bytes32 serviceId, uint16 newBps)',
+  'function treasury() view returns (address)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function FEE_ADMIN_ROLE() view returns (bytes32)',
+  'event FeeBpsChanged(bytes32 indexed serviceId, uint16 oldBps, uint16 newBps, address indexed actor)',
+]
+// The local MockERC4626Vault (scripts/deploy/deploy-local-earn-vault.js) — the Earn deposit's
+// destination, and where a member's NET principal must land when a fee is taken.
+const VAULT_ABI = [
+  'function balanceOf(address) view returns (uint256)',
+  'function convertToAssets(uint256 shares) view returns (uint256)',
+  'function totalAssets() view returns (uint256)',
+  'function asset() view returns (address)',
+]
 
 // Spec 034 Wager Pools — minimal ABIs for the setup/drive transactions the pools e2e suite (#1232)
 // needs to arrange directly (create/join/propose/approve/claim/refund), the same bypass-the-UI
@@ -156,6 +181,10 @@ function revertInterface() {
     '../artifacts/contracts/wagers/WagerRegistryIntents.sol/WagerRegistryIntents.json',
     '../artifacts/contracts/pools/WagerPool.sol/WagerPool.json',
     '../artifacts/contracts/pools/WagerPoolFactory.sol/WagerPoolFactory.json',
+    // Spec 060: `FeeAboveQuoted` and `CapExceeded` are the two reverts the fee specs assert on,
+    // and both are custom errors — without the fragments they arrive as "unknown custom error"
+    // and a test could not tell the ceiling holding from an unrelated failure.
+    '../artifacts/contracts/fees/FeeRouter.sol/FeeRouter.json',
   ]) {
     try {
       fragments.push(...JSON.parse(readFileSync(resolve(__dirname, rel), 'utf8')).abi)
@@ -555,6 +584,86 @@ export default defineConfig({
               ); break
             case 'resolveCondition':
               tx = await ctf.resolveCondition(args.conditionId, args.payouts); break
+
+            // ---------------------------------------------------------------- spec 060 fees
+            /*
+             * The coordinates the fee spec needs, read from the deployment record and the chain
+             * rather than restated in the spec. Two of them are assertions in disguise:
+             *
+             *   · a `feeRouter` the FRONTEND cannot resolve makes every quote fail and every
+             *     deposit block, which would look like a product bug rather than a missing
+             *     fixture — so the spec compares this address against the one the app is built
+             *     with and says which it is;
+             *   · a ZERO treasury means the router SKIPS the fee (FeeRouter.depositToVaultWithFee),
+             *     so a "charged the disclosed rate" assertion would pass at a rate of nothing.
+             *     Reported here so the spec can refuse to run rather than prove the wrong thing.
+             */
+            case 'feeFixtures': {
+              const routerAddress = d.contracts?.feeRouter
+              const vaultAddress = d.mocks?.mockEarnVault
+              if (!routerAddress || !vaultAddress) {
+                return {
+                  ok: false,
+                  error:
+                    `the local deployment record has no ${!routerAddress ? 'contracts.feeRouter' : 'mocks.mockEarnVault'} — ` +
+                    'run `npm run setup:e2e` (which deploys both) before the fee specs',
+                }
+              }
+              const feeRouter = new ethers.Contract(routerAddress, FEE_ROUTER_ABI, provider)
+              const vault = new ethers.Contract(vaultAddress, VAULT_ABI, provider)
+              return {
+                ok: true,
+                feeRouter: routerAddress,
+                treasury: await feeRouter.treasury(),
+                vault: vaultAddress,
+                asset: await vault.asset(),
+              }
+            }
+            case 'feeService': {
+              const feeRouter = new ethers.Contract(d.contracts.feeRouter, FEE_ROUTER_ABI, provider)
+              const svc = await feeRouter.getService(ethers.id(args.label))
+              return {
+                ok: true,
+                kind: Number(svc.kind),
+                feeBps: Number(svc.feeBps),
+                capBps: Number(svc.capBps),
+              }
+            }
+            case 'setFeeBps': {
+              // Sent as #0, which the local deploy seeds with FEE_ADMIN_ROLE on the router it
+              // initialised. Used to ARRANGE a rate; the flow that proves an operator can change
+              // one drives the AdminPanel Fees tab instead.
+              const feeRouter = new ethers.Contract(d.contracts.feeRouter, FEE_ROUTER_ABI, wallet)
+              tx = await feeRouter.setFeeBps(ethers.id(args.label), args.bps)
+              break
+            }
+            case 'feeHistory': {
+              const feeRouter = new ethers.Contract(d.contracts.feeRouter, FEE_ROUTER_ABI, provider)
+              const filter = feeRouter.filters.FeeBpsChanged(ethers.id(args.label))
+              const logs = await feeRouter.queryFilter(filter, args.fromBlock ?? 0, 'latest')
+              return {
+                ok: true,
+                changes: logs.map((l) => ({
+                  oldBps: Number(l.args.oldBps),
+                  newBps: Number(l.args.newBps),
+                  actor: l.args.actor,
+                  blockNumber: l.blockNumber,
+                })),
+              }
+            }
+            case 'vaultPosition': {
+              const vault = new ethers.Contract(d.mocks.mockEarnVault, VAULT_ABI, provider)
+              const shares = await vault.balanceOf(args.address)
+              return {
+                ok: true,
+                shares: shares.toString(),
+                assets: (await vault.convertToAssets(shares)).toString(),
+                totalAssets: (await vault.totalAssets()).toString(),
+              }
+            }
+            case 'blockNumber':
+              return { ok: true, blockNumber: await provider.getBlockNumber() }
+
             default:
               throw new Error(`chainTx: unknown action '${action}'`)
           }

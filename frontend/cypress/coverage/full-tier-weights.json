@@ -1,7 +1,7 @@
 {
   "measuredAt": "2026-08-19",
   "source": "Actions run 32204349960 (PR #1246, head 9a91a93) — the first sharded execution of the on-chain tier. All four shards passed; wall clock per leg was 6:37 / 7:51 / 6:29 / 6:09 against a ~30-minute serial baseline.",
-  "note": "Seconds are per-spec wall clock as Cypress reported it, and INCLUDE tests the spec skipped. Three specs look implausibly cheap for on-chain work (11-refund-timeout, 08-oracle-resolution, 23-lifecycle-e2e) because most of their work happens in chainTx tasks rather than the browser, or because tests were skipped in that run — treat those three as provisional and re-record after the assertion-depth rewrite (#1231) lands, which will change what they actually execute.",
+  "note": "Seconds are per-spec wall clock as Cypress reported it, and INCLUDE tests the spec skipped. Three specs look implausibly cheap for on-chain work (11-refund-timeout, 08-oracle-resolution, 23-lifecycle-e2e) because most of their work happens in chainTx tasks rather than the browser, or because tests were skipped in that run — treat those three as provisional and re-record after the assertion-depth rewrite (#1231) lands, which will change what they actually execute. Two entries are NOT from that Actions run — 24-wager-pools (#1232, 85s) and 25-platform-fees (#1233, 122s), both measured locally against the same node+deploy+dev-server stack so the splitter stops estimating them at the file mean; re-record both from CI with the rest. 25-platform-fees: 122s measured locally against the same node+deploy+dev-server stack, recorded so the splitter stops estimating it at the file mean. Re-record it from CI with the rest.",
   "shards": 4,
   "specs": {
     "cypress/e2e/full/02-membership.cy.js": 187,
@@ -18,6 +18,8 @@
     "cypress/e2e/full/18-frozen-accounts.cy.js": 65,
     "cypress/e2e/full/19-paused-protocol.cy.js": 76,
     "cypress/e2e/full/20-expired-membership.cy.js": 57,
-    "cypress/e2e/full/23-lifecycle-e2e.cy.js": 15
+    "cypress/e2e/full/23-lifecycle-e2e.cy.js": 15,
+    "cypress/e2e/full/24-wager-pools.cy.js": 85,
+    "cypress/e2e/full/25-platform-fees.cy.js": 122
   }
 }

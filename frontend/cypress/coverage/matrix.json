@@ -1454,34 +1454,39 @@
         {
           "id": "fees.disclosed-before-signature",
           "name": "See the live fee rate before signing, and be charged no more than that",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "disclosure",
-          "tests": [],
+          "tests": [
+            "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-01",
+            "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-02"
+          ],
           "issue": "#1233"
         },
         {
           "id": "fees.zero-rate-shows-no-line",
           "name": "See no fee line at all when the rate is zero",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "disclosure",
-          "tests": [],
+          "tests": [
+            "frontend/cypress/e2e/fast/28-platform-fee-disclosure.cy.js::FEE-04",
+            "frontend/cypress/e2e/fast/28-platform-fee-disclosure.cy.js::FEE-05"
+          ],
           "issue": "#1233"
         },
         {
           "id": "fees.admin-changes-rate",
           "name": "An operator changes a service's rate and members see the new one",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "disclosure",
-          "tests": [],
+          "tests": [
+            "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-03"
+          ],
           "issue": "#1233"
         }
       ]
