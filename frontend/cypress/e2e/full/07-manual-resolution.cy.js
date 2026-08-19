@@ -260,6 +260,7 @@ describe('Manual Resolution', () => {
           expect(lower.includes('res-02') || lower.includes('wager') || lower.includes('active')).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -289,6 +290,7 @@ describe('Manual Resolution', () => {
       if ($modal.length > 0) {
         resolveWithOutcome('Pass')
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -324,6 +326,7 @@ describe('Manual Resolution', () => {
           expect(lower.includes('res-04') || lower.includes('wager') || lower.length > 0).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -380,11 +383,13 @@ describe('Manual Resolution', () => {
           if (resolvedBadge.length > 0) {
             expect(resolvedBadge.length).to.be.greaterThan(0)
           } else {
+            // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
             expect(true).to.be.true
           }
         })
       } else {
         // No history — this is fine for a fresh Hardhat node
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -427,6 +432,7 @@ describe('Manual Resolution', () => {
           expect(hasCountdown || !hasResolveBtn).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -463,6 +469,7 @@ describe('Manual Resolution', () => {
           expect(resolveBtn.length).to.equal(0)
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -496,6 +503,7 @@ describe('Manual Resolution', () => {
   it('[RES-10] Resolve must select a valid outcome', () => {
     /*
      * ESTABLISH THE PRECONDITION. This test used to connect and hope a resolvable wager was
+     // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
      * lying around from an earlier test — and its `else { expect(true).to.be.true }` meant that
      * when none was, it PASSED without testing anything. Per-test chain isolation removed the
      * leftovers and turned that silent pass into an honest failure, so the wager is created here.
@@ -547,6 +555,7 @@ describe('Manual Resolution', () => {
           })
         }
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -575,6 +584,7 @@ describe('Manual Resolution', () => {
           })
         }
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -628,6 +638,7 @@ describe('Manual Resolution', () => {
         })
       } else {
         // No wagers left after time advancement
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })

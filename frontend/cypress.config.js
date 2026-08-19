@@ -1,6 +1,7 @@
 import { defineConfig } from 'cypress'
 import { ethers } from 'ethers'
 import { readFileSync, unlinkSync } from 'fs'
+import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
@@ -143,6 +144,10 @@ export default defineConfig({
     responseTimeout: 30000,
 
     env: {
+      // Spec 094: which viewport profile this run uses — `desktop` (1280×720, what every existing
+      // spec was written against) or `phone` (390×844). CI runs the no-chain tier once per profile.
+      // Override with CYPRESS_VIEWPORT_PROFILE.
+      VIEWPORT_PROFILE: 'desktop',
       // Hardhat local testnet configuration (Amoy-shaped when the full tier passes
       // CYPRESS_NETWORK_ID=80002 — see E2E_CHAIN_ID above)
       NETWORK_ID: E2E_CHAIN_ID,
@@ -171,6 +176,24 @@ export default defineConfig({
         log(message) {
           console.log(message)
           return null
+        },
+
+        /*
+         * Spec 094: hand the runner the installed axe-core source so cy.a11yScan can evaluate it
+         * in the app window. Resolved through require.resolve rather than a hardcoded path — the
+         * package hoists to the ROOT node_modules in this workspace (spec 075) but need not, and a
+         * path that silently missed would make every accessibility scan quietly do nothing.
+         *
+         * Returns null on failure rather than throwing, so the command raises the honest error
+         * ("could not load axe-core") instead of a task rejection with no context.
+         */
+        axeSource() {
+          try {
+            return readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8')
+          } catch (e) {
+            console.error('axeSource: could not resolve axe-core —', e.message)
+            return null
+          }
         },
 
         /**

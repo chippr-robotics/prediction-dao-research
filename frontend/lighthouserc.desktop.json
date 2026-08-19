@@ -1,0 +1,112 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "npm run preview",
+      "startServerReadyPattern": "Local:.*http://localhost:4173",
+      "startServerReadyTimeout": 90000,
+      "url": [
+        "http://localhost:4173/",
+        "http://localhost:4173/app",
+        "http://localhost:4173/wallet",
+        "http://localhost:4173/wallet?tab=apps",
+        "http://localhost:4173/admin",
+        "http://localhost:4173/terms"
+      ],
+      "numberOfRuns": 1,
+      "settings": {
+        "preset": "desktop",
+        "onlyCategories": [
+          "accessibility",
+          "performance",
+          "best-practices",
+          "seo"
+        ],
+        "skipAudits": [],
+        "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage --headless=new"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "aria-allowed-attr": "error",
+        "aria-allowed-role": "warn",
+        "aria-required-attr": "error",
+        "aria-valid-attr": "error",
+        "aria-valid-attr-value": "error",
+        "bootup-time": "off",
+        "button-name": "error",
+        "categories:accessibility": [
+          "warn",
+          {
+            "minScore": 0.9
+          }
+        ],
+        "categories:best-practices": [
+          "warn",
+          {
+            "minScore": 0.8
+          }
+        ],
+        "categories:performance": [
+          "warn",
+          {
+            "minScore": 0.7
+          }
+        ],
+        "categories:seo": [
+          "warn",
+          {
+            "minScore": 0.8
+          }
+        ],
+        "color-contrast": "warn",
+        "content-width": "off",
+        "csp-xss": "off",
+        "cumulative-layout-shift": "warn",
+        "document-title": "error",
+        "dom-size": "off",
+        "duplicate-id-aria": "error",
+        "efficient-animated-content": "warn",
+        "errors-in-console": "warn",
+        "first-contentful-paint": "warn",
+        "first-meaningful-paint": "warn",
+        "heading-order": "warn",
+        "html-has-lang": "error",
+        "html-lang-valid": "error",
+        "image-alt": "error",
+        "installable-manifest": "off",
+        "interactive": "warn",
+        "label": "error",
+        "label-content-name-mismatch": "warn",
+        "largest-contentful-paint": "warn",
+        "legacy-javascript": "warn",
+        "link-name": "error",
+        "mainthread-work-breakdown": "off",
+        "maskable-icon": "off",
+        "meta-viewport": "error",
+        "modern-image-formats": "warn",
+        "non-composited-animations": "warn",
+        "render-blocking-resources": "off",
+        "robots-txt": "off",
+        "server-response-time": "off",
+        "speed-index": "warn",
+        "splash-screen": "off",
+        "tabindex": "error",
+        "themed-omnibox": "off",
+        "total-blocking-time": "warn",
+        "total-byte-weight": "off",
+        "unsized-images": [
+          "warn",
+          {
+            "minScore": 0.9
+          }
+        ],
+        "unused-css-rules": "off",
+        "unused-javascript": "off",
+        "uses-long-cache-ttl": "warn",
+        "uses-rel-preconnect": "off",
+        "uses-responsive-images": "warn",
+        "valid-source-maps": "off"
+      }
+    }
+  }
+}

@@ -188,9 +188,11 @@ describe('Wager Acceptance', () => {
 
         cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
           const lower = text.toLowerCase()
+          // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
           expect(lower.includes('accepted') || lower.includes('success') || lower.includes('processing') || lower.includes('error')).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true // No pending offers
       }
     })
@@ -233,6 +235,7 @@ describe('Wager Acceptance', () => {
           expect(hasEncrypted).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -270,6 +273,7 @@ describe('Wager Acceptance', () => {
           expect(hasTimer).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -295,6 +299,7 @@ describe('Wager Acceptance', () => {
         })
       } else {
         // No pending wagers
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -364,6 +369,7 @@ describe('Wager Acceptance', () => {
         })
       } else {
         // Wager may have been auto-cleaned after deadline
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -394,6 +400,7 @@ describe('Wager Acceptance', () => {
           })
         }
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -467,6 +474,7 @@ describe('Wager Acceptance', () => {
           expect(validState).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -540,6 +548,7 @@ describe('Wager Acceptance', () => {
      * rather than the outcome. Whether the UI apologises well is a separate question from
      * whether the member's stake stayed put.
      *
+     // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
      * The `else { expect(true).to.be.true }` this replaces meant a missing offer silently
      * PASSED the test.
      */

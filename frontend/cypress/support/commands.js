@@ -769,35 +769,16 @@ Cypress.Commands.add('syncBrowserClockToChain', () => {
   })
 })
 
-/**
- * Basic accessibility checks: img alt text, button labels.
+/*
+ * `cy.checkA11y` was REMOVED by spec 094 and replaced by `cy.a11yScan` (support/a11y.js), which
+ * runs the real axe ruleset.
+ *
+ * The old command hand-checked image alts and button names, and guarded both loops with
+ * `if ($els.length > 0)` — so on a surface with no visible images and no visible buttons it passed
+ * having checked nothing. That is anti-pattern 7 wearing a different hat, in the one command whose
+ * job was to catch problems. Leaving it beside the new scan would leave a weaker way to do the
+ * same thing, which is how a suite ends up with both.
  */
-Cypress.Commands.add('checkA11y', () => {
-  cy.get('body').should('be.visible')
-
-  cy.get('img:visible').then(($imgs) => {
-    if ($imgs.length > 0) {
-      $imgs.each((index, img) => {
-        const $img = Cypress.$(img)
-        if ($img.is(':visible')) {
-          expect($img.attr('alt')).to.exist
-        }
-      })
-    }
-  })
-
-  cy.get('button:visible').then(($btns) => {
-    if ($btns.length > 0) {
-      $btns.each((index, btn) => {
-        const $btn = Cypress.$(btn)
-        const hasText = $btn.text().trim().length > 0
-        const hasAriaLabel = $btn.attr('aria-label')
-        const hasAriaLabelledBy = $btn.attr('aria-labelledby')
-        expect(hasText || hasAriaLabel || hasAriaLabelledBy).to.be.true
-      })
-    }
-  })
-})
 
 // ***********************************************
 // Precondition helpers (chain 1337 setup) — see

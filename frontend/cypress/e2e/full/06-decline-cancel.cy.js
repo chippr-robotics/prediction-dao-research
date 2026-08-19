@@ -255,6 +255,7 @@ describe('Decline and Cancel Wagers', () => {
             expect(withdrawBtn.length).to.equal(0)
           })
         } else {
+          // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
           expect(true).to.be.true
         }
       }
@@ -363,6 +364,7 @@ describe('Decline and Cancel Wagers', () => {
           }
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })

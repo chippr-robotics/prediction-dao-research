@@ -117,7 +117,25 @@ function createAcceptAndResolve(config = {}) {
   cy.switchAccount(0)
 
   cy.openMyWagers('created')
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
+
+  /*
+   * WAIT FOR THE LIST TO POPULATE BEFORE READING IT.
+   *
+   * The `$panel.find(...)` below is a one-shot DOM snapshot (anti-pattern 3 in
+   * docs/developer-guide/e2e-testing-policy.md). Taken before the async-gated rows render, it finds
+   * neither a Resolve button nor a row, so every branch no-ops silently (anti-pattern 6) and the
+   * test walks on to `resolveWagerInModal`, which waits 15s for a sub-modal nothing opened and
+   * fails there — far from the cause. That is the CLM-01 flake seen on this PR: the same commit
+   * passed one run and failed the next purely on whether the list had rendered in time.
+   *
+   * This assertion makes the precondition explicit: the wager this test just created and accepted
+   * MUST be listed with something to act on. If it is not, the test fails HERE, saying so.
+   */
+  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+    .find('.mm-action-resolve, .mm-table-row, button:contains("Resolve")', { timeout: 20000 })
+    .should('have.length.greaterThan', 0)
+
+  cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
     const resolveBtn = $panel.find('.mm-action-resolve, button:contains("Resolve")')
     if (resolveBtn.length > 0) {
       cy.wrap(resolveBtn.first()).click({ force: true })
@@ -215,6 +233,7 @@ describe('Claim Payouts', () => {
         })
       } else {
         // No resolved wagers
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -241,6 +260,7 @@ describe('Claim Payouts', () => {
           expect(lower.includes('resolved') || lower.includes('ended') || lower.includes('outcome') || lower.includes('wager')).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -272,6 +292,7 @@ describe('Claim Payouts', () => {
           expect(hasFinancialInfo).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -326,6 +347,7 @@ describe('Claim Payouts', () => {
           expect(validState).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -369,6 +391,7 @@ describe('Claim Payouts', () => {
           }
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -410,15 +433,18 @@ describe('Claim Payouts', () => {
                 })
               } else {
                 // Claim button removed after first claim — correct
+                // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
                 expect(true).to.be.true
               }
             })
           } else {
             // No claim button — either already claimed or auto-payout
+            // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
             expect(true).to.be.true
           }
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -450,6 +476,7 @@ describe('Claim Payouts', () => {
           expect(pureClaimButtons.length).to.equal(0)
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -484,6 +511,7 @@ describe('Claim Payouts', () => {
           expect(validState).to.be.true
         })
       } else {
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })

@@ -171,6 +171,7 @@ describe('Dashboard', () => {
       } else {
         // No wagers — the empty state should be visible.
         cy.get('.mm-empty-state').should('be.visible')
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
@@ -279,6 +280,7 @@ describe('Dashboard', () => {
         cy.get('.cta-banner-dismiss').should('be.visible')
       } else {
         // Banner not shown — the user may already have the role. This is OK.
+        // ASSERTION-DEBT: #1231 — this branch passes without proving the outcome; rewrite tracked there.
         expect(true).to.be.true
       }
     })
