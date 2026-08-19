@@ -1,0 +1,2242 @@
+{
+  "version": 1,
+  "generatedDoc": "docs/developer-guide/e2e-coverage-matrix.md",
+  "specs": [
+    {
+      "id": "001-cypress-e2e-flows",
+      "title": "Core wager lifecycle (create \u2192 accept \u2192 resolve \u2192 claim/refund)",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.claim-payout",
+          "name": "The winner claims the escrowed stakes",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-01",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-02",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-03",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-04",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-05",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-06",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-07",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-08",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-09",
+            "frontend/cypress/e2e/full/10-claim-payouts.cy.js::CLM-10"
+          ]
+        },
+        {
+          "id": "wagers.refund-on-timeout",
+          "name": "An unaccepted or unresolved wager refunds after its deadline",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/11-refund-timeout.cy.js::REF-01",
+            "frontend/cypress/e2e/full/11-refund-timeout.cy.js::REF-02"
+          ]
+        },
+        {
+          "id": "wagers.decline-and-cancel",
+          "name": "Decline an offer, or cancel one you created before it is accepted",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-01",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-02",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-03",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-04",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-05",
+            "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-06"
+          ]
+        },
+        {
+          "id": "wagers.full-lifecycle",
+          "name": "One wager driven end to end, create through settlement",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-01",
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-02",
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-03",
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-04",
+            "frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js::E2E-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "002-e2e-encryption-lifecycle",
+      "title": "E2E encryption lifecycle",
+      "memberFacing": false,
+      "reason": "A test-coverage spec for the encryption feature; its flows are recorded under 005-multi-recipient-encryption.",
+      "flows": []
+    },
+    {
+      "id": "003-polymarket-only-oracle-ui",
+      "title": "Polymarket-only oracle UI",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "oracle.select-polymarket-resolution",
+          "name": "Choose Polymarket resolution when creating a wager and see the condition bound to it",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-06",
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-07"
+          ]
+        },
+        {
+          "id": "oracle.auto-resolve-from-condition",
+          "name": "A resolved Polymarket condition settles the wager without either party acting",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/08-oracle-resolution.cy.js::ORC-01",
+            "frontend/cypress/e2e/full/08-oracle-resolution.cy.js::ORC-02",
+            "frontend/cypress/e2e/full/08-oracle-resolution.cy.js::ORC-03"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "004-draw-resolution",
+      "title": "Draw resolution",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.declare-draw",
+          "name": "An arbitrator declares a draw and both stakes are returned",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "smoke",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-13",
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-14"
+          ],
+          "missing": "the draw branch sits behind a precondition guard that ends in an unconditional truth, so the refunded balances are never read back",
+          "issue": "#1244"
+        }
+      ]
+    },
+    {
+      "id": "005-multi-recipient-encryption",
+      "title": "Multi-recipient encryption",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "encryption.register-key",
+          "name": "Register an encryption key so private wagers can be addressed to you",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/03-encryption-chain.cy.js::ENC-02",
+            "frontend/cypress/e2e/full/03-encryption-chain.cy.js::ENC-03"
+          ]
+        },
+        {
+          "id": "encryption.private-wager-roundtrip",
+          "name": "Create a private wager and have every intended recipient decrypt it",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/16-privacy-encryption.cy.js::PRV-01",
+            "frontend/cypress/e2e/full/16-privacy-encryption.cy.js::PRV-02",
+            "frontend/cypress/e2e/full/16-privacy-encryption.cy.js::PRV-03",
+            "frontend/cypress/e2e/full/16-privacy-encryption.cy.js::PRV-04",
+            "frontend/cypress/e2e/full/16-privacy-encryption.cy.js::PRV-05",
+            "frontend/cypress/e2e/full/16-privacy-encryption.cy.js::PRV-07"
+          ]
+        },
+        {
+          "id": "encryption.key-ui",
+          "name": "See encryption state and prompts before any chain write",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/03-encryption-ui.cy.js::ENC-01",
+            "frontend/cypress/e2e/fast/03-encryption-ui.cy.js::ENC-04",
+            "frontend/cypress/e2e/fast/03-encryption-ui.cy.js::ENC-05",
+            "frontend/cypress/e2e/fast/03-encryption-ui.cy.js::ENC-06",
+            "frontend/cypress/e2e/fast/03-encryption-ui.cy.js::ENC-07"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "006-local-dev-environment",
+      "title": "Local development environment",
+      "memberFacing": false,
+      "reason": "Developer tooling; there is no member surface to drive.",
+      "flows": []
+    },
+    {
+      "id": "007-compliance-gating",
+      "title": "Compliance gating",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "compliance.accept-terms-before-entry",
+          "name": "Read and accept the versioned terms before reaching the app",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-01",
+            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-02",
+            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-03"
+          ]
+        },
+        {
+          "id": "compliance.sanctioned-address-refused",
+          "name": "A screened address is refused before any transaction is offered",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        },
+        {
+          "id": "compliance.frozen-account-blocked",
+          "name": "A frozen account cannot create a wager, and unfreezing restores it",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/18-frozen-accounts.cy.js::FRZ-01",
+            "frontend/cypress/e2e/full/18-frozen-accounts.cy.js::FRZ-02"
+          ]
+        },
+        {
+          "id": "compliance.paused-protocol-blocked",
+          "name": "A paused protocol refuses new wagers, and unpausing restores them",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/19-paused-protocol.cy.js::PAU-01",
+            "frontend/cypress/e2e/full/19-paused-protocol.cy.js::PAU-02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "008-runtime-chain-consistency",
+      "title": "Runtime chain consistency",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "network.wrong-chain-guard",
+          "name": "Be told, and blocked, when the wallet is on a different chain than the surface",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/21-network-errors.cy.js::NET-01",
+            "frontend/cypress/e2e/fast/21-network-errors.cy.js::NET-02",
+            "frontend/cypress/e2e/fast/21-network-errors.cy.js::NET-03"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "009-fix-qr-share",
+      "title": "Share a wager by QR",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "share.wager-link-and-qr",
+          "name": "Share a wager by link or QR and have the recipient land on it",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/12-sharing-ui.cy.js::SHR-01",
+            "frontend/cypress/e2e/fast/12-sharing-ui.cy.js::SHR-02",
+            "frontend/cypress/e2e/fast/12-sharing-ui.cy.js::SHR-03",
+            "frontend/cypress/e2e/fast/12-sharing-ui.cy.js::SHR-04"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "010-footer-policy-fixes",
+      "title": "Policy documents",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "legal.read-versioned-policies",
+          "name": "Open terms, risk and privacy from the footer before connecting",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "011-wallet-address-qr",
+      "title": "Wallet address QR",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "receive.show-address-qr",
+          "name": "Show your address as a QR for someone to send to",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/12-sharing-ui.cy.js::SHR-05",
+            "frontend/cypress/e2e/fast/12-sharing-ui.cy.js::SHR-06",
+            "frontend/cypress/e2e/fast/12-sharing-ui.cy.js::SHR-07",
+            "frontend/cypress/e2e/fast/12-sharing-ui.cy.js::SHR-08"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "012-wager-notifications",
+      "title": "Wager notifications",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "notifications.wager-state-change",
+          "name": "Be notified when a wager you are in changes state",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "013-polymarket-search-filter",
+      "title": "Polymarket search and filter",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "predict.search-markets",
+          "name": "Search and filter Polymarket markets when choosing a condition",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1239"
+        }
+      ]
+    },
+    {
+      "id": "014-quick-action-dashboard",
+      "title": "Quick-action dashboard",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "home.quick-actions",
+          "name": "Reach the common actions from the home screen",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-01",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-02",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-03",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-04"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "015-mordor-network-deployment",
+      "title": "Mordor network deployment",
+      "memberFacing": false,
+      "reason": "A deployment target; the member-facing surface is network selection, recorded under 069-network-endpoints-user-panel.",
+      "flows": []
+    },
+    {
+      "id": "016-wager-tax-report",
+      "title": "Wager tax report",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "reports.export-wager-history",
+          "name": "Export a settled-wager report for tax purposes",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "017-subgraph-v2-wager-transfers",
+      "title": "Subgraph v2 wager transfers",
+      "memberFacing": false,
+      "reason": "Indexing infrastructure; the member-facing surface is the wager lists it feeds, recorded under 078.",
+      "flows": []
+    },
+    {
+      "id": "017-wager-grid-redesign",
+      "title": "Wager grid redesign",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.browse-grid",
+          "name": "Browse open and participating wagers",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-05",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-06",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-07"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "018-wager-views-feedback",
+      "title": "Wager view feedback",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.empty-and-loading-states",
+          "name": "See honest empty and loading states rather than a blank grid",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-08",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-09"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "019-wager-auto-views",
+      "title": "Automatic wager views",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.auto-view-selection",
+          "name": "Land on the view that matches what you have",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/23-home-modes.cy.js::HMM-01",
+            "frontend/cypress/e2e/fast/23-home-modes.cy.js::HMM-02",
+            "frontend/cypress/e2e/fast/23-home-modes.cy.js::HMM-03",
+            "frontend/cypress/e2e/fast/23-home-modes.cy.js::HMM-04",
+            "frontend/cypress/e2e/fast/23-home-modes.cy.js::HMM-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "020-account-stats-dashboard",
+      "title": "Account stats",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "account.see-stats",
+          "name": "See your wager record and balances",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-10",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-11",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-12"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "021-address-book",
+      "title": "Address book",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "addressbook.save-and-use-contact",
+          "name": "Save a contact and address a wager or transfer to it",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "022-membership-purchase-progress",
+      "title": "Membership purchase progress",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "membership.purchase-progress",
+          "name": "Watch a membership purchase progress through its steps",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/02-membership.cy.js::MEM-04",
+            "frontend/cypress/e2e/full/02-membership.cy.js::MEM-05",
+            "frontend/cypress/e2e/full/02-membership.cy.js::MEM-06"
+          ]
+        },
+        {
+          "id": "membership.expired-blocks-participation",
+          "name": "An expired membership blocks wager creation until it is renewed",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/20-expired-membership.cy.js::EXP-01",
+            "frontend/cypress/e2e/full/20-expired-membership.cy.js::EXP-02"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "023-oracle-graph-gating",
+      "title": "Oracle graph gating",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "oracle.graph-unavailable-degrades",
+          "name": "See an honest degraded state when the oracle index is unreachable",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "024-open-challenge-wagers",
+      "title": "Open challenge wagers",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.create-open-challenge",
+          "name": "Post a wager anyone may accept",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-09",
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-10"
+          ]
+        },
+        {
+          "id": "wagers.accept-open-challenge",
+          "name": "Accept someone else's open challenge",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "smoke",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-08",
+            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-09"
+          ],
+          "missing": "the acceptance branch is guarded by a precondition that can be absent and ends in an unconditional truth, so the stake transfer is never read back",
+          "issue": "#1244"
+        }
+      ]
+    },
+    {
+      "id": "025-upgradeable-registry",
+      "title": "Upgradeable wager registry",
+      "memberFacing": false,
+      "reason": "Proxy upgrade mechanics; the member-facing surface is every wager flow that runs against the proxy, and is recorded there. Storage layout is gated by check:storage-layout.",
+      "flows": []
+    },
+    {
+      "id": "026-membership-vouchers",
+      "title": "Membership vouchers",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "membership.redeem-voucher",
+          "name": "Redeem a voucher for membership without paying",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1240"
+        }
+      ]
+    },
+    {
+      "id": "027-upgradeable-membership",
+      "title": "Upgradeable membership manager",
+      "memberFacing": false,
+      "reason": "Proxy upgrade mechanics; membership's member-facing flows are recorded under 022 and 071.",
+      "flows": []
+    },
+    {
+      "id": "028-token-mint",
+      "title": "Token Mint mini-app",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "miniapp.token-mint-deploy",
+          "name": "Mint a token through the Token Mint mini-app",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1238"
+        }
+      ]
+    },
+    {
+      "id": "030-clearpath-standard-daos",
+      "title": "ClearPath mini-app",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "miniapp.clearpath-create-dao",
+          "name": "Create a standard DAO through ClearPath",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1238"
+        }
+      ]
+    },
+    {
+      "id": "031-platform-notifications",
+      "title": "Platform notifications",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "notifications.platform-feed",
+          "name": "See platform notifications and clear them",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "032-encrypted-data-sync",
+      "title": "Encrypted data sync",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "backup.encrypted-sync-roundtrip",
+          "name": "Back up local data encrypted and restore it on another device",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "033-network-aware-swap",
+      "title": "Network-aware swap",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "trade.swap-quote-and-execute",
+          "name": "Swap one asset for another on the active network",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1240"
+        }
+      ]
+    },
+    {
+      "id": "034-zk-wager-pools",
+      "title": "Wager pools",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "pools.create-and-join",
+          "name": "Create a group pool and have members join with their stake",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/24-wager-pools.cy.js::POOL-01"
+          ]
+        },
+        {
+          "id": "pools.settle-payout-matrix",
+          "name": "Creator proposes a payout matrix, members approve to threshold, the winner claims",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/24-wager-pools.cy.js::POOL-02"
+          ]
+        },
+        {
+          "id": "pools.deadline-refund",
+          "name": "A pool that never resolves returns members' stakes after the deadline",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/24-wager-pools.cy.js::POOL-03"
+          ]
+        },
+        {
+          "id": "pools.join-with-authorization",
+          "name": "Join a pool gaslessly by signing an EIP-3009 authorization",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/24-wager-pools.cy.js::POOL-04"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "035-intent-based-payments",
+      "title": "Gasless intents",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "intents.sign-and-relay",
+          "name": "Authorize an action by signature and have a relayer submit it",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "smoke",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-13"
+          ],
+          "missing": "no test drives the relayed path end to end, and none exercises the self-submit fallback when the relayer is unavailable \u2014 the never-stranded rule is unproven",
+          "issue": "#1244"
+        }
+      ]
+    },
+    {
+      "id": "036-relayer-infrastructure",
+      "title": "Relayer gateway",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "relay.gateway-policy",
+          "name": "A relayed action is screened, quota-checked and submitted",
+          "status": "out-of-scope",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "reason": "The gateway is a separate service with its own test suite; driving it from the browser suite would test the deployment, not the product. The member-visible half \u2014 the self-submit fallback \u2014 is tracked under intents.sign-and-relay."
+        }
+      ]
+    },
+    {
+      "id": "037-unified-pool-challenge-lookup",
+      "title": "Unified pool and challenge lookup",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.lookup-by-code",
+          "name": "Find a pool or challenge from a code someone sent you",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "038-ux-consistency",
+      "title": "UX consistency",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "ui.consistent-controls",
+          "name": "Find the same control in the same place across surfaces",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/22-accessibility.cy.js::A11Y-01",
+            "frontend/cypress/e2e/fast/22-accessibility.cy.js::A11Y-02",
+            "frontend/cypress/e2e/fast/22-accessibility.cy.js::A11Y-03"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "039-wager-info-tooltips",
+      "title": "Wager info tooltips",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.explanatory-tooltips",
+          "name": "Read what a wager field means before committing to it",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-13",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-14"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "040-my-wagers-refinements",
+      "title": "My Wagers refinements",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.my-wagers-tabs",
+          "name": "Separate what you created from what you joined",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-15",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-16",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-17",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-18"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "041-oracle-open-challenges",
+      "title": "Oracle-resolved open challenges",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.open-challenge-oracle-resolution",
+          "name": "An open challenge resolves from its oracle condition once settled",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/08-oracle-resolution.cy.js::ORC-02",
+            "frontend/cypress/e2e/full/08-oracle-resolution.cy.js::ORC-03"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "041-passkey-wallet-login",
+      "title": "Passkey wallet login",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "passkey.create-account",
+          "name": "Create an account with a passkey and no seed phrase",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-01",
+            "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-02",
+            "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-03"
+          ]
+        },
+        {
+          "id": "passkey.return-and-sign-in",
+          "name": "Come back on the same device and sign in",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/passkey/returning-user.cy.js::RU-01",
+            "frontend/cypress/e2e/passkey/returning-user.cy.js::RU-02"
+          ]
+        },
+        {
+          "id": "passkey.unified-login",
+          "name": "Reach the same account whether you arrive by passkey or by wallet",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-01",
+            "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-02",
+            "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-03",
+            "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-04"
+          ]
+        },
+        {
+          "id": "passkey.controllers",
+          "name": "Add and remove the controllers that may act for the account",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/passkey/controllers.cy.js::CT-01",
+            "frontend/cypress/e2e/passkey/controllers.cy.js::CT-02",
+            "frontend/cypress/e2e/passkey/controllers.cy.js::CT-03"
+          ]
+        },
+        {
+          "id": "passkey.recover-account",
+          "name": "Recover the account on a new device",
+          "status": "partial",
+          "tier": "account-native",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/passkey/recovery.cy.js::RC-01",
+            "frontend/cypress/e2e/passkey/recovery.cy.js::RC-04"
+          ],
+          "missing": "only two of the recovery paths are driven; the guardian and export routes are not",
+          "issue": "#1244"
+        }
+      ]
+    },
+    {
+      "id": "042-clearpath-multi-network",
+      "title": "ClearPath across networks",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "miniapp.clearpath-network-switch",
+          "name": "Use ClearPath on a second network",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1238"
+        }
+      ]
+    },
+    {
+      "id": "043-safe-multisig-custody",
+      "title": "Safe multisig custody",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "custody.create-vault",
+          "name": "Create a Safe vault and add its owners",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1235"
+        },
+        {
+          "id": "custody.propose-and-execute",
+          "name": "Propose a transaction, collect approvals, execute it",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1235"
+        },
+        {
+          "id": "custody.operate-as-vault",
+          "name": "Act as the vault rather than as yourself, and see which you are",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1235"
+        }
+      ]
+    },
+    {
+      "id": "044-connected-account-portfolio",
+      "title": "Connected account portfolio",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "portfolio.see-holdings",
+          "name": "See what the connected account holds across supported assets",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "045-unified-connect-recovery",
+      "title": "Unified connect and recovery",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "connect.choose-a-way-in",
+          "name": "Choose between wallet, passkey and recovery from one entry point",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-01",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-02",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-03",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-04"
+          ]
+        },
+        {
+          "id": "connect.disconnect-and-switch",
+          "name": "Disconnect, and switch between accounts",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-05",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-06",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-07",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-08",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-09",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-10",
+            "frontend/cypress/e2e/fast/01-wallet-connection.cy.js::WAL-11"
+          ]
+        },
+        {
+          "id": "connect.first-run-onboarding",
+          "name": "Arrive with nothing set up and be walked to a way in",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/17-onboarding.cy.js::ONB-01",
+            "frontend/cypress/e2e/fast/17-onboarding.cy.js::ONB-02",
+            "frontend/cypress/e2e/fast/17-onboarding.cy.js::ONB-03"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "046-contract-audit-coverage",
+      "title": "Contract audit coverage",
+      "memberFacing": false,
+      "reason": "Contract test coverage policy; enforced by the Solidity suite and the coverage threshold gate.",
+      "flows": []
+    },
+    {
+      "id": "047-mask-sensitive-values",
+      "title": "Mask sensitive values",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "privacy.mask-balances",
+          "name": "Hide balances on screen when someone is looking over your shoulder",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "048-ethereum-mainnet-support",
+      "title": "Ethereum mainnet support",
+      "memberFacing": false,
+      "reason": "A network configuration; the member-facing surface is network selection and per-chain reads, recorded under 069 and 071.",
+      "flows": []
+    },
+    {
+      "id": "049-multisig-policy-engine",
+      "title": "Multisig policy engine",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "custody.policy-v1-enforced",
+          "name": "A vault policy refuses a transaction that breaks its rules",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1235"
+        }
+      ]
+    },
+    {
+      "id": "050-earn-lending-rewards",
+      "title": "Earn \u2014 lending",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "earn.deposit-to-vault",
+          "name": "Deposit into a lending vault and see the position",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1237"
+        },
+        {
+          "id": "earn.withdraw-from-vault",
+          "name": "Withdraw a lending position back to the wallet",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1237"
+        }
+      ]
+    },
+    {
+      "id": "050-sponsored-paymaster",
+      "title": "Sponsored paymaster",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "paymaster.sponsored-userop",
+          "name": "Send a passkey transaction with the fee sponsored",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "account-native",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1240"
+        },
+        {
+          "id": "paymaster.fallback-disclosed",
+          "name": "When sponsorship is unavailable, be told honestly that you are paying the fee",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "account-native",
+          "depth": "none",
+          "risk": "disclosure",
+          "tests": [],
+          "issue": "#1240"
+        }
+      ]
+    },
+    {
+      "id": "051-unified-activity-ledger",
+      "title": "Activity ledger",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "activity.see-unified-history",
+          "name": "See one history across wagers, transfers and membership",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "052-payments-style-wager-create",
+      "title": "Payments-style wager create",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.create-flow-validation",
+          "name": "Be stopped before signing when the wager form is wrong",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-17",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-18",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-19",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-20",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-21",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-22",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-23",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-24",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-25",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-26",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-27",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-28",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-29",
+            "frontend/cypress/e2e/fast/04-wager-creation-validation.cy.js::CRE-30"
+          ]
+        },
+        {
+          "id": "wagers.create-and-escrow",
+          "name": "Create a wager and have the stake escrowed",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-01",
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-02",
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-03",
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-04",
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "053-home-create-challenge",
+      "title": "Create a challenge from home",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "home.create-challenge-entry",
+          "name": "Start a challenge from the home screen",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-11",
+            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-12"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "054-callsign-registry",
+      "title": "Callsigns",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "callsign.commit-reveal-register",
+          "name": "Register a %callsign through commit and reveal",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        },
+        {
+          "id": "callsign.resolve-in-address-entry",
+          "name": "Address a transfer to someone by their callsign",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        },
+        {
+          "id": "callsign.gated-below-gold",
+          "name": "Be told why registration is unavailable below Gold tier",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        }
+      ]
+    },
+    {
+      "id": "055-collectibles-portfolio",
+      "title": "Collect \u2014 buy side",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "collect.browse-and-buy",
+          "name": "Browse collectibles and buy one",
+          "status": "partial",
+          "tier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "missing": "nothing drives the buy side at any tier; the OpenSea order itself is out of scope but the disclosure and confirm path is drivable",
+          "issue": "#1239"
+        }
+      ]
+    },
+    {
+      "id": "056-collectibles-sell-side",
+      "title": "Collect \u2014 sell side",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "collect.list-for-sale",
+          "name": "List a collectible for sale and see the fee disclosure",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "disclosure",
+          "tests": [],
+          "issue": "#1239"
+        }
+      ]
+    },
+    {
+      "id": "057-predict-polymarket",
+      "title": "Predict \u2014 Polymarket",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "predict.builder-fee-disclosed",
+          "name": "See the additive builder fee as its own line before signing an order",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "disclosure",
+          "tests": [],
+          "issue": "#1239"
+        },
+        {
+          "id": "predict.place-order",
+          "name": "Place an order on Polymarket's order book",
+          "status": "out-of-scope",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "reason": "The order book is a third-party venue with no local stand-in; the member-visible half \u2014 quoting, fee disclosure and the Polygon-only gate \u2014 is drivable and tracked as predict.builder-fee-disclosed."
+        },
+        {
+          "id": "predict.hidden-off-polygon",
+          "name": "See the Predict tab hidden on a chain Polymarket does not serve",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1239"
+        }
+      ]
+    },
+    {
+      "id": "058-send-request-home",
+      "title": "Send and request from home",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "transfer.send-from-home",
+          "name": "Send funds to someone from the home screen",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1240"
+        }
+      ]
+    },
+    {
+      "id": "059-notification-profiles",
+      "title": "Notification profiles",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "notifications.choose-profile",
+          "name": "Choose how much you are notified",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "060-platform-fee-wrapper",
+      "title": "Platform fees",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "fees.disclosed-before-signature",
+          "name": "See the live fee rate before signing, and be charged no more than that",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-01",
+            "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-02"
+          ],
+          "issue": "#1233"
+        },
+        {
+          "id": "fees.zero-rate-shows-no-line",
+          "name": "See no fee line at all when the rate is zero",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/28-platform-fee-disclosure.cy.js::FEE-04",
+            "frontend/cypress/e2e/fast/28-platform-fee-disclosure.cy.js::FEE-05"
+          ],
+          "issue": "#1233"
+        },
+        {
+          "id": "fees.admin-changes-rate",
+          "name": "An operator changes a service's rate and members see the new one",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-03"
+          ],
+          "issue": "#1233"
+        }
+      ]
+    },
+    {
+      "id": "061-bitcoin-transactions",
+      "title": "Bitcoin",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "bitcoin.send",
+          "name": "Send bitcoin, paying the network fee you confirmed",
+          "status": "out-of-scope",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "reason": "No local regtest node exists in the harness, so nothing can settle a Bitcoin send. Standing up one is the work; until then this is a named gap rather than a silent skip."
+        },
+        {
+          "id": "bitcoin.receive-address-rotates",
+          "name": "Get a fresh receive address that is never reissued",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1243"
+        },
+        {
+          "id": "bitcoin.fee-quote-expiry",
+          "name": "Be refused a stale fee quote rather than signing at the wrong fee",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "disclosure",
+          "tests": [],
+          "issue": "#1243"
+        }
+      ]
+    },
+    {
+      "id": "062-legacy-account-recovery",
+      "title": "Legacy account recovery",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "recovery.import-legacy-key",
+          "name": "Import an old private key or word list and have it stored encrypted",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1234"
+        },
+        {
+          "id": "recovery.sweep-per-asset-outcomes",
+          "name": "Sweep a recovered account and see a per-asset result when one asset fails",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1234"
+        }
+      ]
+    },
+    {
+      "id": "063-cross-chain-legacy-recovery",
+      "title": "Cross-chain legacy recovery",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "recovery.sweep-across-chains",
+          "name": "Sweep a recovered account on more than one chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1234"
+        }
+      ]
+    },
+    {
+      "id": "064-universal-asset-selector",
+      "title": "Universal asset selector",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "assets.pick-any-supported-asset",
+          "name": "Pick any supported asset from one selector",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "065-liquid-delegated-staking",
+      "title": "Liquid delegated staking",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "earn.stake-and-delegate",
+          "name": "Stake into a delegated position and see it",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1237"
+        },
+        {
+          "id": "earn.unstake",
+          "name": "Unstake and return the position to the wallet",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1237"
+        }
+      ]
+    },
+    {
+      "id": "066-staking-admin-controls",
+      "title": "Staking admin controls",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "admin.staking-controls",
+          "name": "An operator pauses or retires a staking route",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1237"
+        }
+      ]
+    },
+    {
+      "id": "067-bridge-pool-liquidity",
+      "title": "Bridge and supplied liquidity",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "bridge.deposit-member-is-depositor",
+          "name": "Bridge funds with yourself as the depositor, so an unfilled deposit refunds to you",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1236"
+        },
+        {
+          "id": "liquidity.supply-uniswap-position",
+          "name": "Supply a Uniswap position, minted to you and not the router",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1236"
+        },
+        {
+          "id": "liquidity.pause-stops-new-only",
+          "name": "A pause stops new supplies while existing positions stay withdrawable",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1236"
+        },
+        {
+          "id": "bridge.fee-consent-ceiling",
+          "name": "The quoted bps is a ceiling on what can be charged",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "disclosure",
+          "tests": [],
+          "issue": "#1236"
+        }
+      ]
+    },
+    {
+      "id": "068-protect-multi-chain-policies",
+      "title": "Protect \u2014 policy v2",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "custody.policy-v2-first-match",
+          "name": "A first-match rule array decides a proposal, and no match denies it",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1235"
+        },
+        {
+          "id": "custody.policy-v2-adoption",
+          "name": "A vault consents to the v2 guard through a threshold-approved change",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1235"
+        },
+        {
+          "id": "custody.multi-chain-vault-list",
+          "name": "See vaults across chains, with a failed chain named rather than shown as empty",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1235"
+        }
+      ]
+    },
+    {
+      "id": "069-network-endpoints-user-panel",
+      "title": "Network endpoints",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "endpoints.save-custom-rpc",
+          "name": "Save your own RPC endpoint and have reads use it",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        },
+        {
+          "id": "endpoints.wrong-chain-refused",
+          "name": "Be refused an endpoint that answers with a different chain id",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        },
+        {
+          "id": "endpoints.credentials-redacted",
+          "name": "Never see your endpoint credential rendered back to you",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        }
+      ]
+    },
+    {
+      "id": "070-safe-receiver",
+      "title": "Safe receiver",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "custody.safe-receiver",
+          "name": "A vault receives assets that require a callback",
+          "status": "out-of-scope",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "reason": "Spec 070 is paused with open issues and nothing is shipped; there is no surface to drive."
+        }
+      ]
+    },
+    {
+      "id": "071-multi-chain-admin-console",
+      "title": "Multi-chain admin console",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "admin.estate-reads-three-state",
+          "name": "An operator reads the estate and sees not-deployed and unreadable distinguished from zero",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "smoke",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-01",
+            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-02"
+          ],
+          "missing": "the two admin tests check the panel renders; no test asserts the three-state reads, and none proves an unreachable chain is not rendered as a zero",
+          "issue": "#1242"
+        },
+        {
+          "id": "admin.single-chain-write",
+          "name": "An operator writes to one named chain with authority read from that chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1242"
+        }
+      ]
+    },
+    {
+      "id": "072-white-label-tenants",
+      "title": "White-label tenants",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "tenant.brand-resolves-from-manifest",
+          "name": "A tenant build shows its own identity and no other tenant's",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        }
+      ]
+    },
+    {
+      "id": "073-miniapp-platform",
+      "title": "Mini-app platform",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "miniapp.launch-verified-package",
+          "name": "Launch a mini-app whose bytes are verified against the chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1238"
+        },
+        {
+          "id": "miniapp.launchable-not-status",
+          "name": "A live app whose update is in review still launches",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1238"
+        },
+        {
+          "id": "miniapp.host-submit-screens",
+          "name": "A mini-app transaction is screened inside the host before any rail is touched",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1238"
+        },
+        {
+          "id": "miniapp.curator-approve-content-committed",
+          "name": "A curator approval is refused when the package changed under it",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1238"
+        }
+      ]
+    },
+    {
+      "id": "074-unified-my-account",
+      "title": "My Account",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "account.unified-panel",
+          "name": "Reach preferences, membership and network from one account panel",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "075-monorepo-workspaces",
+      "title": "Monorepo workspaces",
+      "memberFacing": false,
+      "reason": "Build and dependency tooling; no member surface. Gated by check:deps and the byte-diff gates.",
+      "flows": []
+    },
+    {
+      "id": "076-monorepo-semantic-versioning",
+      "title": "Semantic versioning",
+      "memberFacing": false,
+      "reason": "Release tooling; no member surface. Gated by the release tooling tests.",
+      "flows": []
+    },
+    {
+      "id": "077-miniapp-store-redesign",
+      "title": "Mini-app store",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "miniapp.browse-catalog",
+          "name": "Browse the app catalogue and pin an app to quick access",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1238"
+        }
+      ]
+    },
+    {
+      "id": "078-my-wagers-single-table-view",
+      "title": "My Wagers single table",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "wagers.single-table-view",
+          "name": "See every wager you are in as one table",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-05",
+            "frontend/cypress/e2e/fast/13-dashboard.cy.js::DSH-06"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "079-hardhat-3-migration",
+      "title": "Hardhat 3 migration",
+      "memberFacing": false,
+      "reason": "Contract toolchain migration; no member surface.",
+      "flows": []
+    },
+    {
+      "id": "080-deterministic-addresses",
+      "title": "Deterministic addresses",
+      "memberFacing": false,
+      "reason": "Deployment mechanics; the member-facing effect is that addresses match the recorded deployments, gated by the deploy scripts.",
+      "flows": []
+    },
+    {
+      "id": "081-nav-drawer-density",
+      "title": "Nav drawer density",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "nav.drawer-sections-and-density",
+          "name": "Fold nav sections and choose a compact density that survives a reload",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "082-perps-trade-view",
+      "title": "Perps market data",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "perps.browse-venues",
+          "name": "Compare perpetuals pairs across venues",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-01",
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-02",
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-03",
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-04",
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-05"
+          ]
+        },
+        {
+          "id": "perps.degraded-venue-named",
+          "name": "A degraded venue is named and its pairs omitted, never shown as zeros",
+          "status": "partial",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-04"
+          ],
+          "missing": "no assertion proves a missing metric renders as an em dash rather than a zero, which is the invariant the spec turns on",
+          "issue": "#1244"
+        }
+      ]
+    },
+    {
+      "id": "083-perps-position-management",
+      "title": "Perps positions",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "perps.read-positions",
+          "name": "Read your open positions without being offered a way to trade them here",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/25-perps-management.cy.js"
+          ]
+        },
+        {
+          "id": "perps.execute-order",
+          "name": "Place or close a perpetuals order in the app",
+          "status": "out-of-scope",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "reason": "No in-app execution ships (spec 082 FR-018); there is nothing to drive. An execution wrapper is a later spec with its own security lifecycle."
+        }
+      ]
+    },
+    {
+      "id": "084-message-signing-verify",
+      "title": "Message signing and Verify",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "verify.three-verdicts",
+          "name": "Verify a signature and get valid, invalid, or unverifiable \u2014 never a forged-looking result from an RPC timeout",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        },
+        {
+          "id": "verify.refused-while-operating-as-vault",
+          "name": "Be refused message signing while acting as a vault",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1241"
+        }
+      ]
+    },
+    {
+      "id": "085-hardware-wallet-protect",
+      "title": "Hardware wallets",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "hardware.add-and-reconnect",
+          "name": "Add a hardware account and reconnect to it later",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/27-protect-hardware.cy.js::HW-01",
+            "frontend/cypress/e2e/fast/27-protect-hardware.cy.js::HW-02",
+            "frontend/cypress/e2e/fast/27-protect-hardware.cy.js::HW-03",
+            "frontend/cypress/e2e/fast/27-protect-hardware.cy.js::HW-04",
+            "frontend/cypress/e2e/fast/27-protect-hardware.cy.js::HW-05"
+          ]
+        },
+        {
+          "id": "hardware.physical-confirmation",
+          "name": "Confirm a transaction on the device screen",
+          "status": "out-of-scope",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "reason": "Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier."
+        }
+      ]
+    },
+    {
+      "id": "086-account-cards",
+      "title": "Account cards",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "account.cards",
+          "name": "See your accounts as cards and switch between them",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/26-trade-account.cy.js"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "087-infrastructure-as-code",
+      "title": "Infrastructure as code",
+      "memberFacing": false,
+      "reason": "Cloud provisioning; no member surface. Gated by check:iac and the Terraform plan.",
+      "flows": []
+    },
+    {
+      "id": "088-instant-acting-accounts",
+      "title": "Instant acting accounts",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "account.act-immediately-after-create",
+          "name": "Act on a newly created account without waiting for a deploy",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "account-native",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1240"
+        }
+      ]
+    },
+    {
+      "id": "089-finops-dashboard",
+      "title": "FinOps dashboard",
+      "memberFacing": false,
+      "reason": "Internal revenue and cost dashboards; no member surface. Gated by check:finops.",
+      "flows": []
+    },
+    {
+      "id": "090-chippr-brand-alignment",
+      "title": "Chippr brand alignment",
+      "memberFacing": false,
+      "reason": "Design tokens; member-visible but with no journey to drive. Gated by the four brand tests in frontend/src/test/brand/.",
+      "flows": []
+    },
+    {
+      "id": "091-neutral-token-consolidation",
+      "title": "Neutral token consolidation",
+      "memberFacing": false,
+      "reason": "Design tokens; gated by noHardcodedColors and noUndefinedTokens.",
+      "flows": []
+    },
+    {
+      "id": "092-multi-chain-activity",
+      "title": "Multi-chain activity",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "activity.multi-chain-history",
+          "name": "See activity across chains, with an unreadable chain named rather than empty",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1245"
+        }
+      ]
+    },
+    {
+      "id": "093-admin-mini-apps",
+      "title": "Admin mini-apps",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "admin.control-room-gating",
+          "name": "An operator sees granted, denied, or could-not-verify \u2014 never a silent denial",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1242"
+        },
+        {
+          "id": "admin.maintenance-permissionless",
+          "name": "Any entrant reaches Maintenance without elevated status",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1242"
+        }
+      ]
+    },
+    {
+      "id": "094-e2e-coverage-expansion",
+      "title": "E2E coverage expansion",
+      "memberFacing": false,
+      "reason": "This feature: the matrix, the tiering policy and the suite's own gates. Its subject is the coverage of every other row.",
+      "flows": []
+    }
+  ]
+}

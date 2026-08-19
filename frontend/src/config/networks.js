@@ -102,6 +102,23 @@ const earnConfig = () => ({
   legacyRewardsUrl: 'https://rewards-legacy.morpho.org/',
 })
 
+/*
+ * Full-E2E seam, identical in guard and reasoning to the one in config/contracts.js: the tier's
+ * local hardhat node boots AS chainId 80002 so the local chain is the app's membership home, and
+ * `import.meta.env.DEV &&` makes this whole branch dead code in any production bundle.
+ *
+ * Why Earn needs one. `FeeRouter.depositToVaultWithFee` is the only path that CHARGES a platform
+ * fee on chain, and Earn ▸ Lend is its only member surface — so the spec-060 invariant "a member
+ * is never charged above the rate they were shown" can only be settled from chain state on a
+ * network where Earn exists. Real Amoy has no Morpho and never will; the local impersonation has
+ * a FeeRouter and a MockERC4626Vault (scripts/deploy/deploy-local-earn-vault.js), which is what
+ * this flag describes. Nothing else about the section changes: the vault LIST still comes from
+ * the Morpho API, which the spec stubs, so a build with the flag set and no stub shows the same
+ * honest "unavailable" state it would on any other chain.
+ */
+const E2E_AMOY_LOCAL =
+  Boolean(import.meta.env?.DEV) && import.meta.env?.VITE_E2E_AMOY_LOCAL === '1'
+
 // Cross-chain bridge + liquidity supply (spec 067).
 //
 // `bridge` is a BUILD-TIME DISPLAY FALLBACK only (FR-051): the authoritative
@@ -186,8 +203,13 @@ const NETWORKS = {
     stablecoin: {
       address: import.meta.env?.VITE_AMOY_USDC || '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
       symbol: 'USDC',
+      // Decimals follow the address override: the full-E2E tier points VITE_AMOY_USDC at the
+      // local 18-dec mock (the node impersonates Amoy — see dev:e2e), and an address override
+      // with the real token's 6 hardcoded beside it makes every amount computation wrong by
+      // 10^12 — stakes become dust that still clears on-chain, which is worse than failing.
+      // Unset, this is exactly the literal 6 it always was.
       name: 'USD Coin',
-      decimals: 6,
+      decimals: Number(import.meta.env?.VITE_AMOY_USDC_DECIMALS) || 6,
       // EIP-712 domain version for the EIP-3009 payment leg (spec 035 FR-020):
       // native Circle USDC signs under version '2' (bridged USDC.e would be '1').
       domainVersion: '2',
@@ -223,6 +245,10 @@ const NETWORKS = {
       name: 'Uniswap',
       url: 'https://app.uniswap.org/swap',
     },
+    // Earn ▸ Lend exists here ONLY in the local full-E2E impersonation (see E2E_AMOY_LOCAL
+    // above) — real Polygon Amoy has no Morpho deployment, and a shipped build resolves this
+    // to null exactly as it always did.
+    earn: E2E_AMOY_LOCAL ? earnConfig() : null,
     // Passkey smart accounts (spec 041) — Amoy is the passkey validation
     // network: RIP-7212 P-256 precompile live, canonical EntryPoint v0.6.
     passkey: passkeyConfig(

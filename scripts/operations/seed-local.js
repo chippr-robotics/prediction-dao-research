@@ -28,6 +28,11 @@ const { ROLE_HASHES, MembershipTier } = require("../deploy/lib/constants");
 // Local-only chain ids. The script refuses to run anywhere else so it can never
 // mint/grant against a real network.
 const LOCAL_CHAIN_IDS = [1337, 31337];
+// The full E2E tier boots hardhat AS chainId 80002 (see hardhat.config.js) so the local node
+// is the app's membership home. 80002 is also REAL Amoy, and this guard exists precisely to
+// stop a seed reaching a real chain — so the impersonation case must be claimed EXPLICITLY
+// rather than allowlisted: without E2E_AMOY_LOCAL=1 a chainId-80002 target still refuses.
+if (process.env.E2E_AMOY_LOCAL === "1") LOCAL_CHAIN_IDS.push(80002);
 
 // Defaults (human units; scaled by each token's on-chain decimals). Overridable.
 const DEFAULTS = {

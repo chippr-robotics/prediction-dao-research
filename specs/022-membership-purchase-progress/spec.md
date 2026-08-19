@@ -170,6 +170,17 @@ without repeating already-completed payments.
 - **Single combined transaction path**: On networks where payment grants the role
   in one transaction, the indicator must still represent the real number of wallet
   interactions for that path rather than showing steps that never occur.
+- **Entry point that serves both new and existing members**: A control offered to
+  members and non-members alike (the Membership tab's "Renew / Upgrade") cannot
+  know which action it is opening, and MUST NOT assume. Assuming a fresh purchase
+  sends an existing member to `purchaseTier`, which the contract refuses with
+  `AlreadyActive()` — and refuses only AFTER the stablecoin approval has landed,
+  so the member pays a gas fee and grants an allowance for a purchase that could
+  never complete (issue #1226).
+- **Member already holds the tier they select**: Selecting the current tier from a
+  combined entry is a RENEWAL, not a downgrade and not a fresh purchase; it must
+  route to the extend action rather than being rejected as "select a tier higher
+  than your current one".
 
 ## Requirements *(mandatory)*
 
@@ -220,6 +231,18 @@ without repeating already-completed payments.
   wallet interaction is in progress.
 - **FR-013**: The progress indicator MUST be perceivable to assistive technologies,
   announcing the active step, its state, and progress changes.
+- **FR-014**: The action a purchase performs (purchase / upgrade / extend) MUST be
+  derived from the member's CURRENT membership together with the tier they select,
+  not from the entry point that opened the modal. A caller that genuinely knows
+  which action it wants MAY state it and MUST be honoured; a caller that cannot
+  know MUST be able to omit it. Because the contract refuses the wrong call only
+  after taking payment authorization, guessing is not a recoverable error — it
+  costs the member an allowance and a fee (issue #1226).
+- **FR-015**: While the member's current membership cannot be read, the modal MUST
+  refuse to submit rather than deriving an action from an unknown tier. (This is
+  already required by spec 071 FR-005 for a different reason — an unreadable
+  membership must never be treated as "no membership" — and the two must not
+  drift apart.)
 
 ### Key Entities *(include if feature involves data)*
 
