@@ -338,10 +338,21 @@ function expandShots() {
   return out
 }
 
-/** The pre-installed Chromium; the launcher's own default would want a download. */
+/**
+ * The pre-installed Chromium; the launcher's own default would want a download.
+ *
+ * Every "not here" answer is `undefined`, which hands the choice back to Playwright's own
+ * resolution — and, when that also comes up empty, to Playwright's own error, which already says
+ * to run `npx playwright install`. A MISSING browsers root is one of those answers, not a crash:
+ * `/opt/pw-browsers` is this image's layout, and on a machine where the operator installed
+ * browsers the ordinary way it simply does not exist. Without the guard `readdirSync` threw
+ * ENOENT before the launcher was ever reached, which reads as a broken harness rather than as a
+ * different install location. CHROMIUM_PATH still wins outright.
+ */
 function chromiumExecutable() {
   if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH
   const root = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers'
+  if (!existsSync(root)) return undefined
   const dir = readdirSync(root).find((name) => /^chromium-\d+$/.test(name))
   if (!dir) return undefined
   const candidates = [
