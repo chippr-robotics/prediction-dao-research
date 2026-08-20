@@ -1,6 +1,6 @@
 import { defineConfig } from 'cypress'
 import { ethers } from 'ethers'
-import { readFileSync, unlinkSync } from 'fs'
+import { existsSync, readFileSync, unlinkSync } from 'fs'
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
@@ -953,6 +953,201 @@ export default defineConfig({
               }
               default:
                 throw new Error(`bridgeFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+        /**
+         * The committed mini-app package fixture, read on the NODE side.
+         *
+         * `src/test/miniapps/fixtures/index.js` imports `node:fs`, so a spec cannot import it.
+         * The files are UTF-8 text and are handed over AS TEXT: a base64 round-trip through
+         * `cy.intercept`'s body ended up re-encoded, and the loader — correctly — refused the
+         * result as a failed integrity check. What has to survive intact is the exact byte
+         * sequence, because that is what gets hashed.
+         *
+         * `variant: 'tampered'` returns the committed tampered bytes — the same CID, different
+         * content — which is the supply-chain attack the loader's hashing exists to refuse.
+         */
+        miniappPackage({ variant = 'approved' } = {}) {
+          const dir = resolve(__dirname, 'src', 'test', 'miniapps', 'fixtures')
+          const onchain = JSON.parse(readFileSync(resolve(dir, 'onchain.json'), 'utf8'))
+          const from = resolve(dir, variant === 'tampered' ? 'tampered' : 'package')
+          // The tampered fixture only carries the files it actually changed; anything it does not
+          // override is served from the approved package, so the ONLY difference reaching the
+          // loader is the tampering itself.
+          const read = (name) => {
+            const candidate = resolve(from, name)
+            const file = existsSync(candidate) ? candidate : resolve(dir, 'package', name)
+            return readFileSync(file, 'utf8')
+          }
+          return {
+            ok: true,
+            variant,
+            cid: onchain.approved.cid,
+            manifestHash: onchain.approved.manifestHash,
+            files: {
+              'manifest.json': read('manifest.json'),
+              'entry.js': read('entry.js'),
+              'style.css': read('style.css'),
+            },
+          }
+        },
+
+        /**
+         * Fixtures for the mini-app platform (specs 073 / 077 / 028 / 030).
+         *
+         * The registry is the trust boundary for what code the host EXECUTES, so this task only
+         * ARRANGES chain state — submit a listing, approve it, propose an update, suspend it —
+         * and READS it back. It never fetches or verifies a package: the bytes reach the app
+         * through the gateway the loader itself calls, and the hashing that admits them is the
+         * app's own. A fixture that verified on the app's behalf would be testing itself.
+         *
+         * The vendor gate is real too (Silver on WAGER_PARTICIPANT_ROLE), so `submitApp` seeds
+         * membership rather than routing around the check.
+         *
+         * action ∈ submitApp | approve | reject | submitUpdate | suspend | appState | reset
+         */
+        async miniappFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+
+          // Signatures copied verbatim from contracts/apps/MiniAppRegistry.sol and its interface.
+          const REGISTRY_ABI = [
+            'function submitApp(string name, string description, uint8 category, string cid, bytes32 manifestHash) returns (uint256)',
+            'function submitUpdate(uint256 id, string cid, bytes32 manifestHash)',
+            'function approveApp(uint256 id, bytes32 expectedManifestHash)',
+            'function rejectProposal(uint256 id, bytes32 expectedManifestHash)',
+            'function suspendApp(uint256 id)',
+            'function isLaunchable(uint256 id) view returns (bool)',
+            'function idByName(string name) view returns (uint256)',
+            'function appCount() view returns (uint256)',
+            // Field ORDER copied from IMiniAppRegistry.sol#AppView — a plausible reordering decodes
+            // to garbage or throws, and neither failure names the ABI as the cause.
+            'function getApp(uint256 id) view returns (tuple(uint256 id, address vendor, string name, string description, uint8 category, uint8 status, bool launchable, tuple(string cid, bytes32 manifestHash, uint64 version) approved, tuple(string cid, bytes32 manifestHash, uint64 version) proposed, uint64 submittedAt, uint64 approvedAt, uint64 updatedAt))',
+          ]
+          // `durationDays` is uint32, NOT uint256 — copied from contracts/access/MembershipManager.sol.
+          // A uint256 here selects a function that does not exist, falls through, and reverts with
+          // no data, which reads like a failing require rather than a wrong ABI.
+          const MEMBERSHIP_ABI = [
+            'function grantMembership(address user, bytes32 role, uint8 tier, uint32 durationDays)',
+          ]
+          const WAGER_PARTICIPANT_ROLE = ethers.id('WAGER_PARTICIPANT_ROLE')
+
+          const registryAddress = d.contracts?.miniAppRegistry
+          if (!registryAddress) {
+            return {
+              ok: false,
+              error:
+                'the local deployment record has no contracts.miniAppRegistry — run `npm run setup:e2e` ' +
+                '(which now includes `deploy:local:miniapps`) before the mini-app specs',
+            }
+          }
+          const registry = new ethers.Contract(registryAddress, REGISTRY_ABI, admin)
+
+          const view = async (id) => {
+            const a = await registry.getApp(BigInt(id))
+            return {
+              id: Number(a.id),
+              vendor: a.vendor,
+              status: Number(a.status), // Pending 0, Approved 1, Suspended 2, Deprecated 3
+              launchable: a.launchable,
+              name: a.name,
+              approved: { cid: a.approved.cid, manifestHash: a.approved.manifestHash, version: Number(a.approved.version) },
+              proposed: { cid: a.proposed.cid, manifestHash: a.proposed.manifestHash, version: Number(a.proposed.version) },
+            }
+          }
+
+          try {
+            switch (action) {
+              case 'submitApp': {
+                // The vendor tier gate is real; seed it rather than route around it.
+                const membership = new ethers.Contract(d.contracts.membershipManager, MEMBERSHIP_ABI, admin)
+                await (await membership.grantMembership(
+                  await admin.getAddress(), WAGER_PARTICIPANT_ROLE, args.tier ?? 3, 365,
+                )).wait(1)
+
+                // Idempotent: a spec re-run against a long-lived node must not hit DuplicateName.
+                const existing = Number(await registry.idByName(args.name))
+                if (existing !== 0) return { ok: true, id: existing, reused: true, ...(await view(existing)) }
+
+                const rc = await (await registry.submitApp(
+                  args.name,
+                  args.description ?? 'A committed fixture package, served to the loader over the gateway.',
+                  args.category ?? 0,
+                  args.cid,
+                  args.manifestHash,
+                )).wait(1)
+                const id = Number(await registry.idByName(args.name))
+                return { ok: rc.status === 1, id, reused: false, ...(await view(id)) }
+              }
+              /*
+               * Bring the listing to "serving this exact package, nothing in review", FROM ANY
+               * STATE. The fixture manifest claims the id `fixture-app`, and the loader checks
+               * that against `appSlug(record.name)` — so every flow here has to share ONE record,
+               * and a spec that assumed a clean chain would fail on its own second run against
+               * whatever the previous one left behind.
+               *
+               * It converges rather than resetting: read the record, clear any proposal with the
+               * proposal's OWN hash (the contract is content-committed, so a guessed hash is
+               * refused), then approve if it is not already serving.
+               */
+              case 'ensureServing': {
+                const membership = new ethers.Contract(d.contracts.membershipManager, MEMBERSHIP_ABI, admin)
+                await (await membership.grantMembership(
+                  await admin.getAddress(), WAGER_PARTICIPANT_ROLE, args.tier ?? 3, 365,
+                )).wait(1)
+
+                let id = Number(await registry.idByName(args.name))
+                if (id === 0) {
+                  await (await registry.submitApp(
+                    args.name,
+                    args.description ?? 'A committed fixture package, served to the loader over the gateway.',
+                    args.category ?? 0,
+                    args.cid,
+                    args.manifestHash,
+                  )).wait(1)
+                  id = Number(await registry.idByName(args.name))
+                }
+
+                let cur = await view(id)
+                if (cur.proposed.cid) {
+                  await (await registry.rejectProposal(BigInt(id), cur.proposed.manifestHash)).wait(1)
+                  cur = await view(id)
+                }
+                if (!cur.launchable) {
+                  await (await registry.approveApp(BigInt(id), args.manifestHash)).wait(1)
+                  cur = await view(id)
+                }
+                return { ok: true, id, ...cur }
+              }
+              case 'approve': {
+                const rc = await (await registry.approveApp(BigInt(args.id), args.expectedManifestHash)).wait(1)
+                return { ok: rc.status === 1, ...(await view(args.id)) }
+              }
+              case 'reject': {
+                const rc = await (await registry.rejectProposal(BigInt(args.id), args.expectedManifestHash)).wait(1)
+                return { ok: rc.status === 1, ...(await view(args.id)) }
+              }
+              case 'submitUpdate': {
+                const rc = await (await registry.submitUpdate(BigInt(args.id), args.cid, args.manifestHash)).wait(1)
+                return { ok: rc.status === 1, ...(await view(args.id)) }
+              }
+              case 'suspend': {
+                const rc = await (await registry.suspendApp(BigInt(args.id))).wait(1)
+                return { ok: rc.status === 1, ...(await view(args.id)) }
+              }
+              case 'appState': {
+                const id = args.id ?? Number(await registry.idByName(args.name))
+                if (!id) return { ok: true, id: 0, exists: false }
+                return { ok: true, exists: true, appCount: Number(await registry.appCount()), ...(await view(id)) }
+              }
+              default:
+                throw new Error(`miniappFixture: unknown action '${action}'`)
             }
           } catch (e) {
             return { ok: false, error: e.shortMessage || e.reason || e.message }

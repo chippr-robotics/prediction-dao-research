@@ -1876,24 +1876,26 @@
         {
           "id": "miniapp.launch-verified-package",
           "name": "Launch a mini-app whose bytes are verified against the chain",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1238"
+          "tests": [
+            "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-01"
+          ]
         },
         {
           "id": "miniapp.launchable-not-status",
           "name": "A live app whose update is in review still launches",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1238"
+          "tests": [
+            "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-02"
+          ]
         },
         {
           "id": "miniapp.host-submit-screens",
