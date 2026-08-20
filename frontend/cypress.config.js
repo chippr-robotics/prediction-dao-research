@@ -725,6 +725,8 @@ export default defineConfig({
             'function listPool((uint8 kind, bool enabled, uint24 feeTier, address token0, address token1, address poolAddress, uint256 maxDeposit0PerTx, uint256 maxDeposit1PerTx) pool)',
             'function setPoolEnabled(bytes32 poolId, bool enabled)',
             'function computePoolId(uint8 kind, address poolAddress, address token0, address token1) pure returns (bytes32)',
+            'function getPool(bytes32 poolId) view returns ((uint8 kind, bool enabled, uint24 feeTier, address token0, address token1, address poolAddress, uint256 maxDeposit0PerTx, uint256 maxDeposit1PerTx))',
+            'function poolAt(uint256 index) view returns (bytes32)',
             'function pause()',
             'function unpause()',
             'function paused() view returns (bool)',
@@ -736,7 +738,16 @@ export default defineConfig({
             'function lastInputAmount() view returns (uint256)',
             'function depositCount() view returns (uint256)',
           ]
-          const ERC721_ABI = ['function ownerOf(uint256 tokenId) view returns (address)']
+          const ERC721_ABI = [
+            'function ownerOf(uint256 tokenId) view returns (address)',
+            'function balanceOf(address owner) view returns (uint256)',
+            // MockPositionManager's own counter: the id the NEXT mint will use. Read before a
+            // supply so the test knows which token to look up afterwards — token ids accumulate
+            // across specs on a shared node, so a hardcoded `1` asserts on whatever an earlier
+            // run happened to leave behind.
+            'function nextTokenId() view returns (uint256)',
+            'function positions(uint256 tokenId) view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)',
+          ]
           const ERC20_ABI = [
             'function balanceOf(address) view returns (uint256)',
             'function mint(address to, uint256 amount)',
@@ -759,6 +770,40 @@ export default defineConfig({
                   a.toLowerCase() < b.toLowerCase() ? -1 : 1,
                 )
                 const feeTier = args.feeTier ?? 3000
+                const router0 = new ethers.Contract(liquidityRouter, ROUTER_ABI, admin)
+
+                /*
+                 * REUSE an already-curated pool for this pair AND FEE TIER. Listing a second one is not just
+                 * wasteful: every listing renders as its own row for the same two tokens on the
+                 * same network, and a spec that opens "the Amoy row" then has two identical rows
+                 * to choose between — so which pool it supplied to would depend on curation order.
+                 * One pool per (pair, fee tier) keeps the row a spec opens the pool it asserts on,
+                 * and keeps repeated local runs from piling up listings on a long-lived node. The
+                 * fee tier is what lets two specs each own a pool of the same pair: it is the one
+                 * distinguishing thing the row renders ("0.30% fee").
+                 */
+                const existingCount = Number(await router0.poolCount())
+                for (let i = 0; i < existingCount; i += 1) {
+                  const id = await router0.poolAt(i)
+                  const listed = await router0.getPool(id)
+                  if (
+                    Number(listed.kind) === 2 &&
+                    listed.enabled &&
+                    Number(listed.feeTier) === feeTier &&
+                    listed.token0.toLowerCase() === token0.toLowerCase() &&
+                    listed.token1.toLowerCase() === token1.toLowerCase()
+                  ) {
+                    return {
+                      ok: true,
+                      poolId: id,
+                      poolAddress: listed.poolAddress,
+                      token0: listed.token0,
+                      token1: listed.token1,
+                      feeTier: Number(listed.feeTier),
+                      reused: true,
+                    }
+                  }
+                }
                 const artifactPath = resolve(
                   __dirname, '..', 'artifacts', 'contracts', 'mocks',
                   'MockUniswapV3Pool.sol', 'MockUniswapV3Pool.json',
@@ -766,7 +811,10 @@ export default defineConfig({
                 const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'))
                 const deployed = await new ethers.ContractFactory(
                   artifact.abi, artifact.bytecode, admin,
-                ).deploy(token0, token1, feeTier, 60)
+                // Tick spacing follows the fee tier, as Uniswap's factory enforces it
+                // (500→10, 3000→60, 10000→200). The router derives full-range ticks from the
+                // pool's own spacing, so a mismatched pair mints a position at the wrong bounds.
+                ).deploy(token0, token1, feeTier, { 500: 10, 3000: 60, 10000: 200 }[feeTier] ?? 60)
                 await deployed.waitForDeployment()
                 const poolAddress = await deployed.getAddress()
 
@@ -790,9 +838,14 @@ export default defineConfig({
                 return { ok: true, paused: await router.paused() }
               }
               case 'setPaused': {
+                // IDEMPOTENT on purpose. OpenZeppelin's Pausable reverts `ExpectedPause` /
+                // `EnforcedPause` when the flag is already where you are asking it to go, so a
+                // spec establishing a known starting state would fail on the state it wanted.
                 const router = new ethers.Contract(liquidityRouter, ROUTER_ABI, admin)
-                const rc = await (await (args.paused ? router.pause() : router.unpause())).wait(1)
-                return { ok: rc.status === 1 }
+                const want = Boolean(args.paused)
+                if ((await router.paused()) === want) return { ok: true, paused: want, changed: false }
+                const rc = await (await (want ? router.pause() : router.unpause())).wait(1)
+                return { ok: rc.status === 1, paused: want, changed: true }
               }
               case 'lastDepositor': {
                 const spoke = new ethers.Contract(spokePool, SPOKE_ABI, provider)
@@ -809,7 +862,22 @@ export default defineConfig({
               }
               case 'positionOwner': {
                 const nfpm = new ethers.Contract(d.uniswapPositionManager, ERC721_ABI, provider)
-                return { ok: true, owner: await nfpm.ownerOf(BigInt(args.tokenId)) }
+                const [owner, position] = await Promise.all([
+                  nfpm.ownerOf(BigInt(args.tokenId)),
+                  nfpm.positions(BigInt(args.tokenId)),
+                ])
+                return { ok: true, owner, liquidity: position.liquidity.toString() }
+              }
+              case 'positionCounters': {
+                // `nextTokenId` identifies the token a supply is ABOUT to mint; `balance` is how
+                // many the member holds. Together they let a flow assert on the position it just
+                // created without assuming it is the only one on the chain.
+                const nfpm = new ethers.Contract(d.uniswapPositionManager, ERC721_ABI, provider)
+                const [nextTokenId, balance] = await Promise.all([
+                  nfpm.nextTokenId(),
+                  nfpm.balanceOf(args.owner),
+                ])
+                return { ok: true, nextTokenId: Number(nextTokenId), balance: Number(balance) }
               }
               case 'tokenBalanceOf': {
                 const token = new ethers.Contract(args.token, ERC20_ABI, provider)

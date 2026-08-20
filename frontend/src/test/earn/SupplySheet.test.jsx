@@ -128,6 +128,18 @@ const tradingPool = (overrides = {}) => ({
   ...overrides,
 })
 
+/**
+ * The SAME pair, curated at a second fee tier — the ordinary Uniswap case (USDC/WETH exists at
+ * 0.05% and 0.30%). Listed BEFORE `tradingPool()` wherever it is used, because "first match wins"
+ * is exactly the bug the pool-identity test below exists to catch.
+ */
+const lowFeePool = () => ({
+  ...tradingPool(),
+  poolId: `0x${'55'.repeat(32)}`,
+  feeTier: 500,
+  poolAddress: '0x00000000000000000000000000000000000000a5',
+})
+
 const daiPool = () => ({
   ...tradingPool(),
   poolId: `0x${'22'.repeat(32)}`,
@@ -773,5 +785,61 @@ describe('SupplySheet — accessibility', () => {
     const { container } = renderTrading({ positions: [tradingPosition()] })
     await user.click(screen.getByRole('tab', { name: /Withdraw/i }))
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// =========================================================================================
+describe('SupplySheet — the pool a member opened is the pool they supply', () => {
+  /*
+   * Found by the spec-067 e2e flow (issue #1236): with two curated pools for one pair, the
+   * sheet re-resolved the pool from the selected PAIR and took the first match — so opening the
+   * 0.30% row and pressing Supply deposited into the 0.05% pool. Every figure on the confirm
+   * step described one pool and the signature went to another, silently, on a money path.
+   */
+  it('supplies the OPENED pool when the pair is curated at more than one fee tier', async () => {
+    const user = userEvent.setup()
+    const opened = tradingPool() // 0.30%
+    render(
+      <SupplySheet
+        pool={opened}
+        pools={[lowFeePool(), opened, daiPool(), ethPool()]}
+        assetOptions={ASSET_OPTIONS}
+        positions={[]}
+        onClose={() => {}}
+      />,
+    )
+
+    // What the member is being told about, before they type anything.
+    expect(await screen.findByText(/0\.30% pool fee/)).toBeInTheDocument()
+
+    const confirm = await toConfirm(user)
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(confirm)
+
+    // The signing-time re-read names the pool the signature will go to. It must be the one
+    // whose facts were on screen — not `lowFeePool`, which pairs the same two assets.
+    await waitFor(() => expect(readLiquidityPool).toHaveBeenCalled())
+    expect(readLiquidityPool.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ poolAddress: opened.poolAddress }),
+    )
+    expect(readLiquidityPool.mock.calls[0][0].poolAddress).not.toBe(lowFeePool().poolAddress)
+  })
+
+  it('still follows the member to another pool when they CHANGE the pair', async () => {
+    // The resolution this replaces exists for a real case, and it keeps working: pick a
+    // different counterpart and the sheet moves to the pool that actually holds that pair.
+    const user = userEvent.setup()
+    render(
+      <SupplySheet
+        pool={tradingPool()}
+        pools={[tradingPool(), daiPool(), ethPool()]}
+        assetOptions={ASSET_OPTIONS}
+        positions={[]}
+        onClose={() => {}}
+      />,
+    )
+    const listbox = await openSelect(user, 'Paired with')
+    await user.click(within(listbox).getByRole('option', { name: /DAI/ }))
+    expect(await screen.findByLabelText('Amount (DAI)')).toBeInTheDocument()
   })
 })
