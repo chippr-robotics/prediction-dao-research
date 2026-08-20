@@ -1071,8 +1071,27 @@ const MINIAPP_TESTNET_CHAIN_ID = 63
  * Not runtime-configurable, deliberately. The registry is the trust boundary for what code the
  * host executes, so a runtime-swappable registry chain would let a misconfiguration (or a
  * tampered preference) point verification at a chain anyone can write to.
+ *
+ * ── THE ONE EXCEPTION, AND WHY IT DOES NOT WEAKEN THAT ──────────────────────────────────────
+ * `E2E_AMOY_LOCAL` redirects this to the local node, and it is NOT a runtime configuration: it is
+ * `import.meta.env.DEV && VITE_E2E_AMOY_LOCAL === '1'`, so a production build eliminates the
+ * branch entirely and no preference, tampered or otherwise, can reach it. The sentence above is
+ * about a *runtime-swappable* registry chain; this is a compile-time one, and it is the same gate
+ * that already repoints the ENTIRE 80002 address map to `HARDHAT_CONTRACTS` in config/contracts.js
+ * — a strictly larger surface, since that one moves the wager registry and the fee router too.
+ *
+ * It exists because the rules this registry enforces — `launchable` is the serving decision, an
+ * approval is content-committed, screening happens inside `wallet.submit` — are exactly the kind a
+ * refactor inverts silently, and none of them can be settled against a chain the test cannot
+ * write to. Mordor is a public network: a flow test cannot submit a package there, approve it, and
+ * then swap it under the curator. On the local node it can.
+ *
+ * The cohort boundary still holds, and holds MORE tightly than before: 80002 is `isTestnet: true`,
+ * so a testnet build still reads a testnet registry. `src/test/networks.miniapps.test.js` pins the
+ * production answers on both sides so this branch cannot drift into a shipped build.
  */
 export function miniAppChainId() {
+  if (E2E_AMOY_LOCAL) return TESTNET_CHAIN_ID
   return buildIsTestnet() ? MINIAPP_TESTNET_CHAIN_ID : MAINNET_CHAIN_ID
 }
 

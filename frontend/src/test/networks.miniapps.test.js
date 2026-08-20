@@ -57,6 +57,36 @@ describe('mini-app registry chain (spec 073 FR-025)', () => {
     expect(miniAppChainId()).not.toBe(TESTNET_CHAIN_ID)
   })
 
+  /*
+   * The full-E2E seam, and the fence around it (issue #1238).
+   *
+   * `miniAppChainId()` is the trust boundary for which packages the host EXECUTES, so the one
+   * override it has is compile-time, not runtime: `import.meta.env.DEV && VITE_E2E_AMOY_LOCAL`,
+   * read into a module-level const at import. That is why the first case has to reset the module
+   * registry to see it at all — stubbing the variable on a module already loaded does nothing,
+   * which is precisely the property that makes the override unreachable by a tampered preference
+   * at runtime.
+   *
+   * The second case is the one that matters: with the flag unset the shipped answers are
+   * unchanged on both sides of the cohort, so a branch that ever leaked past the flag fails here.
+   */
+  it('redirects to the local node ONLY when the full-E2E flag is set at load', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_E2E_AMOY_LOCAL', '1')
+    const reloaded = await import('../config/networks')
+    expect(reloaded.miniAppChainId()).toBe(TESTNET_CHAIN_ID)
+  })
+
+  it('is unchanged with the flag unset, on both sides of the cohort', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_E2E_AMOY_LOCAL', '')
+    const reloaded = await import('../config/networks')
+    expect(reloaded.miniAppChainId()).toBe(MINIAPP_TESTNET_CHAIN_ID)
+
+    vi.stubEnv('VITE_NETWORK_ID', String(MAINNET_CHAIN_ID))
+    expect(reloaded.miniAppChainId()).toBe(MAINNET_CHAIN_ID)
+  })
+
   it('resolves to Polygon in a mainnet build', () => {
     buildOn(MAINNET_CHAIN_ID)
 
