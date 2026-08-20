@@ -696,6 +696,104 @@ export default defineConfig({
          * action ∈ newAccount | makeTokenRefuse | fundNative | mintToken | balances |
          *          deploymentAddresses
          */
+        /**
+         * Fixtures for Protect (specs 043 / 049 / 068).
+         *
+         * A Safe is a real contract, and every test here needs one that already exists — so the
+         * vault is created on chain by this task and brought into the app through its own "Load
+         * existing" path. Only `custody.create-vault` drives the wizard, because only that test is
+         * about creating one.
+         *
+         * The canonical Safe v1.4.1 addresses are the same ones the app resolves
+         * (frontend/src/config/safeContracts.js); `scripts/e2e/setup-custody-fixtures.js` is what
+         * puts code behind them on this chain, and this task fails loudly if that has not run.
+         *
+         * action ∈ createVault | fundVault | vaultInfo | nativeBalance
+         */
+        async custodyFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const funder = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+
+          const SAFE = {
+            singletonL2: '0x29fcB43b46531BcA003ddC8FCB67FFE91900C762',
+            proxyFactory: '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67',
+            fallbackHandler: '0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99',
+          }
+          const SAFE_ABI = [
+            'function setup(address[] owners, uint256 threshold, address to, bytes data, address fallbackHandler, address paymentToken, uint256 payment, address paymentReceiver)',
+            'function getOwners() view returns (address[])',
+            'function getThreshold() view returns (uint256)',
+            'function nonce() view returns (uint256)',
+            'function VERSION() view returns (string)',
+            'function getStorageAt(uint256 offset, uint256 length) view returns (bytes)',
+          ]
+          const FACTORY_ABI = [
+            'function createProxyWithNonce(address singleton, bytes initializer, uint256 saltNonce) returns (address proxy)',
+            'event ProxyCreation(address indexed proxy, address singleton)',
+          ]
+          // Safe keeps its guard in a fixed storage slot (keccak256("guard_manager.guard.address")).
+          const GUARD_SLOT = '0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8'
+
+          try {
+            switch (action) {
+              case 'createVault': {
+                if ((await provider.getCode(SAFE.proxyFactory)) === '0x') {
+                  throw new Error(
+                    'no Safe proxy factory on this chain — run `npm run setup:e2e:custody` ' +
+                    '(scripts/e2e/setup-custody-fixtures.js) before the custody specs',
+                  )
+                }
+                const safeIface = new ethers.Interface(SAFE_ABI)
+                const initializer = safeIface.encodeFunctionData('setup', [
+                  args.owners, args.threshold, ethers.ZeroAddress, '0x',
+                  SAFE.fallbackHandler, ethers.ZeroAddress, 0, ethers.ZeroAddress,
+                ])
+                const factory = new ethers.Contract(SAFE.proxyFactory, FACTORY_ABI, funder)
+                // A distinct salt per call so repeated runs never collide on an existing proxy.
+                const saltNonce = BigInt(args.saltNonce ?? Date.now())
+                const rc = await (await factory.createProxyWithNonce(
+                  SAFE.singletonL2, initializer, saltNonce,
+                )).wait(1)
+                const created = rc.logs
+                  .map((l) => { try { return factory.interface.parseLog(l) } catch { return null } })
+                  .find((parsed) => parsed && parsed.name === 'ProxyCreation')
+                if (!created) throw new Error('no ProxyCreation event — the vault was not deployed')
+                return { ok: true, address: created.args[0] }
+              }
+              case 'fundVault': {
+                const rc = await (await funder.sendTransaction({
+                  to: args.address,
+                  value: BigInt(args.amount ?? String(10n ** 18n)),
+                })).wait(1)
+                return { ok: rc.status === 1 }
+              }
+              case 'vaultInfo': {
+                const safe = new ethers.Contract(args.address, SAFE_ABI, provider)
+                const [owners, threshold, nonce, version, guardWord] = await Promise.all([
+                  safe.getOwners(), safe.getThreshold(), safe.nonce(), safe.VERSION(),
+                  provider.getStorage(args.address, GUARD_SLOT),
+                ])
+                return {
+                  ok: true,
+                  owners: owners.map((o) => String(o)),
+                  threshold: Number(threshold),
+                  nonce: Number(nonce),
+                  version,
+                  // The guard is the low 20 bytes of that slot; ZeroAddress means "no guard".
+                  guard: ethers.getAddress('0x' + guardWord.slice(-40)),
+                }
+              }
+              case 'nativeBalance':
+                return { ok: true, balance: (await provider.getBalance(args.address)).toString() }
+              default:
+                throw new Error(`custodyFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
         async legacyFixture({ action, args = {} }) {
           const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
           const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })

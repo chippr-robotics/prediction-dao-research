@@ -335,7 +335,23 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   10: { safeProposalHub: 154753770 }, // Optimism
   8453: { safeProposalHub: 49158472 }, // Base
   42161: { safeProposalHub: 488059169 }, // Arbitrum One
-  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024, miniAppRegistry: 0 },
+  80002: {
+    friendGroupMarketFactory: 0,
+    wagerRegistry: 0,
+    membershipVoucher: 40521024,
+    miniAppRegistry: 0,
+    /*
+     * Custody on Amoy exists ONLY in the local full-E2E impersonation (see the matching seams in
+     * safeContracts.js and networks.js), where the chain is a few hundred blocks old and the hub's
+     * code is placed by scripts/e2e/setup-custody-fixtures.js. Block 1 scans all of it.
+     *
+     * The value has to be non-zero: `useVaultProposals` reads 0 as "no recorded block" and refuses
+     * to scan rather than sweeping from genesis on a real chain — which is the right default, and
+     * is why the local impersonation has to say a block rather than inherit one. DEV-guarded, so a
+     * production build still reports nothing here and Amoy proposal discovery stays off.
+     */
+    ...(E2E_AMOY_LOCAL ? { safeProposalHub: 1 } : {}),
+  },
   // Polygon. Blocks marked (measured) were bisected with `eth_getCode` against an archive node
   // rather than taken from a deploy script's report — the two disagreed by up to ten blocks, and
   // a recorded block LATER than the real creation silently drops any event in between. The
