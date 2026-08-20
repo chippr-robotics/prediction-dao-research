@@ -39,6 +39,40 @@ gateway — that composes existing subsystems.
   appends one client-ledger record (`kind: 'legacy_account_recovered'`, `refs` = address + type only)
   with a **stable entryId**, so it is idempotent and never carries key material.
 
+## End-to-end coverage
+
+Two specs cover this feature, split by the tiering rule that a flow validatable without a chain
+must not sit in the full tier ([the tiering policy](./e2e-testing-policy.md)):
+
+- `frontend/cypress/e2e/fast/28-legacy-recovery.cy.js` — the import, asserted against the STORAGE
+  rather than the screen, plus spec 063's cross-chain scan.
+- `frontend/cypress/e2e/full/28-legacy-recovery-sweep.cy.js` — the sweep, judged by chain state.
+
+Status and depth per flow live in the [coverage matrix](./e2e-coverage-matrix.md); it is generated,
+so record changes in `frontend/cypress/coverage/matrix.json` and run `npm run e2e:matrix`.
+
+Notes for anyone extending these:
+
+- The sweep is the reason `cy.mockWeb3Provider` grew `realBalances`. The default mock answers a
+  fixed 100 ETH for **every** address, which is harmless while a spec only reads the connected
+  account and a fabrication the moment it reads one it does not control — such as a recovered
+  legacy key.
+- Fixtures come from the `legacyFixture` Cypress task (`frontend/cypress.config.js`), which mints a
+  **fresh** EOA per test. A fixed key accumulates balances across runs, and "what moved" stops
+  being a property of the code.
+- The per-asset failure has to be forced at the moment of TRANSFER. `sweepAllAssets` re-reads
+  balances itself, so draining a token before "Transfer all" just drops it from the run and proves
+  nothing. `makeTokenRefuse` swaps in `ReentrantToken`'s code (contracts/mocks) over the token the
+  app scans and arms it to refuse one transfer — a token that holds the balance and declines to
+  move it, which is what a blocklisting stablecoin does. Balances are untouched by the swap, and
+  the per-spec chain checkpoint restores the original code.
+- Writing these tests found two real defects in `sweepAllAssets`, both fixed and both invisible to
+  the unit suite because a stubbed provider's nonce and balance never move: the coin leg reused a
+  token leg's nonce, and its value was sized from a balance taken before the token transfers had
+  paid their gas. With any ERC-20 to move first, the member's coin never left.
+- Moving funds is optional, so both tiers assert that too: storing the key completes recovery, and
+  on chain nothing moves until the member asks.
+
 ## Testing note
 
 Under vitest+jsdom, Node's `Buffer` leaks in and ethers' default sha256 returns a `Buffer` its own

@@ -54,6 +54,12 @@ const TOKEN_ABI = [
   'function approve(address spender, uint256 amount) returns (bool)',
   'function allowance(address owner, address spender) view returns (uint256)',
 ]
+// ReentrantToken (contracts/mocks) — a test-only ERC-20 whose next transfer re-enters an armed
+// target and bubbles that call's revert. The legacy-recovery sweep uses it to model a token that
+// REFUSES a transfer it is perfectly able to make (a blocklisting stablecoin is the real-world
+// case), which is the only way to fail one asset and not the others: the sweep re-reads balances
+// itself, so anything that changes the balance simply drops the asset from the run instead.
+const ARMED_TOKEN_ABI = ['function arm(address target, bytes data)']
 const KEYREG_ABI = [
   'function hasKey(address user) view returns (bool)',
   'function getPublicKey(address user) view returns (bytes)',
@@ -673,6 +679,108 @@ export default defineConfig({
             // Return a soft failure so specs can assert "blocked" cases (e.g. a
             // premature claimRefund) instead of the task rejecting the test.
             return { ok: false, error: describeRevert(e) }
+          }
+        },
+
+        /**
+         * Fixtures for the legacy account recovery sweep (spec 062).
+         *
+         * The sweep signs with a key the MEMBER pastes in, not with the connected wallet, so a
+         * test needs a real funded EOA whose private key it can hand to the UI. Every run mints
+         * a FRESH one: a fixed key would accumulate balances across runs and make "what moved"
+         * a function of how many times the suite had been run.
+         *
+         * `makeTokenRefuse` is how ONE asset is failed without disturbing the others — see its
+         * own comment for why a drained balance cannot do that job.
+         *
+         * action ∈ newAccount | makeTokenRefuse | fundNative | mintToken | balances |
+         *          deploymentAddresses
+         */
+        async legacyFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          /*
+           * NonceManager, not a bare Wallet: several fixture actions send two transactions in a
+           * row (deploy then arm), and ethers caches the nonce lookup for a moment — on a local
+           * chain the second send reuses the first's nonce and is rejected. The fixture's sends
+           * must all land, so tracking the nonce locally is exactly right here.
+           */
+          const funder = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+          /*
+           * WHICH token the sweep sees is decided by the APP, not by this record — the portfolio
+           * registry scans what `config/wrappedNative.js` and the network's stablecoin config
+           * resolve. So the caller passes the address the app will actually read, and the spec
+           * asserts that address against this record: the two agreeing is a fact worth checking,
+           * not one to assume (the frontend's constants are only refreshed by
+           * `npm run sync:frontend-contracts`, which the E2E job does not run).
+           */
+          const tokenAddress = args.token || d.wmatic
+          const token = new ethers.Contract(tokenAddress, TOKEN_ABI, funder)
+
+          try {
+            switch (action) {
+              case 'newAccount': {
+                const wallet = ethers.Wallet.createRandom()
+                return { ok: true, address: wallet.address, privateKey: wallet.privateKey, tokenAddress }
+              }
+              case 'makeTokenRefuse': {
+                /*
+                 * Make ONE transfer of an existing token fail, without touching its balances.
+                 *
+                 * Deploy ReentrantToken, copy its RUNTIME code over the token's, and arm it to
+                 * re-enter the token itself with an unknown selector — the token has no fallback,
+                 * so that call reverts and the transfer reverts with it. Only the code changes:
+                 * ERC-20 storage lives in the same slots, so who holds what is unchanged, and the
+                 * per-spec chain checkpoint puts the original code back.
+                 *
+                 * This is the only way to fail one asset and not the others: `sweepAllAssets`
+                 * re-reads balances itself, so emptying a token just drops it from the run.
+                 */
+                const artifactPath = resolve(
+                  __dirname, '..', 'artifacts', 'contracts', 'mocks', 'ReentrantToken.sol', 'ReentrantToken.json',
+                )
+                const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'))
+                const deployed = await new ethers.ContractFactory(artifact.abi, artifact.bytecode, funder).deploy()
+                await deployed.waitForDeployment()
+                await provider.send('hardhat_setCode', [
+                  tokenAddress,
+                  await provider.getCode(await deployed.getAddress()),
+                ])
+                const rc = await (await new ethers.Contract(tokenAddress, ARMED_TOKEN_ABI, funder)
+                  .arm(tokenAddress, '0xdeadbeef')).wait(1)
+                return { ok: rc.status === 1, address: tokenAddress }
+              }
+              case 'fundNative': {
+                const tx = await funder.sendTransaction({
+                  to: args.address,
+                  value: BigInt(args.amount ?? String(10n ** 18n)),
+                })
+                const rc = await tx.wait(1)
+                return { ok: rc.status === 1 }
+              }
+              case 'mintToken': {
+                const rc = await (await token.mint(args.address, BigInt(args.amount ?? String(10n ** 18n)))).wait(1)
+                return { ok: rc.status === 1 }
+              }
+              case 'deploymentAddresses':
+                return { ok: true, paymentToken: d.paymentToken, wmatic: d.wmatic }
+              case 'balances': {
+                // `tokens` is an ORDERED list so the caller can index it the same way it named it.
+                const tokens = args.tokens || [tokenAddress]
+                const native = await provider.getBalance(args.address)
+                const reads = await Promise.all(
+                  tokens.map((t) =>
+                    new ethers.Contract(t, TOKEN_ABI, provider).balanceOf(args.address),
+                  ),
+                )
+                return { ok: true, native: native.toString(), tokens: reads.map((b) => b.toString()) }
+              }
+              default:
+                throw new Error(`legacyFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
           }
         },
 

@@ -58,6 +58,17 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
     activeChainId: Number(networkId),
     authorized: options.preAuthorized === true,
     rejectChainSwitch: options.rejectChainSwitch === true,
+    /*
+     * `eth_getBalance` answers a FIXED 100 ETH by default, which is fine while a spec only needs
+     * the connected account to look funded. It is a fabrication the moment a spec reads the
+     * balance of an account it does NOT control — a recovered legacy key, say — because the stub
+     * answers 100 ETH for every address on earth, including one holding nothing.
+     *
+     * `realBalances: true` asks the node instead, so a balance the app displays (and the gas
+     * reserve it sizes from that balance) is the chain's own answer. Opt-in: the default is
+     * unchanged for every spec written against the stub.
+     */
+    realBalances: options.realBalances === true,
   }
 
   cy.on('window:before:load', (win) => {
@@ -102,6 +113,32 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
       return
     }
 
+    /**
+     * Forward a JSON-RPC call to the node, mapping a JSON-RPC error onto a real rejection
+     * (EIP-1193 shape) so viem/ethers see reverts and failed estimates instead of `undefined`.
+     * That is what makes write txs work: a reverting eth_estimateGas rejects, and
+     * eth_sendTransaction / eth_sendRawTransaction surface the node's own error.
+     */
+    const forwardToNode = (method, params, resolve, reject) => {
+      fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: params || [] }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && data.error) {
+            const e = new Error(data.error.message || 'RPC error')
+            e.code = data.error.code
+            e.data = data.error.data
+            reject(e)
+          } else {
+            resolve(data.result)
+          }
+        })
+        .catch((err) => reject(err))
+    }
+
     win.ethereum = {
       isMetaMask: true,
       selectedAddress: S().activeAccount,
@@ -142,7 +179,10 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               resolve(S().activeChainId.toString())
               break
             case 'eth_getBalance':
-              resolve('0x56bc75e2d63100000') // 100 ETH
+              // The stub answers for EVERY address, so a spec reading an account it does not
+              // control gets a fabricated balance. `realBalances` asks the node instead.
+              if (S().realBalances) forwardToNode(method, params, resolve, reject)
+              else resolve('0x56bc75e2d63100000') // 100 ETH
               break
             case 'personal_sign':
             case 'eth_sign':
@@ -154,33 +194,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               resolve('0x' + S().activeAccount.slice(2).toLowerCase().repeat(4).slice(0, 130))
               break
             default:
-              fetch(rpcUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  jsonrpc: '2.0',
-                  id: 1,
-                  method,
-                  params: params || []
-                })
-              })
-              .then(r => r.json())
-              .then(data => {
-                // Propagate JSON-RPC errors as a real rejection (EIP-1193 shape)
-                // so viem/ethers can handle reverts/estimateGas failures instead
-                // of receiving `undefined`. This is what makes write txs work:
-                // a reverting eth_estimateGas now rejects (ethers retries/falls
-                // back) and eth_sendTransaction surfaces real errors.
-                if (data && data.error) {
-                  const e = new Error(data.error.message || 'RPC error')
-                  e.code = data.error.code
-                  e.data = data.error.data
-                  reject(e)
-                } else {
-                  resolve(data.result)
-                }
-              })
-              .catch(err => reject(err))
+              forwardToNode(method, params, resolve, reject)
           }
         })
       },
@@ -1451,4 +1465,101 @@ Cypress.Commands.add('selectInjectedConnector', () => {
   })
     .first()
     .click()
+})
+
+// ---------------------------------------------------------------------------
+// Legacy account recovery (spec 062 / 063) — shared drivers.
+//
+// Both tiers import a secret the same way, so the wizard lives here rather than
+// twice in two specs. The assertions ABOUT the import (what is on disk, what is
+// not) stay in the specs, because that is what each of them is testing.
+// ---------------------------------------------------------------------------
+
+/**
+ * Open the Recovery tab with the legacy-recovery card already expanded.
+ *
+ * Uses the real deep link (`#legacy-recovery`, resolved by accordionSectionForHash) rather than
+ * clicking the header: a collapsed AccordionSection is `inert`, so anything inside it is
+ * unclickable, and landing open is the behaviour the nav search actually ships.
+ *
+ * Call cy.mockWeb3Provider(...) FIRST — the provider options are the spec's choice.
+ *
+ * @param {object} [visitOptions] forwarded to cy.visit (e.g. an onBeforeLoad recorder).
+ */
+Cypress.Commands.add('openLegacyRecovery', (visitOptions = {}) => {
+  cy.visit('/wallet?tab=security#legacy-recovery', visitOptions)
+  cy.get('[data-attention="legacy-recovery"]', { timeout: 20000 })
+    .should('have.attr', 'data-open', 'true')
+})
+
+/**
+ * Drive the import wizard from the Recovery card to the SAVED screen.
+ *
+ * Leaves the action sheet OPEN on SAVED, because that screen is where the optional follow-ups
+ * (address book, move funds) live and a caller usually wants one of them.
+ *
+ * @param {{secret: string, passphrase?: string}} args
+ */
+Cypress.Commands.add('importLegacyKey', ({ secret, passphrase = 'correct-horse-battery' }) => {
+  cy.get('.legacy-recovery__start').click()
+  // Everything below is inside the sheet. Scoping is not cosmetic: an unscoped cy.contains in
+  // this app finds the page behind the dialog, and that element is genuinely visible.
+  cy.get('.action-sheet').within(() => {
+    cy.contains('button', 'Get started').click()
+    cy.get('textarea[aria-label="Private key or recovery word list"]').type(secret, {
+      delay: 0,
+      // The secret must not be echoed into the Cypress command log / screenshots either.
+      log: false,
+    })
+    // The app recognised the secret and says which account it controls — that is the gate on
+    // Continue, so asserting it here means a failure points at detection, not at a dead button.
+    cy.get('[data-testid="lkr-detected"]').should('be.visible')
+    cy.contains('button', 'Continue').click()
+
+    // Injected (non-passkey) sessions get the passphrase form; biometrics need a real
+    // authenticator, which these tiers do not have.
+    cy.get('input[type="password"]').first().type(passphrase, { log: false })
+    cy.get('input[type="password"]').eq(1).type(passphrase, { log: false })
+    cy.contains('button', 'Encrypt & save').click()
+    cy.get('[data-testid="lkr-saved"]', { timeout: 15000 }).should('be.visible')
+  })
+})
+
+/** The on-disk vault map ({ [lowerAddress]: entry }) for a signed-in owner. */
+Cypress.Commands.add('legacyVault', (owner) => {
+  const key = `fw_user_${String(owner).toLowerCase()}_legacy_recovered_keys`
+  return cy.window({ log: false }).then((win) => JSON.parse(win.localStorage.getItem(key) || '{}'))
+})
+
+/** The client activity-ledger records for an owner on a chain. */
+Cypress.Commands.add('activityLedger', (owner, chainId) => {
+  const key = `fw_user_${String(owner).toLowerCase()}_activity_ledger_v1_${chainId}`
+  return cy
+    .window({ log: false })
+    .then((win) => JSON.parse(win.localStorage.getItem(key) || '{"records":[]}').records || [])
+})
+
+/**
+ * Assert a secret appears NOWHERE observable: not in local/session storage, not in the DOM.
+ *
+ * Deliberately checks every storage entry rather than the one key we expect to be safe — the
+ * invariant is "the clear secret is not persisted", and a copy parked under some other key
+ * would satisfy a check that only looked at `legacy_recovered_keys`.
+ *
+ * Network traffic is covered separately by the spec, which intercepts before the import.
+ */
+Cypress.Commands.add('assertNoClearSecret', (secret) => {
+  const needle = String(secret).toLowerCase()
+  cy.window({ log: false }).then((win) => {
+    const dump = (storage) =>
+      Object.keys(storage).map((k) => `${k}=${storage.getItem(k) || ''}`).join('\n').toLowerCase()
+    const local = dump(win.localStorage)
+    const session = dump(win.sessionStorage)
+    expect(local, 'clear secret in localStorage').to.not.include(needle)
+    expect(session, 'clear secret in sessionStorage').to.not.include(needle)
+    expect(
+      win.document.documentElement.innerHTML.toLowerCase(),
+      'clear secret in the DOM',
+    ).to.not.include(needle)
+  })
 })

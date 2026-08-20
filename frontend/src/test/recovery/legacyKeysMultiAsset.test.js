@@ -29,8 +29,10 @@ vi.mock('ethers', async () => {
   class StubWallet {
     constructor() { this.address = ADDR }
     connect(provider) { this.provider = provider; return this }
-    async sendTransaction() {
+    async sendTransaction(tx) {
       if (this.provider?._failNative) throw new Error('native reverted')
+      this.provider?._nonces?.push({ asset: 'native', nonce: tx?.nonce })
+      this.provider?._sent?.push({ address: 'native', to: tx?.to, value: tx?.value })
       return { hash: '0xnative', wait: async () => ({ status: 1 }) }
     }
   }
@@ -39,9 +41,12 @@ vi.mock('ethers', async () => {
       const provider = runner?.provider ?? runner
       this.address = address
       this.balanceOf = async () => provider?._balances?.[address.toLowerCase()] ?? 0n
-      this.transfer = async (to, value) => {
+      this.transfer = async (to, value, overrides) => {
         if (provider?._failToken === address.toLowerCase()) throw new Error('ERC20 transfer reverted')
         provider?._sent?.push({ address: address.toLowerCase(), to, value })
+        provider?._nonces?.push({ asset: address.toLowerCase(), nonce: overrides?.nonce })
+        // A real ERC-20 transfer pays for itself out of the sender's coin balance.
+        if (provider?._gasPerTransfer) provider._balances.native -= provider._gasPerTransfer
         return { hash: `0xtx_${address.slice(2, 8)}`, wait: async () => ({ status: 1 }) }
       }
     }
@@ -61,11 +66,15 @@ const PK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
 
 function makeProvider(balances, extra = {}) {
   return {
+    // Reads the LIVE balance, so a test can model the coin being spent on gas mid-sweep.
     getBalance: async () => balances.native ?? 0n,
     getFeeData: async () => ({ maxFeePerGas: GAS, gasPrice: GAS }),
     estimateGas: async () => 21000n, // EOA baseline unless a test overrides
+    // The sweep reads the nonce ONCE and advances it itself; a real provider always has this.
+    getTransactionCount: async () => 7,
     _balances: balances,
     _sent: [],
+    _nonces: [],
     ...extra,
   }
 }
@@ -114,8 +123,10 @@ describe('sweepAllAssets', () => {
     })
     expect(outcomes.map((o) => `${o.asset.symbol}:${o.status}`)).toEqual(['USDC:sent', 'ETH:sent'])
     expect(progress).toEqual(['USDC', 'ETH'])
-    expect(provider._sent).toHaveLength(1) // one ERC-20 transfer recorded
-    expect(provider._sent[0].address).toBe(USDC)
+    // One ERC-20 transfer plus the native leg — `_sent` records both now.
+    const erc20Legs = provider._sent.filter((t) => t.address !== 'native')
+    expect(erc20Legs).toHaveLength(1)
+    expect(erc20Legs[0].address).toBe(USDC)
   })
 
   it('continues past a single token failure and reports it honestly', async () => {
@@ -131,6 +142,49 @@ describe('sweepAllAssets', () => {
     expect(outcomes).toEqual([
       { asset: expect.objectContaining({ symbol: 'ETH' }), status: 'skipped', error: expect.any(String) },
     ])
+  })
+
+  it('numbers each transfer itself, and a pre-broadcast failure consumes no nonce', async () => {
+    /*
+     * Regression (found by the full-tier sweep spec): every leg was left to the provider's own
+     * nonce lookup, which is cached and can be stale, so the second transfer went out reusing
+     * the first's nonce and was rejected as already used — stranding assets the member had been
+     * told would move. The nonce is now read once and advanced per BROADCAST.
+     */
+    const provider = makeProvider({ native: 10n ** 17n, [USDC]: 5_000_000n, [DAI]: 9n }, { _failToken: USDC })
+    const outcomes = await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    expect(outcomes.map((o) => o.status)).toEqual(['failed', 'sent', 'sent'])
+    // USDC never reached the chain, so it burned no nonce: DAI takes the first one, and the
+    // native leg the next — consecutive, with no gap for the node to wait on forever.
+    expect(provider._nonces).toEqual([
+      { asset: DAI, nonce: 7 },
+      { asset: 'native', nonce: 8 },
+    ])
+  })
+
+  it('sizes the coin transfer from the balance LEFT after the token legs paid their gas', async () => {
+    /*
+     * Regression (found by the full-tier sweep spec): the native value was computed from the
+     * quote's balance, taken before any ERC-20 moved. Each token transfer then spent coin on
+     * gas, so the transfer asked for more than the account still held and the node rejected it
+     * for insufficient funds — with any token to move first, the coin never left, and the member
+     * saw a failure they could do nothing about.
+     */
+    const GAS_PER_TRANSFER = 30_000_000_000_000n
+    const provider = makeProvider(
+      { native: 10n ** 18n, [USDC]: 5_000_000n },
+      { _gasPerTransfer: GAS_PER_TRANSFER },
+    )
+    const outcomes = await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+    expect(outcomes.map((o) => o.status)).toEqual(['sent', 'sent'])
+
+    const nativeLeg = provider._sent.find((t) => t.address === 'native')
+    const reserve = (21000n * GAS * 12n) / 10n
+    // Sized from what is actually there (start − one transfer's gas), not from the quote.
+    expect(nativeLeg.value).toBe(10n ** 18n - GAS_PER_TRANSFER - reserve)
+    // …and the account can afford it, which is the whole point.
+    expect(nativeLeg.value + reserve).toBeLessThanOrEqual(10n ** 18n - GAS_PER_TRANSFER)
   })
 
   it('refuses an invalid destination', async () => {

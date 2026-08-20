@@ -420,15 +420,45 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
     if (onProgress) onProgress(o)
   }
 
+  /*
+   * The nonce is tracked HERE rather than left to the provider.
+   *
+   * Every leg is signed by the same account through one provider, which looks the nonce up per
+   * send — and that lookup can be stale. ethers caches it briefly, and a failover RPC pool
+   * (spec 069) can answer from a node that has not yet seen the previous transfer. Either way the
+   * next transfer reuses the previous nonce, the node rejects it as already used, and assets the
+   * member was told would move quietly do not — which is exactly the stranding this function
+   * exists to prevent. (Reproduced by the full-tier sweep spec on a fast local chain, where the
+   * first transfer confirms inside the cache window.)
+   *
+   * Read once, then advance ONLY when a transfer was actually broadcast: an asset that fails
+   * before broadcast consumes no nonce, and one that reverts after broadcast consumes its own,
+   * so the assets behind it never queue up behind a gap that will never be filled.
+   */
+  let nonce = await provider.getTransactionCount(quote.from, 'pending')
+
   for (const { asset, balance } of quote.holdings) {
     if (asset.kind === 'native') {
-      const sendable = balance > quote.nativeGasReserve ? balance - quote.nativeGasReserve : 0n
+      /*
+       * Re-read the coin balance instead of trusting the quote's.
+       *
+       * Every ERC-20 leg above paid its gas out of THIS balance, so by the time the native leg
+       * runs the quote's figure is stale by exactly that much — and the reserve only ever covered
+       * the native transfer's own gas. Sending `quotedBalance - reserve` therefore asks to spend
+       * more than the account still holds, and the node rejects it for insufficient funds: with
+       * any ERC-20 to move first, the coin was left behind every time, reported as a failure the
+       * member could do nothing about. (Found by the full-tier sweep spec; the unit suite could
+       * not see it, because a stubbed provider's balance never moves.)
+       */
+      const current = await provider.getBalance(quote.from)
+      const sendable = current > quote.nativeGasReserve ? current - quote.nativeGasReserve : 0n
       if (sendable <= 0n) {
         record({ asset, status: 'skipped', error: 'Not enough to cover the network fee.' })
         continue
       }
       try {
-        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: quote.nativeGasLimit })
+        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: quote.nativeGasLimit, nonce })
+        nonce += 1
         await tx.wait()
         record({ asset, status: 'sent', txHash: tx.hash })
       } catch (e) {
@@ -438,7 +468,8 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
     }
     try {
       const erc20 = new ethers.Contract(asset.address, TRANSFER_ABI, signer)
-      const tx = await erc20.transfer(to, balance)
+      const tx = await erc20.transfer(to, balance, { nonce })
+      nonce += 1
       await tx.wait()
       record({ asset, status: 'sent', txHash: tx.hash })
     } catch (e) {

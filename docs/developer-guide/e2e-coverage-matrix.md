@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 49 |
-| 🟡 partial | 7 |
-| 🔴 absent | 68 |
+| 🟢 covered | 51 |
+| 🟡 partial | 8 |
+| 🔴 absent | 65 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 15 · 🟡 5 · 🔴 25 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 17 · 🟡 6 · 🔴 22 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -201,14 +201,14 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `recovery.import-legacy-key` | Import an old private key or word list and have it stored encrypted | 🔴 absent | none | — (proposed: no-chain) | #1234 |  |
-| `recovery.sweep-per-asset-outcomes` | Sweep a recovered account and see a per-asset result when one asset fails | 🔴 absent | none | — (proposed: on-chain) | #1234 |  |
+| `recovery.import-legacy-key` | Import an old private key or word list and have it stored encrypted | 🟢 covered | settled | `no-chain` | `28-legacy-recovery.cy.js` (LKR-01, LKR-02, LKR-03, LKR-04) |  |
+| `recovery.sweep-per-asset-outcomes` | Sweep a recovered account and see a per-asset result when one asset fails | 🟢 covered | settled | `on-chain` | `28-legacy-recovery-sweep.cy.js` (LKR-S1, LKR-S2, LKR-S3) |  |
 
 ### `063-cross-chain-legacy-recovery` — Cross-chain legacy recovery
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `recovery.sweep-across-chains` | Sweep a recovered account on more than one chain | 🔴 absent | none | — (proposed: on-chain) | #1234 |  |
+| `recovery.sweep-across-chains` | Sweep a recovered account on more than one chain | 🟡 partial | flow | `no-chain` | `28-legacy-recovery.cy.js` (LKR-05) | the SEND is never driven — discovery finds the Solana funds and offers the control, but no SOL or BTC leaves the account; retiered from the proposed on-chain because both venues are non-EVM and reached over HTTP |
 
 ### `065-liquid-delegated-staking` — Liquid delegated staking
 
