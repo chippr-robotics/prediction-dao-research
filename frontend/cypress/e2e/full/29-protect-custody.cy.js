@@ -103,7 +103,13 @@ function waitForGuard(address, expected, tries = 60) {
   return fixture('vaultInfo', { address }).then((info) => {
     if (info.guard.toLowerCase() === expected.toLowerCase()) return info
     if (tries <= 0) {
-      throw new Error(`vault ${address} still reports guard ${info.guard}, expected ${expected}`)
+      // Report what the vault DID, not just what it lacks: "guard is zero after 2 executed
+      // transactions" and "after 0" are completely different bugs, and the screenshot cannot
+      // tell them apart.
+      throw new Error(
+        `vault ${address} still reports guard ${info.guard} after executing ${info.nonce} ` +
+        `transaction(s); expected guard ${expected}`,
+      )
     }
     cy.wait(1000, { log: false })
     return waitForGuard(address, expected, tries - 1)
@@ -128,8 +134,7 @@ function asCoOwner(address) {
  * only order the chain will accept.
  */
 function approveAndExecuteTop(address, expectedNonce) {
-  cy.get(PENDING_ROW, { timeout: 60000 })
-    .first()
+  cy.contains(PENDING_ROW, `nonce ${expectedNonce - 1}`, { timeout: 60000 })
     .contains('button', 'Approve', { timeout: 60000 })
     .should('not.be.disabled')
     .click()
@@ -145,12 +150,16 @@ function approveAndExecuteTop(address, expectedNonce) {
  */
 function executeTop(address, expectedNonce) {
   /*
-   * Wait for a row that is genuinely READY, not merely present, then wait for the CHAIN to say it
-   * landed. The queue emptying a row is not proof the transaction mined, and on a slow runner the
-   * next step was being clicked while the previous was still in flight.
+   * Execute the proposal whose SAFE NONCE is the one the vault will accept next, found by the
+   * nonce the row itself displays — not by rendered position. A multi-step change queues several
+   * proposals at once and nothing promises the list is in nonce order, so `.first()` was a guess
+   * that happened to hold on this machine.
+   *
+   * Then wait for the CHAIN to say it landed: a row leaving the queue is not proof it mined, and
+   * on a slow runner the next step was being clicked while the previous was still in flight.
    */
-  cy.get(PENDING_ROW, { timeout: 60000 })
-    .first()
+  const safeNonce = expectedNonce - 1
+  cy.contains(PENDING_ROW, `nonce ${safeNonce}`, { timeout: 60000 })
     .contains('button', 'Execute', { timeout: 60000 })
     .should('not.be.disabled')
     .click()
@@ -461,6 +470,13 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
         SCENARIO.rules.forEach((r) => addCoinRule(r.perTx))
         cy.contains('button', 'Propose policy change').click()
       })
+
+      /*
+       * Adoption is two proposals — configure the rules, then point the guard slot at them.
+       * Asserted before executing anything, so "only one was created" fails here saying that,
+       * rather than later as a vault that mysteriously ends up ungoverned.
+       */
+      cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length', 2)
 
       // 1-of-1: proposing already recorded the only approval the vault needs, so each step is
       // executable the moment it appears — there is no second owner to wait for.
