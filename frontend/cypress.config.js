@@ -697,6 +697,269 @@ export default defineConfig({
          *          deploymentAddresses
          */
         /**
+         * Fixtures for bridge + supplied liquidity (spec 067).
+         *
+         * Both routers are deployed on the local chain by `deploy-bridge-liquidity.js` (inside
+         * `setup:e2e`), pointed at contracts/mocks stand-ins for Across and Uniswap. Those doubles
+         * are what make the issue's central assertions possible at all: the SpokePool records
+         * `lastDepositor`, and the position manager is a real ERC-721, so "the member is the
+         * depositor" and "the position minted to the member" are read from chain state rather than
+         * inferred from a success message.
+         *
+         * A trading pool has to be LISTED before it can be supplied to, and `listPool`
+         * cross-checks the listing against the pool it names (token0/token1/fee), so the fixture
+         * deploys a real MockUniswapV3Pool rather than listing an arbitrary address.
+         *
+         * action ∈ listTradingPool | poolPaused | setPaused | lastDepositor | positionOwner |
+         *          tokenBalanceOf
+         */
+        async liquidityFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+
+          // Signatures copied from the contracts, not written from memory — a guessed one selects a
+          // different function and reverts with nothing to explain it (see legacyFixture).
+          const ROUTER_ABI = [
+            'function listPool((uint8 kind, bool enabled, uint24 feeTier, address token0, address token1, address poolAddress, uint256 maxDeposit0PerTx, uint256 maxDeposit1PerTx) pool)',
+            'function setPoolEnabled(bytes32 poolId, bool enabled)',
+            'function computePoolId(uint8 kind, address poolAddress, address token0, address token1) pure returns (bytes32)',
+            'function getPool(bytes32 poolId) view returns ((uint8 kind, bool enabled, uint24 feeTier, address token0, address token1, address poolAddress, uint256 maxDeposit0PerTx, uint256 maxDeposit1PerTx))',
+            'function poolAt(uint256 index) view returns (bytes32)',
+            'function pause()',
+            'function unpause()',
+            'function paused() view returns (bool)',
+            'function poolCount() view returns (uint256)',
+          ]
+          const ERC721_ABI = [
+            'function ownerOf(uint256 tokenId) view returns (address)',
+            'function balanceOf(address owner) view returns (uint256)',
+            // MockPositionManager's own counter: the id the NEXT mint will use. Read before a
+            // supply so the test knows which token to look up afterwards — token ids accumulate
+            // across specs on a shared node, so a hardcoded `1` asserts on whatever an earlier
+            // run happened to leave behind.
+            'function nextTokenId() view returns (uint256)',
+            'function positions(uint256 tokenId) view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)',
+          ]
+          const ERC20_ABI = [
+            'function balanceOf(address) view returns (uint256)',
+            'function mint(address to, uint256 amount)',
+          ]
+
+          const liquidityRouter = d.contracts.liquidityRouter
+
+          try {
+            switch (action) {
+              case 'listTradingPool': {
+                /*
+                 * Token order matters to Uniswap: token0 < token1 by address, and `listPool`
+                 * cross-checks the listing against the pool contract it names — a listing whose
+                 * fee tier or token order disagrees with the real pool is REJECTED, which is the
+                 * point of that check. So the fixture deploys a pool with exactly the tuple it
+                 * then lists.
+                 */
+                const [token0, token1] = [args.tokenA, args.tokenB].sort((a, b) =>
+                  a.toLowerCase() < b.toLowerCase() ? -1 : 1,
+                )
+                const feeTier = args.feeTier ?? 3000
+                const router0 = new ethers.Contract(liquidityRouter, ROUTER_ABI, admin)
+
+                /*
+                 * REUSE an already-curated pool for this pair AND FEE TIER. Listing a second one is not just
+                 * wasteful: every listing renders as its own row for the same two tokens on the
+                 * same network, and a spec that opens "the Amoy row" then has two identical rows
+                 * to choose between — so which pool it supplied to would depend on curation order.
+                 * One pool per (pair, fee tier) keeps the row a spec opens the pool it asserts on,
+                 * and keeps repeated local runs from piling up listings on a long-lived node. The
+                 * fee tier is what lets two specs each own a pool of the same pair: it is the one
+                 * distinguishing thing the row renders ("0.30% fee").
+                 */
+                const existingCount = Number(await router0.poolCount())
+                for (let i = 0; i < existingCount; i += 1) {
+                  const id = await router0.poolAt(i)
+                  const listed = await router0.getPool(id)
+                  if (
+                    Number(listed.kind) === 2 &&
+                    listed.enabled &&
+                    Number(listed.feeTier) === feeTier &&
+                    listed.token0.toLowerCase() === token0.toLowerCase() &&
+                    listed.token1.toLowerCase() === token1.toLowerCase()
+                  ) {
+                    return {
+                      ok: true,
+                      poolId: id,
+                      poolAddress: listed.poolAddress,
+                      token0: listed.token0,
+                      token1: listed.token1,
+                      feeTier: Number(listed.feeTier),
+                      reused: true,
+                    }
+                  }
+                }
+                const artifactPath = resolve(
+                  __dirname, '..', 'artifacts', 'contracts', 'mocks',
+                  'MockUniswapV3Pool.sol', 'MockUniswapV3Pool.json',
+                )
+                const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'))
+                const deployed = await new ethers.ContractFactory(
+                  artifact.abi, artifact.bytecode, admin,
+                // Tick spacing follows the fee tier, as Uniswap's factory enforces it
+                // (500→10, 3000→60, 10000→200). The router derives full-range ticks from the
+                // pool's own spacing, so a mismatched pair mints a position at the wrong bounds.
+                ).deploy(token0, token1, feeTier, { 500: 10, 3000: 60, 10000: 200 }[feeTier] ?? 60)
+                await deployed.waitForDeployment()
+                const poolAddress = await deployed.getAddress()
+
+                const router = new ethers.Contract(liquidityRouter, ROUTER_ABI, admin)
+                const TRADING_LP = 2 // ILiquidityRouter.PoolKind — Unlisted, BridgeLp, TradingLp
+                const rc = await (await router.listPool({
+                  kind: TRADING_LP,
+                  enabled: true,
+                  feeTier,
+                  token0,
+                  token1,
+                  poolAddress,
+                  maxDeposit0PerTx: 0n,
+                  maxDeposit1PerTx: 0n,
+                })).wait(1)
+                const poolId = await router.computePoolId(TRADING_LP, poolAddress, token0, token1)
+                return { ok: rc.status === 1, poolId, poolAddress, token0, token1, feeTier }
+              }
+              case 'poolPaused': {
+                const router = new ethers.Contract(liquidityRouter, ROUTER_ABI, provider)
+                return { ok: true, paused: await router.paused() }
+              }
+              case 'setPaused': {
+                // IDEMPOTENT on purpose. OpenZeppelin's Pausable reverts `ExpectedPause` /
+                // `EnforcedPause` when the flag is already where you are asking it to go, so a
+                // spec establishing a known starting state would fail on the state it wanted.
+                const router = new ethers.Contract(liquidityRouter, ROUTER_ABI, admin)
+                const want = Boolean(args.paused)
+                if ((await router.paused()) === want) return { ok: true, paused: want, changed: false }
+                const rc = await (await (want ? router.pause() : router.unpause())).wait(1)
+                return { ok: rc.status === 1, paused: want, changed: true }
+              }
+              case 'positionOwner': {
+                const nfpm = new ethers.Contract(d.uniswapPositionManager, ERC721_ABI, provider)
+                const [owner, position] = await Promise.all([
+                  nfpm.ownerOf(BigInt(args.tokenId)),
+                  nfpm.positions(BigInt(args.tokenId)),
+                ])
+                return { ok: true, owner, liquidity: position.liquidity.toString() }
+              }
+              case 'positionCounters': {
+                // `nextTokenId` identifies the token a supply is ABOUT to mint; `balance` is how
+                // many the member holds. Together they let a flow assert on the position it just
+                // created without assuming it is the only one on the chain.
+                const nfpm = new ethers.Contract(d.uniswapPositionManager, ERC721_ABI, provider)
+                const [nextTokenId, balance] = await Promise.all([
+                  nfpm.nextTokenId(),
+                  nfpm.balanceOf(args.owner),
+                ])
+                return { ok: true, nextTokenId: Number(nextTokenId), balance: Number(balance) }
+              }
+              case 'tokenBalanceOf': {
+                const token = new ethers.Contract(args.token, ERC20_ABI, provider)
+                return { ok: true, balance: (await token.balanceOf(args.address)).toString() }
+              }
+              default:
+                throw new Error(`liquidityFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+        /**
+         * Fixtures for the bridge half of spec 067 (issue #1236).
+         *
+         * Everything a bridge flow needs that the app cannot do for itself: an operator-curated
+         * route, the platform rate on the `bridge.transfer` service, and — the point of the whole
+         * exercise — what the SpokePool wrote down. `MockAcrossSpokePool` records `depositor`
+         * verbatim, and that field is the one the refund path depends on: Across refunds an
+         * unfilled deposit to the depositor on the ORIGIN chain, so a router that named itself
+         * there would strand every member's refund.
+         *
+         * action ∈ setRoute | lastDeposit | setBridgeFeeBps | bridgePaused
+         */
+        async bridgeFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+
+          // Signatures copied from contracts/bridge/IBridgeRouter.sol and contracts/fees, never
+          // written from memory: a plausible-looking guess selects a different function and
+          // reverts with nothing to explain it.
+          const BRIDGE_ABI = [
+            'function setRoute((address inputToken, bool enabled, bool nativeInput, uint32 expectedFillSeconds, address outputToken, uint256 destinationChainId, uint256 maxAmount) route)',
+            'function computeRouteId(address inputToken, address outputToken, uint256 destinationChainId) pure returns (bytes32)',
+            'function paused() view returns (bool)',
+            'function routeCount() view returns (uint256)',
+          ]
+          const SPOKE_ABI = [
+            'function lastDepositor() view returns (address)',
+            'function lastRecipient() view returns (address)',
+            'function lastInputAmount() view returns (uint256)',
+            'function depositCount() view returns (uint256)',
+          ]
+          const FEE_ABI = [
+            'function setFeeBps(bytes32 serviceId, uint16 bps)',
+            'function feeBps(bytes32 serviceId) view returns (uint16)',
+          ]
+          const BRIDGE_TRANSFER = ethers.keccak256(ethers.toUtf8Bytes('bridge.transfer'))
+
+          try {
+            switch (action) {
+              case 'setRoute': {
+                const router = new ethers.Contract(d.contracts.bridgeRouter, BRIDGE_ABI, admin)
+                const route = {
+                  inputToken: args.inputToken,
+                  enabled: args.enabled !== false,
+                  nativeInput: Boolean(args.nativeInput),
+                  expectedFillSeconds: args.expectedFillSeconds ?? 120,
+                  outputToken: args.outputToken,
+                  destinationChainId: BigInt(args.destinationChainId),
+                  maxAmount: BigInt(args.maxAmount ?? 0),
+                }
+                const rc = await (await router.setRoute(route)).wait(1)
+                const routeId = await router.computeRouteId(
+                  route.inputToken, route.outputToken, route.destinationChainId,
+                )
+                return { ok: rc.status === 1, routeId }
+              }
+              case 'lastDeposit': {
+                const spoke = new ethers.Contract(d.acrossSpokePool, SPOKE_ABI, provider)
+                const [depositor, recipient, amount, count] = await Promise.all([
+                  spoke.lastDepositor(), spoke.lastRecipient(), spoke.lastInputAmount(), spoke.depositCount(),
+                ])
+                return {
+                  ok: true,
+                  depositor,
+                  recipient,
+                  amount: amount.toString(),
+                  depositCount: Number(count),
+                }
+              }
+              case 'setBridgeFeeBps': {
+                const fees = new ethers.Contract(d.contracts.feeRouter, FEE_ABI, admin)
+                const rc = await (await fees.setFeeBps(BRIDGE_TRANSFER, Number(args.bps))).wait(1)
+                return { ok: rc.status === 1, bps: Number(await fees.feeBps(BRIDGE_TRANSFER)) }
+              }
+              case 'bridgeFeeBps': {
+                const fees = new ethers.Contract(d.contracts.feeRouter, FEE_ABI, provider)
+                return { ok: true, bps: Number(await fees.feeBps(BRIDGE_TRANSFER)) }
+              }
+              default:
+                throw new Error(`bridgeFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+        /**
          * Fixtures for Protect (specs 043 / 049 / 068).
          *
          * A Safe is a real contract, and every test here needs one that already exists — so the

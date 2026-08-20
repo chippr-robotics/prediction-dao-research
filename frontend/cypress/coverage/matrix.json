@@ -1665,46 +1665,50 @@
         {
           "id": "bridge.deposit-member-is-depositor",
           "name": "Bridge funds with yourself as the depositor, so an unfilled deposit refunds to you",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1236"
+          "tests": [
+            "frontend/cypress/e2e/full/30-bridge-liquidity.cy.js::BL-03"
+          ]
         },
         {
           "id": "liquidity.supply-uniswap-position",
           "name": "Supply a Uniswap position, minted to you and not the router",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1236"
+          "tests": [
+            "frontend/cypress/e2e/full/30-bridge-liquidity.cy.js::BL-01"
+          ]
         },
         {
           "id": "liquidity.pause-stops-new-only",
           "name": "A pause stops new supplies while existing positions stay withdrawable",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1236"
+          "tests": [
+            "frontend/cypress/e2e/full/30-bridge-liquidity.cy.js::BL-02"
+          ]
         },
         {
           "id": "bridge.fee-consent-ceiling",
           "name": "The quoted bps is a ceiling on what can be charged",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "disclosure",
-          "tests": [],
-          "issue": "#1236"
+          "tests": [
+            "frontend/cypress/e2e/full/30-bridge-liquidity.cy.js::BL-04"
+          ]
         }
       ]
     },

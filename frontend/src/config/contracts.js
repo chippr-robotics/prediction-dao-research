@@ -96,8 +96,19 @@ const HARDHAT_CONTRACTS = {
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
   // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
   // per-network empty state (FR-051) — never invented availability.
-  bridgeRouter: '',
-  liquidityRouter: '',
+  /*
+   * Spec 067 routers. NONCE-DERIVED like the two entries at the bottom of this map, and for the
+   * same reason: `deploy-bridge-liquidity.js` runs as a targeted deploy inside `setup:e2e` (after
+   * the custody fixtures, before the seed) and `deployProxy` uses plain CREATE. Inserting or
+   * reordering a deploy in that script silently repoints these at addresses nothing was deployed
+   * to — `frontend/cypress/e2e/full/30-bridge-liquidity.cy.js` asserts both against the chain, so
+   * a reordering fails saying so rather than as "the Bridge surface is unavailable".
+   *
+   * On a local chain the routers point at contracts/mocks stand-ins for Across and Uniswap, which
+   * that same script deploys. They are test doubles and cannot reach a real network.
+   */
+  bridgeRouter: '0x4c5859f0F772848b2D91F1D83E2Fe57935348029',
+  liquidityRouter: '0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154',
   membershipVoucher: '0xF2fc5Ac192E7e48B2EE95D3528870c6ED26908e4',
   voucherBatchMinter: '0xE0b0F625F876f7D78413cc6c402FB92C8E47Ea05',
   tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
