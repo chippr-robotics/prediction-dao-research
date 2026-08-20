@@ -102,3 +102,37 @@ deposits-open provider exists) with the provider's addresses; the capability and
 helpers pick it up automatically. A follow-up is the Polygon-PoS-native sPOL
 deposit path via `sPOLChild` (chainId 137, cross-chain settle) — see research.md
 R2.
+
+## End-to-end coverage (spec 094, issue #1237)
+
+`frontend/cypress/e2e/full/31-earn-lend-stake.cy.js` (on-chain tier) covers the three
+staking rows of the coverage matrix alongside the two lending ones:
+
+| Flow | Test | Settles |
+|---|---|---|
+| `earn.stake-and-delegate` | `ES-01` | The validator's own books credit the member, and exactly that much POL left their wallet |
+| `earn.unstake` | `ES-02` | The stake leaves the validator into an unbond that is *not* claimable, then — one checkpoint later — comes back |
+| `admin.staking-controls` | `ES-03` | The operator's console pauses the router and retires a validator, and the member's screen tells the truth about both |
+
+**Why delegation is the half under test.** It is a direct member call to Polygon's
+`ValidatorShare` with no FairWins contract in the path, so "we never hold your funds" is
+a claim about the calldata rather than about a router's balance. The liquid paths route
+through `StakingRouter` only when a fee applies, and spec 060's own suite already settles
+the rate and the `maxFeeBps` ceiling.
+
+**The local wiring.** `scripts/deploy/deploy-staking-router.js` gained a local-doubles
+branch — the same shape `deploy-bridge-liquidity.js` uses — so on `hardhat`/`localhost`
+it stands up `contracts/mocks/MockStakingProviders.sol` (Lido, sPOL) and
+`contracts/mocks/MockPolygonDelegation.sol` (StakeManager + one ValidatorShare), points
+the router at them, and allowlists the local validator. It is wired into `setup:e2e` as
+`deploy:local:staking`, and `config/networks.js` carries a DEV-only `staking` block for
+chain 80002 behind the existing `E2E_AMOY_LOCAL` seam.
+
+One detail in `MockPolygonDelegation.sol` is load-bearing rather than incidental: the
+token pull runs **through the StakeManager**, because that is the spender
+`buildDelegateCalls` approves. A mock that pulled from the ValidatorShare directly would
+pass while the app approved the wrong contract.
+
+**Note on the allowlist.** `overlayRouterConfig` drops any curated validator the router
+does not list, so on a chain where the router IS deployed the allowlist — not the config
+file — decides what is offered. That is what `ES-03` asserts from both ends.

@@ -71,6 +71,8 @@
  "artifacts/contracts/mocks/MockERC4626Vault.sol/MockERC4626Vault.json": "6ee32a3b28d7b25d86c429e1c8c919f7d0e52122c2a779fe4c8ca6e057d75307",
  "artifacts/contracts/mocks/MockEntryPointStake.sol/MockEntryPointStake.json": "6bbf1cf35ba667137fb2e3b9ec5a799a7e5399ca5e3ed0bdd56f26308c14602e",
  "artifacts/contracts/mocks/MockLyingFeeRouter.sol/MockLyingFeeRouter.json": "d509bc65101dc776b7463c2e0631970a60b23d061d2d506e079d3b53c14f656c",
+ "artifacts/contracts/mocks/MockPolygonDelegation.sol/MockPolygonStakeManager.json": "1a30ec3e90c732eae91302931614158427ebf1fb736f6a0a48ea2fc287e703f9",
+ "artifacts/contracts/mocks/MockPolygonDelegation.sol/MockValidatorShare.json": "d69e2ea6f8a37708b4ed8e001542fc5a30d6bf83da4e38c4c601ea1240ad28a2",
  "artifacts/contracts/mocks/MockPoolCompliance.sol/MockPoolMembership.json": "a5957a866b9e1f41b6b067c97bed20ff34b7ea2ad4803596f1a02d3f6b0062db",
  "artifacts/contracts/mocks/MockPoolCompliance.sol/MockPoolSanctions.json": "708f545de72c6f7aaa22612315ce227e2e210cebfa94398fe674fb3cc43274b7",
  "artifacts/contracts/mocks/MockPositionManager.sol/MockPositionManager.json": "53c02d8d979199e4bb473cc0752238b4fe2a8d7c2bce657bd70b16ee7da878a0",

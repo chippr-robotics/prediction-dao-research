@@ -39,9 +39,20 @@ describe('stakingRouterServiceIdFor', () => {
 })
 
 describe('stakingRouter address resolution', () => {
-  it('is falsy on every configured chain until the router is deployed', () => {
-    for (const chainId of [1, 63, 137, 80002, 1337]) {
+  /*
+   * 1337 is deliberately NOT in this list. The local sandbox genuinely has a StakingRouter now —
+   * `setup:e2e` / `setup:local` deploy one (with contracts/mocks stand-ins for Lido, sPOL and the
+   * Polygon StakeManager) so the specs 065/066 flows have a router to read, pause and curate.
+   * What this test is about is the SHIPPED networks: none of them has one yet, so the member app
+   * falls back to spec-065 fee-free direct staking there.
+   */
+  it('is falsy on every shipped chain until the router is deployed', () => {
+    for (const chainId of [1, 63, 137, 80002]) {
       expect(getContractAddressForChain('stakingRouter', chainId)).toBeFalsy()
     }
+  })
+
+  it('resolves on the local sandbox, which does have one', () => {
+    expect(getContractAddressForChain('stakingRouter', 1337)).toMatch(/^0x[0-9a-fA-F]{40}$/)
   })
 })

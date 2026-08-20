@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 60 |
+| 🟢 covered | 63 |
 | 🟡 partial | 8 |
-| 🔴 absent | 56 |
+| 🔴 absent | 53 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 25 · 🟡 6 · 🔴 14 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 27 · 🟡 6 · 🔴 12 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -214,8 +214,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `earn.stake-and-delegate` | Stake into a delegated position and see it | 🔴 absent | none | — (proposed: on-chain) | #1237 |  |
-| `earn.unstake` | Unstake and return the position to the wallet | 🔴 absent | none | — (proposed: on-chain) | #1237 |  |
+| `earn.stake-and-delegate` | Stake into a delegated position and see it | 🟢 covered | settled | `on-chain` | `31-earn-lend-stake.cy.js` (ES-01) |  |
+| `earn.unstake` | Unstake and return the position to the wallet | 🟢 covered | settled | `on-chain` | `31-earn-lend-stake.cy.js` (ES-02) |  |
 
 ### `067-bridge-pool-liquidity` — Bridge and supplied liquidity
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 15 · 🟡 1 · 🔴 22 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 16 · 🟡 1 · 🔴 21 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -408,7 +408,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `admin.staking-controls` | An operator pauses or retires a staking route | 🔴 absent | none | — (proposed: on-chain) | #1237 |  |
+| `admin.staking-controls` | An operator pauses or retires a staking route | 🟢 covered | settled | `on-chain` | `31-earn-lend-stake.cy.js` (ES-03) |  |
 
 ### `069-network-endpoints-user-panel` — Network endpoints
 

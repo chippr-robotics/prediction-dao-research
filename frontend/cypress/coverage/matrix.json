@@ -1620,24 +1620,26 @@
         {
           "id": "earn.stake-and-delegate",
           "name": "Stake into a delegated position and see it",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1237"
+          "tests": [
+            "frontend/cypress/e2e/full/31-earn-lend-stake.cy.js::ES-01"
+          ]
         },
         {
           "id": "earn.unstake",
           "name": "Unstake and return the position to the wallet",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1237"
+          "tests": [
+            "frontend/cypress/e2e/full/31-earn-lend-stake.cy.js::ES-02"
+          ]
         }
       ]
     },
@@ -1649,13 +1651,14 @@
         {
           "id": "admin.staking-controls",
           "name": "An operator pauses or retires a staking route",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1237"
+          "tests": [
+            "frontend/cypress/e2e/full/31-earn-lend-stake.cy.js::ES-03"
+          ]
         }
       ]
     },
