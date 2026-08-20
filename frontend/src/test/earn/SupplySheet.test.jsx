@@ -843,3 +843,36 @@ describe('SupplySheet — the pool a member opened is the pool they supply', () 
     expect(await screen.findByLabelText('Amount (DAI)')).toBeInTheDocument()
   })
 })
+
+// =========================================================================================
+describe('SupplySheet — a spent position never hides a live one (FR-021/FR-024)', () => {
+  /*
+   * Also found by the spec-067 e2e flow: supplying twice mints a SECOND position NFT, and a
+   * position withdrawn to zero is kept rather than deleted. Matching the pool's position by
+   * first-match meant the emptied one shadowed the live one, and the sheet told a member with
+   * money in the pool that they had nothing to withdraw — on the one path the spec says is
+   * always open.
+   */
+  const spentPosition = () => ({ ...tradingPosition(), tokenId: 41n, liquidity: 0n })
+
+  it('offers the exit when an emptied position is listed BEFORE a live one', async () => {
+    const user = userEvent.setup()
+    renderTrading({ positions: [spentPosition(), tradingPosition()] })
+
+    const withdrawTab = screen.getByRole('tab', { name: /Withdraw/i })
+    expect(withdrawTab).toBeEnabled()
+    await user.click(withdrawTab)
+
+    await user.click(screen.getByRole('button', { name: /Withdraw USDC/i }))
+    await waitFor(() => expect(sendOnChain).toHaveBeenCalled())
+    // And it exits the LIVE position — token 42 — not the empty one it was shadowed by.
+    const [, calls] = sendOnChain.mock.calls[0]
+    expect(calls.length).toBeGreaterThan(1) // decreaseLiquidity + collect: there IS liquidity
+  })
+
+  it('still shows a fully-withdrawn position as nothing to withdraw', async () => {
+    // The change is about ORDERING, not about pretending an empty position is not empty.
+    renderTrading({ positions: [spentPosition()] })
+    expect(screen.getByRole('tab', { name: /Withdraw/i })).toBeDisabled()
+  })
+})

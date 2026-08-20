@@ -29,14 +29,22 @@ const MEMBER = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // hardhat #0
 const USDC = '0xbc4D54AE49ED9C6075770CD6acA930A728dcf526'   // the local payment token (18 dec here)
 const WMATIC = '0x007e106a5664D48e02f571b58694B74c9D5c22a1' // the local wrapped native
 const ROUTER = '0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154' // liquidityRouter (nonce-derived)
+const BRIDGE_ROUTER = '0x4c5859f0F772848b2D91F1D83E2Fe57935348029' // bridgeRouter (nonce-derived)
+// The destination leg. Real USDC on Polygon — the app's own registry entry for chain 137, which
+// is what the destination selector offers and what the curated route must therefore name.
+const USDC_ON_POLYGON = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
 
 const SUPPLY_URL = '/wallet?tab=earn&view=supply'
+const BRIDGE_URL = '/wallet?tab=paytransfer&view=bridge'
 
-const fixture = (action, args = {}) =>
-  cy.task('liquidityFixture', { action, args }).then((r) => {
-    expect(r.ok, `liquidityFixture ${action}: ${r.error || 'no error message returned'}`).to.equal(true)
+const task = (name) => (action, args = {}) =>
+  cy.task(name, { action, args }).then((r) => {
+    expect(r.ok, `${name} ${action}: ${r.error || 'no error message returned'}`).to.equal(true)
     return r
   })
+
+const fixture = task('liquidityFixture')
+const bridge = task('bridgeFixture')
 
 /**
  * Open the sheet for the pool THIS SPEC listed. The whole row is the control (SupplyView).
@@ -223,6 +231,139 @@ describe('Bridge and supplied liquidity (spec 067)', () => {
         })
       })
 
+    })
+  })
+
+  // ── The bridge half ─────────────────────────────────────────────────────────────────────
+  //
+  // A bridge price cannot be derived client-side (research R10), so the app asks the
+  // relay-gateway and the gateway asks Across. There is no gateway on this machine, so the
+  // quote endpoint is STUBBED — and only that. Everything the flows assert (the route, the
+  // rate, the depositor Across recorded, whether anything moved at all) comes from the chain.
+  //
+  // The stub answers arithmetic Across's own contract enforces: `net - totalRelayFee` IS
+  // `outputAmount`. A stub that did not reconcile would make the app drop its itemization and
+  // hide the very lines BL-04 reads.
+  const stubQuote = () => {
+    cy.intercept('GET', '**/v1/bridge/80002/quote*', (req) => {
+      const net = BigInt(new URL(req.url).searchParams.get('amount'))
+      const relayerGasFee = 2_000_000_000_000_000n // 0.002 in 18-dec units
+      const lpFee = 1_000_000_000_000_000n
+      const relayerCapitalFee = 1_000_000_000_000_000n
+      const total = relayerGasFee + lpFee + relayerCapitalFee
+      const nowSec = Math.floor(Date.now() / 1000)
+      req.reply({
+        statusCode: 200,
+        body: {
+          totalRelayFee: { total: total.toString() },
+          relayerGasFee: { total: relayerGasFee.toString() },
+          lpFee: { total: lpFee.toString() },
+          relayerCapitalFee: { total: relayerCapitalFee.toString() },
+          outputAmount: (net - total).toString(),
+          quoteTimestamp: String(nowSec),
+          fillDeadline: String(nowSec + 3600),
+          exclusivityDeadline: '0',
+          inputToken: USDC,
+          outputToken: USDC_ON_POLYGON,
+        },
+      })
+    }).as('bridgeQuote')
+  }
+
+  const openBridge = () => {
+    cy.mockWeb3Provider({ account: MEMBER, preAuthorized: true, realBalances: true })
+    cy.visit(BRIDGE_URL)
+    // The route list is read from the chain; the amount field is only useful once it is in.
+    cy.get('#bridge-amount', { timeout: 60000 }).should('be.enabled')
+  }
+
+  it('[BL-03] bridge.deposit-member-is-depositor — Across records the member, so an unfilled deposit refunds to them', () => {
+    /*
+     * `depositV3` is passed `msg.sender`, never `address(this)`. That single argument is why
+     * `IBridgeRouter` has no rescue and no claim-refund function: an unfilled deposit is
+     * returned by Across to the DEPOSITOR on the origin chain, so as long as that is the
+     * member, there is nothing for FairWins to hold and nothing to hand back. Swapping it for
+     * `address(this)` compiles, passes every unit test about amounts, and quietly makes the
+     * router the only party Across will ever refund.
+     */
+    bridge('setBridgeFeeBps', { bps: 0 })
+    bridge('setRoute', { inputToken: USDC, outputToken: USDC_ON_POLYGON, destinationChainId: 137 })
+
+    bridge('lastDeposit').then(({ depositCount: before }) => {
+      stubQuote()
+      openBridge()
+
+      cy.get('#bridge-amount').type('12')
+      cy.wait('@bridgeQuote')
+      cy.contains('button', /^Bridge /, { timeout: 20000 }).should('not.be.disabled').click()
+
+      // "Sent", not "submitted but unconfirmed": the app only says this once it has read the
+      // deposit back out of the mined receipt, which is the honest bar for having bridged.
+      cy.contains(/Sent from Polygon Amoy/i, { timeout: 60000 }).should('be.visible')
+
+      bridge('lastDeposit').then((deposit) => {
+        expect(deposit.depositCount, 'exactly one deposit reached Across').to.equal(before + 1)
+        expect(deposit.depositor.toLowerCase(), 'Across recorded the MEMBER as depositor')
+          .to.equal(MEMBER.toLowerCase())
+        expect(deposit.depositor.toLowerCase(), 'never the router — that would strand the refund')
+          .to.not.equal(BRIDGE_ROUTER.toLowerCase())
+        expect(deposit.recipient.toLowerCase()).to.equal(MEMBER.toLowerCase())
+        // At a zero rate the whole amount is bridged: the fee split takes nothing.
+        expect(deposit.amount, 'the full amount reached Across').to.equal((12n * 10n ** 18n).toString())
+      })
+
+      // And the router keeps nothing (FR-013). A residue here is custody by accident.
+      fixture('tokenBalanceOf', { token: USDC, address: BRIDGE_ROUTER }).then(({ balance }) => {
+        expect(balance, 'the router holds no member funds after a bridge').to.equal('0')
+      })
+    })
+  })
+
+  it('[BL-04] bridge.fee-consent-ceiling — the disclosed rate is a ceiling, and a zero rate shows no fee line', () => {
+    /*
+     * Both spec-067 fee services ship at RATE 0, cap 250 bps, and nothing here implies
+     * otherwise: the flow ends by putting the rate back to zero and checking that the confirm
+     * screen then carries no fee line AT ALL — not a line reading 0.00% (FR-029).
+     *
+     * The ceiling is the other half. The bps the member was shown travels back into the
+     * calldata as `maxFeeBps`, and `BridgeRouter.bridgeWithFee` reverts `FeeAboveQuoted` when
+     * the live rate is above it. So this flow raises the rate BEHIND THE MEMBER — after they
+     * have read the price and before they sign — and proves the transfer is refused rather
+     * than repriced. Nothing reached Across; that is the assertion, not the error text.
+     */
+    bridge('setRoute', { inputToken: USDC, outputToken: USDC_ON_POLYGON, destinationChainId: 137 })
+    bridge('setBridgeFeeBps', { bps: 25 }).then(({ bps }) => expect(bps).to.equal(25))
+
+    bridge('lastDeposit').then(({ depositCount: before }) => {
+      stubQuote()
+      openBridge()
+
+      cy.get('#bridge-amount').type('20')
+      cy.wait('@bridgeQuote')
+      // The rate is disclosed as its own line before any signature (FR-007/FR-026).
+      cy.contains('FairWins fee', { timeout: 20000 }).should('be.visible')
+      cy.contains('0.25%').should('be.visible')
+
+      // The operator raises the rate while the member is reading the price they were quoted.
+      bridge('setBridgeFeeBps', { bps: 100 }).then(({ bps }) => expect(bps).to.equal(100))
+
+      cy.contains('button', /^Bridge /).should('not.be.disabled').click()
+
+      // Refused, not repriced. The member is told, and — the part that matters — nothing moved.
+      cy.get('.earn-input-error', { timeout: 60000 }).should('be.visible')
+      cy.contains(/Sent from Polygon Amoy/i).should('not.exist')
+      bridge('lastDeposit').then(({ depositCount }) => {
+        expect(depositCount, 'no deposit reached Across at the raised rate').to.equal(before)
+      })
+
+      // ── FR-029: back at the shipping rate, there is no fee line to read. ──
+      bridge('setBridgeFeeBps', { bps: 0 })
+      cy.visit(BRIDGE_URL)
+      cy.get('#bridge-amount', { timeout: 60000 }).should('be.enabled').type('20')
+      cy.wait('@bridgeQuote')
+      cy.contains('button', /^Bridge /, { timeout: 20000 }).should('not.be.disabled')
+      cy.contains('FairWins fee').should('not.exist')
+      cy.contains('0.00%').should('not.exist')
     })
   })
 })

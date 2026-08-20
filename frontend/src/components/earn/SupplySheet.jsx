@@ -72,7 +72,7 @@
  *   onClose / onActionComplete
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits, parseUnits } from 'ethers'
 import UniversalAssetSelect from '../ui/UniversalAssetSelect'
 import InfoTip from '../ui/InfoTip'
@@ -365,13 +365,26 @@ export default function SupplySheet({
   const routerPaused = pool?.unavailableReason === 'paused'
   const risk = poolRiskSummary(pool?.kind)
 
-  const position = useMemo(
-    () => (positions || []).find((p) => p?.poolId && pool?.poolId && p.poolId === pool.poolId) || null,
-    [positions, pool],
+  const stillHolds = useCallback(
+    (p) => Boolean(p) && (isTrading ? (p.liquidity ?? 0n) > 0n : (p.lpBalance ?? 0n) > 0n),
+    [isTrading],
   )
-  const hasPosition = Boolean(
-    position && (isTrading ? (position.liquidity ?? 0n) > 0n : (position.lpBalance ?? 0n) > 0n),
-  )
+
+  /**
+   * The member's position in this pool.
+   *
+   * A LIVE one wins over a spent one. A member can hold several positions in the same pool —
+   * supplying twice mints a second NFT — and a position withdrawn to zero is kept rather than
+   * deleted, because their history is theirs. Taking the plain first match meant one emptied
+   * position hid every live one behind it, and the sheet told a member with money in the pool
+   * that they had nothing to withdraw. FR-021/FR-024 make the exit the one thing that is
+   * always available; a first-match lookup was quietly making it conditional on ordering.
+   */
+  const position = useMemo(() => {
+    const inPool = (positions || []).filter((p) => p?.poolId && pool?.poolId && p.poolId === pool.poolId)
+    return inPool.find(stillHolds) || inPool[0] || null
+  }, [positions, pool, stillHolds])
+  const hasPosition = stillHolds(position)
 
   // ── The live platform fee (FR-026/FR-027/FR-028/FR-029) ────────────────────────────────
   // Fetched ONLY for a trading pool: a bridge pool has no fee to read, and reading one would

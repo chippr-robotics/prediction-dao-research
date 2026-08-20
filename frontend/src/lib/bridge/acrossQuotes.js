@@ -77,7 +77,9 @@ export class BridgeQuoteUnavailable extends Error {
  * related: the same variable also decides whether the Bitcoin gateway (spec 061) counts as
  * configured, so turning the bridge on turned Bitcoin on with it. That collision is a real one —
  * a build that proxies Across has not thereby gained a Bitcoin gateway, and saying it has makes
- * the Bitcoin surface claim a capability it does not have.
+ * the Bitcoin surface claim a capability it does not have. Giving Bitcoin its own name is issue
+ * #1263; the rest of the shared consumers (Predict, Perps, Collect, Solana RPC, intent relay) have
+ * the same latent collision and are noted there.
  */
 export function bridgeGatewayUrl() {
   const configured = import.meta.env.VITE_BRIDGE_GATEWAY_URL || import.meta.env.VITE_RELAYER_URL || ''

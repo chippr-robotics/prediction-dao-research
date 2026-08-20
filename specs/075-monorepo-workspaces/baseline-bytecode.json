@@ -61,7 +61,7 @@
  "artifacts/contracts/mocks/MembershipManagerUpgradeMock.sol/MembershipManagerUpgradeMock.json": "23de62f3fa83d95390e60a76698919fee7aab657cc6c1fb6d2233f2c3e1a0d05",
  "artifacts/contracts/mocks/MiniAppRegistryUpgradeMock.sol/MiniAppRegistryUpgradeMock.json": "cfcafa2fe8bdc7b0725933b4fc56fbef417d06a46030a7437fc55cbcbf469312",
  "artifacts/contracts/mocks/MockAccount.sol/MockAccount.json": "128c1837e1d3cb002842c39dfc07669da6acb151418d8b1217e9ed485adfbd20",
- "artifacts/contracts/mocks/MockAcrossSpokePool.sol/MockAcrossSpokePool.json": "5e6cad80a46f599ec5dfbfb79e3afe17c1a794dcf30e62261a70d7b7d9d3ae76",
+ "artifacts/contracts/mocks/MockAcrossSpokePool.sol/MockAcrossSpokePool.json": "5bfbf27217c690d6bda2a9d765a86ba7b9d4367a5e1e4fb7ea3568b0d30f43fd",
  "artifacts/contracts/mocks/MockAcrossSpokePool.sol/MockLeakySpokePool.json": "07d038a4b03bd9ea5b1d97a0416f7d4c092417ef9664e00bb84e8a8f272b03a2",
  "artifacts/contracts/mocks/MockAcrossSpokePool.sol/MockReentrantSpokePool.json": "3c30ad4f1d0f57584d2659e36b053630bc34ffd09fa5f0d0367b687ebff3cb55",
  "artifacts/contracts/mocks/MockAuthReceiver.sol/IERC3009Bytes.json": "b01a64b54fc88462e92be1e5676a346f6835fcb965c2d73164cc694287c61da3",

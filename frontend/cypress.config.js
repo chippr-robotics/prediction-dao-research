@@ -732,12 +732,6 @@ export default defineConfig({
             'function paused() view returns (bool)',
             'function poolCount() view returns (uint256)',
           ]
-          const SPOKE_ABI = [
-            'function lastDepositor() view returns (address)',
-            'function lastRecipient() view returns (address)',
-            'function lastInputAmount() view returns (uint256)',
-            'function depositCount() view returns (uint256)',
-          ]
           const ERC721_ABI = [
             'function ownerOf(uint256 tokenId) view returns (address)',
             'function balanceOf(address owner) view returns (uint256)',
@@ -754,7 +748,6 @@ export default defineConfig({
           ]
 
           const liquidityRouter = d.contracts.liquidityRouter
-          const spokePool = d.acrossSpokePool
 
           try {
             switch (action) {
@@ -847,19 +840,6 @@ export default defineConfig({
                 const rc = await (await (want ? router.pause() : router.unpause())).wait(1)
                 return { ok: rc.status === 1, paused: want, changed: true }
               }
-              case 'lastDepositor': {
-                const spoke = new ethers.Contract(spokePool, SPOKE_ABI, provider)
-                const [depositor, recipient, amount, count] = await Promise.all([
-                  spoke.lastDepositor(), spoke.lastRecipient(), spoke.lastInputAmount(), spoke.depositCount(),
-                ])
-                return {
-                  ok: true,
-                  depositor,
-                  recipient,
-                  amount: amount.toString(),
-                  depositCount: Number(count),
-                }
-              }
               case 'positionOwner': {
                 const nfpm = new ethers.Contract(d.uniswapPositionManager, ERC721_ABI, provider)
                 const [owner, position] = await Promise.all([
@@ -885,6 +865,94 @@ export default defineConfig({
               }
               default:
                 throw new Error(`liquidityFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+        /**
+         * Fixtures for the bridge half of spec 067 (issue #1236).
+         *
+         * Everything a bridge flow needs that the app cannot do for itself: an operator-curated
+         * route, the platform rate on the `bridge.transfer` service, and — the point of the whole
+         * exercise — what the SpokePool wrote down. `MockAcrossSpokePool` records `depositor`
+         * verbatim, and that field is the one the refund path depends on: Across refunds an
+         * unfilled deposit to the depositor on the ORIGIN chain, so a router that named itself
+         * there would strand every member's refund.
+         *
+         * action ∈ setRoute | lastDeposit | setBridgeFeeBps | bridgePaused
+         */
+        async bridgeFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+
+          // Signatures copied from contracts/bridge/IBridgeRouter.sol and contracts/fees, never
+          // written from memory: a plausible-looking guess selects a different function and
+          // reverts with nothing to explain it.
+          const BRIDGE_ABI = [
+            'function setRoute((address inputToken, bool enabled, bool nativeInput, uint32 expectedFillSeconds, address outputToken, uint256 destinationChainId, uint256 maxAmount) route)',
+            'function computeRouteId(address inputToken, address outputToken, uint256 destinationChainId) pure returns (bytes32)',
+            'function paused() view returns (bool)',
+            'function routeCount() view returns (uint256)',
+          ]
+          const SPOKE_ABI = [
+            'function lastDepositor() view returns (address)',
+            'function lastRecipient() view returns (address)',
+            'function lastInputAmount() view returns (uint256)',
+            'function depositCount() view returns (uint256)',
+          ]
+          const FEE_ABI = [
+            'function setFeeBps(bytes32 serviceId, uint16 bps)',
+            'function feeBps(bytes32 serviceId) view returns (uint16)',
+          ]
+          const BRIDGE_TRANSFER = ethers.keccak256(ethers.toUtf8Bytes('bridge.transfer'))
+
+          try {
+            switch (action) {
+              case 'setRoute': {
+                const router = new ethers.Contract(d.contracts.bridgeRouter, BRIDGE_ABI, admin)
+                const route = {
+                  inputToken: args.inputToken,
+                  enabled: args.enabled !== false,
+                  nativeInput: Boolean(args.nativeInput),
+                  expectedFillSeconds: args.expectedFillSeconds ?? 120,
+                  outputToken: args.outputToken,
+                  destinationChainId: BigInt(args.destinationChainId),
+                  maxAmount: BigInt(args.maxAmount ?? 0),
+                }
+                const rc = await (await router.setRoute(route)).wait(1)
+                const routeId = await router.computeRouteId(
+                  route.inputToken, route.outputToken, route.destinationChainId,
+                )
+                return { ok: rc.status === 1, routeId }
+              }
+              case 'lastDeposit': {
+                const spoke = new ethers.Contract(d.acrossSpokePool, SPOKE_ABI, provider)
+                const [depositor, recipient, amount, count] = await Promise.all([
+                  spoke.lastDepositor(), spoke.lastRecipient(), spoke.lastInputAmount(), spoke.depositCount(),
+                ])
+                return {
+                  ok: true,
+                  depositor,
+                  recipient,
+                  amount: amount.toString(),
+                  depositCount: Number(count),
+                }
+              }
+              case 'setBridgeFeeBps': {
+                const fees = new ethers.Contract(d.contracts.feeRouter, FEE_ABI, admin)
+                const rc = await (await fees.setFeeBps(BRIDGE_TRANSFER, Number(args.bps))).wait(1)
+                return { ok: rc.status === 1, bps: Number(await fees.feeBps(BRIDGE_TRANSFER)) }
+              }
+              case 'bridgeFeeBps': {
+                const fees = new ethers.Contract(d.contracts.feeRouter, FEE_ABI, provider)
+                return { ok: true, bps: Number(await fees.feeBps(BRIDGE_TRANSFER)) }
+              }
+              default:
+                throw new Error(`bridgeFixture: unknown action '${action}'`)
             }
           } catch (e) {
             return { ok: false, error: e.shortMessage || e.reason || e.message }
