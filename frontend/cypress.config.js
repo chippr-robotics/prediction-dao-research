@@ -761,6 +761,48 @@ export default defineConfig({
                 if (!created) throw new Error('no ProxyCreation event — the vault was not deployed')
                 return { ok: true, address: created.args[0] }
               }
+              case 'createV1PolicyVault': {
+                /*
+                 * A vault governed by the SPEC-049 guard, created the way a v1 vault was: the
+                 * Safe's own `setup` delegatecalls PolicyGuardSetup.enablePolicy, attaching the
+                 * guard and its rules atomically at creation.
+                 *
+                 * This is a fixture rather than a UI journey because the UI cannot produce one
+                 * here: on a chain where the ordered engine is deployed, the wizard attaches V2.
+                 * v1 vaults exist because migration is vault-CONSENTED and never happens at
+                 * release time — so a v1 vault to test against has to be made, not adopted.
+                 */
+                const V1_GUARD = '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38'
+                const SETUP = '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b'
+                // Signatures copied verbatim from frontend/src/abis/SafePolicyGuard.js. The limit
+                // fields are uint128, not uint256 — a plausible-looking guess selects a different
+                // function and the Safe's setup delegatecall reverts with no data to explain it.
+                const guardIface = new ethers.Interface([
+                  'function configureRules((address asset, uint128 perTxLimit, uint128 windowLimit)[] limits, uint32 cooldown, bool allowlistEnabled, address[] allowlistAdd, address[] allowlistRemove)',
+                ])
+                const setupIface = new ethers.Interface([
+                  'function enablePolicy(address guard, bytes configureCalldata)',
+                ])
+                const configure = guardIface.encodeFunctionData('configureRules', [
+                  [{ asset: ethers.ZeroAddress, perTxLimit: BigInt(args.perTxLimit), windowLimit: 0n }],
+                  0, false, [], [],
+                ])
+                const safeIface = new ethers.Interface(SAFE_ABI)
+                const initializer = safeIface.encodeFunctionData('setup', [
+                  args.owners, args.threshold,
+                  SETUP, setupIface.encodeFunctionData('enablePolicy', [V1_GUARD, configure]),
+                  SAFE.fallbackHandler, ethers.ZeroAddress, 0, ethers.ZeroAddress,
+                ])
+                const factory = new ethers.Contract(SAFE.proxyFactory, FACTORY_ABI, funder)
+                const rc = await (await factory.createProxyWithNonce(
+                  SAFE.singletonL2, initializer, BigInt(args.saltNonce ?? Date.now()),
+                )).wait(1)
+                const created = rc.logs
+                  .map((l) => { try { return factory.interface.parseLog(l) } catch { return null } })
+                  .find((parsed) => parsed && parsed.name === 'ProxyCreation')
+                if (!created) throw new Error('no ProxyCreation event — the v1 policy vault was not deployed')
+                return { ok: true, address: created.args[0], guard: V1_GUARD }
+              }
               case 'fundVault': {
                 const rc = await (await funder.sendTransaction({
                   to: args.address,

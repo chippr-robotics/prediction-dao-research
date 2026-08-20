@@ -24,8 +24,10 @@
  *   CV-03 custody.operate-as-vault    — act as the vault, and see which you are
  *   CV-04 custody.policy-v2-adoption  — the vault CONSENTS to the ordered guard, by threshold
  *   CV-05 custody.policy-v2-first-match — the FIRST matching rule decides, and no match denies
+ *   CV-06 custody.multi-chain-vault-list — a chain that cannot be read is NAMED, not shown empty
+ *   CV-07 custody.policy-v1-enforced   — the spec-049 guard still refuses what breaks its rules
  *
- * Checklist: CV-01..CV-05
+ * Checklist: CV-01..CV-07
  */
 
 const OWNER_A = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0 — the connected member
@@ -34,6 +36,10 @@ const ONE_COIN = (10n ** 18n).toString()
 const PAYEE = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' // #2 — a transfer destination
 const NATIVE_SYMBOL = 'MATIC' // this chain's coin, as the app labels it
 const HUB = '0x94b5b38C247CE51F7C42C83B63115998b7e970E7' // HARDHAT_CONTRACTS.safeProposalHub
+// A custody chain this test deliberately cannot reach (NETWORKS[137].rpcUrl).
+const POLYGON_RPC = 'https://polygon-bor-rpc.publicnode.com'
+const POLYGON_VAULT = '0x1111111111111111111111111111111111111111'
+const GUARD_V1 = '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38' // HARDHAT_CONTRACTS.safePolicyGuard
 const NO_GUARD = '0x0000000000000000000000000000000000000000'
 /*
  * The ordered engine the app is built with (HARDHAT_CONTRACTS.safePolicyGuardV2). Adoption is
@@ -459,6 +465,83 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
             expect(afterVault.nonce, 'the vault executed nothing').to.equal(beforeVault.nonce)
           })
           cy.get(PENDING_ROW).should('have.length.at.least', 1)
+        })
+      })
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // CV-06 — the estate spans chains, and an unreadable one says so
+  // ---------------------------------------------------------------------------
+  it('[CV-06] names a chain it cannot read instead of showing the vault as gone', () => {
+    fixture('createVault', { owners: [OWNER_A], threshold: 1 }).then(({ address }) => {
+      /*
+       * Two vaults on two chains: one on this node (genuinely readable) and one on Polygon, whose
+       * RPC is made unreachable. Only the FAILING side is stubbed — the readable side is a real
+       * Safe on a real chain, so this cannot pass against an emulator that agrees with itself.
+       */
+      cy.intercept('POST', POLYGON_RPC, { forceNetworkError: true }).as('polygonDown')
+
+      cy.mockWeb3Provider({ account: OWNER_A, preAuthorized: true, realBalances: true })
+      cy.visit('/wallet?tab=custody', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem(
+            `fw_user_${OWNER_A.toLowerCase()}_custody_vault_references`,
+            JSON.stringify([
+              { address, chainId: 80002, label: 'Local Vault', addedAt: 1, role: 'owner' },
+              { address: POLYGON_VAULT, chainId: 137, label: 'Polygon Vault', addedAt: 2, role: 'owner' },
+            ]),
+          )
+        },
+      })
+      cy.get('.custody-panel', { timeout: 20000 }).should('be.visible')
+
+      // BOTH vaults are listed. The estate is the member's, not the connected chain's — a vault
+      // vanishing because its chain is unreachable would read as "my funds are gone".
+      cy.get('.custody-vault-card', { timeout: 30000 }).should('have.length', 2)
+
+      // The unreachable one is named, with its chain, rather than rendered as an empty vault.
+      cy.contains('.custody-vault-card', 'Polygon Vault')
+        .should('contain.text', 'Polygon')
+        .and('contain.text', 'unreachable')
+
+      // …and the readable one is unaffected: per-vault failure isolation, not a global error.
+      cy.contains('.custody-vault-card', 'Local Vault').should('not.contain.text', 'unreachable')
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // CV-07 — the v1 guard is still live, and still enforcing
+  // ---------------------------------------------------------------------------
+  it('[CV-07] refuses a transfer that breaks a v1 policy, on a vault that never adopted v2', () => {
+    // Both guards enforce side by side on purpose: adoption is vault-consented, so a vault that
+    // never opted in is still governed by spec 049 and must still be protected by it.
+    fixture('createV1PolicyVault', {
+      owners: [OWNER_A],
+      threshold: 1,
+      perTxLimit: (10n ** 17n).toString(), // 0.1 coin per transaction
+    }).then(({ address }) => {
+      fixture('fundVault', { address, amount: (10n * 10n ** 18n).toString() })
+
+      fixture('vaultInfo', { address }).then((info) => {
+        expect(info.guard.toLowerCase(), 'governed by the v1 guard, not the ordered one')
+          .to.equal(GUARD_V1.toLowerCase())
+      })
+
+      openProtect()
+      loadVault(address, 'Legacy Policy Vault')
+      openVaultCard()
+
+      // Over the v1 per-transaction limit: the guard refuses, and nothing moves.
+      fixture('vaultInfo', { address }).then((beforeVault) => {
+        fixture('nativeBalance', { address: PAYEE }).then((before) => {
+          transferAsVault(address, 'Legacy Policy Vault', PAYEE, '1')
+          fixture('nativeBalance', { address: PAYEE }).then((after) => {
+            expect(after.balance, 'the refused transfer moved nothing').to.equal(before.balance)
+          })
+          fixture('vaultInfo', { address }).then((afterVault) => {
+            expect(afterVault.nonce, 'the vault executed nothing').to.equal(beforeVault.nonce)
+          })
         })
       })
     })
