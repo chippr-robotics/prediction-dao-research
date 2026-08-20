@@ -1165,24 +1165,26 @@
         {
           "id": "earn.deposit-to-vault",
           "name": "Deposit into a lending vault and see the position",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1237"
+          "tests": [
+            "frontend/cypress/e2e/full/31-earn-lend-stake.cy.js::EL-01"
+          ]
         },
         {
           "id": "earn.withdraw-from-vault",
           "name": "Withdraw a lending position back to the wallet",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1237"
+          "tests": [
+            "frontend/cypress/e2e/full/31-earn-lend-stake.cy.js::EL-02"
+          ]
         }
       ]
     },

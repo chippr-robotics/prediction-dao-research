@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 58 |
+| 🟢 covered | 60 |
 | 🟡 partial | 8 |
-| 🔴 absent | 58 |
+| 🔴 absent | 56 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 23 · 🟡 6 · 🔴 16 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 25 · 🟡 6 · 🔴 14 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -151,8 +151,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `earn.deposit-to-vault` | Deposit into a lending vault and see the position | 🔴 absent | none | — (proposed: on-chain) | #1237 |  |
-| `earn.withdraw-from-vault` | Withdraw a lending position back to the wallet | 🔴 absent | none | — (proposed: on-chain) | #1237 |  |
+| `earn.deposit-to-vault` | Deposit into a lending vault and see the position | 🟢 covered | settled | `on-chain` | `31-earn-lend-stake.cy.js` (EL-01) |  |
+| `earn.withdraw-from-vault` | Withdraw a lending position back to the wallet | 🟢 covered | settled | `on-chain` | `31-earn-lend-stake.cy.js` (EL-02) |  |
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
