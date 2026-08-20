@@ -119,6 +119,66 @@ const earnConfig = () => ({
 const E2E_AMOY_LOCAL =
   Boolean(import.meta.env?.DEV) && import.meta.env?.VITE_E2E_AMOY_LOCAL === '1'
 
+/*
+ * Full-E2E staking wiring (specs 065 + 066), behind the same DEV-only seam as `earn` above.
+ *
+ * Real Polygon Amoy has no Lido, no sPOL and no Polygon StakeManager, so a shipped build
+ * resolves `staking` to null here exactly as it always did and the Stake area names the
+ * networks where staking really exists. The local impersonation points at the contracts/mocks
+ * stand-ins that `scripts/deploy/deploy-staking-router.js` deploys on a local node, which is
+ * what lets the stake, unstake and operator-control flows run against a chain.
+ *
+ * NONCE-DERIVED, like the router addresses in contracts.js — they come from the same deploy.
+ *
+ * `aprApi` and `stakingApi` are deliberately NULL. Both are public third-party endpoints whose
+ * only job is decoration; a local run must not depend on them, and both callers already treat
+ * an unreadable source as "no decoration" rather than as an error.
+ */
+const localStakingConfig = () => ({
+  liquid: [
+    {
+      kind: 'lido',
+      provider: { name: 'Lido', url: 'https://stake.lido.fi' },
+      asset: { symbol: 'ETH', decimals: 18 },
+      lstSymbol: 'wstETH',
+      referral: '0x0000000000000000000000000000000000000000',
+      contracts: {
+        steth: '0x82e01223d51Eb87e16A03E24687EDF0F294da6f1',
+        wsteth: '0x2bdCC0de6bE1f7D2ee689a0342D76F52E8EFABa3',
+        withdrawalQueue: '0x0000000000000000000000000000000000000000',
+      },
+      aprApi: null,
+      unbonding: { kind: 'queue', instantExit: false },
+    },
+    {
+      kind: 'spol',
+      provider: { name: 'sPOL (Polygon)', url: 'https://staking.polygon.technology/lst' },
+      asset: { symbol: 'POL', decimals: 18, address: '0x7969c5eD335650692Bc04293B07F5BF2e7A673C0' },
+      lstSymbol: 'sPOL',
+      referral: null,
+      contracts: {
+        token: '0x7bc06c482DEAd17c0e297aFbC32f6e63d3846650',
+        controller: '0xc351628EB244ec633d5f21fBD6621e1a683B1181',
+      },
+      aprApi: null,
+      unbonding: { kind: 'checkpoints', instantExit: true },
+    },
+  ],
+  delegated: {
+    provider: { name: 'Polygon PoS', url: 'https://staking.polygon.technology' },
+    asset: { symbol: 'POL', decimals: 18, address: '0x7969c5eD335650692Bc04293B07F5BF2e7A673C0' },
+    stakeManager: '0xFD471836031dc5108809D173A067e8486B9047A3',
+    stakingApi: null,
+    validators: [
+      {
+        validatorId: 1,
+        name: 'E2E Validator',
+        validatorShare: '0xcbEAF3BDe82155F56486Fb5a1072cb8baAf547cc',
+      },
+    ],
+  },
+})
+
 // Cross-chain bridge + liquidity supply (spec 067).
 //
 // `bridge` is a BUILD-TIME DISPLAY FALLBACK only (FR-051): the authoritative
@@ -249,6 +309,8 @@ const NETWORKS = {
     // above) — real Polygon Amoy has no Morpho deployment, and a shipped build resolves this
     // to null exactly as it always did.
     earn: E2E_AMOY_LOCAL ? earnConfig() : null,
+    // Same seam, same reason (specs 065 + 066) — see `localStakingConfig` above.
+    staking: E2E_AMOY_LOCAL ? localStakingConfig() : null,
     /*
      * Same seam, same reason (spec 067): Across is not deployed on real Polygon Amoy, so a shipped
      * build resolves this to null and the Bridge surface hides here exactly as it does today. The

@@ -960,6 +960,145 @@ export default defineConfig({
         },
 
         /**
+         * Fixtures for Earn ▸ Stake (specs 065 + 066).
+         *
+         * The delegated path never touches a FairWins contract — it is a direct member call to
+         * Polygon's ValidatorShare — so everything this task does is either ARRANGING the world
+         * (minting POL, advancing a checkpoint epoch, curating the allowlist) or READING BACK
+         * what the chain says happened. It never performs a member action: that is the flow's job.
+         *
+         * action ∈ mintPol | polBalance | delegation | advanceEpoch | routerState | setPaused |
+         *          setValidator
+         */
+        async stakingFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+
+          // Signatures copied from the contracts, never written from memory.
+          const POL_ABI = [
+            'function mint(address to, uint256 amount)',
+            'function balanceOf(address) view returns (uint256)',
+          ]
+          const VALIDATOR_ABI = [
+            'function getTotalStake(address user) view returns (uint256, uint256)',
+            'function unbondNonces(address user) view returns (uint256)',
+            'function unbonds_new(address user, uint256 unbondNonce) view returns (uint256 shares, uint256 withdrawEpoch)',
+            'function setRewards(address account, uint256 amount)',
+          ]
+          const STAKE_MANAGER_ABI = [
+            'function epoch() view returns (uint256)',
+            'function withdrawalDelay() view returns (uint256)',
+            'function advanceEpoch(uint256 by)',
+          ]
+          const ROUTER_ABI = [
+            'function paused() view returns (bool)',
+            'function pause()',
+            'function unpause()',
+            'function addValidator(address validatorShare)',
+            'function removeValidator(address validatorShare)',
+            'function isValidator(address validatorShare) view returns (bool)',
+            'function validatorCount() view returns (uint256)',
+          ]
+
+          const polToken = d.mocks?.mockPolToken
+          const validatorShare = d.mocks?.mockValidatorShare
+          const stakeManager = d.mocks?.mockPolygonStakeManager
+          const stakingRouter = d.contracts?.stakingRouter
+          if (!polToken || !validatorShare || !stakeManager || !stakingRouter) {
+            return {
+              ok: false,
+              error:
+                'the local deployment record has no staking fixtures — run `npm run setup:e2e` ' +
+                '(which now includes `deploy:local:staking`) before the Earn ▸ Stake specs',
+            }
+          }
+
+          try {
+            switch (action) {
+              case 'mintPol': {
+                const pol = new ethers.Contract(polToken, POL_ABI, admin)
+                const rc = await (await pol.mint(args.address, BigInt(args.amount))).wait(1)
+                return { ok: rc.status === 1, balance: (await pol.balanceOf(args.address)).toString() }
+              }
+              case 'polBalance': {
+                const pol = new ethers.Contract(polToken, POL_ABI, provider)
+                return { ok: true, balance: (await pol.balanceOf(args.address)).toString() }
+              }
+              case 'delegation': {
+                const vs = new ethers.Contract(validatorShare, VALIDATOR_ABI, provider)
+                const sm = new ethers.Contract(stakeManager, STAKE_MANAGER_ABI, provider)
+                const [stake, nonce, epoch, delay] = await Promise.all([
+                  vs.getTotalStake(args.address),
+                  vs.unbondNonces(args.address),
+                  sm.epoch(),
+                  sm.withdrawalDelay(),
+                ])
+                const unbond =
+                  nonce > 0n ? await vs.unbonds_new(args.address, nonce) : { shares: 0n, withdrawEpoch: 0n }
+                return {
+                  ok: true,
+                  staked: stake[0].toString(),
+                  unbondNonce: Number(nonce),
+                  unbondShares: (unbond.shares ?? unbond[0]).toString(),
+                  withdrawEpoch: Number(unbond.withdrawEpoch ?? unbond[1]),
+                  epoch: Number(epoch),
+                  withdrawalDelay: Number(delay),
+                }
+              }
+              case 'advanceEpoch': {
+                const sm = new ethers.Contract(stakeManager, STAKE_MANAGER_ABI, admin)
+                const rc = await (await sm.advanceEpoch(BigInt(args.by ?? 1))).wait(1)
+                return { ok: rc.status === 1, epoch: Number(await sm.epoch()) }
+              }
+              case 'routerState': {
+                const router = new ethers.Contract(stakingRouter, ROUTER_ABI, provider)
+                const [paused, listed, count] = await Promise.all([
+                  router.paused(),
+                  router.isValidator(validatorShare),
+                  router.validatorCount(),
+                ])
+                return {
+                  ok: true,
+                  paused,
+                  validatorListed: listed,
+                  validatorCount: Number(count),
+                  validatorShare,
+                  stakingRouter,
+                }
+              }
+              case 'setPaused': {
+                // IDEMPOTENT: Pausable reverts when the flag is already where you are asking it
+                // to go, so a spec establishing a known starting state would fail on the state
+                // it wanted.
+                const router = new ethers.Contract(stakingRouter, ROUTER_ABI, admin)
+                const want = Boolean(args.paused)
+                if ((await router.paused()) === want) return { ok: true, paused: want, changed: false }
+                const rc = await (await (want ? router.pause() : router.unpause())).wait(1)
+                return { ok: rc.status === 1, paused: want, changed: true }
+              }
+              case 'setValidator': {
+                // Also idempotent, for the same reason (`AlreadyListed` / `NotListed`).
+                const router = new ethers.Contract(stakingRouter, ROUTER_ABI, admin)
+                const want = args.listed !== false
+                if ((await router.isValidator(validatorShare)) === want) {
+                  return { ok: true, listed: want, changed: false }
+                }
+                const rc = await (
+                  await (want ? router.addValidator(validatorShare) : router.removeValidator(validatorShare))
+                ).wait(1)
+                return { ok: rc.status === 1, listed: want, changed: true }
+              }
+              default:
+                throw new Error(`stakingFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+        /**
          * Fixtures for Protect (specs 043 / 049 / 068).
          *
          * A Safe is a real contract, and every test here needs one that already exists — so the

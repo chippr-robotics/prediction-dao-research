@@ -91,7 +91,13 @@ const HARDHAT_CONTRACTS = {
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
   miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
-  stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
+  /*
+   * spec 066 — the staking control surface. Deployed on the local node by
+   * `scripts/deploy/deploy-staking-router.js` (which also stands up the Lido/sPOL/Polygon
+   * doubles it points at), so the specs 065/066 flows have a router to read, pause and
+   * curate. NONCE-DERIVED from the `setup:e2e` order, like every address in this block.
+   */
+  stakingRouter: '0xB0D4afd8879eD9F52b28595d31B441D079B2Ca07',
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
   // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest

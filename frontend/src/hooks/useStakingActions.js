@@ -23,6 +23,18 @@ import {
   buildDelegationClaimCalls,
 } from '../lib/staking/polygonDelegation'
 
+/**
+ * The POL contract for an option, taken from the OPTION rather than from the module constant.
+ *
+ * They are the same address on Ethereum — `ethereumStakingConfig()` builds `asset.address` from
+ * `POL_TOKEN_L1` — but the constant is a default, not the identity of the thing on screen. Reading
+ * it instead of the option's own asset silently approves and reads the WRONG TOKEN wherever the two
+ * can differ: a second network offering delegation, or a `VITE_POL_TOKEN_L1` override applied to
+ * one and not the other. The fallback keeps an option that carries no asset address working exactly
+ * as before.
+ */
+const polTokenFor = (option) => option?.asset?.address || POL_TOKEN_L1
+
 async function submitBatch({ sendOnChain, chainId, calls }) {
   const sent = await sendOnChain(chainId, calls)
   if (sent?.state === 'failed') throw new Error(sent.reason || 'transaction failed')
@@ -46,7 +58,7 @@ export function useStakingActions() {
         account: address,
         amount,
         provider,
-        polToken: POL_TOKEN_L1,
+        polToken: polTokenFor(option),
         feeQuote: feeQuote || option.feeQuote,
       })
       return submitBatch({
