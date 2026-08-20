@@ -30,6 +30,8 @@
  * Checklist: CV-01..CV-07
  */
 
+import { FIRST_MATCH_SCENARIOS } from '../../../src/test/fixtures/policyScenarios'
+
 const OWNER_A = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0 — the connected member
 const OWNER_B = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1 — co-owner
 const ONE_COIN = (10n ** 18n).toString()
@@ -414,6 +416,10 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
   // CV-05 — first-match governs, and silence is denial
   // ---------------------------------------------------------------------------
   it('[CV-05] lets the first matching rule decide, and denies what no rule matches', () => {
+    const SCENARIO = FIRST_MATCH_SCENARIOS.find((sc) => sc.id === 'tight-rule-first')
+    const ALLOWED = SCENARIO.attempts.find((a) => a.allowed)
+    const REFUSED = SCENARIO.attempts.find((a) => !a.allowed)
+
     // A 1-of-1 vault: the member is the whole threshold, so the guard's verdict is the ONLY thing
     // standing between the transfer and the chain. Nothing here is about collecting approvals.
     fixture('createVault', { owners: [OWNER_A], threshold: 1 }).then(({ address }) => {
@@ -423,19 +429,18 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
       openVaultCard()
 
       /*
-       * Two rules of the SAME scope, tight one first:
-       *   0. the coin, at most 0.1 per transaction
-       *   1. the coin, at most 5 per transaction
+       * The rules come from the SHARED scenario table (src/test/fixtures/policyScenarios.js), the
+       * same one the Solidity suite drives against the real guard and the Vitest suite checks
+       * `matchPreview` against. Composing them here in the UI and letting the chain decide is the
+       * third leg: if the client twin and enforcement ever drift, one of the three fails.
        *
-       * Under first-match-governs, rule 0 decides every coin transfer and rule 1 is unreachable
-       * for them. That is the whole point of the ordering, and it is what separates this engine
-       * from a best-match or last-match one: a 1-coin transfer must be REFUSED even though a
-       * rule that would allow it is sitting right there.
+       * `tight-rule-first` is two rules of identical scope, tight one first — so rule 001 decides
+       * every coin transfer and rule 002 is unreachable for them. That is what separates this
+       * engine from a best-match or last-match one.
        */
       cy.get('.custody-policy', { timeout: 20000 }).within(() => {
         cy.contains('button', /Add rules|Upgrade to ordered rules|Change rules/).click()
-        addCoinRule('0.1')
-        addCoinRule('5')
+        SCENARIO.rules.forEach((r) => addCoinRule(r.perTx))
         cy.contains('button', 'Propose policy change').click()
       })
 
@@ -445,17 +450,17 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
       executeTop(0)
       waitForGuard(address, GUARD_V2)
 
-      // (a) Within rule 0 — allowed, and the coin actually moves.
+      // (a) Within rule 001 — allowed, and the coin actually moves.
       fixture('nativeBalance', { address: PAYEE }).then((before) => {
-        transferAsVault(address, 'Policy Vault', PAYEE, '0.05')
+        transferAsVault(address, 'Policy Vault', PAYEE, ALLOWED.amount)
         waitForBalanceAbove(PAYEE, before.balance)
       })
 
-      // (b) Over rule 0's limit but inside rule 1's. A later rule cannot rescue it: the first
+      // (b) Over rule 001's limit but inside rule 002's. A later rule cannot rescue it: the first
       // rule whose scope matches is the one that governs, and it said no.
       fixture('vaultInfo', { address }).then((beforeVault) => {
         fixture('nativeBalance', { address: PAYEE }).then((before) => {
-          transferAsVault(address, 'Policy Vault', PAYEE, '1')
+          transferAsVault(address, 'Policy Vault', PAYEE, REFUSED.amount)
           fixture('nativeBalance', { address: PAYEE }).then((after) => {
             expect(after.balance, 'the refused transfer moved nothing').to.equal(before.balance)
           })

@@ -1002,35 +1002,38 @@
         {
           "id": "custody.create-vault",
           "name": "Create a Safe vault and add its owners",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1235"
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-01"
+          ]
         },
         {
           "id": "custody.propose-and-execute",
           "name": "Propose a transaction, collect approvals, execute it",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1235"
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-02"
+          ]
         },
         {
           "id": "custody.operate-as-vault",
           "name": "Act as the vault rather than as yourself, and see which you are",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1235"
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-03"
+          ]
         }
       ]
     },
@@ -1143,13 +1146,14 @@
         {
           "id": "custody.policy-v1-enforced",
           "name": "A vault policy refuses a transaction that breaks its rules",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1235"
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-07"
+          ]
         }
       ]
     },
@@ -1712,35 +1716,38 @@
         {
           "id": "custody.policy-v2-first-match",
           "name": "A first-match rule array decides a proposal, and no match denies it",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1235"
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-05"
+          ]
         },
         {
           "id": "custody.policy-v2-adoption",
           "name": "A vault consents to the v2 guard through a threshold-approved change",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1235"
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-04"
+          ]
         },
         {
           "id": "custody.multi-chain-vault-list",
           "name": "See vaults across chains, with a failed chain named rather than shown as empty",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1235"
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-06"
+          ]
         }
       ]
     },
