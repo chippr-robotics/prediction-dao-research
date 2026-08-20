@@ -23,13 +23,17 @@
  *   CV-02 custody.propose-and-execute — propose, collect approvals, execute
  *   CV-03 custody.operate-as-vault    — act as the vault, and see which you are
  *   CV-04 custody.policy-v2-adoption  — the vault CONSENTS to the ordered guard, by threshold
+ *   CV-05 custody.policy-v2-first-match — the FIRST matching rule decides, and no match denies
  *
- * Checklist: CV-01..CV-04
+ * Checklist: CV-01..CV-05
  */
 
 const OWNER_A = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0 — the connected member
 const OWNER_B = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1 — co-owner
 const ONE_COIN = (10n ** 18n).toString()
+const PAYEE = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' // #2 — a transfer destination
+const NATIVE_SYMBOL = 'MATIC' // this chain's coin, as the app labels it
+const HUB = '0x94b5b38C247CE51F7C42C83B63115998b7e970E7' // HARDHAT_CONTRACTS.safeProposalHub
 const NO_GUARD = '0x0000000000000000000000000000000000000000'
 /*
  * The ordered engine the app is built with (HARDHAT_CONTRACTS.safePolicyGuardV2). Adoption is
@@ -99,11 +103,111 @@ function asCoOwner(address) {
 function approveAndExecuteTop(remaining) {
   cy.get(PENDING_ROW, { timeout: 60000 })
     .first()
-    .within(() => cy.contains('button', 'Approve').click())
+    .contains('button', 'Approve', { timeout: 60000 })
+    .should('not.be.disabled')
+    .click()
+  executeTop(remaining)
+}
+
+/**
+ * Execute the TOP proposal, leaving `remaining` in the queue.
+ *
+ * Used on its own where the proposal is born ready: submitting as the vault records the
+ * proposer's approval on chain, so at 1-of-1 the threshold is already met and the row never
+ * offers an Approve button to click.
+ */
+function executeTop(remaining) {
+  /*
+   * Wait for a row that is genuinely READY, not merely present. Consecutive-nonce steps are
+   * queued together but the later one cannot execute until the earlier has landed, so its row
+   * exists for a while offering nothing to click — and clicking too early is how this test
+   * intermittently left a vault half-adopted.
+   */
   cy.get(PENDING_ROW, { timeout: 60000 })
     .first()
-    .within(() => cy.contains('button', 'Execute').click())
+    .contains('button', 'Execute', { timeout: 60000 })
+    .should('not.be.disabled')
+    .click()
   cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length', remaining)
+}
+
+
+/** Compose one ordered rule: the coin, capped per transaction. */
+function addCoinRule(perTx) {
+  cy.contains('button', 'Add a rule').click()
+  cy.contains('label', `${NATIVE_SYMBOL} only`).find('input[type="radio"]').check()
+  cy.get('#rule-per-tx').clear().type(perTx)
+  cy.contains('button', 'Save rule').click()
+}
+
+/**
+ * Switch the acting account to a vault by its label.
+ *
+ * Deliberately NOT followed by a cy.visit: the acting identity lives in React state, so a reload
+ * puts the member back to personal. Navigate first, then switch.
+ */
+function actAsVault(label) {
+  cy.get('.wallet-account-button', { timeout: 20000 }).click()
+  cy.get('.account-identity-trigger', { timeout: 20000 }).click()
+  cy.get('.account-switch-menu').contains('.account-switch-opt', label).click()
+}
+
+/**
+ * Move the coin AS the vault, and then execute it.
+ *
+ * A vault never sends directly — `submitAsActiveAccount` turns a vault-mode transfer into a
+ * threshold-gated proposal, even at 1-of-1 — so the guard has its say at EXECUTION, which is
+ * where a policy refusal shows up. Executing is done as the owner, so the reload back to Protect
+ * (which resets the acting identity to personal) is correct rather than incidental.
+ */
+function transferAsVault(vaultAddress, vaultLabel, to, amount) {
+  cy.visit('/wallet?tab=paytransfer')
+  actAsVault(vaultLabel)
+
+  // Pick the COIN. The form defaults to the stablecoin, which the vault holds none of, and a
+  // zero balance disables Preview — so without this the test fails on an unrelated guard.
+  cy.get('[aria-label="Asset to send"]', { timeout: 20000 }).click()
+  cy.get('.uas-search').type(NATIVE_SYMBOL)
+  cy.get('[role="option"]').first().click()
+
+  cy.get('#pt-to', { timeout: 20000 }).clear().type(to)
+  cy.get('#pt-amount').clear().type(amount)
+  cy.contains('.pt-actions button', 'Preview').click()
+  // The member is told which account is spending before they commit to it.
+  cy.get('.pt-preview').should('contain.text', 'Vault proposal')
+  cy.contains('.pt-actions button', 'Propose').click()
+  /*
+   * Assert the POSITIVE signal, not the absence of an error. On success the form resets and
+   * leaves the preview, so `.pt-notice-error` is missing either way — a test that only checked
+   * for its absence would pass on a click that did nothing at all.
+   */
+  cy.get('.notification-message', { timeout: 30000 }).should('contain.text', 'Proposed sending')
+
+  cy.visit('/wallet?tab=custody')
+  cy.get('.custody-panel', { timeout: 20000 }).should('be.visible')
+  openVaultCard()
+  // Distinguish "nothing was proposed" from "the queue cannot find it" before waiting 60s on a
+  // row that may never come.
+  fixture('proposalCount', { address: vaultAddress, hub: HUB }).then(({ count }) => {
+    expect(count, 'the hub recorded the proposal').to.be.greaterThan(0)
+  })
+  // Deliberately no count assertion here: a policy REFUSAL leaves the proposal in the queue,
+  // which is the outcome CV-05 goes on to check.
+  cy.get(PENDING_ROW, { timeout: 60000 })
+    .first()
+    .contains('button', 'Execute', { timeout: 60000 })
+    .should('not.be.disabled')
+    .click()
+}
+
+/** Poll an address until its coin balance rises above `floor`. */
+function waitForBalanceAbove(address, floor, tries = 30) {
+  return fixture('nativeBalance', { address }).then((info) => {
+    if (BigInt(info.balance) > BigInt(floor)) return info
+    if (tries <= 0) throw new Error(`${address} balance never rose above ${floor} (still ${info.balance})`)
+    cy.wait(1000, { log: false })
+    return waitForBalanceAbove(address, floor, tries - 1)
+  })
 }
 
 function openProtect(account = OWNER_A) {
@@ -296,6 +400,66 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
 
       waitForGuard(address, GUARD_V2).then((info) => {
         expect(info.threshold, 'adoption does not change the owner set or threshold').to.equal(2)
+      })
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // CV-05 — first-match governs, and silence is denial
+  // ---------------------------------------------------------------------------
+  it('[CV-05] lets the first matching rule decide, and denies what no rule matches', () => {
+    // A 1-of-1 vault: the member is the whole threshold, so the guard's verdict is the ONLY thing
+    // standing between the transfer and the chain. Nothing here is about collecting approvals.
+    fixture('createVault', { owners: [OWNER_A], threshold: 1 }).then(({ address }) => {
+      fixture('fundVault', { address, amount: (10n * 10n ** 18n).toString() })
+      openProtect()
+      loadVault(address, 'Policy Vault')
+      openVaultCard()
+
+      /*
+       * Two rules of the SAME scope, tight one first:
+       *   0. the coin, at most 0.1 per transaction
+       *   1. the coin, at most 5 per transaction
+       *
+       * Under first-match-governs, rule 0 decides every coin transfer and rule 1 is unreachable
+       * for them. That is the whole point of the ordering, and it is what separates this engine
+       * from a best-match or last-match one: a 1-coin transfer must be REFUSED even though a
+       * rule that would allow it is sitting right there.
+       */
+      cy.get('.custody-policy', { timeout: 20000 }).within(() => {
+        cy.contains('button', /Add rules|Upgrade to ordered rules|Change rules/).click()
+        addCoinRule('0.1')
+        addCoinRule('5')
+        cy.contains('button', 'Propose policy change').click()
+      })
+
+      // 1-of-1: proposing already recorded the only approval the vault needs, so each step is
+      // executable the moment it appears — there is no second owner to wait for.
+      executeTop(1)
+      executeTop(0)
+      waitForGuard(address, GUARD_V2)
+
+      // (a) Within rule 0 — allowed, and the coin actually moves.
+      fixture('nativeBalance', { address: PAYEE }).then((before) => {
+        transferAsVault(address, 'Policy Vault', PAYEE, '0.05')
+        waitForBalanceAbove(PAYEE, before.balance)
+      })
+
+      // (b) Over rule 0's limit but inside rule 1's. A later rule cannot rescue it: the first
+      // rule whose scope matches is the one that governs, and it said no.
+      fixture('vaultInfo', { address }).then((beforeVault) => {
+        fixture('nativeBalance', { address: PAYEE }).then((before) => {
+          transferAsVault(address, 'Policy Vault', PAYEE, '1')
+          fixture('nativeBalance', { address: PAYEE }).then((after) => {
+            expect(after.balance, 'the refused transfer moved nothing').to.equal(before.balance)
+          })
+          // A refusal is not a quiet no-op: the vault never advanced its nonce, so nothing it
+          // signed took effect, and the proposal is still sitting in the queue.
+          fixture('vaultInfo', { address }).then((afterVault) => {
+            expect(afterVault.nonce, 'the vault executed nothing').to.equal(beforeVault.nonce)
+          })
+          cy.get(PENDING_ROW).should('have.length.at.least', 1)
+        })
       })
     })
   })

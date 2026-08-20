@@ -786,6 +786,29 @@ export default defineConfig({
               }
               case 'nativeBalance':
                 return { ok: true, balance: (await provider.getBalance(args.address)).toString() }
+              case 'proposalCount': {
+                // Count what the HUB actually recorded for this vault. A queue that renders
+                // nothing is either a vault with no proposals or a discovery problem, and only
+                // the chain can tell the two apart.
+                const hub = new ethers.Contract(
+                  args.hub,
+                  // Signature copied from frontend/src/abis/SafeProposalHub.js — a hand-guessed
+                  // one hashes to a different topic0 and silently matches nothing, which reads
+                  // exactly like "the app proposed nothing".
+                  ['event Proposed(address indexed safe, address indexed proposer, bytes32 indexed safeTxHash, address to, uint256 value, bytes data, uint8 operation, uint256 nonce)'],
+                  provider,
+                )
+                const logs = await provider.getLogs({
+                  address: args.hub,
+                  topics: [
+                    hub.interface.getEvent('Proposed').topicHash,
+                    ethers.zeroPadValue(ethers.getAddress(args.address), 32),
+                  ],
+                  fromBlock: 0,
+                  toBlock: 'latest',
+                })
+                return { ok: true, count: logs.length }
+              }
               default:
                 throw new Error(`custodyFixture: unknown action '${action}'`)
             }
