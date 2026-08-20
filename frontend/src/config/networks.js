@@ -249,6 +249,20 @@ const NETWORKS = {
     // above) — real Polygon Amoy has no Morpho deployment, and a shipped build resolves this
     // to null exactly as it always did.
     earn: E2E_AMOY_LOCAL ? earnConfig() : null,
+    /*
+     * Same seam, same reason (spec 067): Across is not deployed on real Polygon Amoy, so a shipped
+     * build resolves this to null and the Bridge surface hides here exactly as it does today. The
+     * local impersonation points at the contracts/mocks SpokePool that
+     * `scripts/deploy/deploy-bridge-liquidity.js` deploys, so the bridge flows can be driven end to
+     * end against a chain.
+     *
+     * NONCE-DERIVED, like the router addresses in contracts.js — it comes from the same targeted
+     * deploy. No HubPool: bridge-liquidity supply is Ethereum-only (the HubPool is an L1 contract),
+     * and pretending otherwise here would offer a supply route that cannot exist.
+     */
+    bridge: E2E_AMOY_LOCAL
+      ? bridgeConfig('0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00')
+      : null,
     // Passkey smart accounts (spec 041) — Amoy is the passkey validation
     // network: RIP-7212 P-256 precompile live, canonical EntryPoint v0.6.
     passkey: passkeyConfig(
