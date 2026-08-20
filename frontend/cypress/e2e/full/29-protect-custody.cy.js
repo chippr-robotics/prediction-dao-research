@@ -22,13 +22,26 @@
  *   CV-01 custody.create-vault        — create a vault and add its owners
  *   CV-02 custody.propose-and-execute — propose, collect approvals, execute
  *   CV-03 custody.operate-as-vault    — act as the vault, and see which you are
+ *   CV-04 custody.policy-v2-adoption  — the vault CONSENTS to the ordered guard, by threshold
  *
- * Checklist: CV-01..CV-03
+ * Checklist: CV-01..CV-04
  */
 
 const OWNER_A = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0 — the connected member
 const OWNER_B = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1 — co-owner
 const ONE_COIN = (10n ** 18n).toString()
+const NO_GUARD = '0x0000000000000000000000000000000000000000'
+/*
+ * The ordered engine the app is built with (HARDHAT_CONTRACTS.safePolicyGuardV2). Adoption is
+ * judged by the vault's own guard slot holding exactly this — a vault is on v2 because it said so
+ * on chain, never because the UI drew a badge.
+ */
+const GUARD_V2 = '0xc01E5F3EAFd2C0138e98382A3F54B6CeB3dc05cf'
+/*
+ * The PENDING queue only. History rows carry the same `custody-proposal-row` class, so an
+ * unscoped count says "still queued" about a proposal that executed a minute ago.
+ */
+const PENDING_ROW = '.custody-proposal-list:not(.custody-proposal-list--history) .custody-proposal-row'
 
 const fixture = (action, args = {}) =>
   cy.task('custodyFixture', { action, args }).then((r) => {
@@ -52,6 +65,45 @@ function waitForThreshold(address, expected, tries = 30) {
     cy.wait(1000, { log: false })
     return waitForThreshold(address, expected, tries - 1)
   })
+}
+
+/** Poll the VAULT until its guard slot holds `expected`. */
+function waitForGuard(address, expected, tries = 30) {
+  return fixture('vaultInfo', { address }).then((info) => {
+    if (info.guard.toLowerCase() === expected.toLowerCase()) return info
+    if (tries <= 0) {
+      throw new Error(`vault ${address} still reports guard ${info.guard}, expected ${expected}`)
+    }
+    cy.wait(1000, { log: false })
+    return waitForGuard(address, expected, tries - 1)
+  })
+}
+
+/** Become the co-owner and bring the vault into THEIR list (references are per-member). */
+function asCoOwner(address) {
+  cy.switchAccount(1)
+  cy.visit('/wallet?tab=custody')
+  cy.get('.custody-panel', { timeout: 20000 }).should('be.visible')
+  loadVault(address, 'Co-owner view')
+  openVaultCard()
+}
+
+/**
+ * Approve and execute the TOP proposal, leaving `remaining` in the queue.
+ *
+ * One at a time on purpose: a multi-step change (adoption is two — configure the rules, then point
+ * the guard slot at them) is proposed at consecutive nonces, so the second is not executable until
+ * the first has landed. Draining the queue in order is what an owner actually does, and it is the
+ * only order the chain will accept.
+ */
+function approveAndExecuteTop(remaining) {
+  cy.get(PENDING_ROW, { timeout: 60000 })
+    .first()
+    .within(() => cy.contains('button', 'Approve').click())
+  cy.get(PENDING_ROW, { timeout: 60000 })
+    .first()
+    .within(() => cy.contains('button', 'Execute').click())
+  cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length', remaining)
 }
 
 function openProtect(account = OWNER_A) {
@@ -149,7 +201,7 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
       })
 
       // Queued, not applied — the vault still says 2.
-      cy.get('.custody-proposal-row', { timeout: 60000 }).should('have.length.at.least', 1)
+      cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length.at.least', 1)
       fixture('vaultInfo', { address }).then((info) => {
         expect(info.threshold, 'one approval does not change a 2-of-2').to.equal(2)
       })
@@ -160,19 +212,8 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
        * owner B does not inherit owner A's; a test that assumed otherwise would be asserting on a
        * shared list the product deliberately does not have.
        */
-      cy.switchAccount(1)
-      cy.visit('/wallet?tab=custody')
-      cy.get('.custody-panel', { timeout: 20000 }).should('be.visible')
-      loadVault(address, 'Co-owner view')
-      openVaultCard()
-      cy.get('.custody-proposal-row', { timeout: 60000 })
-        .first()
-        .within(() => cy.contains('button', 'Approve').click())
-
-      // With both approvals in it becomes executable — and only executing changes the vault.
-      cy.get('.custody-proposal-row', { timeout: 60000 })
-        .first()
-        .within(() => cy.contains('button', 'Execute').click())
+      asCoOwner(address)
+      approveAndExecuteTop(0)
 
       waitForThreshold(address, 1).then((info) => {
         expect(info.nonce, 'the vault executed exactly one transaction').to.equal(1)
@@ -205,6 +246,57 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
         .invoke('attr', 'title')
         .should('eq', address)
       cy.get('.custody-vault-card').first().should('exist')
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // CV-04 — adopting the ordered guard is the VAULT's decision, taken by threshold
+  // ---------------------------------------------------------------------------
+  it('[CV-04] adopts the ordered policy guard only once the owners approve setGuard', () => {
+    fixture('createVault', { owners: [OWNER_A, OWNER_B], threshold: 2 }).then(({ address }) => {
+      fixture('fundVault', { address, amount: ONE_COIN })
+      openProtect()
+      loadVault(address)
+      openVaultCard()
+
+      // A vault starts with no guard, and migration is vault-consented — never release-time.
+      fixture('vaultInfo', { address }).then((info) => {
+        expect(info.guard, 'no guard before the owners adopt one').to.equal(NO_GUARD)
+      })
+
+      cy.get('.custody-policy', { timeout: 20000 }).within(() => {
+        cy.contains('button', /Add rules|Upgrade to ordered rules/).click()
+        cy.contains('button', 'Add a rule').click()
+      })
+      // The composer's defaults describe a permissive first rule; this test is about ADOPTION,
+      // so what the rule says matters less than the vault agreeing to be governed at all.
+      cy.get('.custody-policy').within(() => {
+        cy.contains('button', /^(Save|Add) rule/).click()
+        cy.contains('button', 'Propose policy change').click()
+      })
+
+      /*
+       * Adoption is TWO transactions, at consecutive nonces: configure the rules (inert while no
+       * guard is active), then point the vault's guard slot at the engine. Both are proposed at
+       * once, and the vault is governed only after BOTH land — asserted below, because a test that
+       * executed one and saw a guard would be describing a product that cannot exist.
+       */
+      cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length', 2)
+      fixture('vaultInfo', { address }).then((info) => {
+        expect(info.guard, 'still ungoverned on one approval').to.equal(NO_GUARD)
+      })
+
+      asCoOwner(address)
+      approveAndExecuteTop(1)
+      // The rules landed first, and they are inert: the vault is still ungoverned.
+      fixture('vaultInfo', { address }).then((info) => {
+        expect(info.guard, 'rules alone do not govern a vault').to.equal(NO_GUARD)
+      })
+      approveAndExecuteTop(0)
+
+      waitForGuard(address, GUARD_V2).then((info) => {
+        expect(info.threshold, 'adoption does not change the owner set or threshold').to.equal(2)
+      })
     })
   })
 })
