@@ -1,56 +1,75 @@
-// =============================================================================
-// 28-legacy-recovery-sweep.cy.js
-// Full-tier E2E for the legacy account sweep (spec 062).
-//
-// Flow covered: recovery.sweep-per-asset-outcomes
-//
-// NEEDS A CHAIN, and needs one for the right reason: the member signs transfers with a key
-// they paste in, value leaves an account, and the invariant under test — a single asset
-// failing NEVER aborts the rest — only exists because real transfers can fail one at a time.
-// Against a mock every leg succeeds and the test proves nothing.
-//
-// The import half of the feature (ciphertext at rest, no clear secret anywhere) is chain-free
-// and lives in `fast/28-legacy-recovery.cy.js`.
-//
-// Fixture shape: each test mints a FRESH legacy EOA (cy.task legacyFixture) and funds it with
-// native + the chain's wrapped-native ERC-20, which is what the portfolio registry scans on
-// 1337. Fresh per test because a fixed key would carry balances between runs and make "what
-// moved" depend on how often the suite had run.
-// =============================================================================
+/**
+ * E2E Tests: legacy account recovery — moving the funds (spec 062, Full-tier)
+ *
+ * NEEDS A CHAIN, and needs one for the right reason: the member signs these transfers with a key
+ * they paste in, value leaves an account, and the invariant under test — **one asset failing never
+ * aborts the rest** — only exists because real transfers fail one at a time. Against a mock every
+ * leg succeeds and the test proves nothing. The import half of the feature (ciphertext at rest, no
+ * clear secret anywhere) needs no chain and lives in `fast/28-legacy-recovery.cy.js`.
+ *
+ * The portfolio the sweep sees is the app's own (`getPortfolioRegistry`): on this chain that is
+ * three fungible assets — the wrapped coin, the stablecoin, and the coin itself — both tokens
+ * being the local `MockERC20`s the suite already seeds. Nothing here is arranged privately
+ * between the test and the chain: the app resolves the addresses through its OWN config, and
+ * `before` asserts the chain was seeded with the same ones.
+ *
+ * The failure in LKR-S2 is a REFUSAL, not a drained balance: `sweepAllAssets` re-reads balances
+ * itself, so emptying a token before "Transfer all" just drops it from the run and proves nothing
+ * about the assets behind a failure. A token that holds the balance and declines to move it is
+ * also the realistic case — a blocklisting stablecoin does exactly that.
+ *
+ * Every test mints a FRESH legacy EOA. A fixed key would carry balances between runs and make
+ * "what moved" a function of how often the suite had been run rather than of the code.
+ *
+ * Sub-issue of #1228. Flows:
+ *   LKR-S1 recovery.sweep-per-asset-outcomes — the whole portfolio moves, ERC-20s then native
+ *   LKR-S2 recovery.sweep-per-asset-outcomes — one asset refuses; the others still move
+ *   LKR-S3 recovery.import-legacy-key       — storing the key moves nothing on chain
+ *
+ * Checklist: LKR-S1..LKR-S3
+ */
 
 const OWNER = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0 — the signed-in member
 const DEST = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'  // #3 — the destination account
 const PASSPHRASE = 'correct-horse-battery'
 
 /*
- * The address the APP scans for chain 1337's wrapped-native ERC-20 — `HARDHAT_CONTRACTS.wmatic`
- * in `frontend/src/config/contracts.js`, resolved through `config/wrappedNative.js`. Mirrored
- * here rather than imported because that module reads `import.meta.env`, which does not exist in
- * the Node process running the fixture task.
+ * The addresses and symbols the APP resolves for this chain (`HARDHAT_CONTRACTS` + `NETWORKS[…]`
+ * in frontend/src/config, reached here through the E2E_AMOY_LOCAL seam). Mirrored rather than
+ * imported: those modules read `import.meta.env`, which does not exist in the Node process that
+ * runs the fixture task.
  *
- * A fresh `deploy:local` does not put the mock here (see the `legacyFixture` comment), so the
- * fixture installs its code at this address. If the constant ever moves, the quote below will not
- * list WETH and the test fails naming exactly that.
+ * Both are asserted against the deployment record in `before`, so a drift between what the app
+ * is built with and what the chain was seeded with is NAMED — rather than discovered as "the
+ * sweep only found one token", which reads like a bug in the sweep.
  */
-const APP_WRAPPED_NATIVE = '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F'
+const APP_WRAPPED_NATIVE = '0x007e106a5664D48e02f571b58694B74c9D5c22a1'
+const APP_STABLECOIN = '0xbc4D54AE49ED9C6075770CD6acA930A728dcf526'
+const WRAPPED_SYMBOL = 'WMATIC'
+const STABLE_SYMBOL = 'USDC'
+const NATIVE_SYMBOL = 'MATIC'
+// Registry order: the wrapped coin, then the stablecoin, then the coin itself (native last —
+// it pays for every transfer, so it can only go last).
+const ASSET_ORDER = [WRAPPED_SYMBOL, STABLE_SYMBOL, NATIVE_SYMBOL]
 
-const ONE_ETH = (10n ** 18n).toString()
+const ONE_COIN = (10n ** 18n).toString()
 const TOKEN_AMOUNT = (5n * 10n ** 18n).toString()
 
 const fixture = (action, args = {}) =>
   cy.task('legacyFixture', { action, args }).then((r) => {
-    // A silent no-op fixture is how a test ends up dying somewhere unrelated: fail here,
-    // where the message still says what could not be arranged.
-    expect(r.ok, `legacyFixture ${action}: ${r.error || ''}`).to.equal(true)
+    // A silent no-op fixture is how a test ends up dying somewhere unrelated: fail here, where
+    // the message still says what could not be arranged.
+    expect(r.ok, `legacyFixture ${action}: ${r.error || 'no error message returned'}`).to.equal(true)
     return r
   })
-
-const balances = (address) => fixture('balances', { address, token: APP_WRAPPED_NATIVE })
 
 // Chai's ordering assertions are not a contract for BigInt, so compare explicitly and put the
 // real values in the message — a failure should say what the balances were, not just "false".
 const isGreater = (a, b) => BigInt(a) > BigInt(b)
 const isLess = (a, b) => BigInt(a) < BigInt(b)
+
+const balancesOf = (address) =>
+  fixture('balances', { address, tokens: [APP_WRAPPED_NATIVE, APP_STABLECOIN] })
 
 /** Import the legacy key and land on the transfer step with a destination entered. */
 function openTransferFor(privateKey, destination = DEST) {
@@ -61,75 +80,97 @@ function openTransferFor(privateKey, destination = DEST) {
   })
 }
 
+/** Read each rendered outcome as `SYMBOL:status`, in the order the sweep produced them. */
+function outcomeRows() {
+  return cy.get('.lkr-outcome').then(($rows) =>
+    [...$rows].map((row) => {
+      const symbol = row.querySelector('.lkr-outcome__sym').textContent.trim()
+      const status = row.className.replace(/.*lkr-outcome--(\w+).*/, '$1')
+      return `${symbol}:${status}`
+    }),
+  )
+}
+
 describe('Legacy account recovery — moving the funds (spec 062)', () => {
-  let legacy // { address, privateKey, tokenAddress } for THIS test
+  let legacy // { address, privateKey } for THIS test
+
+  before(() => {
+    // The app is built with these addresses; the chain is seeded at whatever the deploy produced.
+    // If the two ever part company the sweep quietly finds one asset fewer, and the failure reads
+    // as "the app lost a token" rather than "the build and the chain disagree". Say it here.
+    fixture('deploymentAddresses').then(({ paymentToken, wmatic }) => {
+      expect(String(wmatic).toLowerCase(), 'the deployed wrapped coin is the one the app scans')
+        .to.equal(APP_WRAPPED_NATIVE.toLowerCase())
+      expect(String(paymentToken).toLowerCase(), 'the deployed stablecoin is the one the app scans')
+        .to.equal(APP_STABLECOIN.toLowerCase())
+    })
+  })
 
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
 
-    // Put a working ERC-20 where the app looks for one, in a known unarmed state, BEFORE
-    // minting into it.
-    fixture('installTokenAt', { token: APP_WRAPPED_NATIVE })
-
     fixture('newAccount').then((account) => {
       legacy = account
-      fixture('fundNative', { address: account.address, amount: ONE_ETH })
+      fixture('fundNative', { address: account.address, amount: ONE_COIN })
       fixture('mintToken', { address: account.address, amount: TOKEN_AMOUNT, token: APP_WRAPPED_NATIVE })
+      fixture('mintToken', { address: account.address, amount: TOKEN_AMOUNT, token: APP_STABLECOIN })
     })
 
-    // `realBalances` matters here: the default mock answers a fixed 100 ETH for EVERY address,
-    // so the quote would size its gas reserve against a balance the legacy account does not
-    // have and the native leg would revert for reasons that have nothing to do with the app.
+    /*
+     * `realBalances` is load-bearing: the default mock answers a fixed 100 ETH for EVERY address,
+     * so the quote would size its gas reserve against a balance the legacy account does not have
+     * and the coin leg would fail for reasons that have nothing to do with the app.
+     */
     cy.mockWeb3Provider({ account: OWNER, preAuthorized: true, realBalances: true })
     cy.openLegacyRecovery()
   })
 
   // ---------------------------------------------------------------------------
-  // LKR-S1 — the whole portfolio moves: ERC-20s first, native last, reserve left behind
+  // LKR-S1 — the whole portfolio moves: ERC-20s first, coin last, reserve left behind
   // ---------------------------------------------------------------------------
-  it('[LKR-S1] sweeps every supported asset, ERC-20 first and native last', () => {
-    balances(DEST).then((destBefore) => {
+  it('[LKR-S1] sweeps every supported asset, ERC-20s first and the coin last', () => {
+    balancesOf(DEST).then((destBefore) => {
       openTransferFor(legacy.privateKey)
 
       cy.get('.action-sheet').within(() => {
-        // Only fungible assets are moved, and the screen says so before anything is signed.
+        // Only fungible assets move, and the screen says so before anything is signed.
         cy.contains(/collectibles\/NFTs are not/i).should('be.visible')
 
         cy.contains('button', 'Check balances').click()
         cy.get('.lkr-quote', { timeout: 20000 }).should('be.visible')
-        // Both holdings are found, and the fee the legacy key will pay is disclosed as its
-        // own line — the member is told what will be left behind, not just what will move.
-        // 'WETH' already contains 'ETH', so the native leg is proven by the fee line and by
-        // the outcome symbols below (matched exactly), not by a substring of the token's name.
-        cy.get('.lkr-quote').should('contain.text', 'WETH')
+        cy.get('.lkr-quote').should('contain.text', WRAPPED_SYMBOL).and('contain.text', STABLE_SYMBOL)
+        // The fee the legacy key will pay is disclosed as its own line: the member is told what
+        // stays behind, not only what moves.
         cy.get('.lkr-quote__fee').should('contain.text', 'Estimated network fee')
 
         cy.contains('button', 'Transfer all').click()
-
-        // Every asset reports its own outcome, in the order the sweep must use: the native
-        // coin pays for every transfer, so it can only go last.
-        cy.get('.lkr-outcome', { timeout: 60000 }).should('have.length', 2)
-        cy.get('.lkr-outcome__sym').eq(0).should('have.text', 'WETH')
-        cy.get('.lkr-outcome__sym').eq(1).should('have.text', 'ETH')
-        cy.get('.lkr-outcome--sent').should('have.length', 2)
-        cy.contains(/funds moved/i).should('be.visible')
+        cy.get('.lkr-outcome', { timeout: 90000 }).should('have.length', 3)
       })
+
+      // Each asset reports its own outcome, in the order the sweep must use: the coin pays for
+      // every transfer, so it can only go last.
+      outcomeRows().should('deep.equal', ASSET_ORDER.map((symbol) => `${symbol}:sent`))
+      cy.get('.action-sheet').contains(/funds moved/i).should('be.visible')
 
       // Judged by chain state, not by the dialog's wording.
-      balances(DEST).then((destAfter) => {
-        expect(BigInt(destAfter.token) - BigInt(destBefore.token), 'token received').to.equal(BigInt(TOKEN_AMOUNT))
+      balancesOf(DEST).then((destAfter) => {
+        expect(BigInt(destAfter.tokens[0]) - BigInt(destBefore.tokens[0]), 'wrapped token received')
+          .to.equal(BigInt(TOKEN_AMOUNT))
+        expect(BigInt(destAfter.tokens[1]) - BigInt(destBefore.tokens[1]), 'stablecoin received')
+          .to.equal(BigInt(TOKEN_AMOUNT))
         expect(
           isGreater(destAfter.native, destBefore.native),
-          `native received (${destBefore.native} -> ${destAfter.native})`,
+          `coin received (${destBefore.native} -> ${destAfter.native})`,
         ).to.equal(true)
       })
-      balances(legacy.address).then((left) => {
-        expect(BigInt(left.token), 'token fully swept').to.equal(0n)
-        // The gas reserve is deliberately NOT swept — it is what paid for the sweep. What is
-        // left is dust, not a balance: a small fraction of the 1 ETH it started with.
+      balancesOf(legacy.address).then((left) => {
+        expect(BigInt(left.tokens[0]), 'wrapped token fully swept').to.equal(0n)
+        expect(BigInt(left.tokens[1]), 'stablecoin fully swept').to.equal(0n)
+        // The gas reserve is deliberately NOT swept — it is what paid for the sweep. What stays
+        // is dust, not a balance: a small fraction of the coin the account started with.
         expect(
-          isLess(left.native, (BigInt(ONE_ETH) / 100n).toString()),
+          isLess(left.native, (BigInt(ONE_COIN) / 100n).toString()),
           `only reserve dust left behind (${left.native} wei)`,
         ).to.equal(true)
       })
@@ -139,47 +180,53 @@ describe('Legacy account recovery — moving the funds (spec 062)', () => {
   // ---------------------------------------------------------------------------
   // LKR-S2 — the invariant this tier exists for: one asset fails, the rest still move
   // ---------------------------------------------------------------------------
-  it('[LKR-S2] reports a per-asset failure and still moves the assets that can move', () => {
-    balances(DEST).then((destBefore) => {
+  it('[LKR-S2] reports a per-asset failure and still moves every asset that can move', () => {
+    balancesOf(DEST).then((destBefore) => {
       openTransferFor(legacy.privateKey)
 
       cy.get('.action-sheet').within(() => {
         cy.contains('button', 'Check balances').click()
-        cy.get('.lkr-quote', { timeout: 20000 }).should('contain.text', 'WETH')
+        cy.get('.lkr-quote', { timeout: 20000 }).should('contain.text', WRAPPED_SYMBOL)
       })
 
-      /*
-       * Force ONE leg to fail, at the moment of transfer.
-       *
-       * It has to be the TRANSFER that fails, not the balance: `sweepAllAssets` re-reads
-       * balances itself, so draining the token would simply drop it from the run and prove
-       * nothing. A token that holds the balance and refuses to move it is also the realistic
-       * case — a blocklisting stablecoin does exactly this.
-       */
-      fixture('armTokenToRefuse', { token: APP_WRAPPED_NATIVE })
+      // Refuse the FIRST asset's transfer. It has to be the TRANSFER that fails and not the
+      // balance: the sweep re-reads balances itself, so draining the token would simply drop it
+      // from the run and prove nothing about what happens to the assets behind a failure.
+      fixture('makeTokenRefuse', { token: APP_WRAPPED_NATIVE })
 
       cy.get('.action-sheet').within(() => {
         cy.contains('button', 'Transfer all').click()
+        cy.get('.lkr-outcome', { timeout: 90000 }).should('have.length', 3)
+      })
 
-        cy.get('.lkr-outcome', { timeout: 60000 }).should('have.length', 2)
-        // The failure is named, with its reason, against the asset it belongs to…
-        cy.get('.lkr-outcome').eq(0).should('have.class', 'lkr-outcome--failed')
-        cy.get('.lkr-outcome').eq(0).should('contain.text', 'WETH').and('contain.text', 'failed')
-        // …and the asset that could move, did.
-        cy.get('.lkr-outcome').eq(1).should('have.class', 'lkr-outcome--sent')
-        cy.get('.lkr-outcome').eq(1).should('contain.text', 'ETH')
+      // The refusal is named against the asset it belongs to, and BOTH assets behind it moved —
+      // a failure part-way through the portfolio does not abort what follows it.
+      outcomeRows().should('deep.equal', [
+        `${WRAPPED_SYMBOL}:failed`,
+        `${STABLE_SYMBOL}:sent`,
+        `${NATIVE_SYMBOL}:sent`,
+      ])
 
-        // A run with a failure does NOT claim success: the "Funds moved" screen is withheld
-        // and the member is left on the transfer step with the outcomes in front of them.
+
+      cy.get('.action-sheet').within(() => {
+        // A run with a failure does NOT claim success: the "Funds moved" screen is withheld and
+        // the member is left on the transfer step with the outcomes in front of them.
         cy.contains(/funds moved/i).should('not.exist')
       })
 
-      balances(DEST).then((destAfter) => {
+      balancesOf(DEST).then((destAfter) => {
+        expect(BigInt(destAfter.tokens[1]) - BigInt(destBefore.tokens[1]), 'stablecoin still moved')
+          .to.equal(BigInt(TOKEN_AMOUNT))
         expect(
           isGreater(destAfter.native, destBefore.native),
-          `native still moved (${destBefore.native} -> ${destAfter.native})`,
+          `coin still moved (${destBefore.native} -> ${destAfter.native})`,
         ).to.equal(true)
-        expect(BigInt(destAfter.token) - BigInt(destBefore.token), 'nothing arrived for the failed asset').to.equal(0n)
+        expect(BigInt(destAfter.tokens[0]) - BigInt(destBefore.tokens[0]), 'nothing arrived for the refused asset')
+          .to.equal(0n)
+      })
+      // The refused asset is still where it was — reported as failed, not silently lost.
+      balancesOf(legacy.address).then((left) => {
+        expect(BigInt(left.tokens[0]), 'refused token stays on the legacy account').to.equal(BigInt(TOKEN_AMOUNT))
       })
     })
   })
@@ -188,7 +235,7 @@ describe('Legacy account recovery — moving the funds (spec 062)', () => {
   // LKR-S3 — recovery is complete without a transfer; nothing moves unless asked
   // ---------------------------------------------------------------------------
   it('[LKR-S3] leaves the legacy account untouched when the member stores the key and stops', () => {
-    balances(legacy.address).then((before) => {
+    balancesOf(legacy.address).then((before) => {
       cy.importLegacyKey({ secret: legacy.privateKey, passphrase: PASSPHRASE })
       cy.get('.action-sheet').within(() => {
         cy.contains(/recovery is complete/i).should('be.visible')
@@ -198,9 +245,9 @@ describe('Legacy account recovery — moving the funds (spec 062)', () => {
       cy.get('.lkr-stored__item').should('have.length', 1)
 
       // Storing the key moved nothing. The transfer is genuinely optional, on chain too.
-      balances(legacy.address).then((after) => {
-        expect(BigInt(after.native), 'native untouched').to.equal(BigInt(before.native))
-        expect(BigInt(after.token), 'token untouched').to.equal(BigInt(before.token))
+      balancesOf(legacy.address).then((after) => {
+        expect(BigInt(after.native), 'coin untouched').to.equal(BigInt(before.native))
+        expect(after.tokens, 'token balances untouched').to.deep.equal(before.tokens)
       })
     })
   })

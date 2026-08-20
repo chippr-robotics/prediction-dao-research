@@ -42,13 +42,14 @@ gateway — that composes existing subsystems.
 ## End-to-end coverage
 
 Two specs cover this feature, split by the tiering rule that a flow validatable without a chain
-must not sit in the full tier (issue #1228):
+must not sit in the full tier ([the tiering policy](./e2e-testing-policy.md)):
 
-| Flow | Tier | Spec | What it pins |
-|---|---|---|---|
-| `recovery.import-legacy-key` | fast (no chain) | `frontend/cypress/e2e/fast/28-legacy-recovery.cy.js` | The secret is stored **only** as an AES-GCM blob (`salt`/`iv`/`ct`/`iterations`), and the clear secret appears in no storage entry, no DOM node, and no request body. The audit record carries address + type and no words. A wrong passphrase fails closed and leaves the blob byte-identical. |
-| `recovery.sweep-per-asset-outcomes` | full (on chain) | `frontend/cypress/e2e/full/28-legacy-recovery-sweep.cy.js` | ERC-20s move first and native last with the gas reserve left behind; **one asset failing never aborts the rest** (a token is armed to refuse its transfer, and the native leg still lands); a run with a failure does not claim success. |
-| `recovery.sweep-across-chains` | fast (no chain) | `frontend/cypress/e2e/fast/28-legacy-recovery.cy.js` | Spec 063: a recovered **word list** derives a Solana account whose funds are found and sendable, while an unconfigured Bitcoin gateway is disclosed as unavailable rather than rendered as "no funds found". |
+- `frontend/cypress/e2e/fast/28-legacy-recovery.cy.js` — the import, asserted against the STORAGE
+  rather than the screen, plus spec 063's cross-chain scan.
+- `frontend/cypress/e2e/full/28-legacy-recovery-sweep.cy.js` — the sweep, judged by chain state.
+
+Status and depth per flow live in the [coverage matrix](./e2e-coverage-matrix.md); it is generated,
+so record changes in `frontend/cypress/coverage/matrix.json` and run `npm run e2e:matrix`.
 
 Notes for anyone extending these:
 
@@ -60,14 +61,15 @@ Notes for anyone extending these:
   **fresh** EOA per test. A fixed key accumulates balances across runs, and "what moved" stops
   being a property of the code.
 - The per-asset failure has to be forced at the moment of TRANSFER. `sweepAllAssets` re-reads
-  balances itself, so draining the token before "Transfer all" just drops it from the run and
-  proves nothing. The fixture installs `ReentrantToken` (contracts/mocks) at the address the app
-  scans and arms it to refuse one transfer — a token that holds the balance and declines to move
-  it, which is what a blocklisting stablecoin does.
-- Writing these tests found two real defects in `sweepAllAssets`, both fixed here and both
-  invisible to the unit suite because a stubbed provider's nonce and balance never move: the coin
-  leg reused the token leg's nonce, and its value was sized from a balance taken before the token
-  transfers had paid their gas. With any ERC-20 to move first, the member's coin never left.
+  balances itself, so draining a token before "Transfer all" just drops it from the run and proves
+  nothing. `makeTokenRefuse` swaps in `ReentrantToken`'s code (contracts/mocks) over the token the
+  app scans and arms it to refuse one transfer — a token that holds the balance and declines to
+  move it, which is what a blocklisting stablecoin does. Balances are untouched by the swap, and
+  the per-spec chain checkpoint restores the original code.
+- Writing these tests found two real defects in `sweepAllAssets`, both fixed and both invisible to
+  the unit suite because a stubbed provider's nonce and balance never move: the coin leg reused a
+  token leg's nonce, and its value was sized from a balance taken before the token transfers had
+  paid their gas. With any ERC-20 to move first, the member's coin never left.
 - Moving funds is optional, so both tiers assert that too: storing the key completes recovery, and
   on chain nothing moves until the member asks.
 
