@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 51 |
+| 🟢 covered | 58 |
 | 🟡 partial | 8 |
-| 🔴 absent | 65 |
+| 🔴 absent | 58 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 17 · 🟡 6 · 🔴 22 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 23 · 🟡 6 · 🔴 16 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -137,15 +137,15 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `custody.create-vault` | Create a Safe vault and add its owners | 🔴 absent | none | — (proposed: on-chain) | #1235 |  |
-| `custody.propose-and-execute` | Propose a transaction, collect approvals, execute it | 🔴 absent | none | — (proposed: on-chain) | #1235 |  |
-| `custody.operate-as-vault` | Act as the vault rather than as yourself, and see which you are | 🔴 absent | none | — (proposed: no-chain) | #1235 |  |
+| `custody.create-vault` | Create a Safe vault and add its owners | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-01) |  |
+| `custody.propose-and-execute` | Propose a transaction, collect approvals, execute it | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-02) |  |
+| `custody.operate-as-vault` | Act as the vault rather than as yourself, and see which you are | 🟢 covered | flow | `on-chain` | `29-protect-custody.cy.js` (CV-03) |  |
 
 ### `049-multisig-policy-engine` — Multisig policy engine
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `custody.policy-v1-enforced` | A vault policy refuses a transaction that breaks its rules | 🔴 absent | none | — (proposed: on-chain) | #1235 |  |
+| `custody.policy-v1-enforced` | A vault policy refuses a transaction that breaks its rules | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-07) |  |
 
 ### `050-earn-lending-rewards` — Earn — lending
 
@@ -229,8 +229,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `custody.policy-v2-first-match` | A first-match rule array decides a proposal, and no match denies it | 🔴 absent | none | — (proposed: on-chain) | #1235 |  |
-| `custody.policy-v2-adoption` | A vault consents to the v2 guard through a threshold-approved change | 🔴 absent | none | — (proposed: on-chain) | #1235 |  |
+| `custody.policy-v2-first-match` | A first-match rule array decides a proposal, and no match denies it | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-05) |  |
+| `custody.policy-v2-adoption` | A vault consents to the v2 guard through a threshold-approved change | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-04) |  |
 
 ### `070-safe-receiver` — Safe receiver
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 15 · 🟡 1 · 🔴 16 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 16 · 🟡 1 · 🔴 15 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -593,7 +593,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `custody.multi-chain-vault-list` | See vaults across chains, with a failed chain named rather than shown as empty | 🔴 absent | none | — (proposed: no-chain) | #1235 |  |
+| `custody.multi-chain-vault-list` | See vaults across chains, with a failed chain named rather than shown as empty | 🟢 covered | flow | `on-chain` | `29-protect-custody.cy.js` (CV-06) |  |
 
 ### `074-unified-my-account` — My Account
 
