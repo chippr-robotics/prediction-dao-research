@@ -143,8 +143,8 @@ const localStakingConfig = () => ({
       lstSymbol: 'wstETH',
       referral: '0x0000000000000000000000000000000000000000',
       contracts: {
-        steth: '0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf',
-        wsteth: '0x0E801D84Fa97b50751Dbf25036d067dCf18858bF',
+        steth: '0x82e01223d51Eb87e16A03E24687EDF0F294da6f1',
+        wsteth: '0x2bdCC0de6bE1f7D2ee689a0342D76F52E8EFABa3',
         withdrawalQueue: '0x0000000000000000000000000000000000000000',
       },
       aprApi: null,
@@ -153,12 +153,12 @@ const localStakingConfig = () => ({
     {
       kind: 'spol',
       provider: { name: 'sPOL (Polygon)', url: 'https://staking.polygon.technology/lst' },
-      asset: { symbol: 'POL', decimals: 18, address: '0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf' },
+      asset: { symbol: 'POL', decimals: 18, address: '0x7969c5eD335650692Bc04293B07F5BF2e7A673C0' },
       lstSymbol: 'sPOL',
       referral: null,
       contracts: {
-        token: '0x9d4454B023096f34B160D6B654540c56A1F81688',
-        controller: '0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00',
+        token: '0x7bc06c482DEAd17c0e297aFbC32f6e63d3846650',
+        controller: '0xc351628EB244ec633d5f21fBD6621e1a683B1181',
       },
       aprApi: null,
       unbonding: { kind: 'checkpoints', instantExit: true },
@@ -166,14 +166,14 @@ const localStakingConfig = () => ({
   ],
   delegated: {
     provider: { name: 'Polygon PoS', url: 'https://staking.polygon.technology' },
-    asset: { symbol: 'POL', decimals: 18, address: '0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf' },
-    stakeManager: '0x36C02dA8a0983159322a80FFE9F24b1acfF8B570',
+    asset: { symbol: 'POL', decimals: 18, address: '0x7969c5eD335650692Bc04293B07F5BF2e7A673C0' },
+    stakeManager: '0xFD471836031dc5108809D173A067e8486B9047A3',
     stakingApi: null,
     validators: [
       {
         validatorId: 1,
         name: 'E2E Validator',
-        validatorShare: '0x809d550fca64d94Bd9F66E60752A544199cfAC3D',
+        validatorShare: '0xcbEAF3BDe82155F56486Fb5a1072cb8baAf547cc',
       },
     ],
   },
@@ -311,6 +311,20 @@ const NETWORKS = {
     earn: E2E_AMOY_LOCAL ? earnConfig() : null,
     // Same seam, same reason (specs 065 + 066) — see `localStakingConfig` above.
     staking: E2E_AMOY_LOCAL ? localStakingConfig() : null,
+    /*
+     * Same seam, same reason (spec 067): Across is not deployed on real Polygon Amoy, so a shipped
+     * build resolves this to null and the Bridge surface hides here exactly as it does today. The
+     * local impersonation points at the contracts/mocks SpokePool that
+     * `scripts/deploy/deploy-bridge-liquidity.js` deploys, so the bridge flows can be driven end to
+     * end against a chain.
+     *
+     * NONCE-DERIVED, like the router addresses in contracts.js — it comes from the same targeted
+     * deploy. No HubPool: bridge-liquidity supply is Ethereum-only (the HubPool is an L1 contract),
+     * and pretending otherwise here would offer a supply route that cannot exist.
+     */
+    bridge: E2E_AMOY_LOCAL
+      ? bridgeConfig('0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00')
+      : null,
     // Passkey smart accounts (spec 041) — Amoy is the passkey validation
     // network: RIP-7212 P-256 precompile live, canonical EntryPoint v0.6.
     passkey: passkeyConfig(

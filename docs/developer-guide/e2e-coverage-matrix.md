@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 63 |
+| 🟢 covered | 67 |
 | 🟡 partial | 8 |
-| 🔴 absent | 53 |
+| 🔴 absent | 49 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 27 · 🟡 6 · 🔴 12 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 30 · 🟡 6 · 🔴 9 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -221,9 +221,9 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `bridge.deposit-member-is-depositor` | Bridge funds with yourself as the depositor, so an unfilled deposit refunds to you | 🔴 absent | none | — (proposed: on-chain) | #1236 |  |
-| `liquidity.supply-uniswap-position` | Supply a Uniswap position, minted to you and not the router | 🔴 absent | none | — (proposed: on-chain) | #1236 |  |
-| `liquidity.pause-stops-new-only` | A pause stops new supplies while existing positions stay withdrawable | 🔴 absent | none | — (proposed: on-chain) | #1236 |  |
+| `bridge.deposit-member-is-depositor` | Bridge funds with yourself as the depositor, so an unfilled deposit refunds to you | 🟢 covered | settled | `on-chain` | `30-bridge-liquidity.cy.js` (BL-03) |  |
+| `liquidity.supply-uniswap-position` | Supply a Uniswap position, minted to you and not the router | 🟢 covered | settled | `on-chain` | `30-bridge-liquidity.cy.js` (BL-01) |  |
+| `liquidity.pause-stops-new-only` | A pause stops new supplies while existing positions stay withdrawable | 🟢 covered | settled | `on-chain` | `30-bridge-liquidity.cy.js` (BL-02) |  |
 
 ### `068-protect-multi-chain-policies` — Protect — policy v2
 
@@ -265,7 +265,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Disclosure — a member consents to a cost
 
-9 flows — 🟢 4 · 🟡 0 · 🔴 5 · ⚪ 0 · covered-but-not-proven 0
+9 flows — 🟢 5 · 🟡 0 · 🔴 4 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -309,7 +309,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `bridge.fee-consent-ceiling` | The quoted bps is a ceiling on what can be charged | 🔴 absent | none | — (proposed: on-chain) | #1236 |  |
+| `bridge.fee-consent-ceiling` | The quoted bps is a ceiling on what can be charged | 🟢 covered | settled | `on-chain` | `30-bridge-liquidity.cy.js` (BL-04) |  |
 
 ## Access — gating, identity and permission
 
