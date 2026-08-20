@@ -68,7 +68,7 @@ const fixture = (action, args = {}) =>
  * configuration, and a UI that renders the new threshold before the transaction lands (or never
  * refreshes after it does) must not be able to pass or fail this on its own.
  */
-function waitForThreshold(address, expected, tries = 30) {
+function waitForThreshold(address, expected, tries = 60) {
   return fixture('vaultInfo', { address }).then((info) => {
     if (info.threshold === expected) return info
     if (tries <= 0) {
@@ -79,8 +79,27 @@ function waitForThreshold(address, expected, tries = 30) {
   })
 }
 
+/**
+ * Poll the VAULT until it has executed `expected` transactions.
+ *
+ * This is what sequences a multi-step change. The queue can show two rows both offering Execute
+ * while the first is still in flight, and clicking the second then sends a Safe transaction at
+ * nonce N+1 while the chain is still at N — which reverts, leaving a vault half-adopted with
+ * nothing on screen to say so. The vault's own nonce is the only honest "it landed".
+ */
+function waitForNonce(address, expected, tries = 60) {
+  return fixture('vaultInfo', { address }).then((info) => {
+    if (info.nonce >= expected) return info
+    if (tries <= 0) {
+      throw new Error(`vault ${address} has executed ${info.nonce} transactions, expected ${expected}`)
+    }
+    cy.wait(1000, { log: false })
+    return waitForNonce(address, expected, tries - 1)
+  })
+}
+
 /** Poll the VAULT until its guard slot holds `expected`. */
-function waitForGuard(address, expected, tries = 30) {
+function waitForGuard(address, expected, tries = 60) {
   return fixture('vaultInfo', { address }).then((info) => {
     if (info.guard.toLowerCase() === expected.toLowerCase()) return info
     if (tries <= 0) {
@@ -108,13 +127,13 @@ function asCoOwner(address) {
  * the first has landed. Draining the queue in order is what an owner actually does, and it is the
  * only order the chain will accept.
  */
-function approveAndExecuteTop(remaining) {
+function approveAndExecuteTop(address, expectedNonce) {
   cy.get(PENDING_ROW, { timeout: 60000 })
     .first()
     .contains('button', 'Approve', { timeout: 60000 })
     .should('not.be.disabled')
     .click()
-  executeTop(remaining)
+  executeTop(address, expectedNonce)
 }
 
 /**
@@ -124,19 +143,18 @@ function approveAndExecuteTop(remaining) {
  * proposer's approval on chain, so at 1-of-1 the threshold is already met and the row never
  * offers an Approve button to click.
  */
-function executeTop(remaining) {
+function executeTop(address, expectedNonce) {
   /*
-   * Wait for a row that is genuinely READY, not merely present. Consecutive-nonce steps are
-   * queued together but the later one cannot execute until the earlier has landed, so its row
-   * exists for a while offering nothing to click — and clicking too early is how this test
-   * intermittently left a vault half-adopted.
+   * Wait for a row that is genuinely READY, not merely present, then wait for the CHAIN to say it
+   * landed. The queue emptying a row is not proof the transaction mined, and on a slow runner the
+   * next step was being clicked while the previous was still in flight.
    */
   cy.get(PENDING_ROW, { timeout: 60000 })
     .first()
     .contains('button', 'Execute', { timeout: 60000 })
     .should('not.be.disabled')
     .click()
-  cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length', remaining)
+  waitForNonce(address, expectedNonce)
 }
 
 
@@ -325,7 +343,7 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
        * shared list the product deliberately does not have.
        */
       asCoOwner(address)
-      approveAndExecuteTop(0)
+      approveAndExecuteTop(address, 1)
 
       waitForThreshold(address, 1).then((info) => {
         expect(info.nonce, 'the vault executed exactly one transaction').to.equal(1)
@@ -399,12 +417,12 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
       })
 
       asCoOwner(address)
-      approveAndExecuteTop(1)
+      approveAndExecuteTop(address, 1)
       // The rules landed first, and they are inert: the vault is still ungoverned.
       fixture('vaultInfo', { address }).then((info) => {
         expect(info.guard, 'rules alone do not govern a vault').to.equal(NO_GUARD)
       })
-      approveAndExecuteTop(0)
+      approveAndExecuteTop(address, 2)
 
       waitForGuard(address, GUARD_V2).then((info) => {
         expect(info.threshold, 'adoption does not change the owner set or threshold').to.equal(2)
@@ -446,8 +464,8 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
 
       // 1-of-1: proposing already recorded the only approval the vault needs, so each step is
       // executable the moment it appears — there is no second owner to wait for.
-      executeTop(1)
-      executeTop(0)
+      executeTop(address, 1)
+      executeTop(address, 2)
       waitForGuard(address, GUARD_V2)
 
       // (a) Within rule 001 — allowed, and the coin actually moves.
