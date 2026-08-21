@@ -115,12 +115,28 @@ export function removeAuthenticator(authenticatorId) {
  * confirmation of the choice just made, not a second choice. Specs asserting a budget should say
  * which they mean.
  */
-export function choosePasskey() {
+export function choosePasskey({ mode = 'sign-up' } = {}) {
   cy.contains(/^passkey$/i).click()
-  // Spec 045 FR-010: shown once per browser, so a returning browser goes straight to the ceremony.
+  // Spec 045 FR-010: shown once per browser, so a returning browser goes straight to the chooser.
   cy.get('body').then(($body) => {
     if ($body.find('.passkey-explainer').length > 0) {
       cy.contains('button', /continue with passkey/i).click()
+    }
+  })
+  /*
+   * The chooser. A browser that already knows this passkey lists it; one that knows nothing
+   * offers the two honest options, because the site cannot tell a brand-new member from one whose
+   * passkey synced to this device — only the authenticator can.
+   */
+  cy.get('[data-testid="passkey-picker"]', { timeout: 20000 }).should('exist')
+  cy.get('[data-testid="passkey-picker"]').then(($picker) => {
+    const rows = $picker.find('.connect-modal__account-row button.connect-modal__option')
+    if (mode === 'sign-up') {
+      cy.contains('button', /create a new account/i).click()
+    } else if (rows.length > 0) {
+      cy.wrap(rows.first()).click()
+    } else {
+      cy.contains('button', /i already have a passkey|use a different passkey/i).click()
     }
   })
 }
@@ -136,8 +152,40 @@ export function choosePasskey() {
  *
  * @returns {Cypress.Chainable<string>} the shortened form, e.g. `0x1111...1111`
  */
+/** Whatever the dropdown renders once it is open. */
+const ADDRESS_CONTROL = '[aria-label="Copy account address"], [aria-label="Address copied"]'
+
+/**
+ * Open the header account menu, IDEMPOTENTLY.
+ *
+ * Two things made a plain click unreliable, and both are about state this helper can see and a
+ * caller cannot:
+ *
+ *  - After a reload the header shows the connect surface until the silent reconnect resolves, so
+ *    a click aimed at the account button catches it mid-swap ("disappeared from the page").
+ *    `expectConnected()` settles that. `force` then skips the actionability wait, which is itself
+ *    the window in which the header's balance/roles re-render detaches the button.
+ *  - The button TOGGLES. A helper that toggles blind desynchronises the moment anything else
+ *    opened or closed the menu, so this opens only when the menu is not already open.
+ */
 export function openAccountMenu() {
-  return cy.get('[aria-label="Wallet Account"]', { timeout: 20000 }).click()
+  expectConnected()
+  // The toggle publishes its own state, so drive from that rather than from whether some child
+  // happens to be in the DOM yet: click only when it says closed, then WAIT for it to say open.
+  // That wait is retryable, so a click swallowed by the header's re-render is retried rather
+  // than leaving the next command to time out looking for a menu that never opened.
+  cy.get('[aria-label="Wallet Account"]').then(($btn) => {
+    if ($btn.attr('aria-expanded') !== 'true') cy.wrap($btn).click({ force: true })
+  })
+  return cy.get('[aria-label="Wallet Account"]').should('have.attr', 'aria-expanded', 'true')
+}
+
+/** Close it, idempotently, for the same reason. */
+export function closeAccountMenu() {
+  cy.get('[aria-label="Wallet Account"]').then(($btn) => {
+    if ($btn.attr('aria-expanded') === 'true') cy.wrap($btn).click({ force: true })
+  })
+  return cy.get('[aria-label="Wallet Account"]').should('have.attr', 'aria-expanded', 'false')
 }
 
 export function connectedAddress() {
@@ -145,15 +193,14 @@ export function connectedAddress() {
   // The copy control carries the FULL address in `title` (its visible text is the shortened
   // form). Reading the attribute makes a cross-device identity comparison exact rather than a
   // prefix match, which is the whole claim RU-02 makes.
-  cy.get('[aria-label="Copy account address"], [aria-label="Address copied"]')
+  cy.get(ADDRESS_CONTROL)
     // RETRY UNTIL IT IS THERE. The control renders as soon as the session connects, while the
     // address itself resolves a moment later — so a bare `.invoke('attr', …)`, which does not
     // retry, read an empty string whenever the assertion came straight after the ceremony.
     .should(($el) => expect($el.attr('title') || '').to.match(/^0x[0-9a-fA-F]{40}$/))
     .invoke('attr', 'title')
     .as('__connectedAddress')
-  // Toggle shut, so a later call opens from the same state instead of closing it.
-  cy.get('[aria-label="Wallet Account"]').click()
+  closeAccountMenu()
   return cy.get('@__connectedAddress').then((title) => String(title || '').trim())
 }
 

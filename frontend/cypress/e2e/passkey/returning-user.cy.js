@@ -51,15 +51,22 @@ import {
     // Explicit sign-out, then a timed one-prompt sign-in (SC-005 ≤10 s). Disconnect lives in the
     // header account menu, so it has to be opened first.
     openAccountMenu()
-    // The dropdown re-renders as the balance read settles, so bind to the button only once it is
-    // actually interactive — otherwise the click races that update.
-    cy.get('[aria-label="Disconnect wallet"]').should('be.visible').click()
+    /*
+     * Wait for the balance read to land before clicking.
+     *
+     * The dropdown re-renders when the USDC balance resolves, which detaches the button
+     * mid-click ("the page updated while this command was executing"). `should('be.visible')`
+     * does not help — the element is visible, it is about to be replaced. Waiting on the thing
+     * that causes the re-render is the fix; waiting on the button is waiting on the symptom.
+     */
+    cy.get('.usdc-balance', { timeout: 20000 }).should('not.contain.text', 'Loading')
+    cy.get('[aria-label="Disconnect wallet"]').click()
     cy.contains('button', /connect wallet/i).should('exist')
     const start = Date.now()
     cy.contains('button', /connect wallet/i).click()
-    // Second sign-in in the SAME browser: spec 045's explainer is once-only, so this one goes
-    // straight to the ceremony — which is exactly what `choosePasskey` encodes.
-    choosePasskey()
+    // Second sign-in in the SAME browser: the explainer is once-only and the book now knows this
+    // passkey, so the chooser lists it and signing in is one click.
+    choosePasskey({ mode: 'sign-in' })
     cy.get('@address').then((address) => {
       expectConnected()
       connectedAddress()
@@ -96,7 +103,13 @@ import {
     cy.clearLocalStorage()
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
-    choosePasskey()
+    /*
+     * THE CASE THIS TEST EXISTS FOR. Device B's local book is empty, but the credential synced.
+     * The app used to skip straight to sign-up here and mint a SECOND account — the member's
+     * funds apparently gone — because "nothing to choose between" was read off the browser's book
+     * rather than the device's. Now the chooser offers "I already have a passkey".
+     */
+    choosePasskey({ mode: 'sign-in' })
     cy.get('@address').then((address) => {
       // Same on-chain identity: address, funds, roles all follow (FR-009).
       expectConnected()
