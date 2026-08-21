@@ -296,13 +296,13 @@
         {
           "id": "legal.read-versioned-policies",
           "name": "Open terms, risk and privacy from the footer before connecting",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-05"
+          ]
         }
       ]
     },
@@ -399,13 +399,14 @@
         {
           "id": "reports.export-wager-history",
           "name": "Export a settled-wager report for tax purposes",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-02"
+          ],
+          "note": "the empty state and its promise about where statements come from; generating one needs chain history"
         }
       ]
     },
@@ -505,13 +506,13 @@
         {
           "id": "addressbook.save-and-use-contact",
           "name": "Save a contact and address a wager or transfer to it",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-01"
+          ]
         }
       ]
     },
@@ -679,13 +680,13 @@
         {
           "id": "notifications.platform-feed",
           "name": "See platform notifications and clear them",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-03"
+          ]
         }
       ]
     },
@@ -697,13 +698,15 @@
         {
           "id": "backup.encrypted-sync-roundtrip",
           "name": "Back up local data encrypted and restore it on another device",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "no-chain",
+          "depth": "smoke",
           "risk": "access",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-01"
+          ],
+          "issue": "#1245",
+          "missing": "asserts the surface renders and prints no key material; the encrypt/restore round-trip itself is not driven"
         }
       ]
     },
@@ -823,13 +826,14 @@
         {
           "id": "wagers.lookup-by-code",
           "name": "Find a pool or challenge from a code someone sent you",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "access",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::LK-01"
+          ],
+          "note": "the deep link opens the lookup and the code is cleared from the URL; resolving a real phrase needs a chain"
         }
       ]
     },
@@ -1058,13 +1062,14 @@
         {
           "id": "portfolio.see-holdings",
           "name": "See what the connected account holds across supported assets",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-02",
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-03"
+          ]
         }
       ]
     },
@@ -1134,13 +1139,13 @@
         {
           "id": "privacy.mask-balances",
           "name": "Hide balances on screen when someone is looking over your shoulder",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-05"
+          ]
         }
       ]
     },
@@ -1238,13 +1243,13 @@
         {
           "id": "activity.see-unified-history",
           "name": "See one history across wagers, transfers and membership",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-04"
+          ]
         }
       ]
     },
@@ -1459,13 +1464,14 @@
         {
           "id": "notifications.choose-profile",
           "name": "Choose how much you are notified",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-04"
+          ],
+          "note": "the empty-state route into the wizard; a member with profiles already saved is not modelled here"
         }
       ]
     },
@@ -1616,13 +1622,13 @@
         {
           "id": "assets.pick-any-supported-asset",
           "name": "Pick any supported asset from one selector",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::AS-01"
+          ]
         }
       ]
     },
@@ -1946,13 +1952,13 @@
         {
           "id": "account.unified-panel",
           "name": "Reach preferences, membership and network from one account panel",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-01"
+          ]
         }
       ]
     },
@@ -2032,13 +2038,15 @@
         {
           "id": "nav.drawer-sections-and-density",
           "name": "Fold nav sections and choose a compact density that survives a reload",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::NV-01",
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::NV-02"
+          ],
+          "note": "the fold persists and the filter searches the app; the UNMOUNT rule is asserted in src/test/PortalNav.test.jsx, where the whole rail is in one render tree"
         }
       ]
     },
@@ -2243,13 +2251,15 @@
         {
           "id": "activity.multi-chain-history",
           "name": "See activity across chains, with an unreadable chain named rather than empty",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::MC-01"
+          ],
+          "issue": "#1280",
+          "missing": "the empty-state honesty is covered; the all-networks-unreachable disclosure is NOT — under a total RPC refusal the panel renders \"No activity yet\" and \"Updated 50s ago\" (#1280), and whether that is a product bug or an unmodelled stub is unresolved. The per-network filter renders over entries, so it needs seeded history."
         }
       ]
     },

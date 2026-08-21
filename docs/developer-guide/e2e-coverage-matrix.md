@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 89 |
-| 🟡 partial | 6 |
-| 🔴 absent | 29 |
+| 🟢 covered | 101 |
+| 🟡 partial | 8 |
+| 🔴 absent | 15 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 31 · 🟡 0 · 🔴 7 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 33 · 🟡 1 · 🔴 4 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -347,7 +347,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `addressbook.save-and-use-contact` | Save a contact and address a wager or transfer to it | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `addressbook.save-and-use-contact` | Save a contact and address a wager or transfer to it | 🟢 covered | settled | `no-chain` | `34-member-surfaces.cy.js` (MS-01) |  |
 
 ### `022-membership-purchase-progress` — Membership purchase progress
 
@@ -359,13 +359,13 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟡 partial | smoke | `no-chain` | `35-navigation-and-lookup.cy.js` (BK-01) | asserts the surface renders and prints no key material; the encrypt/restore round-trip itself is not driven |
 
 ### `037-unified-pool-challenge-lookup` — Unified pool and challenge lookup
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `wagers.lookup-by-code` | Find a pool or challenge from a code someone sent you | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `wagers.lookup-by-code` | Find a pool or challenge from a code someone sent you | 🟢 covered | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (LK-01) |  |
 
 ### `041-passkey-wallet-login` — Passkey wallet login
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 17 · 🟡 1 · 🔴 14 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 27 · 🟡 2 · 🔴 3 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -473,7 +473,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `legal.read-versioned-policies` | Open terms, risk and privacy from the footer before connecting | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `legal.read-versioned-policies` | Open terms, risk and privacy from the footer before connecting | 🟢 covered | settled | `no-chain` | `34-member-surfaces.cy.js` (MS-05) |  |
 
 ### `011-wallet-address-qr` — Wallet address QR
 
@@ -503,7 +503,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `reports.export-wager-history` | Export a settled-wager report for tax purposes | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `reports.export-wager-history` | Export a settled-wager report for tax purposes | 🟢 covered | flow | `no-chain` | `34-member-surfaces.cy.js` (MS-02) |  |
 
 ### `017-wager-grid-redesign` — Wager grid redesign
 
@@ -539,7 +539,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `notifications.platform-feed` | See platform notifications and clear them | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `notifications.platform-feed` | See platform notifications and clear them | 🟢 covered | flow | `no-chain` | `34-member-surfaces.cy.js` (MS-03) |  |
 
 ### `038-ux-consistency` — UX consistency
 
@@ -563,31 +563,31 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `portfolio.see-holdings` | See what the connected account holds across supported assets | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `portfolio.see-holdings` | See what the connected account holds across supported assets | 🟢 covered | settled | `no-chain` | `33-account-surfaces.cy.js` (AC-02, AC-03) |  |
 
 ### `047-mask-sensitive-values` — Mask sensitive values
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `privacy.mask-balances` | Hide balances on screen when someone is looking over your shoulder | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `privacy.mask-balances` | Hide balances on screen when someone is looking over your shoulder | 🟢 covered | settled | `no-chain` | `33-account-surfaces.cy.js` (AC-05) |  |
 
 ### `051-unified-activity-ledger` — Activity ledger
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `activity.see-unified-history` | See one history across wagers, transfers and membership | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `activity.see-unified-history` | See one history across wagers, transfers and membership | 🟢 covered | flow | `no-chain` | `33-account-surfaces.cy.js` (AC-04) |  |
 
 ### `059-notification-profiles` — Notification profiles
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `notifications.choose-profile` | Choose how much you are notified | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `notifications.choose-profile` | Choose how much you are notified | 🟢 covered | flow | `no-chain` | `34-member-surfaces.cy.js` (MS-04) |  |
 
 ### `064-universal-asset-selector` — Universal asset selector
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `assets.pick-any-supported-asset` | Pick any supported asset from one selector | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `assets.pick-any-supported-asset` | Pick any supported asset from one selector | 🟢 covered | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (AS-01) |  |
 
 ### `068-protect-multi-chain-policies` — Protect — policy v2
 
@@ -599,7 +599,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `account.unified-panel` | Reach preferences, membership and network from one account panel | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `account.unified-panel` | Reach preferences, membership and network from one account panel | 🟢 covered | settled | `no-chain` | `33-account-surfaces.cy.js` (AC-01) |  |
 
 ### `077-miniapp-store-redesign` — Mini-app store
 
@@ -617,7 +617,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `nav.drawer-sections-and-density` | Fold nav sections and choose a compact density that survives a reload | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `nav.drawer-sections-and-density` | Fold nav sections and choose a compact density that survives a reload | 🟢 covered | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (NV-01, NV-02) |  |
 
 ### `082-perps-trade-view` — Perps market data
 
@@ -642,7 +642,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟡 partial | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01) | the empty-state honesty is covered; the all-networks-unreachable disclosure is NOT — under a total RPC refusal the panel renders "No activity yet" and "Updated 50s ago" (#1280), and whether that is a product bug or an unmodelled stub is unresolved. The per-network filter renders over entries, so it needs seeded history. |
 
 ## No member-facing flow
 

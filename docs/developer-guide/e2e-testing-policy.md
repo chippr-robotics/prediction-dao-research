@@ -93,6 +93,7 @@ was checking something.
 | 7 | `expect(true).to.be.true` behind a precondition guard | Reports as coverage | 33 branches across four money-path specs. **A test that passes when its precondition is absent is worse than a missing test.** |
 | 8 | `if (!Cypress.env('X')) this.skip()` where nothing sets `X` | Reads as a conditional skip | The skip is permanent, not conditional. 16 of the account-native tier's 17 tests were pending for a year while the matrix called them covered; when they were finally allowed to run, every one of them failed (#1271) — including three asserting a `data-testid` the app does not have. Record it as depth `skipped`, and make the env var real or delete the test. |
 | 9 | `const t0 = Date.now()` in a Cypress test body | Looks like a stopwatch | The body is EVALUATED before a single command runs, so the timer starts at test start and a later assertion is charged everything before it. RU-01 read 16s for a sign-in that takes ~700ms. Stamp inside `cy.then()`. |
+| 10 | A selector only one viewport profile renders | Green on the profile you ran locally | The no-chain tier runs at **both** `desktop` and `phone` (FR-019), and plenty of switchers ship twice: My Account's view strip is `display:none` ≤768px while `SectionIconNav` renders only ≤768px. `[role="tab"]` still **exists** at 390px, so `.should('exist')` passes and `.click()` then hits a hidden element. Pick the switcher the viewport actually shows, and assert through that control's own idiom (`aria-selected` on a tab, `aria-current` on the icon bar). |
 
 ### Pattern 7 is gated
 
