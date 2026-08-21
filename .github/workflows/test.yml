@@ -593,6 +593,13 @@ jobs:
           # Read by cypress/support/viewports.js and applied from a global beforeEach, so a spec
           # written tomorrow is covered at both widths without its author doing anything.
           CYPRESS_VIEWPORT_PROFILE: ${{ matrix.viewport }}
+          # Account-native tier (#1271). Without this the WebAuthn specs skip themselves, and 16
+          # of the tier's 17 tests were permanently pending while the coverage matrix recorded
+          # them as covered. It needs no bundler — the ceremonies and the local address derivation
+          # run without a chain, which is why the author gated them separately from
+          # PASSKEY_FULL_STACK. Desktop only: the passkey specs ride that leg (see the spec
+          # selection above), so setting it on the phone leg would claim something it never ran.
+          CYPRESS_PASSKEY_ENABLED: ${{ matrix.viewport == 'desktop' && '1' || '' }}
         run: |
           set -o pipefail
           npx start-server-and-test dev http://localhost:5173 'cypress run --spec "${{ steps.specs.outputs.specs }}" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt

@@ -28,7 +28,15 @@ const RISK_TITLES = {
   none: 'No member consequence',
 }
 const STATUS_ICON = { covered: '🟢', partial: '🟡', absent: '🔴', 'out-of-scope': '⚪' }
-const DEPTH_ORDER = ['none', 'smoke', 'flow', 'settled']
+/*
+ * `skipped` sits at the bottom with `none`, deliberately.
+ *
+ * It means: tests are written and cited, and they DO NOT EXECUTE. That is not a shallower kind of
+ * evidence, it is the absence of evidence wearing a test file's name — the failure #1271 measured,
+ * where six rows read `covered / flow` while sixteen of the tier's seventeen tests were
+ * permanently pending. Ordering it below `smoke` keeps it out of every "is this proven" comparison.
+ */
+const DEPTH_ORDER = ['none', 'skipped', 'smoke', 'flow', 'settled']
 
 const readMatrix = () => JSON.parse(fs.readFileSync(MATRIX, 'utf8'))
 

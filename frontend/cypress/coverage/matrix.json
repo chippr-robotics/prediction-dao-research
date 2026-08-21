@@ -197,9 +197,9 @@
         {
           "id": "compliance.accept-terms-before-entry",
           "name": "Read and accept the versioned terms before reaching the app",
-          "status": "covered",
+          "status": "absent",
           "tier": "account-native",
-          "depth": "flow",
+          "depth": "skipped",
           "risk": "access",
           "tests": [
             "frontend/cypress/e2e/passkey/compliance.cy.js::CP-01",
@@ -207,7 +207,7 @@
             "frontend/cypress/e2e/passkey/compliance.cy.js::CP-03"
           ],
           "issue": "#1271",
-          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
+          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
         },
         {
           "id": "compliance.sanctioned-address-refused",
@@ -922,29 +922,26 @@
           "name": "Create an account with a passkey and no seed phrase",
           "status": "covered",
           "tier": "account-native",
-          "depth": "flow",
+          "depth": "settled",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-01",
-            "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-02",
-            "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-03"
+            "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-02"
           ],
           "issue": "#1271",
-          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
+          "note": "PK-01 and PK-03 remain pending (#1019 / PASSKEY_FULL_STACK); PK-02 runs and is the flow"
         },
         {
           "id": "passkey.return-and-sign-in",
           "name": "Come back on the same device and sign in",
           "status": "covered",
           "tier": "account-native",
-          "depth": "flow",
+          "depth": "settled",
           "risk": "access",
           "tests": [
             "frontend/cypress/e2e/passkey/returning-user.cy.js::RU-01",
             "frontend/cypress/e2e/passkey/returning-user.cy.js::RU-02"
           ],
-          "issue": "#1271",
-          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
+          "issue": "#1271"
         },
         {
           "id": "passkey.unified-login",
@@ -954,20 +951,18 @@
           "depth": "flow",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-01",
-            "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-02",
             "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-03",
-            "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-04"
+            "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-05"
           ],
           "issue": "#1271",
-          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
+          "note": "UL-01, UL-02 and UL-04 stay pending (#1019); UL-03/UL-05 execute and pin session restore vs honest sign-out"
         },
         {
           "id": "passkey.controllers",
           "name": "Add and remove the controllers that may act for the account",
-          "status": "covered",
+          "status": "absent",
           "tier": "account-native",
-          "depth": "flow",
+          "depth": "skipped",
           "risk": "access",
           "tests": [
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-01",
@@ -975,20 +970,20 @@
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-03"
           ],
           "issue": "#1271",
-          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
+          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
         },
         {
           "id": "passkey.recover-account",
           "name": "Recover the account on a new device",
-          "status": "partial",
+          "status": "absent",
           "tier": "account-native",
-          "depth": "flow",
+          "depth": "skipped",
           "risk": "custody",
           "tests": [
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-01",
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-04"
           ],
-          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one",
+          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
           "issue": "#1271"
         }
       ]

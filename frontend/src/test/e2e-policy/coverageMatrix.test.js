@@ -24,7 +24,8 @@ const MATRIX_PATH = resolve(ROOT, 'frontend/cypress/coverage/matrix.json')
 const SPECS_DIR = resolve(ROOT, 'specs')
 
 const STATUSES = ['covered', 'partial', 'absent', 'out-of-scope']
-const DEPTHS = ['none', 'smoke', 'flow', 'settled']
+// `skipped` = the tests exist and are cited, and they do not run (#1271). See the depth rules below.
+const DEPTHS = ['none', 'skipped', 'smoke', 'flow', 'settled']
 const TIERS = ['no-chain', 'on-chain', 'account-native', 'none']
 const RISKS = ['custody', 'disclosure', 'access', 'information', 'none']
 
@@ -120,6 +121,29 @@ describe('e2e coverage matrix', () => {
       } else {
         expect(tests.length, `${flow.id}: depth "${flow.depth}" must cite the tests that back it`).toBeGreaterThan(0)
       }
+    }
+  })
+
+  /*
+   * `skipped` is the one depth that cites tests while proving nothing, so it needs its own rule in
+   * both directions: it must name the files (a reader has to be able to find the dead tests) and
+   * it must never be paired with a status that claims coverage. Without the second half it would
+   * become a more comfortable way to write `covered`.
+   */
+  it('keeps depth "skipped" honest: cites its dead tests, claims no coverage', () => {
+    for (const flow of allFlows.filter((f) => f.depth === 'skipped')) {
+      expect(
+        (flow.tests || []).length,
+        `${flow.id}: depth "skipped" must cite the tests that do not run`
+      ).toBeGreaterThan(0)
+      expect(
+        ['absent', 'partial'],
+        `${flow.id}: depth "skipped" cannot be status "${flow.status}" — a test that never runs is not coverage`
+      ).toContain(flow.status)
+      expect(
+        flow.missing,
+        `${flow.id}: depth "skipped" must say WHY the tests do not run`
+      ).toBeTruthy()
     }
   })
 

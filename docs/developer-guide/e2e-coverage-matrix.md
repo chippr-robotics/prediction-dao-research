@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 91 |
-| 🟡 partial | 7 |
-| 🔴 absent | 26 |
+| 🟢 covered | 89 |
+| 🟡 partial | 6 |
+| 🔴 absent | 29 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 36 · 🟡 6 · 🔴 3 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 36 · 🟡 5 · 🔴 4 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -131,7 +131,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `passkey.recover-account` | Recover the account on a new device | 🟡 partial | flow | `account-native` | `recovery.cy.js` (RC-01, RC-04) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
+| `passkey.recover-account` | Recover the account on a new device | 🔴 absent | skipped | `account-native` | `recovery.cy.js` (RC-01, RC-04) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
 
 ### `043-safe-multisig-custody` — Safe multisig custody
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 33 · 🟡 0 · 🔴 5 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 31 · 🟡 0 · 🔴 7 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -332,7 +332,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `compliance.accept-terms-before-entry` | Read and accept the versioned terms before reaching the app | 🟢 covered | flow | `account-native` | `compliance.cy.js` (CP-01, CP-02, CP-03) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
+| `compliance.accept-terms-before-entry` | Read and accept the versioned terms before reaching the app | 🔴 absent | skipped | `account-native` | `compliance.cy.js` (CP-01, CP-02, CP-03) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
 | `compliance.sanctioned-address-refused` | A screened address is refused before any transaction is offered | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CM-01) |  |
 | `compliance.frozen-account-blocked` | A frozen account cannot create a wager, and unfreezing restores it | 🟢 covered | settled | `on-chain` | `18-frozen-accounts.cy.js` (FRZ-01, FRZ-02) |  |
 | `compliance.paused-protocol-blocked` | A paused protocol refuses new wagers, and unpausing restores them | 🟢 covered | settled | `on-chain` | `19-paused-protocol.cy.js` (PAU-01, PAU-02) |  |
@@ -371,10 +371,10 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `passkey.create-account` | Create an account with a passkey and no seed phrase | 🟢 covered | flow | `account-native` | `onboarding-journey.cy.js` (PK-01, PK-02, PK-03) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
-| `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | flow | `account-native` | `returning-user.cy.js` (RU-01, RU-02) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
-| `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-01, UL-02, UL-03, UL-04) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
-| `passkey.controllers` | Add and remove the controllers that may act for the account | 🟢 covered | flow | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
+| `passkey.create-account` | Create an account with a passkey and no seed phrase | 🟢 covered | settled | `account-native` | `onboarding-journey.cy.js` (PK-02) |  |
+| `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | settled | `account-native` | `returning-user.cy.js` (RU-01, RU-02) |  |
+| `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-03, UL-05) |  |
+| `passkey.controllers` | Add and remove the controllers that may act for the account | 🔴 absent | skipped | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
 
 ### `042-clearpath-multi-network` — ClearPath across networks
 
