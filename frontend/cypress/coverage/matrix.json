@@ -1326,13 +1326,14 @@
         {
           "id": "callsign.commit-reveal-register",
           "name": "Register a %callsign through commit and reveal",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/full/34-callsign-registration.cy.js::CR-01"
+          ]
         },
         {
           "id": "callsign.resolve-in-address-entry",
@@ -2140,7 +2141,8 @@
           "depth": "none",
           "risk": "access",
           "tests": [],
-          "issue": "#1241"
+          "issue": "#1274",
+          "missing": "the refusal itself is one client-side branch, but reaching it needs a vault, operate-as mode (offered only in TransferForm) and in-app navigation that preserves the memory-only active identity — a test-reachability problem, not a product one"
         }
       ]
     },

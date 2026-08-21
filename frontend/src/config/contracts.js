@@ -136,6 +136,13 @@ const HARDHAT_CONTRACTS = {
    */
   externalDAORegistry: '0x36b58F5C1969B7b6591D752ea6F5486D069010AB',
   /*
+   * spec 054 — the %callsign registry. NONCE-DERIVED, deployed by `deploy:local:callsigns`, which
+   * runs after the swap doubles and before the package publish. Registration is Gold-gated and
+   * commit→reveal, so the on-chain flow needs a registry it can actually write to; a shipped build
+   * still resolves this from the per-network maps above (Polygon has one, Mordor does not yet).
+   */
+  callsignRegistry: '0xffa7CA1AEEEbBc30C874d32C7e22F052BbEa0429',
+  /*
    * THE TWO ENTRIES BELOW ARE NONCE-DERIVED, AND THEIR ORDER IS THE `setup:e2e` ORDER.
    *
    * Both come from targeted deploys that run AFTER `deploy:local` (`deploy:local:pools`, then

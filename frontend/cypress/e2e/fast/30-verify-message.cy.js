@@ -146,4 +146,5 @@ describe('Verify a signature (spec 084)', () => {
       .should('have.attr', 'data-status', 'invalid')
       .and('contain.text', 'holds no contract')
   })
+
 })

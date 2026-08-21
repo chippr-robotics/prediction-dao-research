@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 86 |
+| 🟢 covered | 87 |
 | 🟡 partial | 8 |
-| 🔴 absent | 30 |
+| 🔴 absent | 29 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 28 · 🟡 1 · 🔴 9 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 29 · 🟡 1 · 🔴 8 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -394,7 +394,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `callsign.commit-reveal-register` | Register a %callsign through commit and reveal | 🔴 absent | none | — (proposed: on-chain) | #1241 |  |
+| `callsign.commit-reveal-register` | Register a %callsign through commit and reveal | 🟢 covered | settled | `on-chain` | `34-callsign-registration.cy.js` (CR-01) |  |
 | `callsign.resolve-in-address-entry` | Address a transfer to someone by their callsign | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CS-02) |  |
 | `callsign.gated-below-gold` | Be told why registration is unavailable below Gold tier | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CS-01) |  |
 
@@ -444,7 +444,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `verify.three-verdicts` | Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout | 🟢 covered | settled | `no-chain` | `30-verify-message.cy.js` (VF-01, VF-02) |  |
-| `verify.refused-while-operating-as-vault` | Be refused message signing while acting as a vault | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
+| `verify.refused-while-operating-as-vault` | Be refused message signing while acting as a vault | 🔴 absent | none | — (proposed: no-chain) | #1274 | the refusal itself is one client-side branch, but reaching it needs a vault, operate-as mode (offered only in TransferForm) and in-app navigation that preserves the memory-only active identity — a test-reachability problem, not a product one |
 
 ### `093-admin-mini-apps` — Admin mini-apps
 
