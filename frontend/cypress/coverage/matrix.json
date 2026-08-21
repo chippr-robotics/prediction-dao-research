@@ -205,7 +205,9 @@
             "frontend/cypress/e2e/passkey/compliance.cy.js::CP-01",
             "frontend/cypress/e2e/passkey/compliance.cy.js::CP-02",
             "frontend/cypress/e2e/passkey/compliance.cy.js::CP-03"
-          ]
+          ],
+          "issue": "#1271",
+          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
         },
         {
           "id": "compliance.sanctioned-address-refused",
@@ -610,13 +612,14 @@
         {
           "id": "membership.redeem-voucher",
           "name": "Redeem a voucher for membership without paying",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1240"
+          "tests": [
+            "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::VC-01"
+          ]
         }
       ]
     },
@@ -711,13 +714,14 @@
         {
           "id": "trade.swap-quote-and-execute",
           "name": "Swap one asset for another on the active network",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1240"
+          "tests": [
+            "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::SW-01"
+          ]
         }
       ]
     },
@@ -923,7 +927,9 @@
             "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-01",
             "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-02",
             "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-03"
-          ]
+          ],
+          "issue": "#1271",
+          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
         },
         {
           "id": "passkey.return-and-sign-in",
@@ -935,7 +941,9 @@
           "tests": [
             "frontend/cypress/e2e/passkey/returning-user.cy.js::RU-01",
             "frontend/cypress/e2e/passkey/returning-user.cy.js::RU-02"
-          ]
+          ],
+          "issue": "#1271",
+          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
         },
         {
           "id": "passkey.unified-login",
@@ -949,7 +957,9 @@
             "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-02",
             "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-03",
             "frontend/cypress/e2e/passkey/unified-login.cy.js::UL-04"
-          ]
+          ],
+          "issue": "#1271",
+          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
         },
         {
           "id": "passkey.controllers",
@@ -962,7 +972,9 @@
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-01",
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-02",
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-03"
-          ]
+          ],
+          "issue": "#1271",
+          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one"
         },
         {
           "id": "passkey.recover-account",
@@ -975,8 +987,8 @@
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-01",
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-04"
           ],
-          "missing": "only two of the recovery paths are driven; the guardian and export routes are not",
-          "issue": "#1244"
+          "missing": "these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for \"written but never run\" — #1271 adds one",
+          "issue": "#1271"
         }
       ]
     },
@@ -1429,13 +1441,14 @@
         {
           "id": "transfer.send-from-home",
           "name": "Send funds to someone from the home screen",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1240"
+          "tests": [
+            "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::TR-01"
+          ]
         }
       ]
     },
@@ -1472,8 +1485,7 @@
           "tests": [
             "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-01",
             "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-02"
-          ],
-          "issue": "#1233"
+          ]
         },
         {
           "id": "fees.zero-rate-shows-no-line",
@@ -1485,8 +1497,7 @@
           "tests": [
             "frontend/cypress/e2e/fast/28-platform-fee-disclosure.cy.js::FEE-04",
             "frontend/cypress/e2e/fast/28-platform-fee-disclosure.cy.js::FEE-05"
-          ],
-          "issue": "#1233"
+          ]
         },
         {
           "id": "fees.admin-changes-rate",
@@ -1497,8 +1508,7 @@
           "risk": "disclosure",
           "tests": [
             "frontend/cypress/e2e/full/25-platform-fees.cy.js::FEE-03"
-          ],
-          "issue": "#1233"
+          ]
         }
       ]
     },

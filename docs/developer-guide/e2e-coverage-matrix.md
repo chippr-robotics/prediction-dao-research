@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 75 |
+| 🟢 covered | 78 |
 | 🟡 partial | 8 |
-| 🔴 absent | 41 |
+| 🔴 absent | 38 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 33 · 🟡 6 · 🔴 6 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 36 · 🟡 6 · 🔴 3 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -80,7 +80,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `membership.redeem-voucher` | Redeem a voucher for membership without paying | 🔴 absent | none | — (proposed: on-chain) | #1240 |  |
+| `membership.redeem-voucher` | Redeem a voucher for membership without paying | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-01) |  |
 
 ### `028-token-mint` — Token Mint mini-app
 
@@ -98,7 +98,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `trade.swap-quote-and-execute` | Swap one asset for another on the active network | 🔴 absent | none | — (proposed: on-chain) | #1240 |  |
+| `trade.swap-quote-and-execute` | Swap one asset for another on the active network | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (SW-01) |  |
 
 ### `034-zk-wager-pools` — Wager pools
 
@@ -131,7 +131,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `passkey.recover-account` | Recover the account on a new device | 🟡 partial | flow | `account-native` | `recovery.cy.js` (RC-01, RC-04) | only two of the recovery paths are driven; the guardian and export routes are not |
+| `passkey.recover-account` | Recover the account on a new device | 🟡 partial | flow | `account-native` | `recovery.cy.js` (RC-01, RC-04) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
 
 ### `043-safe-multisig-custody` — Safe multisig custody
 
@@ -188,7 +188,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `transfer.send-from-home` | Send funds to someone from the home screen | 🔴 absent | none | — (proposed: on-chain) | #1240 |  |
+| `transfer.send-from-home` | Send funds to someone from the home screen | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (TR-01) |  |
 
 ### `061-bitcoin-transactions` — Bitcoin
 
@@ -332,7 +332,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `compliance.accept-terms-before-entry` | Read and accept the versioned terms before reaching the app | 🟢 covered | flow | `account-native` | `compliance.cy.js` (CP-01, CP-02, CP-03) |  |
+| `compliance.accept-terms-before-entry` | Read and accept the versioned terms before reaching the app | 🟢 covered | flow | `account-native` | `compliance.cy.js` (CP-01, CP-02, CP-03) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
 | `compliance.sanctioned-address-refused` | A screened address is refused before any transaction is offered | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
 | `compliance.frozen-account-blocked` | A frozen account cannot create a wager, and unfreezing restores it | 🟢 covered | settled | `on-chain` | `18-frozen-accounts.cy.js` (FRZ-01, FRZ-02) |  |
 | `compliance.paused-protocol-blocked` | A paused protocol refuses new wagers, and unpausing restores them | 🟢 covered | settled | `on-chain` | `19-paused-protocol.cy.js` (PAU-01, PAU-02) |  |
@@ -371,10 +371,10 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `passkey.create-account` | Create an account with a passkey and no seed phrase | 🟢 covered | flow | `account-native` | `onboarding-journey.cy.js` (PK-01, PK-02, PK-03) |  |
-| `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | flow | `account-native` | `returning-user.cy.js` (RU-01, RU-02) |  |
-| `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-01, UL-02, UL-03, UL-04) |  |
-| `passkey.controllers` | Add and remove the controllers that may act for the account | 🟢 covered | flow | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) |  |
+| `passkey.create-account` | Create an account with a passkey and no seed phrase | 🟢 covered | flow | `account-native` | `onboarding-journey.cy.js` (PK-01, PK-02, PK-03) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
+| `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | flow | `account-native` | `returning-user.cy.js` (RU-01, RU-02) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
+| `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-01, UL-02, UL-03, UL-04) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
+| `passkey.controllers` | Add and remove the controllers that may act for the account | 🟢 covered | flow | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
 
 ### `042-clearpath-multi-network` — ClearPath across networks
 

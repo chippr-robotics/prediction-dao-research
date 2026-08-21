@@ -36,6 +36,13 @@ const MEMBERSHIP_ABI = [
   'function grantMembership(address user, bytes32 role, uint8 tier, uint32 durationDays)',
 ]
 // Hardhat default account private keys (#0–#4) — public test keys, test-only.
+/**
+ * Hardhat's default mnemonic. The node unlocks the first 20 accounts derived from it, and
+ * `eth_sendTransaction` from any of them is signed by the node — which is what lets a flow act as
+ * an account this file did not hardcode a key for.
+ */
+const HARDHAT_MNEMONIC = 'test test test test test test test test test test test junk'
+
 const ACCOUNT_KEYS = [
   '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
   '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
@@ -157,6 +164,29 @@ const E2E_CHAIN_ID = Number(globalThis.process?.env?.CYPRESS_NETWORK_ID) || 1337
 function loadLocalDeployment() {
   const path = resolve(__dirname, '..', 'deployments', `localhost-chain${E2E_CHAIN_ID}-v2.json`)
   return JSON.parse(readFileSync(path, 'utf8'))
+}
+
+
+/**
+ * Every voucher an address holds, by walking `ownerOf` over the minted range.
+ *
+ * The voucher contract is a plain ERC-721 with no enumerable extension, so there is no
+ * `tokenOfOwnerByIndex` to call — and inventing one in a fixture would test a contract that does
+ * not exist. Ids start at 1 and increase by one per mint, so a bounded walk is exact; a gap left
+ * by a burned (redeemed) voucher makes `ownerOf` revert, which is skipped rather than treated as
+ * the end of the range.
+ */
+async function ownedVouchers(voucher, owner, max = 64) {
+  const held = []
+  const want = String(owner).toLowerCase()
+  for (let id = 1; id <= max; id += 1) {
+    try {
+      if (String(await voucher.ownerOf(id)).toLowerCase() === want) held.push(id)
+    } catch {
+      // Burned or never minted — neither is the end of the range.
+    }
+  }
+  return held
 }
 
 /** Read a Hardhat-compiled artifact (abi + bytecode) written by `npm run compile` / `deploy:local`. */
@@ -1408,6 +1438,156 @@ export default defineConfig({
               }
               default:
                 throw new Error(`appActorFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+
+        /**
+         * Fixtures for membership vouchers (spec 026) and the swap doubles (spec 033).
+         *
+         * Everything here is either an on-chain PRECONDITION the member would otherwise have had
+         * to buy, or a read of what the chain recorded. The redemption itself is never performed:
+         * that is the flow's job, through the app, which is the only way "a member can redeem a
+         * voucher" means anything.
+         *
+         * Vouchers are minted BY the recipient (the contract mints to `msg.sender` and charges
+         * that tier's USDC price), so this funds and approves that account first. Routing around
+         * the payment would make the mint a different transaction than the one a member sends.
+         *
+         * action ∈ mintVoucher | vouchersOf | membership | swapRate
+         */
+        async voucherFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+
+          /*
+           * COMPILED ABIs, not hand-written ones.
+           *
+           * `TierConfig` is `{uint128 priceUSDC; uint32 durationDays; bool active; Limits limits}`
+           * and `Membership` carries an `activeCount` between `monthCount` and `monthAnchor` —
+           * neither matches the plausible ordering, and a wrong one does not throw: it decodes to
+           * garbage, so `cfg.priceUSDC` came back as something that funded the buyer with nothing
+           * and the mint reverted on an allowance the fixture thought it had set. Reading the
+           * artifact removes the whole class of that mistake, and costs nothing here because
+           * `npm run compile` has already run before any E2E setup.
+           */
+          const VOUCHER_ABI = loadArtifact('access/MembershipVoucher.sol', 'MembershipVoucher').abi
+          const MANAGER_ABI = loadArtifact('access/MembershipManager.sol', 'MembershipManager').abi
+          const TOKEN = [
+            'function mint(address to, uint256 amount)',
+            'function approve(address spender, uint256 amount) returns (bool)',
+            'function balanceOf(address) view returns (uint256)',
+          ]
+          const WAGER_PARTICIPANT_ROLE = ethers.id('WAGER_PARTICIPANT_ROLE')
+
+          const voucherAddress = d.contracts?.membershipVoucher
+          if (!voucherAddress) {
+            return { ok: false, error: 'no contracts.membershipVoucher in the local deployment record — run `npm run setup:e2e`' }
+          }
+
+          try {
+            switch (action) {
+              /*
+               * A redeemer with NO active membership, plus a voucher in their hands.
+               *
+               * `redeemVoucher` reverts `AlreadyActive` for a member who already has one, and
+               * redeeming is permanent for the membership's duration — so a fixed account makes
+               * this flow pass exactly once against any given node and fail for the rest of its
+               * life. That is the "unfalsifiable when run alone" failure the policy names, arriving
+               * from the other direction.
+               *
+               * So the account is CHOSEN, not fixed: walk hardhat's own unlocked accounts and take
+               * the first that owes nothing to an earlier run. It must be one the node can sign
+               * for — the browser sends `redeemVoucher` through `eth_sendTransaction`, which the
+               * node signs with an unlocked key — which is why this derives from hardhat's default
+               * mnemonic rather than inventing an address. Exhaustion fails loudly with the reason
+               * rather than looking like a product bug.
+               */
+              case 'freshRedeemer': {
+                const manager = new ethers.Contract(d.contracts.membershipManager, MANAGER_ABI, provider)
+                let buyer = null
+                for (let i = args.startIndex ?? 3; i < (args.endIndex ?? 20); i += 1) {
+                  const w = ethers.HDNodeWallet.fromPhrase(HARDHAT_MNEMONIC, undefined, `m/44'/60'/0'/0/${i}`)
+                  if (Number(await manager.getActiveTier(w.address, WAGER_PARTICIPANT_ROLE)) === 0) {
+                    buyer = { index: i, wallet: w.connect(provider) }
+                    break
+                  }
+                }
+                if (!buyer) {
+                  return {
+                    ok: false,
+                    error:
+                      'every hardhat account already holds an active WAGER_PARTICIPANT membership — ' +
+                      'this node has been re-used past what the voucher flow can arrange. Restart it ' +
+                      'and re-run `npm run setup:e2e`.',
+                  }
+                }
+                return { ok: true, index: buyer.index, address: buyer.wallet.address }
+              }
+              case 'mintVoucher': {
+                // The recipient mints for themselves, paying the tier price, exactly as the
+                // Vouchers page's Buy section does.
+                const buyer = new ethers.NonceManager(
+                  args.address
+                    ? ethers.HDNodeWallet.fromPhrase(HARDHAT_MNEMONIC, undefined, `m/44'/60'/0'/0/${args.index}`).connect(provider)
+                    : new ethers.Wallet(ACCOUNT_KEYS[args.index ?? 1], provider),
+                )
+                const buyerAddress = await buyer.getAddress()
+                if (args.address && buyerAddress.toLowerCase() !== String(args.address).toLowerCase()) {
+                  return { ok: false, error: `derived ${buyerAddress} for index ${args.index}, expected ${args.address}` }
+                }
+                const manager = new ethers.Contract(d.contracts.membershipManager, MANAGER_ABI, provider)
+                const tier = args.tier ?? 1 // Bronze
+                const cfg = await manager.getTierConfig(WAGER_PARTICIPANT_ROLE, tier)
+                if (!cfg.active) return { ok: false, error: `tier ${tier} is not active for WAGER_PARTICIPANT_ROLE` }
+
+                // Native gas needs no arranging: hardhat funds all 20 derived accounts at boot.
+                const token = new ethers.Contract(d.paymentToken, TOKEN, admin)
+                await (await token.mint(buyerAddress, cfg.priceUSDC * 4n)).wait(1)
+                await (await new ethers.Contract(d.paymentToken, TOKEN, buyer).approve(voucherAddress, cfg.priceUSDC * 4n)).wait(1)
+
+                const voucher = new ethers.Contract(voucherAddress, VOUCHER_ABI, buyer)
+                const rc = await (await voucher.mint(WAGER_PARTICIPANT_ROLE, tier)).wait(1)
+                // The id is read back rather than parsed out of a log: `balanceOf` + `ownerOf` is
+                // what the app itself lists from, so the fixture and the surface agree by
+                // construction.
+                const held = await ownedVouchers(new ethers.Contract(voucherAddress, VOUCHER_ABI, provider), buyerAddress)
+                return { ok: rc.status === 1, address: buyerAddress, tier, held, priceUSDC: cfg.priceUSDC.toString() }
+              }
+              case 'vouchersOf': {
+                const v = new ethers.Contract(voucherAddress, VOUCHER_ABI, provider)
+                return { ok: true, held: await ownedVouchers(v, args.address) }
+              }
+              case 'membership': {
+                const manager = new ethers.Contract(d.contracts.membershipManager, MANAGER_ABI, provider)
+                const m = await manager.getMembership(args.address, WAGER_PARTICIPANT_ROLE)
+                return {
+                  ok: true,
+                  tier: Number(await manager.getActiveTier(args.address, WAGER_PARTICIPANT_ROLE)),
+                  storedTier: Number(m.tier),
+                  expiresAt: Number(m.expiresAt),
+                }
+              }
+              case 'swapRate': {
+                const rates = d.mocks?.mockUniswapRates
+                if (!rates) return { ok: false, error: 'no mocks.mockUniswapRates — run `npm run setup:e2e`' }
+                const c = new ethers.Contract(rates, ['function rate(address,address) view returns (uint256)'], provider)
+                return {
+                  ok: true,
+                  rates,
+                  usdc: d.paymentToken,
+                  wmatic: d.wmatic,
+                  usdcToWmatic: (await c.rate(d.paymentToken, d.wmatic)).toString(),
+                  wmaticToUsdc: (await c.rate(d.wmatic, d.paymentToken)).toString(),
+                }
+              }
+              default:
+                throw new Error(`voucherFixture: unknown action '${action}'`)
             }
           } catch (e) {
             return { ok: false, error: e.shortMessage || e.reason || e.message }
