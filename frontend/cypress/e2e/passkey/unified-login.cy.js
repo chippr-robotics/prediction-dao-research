@@ -15,12 +15,41 @@
 // =============================================================================
 
 const SESSION_KEY = 'fairwins.passkey.session.v1'
+const CREDENTIALS_KEY = 'fairwins.passkey.credentials.v1'
 const ACCOUNT = '0x1111000000000000000000000000000000001111'
+
+/** A book entry the connector considers able to transact (credentialId + a P-256 key). */
+const completeRecord = (credentialId) => [
+  {
+    credentialId,
+    address: ACCOUNT,
+    publicKey: {
+      x: '0x1111111111111111111111111111111111111111111111111111111111111111',
+      y: '0x2222222222222222222222222222222222222222222222222222222222222222',
+    },
+  },
+]
+
+const seed = (win, { session, credentials }) => {
+  win.localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  if (credentials) win.localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(credentials))
+}
 
 describe('Unified login surface (US2)', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * CLOSE THE NETWORK BOUNDARY — required now that the session actually restores.
+     *
+     * A restored session makes the app read: roles across the cohort, balances, prices. Left
+     * open, those hit real public RPC hosts, and their retries outlive the test and kill the
+     * browser connection (a reproducible ECONNRESET). This spec was stable before only because
+     * reconnect never happened, so nothing was ever read.
+     */
+    cy.intercept({ method: 'POST', hostname: /publicnode\.com$|rivet\.link$|etcdesktop\.com$|polygon\.technology$/ }, (req) =>
+      req.reply({ statusCode: 503, body: 'no chain in the no-chain tier' }),
+    )
   })
 
   // PENDING (#1019): asserts the passkey option is absent, but CI renders it — the network passkey config differs from the assumption. Decide the expected capability matrix.
@@ -47,14 +76,22 @@ describe('Unified login surface (US2)', () => {
     cy.contains(/0xf39F/i, { timeout: 15000 }).should('exist')
   })
 
-  it('[UL-03] passkey session persists across reload and clears on sign-out (FR-003)', () => {
-    // Storage-boundary check: a persisted passkey session survives reload…
+  /*
+   * THIS TEST USED TO SEED A SESSION WITH NO CREDENTIAL RECORD and assert it survived a reload.
+   *
+   * It did survive — because nothing ever read it. wagmi skipped the passkey connector on every
+   * reconnect (its `getProvider()` returned null, and reconnect drops a connector without one), so
+   * the session sat in storage untouched and the assertion passed on the strength of the bug. The
+   * moment reconnect actually ran, the connector did the right thing and cleared it, and this
+   * test failed. Both halves of FR-003/FR-005 are now pinned against a reconnect that happens.
+   */
+  it('[UL-03] a complete passkey session survives reload, and sign-out clears it (FR-003)', () => {
     cy.visit('/fairwins', {
       onBeforeLoad(win) {
-        win.localStorage.setItem(
-          SESSION_KEY,
-          JSON.stringify({ address: ACCOUNT, chainId: 80002, credentialId: 'c1', loginMethod: 'passkey' })
-        )
+        seed(win, {
+          session: { address: ACCOUNT, chainId: 80002, credentialId: 'c1', loginMethod: 'passkey' },
+          credentials: completeRecord('c1'),
+        })
       },
     })
     cy.reload()
@@ -63,6 +100,23 @@ describe('Unified login surface (US2)', () => {
       // …and sign-out (the WalletContext disconnect path) removes it atomically.
       win.localStorage.removeItem(SESSION_KEY)
       expect(win.localStorage.getItem(SESSION_KEY)).to.equal(null)
+    })
+  })
+
+  it('[UL-05] a session this browser cannot sign for is cleared, not restored (spec 045 FR-005)', () => {
+    // Session present, credential book empty: restoring would hand the member an account that
+    // fails on its first action. An honest sign-out is the correct outcome.
+    cy.visit('/fairwins', {
+      onBeforeLoad(win) {
+        seed(win, {
+          session: { address: ACCOUNT, chainId: 80002, credentialId: 'orphan', loginMethod: 'passkey' },
+          credentials: [],
+        })
+      },
+    })
+    cy.get('[aria-label="Connect Wallet"]', { timeout: 20000 }).should('exist')
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(SESSION_KEY), 'unusable session is cleared').to.equal(null)
     })
   })
 
