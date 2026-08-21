@@ -380,4 +380,117 @@ describe('Mini-app platform (specs 073 / 077 / 028 / 030)', () => {
     })
   })
 
+
+  it('[MA-06] miniapp.clearpath-create-dao — ClearPath registers an external DAO on chain, through the host', () => {
+    /*
+     * SCOPE, STATED HONESTLY. This flow is filed against spec 030, whose pillar A is native
+     * standard DAOs — creating one. That pillar has no member surface at all: the ClearPath
+     * package ships Register and Track and nothing that deploys a Governor (OZ 5.4.0's
+     * GovernorUpgradeable pulls in the Cancun `mcopy` opcode and is not deployable on the
+     * pre-Cancun chains this platform targets, so the contract side was deferred too). Testing
+     * what ships is the only option that measures anything; the gap is tracked separately rather
+     * than papered over with a flow id that promises creation.
+     *
+     * What ships IS a value-bearing member action: registering writes to the on-chain
+     * ExternalDAORegistry, behind a real Silver membership gate and a real `_isGovernor` probe,
+     * through the same `host.wallet.submit` a package has no way around.
+     */
+    const LABEL = `E2E DAO ${Date.now().toString().slice(-6)}`
+
+    publishReal('clearpath').then((pkg) => {
+      expect(pkg.contracts, 'the package declares the registry it resolves').to.include('externalDAORegistry')
+
+      // Silver is the registry's own floor. Granting it is arranging an authorization the member
+      // genuinely needs — the gate is not bypassed, it is satisfied.
+      actor('grantDaoTier', { address: MEMBER })
+
+      // A FRESH Governor each run: registration is permanent (there is no unregister), so reusing
+      // one would make this flow pass exactly once against any given node.
+      actor('deployGovernor').then(({ address: governor }) => {
+        expect(governor, 'a Governor stand-in was deployed for this run').to.match(/^0x[0-9a-fA-F]{40}$/)
+
+        actor('daoRegistry', { dao: governor, registrant: MEMBER }).then(({ registered }) => {
+          expect(registered, 'nothing has registered this DAO yet').to.equal(false)
+
+          cy.mockWeb3Provider({ account: MEMBER, preAuthorized: true, realBalances: true })
+          cy.visit('/apps/clearpath')
+          cy.get('.miniapp-workspace-root', { timeout: 60000 }).should('exist')
+          cy.get('.miniapp-workspace-refusal').should('not.exist')
+
+          cy.contains('.cp-tab', /Register \/ Track/i, { timeout: 30000 }).click()
+
+          // The connected chain carries a registry, so the action really is "Register DAO" — the
+          // heading says so, and that wording is the app telling the truth about what the button
+          // will do (on a registry-less network the same surface says "Track DAO" and writes
+          // nothing on chain).
+          cy.contains('h4', /Register an external DAO/i, { timeout: 20000 }).should('be.visible')
+
+          cy.get('#cp-dao-addr').clear().type(governor)
+          cy.contains('button', /^Validate$/).click()
+
+          // Validation is a real read against the target chain's own RPC: the app recognises a
+          // Governor or it does not, and a wrong answer here would be the app's, not the fixture's.
+          cy.get('.cp-ok', { timeout: 30000 }).should('contain.text', 'Recognized')
+
+          cy.get('#cp-dao-label').clear().type(LABEL)
+          cy.contains('button', /^Register DAO$/).should('not.be.disabled').click()
+
+          cy.get('.notification-message', { timeout: 90000 })
+            .invoke('text')
+            .should('match', new RegExp(`Registered ${LABEL}`, 'i'))
+
+          // The durable proof: the registry itself, and the entry attributed to the signer.
+          actor('daoRegistry', { dao: governor, registrant: MEMBER }).then((r) => {
+            expect(r.registered, 'the DAO is registered on chain').to.equal(true)
+            expect(r.byRegistrant, 'and recorded against the member who signed').to.have.length.greaterThan(0)
+          })
+        })
+      })
+    })
+  })
+
+  it('[MA-07] miniapp.clearpath-network-switch — a registry write on another chain demands the switch instead of signing on the wrong one', () => {
+    /*
+     * ClearPath READS every chain in the cohort over that chain's own RPC — no switch needed, and
+     * that is deliberate: a member should be able to look at a DAO anywhere. Registering is
+     * different, because a signer can only sign for the chain it is connected to. So the same
+     * surface has to offer two different things depending on the target, and the dangerous
+     * inversion is the silent one: offering "Register DAO" for a chain the wallet is not on, and
+     * producing a signature that lands somewhere nobody chose.
+     *
+     * The app must therefore refuse to offer the action and ask for the switch instead. That
+     * decision is `needsSwitch` — a registry EXISTS on the target and it is NOT the connected
+     * chain — and it is made in the package, using only what the host told it about the cohort.
+     */
+    publishReal('clearpath').then(() => {
+      cy.mockWeb3Provider({ account: MEMBER, preAuthorized: true, realBalances: true })
+      cy.visit('/apps/clearpath')
+      cy.get('.miniapp-workspace-root', { timeout: 60000 }).should('exist')
+      cy.contains('.cp-tab', /Register \/ Track/i, { timeout: 30000 }).click()
+
+      // The network selector lists what the PACKAGE decided it can operate on, from
+      // `host.networks()` — the host publishes the cohort, not a per-app capability flag.
+      cy.get('#cp-dao-network', { timeout: 20000 }).find('option').should('have.length.greaterThan', 1)
+
+      // On the connected chain the write is offered outright.
+      cy.contains('button', /^Register DAO$|^Track DAO$/).should('exist')
+
+      /*
+       * Move the target to a chain that is NOT the connected one but DOES carry a registry. Taken
+       * from the rendered options rather than hardcoded, so this keeps measuring the rule and not
+       * a chain id: the connected chain is the local node, and any other option with a registry
+       * will do.
+       */
+      cy.get('#cp-dao-network').find('option').then(($opts) => {
+        const others = [...$opts].map((o) => Number(o.value)).filter((id) => id !== 80002)
+        expect(others, 'the cohort offers a second network to target').to.have.length.greaterThan(0)
+        cy.get('#cp-dao-network').select(String(others[0]))
+      })
+
+      // The write is no longer on offer. What replaces it names the network and says why.
+      cy.contains('button', /^Register DAO$/).should('not.exist')
+      cy.contains('button', /Switch to .* to register/i).should('be.visible')
+    })
+  })
+
 })

@@ -21,41 +21,6 @@ const path = require("path");
 const { saveDeployment, getDeploymentFilename } = require("./lib/helpers");
 const { deployProxy } = require("./lib/upgradeable");
 
-const LOCAL_NETWORKS = new Set(["hardhat", "localhost"]);
-
-async function hasCode(address) {
-  if (!address || !ethers.isAddress(address)) return false;
-  return (await ethers.provider.getCode(address)) !== "0x";
-}
-
-/**
- * LOCAL DEV ONLY — a Governor for the registry to accept.
- *
- * `registerExternalDAO` validates its target with `_isGovernor`, which is a real on-chain probe
- * (ERC-165, then a defensive `COUNTING_MODE`/`votingPeriod` fallback). On a local node there is
- * no DAO to point at, so the Register surface could only ever be exercised against a revert.
- * `contracts/mocks/clearpath/MockGovernorLike.sol` is the stand-in the contract suite already
- * uses for exactly that probe, so the e2e flow and the unit tests agree on what a Governor is.
- *
- * It is a TEST DOUBLE. It is recorded under `mocks`, never `contracts`, so nothing that reads a
- * deployment record for a protocol address can pick it up, and it is only ever deployed on a
- * network named `hardhat` or `localhost`.
- */
-async function deployLocalGovernorDouble(record) {
-  const mocks = record.mocks || (record.mocks = {});
-  if (await hasCode(mocks.mockGovernorLike)) {
-    console.log(`\n⚠️  LOCAL DEV ONLY — reusing the recorded MockGovernorLike (${mocks.mockGovernorLike}).`);
-    return mocks.mockGovernorLike;
-  }
-  console.log("\n⚠️  LOCAL DEV ONLY — deploying contracts/mocks/clearpath/MockGovernorLike as a");
-  console.log("   registrable DAO. This is a test double, NOT a real Governor.");
-  const gov = await (await ethers.getContractFactory("MockGovernorLike")).deploy(true);
-  await gov.waitForDeployment();
-  mocks.mockGovernorLike = await gov.getAddress();
-  console.log(`   MockGovernorLike ${mocks.mockGovernorLike}`);
-  return mocks.mockGovernorLike;
-}
-
 async function main() {
   const network = await ethers.provider.getNetwork();
   const networkName = hre.network.name;
@@ -99,8 +64,6 @@ async function main() {
   // APPEND to the record (preserve everything already there).
   contracts.externalDAORegistry = proxy.proxy;
   contracts.externalDAORegistryImpl = proxy.implementation;
-
-  if (LOCAL_NETWORKS.has(networkName)) await deployLocalGovernorDouble(record);
   record.constructorArgs = record.constructorArgs || {};
   record.constructorArgs.externalDAORegistryImpl = [];
   record.clearpathDeployedAt = new Date().toISOString();

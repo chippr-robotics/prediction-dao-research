@@ -1176,7 +1176,15 @@ export default defineConfig({
                   await (await registry.submitUpdate(BigInt(id), args.cid, args.manifestHash)).wait(1)
                   cur = await view(id)
                 }
-                if (!cur.launchable) {
+                /*
+                 * Approve when the record is not serving AT ALL, and equally when it is serving
+                 * something ELSE. The second case is the one that bit: a record left launchable on
+                 * a previous version satisfied `launchable`, so the new proposal sat in review and
+                 * the flow served bytes the chain had not approved. The loader refused them — and
+                 * the failure read "and it is the package just built", which is true and says
+                 * nothing about why.
+                 */
+                if (!cur.launchable || cur.approved.manifestHash !== args.manifestHash) {
                   // Promote the proposal if there is one; otherwise reinstate what was approved
                   // before (the shape `approveApp` takes for a suspended record).
                   const expected = cur.proposed.cid ? cur.proposed.manifestHash : cur.approved.manifestHash
@@ -1274,10 +1282,11 @@ export default defineConfig({
          * the flow drives those through the mini-app's own UI, which is the only way the claim
          * "the package can do this" means anything.
          *
-         * `mockGovernorLike` is the local stand-in `deploy-clearpath.js` deploys — the registry's
-         * `_isGovernor` probe is real, so a local flow needs a real answer to it.
+         * `deployGovernor` is the one exception in spirit and not in fact: the registry's
+         * `_isGovernor` probe is a real on-chain call, and a local node has no DAO to point it at,
+         * so a stand-in has to exist before the flow can exercise the probe at all.
          *
-         * action ∈ grantDaoTier | daoRegistry | daoCount | tokenIssuer | tokenCount
+         * action ∈ grantDaoTier | daoRegistry | deployGovernor | tokenCount
          */
         async appActorFixture({ action, args = {} }) {
           const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
@@ -1316,8 +1325,25 @@ export default defineConfig({
                   externalCount: Number(await registry.externalCount()),
                 }
               }
-              case 'governor':
-                return { ok: true, address: d.mocks?.mockGovernorLike ?? null }
+              /*
+               * A FRESH Governor for the flow to register, deployed per call.
+               *
+               * `registerExternalDAO` reverts `AlreadyRegistered` for a DAO already in the
+               * registry, so a single recorded stand-in would make the register flow pass exactly
+               * once and then fail against the same node for the rest of its life. Registration is
+               * permanent by design — there is no unregister — so the only re-runnable shape is a
+               * new DAO each time.
+               *
+               * `contracts/mocks/clearpath/MockGovernorLike.sol` is the same double the contract
+               * suite uses for `_isGovernor`, so the e2e flow and the unit tests agree on what a
+               * Governor is. `true` = it answers the ERC-165 probe.
+               */
+              case 'deployGovernor': {
+                const art = loadArtifact('mocks/clearpath/MockGovernorLike.sol', 'MockGovernorLike')
+                const gov = await new ethers.ContractFactory(art.abi, art.bytecode, admin).deploy(true)
+                await gov.waitForDeployment()
+                return { ok: true, address: await gov.getAddress() }
+              }
               case 'tokenCount': {
                 const factory = new ethers.Contract(
                   d.contracts.tokenFactory,

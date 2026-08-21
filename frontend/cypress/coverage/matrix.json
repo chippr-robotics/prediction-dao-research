@@ -654,13 +654,16 @@
         {
           "id": "miniapp.clearpath-create-dao",
           "name": "Create a standard DAO through ClearPath",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1238"
+          "tests": [
+            "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-06"
+          ],
+          "missing": "the flow covers what ships — registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does",
+          "issue": "#1268"
         }
       ]
     },
@@ -985,13 +988,14 @@
         {
           "id": "miniapp.clearpath-network-switch",
           "name": "Use ClearPath on a second network",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1238"
+          "tests": [
+            "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-07"
+          ]
         }
       ]
     },
