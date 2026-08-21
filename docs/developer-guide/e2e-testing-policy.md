@@ -61,10 +61,21 @@ that cannot fail:
 | `settled` | The outcome was read back from the authority that decides it — chain state, a stored record, a balance. |
 | `flow` | The journey completed and the interface agreed it had. |
 | `smoke` | A surface rendered; a control existed. |
+| `skipped` | Tests are written and cited, and they **do not execute**. |
 | `none` | No test, or only assertions that cannot fail. |
 
 A flow whose only test is guarded by a precondition that can be absent is `smoke`, however many
 tests pass.
+
+`skipped` exists because a permanently-skipped test is the same defect as anti-pattern 7 arriving
+by another route — the suite is green, the row says covered, nothing was checked. It was measured
+(#1271): the account-native tier ran **1 of its 17 tests** for want of an env var nothing set, while
+six rows read `covered / flow`. The depth cites the dead tests, so a reader can find them, and
+claims nothing: its status must be `absent` or `partial`, and `missing` must say why they do not
+run. It sorts below `smoke`, so it loses every is-this-proven comparison.
+
+A skip that is *conditional* on something CI provides is fine. A skip nothing can satisfy is a
+gap, and belongs in the matrix as one.
 
 ## Anti-patterns
 
@@ -80,6 +91,8 @@ was checking something.
 | 5 | Rejecting `eth_sendTransaction` to test a refusal | Looks like a refusal test | On the intent rail the member's authorization is a **signature**; nothing is refused. |
 | 6 | Silent no-op branches | The test goes green | It continued past a failed precondition and died somewhere unrelated — or passed having tested nothing. |
 | 7 | `expect(true).to.be.true` behind a precondition guard | Reports as coverage | 33 branches across four money-path specs. **A test that passes when its precondition is absent is worse than a missing test.** |
+| 8 | `if (!Cypress.env('X')) this.skip()` where nothing sets `X` | Reads as a conditional skip | The skip is permanent, not conditional. 16 of the account-native tier's 17 tests were pending for a year while the matrix called them covered; when they were finally allowed to run, every one of them failed (#1271) — including three asserting a `data-testid` the app does not have. Record it as depth `skipped`, and make the env var real or delete the test. |
+| 9 | `const t0 = Date.now()` in a Cypress test body | Looks like a stopwatch | The body is EVALUATED before a single command runs, so the timer starts at test start and a later assertion is charged everything before it. RU-01 read 16s for a sign-in that takes ~700ms. Stamp inside `cy.then()`. |
 
 ### Pattern 7 is gated
 
