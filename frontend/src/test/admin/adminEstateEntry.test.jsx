@@ -183,6 +183,27 @@ describe('an unread chain is never counted as a denial (FR-011, FR-012)', () => 
     expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument()
     expect(screen.getByText(/Checked across 2 networks/i)).toBeInTheDocument()
   })
+
+  /*
+   * A chain carrying none of the operator contracts is a THIRD thing, and saying so is what
+   * keeps the read count meaningful: "read across 5 networks" was previously true of an estate
+   * where four of the five had nothing to read.
+   */
+  it('names the chains that carry no operator contracts, apart from the ones it read', () => {
+    m.roles = [ROLES.GUARDIAN]
+    m.roleChains = { [ROLES.GUARDIAN]: [HOME] }
+    m.estateRead = { read: [HOME], notDeployed: [OTHER], unreadable: [], swept: true }
+
+    const { container } = renderControlRoom()
+    const card = [...container.querySelectorAll('.admin-card')].find((el) =>
+      within(el).queryByText('Your Permissions'),
+    )
+    const info = card.querySelector('.card-info').textContent
+
+    expect(info).toMatch(/Read across 1 network\./)
+    expect(info).toContain('no operator contracts')
+    expect(info).not.toMatch(/could not be read/)
+  })
 })
 
 describe('the permissions card names where each role lives (FR-010)', () => {

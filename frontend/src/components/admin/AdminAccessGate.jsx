@@ -58,6 +58,10 @@ export default function AdminAccessGate({ access, children }) {
               Operator roles: {OPERATOR_ROLE_NAMES.join(', ')} — or the mini-app curator
               authority. Checked across{' '}
               {estateRead?.read?.length ?? 0} network{(estateRead?.read?.length ?? 0) === 1 ? '' : 's'}
+              {estateRead?.notDeployed?.length > 0 &&
+                ` (${estateRead.notDeployed.map(networkName).join(', ')} carr${
+                  estateRead.notDeployed.length === 1 ? 'ies' : 'y'
+                } no operator contracts)`}
               {estateRead?.unreadable?.length > 0 &&
                 ` (${estateRead.unreadable.map(networkName).join(', ')} could not be read)`}
               .
