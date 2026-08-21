@@ -1,149 +1,77 @@
 // =============================================================================
-// 30-identity-access.cy.js
-// Fast-tier E2E tests for identity and access (specs 084 + 069).
+// 31-identity-access.cy.js
+// Fast-tier E2E tests for endpoints, callsigns and compliance gating
+// (specs 069 + 054 + 007).
 //
-// Issue #1241. Every flow here is decided on the member's own device: a
-// signature checked offline, an endpoint saved to device-scoped preferences, a
-// credential redacted before it reaches the DOM. None of it moves value, so
-// admission rule 1 puts all of it in the no-chain tier.
+// Issue #1241. Every flow here is decided on the member's own device, or by a
+// single contract READ that changes what they are shown: an endpoint saved to
+// device-scoped preferences, a credential redacted before it reaches the DOM, a
+// tier gate, a screening verdict. None of it moves value, so admission rule 1
+// puts all of it in the no-chain tier, and the reads are answered at the RPC
+// boundary using the app's OWN ABI fragments.
 //
-// ── THE ONE RPC THAT DOES APPEAR, AND WHY IT IS STUBBED ────────────────────
-// Verify's ESCALATION is a network read by design — a contract account has no
-// public key, so only the account itself can say whether it stands behind the
-// bytes. That read is stubbed at the RPC boundary, which is the whole point:
-// the flow that matters is the one where the node does NOT answer, and the only
-// way to test "an unreachable node is not a forged signature" is to make a node
-// unreachable on purpose.
+// SPLIT FROM THE VERIFY SPEC DELIBERATELY. Seven heavy tests in one file killed
+// the browser mid-run — a reproducible ECONNRESET after the fifth — and the fast
+// tier is already over its per-leg budget (#1249). Two focused specs also shard
+// better than one long one.
 // =============================================================================
 
-import {
-  MESSAGE,
-  SIGNATURE,
-  SIGNER_ADDRESS,
-  OTHER_ADDRESS,
-} from '../../../src/test/fixtures/signedMessages'
-
 const ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
-const CUSTODY_URL = '/wallet?tab=custody'
 const NETWORK_URL = '/wallet?tab=network'
+const MEMBERSHIP_URL = '/wallet?tab=membership'
+
+/** A counterparty the screening world below reports as restricted. */
+const FLAGGED_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 
 /** Every shipped read provider this build resolves runs through publicnode. */
 const RPC_PATTERN = /publicnode\.com/
 
-/**
- * Answer the escalation's `eth_getCode`, or refuse to.
+/*
+ * The WALLET's own transport, pointed at the same host the intercept covers.
  *
- * `mode: 'unreachable'` fails the request outright — a node that cannot be asked. `mode: 'no-code'`
- * answers honestly that the address holds no contract, which IS a definite negative and the reason
- * the escalation is worth offering at all.
+ * `cy.mockWeb3Provider` forwards every request to `rpcUrl`, which defaults to localhost:8545 — a
+ * node that is not running in this tier, or worse, one running a DIFFERENT chain. A wallet that
+ * claims 137 while reading from an 80002 node finds no contract at Polygon's guard address, the
+ * read reverts, and the surface renders "Screening unavailable" — a truthful answer to a question
+ * the test never meant to ask. Pointing it here puts the wallet's reads under the same stub as
+ * the app's.
  */
-function stubEscalation(mode) {
+const POLYGON_RPC = 'https://polygon-bor-rpc.publicnode.com'
+
+/**
+ * Answer the app's contract READS from `answers` (selector -> encoded result).
+ *
+ * Deliberately narrow: only the selectors a flow needs are listed, and everything else returns
+ * `0x`, which ethers rejects — so a read this world does not model surfaces as the app's own
+ * unavailable state rather than as a fabricated value.
+ */
+function stubReads(answers) {
   cy.intercept({ method: 'POST', url: RPC_PATTERN }, (req) => {
-    if (mode === 'unreachable') {
-      req.destroy()
-      return
-    }
     const body = req.body
-    const one = ({ method, id }) => {
+    const one = ({ method, params, id }) => {
       switch (method) {
         case 'eth_chainId':
-          return { jsonrpc: '2.0', id, result: '0x1' }
+          return { jsonrpc: '2.0', id, result: '0x89' }
         case 'net_version':
-          return { jsonrpc: '2.0', id, result: '1' }
-        case 'eth_getCode':
-          // No contract at that address on this chain — a plain account.
-          return { jsonrpc: '2.0', id, result: '0x' }
+          return { jsonrpc: '2.0', id, result: '137' }
         case 'eth_blockNumber':
-          return { jsonrpc: '2.0', id, result: '0x1312d00' }
+          return { jsonrpc: '2.0', id, result: '0x4000000' }
+        case 'eth_getCode':
+          return { jsonrpc: '2.0', id, result: '0x60806040' }
+        case 'eth_call':
+          return { jsonrpc: '2.0', id, result: answers[String(params?.[0]?.data || '').slice(0, 10)] ?? '0x' }
         default:
           return { jsonrpc: '2.0', id, result: '0x' }
       }
     }
     req.reply({ statusCode: 200, body: Array.isArray(body) ? body.map(one) : one(body || {}) })
-  }).as('escalationRpc')
+  }).as('identityRpc')
 }
 
-const openVerify = () => {
-  cy.mockWeb3Provider({ account: ACCOUNT, preAuthorized: true })
-  cy.visit(CUSTODY_URL)
-  /*
-   * Protect's sections are an accordion. `AccordionSection` puts the section id on
-   * `data-attention` (the drawer-search deep-link target) and derives the trigger's DOM id from
-   * it — there is no element with a bare `#custody-verify`, so addressing that finds nothing and
-   * the failure says only "not found". The trigger is what a member clicks.
-   */
-  cy.get('#custody-verify-header', { timeout: 40000 }).should('exist').click()
-  cy.get('[data-testid="custody-acc-verify"]').contains('button', /^Check$/, { timeout: 20000 }).click()
-  cy.get('#verify-check-message', { timeout: 20000 }).should('be.visible')
-}
-
-const fillCheck = ({ message, signature, address }) => {
-  cy.get('#verify-check-message').clear().type(message, { parseSpecialCharSequences: false, delay: 0 })
-  cy.get('#verify-check-signature').clear().type(signature, { delay: 0 })
-  if (address) cy.get('#verify-check-address').clear().type(address, { delay: 0 })
-  cy.get('button.verify-primary').should('not.be.disabled').click()
-}
-
-describe('Identity and access (specs 084 + 069)', () => {
+describe('Endpoints, callsigns and compliance (specs 069 / 054 / 007)', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
-  })
-
-  it('[VF-01] verify.three-verdicts — valid, invalid, and unverifiable are three different answers', () => {
-    /*
-     * The rule this exists to hold: a mismatching ECDSA recovery is NOT a negative while the
-     * on-chain leg could not run, because that is exactly what a legitimate smart-account
-     * signature looks like from outside. Two verdicts would make an RPC timeout indistinguishable
-     * from a forgery, and a member acting on that would be acting on a fabricated accusation.
-     */
-
-    // ── VALID. Offline, no network, nothing to stub. ────────────────────────────────
-    openVerify()
-    fillCheck({ message: MESSAGE, signature: SIGNATURE, address: SIGNER_ADDRESS })
-    cy.get('[data-testid="verify-result"]', { timeout: 20000 })
-      .should('have.attr', 'data-status', 'valid')
-      .and('contain.text', SIGNER_ADDRESS)
-
-    // ── UNVERIFIABLE. The same bytes, claimed for somebody else. Offline arithmetic alone
-    //    cannot settle it: the claimed account might be a contract that stands behind them.
-    fillCheck({ message: MESSAGE, signature: SIGNATURE, address: OTHER_ADDRESS })
-    cy.get('[data-testid="verify-result"]')
-      .should('have.attr', 'data-status', 'unverifiable')
-      .and('contain.text', 'not a failed check')
-
-    // The escalation is offered, and ONLY here — this is the one outcome a network can settle.
-    cy.get('#verify-check-chain').should('exist')
-
-    // ── STILL UNVERIFIABLE when the node cannot be asked. THE ASSERTION THAT MATTERS. ──
-    stubEscalation('unreachable')
-    cy.get('#verify-check-chain').select('1')
-    cy.contains('button', /Check on-chain/i).click()
-    cy.get('[data-testid="verify-result"]', { timeout: 30000 })
-      .should('have.attr', 'data-status', 'unverifiable')
-    cy.get('[data-testid="verify-result"]').should('not.have.attr', 'data-status', 'invalid')
-    // The offline fact survives the failed escalation rather than being replaced by less.
-    cy.get('[data-testid="verify-result"]').should('contain.text', SIGNER_ADDRESS)
-  })
-
-  it('[VF-02] verify.three-verdicts — a negative is reported only when it is knowable', () => {
-    /*
-     * The companion to VF-01, and the reason the escalation is worth offering: when the account
-     * ANSWERS — here, by holding no code at all — the claim really is settled, and saying so is
-     * not an accusation but a fact the member came for.
-     */
-    openVerify()
-    fillCheck({ message: MESSAGE, signature: SIGNATURE, address: OTHER_ADDRESS })
-    cy.get('[data-testid="verify-result"]', { timeout: 20000 })
-      .should('have.attr', 'data-status', 'unverifiable')
-
-    stubEscalation('no-code')
-    cy.get('#verify-check-chain').select('1')
-    cy.contains('button', /Check on-chain/i).click()
-
-    cy.get('[data-testid="verify-result"]', { timeout: 30000 })
-      .should('have.attr', 'data-status', 'invalid')
-      .and('contain.text', 'holds no contract')
   })
 
   it('[EP-01] endpoints.save-custom-rpc — a member endpoint is saved, disclosed as theirs, and shown redacted', () => {
@@ -237,6 +165,21 @@ describe('Identity and access (specs 084 + 069)', () => {
     cy.visit(NETWORK_URL)
     cy.contains('button', /^Edit endpoints$/, { timeout: 40000 }).first().click()
 
+    /*
+     * Answer the endpoint the member is about to save.
+     *
+     * Once saved it becomes the route EVERY Polygon read takes, including the ones the reload
+     * below issues. Left unanswered it is a host that does not resolve, and the retries outlived
+     * the test: the NEXT test's `visit` met a browser still chasing them and the run died with
+     * ECONNRESET — reproducibly, and nowhere near the cause. A saved endpoint that answers is also
+     * simply the honest arrangement.
+     */
+    cy.intercept({ method: 'POST', url: /keyed-provider\.example/ }, (req) => {
+      const one = ({ id }) => ({ jsonrpc: '2.0', id, result: '0x89' })
+      const body = req.body
+      req.reply({ statusCode: 200, body: Array.isArray(body) ? body.map(one) : one(body || {}) })
+    }).as('memberEndpoint')
+
     cy.get('.network-endpoint-form input[type="url"]').first().clear().type(NODE)
     cy.get('.network-endpoint-form select').first().select('header')
     cy.get('.network-endpoint-form input[placeholder="x-api-key"]').clear().type('x-api-key')
@@ -261,5 +204,55 @@ describe('Identity and access (specs 084 + 069)', () => {
     cy.reload()
     cy.get('.network-endpoint-row', { timeout: 40000 }).should('exist')
     cy.get('body').invoke('text').should('not.contain', SECRET)
+  })
+
+  it('[CS-01] callsign.gated-below-gold — below Gold the member is told why, and offered the way up', () => {
+    /*
+     * Callsigns are OPTIONAL and Gold-gated, and the gate's job is to be an actionable route
+     * rather than a dead disabled control. The tier read is answered here as `None`, which is what
+     * a member who has never bought a membership genuinely reads back.
+     */
+    cy.task('identityWorld', { tier: 0 }).then(({ answers }) => {
+      stubReads(answers)
+      /*
+       * ON POLYGON, explicitly. The callsign registry is deployed on Polygon in this build, and
+       * the panel reads it for the CONNECTED chain — so the mock's default 1337 makes the panel
+       * answer "not available on this network yet", which is correct behaviour and a different
+       * test. The gate under test is the TIER gate, which only exists where a registry does.
+       */
+      cy.mockWeb3Provider({ account: ACCOUNT, networkId: 137, rpcUrl: POLYGON_RPC, preAuthorized: true })
+      cy.visit(MEMBERSHIP_URL)
+
+      cy.get('[data-testid="callsign-upgrade"]', { timeout: 40000 })
+        .should('be.visible')
+        .and('contain.text', 'Gold')
+      // The sentence that keeps this a perk rather than a gate on anything that matters.
+      cy.get('[data-testid="callsign-upgrade"]').should('contain.text', 'never need one to wager')
+      cy.get('[data-testid="callsign-upgrade"]').contains('button', /Membership/i).should('be.visible')
+    })
+  })
+
+  it('[CM-01] compliance.sanctioned-address-refused — a screened recipient is refused before any transaction is offered', () => {
+    /*
+     * The refusal has to land on the RECIPIENT, before a member has committed to anything — which
+     * is why this drives the home screen's own address entry rather than a confirm step. The
+     * screening read is answered as "not allowed"; everything else about the panel is real.
+     */
+    cy.task('identityWorld', { allowed: false }).then(({ answers }) => {
+      stubReads(answers)
+      cy.mockWeb3Provider({ account: ACCOUNT, networkId: 137, rpcUrl: POLYGON_RPC, preAuthorized: true, realBalances: true })
+      cy.visit('/fairwins')
+
+      cy.get('.pay-panel', { timeout: 40000 }).should('be.visible')
+      cy.get('#pay-to').clear().type(FLAGGED_ADDRESS, { delay: 0 })
+
+      cy.contains('.fm-error-banner', /flagged by sanctions screening/i, { timeout: 30000 })
+        .should('be.visible')
+
+      // And the refusal is not cosmetic: the action is withheld, not merely annotated.
+      cy.get('.pay-panel .fm-success-actions')
+        .contains('button', /^Pay$/)
+        .should('be.disabled')
+    })
   })
 })

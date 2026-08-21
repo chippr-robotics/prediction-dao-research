@@ -1073,6 +1073,43 @@ export default defineConfig({
           }
         },
 
+
+        /**
+         * ABI-encoded answers for the identity surfaces (specs 054 + 007), no-chain tier.
+         *
+         * Callsign resolution, the Gold gate and sanctions screening are all single contract READS,
+         * and all three decide something a member sees rather than anything that settles. So the
+         * flows belong in the no-chain tier, and the reads are answered here — encoded with the
+         * app's OWN ABI fragments so a struct field added to `CallsignInfo` changes what this
+         * returns rather than decoding into the wrong columns.
+         *
+         * Keyed by SELECTOR so a spec can dispatch on `params[0].data.slice(0, 10)` without knowing
+         * how any of them is encoded. Anything not listed stays unanswered on purpose: `0x` makes
+         * ethers reject the decode, which every caller here turns into an honest unavailable state
+         * rather than into a fabricated value.
+         */
+        identityWorld({ callsign = null, owner = null, tier = 0, allowed = true } = {}) {
+          // Copied from frontend/src/abis/callsignRegistry.js and the membership/guard ABIs.
+          const CALLSIGN_INFO =
+            '(address owner, string callsign, uint8 status, bool verified, address pendingOwner, uint64 repointEffectiveAt, uint64 quarantinedUntil)'
+          const iface = new ethers.Interface([
+            `function resolve(string callsign) view returns (${CALLSIGN_INFO})`,
+            'function getActiveTier(address user, bytes32 role) view returns (uint8)',
+            'function isAllowed(address account) view returns (bool)',
+          ])
+          const CALLSIGN_STATUS_ACTIVE = 1
+          const answers = {
+            [iface.getFunction('getActiveTier').selector]: iface.encodeFunctionResult('getActiveTier', [tier]),
+            [iface.getFunction('isAllowed').selector]: iface.encodeFunctionResult('isAllowed', [allowed]),
+          }
+          if (callsign && owner) {
+            answers[iface.getFunction('resolve').selector] = iface.encodeFunctionResult('resolve', [
+              [owner, callsign, CALLSIGN_STATUS_ACTIVE, true, ethers.ZeroAddress, 0n, 0n],
+            ])
+          }
+          return { ok: true, answers }
+        },
+
         /**
          * A REAL first-party mini-app package (Token Mint, spec 028 / ClearPath, spec 030),
          * read from what `npm run publish:local:miniapps` staged.

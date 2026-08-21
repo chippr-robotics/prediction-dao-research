@@ -212,13 +212,14 @@
         {
           "id": "compliance.sanctioned-address-refused",
           "name": "A screened address is refused before any transaction is offered",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::CM-01"
+          ]
         },
         {
           "id": "compliance.frozen-account-blocked",
@@ -1347,13 +1348,14 @@
         {
           "id": "callsign.gated-below-gold",
           "name": "Be told why registration is unavailable below Gold tier",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::CS-01"
+          ]
         }
       ]
     },
@@ -1789,7 +1791,7 @@
           "depth": "settled",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/fast/30-identity-access.cy.js::EP-01"
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::EP-01"
           ]
         },
         {
@@ -1801,7 +1803,7 @@
           "depth": "settled",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/fast/30-identity-access.cy.js::EP-02"
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::EP-02"
           ]
         },
         {
@@ -1813,7 +1815,7 @@
           "depth": "settled",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/fast/30-identity-access.cy.js::EP-03"
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::EP-03"
           ]
         }
       ]
@@ -2123,8 +2125,8 @@
           "depth": "settled",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/fast/30-identity-access.cy.js::VF-01",
-            "frontend/cypress/e2e/fast/30-identity-access.cy.js::VF-02"
+            "frontend/cypress/e2e/fast/30-verify-message.cy.js::VF-01",
+            "frontend/cypress/e2e/fast/30-verify-message.cy.js::VF-02"
           ]
         },
         {

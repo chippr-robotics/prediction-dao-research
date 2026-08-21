@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 82 |
+| 🟢 covered | 84 |
 | 🟡 partial | 8 |
-| 🔴 absent | 34 |
+| 🔴 absent | 32 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 24 · 🟡 1 · 🔴 13 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 26 · 🟡 1 · 🔴 11 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -333,7 +333,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `compliance.accept-terms-before-entry` | Read and accept the versioned terms before reaching the app | 🟢 covered | flow | `account-native` | `compliance.cy.js` (CP-01, CP-02, CP-03) | these tests never execute: `PASSKEY_ENABLED` / `PASSKEY_FULL_STACK` gate them and nothing in the repository sets either, so 16 of the tier's 17 tests are permanently pending (measured). The depth column has no value for "written but never run" — #1271 adds one |
-| `compliance.sanctioned-address-refused` | A screened address is refused before any transaction is offered | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
+| `compliance.sanctioned-address-refused` | A screened address is refused before any transaction is offered | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CM-01) |  |
 | `compliance.frozen-account-blocked` | A frozen account cannot create a wager, and unfreezing restores it | 🟢 covered | settled | `on-chain` | `18-frozen-accounts.cy.js` (FRZ-01, FRZ-02) |  |
 | `compliance.paused-protocol-blocked` | A paused protocol refuses new wagers, and unpausing restores them | 🟢 covered | settled | `on-chain` | `19-paused-protocol.cy.js` (PAU-01, PAU-02) |  |
 
@@ -396,7 +396,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `callsign.commit-reveal-register` | Register a %callsign through commit and reveal | 🔴 absent | none | — (proposed: on-chain) | #1241 |  |
 | `callsign.resolve-in-address-entry` | Address a transfer to someone by their callsign | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
-| `callsign.gated-below-gold` | Be told why registration is unavailable below Gold tier | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
+| `callsign.gated-below-gold` | Be told why registration is unavailable below Gold tier | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CS-01) |  |
 
 ### `057-predict-polymarket` — Predict — Polymarket
 
@@ -414,9 +414,9 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `endpoints.save-custom-rpc` | Save your own RPC endpoint and have reads use it | 🟢 covered | settled | `no-chain` | `30-identity-access.cy.js` (EP-01) |  |
-| `endpoints.wrong-chain-refused` | Be refused an endpoint that answers with a different chain id | 🟢 covered | settled | `no-chain` | `30-identity-access.cy.js` (EP-02) |  |
-| `endpoints.credentials-redacted` | Never see your endpoint credential rendered back to you | 🟢 covered | settled | `no-chain` | `30-identity-access.cy.js` (EP-03) |  |
+| `endpoints.save-custom-rpc` | Save your own RPC endpoint and have reads use it | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (EP-01) |  |
+| `endpoints.wrong-chain-refused` | Be refused an endpoint that answers with a different chain id | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (EP-02) |  |
+| `endpoints.credentials-redacted` | Never see your endpoint credential rendered back to you | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (EP-03) |  |
 
 ### `071-multi-chain-admin-console` — Multi-chain admin console
 
@@ -443,7 +443,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `verify.three-verdicts` | Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout | 🟢 covered | settled | `no-chain` | `30-identity-access.cy.js` (VF-01, VF-02) |  |
+| `verify.three-verdicts` | Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout | 🟢 covered | settled | `no-chain` | `30-verify-message.cy.js` (VF-01, VF-02) |  |
 | `verify.refused-while-operating-as-vault` | Be refused message signing while acting as a vault | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
 
 ### `093-admin-mini-apps` — Admin mini-apps
