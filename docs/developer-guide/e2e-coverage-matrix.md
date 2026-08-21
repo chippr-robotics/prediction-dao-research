@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 67 |
+| 🟢 covered | 75 |
 | 🟡 partial | 8 |
-| 🔴 absent | 49 |
+| 🔴 absent | 41 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 30 · 🟡 6 · 🔴 9 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 33 · 🟡 6 · 🔴 6 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -86,13 +86,13 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.token-mint-deploy` | Mint a token through the Token Mint mini-app | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
+| `miniapp.token-mint-deploy` | Mint a token through the Token Mint mini-app | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-04) |  |
 
 ### `030-clearpath-standard-daos` — ClearPath mini-app
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.clearpath-create-dao` | Create a standard DAO through ClearPath | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
+| `miniapp.clearpath-create-dao` | Create a standard DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) | the flow covers what ships — registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does |
 
 ### `033-network-aware-swap` — Network-aware swap
 
@@ -242,7 +242,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.host-submit-screens` | A mini-app transaction is screened inside the host before any rail is touched | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
+| `miniapp.host-submit-screens` | A mini-app transaction is screened inside the host before any rail is touched | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-05) |  |
 
 ### `083-perps-position-management` — Perps positions
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 16 · 🟡 1 · 🔴 21 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 20 · 🟡 1 · 🔴 17 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -380,7 +380,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.clearpath-network-switch` | Use ClearPath on a second network | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
+| `miniapp.clearpath-network-switch` | Use ClearPath on a second network | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-07) |  |
 
 ### `045-unified-connect-recovery` — Unified connect and recovery
 
@@ -435,9 +435,9 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.launch-verified-package` | Launch a mini-app whose bytes are verified against the chain | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
-| `miniapp.launchable-not-status` | A live app whose update is in review still launches | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
-| `miniapp.curator-approve-content-committed` | A curator approval is refused when the package changed under it | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
+| `miniapp.launch-verified-package` | Launch a mini-app whose bytes are verified against the chain | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-01) |  |
+| `miniapp.launchable-not-status` | A live app whose update is in review still launches | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-02) |  |
+| `miniapp.curator-approve-content-committed` | A curator approval is refused when the package changed under it | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-03) |  |
 
 ### `084-message-signing-verify` — Message signing and Verify
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 16 · 🟡 1 · 🔴 15 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 17 · 🟡 1 · 🔴 14 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -605,7 +605,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.browse-catalog` | Browse the app catalogue and pin an app to quick access | 🔴 absent | none | — (proposed: no-chain) | #1238 |  |
+| `miniapp.browse-catalog` | Browse the app catalogue and pin an app to quick access | 🟢 covered | settled | `no-chain` | `29-miniapp-catalog.cy.js` (MC-01, MC-02, MC-03) |  |
 
 ### `078-my-wagers-single-table-view` — My Wagers single table
 

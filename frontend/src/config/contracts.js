@@ -90,7 +90,15 @@ const HARDHAT_CONTRACTS = {
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
-  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
+  /*
+   * spec 073 — the mini-app catalog registry, the trust boundary for which packages the host
+   * fetches, verifies and EXECUTES. On a shipped build this key is empty here and the catalog
+   * resolves to Polygon or Mordor; the local node gets one so the 073 flows can submit a package,
+   * approve it, and swap it under the curator — none of which is possible against a public chain.
+   * Deployed by `scripts/deploy/deploy-miniapp-registry.js`, which `setup:e2e` runs LAST so no
+   * earlier nonce-derived address moves. See `miniAppChainId()` in config/networks.js.
+   */
+  miniAppRegistry: '0x5081a39b8A5f0E35a8D959395a630b68B74Dd30f',
   /*
    * spec 066 — the staking control surface. Deployed on the local node by
    * `scripts/deploy/deploy-staking-router.js` (which also stands up the Lido/sPOL/Polygon
@@ -118,6 +126,15 @@ const HARDHAT_CONTRACTS = {
   membershipVoucher: '0xF2fc5Ac192E7e48B2EE95D3528870c6ED26908e4',
   voucherBatchMinter: '0xE0b0F625F876f7D78413cc6c402FB92C8E47Ea05',
   tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
+  /*
+   * spec 030 — ClearPath's ExternalDAORegistry. NONCE-DERIVED, and it is the LAST deploy
+   * `setup:e2e` performs (after the seed, deliberately: appending there left every address
+   * above it byte-identical). It exists locally because the ClearPath mini-app declares
+   * `externalDAORegistry` in its manifest, and `host.contracts(name)` THROWS for a declared
+   * name it cannot resolve — so without this entry the app's own Register surface would refuse
+   * before reaching the chain, and the e2e flow would be measuring a missing constant.
+   */
+  externalDAORegistry: '0x36b58F5C1969B7b6591D752ea6F5486D069010AB',
   /*
    * THE TWO ENTRIES BELOW ARE NONCE-DERIVED, AND THEIR ORDER IS THE `setup:e2e` ORDER.
    *
@@ -367,7 +384,9 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
      * is why the local impersonation has to say a block rather than inherit one. DEV-guarded, so a
      * production build still reports nothing here and Amoy proposal discovery stays off.
      */
-    ...(E2E_AMOY_LOCAL ? { safeProposalHub: 1 } : {}),
+    // Same seam, same reason: the registry exists on Amoy only in the local impersonation, and
+    // its catalog reads scan from a recorded block. 1 covers a chain a few hundred blocks old.
+    ...(E2E_AMOY_LOCAL ? { safeProposalHub: 1, miniAppRegistry: 1 } : {}),
   },
   // Polygon. Blocks marked (measured) were bisected with `eth_getCode` against an archive node
   // rather than taken from a deploy script's report — the two disagreed by up to ten blocks, and
