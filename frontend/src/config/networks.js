@@ -75,26 +75,6 @@ const COLLECTIBLES_CHAIN_IDS = new Set([1, 137])
 // Polymarket runs nowhere else. Everywhere else the capability is false and the Predict tab hides
 // entirely (FR-018 soft-fail), mirroring COLLECTIBLES_CHAIN_IDS.
 const PREDICT_CHAIN_IDS = new Set([137])
-// In-app token swapping (spec 033 / 067 FR-016a). An EXPLICIT allow-list, not
-// `Boolean(this.dex)`.
-//
-// Why explicit: `capabilities.dex` gates the Trade surface, the portfolio asset
-// sheet's Swap action, and DEX spot pricing. Deriving it from the presence of
-// `dex` addresses means adding those addresses for a DIFFERENT reason — spec
-// 067 needs `positionManager` for liquidity supply — silently switches token
-// swapping on as a side effect. That is exactly how Ethereum ended up
-// swap-less: it had no `dex` block, so the capability was false by accident of
-// configuration rather than by decision (research R4a).
-//
-// Liquidity supply is a SEPARATE capability derived from `dex.positionManager`
-// plus a deployed `liquidityRouter`, so the two can move independently: a
-// network may have pools worth supplying before FairWins exposes swapping
-// there, or the reverse.
-//
-// Membership here is a POLICY gate, not a claim that the network is ready: the
-// capability also requires real `dex` config, because ETC/Mordor/Amoy build
-// theirs from env vars and yield null when unset.
-const SWAP_CHAIN_IDS = new Set([1, 10, 61, 63, 137, 8453, 42161])
 
 const earnConfig = () => ({
   provider: { name: 'Morpho', url: 'https://app.morpho.org' },
@@ -118,6 +98,36 @@ const earnConfig = () => ({
  */
 const E2E_AMOY_LOCAL =
   Boolean(import.meta.env?.DEV) && import.meta.env?.VITE_E2E_AMOY_LOCAL === '1'
+
+// In-app token swapping (spec 033 / 067 FR-016a). An EXPLICIT allow-list, not
+// `Boolean(this.dex)`.
+//
+// Why explicit: `capabilities.dex` gates the Trade surface, the portfolio asset
+// sheet's Swap action, and DEX spot pricing. Deriving it from the presence of
+// `dex` addresses means adding those addresses for a DIFFERENT reason — spec
+// 067 needs `positionManager` for liquidity supply — silently switches token
+// swapping on as a side effect. That is exactly how Ethereum ended up
+// swap-less: it had no `dex` block, so the capability was false by accident of
+// configuration rather than by decision (research R4a).
+//
+// Liquidity supply is a SEPARATE capability derived from `dex.positionManager`
+// plus a deployed `liquidityRouter`, so the two can move independently: a
+// network may have pools worth supplying before FairWins exposes swapping
+// there, or the reverse.
+//
+// Membership here is a POLICY gate, not a claim that the network is ready: the
+// capability also requires real `dex` config, because ETC/Mordor/Amoy build
+// theirs from env vars and yield null when unset.
+//
+// The 80002 entry is the LOCAL E2E IMPERSONATION ONLY, and is the same seam `earn` and the staking
+// config already use on this network (`E2E_AMOY_LOCAL`, above). It is compile-time — a shipped
+// build has `import.meta.env.DEV` false, the branch is dead code, and real Polygon Amoy stays
+// swap-less exactly as it is today. It exists because admission rule 2 of the e2e policy says a
+// flow in which a member signs something that costs them money must have on-chain coverage, the
+// on-chain tier impersonates Amoy, and a member swapping is spending. Membership of this set is
+// still not sufficient on its own: Amoy's `dex` block is built from VITE_AMOY_UNISWAP_* and stays
+// null unless something supplies them — locally, `scripts/deploy/deploy-local-swap.js`.
+const SWAP_CHAIN_IDS = new Set([1, 10, 61, 63, 137, 8453, 42161, ...(E2E_AMOY_LOCAL ? [80002] : [])])
 
 /*
  * Full-E2E staking wiring (specs 065 + 066), behind the same DEV-only seam as `earn` above.

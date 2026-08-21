@@ -386,7 +386,17 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
      */
     // Same seam, same reason: the registry exists on Amoy only in the local impersonation, and
     // its catalog reads scan from a recorded block. 1 covers a chain a few hundred blocks old.
-    ...(E2E_AMOY_LOCAL ? { safeProposalHub: 1, miniAppRegistry: 1 } : {}),
+    /*
+     * The full-E2E impersonation runs on a local node ~100 blocks long, so every REAL Amoy block
+     * number above is a starting point in the far future: a bounded scan from it finds nothing and
+     * the surface renders an honest-looking empty list for a holding that exists. `membershipVoucher`
+     * is the one that bit — `useVouchers#listMyVouchers` derives holdings from a Transfer-log scan,
+     * so the Vouchers page showed "you don't have any vouchers to redeem" for a wallet holding one.
+     *
+     * Zero is safe HERE and only here: the "never scan from genesis" rule (#703/#704) is about
+     * public chains with millions of blocks behind them.
+     */
+    ...(E2E_AMOY_LOCAL ? { safeProposalHub: 1, miniAppRegistry: 1, membershipVoucher: 0 } : {}),
   },
   // Polygon. Blocks marked (measured) were bisected with `eth_getCode` against an archive node
   // rather than taken from a deploy script's report — the two disagreed by up to ten blocks, and
