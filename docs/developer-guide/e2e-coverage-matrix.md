@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 93 |
+| 🟢 covered | 98 |
 | 🟡 partial | 6 |
-| 🔴 absent | 25 |
+| 🔴 absent | 20 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 31 · 🟡 0 · 🔴 7 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 32 · 🟡 0 · 🔴 6 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -347,7 +347,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `addressbook.save-and-use-contact` | Save a contact and address a wager or transfer to it | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `addressbook.save-and-use-contact` | Save a contact and address a wager or transfer to it | 🟢 covered | settled | `no-chain` | `34-member-surfaces.cy.js` (MS-01) |  |
 
 ### `022-membership-purchase-progress` — Membership purchase progress
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 21 · 🟡 1 · 🔴 10 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 25 · 🟡 1 · 🔴 6 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -473,7 +473,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `legal.read-versioned-policies` | Open terms, risk and privacy from the footer before connecting | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `legal.read-versioned-policies` | Open terms, risk and privacy from the footer before connecting | 🟢 covered | settled | `no-chain` | `34-member-surfaces.cy.js` (MS-05) |  |
 
 ### `011-wallet-address-qr` — Wallet address QR
 
@@ -503,7 +503,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `reports.export-wager-history` | Export a settled-wager report for tax purposes | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `reports.export-wager-history` | Export a settled-wager report for tax purposes | 🟢 covered | flow | `no-chain` | `34-member-surfaces.cy.js` (MS-02) |  |
 
 ### `017-wager-grid-redesign` — Wager grid redesign
 
@@ -539,7 +539,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `notifications.platform-feed` | See platform notifications and clear them | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `notifications.platform-feed` | See platform notifications and clear them | 🟢 covered | flow | `no-chain` | `34-member-surfaces.cy.js` (MS-03) |  |
 
 ### `038-ux-consistency` — UX consistency
 
@@ -581,7 +581,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `notifications.choose-profile` | Choose how much you are notified | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `notifications.choose-profile` | Choose how much you are notified | 🟢 covered | flow | `no-chain` | `34-member-surfaces.cy.js` (MS-04) |  |
 
 ### `064-universal-asset-selector` — Universal asset selector
 

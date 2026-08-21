@@ -296,13 +296,13 @@
         {
           "id": "legal.read-versioned-policies",
           "name": "Open terms, risk and privacy from the footer before connecting",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-05"
+          ]
         }
       ]
     },
@@ -399,13 +399,14 @@
         {
           "id": "reports.export-wager-history",
           "name": "Export a settled-wager report for tax purposes",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-02"
+          ],
+          "note": "the empty state and its promise about where statements come from; generating one needs chain history"
         }
       ]
     },
@@ -505,13 +506,13 @@
         {
           "id": "addressbook.save-and-use-contact",
           "name": "Save a contact and address a wager or transfer to it",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-01"
+          ]
         }
       ]
     },
@@ -679,13 +680,13 @@
         {
           "id": "notifications.platform-feed",
           "name": "See platform notifications and clear them",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-03"
+          ]
         }
       ]
     },
@@ -1460,13 +1461,14 @@
         {
           "id": "notifications.choose-profile",
           "name": "Choose how much you are notified",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-04"
+          ],
+          "note": "the empty-state route into the wizard; a member with profiles already saved is not modelled here"
         }
       ]
     },
