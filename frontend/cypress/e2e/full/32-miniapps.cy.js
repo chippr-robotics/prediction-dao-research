@@ -45,6 +45,33 @@ const REVIEW_URL = '/admin/compliance?view=miniapp-review'
  */
 const packageBytes = (variant) => cy.task('miniappPackage', { variant })
 
+/**
+ * A REAL first-party package (`token-mint`, `clearpath`), as `publish:local:miniapps` staged it.
+ *
+ * The three flows above run against the committed FIXTURE package, whose whole job is to be small
+ * enough to reason about. Token Mint and ClearPath are the two packages members actually launch,
+ * they carry `wallet:submit` and a `contracts` allowlist the fixture does not, and every claim
+ * about what a package may do is a claim about THEM. Nothing here is synthesized: the bytes come
+ * out of the same preset and the same `publish.js` pipeline that pins a released package.
+ */
+const realPackage = (app) =>
+  cy.task('miniappRealPackage', { app }).then((r) => {
+    expect(r.ok, `miniappRealPackage ${app}: ${r.error || 'no error message returned'}`).to.equal(true)
+    return r
+  })
+
+const sanctions = (action, args = {}) =>
+  cy.task('sanctionsFixture', { action, args }).then((r) => {
+    expect(r.ok, `sanctionsFixture ${action}: ${r.error || 'no error message returned'}`).to.equal(true)
+    return r
+  })
+
+const actor = (action, args = {}) =>
+  cy.task('appActorFixture', { action, args }).then((r) => {
+    expect(r.ok, `appActorFixture ${action}: ${r.error || 'no error message returned'}`).to.equal(true)
+    return r
+  })
+
 const registry = (action, args = {}) =>
   cy.task('miniappFixture', { action, args }).then((r) => {
     expect(r.ok, `miniappFixture ${action}: ${r.error || 'no error message returned'}`).to.equal(true)
@@ -57,16 +84,37 @@ const registry = (action, args = {}) =>
  * Deliberately serves BYTES rather than a parsed body: the manifest is hashed before it is
  * parsed (FR-011), so a stub that replied with an object would skip the very step under test.
  */
-const servePackage = (variant) =>
-  packageBytes(variant).then(({ cid, files }) => {
-    for (const [path, text] of Object.entries(files)) {
-      // `body` is the file's exact text. Anything that re-encodes it — base64, a JSON body —
-      // changes the bytes, and the loader refuses them as an integrity failure, which is the
-      // right answer to the wrong question.
-      cy.intercept('GET', `${GATEWAY}/ipfs/${cid}/${path}`, (req) => {
-        req.reply({ statusCode: 200, body: text, headers: { 'content-type': 'text/plain' } })
-      })
-    }
+const serveFiles = ({ cid, files }) => {
+  for (const [path, text] of Object.entries(files)) {
+    // `body` is the file's exact text. Anything that re-encodes it — base64, a JSON body —
+    // changes the bytes, and the loader refuses them as an integrity failure, which is the
+    // right answer to the wrong question.
+    cy.intercept('GET', `${GATEWAY}/ipfs/${cid}/${path}`, (req) => {
+      req.reply({ statusCode: 200, body: text, headers: { 'content-type': 'text/plain' } })
+    })
+  }
+}
+
+const servePackage = (variant) => packageBytes(variant).then(serveFiles)
+
+/**
+ * Put a real package on the chain and on the gateway, and hand back what was published.
+ *
+ * The listing NAME matters: `registryClient#appSlug(record.name)` is passed to the loader as the
+ * id it expects, and the loader compares it to the `id` inside the authenticated manifest. So the
+ * name a curator lists cannot be chosen freely here — "Token Mint" folds to `token-mint`, which is
+ * what the package claims to be, and anything else refuses at launch rather than at listing.
+ */
+const publishReal = (app) =>
+  realPackage(app).then((pkg) => {
+    serveFiles(pkg)
+    return registry('ensureServing', { name: pkg.name, cid: pkg.cid, manifestHash: pkg.manifestHash }).then(
+      (record) => {
+        expect(record.launchable, `${pkg.name} is serving`).to.equal(true)
+        expect(record.approved.manifestHash, 'and it is the package just built').to.equal(pkg.manifestHash)
+        return { ...pkg, record }
+      },
+    )
   })
 
 const openCatalog = () => {
@@ -79,6 +127,20 @@ describe('Mini-app platform (specs 073 / 077 / 028 / 030)', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+  })
+
+  /*
+   * The deny list is chain state on an account every test in this file shares, so restoring it
+   * cannot live at the end of the test that sets it: MA-05 failing anywhere before its last line
+   * left the member restricted, and the next run's very first `grantMembership` reverted — five
+   * failures whose message said nothing about sanctions. Cleanup that only runs on success is not
+   * cleanup. The task is idempotent, so this costs nothing on the tests that never touched it.
+   */
+  afterEach(() => {
+    cy.task('sanctionsFixture', {
+      action: 'setDenied',
+      args: { address: MEMBER, denied: false, reason: 'e2e: afterEach restore' },
+    })
   })
 
   it('[MA-01] miniapp.launch-verified-package — the bytes are checked against the chain, and tampered bytes never run', () => {
@@ -215,4 +277,107 @@ describe('Mini-app platform (specs 073 / 077 / 028 / 030)', () => {
       })
     })
   })
+
+  it('[MA-04] miniapp.token-mint-deploy — a package deploys a real contract through the host, and only through the host', () => {
+    /*
+     * Token Mint (spec 028) is a converted mini-app: the same issuance surface that used to be
+     * host code now ships as third-party-shaped bytes behind an on-chain commitment. What has to
+     * still be true afterwards is that it can do the ONE privileged thing it exists for — put a
+     * contract on chain — and that it does it through `host.wallet.submit` rather than through a
+     * signer of its own, because a package has no signer and must never acquire one.
+     *
+     * The proof is taken from the chain, not from the app's own success panel: `tokenCount` on the
+     * factory the HOST resolved, before and after.
+     */
+    const SYMBOL = `E2E${Date.now().toString().slice(-6)}`
+
+    publishReal('token-mint').then((pkg) => {
+      expect(pkg.permissions, 'the package asks the host for a write').to.include('wallet:submit')
+      expect(pkg.contracts, 'and declares the one contract it may resolve').to.deep.equal(['tokenFactory'])
+
+      actor('tokenCount', { issuer: MEMBER }).then(({ total: before }) => {
+        cy.mockWeb3Provider({ account: MEMBER, preAuthorized: true, realBalances: true })
+        cy.visit('/apps/token-mint')
+        cy.get('.miniapp-workspace-root', { timeout: 60000 }).should('exist')
+        cy.get('.miniapp-workspace-refusal').should('not.exist')
+
+        // The create form is the package's own DOM, rendered inside the host's workspace. The app
+        // opens on "My Tokens"; issuance lives behind its own tab.
+        cy.contains('.tm-tab', 'Create', { timeout: 30000 }).click()
+        cy.get('#tk-name', { timeout: 30000 }).should('be.visible').clear().type('E2E Coverage Token')
+        cy.get('#tk-symbol').clear().type(SYMBOL)
+        cy.get('#tk-supply').clear().type('1000')
+
+        // `canIssue` is a real read of TOKEN_ISSUER_ROLE against the factory — if the button is
+        // disabled the member genuinely is not authorized, which is a different failure than a
+        // broken flow, so it is asserted separately.
+        cy.contains('button', /Review & deploy/i).should('not.be.disabled').click()
+
+        // The app waits for CONFIRMATION before it claims anything (`submit` resolves at
+        // broadcast), so this line is the app agreeing with the chain rather than guessing.
+        cy.contains('.tm-success', /created and confirmed on-chain/i, { timeout: 90000 }).should('be.visible')
+
+        actor('tokenCount', { issuer: MEMBER }).then(({ total: after, byIssuer }) => {
+          expect(after, 'the factory recorded exactly one new token').to.equal(before + 1)
+          expect(byIssuer, 'and it is attributed to the member who signed').to.have.length.greaterThan(0)
+        })
+      })
+    })
+  })
+
+  it('[MA-05] miniapp.host-submit-screens — sanctions screening happens INSIDE submit, not in the app', () => {
+    /*
+     * The host screens the acting account inside `wallet.submit`, before either write rail is
+     * touched. That placement is the whole control: an app-side pre-check is something a package
+     * can simply not write, and the packages most worth screening are the least likely to
+     * cooperate. This flow measures the placement — same package, same form, same button, one
+     * on-chain deny-list entry — and it is worth measuring precisely because nothing in the
+     * package changes, so no test inside the package could ever catch its removal.
+     *
+     * The deny-list write is real (`SanctionsGuard.setDenied`), because `useAddressScreening`
+     * reads that contract. Nothing about screening is stubbed.
+     */
+    const SYMBOL = `BLK${Date.now().toString().slice(-6)}`
+
+    publishReal('token-mint').then(() => {
+      actor('tokenCount', { issuer: MEMBER }).then(({ total: before }) => {
+        sanctions('setDenied', { address: MEMBER, denied: true, reason: 'e2e: host-submit-screens' }).then((s) => {
+          expect(s.denied, 'the chain now denies the member').to.equal(true)
+        })
+
+        cy.mockWeb3Provider({ account: MEMBER, preAuthorized: true, realBalances: true })
+        cy.visit('/apps/token-mint')
+        cy.get('.miniapp-workspace-root', { timeout: 60000 }).should('exist')
+
+        cy.contains('.tm-tab', 'Create', { timeout: 30000 }).click()
+        cy.get('#tk-name', { timeout: 30000 }).should('be.visible').clear().type('Refused Token')
+        cy.get('#tk-symbol').clear().type(SYMBOL)
+        cy.get('#tk-supply').clear().type('1000')
+        cy.contains('button', /Review & deploy/i).should('not.be.disabled').click()
+
+        /*
+         * The refusal is the HOST's, surfaced through the package's own error notification —
+         * which is the honest shape: the app is told it may not send, and says so, without
+         * having had to ask.
+         */
+        cy.get('.notification-message', { timeout: 60000 })
+          .invoke('text')
+          .should('match', /restricted|sanction/i)
+
+        cy.contains('.tm-success', /created and confirmed on-chain/i).should('not.exist')
+
+        // Nothing reached a rail. The count is the durable proof; the toast is not.
+        actor('tokenCount', { issuer: MEMBER }).then(({ total: after }) => {
+          expect(after, 'no transaction was sent').to.equal(before)
+        })
+
+        // Put the member back. Every later test in this file shares this account, and a wallet
+        // left restricted would fail them for a reason none of them is about.
+        sanctions('setDenied', { address: MEMBER, denied: false, reason: 'e2e: cleanup' }).then((s) => {
+          expect(s.allowed, 'the member is unrestricted again').to.equal(true)
+        })
+      })
+    })
+  })
+
 })

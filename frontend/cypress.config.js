@@ -997,6 +997,52 @@ export default defineConfig({
         },
 
         /**
+         * A REAL first-party mini-app package (Token Mint, spec 028 / ClearPath, spec 030),
+         * read from what `npm run publish:local:miniapps` staged.
+         *
+         * Not a fixture. These are the same bytes `scripts/miniapps/publish.js` would pin, built
+         * by the same preset, hashed by the same pipeline — the `--dev` mode differs from the
+         * pinned one only in where the files end up, which is the property that makes serving
+         * them here worth anything. The staging id it prints is `dev<manifestHash minus 0x>`, so
+         * the CID is recomputed here from the manifest rather than parsed out of that output:
+         * the value the chain is told and the value the gateway is asked for then come from the
+         * same bytes by construction.
+         *
+         * `styles` is read from the manifest instead of assumed, because a package that ships no
+         * stylesheet is a shape the host must handle and a hardcoded `style.css` would hide it.
+         */
+        miniappRealPackage({ app }) {
+          const dir = resolve(__dirname, 'miniapps', app, 'dist')
+          if (!existsSync(resolve(dir, 'manifest.json'))) {
+            return {
+              ok: false,
+              error:
+                `frontend/miniapps/${app}/dist/manifest.json is missing — run \`npm run setup:e2e\` ` +
+                '(whose last step is `publish:local:miniapps`) before the mini-app specs',
+            }
+          }
+          const manifestText = readFileSync(resolve(dir, 'manifest.json'), 'utf8')
+          const manifestHash = ethers.keccak256(ethers.toUtf8Bytes(manifestText))
+          const manifest = JSON.parse(manifestText)
+          const files = { 'manifest.json': manifestText }
+          for (const name of [manifest.entry, ...(manifest.styles || [])]) {
+            files[name] = readFileSync(resolve(dir, name), 'utf8')
+          }
+          return {
+            ok: true,
+            app,
+            name: manifest.name,
+            appId: manifest.id,
+            // `dev` + the hash, exactly as publish.js derives it for a locally staged package.
+            cid: `dev${manifestHash.slice(2)}`,
+            manifestHash,
+            permissions: manifest.permissions || [],
+            contracts: manifest.contracts || [],
+            files,
+          }
+        },
+
+        /**
          * Fixtures for the mini-app platform (specs 073 / 077 / 028 / 030).
          *
          * The registry is the trust boundary for what code the host EXECUTES, so this task only
@@ -1162,6 +1208,133 @@ export default defineConfig({
               }
               default:
                 throw new Error(`miniappFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+        /**
+         * Sanctions screening state (spec 021 guard, used here for spec 073's host rule).
+         *
+         * Nothing about the screening path is stubbed: `useAddressScreening` reads the on-chain
+         * `SanctionsGuard`, so making an account restricted means writing the deny list the app
+         * will actually read. That is what lets the mini-app flow assert the host refused a
+         * submission rather than assert that a mock said it would.
+         *
+         * IDEMPOTENT and reversible. The e2e member IS the deployer, so a flow that denies it
+         * must put it back — otherwise every later test in the file inherits a restricted wallet
+         * and fails for a reason that has nothing to do with what it measures.
+         *
+         * action ∈ setDenied | status
+         */
+        async sanctionsFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+          // Copied from contracts/access/SanctionsGuard.sol — `setDenied` carries a reason string
+          // and is gated on SANCTIONS_ADMIN_ROLE, which the local deployer holds.
+          const guard = new ethers.Contract(
+            d.contracts.sanctionsGuard,
+            [
+              'function setDenied(address account, bool denied, string reason)',
+              'function isAllowed(address account) view returns (bool)',
+              'function isDenied(address account) view returns (bool)',
+            ],
+            admin,
+          )
+          try {
+            switch (action) {
+              case 'setDenied': {
+                const denied = Boolean(args.denied)
+                // Writing the state it is already in is a wasted block, not an error — but the
+                // read afterwards is what the caller is told, either way.
+                if ((await guard.isDenied(args.address)) !== denied) {
+                  await (await guard.setDenied(args.address, denied, args.reason ?? 'e2e fixture')).wait(1)
+                }
+                return { ok: true, denied: await guard.isDenied(args.address), allowed: await guard.isAllowed(args.address) }
+              }
+              case 'status':
+                return { ok: true, denied: await guard.isDenied(args.address), allowed: await guard.isAllowed(args.address) }
+              default:
+                throw new Error(`sanctionsFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+        /**
+         * Fixtures for ClearPath (spec 030) and Token Mint (spec 028) — the two real packages.
+         *
+         * Both apps act on contracts the HOST resolves and the CHAIN gates, so everything here
+         * either arranges an authorization the member genuinely needs (a membership tier, the
+         * token-issuer role) or reads back what the chain recorded. No app action is performed:
+         * the flow drives those through the mini-app's own UI, which is the only way the claim
+         * "the package can do this" means anything.
+         *
+         * `mockGovernorLike` is the local stand-in `deploy-clearpath.js` deploys — the registry's
+         * `_isGovernor` probe is real, so a local flow needs a real answer to it.
+         *
+         * action ∈ grantDaoTier | daoRegistry | daoCount | tokenIssuer | tokenCount
+         */
+        async appActorFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+
+          // `durationDays` is uint32 — see the note on miniappFixture's copy of this signature.
+          const MEMBERSHIP_ABI = ['function grantMembership(address user, bytes32 role, uint8 tier, uint32 durationDays)']
+          const DAO_MEMBER_ROLE = ethers.id('DAO_MEMBER_ROLE')
+
+          try {
+            switch (action) {
+              case 'grantDaoTier': {
+                const membership = new ethers.Contract(d.contracts.membershipManager, MEMBERSHIP_ABI, admin)
+                // Silver is the registry's floor (ExternalDAORegistry#registerExternalDAO); Gold is
+                // granted so the flow is not sitting exactly on the boundary it is not testing.
+                await (await membership.grantMembership(args.address, DAO_MEMBER_ROLE, args.tier ?? 3, 365)).wait(1)
+                return { ok: true }
+              }
+              case 'daoRegistry': {
+                // Field order copied from contracts/clearpath/ExternalDAORegistry.sol.
+                const registry = new ethers.Contract(
+                  d.contracts.externalDAORegistry,
+                  [
+                    'function isRegistered(address dao) view returns (bool)',
+                    'function getExternalDAOsByRegistrant(address who) view returns (uint256[])',
+                    'function externalCount() view returns (uint256)',
+                  ],
+                  provider,
+                )
+                return {
+                  ok: true,
+                  registered: await registry.isRegistered(args.dao),
+                  byRegistrant: (await registry.getExternalDAOsByRegistrant(args.registrant ?? args.dao)).map(Number),
+                  externalCount: Number(await registry.externalCount()),
+                }
+              }
+              case 'governor':
+                return { ok: true, address: d.mocks?.mockGovernorLike ?? null }
+              case 'tokenCount': {
+                const factory = new ethers.Contract(
+                  d.contracts.tokenFactory,
+                  [
+                    'function tokenCount() view returns (uint256)',
+                    'function getTokensByIssuer(address issuer) view returns (uint256[])',
+                  ],
+                  provider,
+                )
+                return {
+                  ok: true,
+                  total: Number(await factory.tokenCount()),
+                  byIssuer: args.issuer ? (await factory.getTokensByIssuer(args.issuer)).map(Number) : [],
+                }
+              }
+              default:
+                throw new Error(`appActorFixture: unknown action '${action}'`)
             }
           } catch (e) {
             return { ok: false, error: e.shortMessage || e.reason || e.message }

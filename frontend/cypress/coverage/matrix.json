@@ -635,13 +635,14 @@
         {
           "id": "miniapp.token-mint-deploy",
           "name": "Mint a token through the Token Mint mini-app",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1238"
+          "tests": [
+            "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-04"
+          ]
         }
       ]
     },
@@ -1900,13 +1901,14 @@
         {
           "id": "miniapp.host-submit-screens",
           "name": "A mini-app transaction is screened inside the host before any rail is touched",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1238"
+          "tests": [
+            "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-05"
+          ]
         },
         {
           "id": "miniapp.curator-approve-content-committed",

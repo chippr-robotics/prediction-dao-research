@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 70 |
+| 🟢 covered | 72 |
 | 🟡 partial | 8 |
-| 🔴 absent | 46 |
+| 🔴 absent | 44 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 30 · 🟡 6 · 🔴 9 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 32 · 🟡 6 · 🔴 7 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -86,7 +86,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.token-mint-deploy` | Mint a token through the Token Mint mini-app | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
+| `miniapp.token-mint-deploy` | Mint a token through the Token Mint mini-app | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-04) |  |
 
 ### `030-clearpath-standard-daos` — ClearPath mini-app
 
@@ -242,7 +242,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.host-submit-screens` | A mini-app transaction is screened inside the host before any rail is touched | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
+| `miniapp.host-submit-screens` | A mini-app transaction is screened inside the host before any rail is touched | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-05) |  |
 
 ### `083-perps-position-management` — Perps positions
 

@@ -127,6 +127,15 @@ const HARDHAT_CONTRACTS = {
   voucherBatchMinter: '0xE0b0F625F876f7D78413cc6c402FB92C8E47Ea05',
   tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
   /*
+   * spec 030 — ClearPath's ExternalDAORegistry. NONCE-DERIVED, and it is the LAST deploy
+   * `setup:e2e` performs (after the seed, deliberately: appending there left every address
+   * above it byte-identical). It exists locally because the ClearPath mini-app declares
+   * `externalDAORegistry` in its manifest, and `host.contracts(name)` THROWS for a declared
+   * name it cannot resolve — so without this entry the app's own Register surface would refuse
+   * before reaching the chain, and the e2e flow would be measuring a missing constant.
+   */
+  externalDAORegistry: '0x36b58F5C1969B7b6591D752ea6F5486D069010AB',
+  /*
    * THE TWO ENTRIES BELOW ARE NONCE-DERIVED, AND THEIR ORDER IS THE `setup:e2e` ORDER.
    *
    * Both come from targeted deploys that run AFTER `deploy:local` (`deploy:local:pools`, then
