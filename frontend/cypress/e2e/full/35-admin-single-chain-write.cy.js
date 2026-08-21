@@ -24,8 +24,17 @@ const OTHER = 'Ethereum Classic Mordor'
 
 const EMERGENCY = '/admin/incident-response?view=emergency'
 
-const registryPaused = () =>
-  cy.task('chainTx', { action: 'registryPaused' }, { timeout: 60000 })
+/*
+ * The registry's pause flag, read from the chain.
+ *
+ * Takes its options, because the first version dropped them on the floor: the helper accepted no
+ * arguments while the call sites passed `{ timeout: 60000 }`, so every read ran on the default
+ * command timeout. Locally the node mines fast enough that it never showed; on a CI runner it
+ * read the flag before the transaction had been mined and reported a pause that had not landed
+ * yet as one that never would.
+ */
+const registryPaused = (options = {}) =>
+  cy.task('chainTx', { action: 'registryPaused' }, { timeout: 60000, ...options })
 
 function enterAsGuardian() {
   cy.mockWeb3Provider({ account: GUARDIAN })
@@ -40,6 +49,15 @@ describe('Operations: a write acts on one named chain (specs 071 + 093)', () => 
    * settlement all revert while it stands. The test unpauses through the UI as part of the flow;
    * this is the net under it, and it no-ops when the flow already finished.
    */
+  /*
+   * The precondition, stated rather than inherited. This spec shares a node with the rest of its
+   * shard, and the flow below starts by asserting the registry is unpaused — so a preceding spec
+   * that left a pause standing would fail this one for something it did not do.
+   */
+  before(() => {
+    cy.task('chainTx', { action: 'unpause' }, { timeout: 60000 })
+  })
+
   afterEach(() => {
     cy.task('chainTx', { action: 'unpause' }, { timeout: 60000 })
   })
@@ -76,20 +94,25 @@ describe('Operations: a write acts on one named chain (specs 071 + 093)', () => 
     // ── THE WRITE ────────────────────────────────────────────────────────────────────────────
     cy.contains('button', `Pause on ${LOCAL}`).click()
 
+    /*
+     * WAIT ON THE CONSOLE, THEN ASK THE CHAIN — in that order, and the order is the point.
+     *
+     * The control flips to its inverse only after `useAdminTx` has awaited `tx.wait()` and the
+     * pause estate has re-read the contract, so this assertion is itself the evidence that the
+     * console read its own write back rather than trusting the transaction it sent. It also
+     * makes the chain read below unambiguous: reading first raced the miner, and a `false` then
+     * means "not yet", which is indistinguishable from "never".
+     */
+    cy.contains('button', `Unpause on ${LOCAL}`, { timeout: 90000 }).should('be.visible')
+
     // The contract is the authority, so the contract is what is asserted — not the toast.
-    registryPaused({ timeout: 60000 }).should((r) => {
+    registryPaused().should((r) => {
       expect(r.paused, 'the pause reached the registry the button named').to.equal(true)
     })
 
-    /*
-     * And the console now READS its own write back: the control flips to its inverse, which is
-     * only possible if the pause state on screen came from the chain rather than from optimism
-     * about the transaction.
-     */
-    cy.contains('button', `Unpause on ${LOCAL}`, { timeout: 40000 }).should('be.visible')
-
     cy.contains('button', `Unpause on ${LOCAL}`).click()
-    registryPaused({ timeout: 60000 }).should((r) => {
+    cy.contains('button', `Pause on ${LOCAL}`, { timeout: 90000 }).should('be.visible')
+    registryPaused().should((r) => {
       expect(r.paused, 'unpausing restored the network').to.equal(false)
     })
   })
