@@ -353,13 +353,13 @@
         {
           "id": "predict.search-markets",
           "name": "Search and filter Polymarket markets when choosing a condition",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::PR-01"
+          ]
         }
       ]
     },
@@ -1371,10 +1371,12 @@
           "name": "Browse collectibles and buy one",
           "status": "partial",
           "tier": "no-chain",
-          "depth": "none",
+          "depth": "smoke",
           "risk": "custody",
-          "tests": [],
-          "missing": "nothing drives the buy side at any tier; the OpenSea order itself is out of scope but the disclosure and confirm path is drivable",
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::CO-01"
+          ],
+          "missing": "covers the soft-fail: an unreachable OpenSea gateway is not rendered as an empty collection. Browsing a stocked collection and the buy path are not driven.",
           "issue": "#1239"
         }
       ]
@@ -1405,13 +1407,14 @@
         {
           "id": "predict.builder-fee-disclosed",
           "name": "See the additive builder fee as its own line before signing an order",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "disclosure",
-          "tests": [],
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::PR-02",
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::PR-04"
+          ]
         },
         {
           "id": "predict.place-order",
@@ -1427,13 +1430,13 @@
         {
           "id": "predict.hidden-off-polygon",
           "name": "See the Predict tab hidden on a chain Polymarket does not serve",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::PR-03"
+          ]
         }
       ]
     },

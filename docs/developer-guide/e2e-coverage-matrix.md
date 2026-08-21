@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 101 |
+| 🟢 covered | 104 |
 | 🟡 partial | 8 |
-| 🔴 absent | 15 |
+| 🔴 absent | 12 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -176,7 +176,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `collect.browse-and-buy` | Browse collectibles and buy one | 🟡 partial | none | `no-chain` | #1239 | nothing drives the buy side at any tier; the OpenSea order itself is out of scope but the disclosure and confirm path is drivable |
+| `collect.browse-and-buy` | Browse collectibles and buy one | 🟡 partial | smoke | `no-chain` | `37-predict-and-collect.cy.js` (CO-01) | covers the soft-fail: an unreachable OpenSea gateway is not rendered as an empty collection. Browsing a stocked collection and the buy path are not driven. |
 
 ### `057-predict-polymarket` — Predict — Polymarket
 
@@ -265,7 +265,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Disclosure — a member consents to a cost
 
-9 flows — 🟢 5 · 🟡 0 · 🔴 4 · ⚪ 0 · covered-but-not-proven 0
+9 flows — 🟢 6 · 🟡 0 · 🔴 3 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -289,7 +289,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `predict.builder-fee-disclosed` | See the additive builder fee as its own line before signing an order | 🔴 absent | none | — (proposed: no-chain) | #1239 |  |
+| `predict.builder-fee-disclosed` | See the additive builder fee as its own line before signing an order | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-02, PR-04) |  |
 
 ### `060-platform-fee-wrapper` — Platform fees
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 33 · 🟡 1 · 🔴 4 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 34 · 🟡 1 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -402,7 +402,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `predict.hidden-off-polygon` | See the Predict tab hidden on a chain Polymarket does not serve | 🔴 absent | none | — (proposed: no-chain) | #1239 |  |
+| `predict.hidden-off-polygon` | See the Predict tab hidden on a chain Polymarket does not serve | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-03) |  |
 
 ### `066-staking-admin-controls` — Staking admin controls
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 27 · 🟡 2 · 🔴 3 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 28 · 🟡 2 · 🔴 2 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -491,7 +491,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `predict.search-markets` | Search and filter Polymarket markets when choosing a condition | 🔴 absent | none | — (proposed: no-chain) | #1239 |  |
+| `predict.search-markets` | Search and filter Polymarket markets when choosing a condition | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-01) |  |
 
 ### `014-quick-action-dashboard` — Quick-action dashboard
 

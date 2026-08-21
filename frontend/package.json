@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "_comment:dev:fast": "Dev server for the NO-CHAIN tier. Identical to `dev` but with VITE_RELAYER_URL set to a host nothing serves: Predict (spec 057) and Collect (055/056) both gate on that one variable, so with it unset their tabs hide entirely and their flows are unreachable \u2014 the tier could not test them at all. Pointed at a dead port on purpose: a spec that wants those surfaces intercepts the gateway itself, and a spec that does not sees the honest unreachable-gateway state rather than invented data. Never a real gateway.",
+    "dev:fast": "VITE_RELAYER_URL=http://localhost:8899 vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -16,12 +18,12 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "cypress": "cypress open",
-    "_comment:dev:e2e": "Dev server for the full E2E tier. VITE_NETWORK_ID=80002 makes it a TESTNET-COHORT build (getCurrentChainId is env-or-PRIMARY, and PRIMARY is Polygon) so membershipChainId() resolves to Amoy = the local node; without it the modal demands a switch to Polygon and the purchase button stays disabled. The JWT is a DUMMY and deliberately not a credential: encryption is mandatory on the create path, and PINATA_CONFIG.USE_PROXY is false outside a production build, so getPinataAuthHeaders() THROWS without one and every wager creation dies before reaching WagerRegistry. Its only job is to let the request be issued so cy.interceptIpfs() can stub it — no bytes leave the machine. Safe by construction: pinataSecretGuard() in vite.config.js refuses any production build that has these vars set.",
+    "_comment:dev:e2e": "Dev server for the full E2E tier. VITE_NETWORK_ID=80002 makes it a TESTNET-COHORT build (getCurrentChainId is env-or-PRIMARY, and PRIMARY is Polygon) so membershipChainId() resolves to Amoy = the local node; without it the modal demands a switch to Polygon and the purchase button stays disabled. The JWT is a DUMMY and deliberately not a credential: encryption is mandatory on the create path, and PINATA_CONFIG.USE_PROXY is false outside a production build, so getPinataAuthHeaders() THROWS without one and every wager creation dies before reaching WagerRegistry. Its only job is to let the request be issued so cy.interceptIpfs() can stub it \u2014 no bytes leave the machine. Safe by construction: pinataSecretGuard() in vite.config.js refuses any production build that has these vars set.",
     "dev:e2e": "VITE_NETWORK_ID=80002 VITE_PINATA_JWT=e2e-not-a-real-credential VITE_E2E_AMOY_LOCAL=1 VITE_RPC_URL_AMOY=http://localhost:8545 VITE_AMOY_USDC=0xbc4D54AE49ED9C6075770CD6acA930A728dcf526 VITE_AMOY_USDC_DECIMALS=18 VITE_BRIDGE_GATEWAY_URL=http://localhost:8787 VITE_MINIAPP_GATEWAY=http://localhost:8090 VITE_AMOY_WMATIC=0x007e106a5664D48e02f571b58694B74c9D5c22a1 VITE_AMOY_UNISWAP_FACTORY=0xD84379CEae14AA33C123Af12424A37803F885889 VITE_AMOY_UNISWAP_QUOTER=0x2B0d36FACD61B71CC05ab8F3D2355ec3631C0dd5 VITE_AMOY_UNISWAP_SWAP_ROUTER=0xfbC22278A96299D91d41C453234d97b4F5Eb9B2d vite",
     "cypress:headless": "cypress run",
     "cypress:run": "cypress run",
     "test:e2e": "start-server-and-test dev http://localhost:5173 cypress:headless",
-    "test:e2e:fast": "start-server-and-test dev http://localhost:5173 'cypress run --spec cypress/e2e/fast/**/*.cy.js'",
+    "test:e2e:fast": "start-server-and-test dev:fast http://localhost:5173 'cypress run --spec cypress/e2e/fast/**/*.cy.js'",
     "test:e2e:full": "start-server-and-test dev http://localhost:5173 'cypress run --spec cypress/e2e/full/**/*.cy.js'",
     "test:e2e:open": "start-server-and-test dev http://localhost:5173 cypress",
     "test:watch": "vitest"
