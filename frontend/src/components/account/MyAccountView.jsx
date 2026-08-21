@@ -103,7 +103,8 @@ function MyAccountView() {
    * "your wagers, transfers, earn, pool, and membership activity will appear here" and so claims
    * every one of those was checked. The classes that failed are named instead (#1280).
    */
-  const partiallyUnread = staleClasses.length > 0
+  const unreadClasses = staleClasses || []
+  const partiallyUnread = unreadClasses.length > 0
   const activityHonestState = () => {
     if (allNetworksFailed) {
       return (
@@ -117,7 +118,7 @@ function MyAccountView() {
       return (
         <EmptyState
           title="Some of your history could not be read"
-          message={`Nothing is shown for ${staleClasses.join(', ')} — those could not be read just now, so an empty history would not be true. Anything else recorded for this account is already here.`}
+          message={`Nothing is shown for ${unreadClasses.join(', ')} — those could not be read just now, so an empty history would not be true. Anything else recorded for this account is already here.`}
         />
       )
     }
@@ -157,7 +158,7 @@ function MyAccountView() {
         <EmptyState
           compact
           title="Some of your history could not be read"
-          message={`Figures exclude ${staleClasses.join(', ')} — those could not be read just now, so they are withheld rather than counted as zero.`}
+          message={`Figures exclude ${unreadClasses.join(', ')} — those could not be read just now, so they are withheld rather than counted as zero.`}
         />
       )
     }
