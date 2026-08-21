@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 131 |
-| 🟢 covered | 114 |
+| 🟢 covered | 115 |
 | 🟡 partial | 5 |
-| 🔴 absent | 6 |
+| 🔴 absent | 5 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 38 · 🟡 4 · 🔴 3 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 39 · 🟡 4 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -261,7 +261,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `account.act-immediately-after-create` | Act on a newly created account without waiting for a deploy | 🔴 absent | none | — (proposed: account-native) | #1240 |  |
+| `account.act-immediately-after-create` | Switch to an acting account and use it immediately, with no ceremony at switch time | 🟢 covered | flow | `no-chain` | `33-account-surfaces.cy.js` (AA-01) |  |
 
 ## Disclosure — a member consents to a cost
 

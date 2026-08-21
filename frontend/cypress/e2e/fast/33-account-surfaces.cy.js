@@ -245,4 +245,84 @@ describe('The account surfaces (specs 074 / 044 / 051 / 047)', () => {
       expect(win.localStorage.getItem(key), 'the member choice was written under their account').to.equal('false')
     })
   })
+
+  it('[AA-01] account.act-immediately-after-create — switching the acting account is instant and address-only', () => {
+    /*
+     * Spec 088 FR-003, and the regression it was written for.
+     *
+     * `operateAsLegacy` / `operateAsHardware` used to hard-require a signer, so merely CHOOSING a
+     * recovered account demanded its passphrase before the member could even look at it. That is
+     * the wrong place for the ceremony twice over: it charges a member for a decision they have
+     * not made yet, and it makes browsing your own accounts feel like authorising something.
+     *
+     * The signature ceremony belongs at the moment a signature is needed — spec 088 moved it to
+     * `SignerRequestHost`, which renders at SEND time. So the claim here is a conjunction: the
+     * switch takes effect, AND nothing was asked for.
+     *
+     * The RECOVERED kind is the one worth driving. A vault is address-only by nature — there is
+     * no secret to unlock — so it could never have demanded a ceremony; the recovered account
+     * holds a passphrase-encrypted key, which is exactly what used to be asked for at switch time.
+     * (A vault would also need on-chain code to list, and this tier answers `eth_getCode` with
+     * `0x` — so including one here would be testing the stub.)
+     *
+     * The store is seeded directly: a recovered-key record is client-side by construction
+     * (spec 062) and authoritative over nothing, so what is under test is the switch, not how the
+     * record got there. The `ct` is deliberately NOT a real ciphertext — nothing in this flow may
+     * try to decrypt it, and if something ever does, this test is where that shows up.
+     */
+    const RECOVERED = '0x2222222222222222222222222222222222222222'
+    const key = (name) => `fw_user_${ACCOUNT.toLowerCase()}_${name}`
+
+    cy.on('window:before:load', (win) => {
+      win.localStorage.setItem(
+        key('legacy_recovered_keys'),
+        JSON.stringify({
+          [RECOVERED.toLowerCase()]: {
+            address: RECOVERED,
+            ct: 'not-a-real-ciphertext',
+            kind: 'privateKey',
+            importedAt: 1,
+          },
+        }),
+      )
+    })
+
+    chainWorld()
+    connect()
+    cy.visit('/wallet?tab=paytransfer')
+    cy.get('[aria-label="Sending account"]', { timeout: 40000 }).should('exist')
+
+    // The recovered account is offered beside the personal wallet.
+    cy.get('[aria-label="Sending account"]').click()
+    cy.get('[role="listbox"][aria-label="Sending accounts"]')
+      .find('[role="option"]')
+      .should('have.length.at.least', 2)
+
+    // Switch to it — the kind that used to demand a passphrase at switch time.
+    cy.get('[role="listbox"][aria-label="Sending accounts"]')
+      .contains('[role="option"]', /Recovered|0x2222/i)
+      .click()
+
+    /*
+     * The switch TOOK EFFECT — asserted first, and positively. Checking for the absence of a
+     * dialog immediately after a click proves nothing: it may simply not have opened yet. Waiting
+     * for the completed switch means a ceremony-at-switch would have had to appear by now.
+     */
+    cy.get('[aria-label="Sending account"]', { timeout: 20000 }).should('contain.text', 'Recovered')
+
+    // …and nothing was asked for. No unlock sheet, no passphrase field, no device prompt.
+    cy.get('[aria-label="Use this account"]').should('not.exist')
+    cy.get('input[aria-label="Passphrase"]').should('not.exist')
+    cy.get('.action-sheet__backdrop').should('not.exist')
+
+    // Switching BACK is equally free — a member browsing their accounts is not authorising anything.
+    cy.get('[aria-label="Sending account"]').click()
+    cy.get('[role="listbox"][aria-label="Sending accounts"]')
+      .find('[role="option"]')
+      .first()
+      .click()
+    cy.get('[aria-label="Sending account"]', { timeout: 20000 }).should('not.contain.text', 'Recovered')
+    cy.get('input[aria-label="Passphrase"]').should('not.exist')
+  })
+
 })

@@ -2226,14 +2226,14 @@
       "flows": [
         {
           "id": "account.act-immediately-after-create",
-          "name": "Act on a newly created account without waiting for a deploy",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "account-native",
-          "depth": "none",
+          "name": "Switch to an acting account and use it immediately, with no ceremony at switch time",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1240"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AA-01"
+          ]
         }
       ]
     },
