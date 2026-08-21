@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 104 |
-| 🟡 partial | 8 |
-| 🔴 absent | 12 |
+| 🟢 covered | 106 |
+| 🟡 partial | 7 |
+| 🔴 absent | 11 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 34 · 🟡 1 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 35 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -444,7 +444,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `verify.three-verdicts` | Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout | 🟢 covered | settled | `no-chain` | `30-verify-message.cy.js` (VF-01, VF-02) |  |
-| `verify.refused-while-operating-as-vault` | Be refused message signing while acting as a vault | 🔴 absent | none | — (proposed: no-chain) | #1274 | the refusal itself is one client-side branch, but reaching it needs a vault, operate-as mode (offered only in TransferForm) and in-app navigation that preserves the memory-only active identity — a test-reachability problem, not a product one |
+| `verify.refused-while-operating-as-vault` | Be refused message signing while acting as a vault | 🟢 covered | flow | `no-chain` | `30-verify-message.cy.js` (VF-03) |  |
 
 ### `093-admin-mini-apps` — Admin mini-apps
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 28 · 🟡 2 · 🔴 2 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 29 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -624,7 +624,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `perps.browse-venues` | Compare perpetuals pairs across venues | 🟢 covered | flow | `no-chain` | `24-perps.cy.js` (PERPS-01, PERPS-02, PERPS-03, PERPS-04, PERPS-05) |  |
-| `perps.degraded-venue-named` | A degraded venue is named and its pairs omitted, never shown as zeros | 🟡 partial | smoke | `no-chain` | `24-perps.cy.js` (PERPS-04) | no assertion proves a missing metric renders as an em dash rather than a zero, which is the invariant the spec turns on |
+| `perps.degraded-venue-named` | A degraded venue is named and its pairs omitted, never shown as zeros | 🟢 covered | flow | `no-chain` | `24-perps.cy.js` (PERPS-01, PERPS-06) |  |
 
 ### `083-perps-position-management` — Perps positions
 

@@ -64,6 +64,24 @@ function stubEscalation(mode) {
   }).as('escalationRpc')
 }
 
+/** A vault the member belongs to, seeded into the client-side reference store (spec 043). */
+const VAULT_ADDRESS = '0x1111111111111111111111111111111111111111'
+
+/**
+ * Seed one vault reference for ACCOUNT before the app boots.
+ *
+ * `vaultReferences` is a client-side record of which vaults a member belongs to — it is not
+ * authoritative over anything on chain, which is exactly why a no-chain test may write it: the
+ * vault's existence is not what is under test, the refusal is.
+ */
+function seedVault() {
+  const key = `fw_user_${ACCOUNT.toLowerCase()}_custody_vault_references`
+  const value = JSON.stringify([
+    { address: VAULT_ADDRESS, chainId: 137, label: 'Test vault', addedAt: 1, role: 'owner' },
+  ])
+  cy.on('window:before:load', (win) => win.localStorage.setItem(key, value))
+}
+
 const openVerify = () => {
   cy.mockWeb3Provider({ account: ACCOUNT, preAuthorized: true })
   cy.visit(CUSTODY_URL)
@@ -145,6 +163,73 @@ describe('Verify a signature (spec 084)', () => {
     cy.get('[data-testid="verify-result"]', { timeout: 30000 })
       .should('have.attr', 'data-status', 'invalid')
       .and('contain.text', 'holds no contract')
+  })
+
+
+  it('[VF-03] verify.refused-while-operating-as-vault — a vault cannot sign, and the button is not offered', () => {
+    /*
+     * Spec 084's hardest refusal, and the reason it is a refusal rather than a failed signature.
+     *
+     * A Safe has no key. If the app signed anyway while the member was operating as a vault, the
+     * signature would be their OWN account's — a true signature under a false label, which is the
+     * one output a proof-of-control surface must never produce. So the control is withheld and the
+     * reason shown in its place, rather than a button that fails on click.
+     *
+     * Reaching this state is the whole difficulty: the active identity is MEMORY-ONLY (spec 043 —
+     * nothing persists an operate-as choice, deliberately), and operate-as is offered only in
+     * Transfer. So the test switches there and then walks to Protect THROUGH THE APP. A cy.visit
+     * would reload, drop the identity, and quietly test the personal-account path instead — which
+     * passes, and proves nothing.
+     */
+    seedVault()
+    cy.mockWeb3Provider({ account: ACCOUNT, preAuthorized: true, networkId: 137 })
+    cy.visit('/wallet?tab=paytransfer')
+
+    // Operate as the vault.
+    cy.get('[aria-label="Sending account"]', { timeout: 40000 }).click()
+    cy.get('[role="listbox"][aria-label="Sending accounts"]').contains('[role="option"]', 'Test vault').click()
+    // The switch took effect — Transfer says so before we leave it, so a failure downstream is
+    // never ambiguous about whether the identity was ever set.
+    cy.contains('Sending creates a proposal', { timeout: 20000 }).should('exist')
+
+    // …and now walk to Protect through the app, without a page load.
+    cy.get('[aria-label="Open menu"], [aria-label="Toggle navigation menu"]', { timeout: 20000 })
+      .first()
+      .click({ force: true })
+    /*
+     * Protect lives in the Tools group, and spec 081 folds every group that is not the active one
+     * — the active section here is Finance, because that is where the vault was selected. A
+     * collapsed section is UNMOUNTED, not hidden, so the item genuinely is not in the DOM until
+     * its heading is opened. Headings are named "<label> section" (a group and one of its items
+     * can share a name).
+     */
+    cy.get('[aria-label="Tools section"]', { timeout: 20000 }).then(($h) => {
+      if ($h.attr('aria-expanded') !== 'true') cy.wrap($h).click({ force: true })
+    })
+    cy.get('[aria-label="Site navigation"]').contains('Protect').click({ force: true })
+    cy.location('search', { timeout: 20000 }).should('contain', 'tab=custody')
+
+    cy.get('#custody-verify-header', { timeout: 40000 }).should('exist').click()
+    cy.get('[data-testid="custody-acc-verify"]').contains('button', /^Sign$/, { timeout: 20000 }).click()
+
+    // The refusal: stated, and specific about why a vault is different.
+    cy.get('form[aria-label="Sign a message"]', { timeout: 20000 })
+      .should('exist')
+      .and('contain.text', 'A vault has no signing key of its own')
+
+    // No signing control is offered at all — not a disabled one, and not one that would fail.
+    cy.get('form[aria-label="Sign a message"]').find('button[type="submit"]').should('not.exist')
+
+    /*
+     * CHECKING is unaffected. The refusal is about producing a proof under an identity that cannot
+     * make one; reading somebody else's proof needs no key and is still available. A blanket
+     * "Verify is unavailable while acting as a vault" would be the over-correction.
+     */
+    // Both forms live in an action sheet, so the Sign one is dismissed before opening Check.
+    cy.get('.action-sheet__close').click()
+    cy.get('.action-sheet__backdrop').should('not.exist')
+    cy.get('[data-testid="custody-acc-verify"]').contains('button', /^Check$/).click()
+    cy.get('#verify-check-message', { timeout: 20000 }).should('be.visible').and('not.be.disabled')
   })
 
 })

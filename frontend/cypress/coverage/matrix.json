@@ -2076,15 +2076,14 @@
         {
           "id": "perps.degraded-venue-named",
           "name": "A degraded venue is named and its pairs omitted, never shown as zeros",
-          "status": "partial",
+          "status": "covered",
           "tier": "no-chain",
-          "depth": "smoke",
+          "depth": "flow",
           "risk": "information",
           "tests": [
-            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-04"
-          ],
-          "missing": "no assertion proves a missing metric renders as an em dash rather than a zero, which is the invariant the spec turns on",
-          "issue": "#1244"
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-01",
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-06"
+          ]
         }
       ]
     },
@@ -2138,14 +2137,13 @@
         {
           "id": "verify.refused-while-operating-as-vault",
           "name": "Be refused message signing while acting as a vault",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "access",
-          "tests": [],
-          "issue": "#1274",
-          "missing": "the refusal itself is one client-side branch, but reaching it needs a vault, operate-as mode (offered only in TransferForm) and in-app navigation that preserves the memory-only active identity — a test-reachability problem, not a product one"
+          "tests": [
+            "frontend/cypress/e2e/fast/30-verify-message.cy.js::VF-03"
+          ]
         }
       ]
     },
