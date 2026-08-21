@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 106 |
+| 🟢 covered | 108 |
 | 🟡 partial | 7 |
-| 🔴 absent | 11 |
+| 🔴 absent | 9 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -265,7 +265,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Disclosure — a member consents to a cost
 
-9 flows — 🟢 6 · 🟡 0 · 🔴 3 · ⚪ 0 · covered-but-not-proven 0
+9 flows — 🟢 7 · 🟡 0 · 🔴 2 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -283,7 +283,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `collect.list-for-sale` | List a collectible for sale and see the fee disclosure | 🔴 absent | none | — (proposed: no-chain) | #1239 |  |
+| `collect.list-for-sale` | List a collectible for sale and see the fee disclosure | 🟢 covered | flow | `no-chain` | `37-predict-and-collect.cy.js` (CO-02) |  |
 
 ### `057-predict-polymarket` — Predict — Polymarket
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 29 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 30 · 🟡 1 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -533,7 +533,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `oracle.graph-unavailable-degrades` | See an honest degraded state when the oracle index is unreachable | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `oracle.graph-unavailable-degrades` | See an honest degraded state when the oracle index is unreachable | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (OG-01) |  |
 
 ### `031-platform-notifications` — Platform notifications
 

@@ -556,13 +556,13 @@
         {
           "id": "oracle.graph-unavailable-degrades",
           "name": "See an honest degraded state when the oracle index is unreachable",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::OG-01"
+          ]
         }
       ]
     },
@@ -1389,13 +1389,13 @@
         {
           "id": "collect.list-for-sale",
           "name": "List a collectible for sale and see the fee disclosure",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "disclosure",
-          "tests": [],
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::CO-02"
+          ]
         }
       ]
     },

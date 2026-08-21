@@ -91,18 +91,67 @@ describe('Activity across chains, and honest capability gating (specs 092 / 051 
    * A test written now would either pass for the wrong reason or fail for one.
    */
 
-  /*
-   * `oracle.graph-unavailable-degrades` (spec 023) BELONGS HERE and is not written yet.
-   *
-   * The rule is good and worth pinning: an oracle with no adapter deployed on the current network
-   * renders as a LOCKED tab carrying its reason ("Chainlink Data Feed adapter isn't deployed on
-   * this network yet", "Requires the Polymarket CTF. Switch to Polygon…") rather than being
-   * hidden or, worse, offered — an offered oracle is a wager that fails at signature.
-   *
-   * Reaching those tabs means opening the create-wager modal on a chain with no adapters
-   * (Ethereum carries the spec-067 routers and no oracles), and the first attempt could not get
-   * the modal open there — the wager entry point is gated differently per network, so the drive
-   * needs establishing before the assertion means anything. Left absent in the matrix with this
-   * note rather than covered by a test that renders nothing and asserts nothing about it.
-   */
+  it('[OG-01] oracle.graph-unavailable-degrades — an oracle that cannot settle here is LOCKED with its reason, not hidden', () => {
+    /*
+     * Spec 023's rule, and the reason it is a rule.
+     *
+     * There are three things the app could do with an oracle whose adapter is not deployed on the
+     * member's chain, and only one of them is honest:
+     *
+     *   - OFFER it. The wager fails at signature, after the member has composed the whole thing.
+     *   - HIDE it. The member cannot tell a settlement source that does not exist from one that
+     *     exists everywhere except here, so they never learn that switching chains would help.
+     *   - LOCK it, and say why. That is what ships.
+     *
+     * Ethereum carries the spec-067 bridge/liquidity routers and NO oracle adapters, and the
+     * Polymarket CTF is Polygon-only — so on chain 1 every oracle settlement source is out of
+     * reach while the participant ones are unaffected. That asymmetry is the test: a locked
+     * oracle beside enabled human settlement proves the lock is about capability, not about the
+     * form being disabled.
+     *
+     * The OFFER flow is what renders the strip. In the oracle-only flow the build's default
+     * exposure (`VITE_ORACLE_MODELS` unset ⇒ Polymarket only) leaves a single settlement type,
+     * and a one-option strip is not rendered at all.
+     */
+    chainWorld()
+    subgraphWorld()
+    connect(1, 'https://ethereum-rpc.publicnode.com')
+    cy.visit('/wallet?tab=paytransfer&view=wagers')
+    waitForAccount()
+
+    cy.contains('Make an Offer', { timeout: 40000 }).click()
+
+    /*
+     * The strip exists and the oracle option is ON it — present, not hidden. It is labelled
+     * "Oracle" rather than "Polymarket": under the build's default exposure Polymarket is the
+     * only oracle model offered, so the strip names the CATEGORY and the locked reason names the
+     * specific venue that is out of reach.
+     */
+    cy.get('.pill-select', { timeout: 40000 }).should('exist')
+    cy.contains('.pill-select-option', 'Oracle', { timeout: 20000 }).as('oracleOption')
+
+    // LOCKED: disabled, marked as such to assistive tech, and carrying its reason.
+    cy.get('@oracleOption')
+      .should('have.class', 'locked')
+      .and('be.disabled')
+      .and('have.attr', 'aria-disabled', 'true')
+      .and('have.attr', 'title')
+      .and('match', /Polymarket CTF|Switch to Polygon/i)
+
+    /*
+     * The reason is available to a screen reader too, not only as a hover title — a member who
+     * cannot hover is exactly the member who cannot discover why the option will not take.
+     */
+    cy.get('@oracleOption')
+      .invoke('attr', 'aria-describedby')
+      .then((id) => {
+        expect(id, 'the locked option points at its reason').to.be.a('string')
+        cy.get(`#${id}`).should('contain.text', 'Polygon')
+      })
+
+    // Human settlement is untouched: the lock is about this oracle's reach, not about the form.
+    cy.get('.pill-select-option:not(.locked)').should('have.length.at.least', 1)
+    cy.get('.pill-select-option:not(.locked)').first().should('not.be.disabled')
+  })
+
 })

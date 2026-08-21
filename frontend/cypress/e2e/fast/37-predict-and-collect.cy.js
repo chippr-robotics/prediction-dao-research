@@ -261,4 +261,113 @@ describe('Predict and Collect (specs 057 / 055 / 056 / 013)', () => {
       ).to.equal(true)
     })
   })
+
+  it('[CO-02] collect.list-for-sale — every fee is itemised and the net proceeds shown BEFORE any signature', () => {
+    /*
+     * Spec 056 FR-002/FR-009/FR-014. Listing is the one Collect flow where the member gives
+     * something up, and the number they actually care about is not the price — it is what lands in
+     * their wallet after OpenSea's cut and the creator royalty. So the confirm step states both:
+     * each required fee as its own line, and the resulting net.
+     *
+     * Two further claims are asserted because both are easy to get wrong in the honest direction:
+     *
+     *   - The FairWins referral reward is disclosed AND stated to cost the seller nothing. It
+     *     genuinely does not — OpenSea pays it out of its own fee — and Collect is the surface
+     *     where that is true. (Predict's builder fee is the opposite case and says so; the two
+     *     sit side by side in this file precisely so neither drifts into the other's wording.)
+     *   - A price that would not survive the fees is refused, not signed. Netting zero is not a
+     *     listing, it is a donation with extra steps.
+     */
+    const ITEM = {
+      chainId: 137,
+      contract: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      identifier: '7',
+      name: 'Test Collectible',
+      collectionSlug: 'test-collection',
+      imageUrl: null,
+      standard: 'erc721',
+      quantity: 1,
+      isFlagged: false,
+      openseaUrl: 'https://opensea.io/assets/matic/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/7',
+    }
+    const ENVELOPE = { fetchedAt: '2026-08-21T12:00:00.000Z', stale: false }
+
+    cy.intercept('GET', '**/v1/opensea/137/account/**/nfts*', {
+      statusCode: 200,
+      body: { items: [ITEM], next: null, ...ENVELOPE },
+    }).as('nfts')
+    cy.intercept('GET', '**/v1/opensea/137/contract/**/nfts/**', {
+      statusCode: 200,
+      body: {
+        item: ITEM,
+        traits: [],
+        collection: { slug: 'test-collection', name: 'Test Collection', floorPrice: null },
+        bestOffer: null,
+        bestOfferHash: null,
+        listing: null,
+        ...ENVELOPE,
+      },
+    }).as('detail')
+    /*
+     * 2.5% marketplace + 5% creator royalty, both REQUIRED. Two lines rather than one total,
+     * because "fees: 7.5%" hides which of them a member could negotiate and which they cannot.
+     */
+    cy.intercept('GET', '**/v1/opensea/137/collections/test-collection/required-fees*', {
+      statusCode: 200,
+      body: {
+        chainId: 137,
+        collectionSlug: 'test-collection',
+        marketplaceFee: { recipient: '0x0000a26b00c1F0DF003000390027140000fAa719', basisPoints: 250 },
+        creatorRoyalty: { recipient: '0xcccccccccccccccccccccccccccccccccccccccc', basisPoints: 500, required: true },
+        fees: [
+          { recipient: '0x0000a26b00c1F0DF003000390027140000fAa719', basisPoints: 250, required: true },
+          { recipient: '0xcccccccccccccccccccccccccccccccccccccccc', basisPoints: 500, required: true },
+        ],
+        totalRequiredBasisPoints: 750,
+        protocolAddress: '0x0000000000000068F116a894984e2DB1123eB395',
+        protocolVersion: '1.6',
+        conduitKey: '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000',
+        conduitAddress: '0x1E0049783F008A0085193E00003D00cd54003c71',
+        ...ENVELOPE,
+      },
+    }).as('fees')
+
+    chainWorld()
+    connect(137, 'https://polygon-bor-rpc.publicnode.com')
+    cy.visit('/wallet?tab=collectibles')
+    waitForAccount()
+
+    cy.contains('.collectible-card-button', 'Test Collectible', { timeout: 40000 }).click()
+    cy.contains('button', /^Sell$/, { timeout: 20000 }).click()
+
+    // Fees are CONFIRMED LIVE before the form is usable — a stale or guessed rate would be a
+    // number the member relies on and we did not check (FR-009).
+    cy.wait('@fees')
+    cy.get('.sell-confirm', { timeout: 20000 }).should('be.visible')
+
+    cy.get('input[aria-label="Listing price"]').clear().type('1')
+
+    // Each required fee as its own line, and the net as its own row.
+    cy.get('.sell-confirm-breakdown dt').should('have.length.at.least', 2)
+    cy.get('[data-testid="sell-net"]').should('be.visible').should(($n) => {
+      const text = $n.text()
+      // 1.0 less 7.5% = 0.925. Asserted as a value, not merely as "something rendered": the whole
+      // point of the row is that it is arithmetic the member can check.
+      expect(text, `net proceeds were computed and shown. Rendered: ${text}`).to.contain('0.925')
+    })
+
+    // The referral is disclosed, and disclosed as free to the seller — which it is.
+    cy.get('.sell-confirm-reward')
+      .should('be.visible')
+      .and('contain.text', 'referral')
+      .and('contain.text', 'costs you nothing')
+
+    // Signing is offered only once there is something to sign for.
+    cy.get('.sell-confirm-submit').should('not.be.disabled')
+
+    // A price the fees would swallow whole is refused rather than signed.
+    cy.get('input[aria-label="Listing price"]').clear().type('0')
+    cy.get('.sell-confirm-submit').should('be.disabled')
+  })
+
 })
