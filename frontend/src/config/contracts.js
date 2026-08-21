@@ -141,7 +141,7 @@ const HARDHAT_CONTRACTS = {
    * commit→reveal, so the on-chain flow needs a registry it can actually write to; a shipped build
    * still resolves this from the per-network maps above (Polygon has one, Mordor does not yet).
    */
-  callsignRegistry: '0xffa7CA1AEEEbBc30C874d32C7e22F052BbEa0429',
+  callsignRegistry: '0x7A9Ec1d04904907De0ED7b6839CcdD59c3716AC9',
   /*
    * THE TWO ENTRIES BELOW ARE NONCE-DERIVED, AND THEIR ORDER IS THE `setup:e2e` ORDER.
    *
