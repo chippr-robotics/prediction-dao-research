@@ -370,4 +370,93 @@ describe('Predict and Collect (specs 057 / 055 / 056 / 013)', () => {
     cy.get('.sell-confirm-submit').should('be.disabled')
   })
 
+
+  it('[CO-03] collect.browse-and-buy — a stocked collection browses, and market data that failed is not "no offers"', () => {
+    /*
+     * The other half of CO-01. That one proves an unreachable gateway is not rendered as an empty
+     * collection; this one proves the collection renders when it IS reachable, and that the same
+     * discipline holds one level down — inside an item, where the numbers are.
+     *
+     * "no offers yet" and "unavailable right now" are the two states a member could be shown for
+     * the same blank space, and they mean opposite things: the first says the market looked and
+     * found nobody, the second says we never got to ask. Someone deciding whether to sell acts on
+     * that difference.
+     */
+    const ITEM = {
+      chainId: 137,
+      contract: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      identifier: '3',
+      name: 'Browsable Collectible',
+      collectionSlug: 'browse-collection',
+      imageUrl: null,
+      standard: 'erc721',
+      quantity: 1,
+      isFlagged: false,
+      openseaUrl: 'https://opensea.io/assets/matic/0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/3',
+    }
+    const ENVELOPE = { fetchedAt: '2026-08-21T12:00:00.000Z', stale: false }
+
+    cy.intercept('GET', '**/v1/opensea/137/account/**/nfts*', {
+      statusCode: 200,
+      body: { items: [ITEM], next: null, ...ENVELOPE },
+    }).as('nfts')
+
+    // A priced market: a floor AND a standing offer, both of which the sheet must show as numbers.
+    cy.intercept('GET', '**/v1/opensea/137/contract/**/nfts/**', {
+      statusCode: 200,
+      body: {
+        item: ITEM,
+        traits: [{ traitType: 'Background', value: 'Teal' }],
+        collection: { slug: 'browse-collection', name: 'Browse Collection', floorPrice: { amount: '1.25', currency: 'WETH' } },
+        bestOffer: { amount: '0.9', currency: 'WETH' },
+        bestOfferHash: '0x' + 'a'.repeat(64),
+        listing: null,
+        ...ENVELOPE,
+      },
+    }).as('detail')
+
+    chainWorld()
+    connect(137, 'https://polygon-bor-rpc.publicnode.com')
+    cy.visit('/wallet?tab=collectibles')
+    waitForAccount()
+
+    // The grid is stocked, and the item is identified by name and collection.
+    cy.contains('.collectible-card-name', 'Browsable Collectible', { timeout: 40000 }).should('be.visible')
+    cy.contains('.collectible-card-button', 'Browsable Collectible').click()
+
+    cy.wait('@detail')
+    cy.get('.collectible-sheet-market', { timeout: 20000 })
+      .should('contain.text', '1.25')
+      .and('contain.text', '0.9')
+    cy.get('.collectible-sheet-traits').should('contain.text', 'Background')
+
+    /*
+     * A standing offer is an amount someone will pay, so accepting it costs gas and deducts fees.
+     * Both are disclosed on the confirm, before the member commits to anything.
+     */
+    cy.contains('button', /accept best offer/i).click()
+    cy.get('[aria-label="Confirm accept offer"]')
+      .should('contain.text', '0.9')
+      .and('contain.text', 'you pay gas')
+      // `.and('match', …)` on an element matches the SELECTOR, not the text — a trap worth not
+      // stepping in twice. Text assertions go through contain.text.
+      .and('contain.text', 'creator royalty')
+    cy.contains('button', /not now/i).click()
+
+    // Now the same item with the detail read REFUSED. The blank must read as unasked, not as empty.
+    cy.intercept('GET', '**/v1/opensea/137/contract/**/nfts/**', {
+      statusCode: 503,
+      body: { error: { code: 'upstream_unavailable' } },
+    }).as('detailDown')
+    cy.reload()
+    cy.contains('.collectible-card-button', 'Browsable Collectible', { timeout: 40000 }).click()
+    cy.wait('@detailDown')
+
+    cy.get('.collectible-sheet-market', { timeout: 20000 }).should(($m) => {
+      const text = $m.text()
+      expect(text, 'a market that could not be read says so').to.match(/unavailable right now/i)
+      expect(text, 'and is never reported as a market with no offers').to.not.match(/no offers yet|no floor price yet/i)
+    })
+  })
+
 })

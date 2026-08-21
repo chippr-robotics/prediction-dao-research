@@ -29,8 +29,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 109 |
-| 🟡 partial | 6 |
+| 🟢 covered | 110 |
+| 🟡 partial | 5 |
 | 🔴 absent | 9 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 36 · 🟡 5 · 🔴 4 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 37 · 🟡 4 · 🔴 4 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -176,7 +176,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `collect.browse-and-buy` | Browse collectibles and buy one | 🟡 partial | smoke | `no-chain` | `37-predict-and-collect.cy.js` (CO-01) | covers the soft-fail: an unreachable OpenSea gateway is not rendered as an empty collection. Browsing a stocked collection and the buy path are not driven. |
+| `collect.browse-and-buy` | Browse collectibles and buy one | 🟢 covered | flow | `no-chain` | `37-predict-and-collect.cy.js` (CO-01, CO-03) |  |
 
 ### `057-predict-polymarket` — Predict — Polymarket
 

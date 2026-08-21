@@ -1370,15 +1370,14 @@
         {
           "id": "collect.browse-and-buy",
           "name": "Browse collectibles and buy one",
-          "status": "partial",
+          "status": "covered",
           "tier": "no-chain",
-          "depth": "smoke",
+          "depth": "flow",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::CO-01"
-          ],
-          "missing": "covers the soft-fail: an unreachable OpenSea gateway is not rendered as an empty collection. Browsing a stocked collection and the buy path are not driven.",
-          "issue": "#1239"
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::CO-01",
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::CO-03"
+          ]
         }
       ]
     },
