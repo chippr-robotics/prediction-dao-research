@@ -581,6 +581,15 @@ export default defineConfig({
               const reg3 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
               return { ok: true, frozen: await reg3.isFrozen(args.address) }
             }
+            /*
+             * The registry's pause flag, READ. `pause`/`unpause` above are writes that no-op when
+             * already in the wanted state, so neither can witness a pause the UI performed — which
+             * is the whole assertion of the single-chain-write flow (#1242).
+             */
+            case 'registryPaused': {
+              const reg4 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
+              return { ok: true, paused: await reg4.paused() }
+            }
             case 'autoResolve':
               tx = await registry.autoResolveFromPolymarket(args.wagerId); break
             case 'prepareCondition': {

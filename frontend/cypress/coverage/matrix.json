@@ -1848,27 +1848,24 @@
         {
           "id": "admin.estate-reads-three-state",
           "name": "An operator reads the estate and sees not-deployed and unreadable distinguished from zero",
-          "status": "partial",
-          "tier": "on-chain",
-          "depth": "smoke",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-01",
-            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-02"
-          ],
-          "missing": "the two admin tests check the panel renders; no test asserts the three-state reads, and none proves an unreachable chain is not rendered as a zero",
-          "issue": "#1242"
+            "frontend/cypress/e2e/fast/32-admin-console.cy.js::AD-04"
+          ]
         },
         {
           "id": "admin.single-chain-write",
           "name": "An operator writes to one named chain with authority read from that chain",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1242"
+          "tests": [
+            "frontend/cypress/e2e/full/35-admin-single-chain-write.cy.js::AD-06"
+          ]
         }
       ]
     },
@@ -2269,24 +2266,29 @@
         {
           "id": "admin.control-room-gating",
           "name": "An operator sees granted, denied, or could-not-verify — never a silent denial",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1242"
+          "tests": [
+            "frontend/cypress/e2e/fast/32-admin-console.cy.js::AD-01",
+            "frontend/cypress/e2e/fast/32-admin-console.cy.js::AD-02",
+            "frontend/cypress/e2e/fast/32-admin-console.cy.js::AD-03",
+            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-01",
+            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-02"
+          ],
+          "note": "the three-way distinction is settled in the no-chain tier; ADM-01/ADM-02 keep the granted and denied arms exercised against a real chain"
         },
         {
           "id": "admin.maintenance-permissionless",
           "name": "Any entrant reaches Maintenance without elevated status",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1242"
+          "tests": [
+            "frontend/cypress/e2e/fast/32-admin-console.cy.js::AD-05"
+          ]
         }
       ]
     },

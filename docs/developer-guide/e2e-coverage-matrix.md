@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 87 |
-| 🟡 partial | 8 |
-| 🔴 absent | 29 |
+| 🟢 covered | 91 |
+| 🟡 partial | 7 |
+| 🔴 absent | 26 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 29 · 🟡 1 · 🔴 8 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 33 · 🟡 0 · 🔴 5 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -422,8 +422,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `admin.estate-reads-three-state` | An operator reads the estate and sees not-deployed and unreadable distinguished from zero | 🟡 partial | smoke | `on-chain` | `15-admin-panel.cy.js` (ADM-01, ADM-02) | the two admin tests check the panel renders; no test asserts the three-state reads, and none proves an unreachable chain is not rendered as a zero |
-| `admin.single-chain-write` | An operator writes to one named chain with authority read from that chain | 🔴 absent | none | — (proposed: on-chain) | #1242 |  |
+| `admin.estate-reads-three-state` | An operator reads the estate and sees not-deployed and unreadable distinguished from zero | 🟢 covered | settled | `no-chain` | `32-admin-console.cy.js` (AD-04) |  |
+| `admin.single-chain-write` | An operator writes to one named chain with authority read from that chain | 🟢 covered | settled | `on-chain` | `35-admin-single-chain-write.cy.js` (AD-06) |  |
 
 ### `072-white-label-tenants` — White-label tenants
 
@@ -450,8 +450,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `admin.control-room-gating` | An operator sees granted, denied, or could-not-verify — never a silent denial | 🔴 absent | none | — (proposed: on-chain) | #1242 |  |
-| `admin.maintenance-permissionless` | Any entrant reaches Maintenance without elevated status | 🔴 absent | none | — (proposed: no-chain) | #1242 |  |
+| `admin.control-room-gating` | An operator sees granted, denied, or could-not-verify — never a silent denial | 🟢 covered | settled | `no-chain` | `32-admin-console.cy.js` (AD-01, AD-02, AD-03); `15-admin-panel.cy.js` (ADM-01, ADM-02) |  |
+| `admin.maintenance-permissionless` | Any entrant reaches Maintenance without elevated status | 🟢 covered | settled | `no-chain` | `32-admin-console.cy.js` (AD-05) |  |
 
 ## Information — read-only surfaces
 
