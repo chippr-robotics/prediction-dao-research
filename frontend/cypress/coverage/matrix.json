@@ -1058,13 +1058,14 @@
         {
           "id": "portfolio.see-holdings",
           "name": "See what the connected account holds across supported assets",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-02",
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-03"
+          ]
         }
       ]
     },
@@ -1134,13 +1135,13 @@
         {
           "id": "privacy.mask-balances",
           "name": "Hide balances on screen when someone is looking over your shoulder",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-05"
+          ]
         }
       ]
     },
@@ -1238,13 +1239,13 @@
         {
           "id": "activity.see-unified-history",
           "name": "See one history across wagers, transfers and membership",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-04"
+          ]
         }
       ]
     },
@@ -1946,13 +1947,13 @@
         {
           "id": "account.unified-panel",
           "name": "Reach preferences, membership and network from one account panel",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AC-01"
+          ]
         }
       ]
     },

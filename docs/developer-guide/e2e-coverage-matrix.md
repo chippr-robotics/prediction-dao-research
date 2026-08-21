@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 89 |
+| 🟢 covered | 93 |
 | 🟡 partial | 6 |
-| 🔴 absent | 29 |
+| 🔴 absent | 25 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 17 · 🟡 1 · 🔴 14 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 21 · 🟡 1 · 🔴 10 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -563,19 +563,19 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `portfolio.see-holdings` | See what the connected account holds across supported assets | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `portfolio.see-holdings` | See what the connected account holds across supported assets | 🟢 covered | settled | `no-chain` | `33-account-surfaces.cy.js` (AC-02, AC-03) |  |
 
 ### `047-mask-sensitive-values` — Mask sensitive values
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `privacy.mask-balances` | Hide balances on screen when someone is looking over your shoulder | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `privacy.mask-balances` | Hide balances on screen when someone is looking over your shoulder | 🟢 covered | settled | `no-chain` | `33-account-surfaces.cy.js` (AC-05) |  |
 
 ### `051-unified-activity-ledger` — Activity ledger
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `activity.see-unified-history` | See one history across wagers, transfers and membership | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `activity.see-unified-history` | See one history across wagers, transfers and membership | 🟢 covered | flow | `no-chain` | `33-account-surfaces.cy.js` (AC-04) |  |
 
 ### `059-notification-profiles` — Notification profiles
 
@@ -599,7 +599,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `account.unified-panel` | Reach preferences, membership and network from one account panel | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `account.unified-panel` | Reach preferences, membership and network from one account panel | 🟢 covered | settled | `no-chain` | `33-account-surfaces.cy.js` (AC-01) |  |
 
 ### `077-miniapp-store-redesign` — Mini-app store
 
