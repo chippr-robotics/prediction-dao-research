@@ -61,6 +61,45 @@ function connect() {
   })
 }
 
+/**
+ * Switch account view through whichever switcher THIS viewport ships.
+ *
+ * Spec 074 puts the same three views behind two controls: the desktop tab strip
+ * (`.my-account-tabs`, hidden ≤768px in CSS) and WalletPage's bottom icon bar
+ * (`SectionIconNav`, which returns null above 768px). Exactly one is visible at
+ * any width, so a test that reaches for `[role="tab"]` unconditionally is a
+ * desktop-only test wearing a viewport-agnostic name — it passes at 1280 and
+ * clicks a `display:none` element at 390.
+ *
+ * Each switcher states the selection in its own idiom, and each is asserted in
+ * its own: `aria-selected` on a tab, `aria-current="page"` on the icon bar.
+ */
+function accountSwitcher() {
+  return cy.get('body').then(($body) => {
+    const strip = $body.find('[role="tablist"][aria-label="Account views"]:visible')
+    return strip.length ? 'tabs' : 'icons'
+  })
+}
+
+function selectAccountView(label) {
+  accountSwitcher().then((kind) => {
+    if (kind === 'tabs') cy.contains('[role="tab"]', label).click()
+    else cy.get('nav[aria-label="Account views"]').contains('button', label).click()
+  })
+}
+
+function expectAccountViewSelected(label) {
+  accountSwitcher().then((kind) => {
+    if (kind === 'tabs') {
+      cy.contains('[role="tab"]', label).should('have.attr', 'aria-selected', 'true')
+    } else {
+      cy.get('nav[aria-label="Account views"]')
+        .contains('button', label)
+        .should('have.attr', 'aria-current', 'page')
+    }
+  })
+}
+
 describe('The account surfaces (specs 074 / 044 / 051 / 047)', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
@@ -76,25 +115,34 @@ describe('The account surfaces (specs 074 / 044 / 051 / 047)', () => {
     connect()
     cy.visit(ACCOUNT_URL)
 
-    cy.get('[role="tablist"][aria-label="Account views"]', { timeout: 40000 }).should('exist')
-    cy.get('[role="tab"]').should('have.length.at.least', 3)
+    cy.get('[role="tabpanel"][aria-label="Portfolio"]', { timeout: 40000 }).should('exist')
 
-    // The default view is Portfolio, and it is the one selected — not merely the one rendered.
-    cy.get('[role="tabpanel"][aria-label="Portfolio"]').should('exist')
-    cy.contains('[role="tab"]', 'Portfolio').should('have.attr', 'aria-selected', 'true')
+    /*
+     * EXACTLY ONE switcher is offered, whatever the width. Two would give the member a second
+     * copy of the same selection to disagree with; none would strand them on whichever view the
+     * URL happened to name.
+     */
+    cy.get('body').then(($body) => {
+      const tabs = $body.find('[role="tablist"][aria-label="Account views"]:visible').length
+      const icons = $body.find('nav[aria-label="Account views"]:visible').length
+      expect(tabs + icons, 'one — and only one — account view switcher is visible').to.equal(1)
+    })
 
-    cy.contains('[role="tab"]', 'Activity').click()
+    // The default view is Portfolio, and it is the one SELECTED — not merely the one rendered.
+    expectAccountViewSelected('Portfolio')
+
+    selectAccountView('Activity')
     cy.get('[role="tabpanel"][aria-label="Activity"]').should('exist')
-    cy.contains('[role="tab"]', 'Activity').should('have.attr', 'aria-selected', 'true')
+    expectAccountViewSelected('Activity')
     cy.location('search').should('contain', 'view=activity')
 
-    cy.contains('[role="tab"]', 'Stats').click()
+    selectAccountView('Stats')
     cy.get('[role="tabpanel"][aria-label="Stats"]').should('exist')
 
     // Addressable: arriving directly on a view lands on it, not on the default.
     cy.visit('/wallet?tab=account&view=activity')
     cy.get('[role="tabpanel"][aria-label="Activity"]', { timeout: 40000 }).should('exist')
-    cy.contains('[role="tab"]', 'Activity').should('have.attr', 'aria-selected', 'true')
+    expectAccountViewSelected('Activity')
   })
 
   it('[AC-02] portfolio.see-holdings — the portfolio renders for a connected account', () => {
