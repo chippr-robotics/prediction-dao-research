@@ -996,6 +996,53 @@ export default defineConfig({
           }
         },
 
+
+        /**
+         * A mini-app catalog, ABI-ENCODED — the no-chain tier's registry.
+         *
+         * Browsing a catalogue is reading, filtering and pinning: nothing signs, nothing settles,
+         * and nothing about it needs a chain. The e2e admission rule is explicit that a flow
+         * validatable without a chain must NOT live in the on-chain tier, so this one runs in the
+         * fast tier and the registry read is answered from here.
+         *
+         * The encoding is done with the REAL ABI fragment the app reads through
+         * (`frontend/src/abis/miniAppRegistry.js`), on the Node side, so the spec never
+         * hand-assembles a tuple: a field added to `AppView` changes what this returns rather than
+         * producing plausible garbage that decodes into the wrong columns.
+         *
+         * Answers are keyed by SELECTOR so a spec can dispatch on `params[0].data.slice(0, 10)`
+         * without knowing how either call is encoded.
+         */
+        miniappCatalogWorld({ apps = [] } = {}) {
+          const iface = new ethers.Interface([
+            'function appCount() view returns (uint256)',
+            'function getAppsPaged(uint256 offset, uint256 limit) view returns ((uint256 id, address vendor, string name, string description, uint8 category, uint8 status, bool launchable, (string cid, bytes32 manifestHash, uint64 version) approved, (string cid, bytes32 manifestHash, uint64 version) proposed, uint64 submittedAt, uint64 approvedAt, uint64 updatedAt)[] apps)',
+          ])
+          const now = Math.floor(Date.UTC(2026, 0, 1) / 1000) // fixed: nothing here may depend on the clock
+          const rows = apps.map((a, i) => [
+            BigInt(a.id ?? i + 1),
+            a.vendor ?? '0x00000000000000000000000000000000000000a1',
+            a.name,
+            a.description ?? `${a.name} — a curated mini-app.`,
+            a.category ?? 0,
+            a.status ?? 1, // Approved
+            a.launchable ?? true,
+            [a.cid ?? `bafybei${'x'.repeat(45)}`, a.manifestHash ?? `0x${'11'.repeat(32)}`, BigInt(a.version ?? 1)],
+            ['', `0x${'00'.repeat(32)}`, 0n],
+            BigInt(now),
+            BigInt(now),
+            BigInt(now),
+          ])
+          return {
+            ok: true,
+            count: rows.length,
+            answers: {
+              [iface.getFunction('appCount').selector]: iface.encodeFunctionResult('appCount', [rows.length]),
+              [iface.getFunction('getAppsPaged').selector]: iface.encodeFunctionResult('getAppsPaged', [rows]),
+            },
+          }
+        },
+
         /**
          * A REAL first-party mini-app package (Token Mint, spec 028 / ClearPath, spec 030),
          * read from what `npm run publish:local:miniapps` staged.

@@ -1968,13 +1968,16 @@
         {
           "id": "miniapp.browse-catalog",
           "name": "Browse the app catalogue and pin an app to quick access",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1238"
+          "tests": [
+            "frontend/cypress/e2e/fast/29-miniapp-catalog.cy.js::MC-01",
+            "frontend/cypress/e2e/fast/29-miniapp-catalog.cy.js::MC-02",
+            "frontend/cypress/e2e/fast/29-miniapp-catalog.cy.js::MC-03"
+          ]
         }
       ]
     },

@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 74 |
+| 🟢 covered | 75 |
 | 🟡 partial | 8 |
-| 🔴 absent | 42 |
+| 🔴 absent | 41 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 16 · 🟡 1 · 🔴 15 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 17 · 🟡 1 · 🔴 14 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -605,7 +605,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.browse-catalog` | Browse the app catalogue and pin an app to quick access | 🔴 absent | none | — (proposed: no-chain) | #1238 |  |
+| `miniapp.browse-catalog` | Browse the app catalogue and pin an app to quick access | 🟢 covered | settled | `no-chain` | `29-miniapp-catalog.cy.js` (MC-01, MC-02, MC-03) |  |
 
 ### `078-my-wagers-single-table-view` — My Wagers single table
 
