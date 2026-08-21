@@ -94,12 +94,30 @@ function MyAccountView() {
   // could not be read is disclosed by name instead (`partialChains`), and an
   // all-chains failure surfaces the hook's error with last-known data kept.
   const allNetworksFailed = Boolean(error) && partialChains.length > 0 && activity.length === 0
+  /*
+   * An empty feed is only "no activity" if everything that feeds it answered.
+   *
+   * The ledger gathers its sources per chain with `allSettled`, so a member whose on-chain reads
+   * all failed while their device-local sources answered "nothing" lands here with zero entries
+   * and a populated `staleClasses` — and used to be shown the clean empty state, which says
+   * "your wagers, transfers, earn, pool, and membership activity will appear here" and so claims
+   * every one of those was checked. The classes that failed are named instead (#1280).
+   */
+  const partiallyUnread = staleClasses.length > 0
   const activityHonestState = () => {
     if (allNetworksFailed) {
       return (
         <EmptyState
           title="Your networks could not be read"
           message={`None of your networks answered: ${partialChains.join(', ')}. Nothing is shown rather than an empty history that isn't true.`}
+        />
+      )
+    }
+    if (isEmpty && partiallyUnread) {
+      return (
+        <EmptyState
+          title="Some of your history could not be read"
+          message={`Nothing is shown for ${staleClasses.join(', ')} — those could not be read just now, so an empty history would not be true. Anything else recorded for this account is already here.`}
         />
       )
     }
@@ -131,6 +149,15 @@ function MyAccountView() {
           compact
           title="Your networks could not be read"
           message={`None of your networks answered: ${partialChains.join(', ')}. Figures are withheld rather than shown as zeros.`}
+        />
+      )
+    }
+    if (isEmpty && partiallyUnread) {
+      return (
+        <EmptyState
+          compact
+          title="Some of your history could not be read"
+          message={`Figures exclude ${staleClasses.join(', ')} — those could not be read just now, so they are withheld rather than counted as zero.`}
         />
       )
     }

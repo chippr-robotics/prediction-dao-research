@@ -9,11 +9,20 @@
 // =============================================================================
 
 const ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
-const RPC_HOSTS = /publicnode\.com$|rivet\.link$|etcdesktop\.com$|polygon\.technology$/
+/*
+ * EVERY remote JSON-RPC, not a list of the hosts this build happens to use today.
+ *
+ * The cohort spans six networks whose endpoints live on four different providers, and the ledger
+ * reads each of them. A host allow-list leaves the ones it forgot genuinely unreachable, which
+ * makes the 'answer' world a PARTIAL read — and a test asserting a clean empty state against it
+ * is asserting that the app over-claims. Matching every https POST is what makes "answer" mean
+ * answered. The gateway stubs elsewhere ride on http://localhost and are unaffected.
+ */
+const REMOTE_RPC = /^https:\/\//
 
 /** @param {'answer'|'refuse'} mode */
 function chainWorld(mode = 'answer') {
-  cy.intercept({ method: 'POST', hostname: RPC_HOSTS }, (req) => {
+  cy.intercept({ method: 'POST', url: REMOTE_RPC }, (req) => {
     if (mode === 'refuse') {
       req.reply({ statusCode: 503, body: 'chain unavailable' })
       return
@@ -77,19 +86,51 @@ describe('Activity across chains, and honest capability gating (specs 092 / 051 
     })
   })
 
-  /*
-   * A THIRD TEST BELONGS HERE and is deliberately not written yet.
-   *
-   * Under a TOTAL RPC refusal this panel renders "No activity yet — your wagers, transfers …
-   * will appear here", with the freshness indicator reading "Updated 50s ago". `useAccountStats`
-   * has exactly the right branch for this (`allUnreachable` → "None of your networks answered:
-   * … Nothing is shown rather than an empty history that isn't true"), so either the ledger does
-   * not classify a refused chain as unreachable, or that branch is unreachable in practice.
-   *
-   * Which of those it is decides whether this is a product bug or a stub that did not model the
-   * failure, and that is not established yet — so it is filed (#1280) rather than asserted here.
-   * A test written now would either pass for the wrong reason or fail for one.
-   */
+  it('[MC-02] activity.multi-chain-history — a ledger that could not be read never renders as "no activity"', () => {
+    /*
+     * #1280, and the reason it was filed rather than asserted at the time.
+     *
+     * Under a total RPC refusal this panel used to render "No activity yet — your wagers,
+     * transfers … will appear here", with the freshness indicator reading "Updated 50s ago".
+     * `useAccountStats` had exactly the right branch for it (`allUnreachable` → "None of your
+     * networks answered"), so the open question was whether the ledger failed to classify a
+     * refused chain as unreachable, or whether that branch was unreachable in practice.
+     *
+     * It was the first, and the cause was one layer further down. `listEntries` gathers its
+     * sources with `allSettled` so ONE bad source degrades to stale rather than taking the whole
+     * ledger down — which is right — but it means a chain whose sources ALL failed returned
+     * exactly what a chain with no history returns: an empty array. The estate ledger recorded
+     * that as a successful read of zero entries, `every(state === 'unreachable')` was never true,
+     * and the honest branch could not fire.
+     *
+     * The distinction is now made where it is knowable (`readState`), and one layer above it too.
+     * Under a refused RPC the device-local sources still answer — with nothing — so the chain is
+     * not wholly unreadable and `allUnreachable` correctly does not fire. What was wrong was the
+     * empty state it fell through to: "No activity yet — your wagers, transfers, earn, pool and
+     * membership activity will appear here" claims all of those were checked. The classes that
+     * failed are now named instead.
+     */
+    chainWorld('refuse')
+    subgraphWorld('refuse')
+    connect()
+    cy.visit('/wallet?tab=account&view=activity')
+    waitForAccount()
+
+    cy.get('[role="tabpanel"][aria-label="Activity"]', { timeout: 40000 }).should('exist')
+    cy.get('[role="tabpanel"][aria-label="Activity"]', { timeout: 40000 }).should(($p) => {
+      const text = $p.text()
+      /*
+       * The two sentences are opposite claims about the same account, and only one of them is
+       * supported by anything. "No activity yet" is a statement about the member's history;
+       * "your networks could not be read" is a statement about our own reach.
+       */
+      expect(text, 'the failure is disclosed').to.match(/could not be read|None of your networks/i)
+      expect(text, 'and an absence is not asserted in its place').to.not.match(/No activity yet/i)
+      // The disclosure NAMES what is missing. "Something went wrong" leaves the member unable to
+      // tell whether the gap is their whole history or one corner of it.
+      expect(text, 'the unread classes are named').to.match(/wager|transfer|earn|pool|membership/i)
+    })
+  })
 
   it('[OG-01] oracle.graph-unavailable-degrades — an oracle that cannot settle here is LOCKED with its reason, not hidden', () => {
     /*

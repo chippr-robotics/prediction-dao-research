@@ -2253,15 +2253,14 @@
         {
           "id": "activity.multi-chain-history",
           "name": "See activity across chains, with an unreadable chain named rather than empty",
-          "status": "partial",
+          "status": "covered",
           "tier": "no-chain",
           "depth": "flow",
           "risk": "information",
           "tests": [
-            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::MC-01"
-          ],
-          "issue": "#1280",
-          "missing": "the empty-state honesty is covered; the all-networks-unreachable disclosure is NOT — under a total RPC refusal the panel renders \"No activity yet\" and \"Updated 50s ago\" (#1280), and whether that is a product bug or an unmodelled stub is unresolved. The per-network filter renders over entries, so it needs seeded history."
+            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::MC-01",
+            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::MC-02"
+          ]
         }
       ]
     },

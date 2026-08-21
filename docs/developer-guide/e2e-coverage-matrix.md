@@ -29,8 +29,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 108 |
-| 🟡 partial | 7 |
+| 🟢 covered | 109 |
+| 🟡 partial | 6 |
 | 🔴 absent | 9 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 30 · 🟡 1 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 31 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -642,7 +642,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟡 partial | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01) | the empty-state honesty is covered; the all-networks-unreachable disclosure is NOT — under a total RPC refusal the panel renders "No activity yet" and "Updated 50s ago" (#1280), and whether that is a product bug or an unmodelled stub is unresolved. The per-network filter renders over entries, so it needs seeded history. |
+| `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01, MC-02) |  |
 
 ## No member-facing flow
 
