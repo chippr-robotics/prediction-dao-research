@@ -116,29 +116,50 @@ export function removeAuthenticator(authenticatorId) {
  * which they mean.
  */
 export function choosePasskey({ mode = 'sign-up' } = {}) {
-  cy.contains(/^passkey$/i).click()
-  // Spec 045 FR-010: shown once per browser, so a returning browser goes straight to the chooser.
-  cy.get('body').then(($body) => {
-    if ($body.find('.passkey-explainer').length > 0) {
-      cy.contains('button', /continue with passkey/i).click()
-    }
+  /*
+   * A returning member does not see the method list at all: with a known passkey in the book the
+   * connect surface opens straight on the chooser ("Unlock your account"). So the method click and
+   * the explainer are both conditional on actually being offered — not defensive hedging, but the
+   * three shapes this surface genuinely has: methods → explainer → chooser (first time), methods →
+   * chooser (explainer already seen), chooser alone (returning).
+   */
+  // WAIT FOR THE SURFACE BEFORE BRANCHING ON IT. A synchronous probe of `body` taken while the
+  // modal is still opening sees neither shape, falls to the method click, and burns that
+  // command's full retry budget before the DOM catches up — 10 of the 16 seconds this test once
+  // charged to the product, whose sign-in actually takes about 600ms.
+  cy.get('.connect-modal', { timeout: 20000 }).should('exist')
+  cy.get('.connect-modal').then(($modal) => {
+    if ($modal.find('[data-testid="passkey-picker"]').length > 0) return
+    cy.contains(/^passkey$/i).click()
+    cy.get('.connect-modal').then(($afterMethod) => {
+      if ($afterMethod.find('.passkey-explainer').length > 0) {
+        cy.contains('button', /continue with passkey/i).click()
+      }
+    })
   })
   /*
    * The chooser. A browser that already knows this passkey lists it; one that knows nothing
    * offers the two honest options, because the site cannot tell a brand-new member from one whose
    * passkey synced to this device — only the authenticator can.
    */
-  cy.get('[data-testid="passkey-picker"]', { timeout: 20000 }).should('exist')
-  cy.get('[data-testid="passkey-picker"]').then(($picker) => {
-    const rows = $picker.find('.connect-modal__account-row button.connect-modal__option')
-    if (mode === 'sign-up') {
-      cy.contains('button', /create a new account/i).click()
-    } else if (rows.length > 0) {
-      cy.wrap(rows.first()).click()
-    } else {
-      cy.contains('button', /i already have a passkey|use a different passkey/i).click()
-    }
-  })
+  const PICKER = '[data-testid="passkey-picker"]'
+  const ROW = `${PICKER} .connect-modal__account-row button.connect-modal__option`
+  cy.get(PICKER, { timeout: 20000 }).should('exist')
+  if (mode === 'sign-up') {
+    cy.contains('button', /create a new account/i).click()
+    return
+  }
+  /*
+   * Branch on the COUNT, then re-query before clicking. Capturing the row element inside a
+   * `.then` and clicking the captured node clicks a stale reference the moment React re-renders
+   * between the snapshot and the click — the click reports success and nothing happens.
+   */
+  cy.get('body')
+    .then(($body) => $body.find(ROW).length)
+    .then((rows) => {
+      if (rows > 0) cy.get(ROW).first().click()
+      else cy.contains('button', /i already have a passkey|use a different passkey/i).click()
+    })
 }
 
 /**
@@ -207,6 +228,8 @@ export function connectedAddress() {
 /** Assert a passkey ceremony landed a connected account (the connect surface is gone). */
 export function expectConnected() {
   cy.get('[aria-label="Wallet Account"]', { timeout: 20000 }).should('exist')
-  cy.get('[aria-label="Connect Wallet"]').should('not.exist')
+  // Returned so callers can chain — a helper that ends a chain silently is how a `.then` on it
+  // becomes `undefined.then`.
+  return cy.get('[aria-label="Connect Wallet"]').should('not.exist')
 }
 

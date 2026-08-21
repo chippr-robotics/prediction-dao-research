@@ -195,6 +195,49 @@ describe('connect', () => {
     expect(deps.getAssertion).not.toHaveBeenCalled()
   })
 
+  /*
+   * THE REGRESSION THAT COST EVERY PASSKEY MEMBER THEIR SESSION ON RELOAD.
+   *
+   * wagmi's `reconnect` filters connectors before it asks whether they are authorized:
+   *
+   *     const provider = await connector.getProvider().catch(() => undefined)
+   *     if (!provider) continue
+   *
+   * `getProvider()` returned null, so the passkey connector was skipped every time and the
+   * reconnect below — which has always passed — was never reached in a real browser. The unit
+   * test proving the restore works is exactly what made the breakage invisible, so this asserts
+   * the precondition wagmi actually applies.
+   */
+  it('exposes a provider at all, because wagmi skips connectors without one', async () => {
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    expect(provider, 'a null provider makes reconnect unreachable').toBeTruthy()
+  })
+
+  it('keeps provider identity stable — wagmi dedupes providers by reference', async () => {
+    const { connector } = makeConnector()
+    expect(await connector.getProvider()).toBe(await connector.getProvider())
+  })
+
+  it('refuses to sign from the facade: this connector holds no key', async () => {
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    await expect(provider.request({ method: 'eth_sendTransaction', params: [{}] })).rejects.toThrow(
+      /submission router/,
+    )
+    await expect(provider.request({ method: 'personal_sign', params: [] })).rejects.toThrow(
+      /submission router/,
+    )
+  })
+
+  it('answers eth_accounts from the session, so the facade agrees with the connector', async () => {
+    rememberCompleteRecord()
+    writeSession({ address: ACCOUNT, chainId: 80002, credentialId: 'cred-1', loginMethod: 'passkey' })
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    expect(await provider.request({ method: 'eth_accounts' })).toEqual(await connector.getAccounts())
+  })
+
   it('reconnect with no stored session fails (no silent account invention)', async () => {
     const { connector } = makeConnector()
     await expect(connector.connect({ chainId: 80002, isReconnecting: true })).rejects.toThrow(/No passkey session/)

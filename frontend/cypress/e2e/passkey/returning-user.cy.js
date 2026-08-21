@@ -34,6 +34,16 @@ import {
   })
 
   it('[RU-01] same device: reload restores silently; sign-in after sign-out is ONE prompt within budget (SC-005)', () => {
+    /*
+     * CLOSE THE NETWORK BOUNDARY. This is a no-chain-tier spec, and SC-005 is a budget on the
+     * app's sign-in path — left open, the stopwatch measures the runner's internet latency to a
+     * public RPC host instead, which is neither the product's fault nor its achievement. Failing
+     * fast is deliberate: sign-in for a member whose record is already complete needs no chain,
+     * so a refused read must not change the outcome — and if it ever does, this test says so.
+     */
+    cy.intercept({ method: 'POST', hostname: /publicnode\.com$|rivet\.link$|etcdesktop\.com$/ }, (req) =>
+      req.reply({ statusCode: 503, body: 'no chain in the no-chain tier' }),
+    )
     addAuthenticator()
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
@@ -62,19 +72,36 @@ import {
     cy.get('.usdc-balance', { timeout: 20000 }).should('not.contain.text', 'Loading')
     cy.get('[aria-label="Disconnect wallet"]').click()
     cy.contains('button', /connect wallet/i).should('exist')
-    const start = Date.now()
+    /*
+     * STAMP THE START INSIDE THE QUEUE.
+     *
+     * `const start = Date.now()` in the test body runs when Cypress EVALUATES the body — before a
+     * single command has executed — so the budget below was charged the whole test: the visit, the
+     * first ceremony, the reload, the menu, the sign-out. It read ~16s against a 10s budget for a
+     * sign-in that takes about 700ms. The original test had this from the day it was written and
+     * could not report it, because the tier never ran it.
+     */
+    let start = 0
+    cy.then(() => {
+      start = Date.now()
+    })
     cy.contains('button', /connect wallet/i).click()
     // Second sign-in in the SAME browser: the explainer is once-only and the book now knows this
     // passkey, so the chooser lists it and signing in is one click.
     choosePasskey({ mode: 'sign-in' })
-    cy.get('@address').then((address) => {
-      expectConnected()
-      connectedAddress()
-        .should('equal', address)
-        .then(() => {
-          expect(Date.now() - start, 'sign-in wall clock (SC-005)').to.be.lessThan(10000)
-        })
+    /*
+     * STOP THE CLOCK WHEN THE MEMBER IS SIGNED IN, not when the test has finished inspecting.
+     *
+     * SC-005 budgets the member-visible sign-in: press connect, one prompt, you are in. Opening
+     * the account menu and reading an address out of it is how this test establishes identity —
+     * it is not part of signing in, and timing it charged Cypress's own retries to the product.
+     */
+    expectConnected().then(() => {
+      expect(Date.now() - start, 'sign-in wall clock (SC-005)').to.be.lessThan(10000)
     })
+
+    // Same account as before the sign-out — asserted, but outside the timed window.
+    cy.get('@address').then((address) => connectedAddress().should('equal', address))
   })
 
   it('[RU-02] synced device: the same credential on a second authenticator reaches the SAME account', () => {
