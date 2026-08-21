@@ -1,6 +1,6 @@
 import { defineConfig } from 'cypress'
 import { ethers } from 'ethers'
-import { existsSync, readFileSync, unlinkSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, unlinkSync } from 'fs'
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
@@ -1073,6 +1073,91 @@ export default defineConfig({
           }
         },
 
+
+
+        /**
+         * The tenant manifests, read from disk (spec 072).
+         *
+         * `tenants/<id>/manifest.json` is the single source of truth for a tenant's identity, and
+         * the flow's claim is that the RENDERED brand comes from it. Comparing the page against
+         * values hardcoded in a spec would only prove the spec and the page agree; comparing it
+         * against the manifest compares two independent sources, and a manifest edit that the app
+         * stops honouring then fails here.
+         *
+         * `others` carries every OTHER tenant's display name, so "and no other tenant's identity"
+         * is derived from what exists rather than from a name someone remembered to list.
+         */
+        tenantManifests({ id = 'fairwins' } = {}) {
+          const dir = resolve(__dirname, '..', 'tenants')
+          const ids = readdirSync(dir, { withFileTypes: true })
+            .filter((e) => e.isDirectory() && existsSync(resolve(dir, e.name, 'manifest.json')))
+            .map((e) => e.name)
+          const read = (tenantId) => JSON.parse(readFileSync(resolve(dir, tenantId, 'manifest.json'), 'utf8'))
+          const active = read(id)
+          return {
+            ok: true,
+            id: active.id,
+            displayName: active.identity.displayName,
+            htmlTitle: active.brand.htmlTitle ?? active.identity.displayName,
+            copyrightNotice:
+              active.identity.copyrightNotice ?? active.identity.legalName ?? active.identity.displayName,
+            logo: active.brand.logo,
+            others: ids.filter((t) => t !== id).map((t) => read(t).identity.displayName),
+          }
+        },
+
+        /**
+         * ABI-encoded answers for the identity surfaces (specs 054 + 007), no-chain tier.
+         *
+         * Callsign resolution, the Gold gate and sanctions screening are all single contract READS,
+         * and all three decide something a member sees rather than anything that settles. So the
+         * flows belong in the no-chain tier, and the reads are answered here — encoded with the
+         * app's OWN ABI fragments so a struct field added to `CallsignInfo` changes what this
+         * returns rather than decoding into the wrong columns.
+         *
+         * Keyed by SELECTOR so a spec can dispatch on `params[0].data.slice(0, 10)` without knowing
+         * how any of them is encoded. Anything not listed stays unanswered on purpose: `0x` makes
+         * ethers reject the decode, which every caller here turns into an honest unavailable state
+         * rather than into a fabricated value.
+         */
+        identityWorld({ callsign = null, owner = null, tier = 0, allowed = true, vaultOwners = null } = {}) {
+          // Copied from frontend/src/abis/callsignRegistry.js and the membership/guard ABIs.
+          const CALLSIGN_INFO =
+            '(address owner, string callsign, uint8 status, bool verified, address pendingOwner, uint64 repointEffectiveAt, uint64 quarantinedUntil)'
+          const iface = new ethers.Interface([
+            `function resolve(string callsign) view returns (${CALLSIGN_INFO})`,
+            'function getActiveTier(address user, bytes32 role) view returns (uint8)',
+            'function isAllowed(address account) view returns (bool)',
+            // The four reads `lib/custody/safeVault.js#loadVault` makes. A vault is a PRECONDITION
+            // for the "refused while operating as a vault" flow, never its subject: what is under
+            // test is a client-side refusal, and a Safe that answers is the cheapest way to reach
+            // it. Answering them is strictly less than deploying one.
+            'function getOwners() view returns (address[])',
+            'function getThreshold() view returns (uint256)',
+            'function nonce() view returns (uint256)',
+            'function VERSION() view returns (string)',
+          ])
+          const CALLSIGN_STATUS_ACTIVE = 1
+          const answers = {
+            [iface.getFunction('getActiveTier').selector]: iface.encodeFunctionResult('getActiveTier', [tier]),
+            [iface.getFunction('isAllowed').selector]: iface.encodeFunctionResult('isAllowed', [allowed]),
+          }
+          if (vaultOwners) {
+            answers[iface.getFunction('getOwners').selector] = iface.encodeFunctionResult('getOwners', [vaultOwners])
+            answers[iface.getFunction('getThreshold').selector] = iface.encodeFunctionResult('getThreshold', [
+              Math.min(2, vaultOwners.length),
+            ])
+            answers[iface.getFunction('nonce').selector] = iface.encodeFunctionResult('nonce', [0])
+            answers[iface.getFunction('VERSION').selector] = iface.encodeFunctionResult('VERSION', ['1.4.1'])
+          }
+          if (callsign && owner) {
+            answers[iface.getFunction('resolve').selector] = iface.encodeFunctionResult('resolve', [
+              [owner, callsign, CALLSIGN_STATUS_ACTIVE, true, ethers.ZeroAddress, 0n, 0n],
+            ])
+          }
+          return { ok: true, answers }
+        },
+
         /**
          * A REAL first-party mini-app package (Token Mint, spec 028 / ClearPath, spec 030),
          * read from what `npm run publish:local:miniapps` staged.
@@ -1588,6 +1673,88 @@ export default defineConfig({
               }
               default:
                 throw new Error(`voucherFixture: unknown action '${action}'`)
+            }
+          } catch (e) {
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
+        },
+
+
+        /**
+         * Fixtures for callsign registration (spec 054), on-chain tier.
+         *
+         * Registration is Gold-gated and permanent until released, and one account may hold at
+         * most one callsign — so a fixed account makes the flow pass exactly once against any node
+         * (`AlreadyHasCallsign` from then on). `freshOwner` therefore CHOOSES an account the way
+         * the voucher flow chooses a redeemer: walk hardhat's own unlocked accounts, take the first
+         * that owes nothing to an earlier run, and fail loudly rather than mysteriously when they
+         * are exhausted. The browser can act as any of them because `eth_sendTransaction` is signed
+         * by the node.
+         *
+         * `grantGold` arranges an authorization the member genuinely needs — the tier gate is not
+         * bypassed, it is satisfied.
+         *
+         * action ∈ freshOwner | grantGold | callsignOf | registryState
+         */
+        async callsignFixture({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+
+          const registryAddress = d.contracts?.callsignRegistry
+          if (!registryAddress) {
+            return {
+              ok: false,
+              error:
+                'the local deployment record has no contracts.callsignRegistry — run `npm run setup:e2e` ' +
+                '(whose `deploy:local:callsigns` step deploys it) before the callsign spec',
+            }
+          }
+          // Compiled ABIs, for the reason spelled out on voucherFixture: a hand-written tuple that
+          // decodes to garbage does not throw, it lies.
+          const REGISTRY_ABI = loadArtifact('naming/CallsignRegistry.sol', 'CallsignRegistry').abi
+          const MEMBERSHIP_ABI = ['function grantMembership(address user, bytes32 role, uint8 tier, uint32 durationDays)']
+          const WAGER_PARTICIPANT_ROLE = ethers.id('WAGER_PARTICIPANT_ROLE')
+          const registry = new ethers.Contract(registryAddress, REGISTRY_ABI, provider)
+
+          try {
+            switch (action) {
+              case 'freshOwner': {
+                for (let i = args.startIndex ?? 5; i < (args.endIndex ?? 20); i += 1) {
+                  const w = ethers.HDNodeWallet.fromPhrase(HARDHAT_MNEMONIC, undefined, `m/44'/60'/0'/0/${i}`)
+                  if (!(await registry.callsignOf(w.address))) {
+                    return { ok: true, index: i, address: w.address }
+                  }
+                }
+                return {
+                  ok: false,
+                  error:
+                    'every hardhat account already holds a callsign — this node has been re-used past ' +
+                    'what the registration flow can arrange. Restart it and re-run `npm run setup:e2e`.',
+                }
+              }
+              case 'grantGold': {
+                // Gold is tier 3 (None 0, Bronze 1, Silver 2, Gold 3, Platinum 4) and is the
+                // registry's own floor, hard-configured — see `minTier` in CallsignRegistry.
+                const membership = new ethers.Contract(d.contracts.membershipManager, MEMBERSHIP_ABI, admin)
+                await (await membership.grantMembership(args.address, WAGER_PARTICIPANT_ROLE, 3, 365)).wait(1)
+                return { ok: true }
+              }
+              case 'callsignOf':
+                return { ok: true, callsign: await registry.callsignOf(args.address) }
+              case 'registryState': {
+                const info = await registry.resolve(args.callsign)
+                return {
+                  ok: true,
+                  owner: info.owner,
+                  callsign: info.callsign,
+                  status: Number(info.status),
+                  available: await registry.isAvailable(args.callsign),
+                }
+              }
+              default:
+                throw new Error(`callsignFixture: unknown action '${action}'`)
             }
           } catch (e) {
             return { ok: false, error: e.shortMessage || e.reason || e.message }

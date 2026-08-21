@@ -212,13 +212,14 @@
         {
           "id": "compliance.sanctioned-address-refused",
           "name": "A screened address is refused before any transaction is offered",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::CM-01"
+          ]
         },
         {
           "id": "compliance.frozen-account-blocked",
@@ -1325,35 +1326,38 @@
         {
           "id": "callsign.commit-reveal-register",
           "name": "Register a %callsign through commit and reveal",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/full/34-callsign-registration.cy.js::CR-01"
+          ]
         },
         {
           "id": "callsign.resolve-in-address-entry",
           "name": "Address a transfer to someone by their callsign",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::CS-02"
+          ]
         },
         {
           "id": "callsign.gated-below-gold",
           "name": "Be told why registration is unavailable below Gold tier",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::CS-01"
+          ]
         }
       ]
     },
@@ -1783,35 +1787,38 @@
         {
           "id": "endpoints.save-custom-rpc",
           "name": "Save your own RPC endpoint and have reads use it",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::EP-01"
+          ]
         },
         {
           "id": "endpoints.wrong-chain-refused",
           "name": "Be refused an endpoint that answers with a different chain id",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::EP-02"
+          ]
         },
         {
           "id": "endpoints.credentials-redacted",
           "name": "Never see your endpoint credential rendered back to you",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::EP-03"
+          ]
         }
       ]
     },
@@ -1873,13 +1880,14 @@
         {
           "id": "tenant.brand-resolves-from-manifest",
           "name": "A tenant build shows its own identity and no other tenant's",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::TN-01"
+          ]
         }
       ]
     },
@@ -2114,13 +2122,15 @@
         {
           "id": "verify.three-verdicts",
           "name": "Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/30-verify-message.cy.js::VF-01",
+            "frontend/cypress/e2e/fast/30-verify-message.cy.js::VF-02"
+          ]
         },
         {
           "id": "verify.refused-while-operating-as-vault",
@@ -2131,7 +2141,8 @@
           "depth": "none",
           "risk": "access",
           "tests": [],
-          "issue": "#1241"
+          "issue": "#1274",
+          "missing": "the refusal itself is one client-side branch, but reaching it needs a vault, operate-as mode (offered only in TransferForm) and in-app navigation that preserves the memory-only active identity — a test-reachability problem, not a product one"
         }
       ]
     },

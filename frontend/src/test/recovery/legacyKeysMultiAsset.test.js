@@ -199,3 +199,61 @@ describe('sweepAllAssets', () => {
     ).rejects.toThrow(/destination other than/i)
   })
 })
+
+/*
+ * The native leg's reserve has to survive a RISING fee, not just a falling balance.
+ *
+ * `quoteAllAssets` reads the fee once, before anything has mined. Every ERC-20 leg then mines,
+ * and on a chain whose base fee is climbing the native transfer's own max fee ends up larger than
+ * the reserve set aside for it — `value + gas > balance`, the node refuses it for insufficient
+ * funds, and the member is told their coin "failed" for a reason they could do nothing about.
+ *
+ * A REVERTING ERC-20 leg is the sharpest case: a reverted transfer consumes its whole gas limit,
+ * which is exactly what fills a block and lifts the base fee. That is the shape of the full-tier
+ * failure this was found by (`28-legacy-recovery-sweep.cy.js::LKR-S2`, which mines exactly one
+ * reverting transfer before the coin moves).
+ *
+ * The balance re-read alone cannot catch it, which is why this is its own test.
+ */
+describe('sweepAllAssets — the native reserve tracks a rising fee', () => {
+  const risingFeeProvider = (balances, { first, later }) => {
+    let calls = 0
+    return makeProvider(balances, {
+      getFeeData: async () => {
+        calls += 1
+        return calls === 1 ? { maxFeePerGas: first, gasPrice: first } : { maxFeePerGas: later, gasPrice: later }
+      },
+    })
+  }
+
+  it('leaves enough behind to pay the fee that is current when the coin moves', async () => {
+    const LATER = GAS * 3n
+    const balance = 10n ** 17n
+    const provider = risingFeeProvider({ native: balance, [USDC]: 5_000_000n }, { first: GAS, later: LATER })
+
+    await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const nativeSend = provider._sent.find((s) => s.address === 'native')
+    expect(nativeSend, 'the coin still moved').toBeTruthy()
+
+    // 21000 baseline * the 20% buffer the quote applies.
+    const nativeGasLimit = (21000n * 12n) / 10n
+    expect(
+      nativeSend.value + nativeGasLimit * LATER,
+      'what is sent plus what the CURRENT fee will cost must fit in the balance',
+    ).toBeLessThanOrEqual(balance)
+  })
+
+  it('never reserves less than the quote did when the fee falls', async () => {
+    // A cheaper fee is not a reason to cut the margin the member was quoted. The reserve is a
+    // floor, so a falling fee simply leaves a little more behind — never less.
+    const balance = 10n ** 17n
+    const provider = risingFeeProvider({ native: balance }, { first: GAS, later: GAS / 4n })
+
+    await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const nativeSend = provider._sent.find((s) => s.address === 'native')
+    const quotedReserve = ((21000n * 12n) / 10n) * GAS
+    expect(nativeSend.value, 'the quoted reserve still stands').toBe(balance - quotedReserve)
+  })
+})

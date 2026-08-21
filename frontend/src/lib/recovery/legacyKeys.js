@@ -451,7 +451,29 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
        * not see it, because a stubbed provider's balance never moves.)
        */
       const current = await provider.getBalance(quote.from)
-      const sendable = current > quote.nativeGasReserve ? current - quote.nativeGasReserve : 0n
+      /*
+       * Re-read the FEE for the same reason the balance is re-read, and it is a separate failure.
+       *
+       * `quote.nativeGasReserve` was derived from a fee read BEFORE any ERC-20 leg mined. On a
+       * chain whose base fee is rising the transaction's own max fee is larger than the reserve set
+       * aside for it, so `value + gas > balance` and the node refuses it for insufficient funds —
+       * the coin is left behind, reported as a failure the member could do nothing about. A
+       * REVERTING ERC-20 leg is the sharpest case, because a reverted transfer consumes its whole
+       * gas limit, which is exactly what fills a block and lifts the base fee.
+       *
+       * Never reserve LESS than the quote did: a falling fee is not a reason to cut the margin the
+       * member was quoted, and `max` keeps this strictly safer than the value it replaces.
+       */
+      let reserve = quote.nativeGasReserve
+      try {
+        const freshFee = await provider.getFeeData()
+        const freshGasPrice = freshFee?.maxFeePerGas ?? freshFee?.gasPrice ?? 0n
+        const freshReserve = quote.nativeGasLimit * freshGasPrice
+        if (freshReserve > reserve) reserve = freshReserve
+      } catch {
+        /* fee unavailable — the quote's reserve stands, which is what shipped before this */
+      }
+      const sendable = current > reserve ? current - reserve : 0n
       if (sendable <= 0n) {
         record({ asset, status: 'skipped', error: 'Not enough to cover the network fee.' })
         continue
