@@ -275,6 +275,14 @@ function ControlRoomBody({ access }) {
         <p className="card-info">
           Read across {estateRead?.read?.length ?? 0} network
           {(estateRead?.read?.length ?? 0) === 1 ? '' : 's'}.
+          {estateRead?.notDeployed?.length > 0 && (
+            <>
+              {' '}
+              {`${estateRead.notDeployed.map(networkName).join(', ')} ${
+                estateRead.notDeployed.length === 1 ? 'carries' : 'carry'
+              } no operator contracts, so there is nothing to hold a role on there.`}
+            </>
+          )}
           {estateRead?.unreadable?.length > 0 && (
             <> {estateRead.unreadable.map(networkName).join(', ')} could not be read, so nothing
             above rules out a role held there.</>

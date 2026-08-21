@@ -14,13 +14,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
-const m = vi.hoisted(() => ({ roles: [] }))
+const m = vi.hoisted(() => ({ roles: [], swept: true, curator: { held: false, outcome: 'not-held' } }))
 
 vi.mock('../../hooks/useRoles', () => ({
   useRoles: () => ({
     hasRole: (r) => m.roles.includes(r),
     hasAnyRole: (rs) => rs.some((r) => m.roles.includes(r)),
-    estateRead: { read: [137], unreadable: [], swept: true },
+    estateRead: { read: [137], notDeployed: [], unreadable: [], swept: m.swept },
     chainsForRole: () => [],
     loadRoles: vi.fn(),
   }),
@@ -43,7 +43,7 @@ vi.mock('../../config/contracts', () => ({
   },
 }))
 vi.mock('../../lib/miniapps/registryAuthority', () => ({
-  readCuratorAuthority: () => Promise.resolve({ held: false, outcome: 'not-held' }),
+  readCuratorAuthority: () => Promise.resolve(m.curator),
 }))
 vi.mock('../../hooks/useCallsignRegistryMetrics', () => ({
   useCallsignRegistryMetrics: () => ({ loading: false, error: null, data: null, refresh: vi.fn() }),
@@ -66,6 +66,8 @@ const renderAt = (path) =>
 
 beforeEach(() => {
   m.roles = []
+  m.swept = true
+  m.curator = { held: false, outcome: 'not-held' }
   contractSpy.mockClear()
 })
 
@@ -102,6 +104,23 @@ describe('entitlement is enforced at every depth', () => {
   it('shows a role-less account the standard denied screen, not a redirect', async () => {
     renderAt('/admin/maintenance')
     expect(await screen.findByText(/Access Restricted/i)).toBeInTheDocument()
+  })
+
+  /*
+   * The redirect above acts on the ABSENCE of a role flag, so it must not run before the flags
+   * are in. Entry can be granted by the curator authority — a single contract read — while the
+   * role sweep is still going, and in that window every flag is false. An operator following a
+   * bookmarked link to the killswitch was bounced to the Control Room for it.
+   */
+  it('does not redirect while the role sweep is still running', async () => {
+    m.curator = { held: true, outcome: 'held' } // entry granted by the curator read…
+    m.swept = false // …while the sweep, which would have found GUARDIAN, is still in flight
+
+    // Uses the same app as the redirect case above, so this file loads no further lazy screens.
+    renderAt('/admin/identity?view=callsigns')
+
+    expect(await screen.findByRole('heading', { name: 'Identity' })).toBeInTheDocument()
+    expect(screen.queryByTestId('control-room-stub')).toBeNull()
   })
 
   it('gates a deep link at the same strength as the front door', async () => {

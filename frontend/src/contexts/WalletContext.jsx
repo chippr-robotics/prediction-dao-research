@@ -3,6 +3,7 @@ import { useAccount, useConnect, useDisconnect, useSwitchChain, useWalletClient 
 import ConnectModal from '../components/wallet/ConnectModal'
 import { ethers } from 'ethers'
 import { isSupportedChainId, getNetwork, PRIMARY_CHAIN_ID, cohortChainIds } from '../config/networks'
+import { classifyEstateProbes } from '../lib/chains/estateSweep'
 import { useWalletChainId } from '../hooks/useWalletChainId'
 import { makeReadProvider } from '../utils/rpcProvider'
 import {
@@ -53,7 +54,12 @@ export function WalletProvider({ children }) {
   // the flat estate-wide list every existing caller reads; these two carry the detail the
   // operations control plane needs to be honest about what it actually learned.
   const [roleChains, setRoleChains] = useState({})
-  const [estateRead, setEstateRead] = useState({ read: [], unreadable: [], swept: false })
+  const [estateRead, setEstateRead] = useState({
+    read: [],
+    notDeployed: [],
+    unreadable: [],
+    swept: false,
+  })
   // FR-004: false ⇒ membership is UNKNOWN (the reference chain would not answer), which is
   // never the same as "no membership". Surfaces so a gated action can attribute its refusal.
   const [membershipReadable, setMembershipReadable] = useState(true)
@@ -395,9 +401,19 @@ export function WalletProvider({ children }) {
         walletChainFirst.map(async (id) => {
           try {
             const r = await hasRoleOnChain(walletAddress, roleName, id, { detailed: true })
-            return { roleName, chainId: id, held: Boolean(r?.held), readable: r?.readable !== false }
+            return {
+              roleName,
+              chainId: id,
+              held: Boolean(r?.held),
+              readable: r?.readable !== false,
+              // Carried through, not derived: only `hasRoleOnChain` knows whether there was a
+              // contract to ask. Dropping it here is what let a chain with nothing deployed
+              // count as a chain that answered.
+              deployed: r?.deployed !== false,
+            }
           } catch (e) {
-            return { roleName, chainId: id, held: false, readable: false, reason: e?.message }
+            // A thrown probe reached for something and failed — an outage, not an absence.
+            return { roleName, chainId: id, held: false, readable: false, deployed: true, reason: e?.message }
           }
         }),
       ),
@@ -425,13 +441,15 @@ export function WalletProvider({ children }) {
     for (const p of probes) {
       if (p.held) (foundOn[p.roleName] ||= []).push(p.chainId)
     }
-    // A chain counts as unreadable only if EVERY probe against it failed — one contract missing
-    // there is a deployment fact, not a connectivity failure.
-    const unreadableChains = walletChainFirst.filter((id) => {
-      const forChain = probes.filter((p) => p.chainId === id)
-      return forChain.length > 0 && forChain.every((p) => !p.readable)
-    })
-    const readChains = walletChainFirst.filter((id) => !unreadableChains.includes(id))
+    // Three states, never two (spec 071 FR-011): a chain answered, a chain has nothing deployed
+    // to answer with, or a chain would not answer. `classifyEstateProbes` decides on the probes
+    // that actually had a contract to read — a chain carrying none of the operator contracts
+    // settles from the address book and must not be counted as having answered.
+    const {
+      read: readChains,
+      notDeployed: notDeployedChains,
+      unreadable: unreadableChains,
+    } = classifyEstateProbes(probes, walletChainFirst)
 
     const updatedRoles = [
       ...(membershipHeld ? ['WAGER_PARTICIPANT'] : []),
@@ -475,7 +493,12 @@ export function WalletProvider({ children }) {
       hasChanges,
       errors: [],
       roleChains: foundOn,
-      estateRead: { read: readChains, unreadable: unreadableChains, swept: true },
+      estateRead: {
+        read: readChains,
+        notDeployed: notDeployedChains,
+        unreadable: unreadableChains,
+        swept: true,
+      },
       membershipReadable,
     }
   }, [])
@@ -497,7 +520,9 @@ export function WalletProvider({ children }) {
       const synced = await syncRolesWithBlockchain(walletAddress, localRoles, activeChainId)
       setRoles(synced.roles)
       setRoleChains(synced.roleChains || {})
-      setEstateRead(synced.estateRead || { read: [], unreadable: [], swept: true })
+      setEstateRead(
+        synced.estateRead || { read: [], notDeployed: [], unreadable: [], swept: true },
+      )
       setMembershipReadable(synced.membershipReadable !== false)
       setBlockchainSynced(true)
     } catch (error) {
@@ -507,7 +532,7 @@ export function WalletProvider({ children }) {
       setMembershipReadable(false)
       // A failed sweep is NOT "you hold nothing" — leave it unswept so the console can say so
       // rather than asserting a denial it never established (FR-012).
-      setEstateRead({ read: [], unreadable: [], swept: false })
+      setEstateRead({ read: [], notDeployed: [], unreadable: [], swept: false })
     } finally {
       setRolesLoading(false)
     }

@@ -98,6 +98,33 @@ missing — there is simply nothing there.
 
 Render with `ChainStateTable`, which handles all three states and the partial label.
 
+### The role sweep obeys the same three states
+
+The console's entry decision is itself an estate read — `hasRole` per operator role per cohort
+chain — and it is classified by `classifyEstateProbes` (`lib/chains/estateSweep.js`), which fills
+`estateRead = { read, notDeployed, unreadable, swept }`.
+
+The rule that makes it honest: **a chain is classified on the probes that had a contract to
+read.** `hasRoleOnChain(..., { detailed: true })` reports `deployed: false` when no contract on
+that chain could hold the role — Ethereum Classic carries no `WagerRegistry`, so nobody is its
+Account Moderator, and that is settled from the address book without a network call. Those probes
+say nothing about whether the chain answered.
+
+Collapsing them into `read` is a bug with a specific, bad shape. On a mainnet build only Polygon
+carries a contract for *every* operator role; the four spec-067 chains carry the routers and
+nothing else, and ETC carries neither. So a total RPC outage produced `read` = five chains that
+had "answered" from config, `unreadable` = `[137]`, and an entry state of `denied` — the operator
+was shown **"Access Restricted"**, a statement about their permissions, on the strength of zero
+successful reads, at exactly the moment an incident commander needs to get in. `unverified`
+("Could Not Verify Access", with a retry) is the honest screen, and it is only reachable if
+`read` can actually be empty.
+
+`useAdminAccess` also exposes **`settled`** — `swept && curatorAuthority !== null`. Entry can be
+granted by the curator authority (one contract read) before the role sweep returns, and in that
+window every role flag is still false. Anything acting on the ABSENCE of a flag must wait for
+`settled`, or it acts on a fact that is not in yet: `AdminAppShell`'s deep-link redirect did not,
+and bounced an entitled operator following a bookmarked link back to the Control Room.
+
 ## 4. Operator views: scope reads, gate writes
 
 ```js
