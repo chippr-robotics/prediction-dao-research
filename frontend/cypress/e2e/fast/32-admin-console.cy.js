@@ -50,7 +50,15 @@ const HAS_ROLE = '0x91d14854' // hasRole(bytes32,address)
 const BOOL_TRUE = `0x${'0'.repeat(63)}1`
 const BOOL_FALSE = `0x${'0'.repeat(64)}`
 
-const hostPattern = (host) => new RegExp(host.replace(/\./g, '\\.'))
+/*
+ * Match on `hostname`, never a regex built from a string.
+ *
+ * The first version of this built `new RegExp(host.replace(/\./g, '\\.'))`, which CodeQL
+ * correctly flagged twice over: the replace escapes dots but not backslashes (incomplete
+ * escaping), and a regex is a SUBSTRING match, so a pattern for one host can match another. The
+ * matcher Cypress already provides compares the hostname exactly and needs no escaping at all.
+ */
+const rpcRoute = (host) => ({ method: 'POST', hostname: host })
 
 /**
  * Stand the estate up.
@@ -67,13 +75,13 @@ function estateWorld({ dead = [], holds = {} } = {}) {
     hosts.forEach((host, i) => {
       const alias = `rpc-${id}-${i}`
       if (dead.includes(id)) {
-        cy.intercept({ method: 'POST', url: hostPattern(host) }, (req) =>
+        cy.intercept(rpcRoute(host), (req) =>
           req.reply({ statusCode: 503, body: 'upstream unavailable' }),
         ).as(alias)
         return
       }
       const held = new Set(holds[id] || [])
-      cy.intercept({ method: 'POST', url: hostPattern(host) }, (req) => {
+      cy.intercept(rpcRoute(host), (req) => {
         const one = ({ method, params, id: rpcId }) => {
           const reply = (result) => ({ jsonrpc: '2.0', id: rpcId, result })
           switch (method) {
