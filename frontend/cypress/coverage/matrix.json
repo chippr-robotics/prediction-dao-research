@@ -1337,13 +1337,14 @@
         {
           "id": "callsign.resolve-in-address-entry",
           "name": "Address a transfer to someone by their callsign",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::CS-02"
+          ]
         },
         {
           "id": "callsign.gated-below-gold",
@@ -1878,13 +1879,14 @@
         {
           "id": "tenant.brand-resolves-from-manifest",
           "name": "A tenant build shows its own identity and no other tenant's",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::TN-01"
+          ]
         }
       ]
     },

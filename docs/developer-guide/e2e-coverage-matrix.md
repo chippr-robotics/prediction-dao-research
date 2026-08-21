@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 84 |
+| 🟢 covered | 86 |
 | 🟡 partial | 8 |
-| 🔴 absent | 32 |
+| 🔴 absent | 30 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 26 · 🟡 1 · 🔴 11 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 28 · 🟡 1 · 🔴 9 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -395,7 +395,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `callsign.commit-reveal-register` | Register a %callsign through commit and reveal | 🔴 absent | none | — (proposed: on-chain) | #1241 |  |
-| `callsign.resolve-in-address-entry` | Address a transfer to someone by their callsign | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
+| `callsign.resolve-in-address-entry` | Address a transfer to someone by their callsign | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CS-02) |  |
 | `callsign.gated-below-gold` | Be told why registration is unavailable below Gold tier | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CS-01) |  |
 
 ### `057-predict-polymarket` — Predict — Polymarket
@@ -429,7 +429,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `tenant.brand-resolves-from-manifest` | A tenant build shows its own identity and no other tenant's | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
+| `tenant.brand-resolves-from-manifest` | A tenant build shows its own identity and no other tenant's | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (TN-01) |  |
 
 ### `073-miniapp-platform` — Mini-app platform
 

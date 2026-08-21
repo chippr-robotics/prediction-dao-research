@@ -1,6 +1,6 @@
 import { defineConfig } from 'cypress'
 import { ethers } from 'ethers'
-import { existsSync, readFileSync, unlinkSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, unlinkSync } from 'fs'
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
@@ -1073,6 +1073,38 @@ export default defineConfig({
           }
         },
 
+
+
+        /**
+         * The tenant manifests, read from disk (spec 072).
+         *
+         * `tenants/<id>/manifest.json` is the single source of truth for a tenant's identity, and
+         * the flow's claim is that the RENDERED brand comes from it. Comparing the page against
+         * values hardcoded in a spec would only prove the spec and the page agree; comparing it
+         * against the manifest compares two independent sources, and a manifest edit that the app
+         * stops honouring then fails here.
+         *
+         * `others` carries every OTHER tenant's display name, so "and no other tenant's identity"
+         * is derived from what exists rather than from a name someone remembered to list.
+         */
+        tenantManifests({ id = 'fairwins' } = {}) {
+          const dir = resolve(__dirname, '..', 'tenants')
+          const ids = readdirSync(dir, { withFileTypes: true })
+            .filter((e) => e.isDirectory() && existsSync(resolve(dir, e.name, 'manifest.json')))
+            .map((e) => e.name)
+          const read = (tenantId) => JSON.parse(readFileSync(resolve(dir, tenantId, 'manifest.json'), 'utf8'))
+          const active = read(id)
+          return {
+            ok: true,
+            id: active.id,
+            displayName: active.identity.displayName,
+            htmlTitle: active.brand.htmlTitle ?? active.identity.displayName,
+            copyrightNotice:
+              active.identity.copyrightNotice ?? active.identity.legalName ?? active.identity.displayName,
+            logo: active.brand.logo,
+            others: ids.filter((t) => t !== id).map((t) => read(t).identity.displayName),
+          }
+        },
 
         /**
          * ABI-encoded answers for the identity surfaces (specs 054 + 007), no-chain tier.

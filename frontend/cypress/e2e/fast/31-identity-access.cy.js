@@ -255,4 +255,83 @@ describe('Endpoints, callsigns and compliance (specs 069 / 054 / 007)', () => {
         .should('be.disabled')
     })
   })
+
+  it('[CS-02] callsign.resolve-in-address-entry — a %callsign resolves to its owner, shown before any value moves', () => {
+    /*
+     * The address field is where a callsign earns its keep, and where it is most dangerous: a
+     * member typing `%name` is about to send somebody money. So the surface resolves it and shows
+     * the FULL resolved address for confirmation before any value-bearing action (FR-011) rather
+     * than silently substituting one.
+     *
+     * Nothing on the value path is gated on owning a callsign, and this flow does not assert that
+     * it is — a test that required a callsign to send would be asserting a rule the product does
+     * not have.
+     */
+    const CALLSIGN = 'chipprbots'
+    const OWNER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+
+    cy.task('identityWorld', { callsign: CALLSIGN, owner: OWNER, allowed: true }).then(({ answers }) => {
+      stubReads(answers)
+      cy.mockWeb3Provider({ account: ACCOUNT, networkId: 137, rpcUrl: POLYGON_RPC, preAuthorized: true, realBalances: true })
+      cy.visit('/fairwins')
+
+      cy.get('.pay-panel', { timeout: 40000 }).should('be.visible')
+      cy.get('#pay-to').clear().type(`%${CALLSIGN}`, { delay: 0 })
+
+      // The confirmation line names the callsign AND the address it resolved to. Both halves
+      // matter: the name alone is what a member typed, and the address alone is unreadable.
+      cy.contains(`%${CALLSIGN}`, { timeout: 30000 }).should('be.visible')
+      cy.contains('resolves to', { timeout: 30000 }).should('be.visible')
+
+      // The resolved owner reaches the form, not just the hint — the abbreviated form the hint
+      // renders is checked at its ends so this cannot pass on a truncation that hid a different
+      // address in the middle.
+      cy.contains('code', OWNER.slice(0, 6)).should('contain.text', OWNER.slice(-4))
+    })
+  })
+
+  it('[TN-01] tenant.brand-resolves-from-manifest — the build shows its own tenant, and no other', () => {
+    /*
+     * Tenant selection is BUILD-TIME and one origin serves exactly one tenant, so the failure this
+     * guards is a build that renders somebody else's identity — a brand leak, not a layout bug.
+     *
+     * Every expected value comes from `tenants/<id>/manifest.json` read on the Node side rather
+     * than from constants written here: comparing the page to a spec's own copy would only prove
+     * the two agree with each other. The names it must NOT show are derived the same way, from
+     * whichever other tenants exist.
+     */
+    cy.task('tenantManifests', { id: 'fairwins' }).then((t) => {
+      expect(t.ok, 'the default tenant manifest was read').to.equal(true)
+      expect(t.others, 'there is another tenant to be confused with').to.have.length.greaterThan(0)
+
+      /*
+       * The LANDING page, and no wallet. A tenant's brand is what a visitor meets before anything
+       * else, so this is where it is most on display — and `/fairwins` deliberately hides the page
+       * footer (the nav drawer carries its own copy), so the copyright would simply be absent
+       * there for a reason that has nothing to do with tenancy.
+       */
+      // `?stay=1` is the app's own "do not forward me past the landing page" switch
+      // (`LandingRoute`): without it a browser carrying any wallet history is redirected straight
+      // into the app, which is correct behaviour and lands on a route that hides the footer.
+      cy.visit('/?stay=1')
+      cy.get('footer', { timeout: 40000 }).should('exist')
+
+      // The document title is the manifest's, verbatim.
+      cy.title().should('equal', t.htmlTitle)
+
+      // The copyright is the manifest's legal notice, not a hardcoded string in a component.
+      cy.get('body').invoke('text').should('contain', t.copyrightNotice)
+
+      // And the logo is the manifest's asset path.
+      cy.get(`img[src="${t.logo}"], img[src$="${t.logo.split('/').pop()}"]`).should('exist')
+
+      // No other tenant's identity appears anywhere on the page.
+      cy.get('body').invoke('text').then((text) => {
+        for (const other of t.others) {
+          expect(text, `no trace of tenant "${other}"`).to.not.contain(other)
+        }
+      })
+    })
+  })
+
 })
