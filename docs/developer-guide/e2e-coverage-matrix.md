@@ -359,7 +359,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟡 partial | smoke | `no-chain` | `35-navigation-and-lookup.cy.js` (BK-01) | asserts the surface renders and prints no key material; the encrypt/restore round-trip itself is not driven |
+| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟡 partial | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (BK-01, BK-02) | the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for — admission rule 2 puts that half in the on-chain tier |
 
 ### `037-unified-pool-challenge-lookup` — Unified pool and challenge lookup
 

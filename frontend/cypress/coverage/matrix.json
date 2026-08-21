@@ -700,13 +700,14 @@
           "name": "Back up local data encrypted and restore it on another device",
           "status": "partial",
           "tier": "no-chain",
-          "depth": "smoke",
+          "depth": "flow",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-01"
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-01",
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-02"
           ],
-          "issue": "#1245",
-          "missing": "asserts the surface renders and prints no key material; the encrypt/restore round-trip itself is not driven"
+          "issue": "#1228",
+          "missing": "the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for — admission rule 2 puts that half in the on-chain tier"
         }
       ]
     },
