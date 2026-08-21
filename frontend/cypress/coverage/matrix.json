@@ -197,17 +197,14 @@
         {
           "id": "compliance.accept-terms-before-entry",
           "name": "Read and accept the versioned terms before reaching the app",
-          "status": "absent",
-          "tier": "account-native",
-          "depth": "skipped",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-01",
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-02",
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-03"
-          ],
-          "issue": "#1271",
-          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::CG-01",
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::CG-02"
+          ]
         },
         {
           "id": "compliance.sanctioned-address-refused",
