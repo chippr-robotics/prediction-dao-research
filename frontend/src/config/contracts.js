@@ -89,7 +89,6 @@ const HARDHAT_CONTRACTS = {
   safePolicyGuardV2: '0xc01E5F3EAFd2C0138e98382A3F54B6CeB3dc05cf',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
-  callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
   /*
    * spec 073 — the mini-app catalog registry, the trust boundary for which packages the host
    * fetches, verifies and EXECUTES. On a shipped build this key is empty here and the catalog
