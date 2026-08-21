@@ -102,7 +102,6 @@ function addressAfterChange(prev) {
     cy.get('@first').then((a) => { previous = a })
     for (let i = 0; i < 4; i += 1) {
       cy.contains('button', /^New address$/).click()
-      // eslint-disable-next-line no-loop-func
       cy.then(() => addressAfterChange(previous).then((a) => {
         expect(a, `rotation ${i + 1} produced a bech32 address`).to.match(/^bc1q[0-9a-z]{20,}$/)
         // The set catches the case the change-wait cannot: a repeat of an EARLIER address rather
