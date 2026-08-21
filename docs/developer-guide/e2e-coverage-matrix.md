@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 78 |
+| 🟢 covered | 82 |
 | 🟡 partial | 8 |
-| 🔴 absent | 38 |
+| 🔴 absent | 34 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 20 · 🟡 1 · 🔴 17 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 24 · 🟡 1 · 🔴 13 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -414,9 +414,9 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `endpoints.save-custom-rpc` | Save your own RPC endpoint and have reads use it | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
-| `endpoints.wrong-chain-refused` | Be refused an endpoint that answers with a different chain id | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
-| `endpoints.credentials-redacted` | Never see your endpoint credential rendered back to you | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
+| `endpoints.save-custom-rpc` | Save your own RPC endpoint and have reads use it | 🟢 covered | settled | `no-chain` | `30-identity-access.cy.js` (EP-01) |  |
+| `endpoints.wrong-chain-refused` | Be refused an endpoint that answers with a different chain id | 🟢 covered | settled | `no-chain` | `30-identity-access.cy.js` (EP-02) |  |
+| `endpoints.credentials-redacted` | Never see your endpoint credential rendered back to you | 🟢 covered | settled | `no-chain` | `30-identity-access.cy.js` (EP-03) |  |
 
 ### `071-multi-chain-admin-console` — Multi-chain admin console
 
@@ -443,7 +443,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `verify.three-verdicts` | Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
+| `verify.three-verdicts` | Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout | 🟢 covered | settled | `no-chain` | `30-identity-access.cy.js` (VF-01, VF-02) |  |
 | `verify.refused-while-operating-as-vault` | Be refused message signing while acting as a vault | 🔴 absent | none | — (proposed: no-chain) | #1241 |  |
 
 ### `093-admin-mini-apps` — Admin mini-apps

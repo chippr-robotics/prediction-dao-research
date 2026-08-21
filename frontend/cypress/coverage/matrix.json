@@ -1783,35 +1783,38 @@
         {
           "id": "endpoints.save-custom-rpc",
           "name": "Save your own RPC endpoint and have reads use it",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/30-identity-access.cy.js::EP-01"
+          ]
         },
         {
           "id": "endpoints.wrong-chain-refused",
           "name": "Be refused an endpoint that answers with a different chain id",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/30-identity-access.cy.js::EP-02"
+          ]
         },
         {
           "id": "endpoints.credentials-redacted",
           "name": "Never see your endpoint credential rendered back to you",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/30-identity-access.cy.js::EP-03"
+          ]
         }
       ]
     },
@@ -2114,13 +2117,15 @@
         {
           "id": "verify.three-verdicts",
           "name": "Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "no-chain",
           "proposedTier": "no-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1241"
+          "tests": [
+            "frontend/cypress/e2e/fast/30-identity-access.cy.js::VF-01",
+            "frontend/cypress/e2e/fast/30-identity-access.cy.js::VF-02"
+          ]
         },
         {
           "id": "verify.refused-while-operating-as-vault",
