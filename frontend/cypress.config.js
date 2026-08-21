@@ -1115,12 +1115,26 @@ export default defineConfig({
                 }
 
                 let cur = await view(id)
-                if (cur.proposed.cid) {
+                // A proposal for the package we WANT is the thing to approve, not to clear — on a
+                // freshly submitted record that proposal is the only copy there is, and rejecting
+                // it leaves nothing to approve at all (`NothingProposed`). Only a FOREIGN proposal,
+                // left by a flow that swapped one in, gets cleared.
+                if (cur.proposed.cid && cur.proposed.manifestHash !== args.manifestHash) {
                   await (await registry.rejectProposal(BigInt(id), cur.proposed.manifestHash)).wait(1)
                   cur = await view(id)
                 }
+                // The record exists but holds our package nowhere — a listing whose only proposal
+                // was rejected has neither an approved nor a proposed tuple, and there is nothing
+                // for `approveApp` to promote. Re-propose it.
+                if (!cur.proposed.cid && cur.approved.manifestHash !== args.manifestHash) {
+                  await (await registry.submitUpdate(BigInt(id), args.cid, args.manifestHash)).wait(1)
+                  cur = await view(id)
+                }
                 if (!cur.launchable) {
-                  await (await registry.approveApp(BigInt(id), args.manifestHash)).wait(1)
+                  // Promote the proposal if there is one; otherwise reinstate what was approved
+                  // before (the shape `approveApp` takes for a suspended record).
+                  const expected = cur.proposed.cid ? cur.proposed.manifestHash : cur.approved.manifestHash
+                  await (await registry.approveApp(BigInt(id), expected)).wait(1)
                   cur = await view(id)
                 }
                 return { ok: true, id, ...cur }

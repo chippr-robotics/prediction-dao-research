@@ -1911,13 +1911,14 @@
         {
           "id": "miniapp.curator-approve-content-committed",
           "name": "A curator approval is refused when the package changed under it",
-          "status": "absent",
-          "tier": "none",
+          "status": "covered",
+          "tier": "on-chain",
           "proposedTier": "on-chain",
-          "depth": "none",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1238"
+          "tests": [
+            "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-03"
+          ]
         }
       ]
     },

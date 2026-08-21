@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 69 |
+| 🟢 covered | 70 |
 | 🟡 partial | 8 |
-| 🔴 absent | 47 |
+| 🔴 absent | 46 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 18 · 🟡 1 · 🔴 19 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 19 · 🟡 1 · 🔴 18 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -437,7 +437,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `miniapp.launch-verified-package` | Launch a mini-app whose bytes are verified against the chain | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-01) |  |
 | `miniapp.launchable-not-status` | A live app whose update is in review still launches | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-02) |  |
-| `miniapp.curator-approve-content-committed` | A curator approval is refused when the package changed under it | 🔴 absent | none | — (proposed: on-chain) | #1238 |  |
+| `miniapp.curator-approve-content-committed` | A curator approval is refused when the package changed under it | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-03) |  |
 
 ### `084-message-signing-verify` — Message signing and Verify
 

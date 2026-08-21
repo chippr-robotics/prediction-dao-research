@@ -4,8 +4,9 @@
  * Issue #1238. The Apps section executes UNTRUSTED THIRD-PARTY CODE, and the rules that make
  * that safe are the kind a refactor inverts without breaking a single unit test:
  *
- *   MA-01  miniapp.launch-verified-package   bytes are verified against the chain before they run
- *   MA-02  miniapp.launchable-not-status     a live app whose update is in review still launches
+ *   MA-01  miniapp.launch-verified-package        bytes are verified against the chain before they run
+ *   MA-02  miniapp.launchable-not-status          a live app whose update is in review still launches
+ *   MA-03  miniapp.curator-approve-content-committed  an approval is refused when the package changed
  *
  * ── WHY THIS NEEDS A CHAIN IT CAN WRITE TO ────────────────────────────────────────────────
  * Every one of these claims is about the relationship between a package and an on-chain record,
@@ -36,6 +37,7 @@ const APP_SLUG = 'fixture-app'
 const GATEWAY = 'http://localhost:8090'
 
 const CATALOG_URL = '/wallet?tab=apps'
+const REVIEW_URL = '/admin/compliance?view=miniapp-review'
 
 /**
  * The fixture package's bytes, fetched through a task because the fixtures module is Node-side
@@ -133,6 +135,83 @@ describe('Mini-app platform (specs 073 / 077 / 028 / 030)', () => {
         cy.visit(`/apps/${APP_SLUG}`)
         cy.get('.miniapp-workspace-root', { timeout: 40000 }).should('exist')
         cy.get('.miniapp-workspace-refusal').should('not.exist')
+      })
+    })
+  })
+
+  it('[MA-03] miniapp.curator-approve-content-committed — an approval is refused when the package changed under it', () => {
+    /*
+     * `approveApp(id, expectedManifestHash)` has no id-only overload, deliberately: reading the
+     * proposed tuple at EXECUTION time let a vendor swap the package after review and have the
+     * curator's signature land on something nobody read. This flow is that attack.
+     *
+     * The swap has to happen while the review page is OPEN and must not be followed by a refresh —
+     * a reloaded page would pick up the new hash and approve it quite correctly. What is under
+     * test is the commitment the curator's client made when they decided, not the chain's ability
+     * to compare two numbers.
+     */
+    packageBytes('approved').then(({ cid, manifestHash }) => {
+      registry('ensureServing', { name: APP_NAME, cid, manifestHash }).then(({ id }) => {
+        // The vendor proposes something. Its CID is deliberately one the gateway does not serve,
+        // so the curator's verification fails and they have to acknowledge that before approving —
+        // which is exactly the circumstance in which content-commitment earns its keep.
+        const reviewed = `0x${'11'.repeat(32)}`
+        registry('submitUpdate', { id, cid: 'bafybeireviewedpackage073t014exampleaaaaaaaaaaaaaaaaaa', manifestHash: reviewed })
+
+        cy.mockWeb3Provider({ account: MEMBER, preAuthorized: true, realBalances: true })
+        cy.visit(REVIEW_URL)
+        cy.contains('h3', 'Mini-app review', { timeout: 40000 }).should('be.visible')
+        cy.contains('.miniapp-review-record', APP_NAME, { timeout: 30000 }).as('record')
+
+        // The curator reviews: verification cannot fetch the package, so they take it on
+        // themselves in as many words.
+        cy.get('@record').contains('button', /Verify proposed package/i).click()
+        cy.get('@record').find('label.checkbox-label input[type="checkbox"]', { timeout: 40000 })
+          .check()
+        cy.get('@record').contains('button', /^Approve v/).should('not.be.disabled')
+
+        // ── The swap. The page is not reloaded; the curator is still looking at v2. ──────
+        const swapped = `0x${'22'.repeat(32)}`
+        registry('submitUpdate', { id, cid: 'bafybeiswappedpackage073t014examplebbbbbbbbbbbbbbbbbbb', manifestHash: swapped })
+          .then((app) => {
+            expect(app.proposed.manifestHash, 'the chain now holds the swapped package').to.equal(swapped)
+          })
+
+        cy.get('@record').contains('button', /^Approve v/).click()
+
+        /*
+         * Refused, and the refusal NAMES what happened rather than reporting a failed transaction:
+         * the curator has to learn the package MOVED, not merely that their click did not work.
+         *
+         * Asserted on the toast without a wait first, because this notice is transient — and
+         * because the console re-reads the record straight afterwards and re-arms Approve on the
+         * NEW proposal, which is correct behaviour and would erase any later evidence.
+         */
+        // Scoped to the notification itself. `cy.assertToast` matches any `[role="alert"]`, and the
+        // record already carries one — the verification-failure panel this flow deliberately
+        // provoked — so the generic helper reads the wrong element.
+        /*
+         * The curator is TOLD, and the approval does not go through.
+         *
+         * Deliberately not asserting the specific `StaleProposal` wording that
+         * `MiniAppReviewTab#decodeStaleProposal` composes ("the vendor replaced this package since
+         * you opened it…"). That message needs ethers to have decoded the revert into
+         * `error.revert`, and through the injected-wallet path it arrives as raw `error.data`
+         * instead, so what actually renders here is the generic "execution reverted". Whether a
+         * real wallet fares better is not something this harness can settle, so the flow asserts
+         * the refusal it can prove rather than a sentence it cannot. Tracked in #1267.
+         */
+        cy.get('.notification-message', { timeout: 30000 })
+          .invoke('text')
+          .should('match', /revert|failed|error/i)
+
+        // The durable proof, from the chain: the swap was never promoted, and the package members
+        // are being served is the one approved long before any of this.
+        registry('appState', { id }).then((app) => {
+          expect(app.proposed.manifestHash, 'the swap was not promoted').to.equal(swapped)
+          expect(app.approved.manifestHash, 'and the served package is untouched').to.equal(manifestHash)
+          expect(app.launchable, 'members are unaffected throughout').to.equal(true)
+        })
       })
     })
   })
