@@ -698,13 +698,15 @@
         {
           "id": "backup.encrypted-sync-roundtrip",
           "name": "Back up local data encrypted and restore it on another device",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "no-chain",
+          "depth": "smoke",
           "risk": "access",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-01"
+          ],
+          "issue": "#1245",
+          "missing": "asserts the surface renders and prints no key material; the encrypt/restore round-trip itself is not driven"
         }
       ]
     },
@@ -824,13 +826,14 @@
         {
           "id": "wagers.lookup-by-code",
           "name": "Find a pool or challenge from a code someone sent you",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "access",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::LK-01"
+          ],
+          "note": "the deep link opens the lookup and the code is cleared from the URL; resolving a real phrase needs a chain"
         }
       ]
     },
@@ -1619,13 +1622,13 @@
         {
           "id": "assets.pick-any-supported-asset",
           "name": "Pick any supported asset from one selector",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::AS-01"
+          ]
         }
       ]
     },
@@ -2035,13 +2038,15 @@
         {
           "id": "nav.drawer-sections-and-density",
           "name": "Fold nav sections and choose a compact density that survives a reload",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::NV-01",
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::NV-02"
+          ],
+          "note": "the fold persists and the filter searches the app; the UNMOUNT rule is asserted in src/test/PortalNav.test.jsx, where the whole rail is in one render tree"
         }
       ]
     },

@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 98 |
-| 🟡 partial | 6 |
-| 🔴 absent | 20 |
+| 🟢 covered | 101 |
+| 🟡 partial | 7 |
+| 🔴 absent | 16 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 32 · 🟡 0 · 🔴 6 · ⚪ 0 · covered-but-not-proven 1
+38 flows — 🟢 33 · 🟡 1 · 🔴 4 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -359,13 +359,13 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟡 partial | smoke | `no-chain` | `35-navigation-and-lookup.cy.js` (BK-01) | asserts the surface renders and prints no key material; the encrypt/restore round-trip itself is not driven |
 
 ### `037-unified-pool-challenge-lookup` — Unified pool and challenge lookup
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `wagers.lookup-by-code` | Find a pool or challenge from a code someone sent you | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `wagers.lookup-by-code` | Find a pool or challenge from a code someone sent you | 🟢 covered | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (LK-01) |  |
 
 ### `041-passkey-wallet-login` — Passkey wallet login
 
@@ -455,7 +455,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 25 · 🟡 1 · 🔴 6 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 27 · 🟡 1 · 🔴 4 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -587,7 +587,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `assets.pick-any-supported-asset` | Pick any supported asset from one selector | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `assets.pick-any-supported-asset` | Pick any supported asset from one selector | 🟢 covered | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (AS-01) |  |
 
 ### `068-protect-multi-chain-policies` — Protect — policy v2
 
@@ -617,7 +617,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `nav.drawer-sections-and-density` | Fold nav sections and choose a compact density that survives a reload | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `nav.drawer-sections-and-density` | Fold nav sections and choose a compact density that survives a reload | 🟢 covered | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (NV-01, NV-02) |  |
 
 ### `082-perps-trade-view` — Perps market data
 
