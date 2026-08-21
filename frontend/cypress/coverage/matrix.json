@@ -1539,13 +1539,14 @@
         {
           "id": "bitcoin.receive-address-rotates",
           "name": "Get a fresh receive address that is never reissued",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1243"
+          "tests": [
+            "frontend/cypress/e2e/passkey/bitcoin-receive.cy.js::BTC-01",
+            "frontend/cypress/e2e/passkey/bitcoin-receive.cy.js::BTC-02"
+          ]
         },
         {
           "id": "bitcoin.fee-quote-expiry",

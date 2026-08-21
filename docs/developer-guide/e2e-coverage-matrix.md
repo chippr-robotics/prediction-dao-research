@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 110 |
+| 🟢 covered | 111 |
 | 🟡 partial | 5 |
-| 🔴 absent | 9 |
+| 🔴 absent | 8 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 37 · 🟡 4 · 🔴 4 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 38 · 🟡 4 · 🔴 3 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -195,7 +195,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `bitcoin.send` | Send bitcoin, paying the network fee you confirmed | ⚪ out-of-scope | none | — (proposed: on-chain) | — | No local regtest node exists in the harness, so nothing can settle a Bitcoin send. Standing up one is the work; until then this is a named gap rather than a silent skip. |
-| `bitcoin.receive-address-rotates` | Get a fresh receive address that is never reissued | 🔴 absent | none | — (proposed: no-chain) | #1243 |  |
+| `bitcoin.receive-address-rotates` | Get a fresh receive address that is never reissued | 🟢 covered | flow | `account-native` | `bitcoin-receive.cy.js` (BTC-01, BTC-02) |  |
 
 ### `062-legacy-account-recovery` — Legacy account recovery
 
