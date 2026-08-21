@@ -1551,13 +1551,13 @@
         {
           "id": "bitcoin.fee-quote-expiry",
           "name": "Be refused a stale fee quote rather than signing at the wrong fee",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
           "risk": "disclosure",
-          "tests": [],
-          "issue": "#1243"
+          "tests": [
+            "frontend/cypress/e2e/passkey/bitcoin-send-fee.cy.js::BTC-03"
+          ]
         }
       ]
     },

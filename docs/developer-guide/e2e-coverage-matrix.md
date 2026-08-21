@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 130 |
-| 🟢 covered | 111 |
+| 🟢 covered | 112 |
 | 🟡 partial | 5 |
-| 🔴 absent | 8 |
+| 🔴 absent | 7 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -265,7 +265,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Disclosure — a member consents to a cost
 
-9 flows — 🟢 7 · 🟡 0 · 🔴 2 · ⚪ 0 · covered-but-not-proven 0
+9 flows — 🟢 8 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -303,7 +303,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `bitcoin.fee-quote-expiry` | Be refused a stale fee quote rather than signing at the wrong fee | 🔴 absent | none | — (proposed: no-chain) | #1243 |  |
+| `bitcoin.fee-quote-expiry` | Be refused a stale fee quote rather than signing at the wrong fee | 🟢 covered | flow | `account-native` | `bitcoin-send-fee.cy.js` (BTC-03) |  |
 
 ### `067-bridge-pool-liquidity` — Bridge and supplied liquidity
 
