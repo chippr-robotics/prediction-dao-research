@@ -141,6 +141,31 @@
  *   ASSISTANT_MODEL            model id (default claude-sonnet-5)
  *   ASSISTANT_MAX_TOKENS       reply cap (default 1024)
  *   ASSISTANT_TIMEOUT_MS       upstream request timeout (default 30000)
+ *   X402_ENABLED               'true' enables the x402 pay-per-request rail on the member API's PRICED
+ *                              operations (spec 096; default false). Disabled => byte-identical
+ *                              behaviour to a pre-096 gateway: an unauthenticated priced request
+ *                              answers 401 exactly as before, and nothing ever answers 402
+ *   X402_KILLSWITCH            'true' => the paid rail stops being OFFERED (ops kill). Member bearer
+ *                              requests are unaffected — they were never charged in the first place
+ *   X402_CHAIN_ID              chain payments are signed on and settled on. MUST be an enabled chain
+ *                              that supports EIP-3009 (a recorded paymentToken + a token EIP-712
+ *                              domain) — boot fails otherwise, because a rail that can never settle
+ *                              must not advertise a price. Defaults to the first enabled such chain
+ *   X402_PAY_TO                the platform treasury every payment is made to. REQUIRED when enabled,
+ *                              with NO DEFAULT ON PURPOSE: a defaulted treasury address would send
+ *                              agents' money somewhere nobody chose
+ *   X402_SETTLE_BUFFER_SECONDS how much validity an authorization must have LEFT to be accepted
+ *                              (default 60). One that expires mid-settlement would be accepted here
+ *                              and refused by the token — refusing it now costs the payer nothing
+ *   X402_MAX_TIMEOUT_SECONDS   `maxTimeoutSeconds` published in the 402 offer (default 300)
+ *   X402_PRICE_READ            price of a priced READ op, in USDC base units (default 10000 = $0.01)
+ *   X402_PRICE_BUILD           price of a typed-data BUILD (default 50000 = $0.05)
+ *   X402_PRICE_ASSISTANT       price of one assistant message (default 100000 = $0.10)
+ *                              EACH PRICE AT 0 MEANS "NOT OFFERED", never "free": that op class is
+ *                              simply absent from the paid rail and answers 401 as it does today
+ *   X402_NONCE_MAX             bound on the in-process replay set (default 50000). Phase 1: the
+ *                              TOKEN's own authorization state is the real uniqueness guarantee — a
+ *                              replay reverts on chain — so this only saves the gas of finding out
  *   FEE_ROUTER_ADDRESS         FeeRouter proxy (spec 060) serving the LIVE polymarket.taker/.maker bps.
  *                              Defaults to the deployment record's feeRouter for FEE_ROUTER_CHAIN_ID;
  *                              a set value that CONTRADICTS the record fails boot loudly. Unset and not
@@ -774,6 +799,97 @@ export function loadConfig(env = process.env, opts = {}) {
           maxTokens: assistantMaxTokens,
           timeoutMs: int(env, 'ASSISTANT_TIMEOUT_MS', 30_000),
         },
+      }
+    })(),
+    // x402 agentic payments (spec 096): a pay-per-request rail on the member API's PRICED
+    // operations, for an agent that holds no member key. Optional exactly like the blocks above —
+    // disabled (the default) means no route ever answers 402 and an unauthenticated priced request
+    // gets the same 401 it got before this module existed.
+    //
+    // THE PAID RAIL SUBSTITUTES MEMBERSHIP FOR ONE OPERATION, and never applies to a member whose
+    // bearer token works: routes.js checks the token FIRST. Payment is an EIP-3009
+    // `TransferWithAuthorization` the PAYER signs on the chain's own USDC to X402_PAY_TO; this
+    // gateway verifies it and hands the settlement to the SAME engine the intent rail uses. No key
+    // is held here, and nothing is signed server-side — as everywhere else in this service.
+    //
+    // Fail-loud validation applies ONLY when the module is ENABLED, same philosophy as the
+    // bitcoin/bridge/perps/memberApi blocks — with one addition that matters more than the others:
+    // X402_PAY_TO has no default, because a defaulted treasury is money sent somewhere nobody chose.
+    x402: (() => {
+      const enabled = opt(env, 'X402_ENABLED', 'false').toLowerCase() === 'true'
+
+      // EIP-3009 is the whole settlement mechanism, so the only candidate chains are the ones this
+      // gateway already knows carry an EIP-3009 token (`paymentSupported` + a recorded paymentToken).
+      // On 61/63 the live token is permit-only and there is nothing to settle with.
+      const defaultChain = enabledChainIds.find((id) => chains[id]?.paymentSupported && chains[id]?.paymentToken)
+      const chainId = int(env, 'X402_CHAIN_ID', defaultChain ?? enabledChainIds[0])
+      const payTo = opt(env, 'X402_PAY_TO', null)
+      const prices = {
+        read: int(env, 'X402_PRICE_READ', 10_000),
+        build: int(env, 'X402_PRICE_BUILD', 50_000),
+        assistant: int(env, 'X402_PRICE_ASSISTANT', 100_000),
+      }
+      const settleBufferSeconds = int(env, 'X402_SETTLE_BUFFER_SECONDS', 60)
+      const maxTimeoutSeconds = int(env, 'X402_MAX_TIMEOUT_SECONDS', 300)
+
+      if (enabled) {
+        const chain = chains[chainId]
+        if (!chain) {
+          throw new Error(
+            `[relay-gateway] X402_CHAIN_ID=${chainId} is not an enabled chain (enabled: ${enabledChainIds.join(', ')}). ` +
+              'Refusing to start: the paid rail would advertise a price it could never settle.'
+          )
+        }
+        if (!chain.paymentSupported || !ADDRESS_RE.test(chain.paymentToken || '')) {
+          throw new Error(
+            `[relay-gateway] X402_CHAIN_ID=${chainId} has no EIP-3009 payment token recorded, so an x402 payment ` +
+              'could never be settled there. Refusing to start.'
+          )
+        }
+        if (!chain.tokenDomain?.name || !chain.tokenDomain?.version) {
+          throw new Error(
+            `[relay-gateway] chain ${chainId} has no payment-token EIP-712 domain, so a payment signature could ` +
+              'never be verified. Refusing to start.'
+          )
+        }
+        if (!chain.engineRelayerId) {
+          throw new Error(`[relay-gateway] chain ${chainId} has no engine relayer id; x402 settlement has no lane`)
+        }
+        // REQUIRED, and validated. There is deliberately no fallback: an unset treasury must stop
+        // the boot, never quietly resolve to an address an operator did not choose.
+        if (!payTo) {
+          throw new Error(
+            '[relay-gateway] X402_ENABLED=true requires X402_PAY_TO (the treasury every payment is made to). ' +
+              'It has no default on purpose — refusing to start.'
+          )
+        }
+        if (!ADDRESS_RE.test(payTo)) throw new Error(`[relay-gateway] X402_PAY_TO=${payTo} is not an address`)
+        if (Object.values(prices).every((p) => p <= 0)) {
+          throw new Error(
+            '[relay-gateway] X402_ENABLED=true but every X402_PRICE_* is 0, so no operation is offered over the ' +
+              'paid rail. Refusing to start: the module would be on and do nothing.'
+          )
+        }
+        if (settleBufferSeconds < 1) {
+          throw new Error(`[relay-gateway] X402_SETTLE_BUFFER_SECONDS=${settleBufferSeconds} must be >= 1`)
+        }
+        if (maxTimeoutSeconds < settleBufferSeconds) {
+          throw new Error(
+            `[relay-gateway] X402_MAX_TIMEOUT_SECONDS=${maxTimeoutSeconds} is below X402_SETTLE_BUFFER_SECONDS=` +
+              `${settleBufferSeconds}; the offer would promise less time than settlement demands`
+          )
+        }
+      }
+
+      return {
+        enabled,
+        killSwitch: opt(env, 'X402_KILLSWITCH', 'false').toLowerCase() === 'true',
+        chainId,
+        payTo,
+        prices,
+        settleBufferSeconds,
+        maxTimeoutSeconds,
+        nonceMaxEntries: int(env, 'X402_NONCE_MAX', 50_000),
       }
     })(),
     // FeeRouter (spec 060): the on-chain source of truth for the Polymarket builder bps. The env

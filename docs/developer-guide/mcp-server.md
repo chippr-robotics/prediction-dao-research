@@ -80,7 +80,40 @@ Two transports:
 - **`--http <port>`** — `POST /mcp` carrying a single JSON-RPC message, plus `GET /healthz`. A
   per-request `Authorization: Bearer` header **overrides** `FAIRWINS_API_TOKEN`, which is what
   makes one hosted instance usable by more than one member without the instance holding anyone's
-  credential.
+  credential. A per-request `X-PAYMENT` header rides the same way — see below.
+
+## Payments: it carries them, it never makes them (spec 096)
+
+The gateway may price an operation and accept a [pay-per-request payment](agentic-payments.md) from a
+caller with no member token. This server participates in exactly two ways.
+
+Only three tools can ever be priced — `get_wagers`, `get_fees` and `build_intent`. `get_profile` and
+`get_membership` never are (they answer questions about a token and a membership, and a paying caller
+has neither), and the public tools are free by construction.
+
+**A `402` is surfaced whole.** The tool result carries the complete `accepts[]` offer — amount, asset,
+recipient, CAIP-2 network and the token's own EIP-712 domain — plus the statement that this server
+holds no key and cannot pay, worded as a **price rather than an outage**. Flattening the offer (the
+default behaviour of any generic HTTP error mapper, which would report `http_402`) would leave an
+agent holding a price it cannot read and telling a member that available data is unavailable.
+
+**An inbound `X-PAYMENT` header is forwarded upstream byte-for-byte**, and the gateway's own
+`X-PAYMENT-RESPONSE` bytes are returned to whoever paid. The tool result restates the receipt and says
+the transaction was **broadcast, not confirmed**.
+
+Three shapes are deliberate:
+
+- **A payment is never a tool argument.** A tool argument is model-authored text, and the one thing a
+  model must not be able to author is a transfer authorisation. It travels as a transport header.
+- **The payload is forwarded, not re-encoded.** A re-encoded payload is a different signature payload.
+- **A supplied payment replaces the bearer for that call.** The paid rail serves the request as the
+  *payer*; sending somebody else's token alongside a payment would ask two different questions at
+  once, and is the shape in which a member gets charged for something their membership covers.
+
+**stdio cannot carry a payment, and says so** rather than approximating one with an environment
+variable: a payload replayable out of configuration would be a standing withdrawal, not a single-use
+authorisation. Price discovery needs no token — `get_gateway_status` reports whether the rail is on
+and what each class costs.
 
 ## Tools
 
@@ -130,6 +163,10 @@ act — there is nothing here to act with.
 | `FAIRWINS_API_URL` | to serve | Gateway base URL, e.g. `https://relay.fairwins.app`. Unset ⇒ tools return honest errors. |
 | `FAIRWINS_API_TOKEN` | no | The member's own `fw1.…` token. **Secret.** In HTTP mode a request header overrides it. |
 
+There is deliberately **no variable for a payment**: a payment is single-use and per-request, and one
+replayable out of configuration would be a standing withdrawal. It travels as an `X-PAYMENT` request
+header, in HTTP mode only.
+
 Client configuration examples (Claude Desktop / Claude Code JSON) live in
 `services/mcp-server/README.md`.
 
@@ -147,7 +184,8 @@ authorisation arrives on each request. Scale-to-zero, single container.
   Node ships. A PR that adds one is a design change, not a convenience.
 - **The server never creates, stores, or persists a token.** It reads one from the environment or a
   request header and forwards it.
-- **The server never signs.** There is no signing code path and no key material.
+- **The server never signs, and never pays.** There is no signing code path and no key material. It
+  forwards a payment somebody else made, unaltered, and returns the receipt to them.
 - **A failed upstream read is `isError: true` naming the failure** — never an empty list, a zero,
   or a silently omitted field.
 - **Public tools work without a token**, and say so, so a member can verify connectivity before
@@ -159,11 +197,13 @@ authorisation arrives on each request. Scale-to-zero, single container.
 `services/mcp-server/test/` under `node:test`, no runner and no dependency:
 `jsonrpc.test.js` (framing, ids, error shapes), `mcp.test.js` (handshake and method coverage),
 `tools.test.js` (input schemas and upstream failure mapping), `stdio.test.js` and `http.test.js`
-(both transports, including header-over-env token precedence).
+(both transports, including header-over-env token precedence), and `x402.test.js` (offer surfacing,
+the non-x402 402 fallback, byte-for-byte payment passthrough, and the receipt round trip).
 
 ## Related
 
 - [Member API](member-api.md) — the API this server consumes.
+- [Agentic payments](agentic-payments.md) — the pay-per-request rail this server carries payments for.
 - [Member API Operations](../runbooks/member-api-operations.md) — enabling and incident response.
 - [Assistant & API access](../user-guide/assistant-and-api.md) — connecting an MCP client, for members.
 - Spec: `specs/095-member-api-agentic-access/`.

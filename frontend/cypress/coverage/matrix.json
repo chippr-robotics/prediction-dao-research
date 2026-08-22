@@ -243,16 +243,16 @@
         {
           "id": "compliance.passkey-account-parity",
           "name": "A passkey account meets the same compliance gates as a classic wallet",
-          "status": "absent",
-          "tier": "account-native",
-          "depth": "skipped",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-02",
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-03"
+            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-01",
+            "frontend/cypress/e2e/full/38-passkey-compliance.cy.js::CP-02",
+            "frontend/cypress/e2e/full/38-passkey-compliance.cy.js::CP-03"
           ],
-          "issue": "#1271",
-          "missing": "both tests are PERMANENTLY PENDING and would fail if allowed to run: they gate on PASSKEY_FULL_STACK, which nothing sets, they call a `flagAddress` cypress task that is not registered, and they read a `[data-testid=\"passkey-account-address\"]` the app does not render. The gates themselves ARE covered for classic wallets (compliance.sanctioned-address-refused, compliance.frozen-account-blocked); what is absent is the parity claim for the passkey rail"
+          "note": "CP-01 is no-chain (the entry gate is a browser decision and passkey sign-in needs no chain): it proves the gate is not bypassable by the passkey route, asserted by OCCLUSION rather than absence, and that entering then lets the passkey session complete. CP-02/CP-03 need chain state: screening (SanctionsGuard) and the membership gate. CP-02 grants membership BEFORE flagging so the membership gate cannot explain the refusal, and attributes it to screening by a control \u2014 lifting only the flag makes the pre-submission refusal disappear. It cannot yet assert the refusal's WORDING because the guard's custom error is not decoded (#1292)."
         }
       ]
     },
@@ -2329,7 +2329,7 @@
           "tests": [
             "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-01"
           ],
-          "note": "default OFF is the absence of the feature, not a UI state, so it is proved by absence at both ends — before the switch and after it is switched back"
+          "note": "default OFF is the absence of the feature, not a UI state, so it is proved by absence at both ends \u2014 before the switch and after it is switched back"
         },
         {
           "id": "assistant.honest-unreachable",
@@ -2341,7 +2341,7 @@
           "tests": [
             "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-02"
           ],
-          "note": "no intercept — the no-chain dev server points VITE_RELAYER_URL at a dead port, so the transport failure is real; the test asserts the named error, the retry, and the ABSENCE of an assistant bubble"
+          "note": "no intercept \u2014 the no-chain dev server points VITE_RELAYER_URL at a dead port, so the transport failure is real; the test asserts the named error, the retry, and the ABSENCE of an assistant bubble"
         },
         {
           "id": "assistant.memory-clear",
@@ -2366,7 +2366,7 @@
             "frontend/cypress/e2e/fast/39-api-access.cy.js::API-01",
             "frontend/cypress/e2e/fast/39-api-access.cy.js::API-05"
           ],
-          "note": "cy.assertNoClearSecret sweeps every storage key and the whole DOM after the reveal is dismissed; the metadata record is re-read after a reload. API-05 holds the three-state gate in both directions — an unreadable membership offers a retry, a chain that answered tier 0 offers the upgrade route, and neither is the console."
+          "note": "cy.assertNoClearSecret sweeps every storage key and the whole DOM after the reveal is dismissed; the metadata record is re-read after a reload. API-05 holds the three-state gate in both directions \u2014 an unreadable membership offers a retry, a chain that answered tier 0 offers the upgrade route, and neither is the console."
         },
         {
           "id": "api-access.revoke-key",
@@ -2391,10 +2391,17 @@
           "tests": [
             "frontend/cypress/e2e/fast/39-api-access.cy.js::API-04"
           ],
-          "missing": "Only the HOST card is exercised — the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them.",
+          "missing": "Only the HOST card is exercised \u2014 the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them.",
           "issue": "#1285"
         }
       ]
+    },
+    {
+      "id": "096-x402-agentic-payments",
+      "title": "x402 pay-per-request access to the member API",
+      "memberFacing": false,
+      "reason": "An agent-facing HTTP rail with no member surface: an unauthenticated caller is answered 402 with a price, pays with an X-PAYMENT header, and is served as the payer. No component, route or member journey changes, and a member holding a capability token never enters the path. Its gate is the gateway vitest suite (services/relay-gateway/test/x402.test.js) plus the spec-095 suites passing unchanged with the rail enabled, and node:test coverage of the MCP server's 402 surfacing and payment passthrough.",
+      "flows": []
     }
   ]
 }

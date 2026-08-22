@@ -104,6 +104,39 @@ Member API tokens are **not** configuration: a member signs their own EIP-712
 capability grant in the app and the gateway stores nothing. There is no key,
 table, or credential on the server side to configure, back up, or rotate.
 
+## x402 pay-per-request (gateway)
+
+Set on the **relay gateway**, spec 096. A sub-module of the Member API: it cannot
+answer while `MEMBER_API_ENABLED` is false, and with `X402_ENABLED=false` the
+member API behaves exactly as it did before spec 096. **None of these are
+secrets** — the treasury, the network and the prices are published to every
+unauthenticated caller by design, in every `402` answer and at `/status`.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `X402_ENABLED` | `false` | Master switch for the paid rail. A valid capability token is checked first and is **never** charged |
+| `X402_KILLSWITCH` | `false` | On ⇒ the offer is withdrawn: priced routes refuse exactly as unpriced ones do and no payment is taken; member-authenticated traffic unaffected |
+| `X402_CHAIN_ID` | the gateway's default chain | Chain payments are signed on and settle on. When enabled it must be an enabled chain with a payment token, a token domain and an engine lane — anything else fails the boot by name |
+| `X402_PAY_TO` | — | Treasury address payments are made to. **Required when enabled, and deliberately has no default** — a default is a default destination for other people's money, and a stale one is money sent to an address nobody holds |
+| `X402_SETTLE_BUFFER_SECONDS` | `60` | Minimum remaining validity a payment must carry, so a payer is not charged for a race between the check and the submission |
+| `X402_MAX_TIMEOUT_SECONDS` | `300` | The `maxTimeoutSeconds` published in each offer |
+| `X402_PRICE_READ` | `10000` | Read class, in USDC base units (6 decimals, so `10000` = $0.01). **`0` ⇒ that class is not offered at all** — zero is off, not free |
+| `X402_PRICE_BUILD` | `50000` | Typed-data build class. `0` ⇒ not offered |
+| `X402_PRICE_ASSISTANT` | `100000` | Assistant turn. `0` ⇒ not offered |
+| `X402_NONCE_MAX` | `50000` | Bound on the in-process replay set (Phase 1 — the durable guarantee is the token's own authorisation state) |
+
+!!! warning "An enabled rail with no `X402_PAY_TO` fails to boot, on purpose"
+    Boot-failing validation runs **only** inside the enabled branch, so an
+    unconfigured optional module can never take the gateway's relay path down —
+    but an *enabled* one missing a treasury, a payment token or an engine lane
+    refuses to start rather than guessing. Do not resolve that by adding a
+    default address. See
+    [Member API Operations](../runbooks/member-api-operations.md#33-enable-pay-per-request-x402-spec-096).
+
+A payment itself is never configuration: it is a single-use, per-request
+`X-PAYMENT` header signed by the payer. A payload replayable out of an
+environment variable would be a standing withdrawal rather than a payment.
+
 ## MCP server
 
 Set on the `fairwins-mcp-server` service (`services/mcp-server`), or in a member's
@@ -113,9 +146,13 @@ own MCP client configuration when they run it locally.
 |----------|---------|---------|
 | `FAIRWINS_API_URL` | — | Gateway base URL (e.g. `https://relay.fairwins.app`). Unset ⇒ the server still starts and lists tools, and each call returns an honest error |
 | `FAIRWINS_API_TOKEN` | — | **SECRET (the member's own token).** In `--http` mode a per-request `Authorization: Bearer` header overrides it, which is what lets one hosted instance serve several members without holding anyone's credential |
+| `FAIRWINS_TIMEOUT_MS` | `15000` | Per-request upstream timeout |
+| `PORT` | `8790` | Default port for `--http` when none is given on the command line |
 
 The service holds no other secret and no service account of its own — authorization
-arrives with each request.
+arrives with each request. There is deliberately **no variable for an x402 payment**:
+a payment is single-use and per-request, so it travels as an `X-PAYMENT` header in
+`--http` mode and is forwarded upstream unaltered.
 
 ## Updating configuration
 
