@@ -608,7 +608,10 @@ Cypress.Commands.add('fillWagerForm', (config = {}) => {
  */
 Cypress.Commands.add('enterAmountViaKeypad', (baseId, amount) => {
   const text = String(amount)
-  if (!/^\d*\.?\d*$/.test(text)) {
+  // Unambiguous form of `\d*\.?\d*` — the original let a digit match on either side of the
+  // optional dot, which is the polynomial-backtracking shape CodeQL flags (js/polynomial-redos).
+  // Same accepted language: digits, at most one '.', either side optionally empty.
+  if (!/^\d*(?:\.\d*)?$/.test(text)) {
     throw new Error(`enterAmountViaKeypad: "${text}" is not a plain decimal amount`)
   }
 
