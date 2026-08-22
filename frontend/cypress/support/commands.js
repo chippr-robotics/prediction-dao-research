@@ -193,6 +193,27 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               // the 40-hex-char account to a 65-byte (130-hex) value.
               resolve('0x' + S().activeAccount.slice(2).toLowerCase().repeat(4).slice(0, 130))
               break
+            case 'eth_signTypedData_v4':
+            case 'eth_signTypedData':
+              /*
+               * Deterministic PER-ACCOUNT typed-data signature, the same idea as personal_sign
+               * above and with the same hard limit: IT DOES NOT VERIFY. No key produced it, so
+               * `ecrecover` over the EIP-712 digest returns some other address, and ERC-1271
+               * would return nothing at all. Any surface whose signature is actually CHECKED —
+               * the registry's `…WithSig` twins, the relay's signer recovery — needs a real
+               * signer (the on-chain tier) or an explicitly stubbed verification boundary.
+               *
+               * What it IS for is the surfaces where the member's signature is the ceremony and
+               * something else is under test. Spec 095's API-key grant is signed here, encoded
+               * into an `fw1.…` capability token, and verified by the GATEWAY — which a
+               * no-chain-tier spec intercepts — so the signature never has to be real for the
+               * flow to be real.
+               *
+               * Shaped like a 65-byte secp256k1 signature (r‖s‖v) and ending in a plausible `v`
+               * byte, which also makes it distinguishable from this mock's personal_sign value.
+               */
+              resolve('0x' + S().activeAccount.slice(2).toLowerCase().repeat(4).slice(0, 128) + '1b')
+              break
             default:
               forwardToNode(method, params, resolve, reject)
           }

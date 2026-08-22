@@ -26,11 +26,11 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 96 |
-| With a member-facing flow | 79 |
-| Member-facing flows | 131 |
-| 🟢 covered | 116 |
-| 🟡 partial | 4 |
+| Spec directories | 97 |
+| With a member-facing flow | 80 |
+| Member-facing flows | 137 |
+| 🟢 covered | 121 |
+| 🟡 partial | 5 |
 | 🔴 absent | 5 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -265,7 +265,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Disclosure — a member consents to a cost
 
-9 flows — 🟢 9 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
+12 flows — 🟢 12 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -311,9 +311,17 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `bridge.fee-consent-ceiling` | The quoted bps is a ceiling on what can be charged | 🟢 covered | settled | `on-chain` | `30-bridge-liquidity.cy.js` (BL-04) |  |
 
+### `095-member-api-agentic-access` — Member API, private API keys and the opt-in assistant
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `assistant.opt-in` | The assistant does not exist until Settings turns it on, and stops existing when it is turned off | 🟢 covered | flow | `no-chain` | `38-assistant.cy.js` (AS-01) |  |
+| `assistant.honest-unreachable` | An unreachable assistant service is named and retryable, and never answered for | 🟢 covered | flow | `no-chain` | `38-assistant.cy.js` (AS-02) |  |
+| `assistant.memory-clear` | Conversation memory is device-local, counted in Settings, and clearable to nothing | 🟢 covered | settled | `no-chain` | `38-assistant.cy.js` (AS-03) |  |
+
 ## Access — gating, identity and permission
 
-39 flows — 🟢 36 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
+42 flows — 🟢 38 · 🟡 2 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -453,6 +461,14 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `admin.control-room-gating` | An operator sees granted, denied, or could-not-verify — never a silent denial | 🟢 covered | settled | `no-chain` | `32-admin-console.cy.js` (AD-01, AD-02, AD-03); `15-admin-panel.cy.js` (ADM-01, ADM-02) |  |
 | `admin.maintenance-permissionless` | Any entrant reaches Maintenance without elevated status | 🟢 covered | settled | `no-chain` | `32-admin-console.cy.js` (AD-05) |  |
+
+### `095-member-api-agentic-access` — Member API, private API keys and the opt-in assistant
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `api-access.create-key` | A member-signed grant is revealed once, persisted nowhere, and leaves only metadata | 🟢 covered | settled | `no-chain` | `39-api-access.cy.js` (API-01, API-05) |  |
+| `api-access.revoke-key` | A signed revocation is registered without overstating what registration means | 🟢 covered | flow | `no-chain` | `39-api-access.cy.js` (API-02, API-03) |  |
+| `api-access.console` | The api-access developer console: OpenAPI explorer, token introspection and MCP setup | 🟡 partial | smoke | `no-chain` | `39-api-access.cy.js` (API-04) | Only the HOST card is exercised — the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them. |
 
 ## Information — read-only surfaces
 

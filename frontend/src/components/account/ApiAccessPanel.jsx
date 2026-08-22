@@ -40,6 +40,7 @@ import {
   forgetApiKey,
   grantTypedData,
   keyState,
+  keyStateLabel,
   listApiKeys,
   markApiKeyRevoked,
   recordApiKey,
@@ -232,8 +233,10 @@ export default function ApiAccessPanel() {
         }
 
         // The local note is written either way: the member decided to withdraw this key, and the
-        // list must reflect that decision even when the registration could not be delivered.
-        markApiKeyRevoked(account, record.keyId, revocation.revokedAt)
+        // list must reflect that decision even when the registration could not be delivered. The
+        // `delivered` flag keeps the chip honest — an undelivered revocation reads
+        // "revocation signed — not delivered", never a plain "revoked" the gateway may not agree with.
+        markApiKeyRevoked(account, record.keyId, revocation.revokedAt, { delivered: registered })
         captureApiKeyRevoked(account, chainId, { keyId: record.keyId, label: record.label, durable })
         rerender()
 
@@ -451,7 +454,9 @@ export default function ApiAccessPanel() {
                   <li key={record.keyId} className="api-access__key" data-testid="api-access-key">
                     <div className="api-access__key-head">
                       <span className="api-access__key-label">{record.label || 'Unnamed key'}</span>
-                      <span className={`api-access__chip api-access__chip--${state}`}>{state}</span>
+                      <span className={`api-access__chip api-access__chip--${state}`} data-testid="api-access-key-state">
+                        {keyStateLabel(state)}
+                      </span>
                     </div>
                     <code className="api-access__key-id">{shortKeyId(record.keyId)}</code>
                     <p className="api-access__key-meta">

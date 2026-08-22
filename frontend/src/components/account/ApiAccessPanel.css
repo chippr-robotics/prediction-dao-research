@@ -210,6 +210,13 @@
   color: var(--danger-text);
 }
 
+/* The member signed the withdrawal but the gateway never heard it — the grant may still be
+   honoured there, so this must read as a warning, not as the settled "revoked" state. */
+.api-access__chip--revocation-signed {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
 /* --- Notices -------------------------------------------------------------- */
 .api-access__notice {
   border-radius: var(--radius-md);

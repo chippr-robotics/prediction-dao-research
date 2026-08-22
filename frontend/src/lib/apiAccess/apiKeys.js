@@ -262,11 +262,21 @@ export function recordApiKey(account, grant) {
  * Mark a key revoked locally. This is a NOTE, not a revocation: the authority is the gateway's own
  * in-process set, which does not survive a restart. The panel says both things.
  */
-export function markApiKeyRevoked(account, keyId, revokedAt) {
+export function markApiKeyRevoked(account, keyId, revokedAt, { delivered = true } = {}) {
   if (!account) return
   const at = Math.floor(Number(revokedAt) || Date.now() / 1000)
   const next = listApiKeys(account)
-    .map((r) => (r.keyId === keyId ? { ...r, revokedAt: r.revokedAt ?? at } : r))
+    .map((r) =>
+      r.keyId === keyId
+        ? {
+            ...r,
+            revokedAt: r.revokedAt ?? at,
+            // Once a revocation has reached the gateway it stays delivered; an undelivered signing
+            // is recorded as such so the list never claims the gateway agrees when it might not.
+            revocationDelivered: r.revocationDelivered === true || delivered === true,
+          }
+        : r,
+    )
     .sort((a, b) => a.issuedAt - b.issuedAt)
   writeAll(account, next)
 }
@@ -280,11 +290,22 @@ export function forgetApiKey(account, keyId) {
   writeAll(account, next)
 }
 
-/** Three-state-ish lifecycle for display: 'revoked' | 'expired' | 'active'. */
+/**
+ * Lifecycle for display: 'revoked' | 'revocation-signed' | 'expired' | 'active'.
+ * 'revocation-signed' means the member signed the withdrawal but it never reached the gateway —
+ * the grant may still be honoured there, and rendering it as plain "revoked" would claim
+ * agreement the gateway has not given. Records written before the flag existed (no
+ * `revocationDelivered` field) keep reading as 'revoked'.
+ */
 export function keyState(record, nowSeconds = Math.floor(Date.now() / 1000)) {
-  if (record?.revokedAt) return 'revoked'
+  if (record?.revokedAt) return record?.revocationDelivered === false ? 'revocation-signed' : 'revoked'
   if (Number(record?.expiresAt) <= nowSeconds) return 'expired'
   return 'active'
+}
+
+/** Member-facing wording for a `keyState` value. */
+export function keyStateLabel(state) {
+  return state === 'revocation-signed' ? 'revocation signed — not delivered' : state
 }
 
 /** Short display form of a key id — enough to tell two keys apart, never a secret. */
