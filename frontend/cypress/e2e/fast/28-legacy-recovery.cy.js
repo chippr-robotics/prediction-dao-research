@@ -32,7 +32,15 @@ const PASSPHRASE = 'correct-horse-battery'
 
 // Matched as a RegExp rather than a glob: the endpoint is a bare origin with no path, which
 // leaves nothing for a `**` suffix to bind to.
-const SOLANA_RPC_MATCH = /api\.mainnet-beta\.solana\.com/
+/*
+ * The Solana endpoint is not a constant: `lib/solana/rpc.js` prefers the relay-gateway proxy when
+ * one is configured and falls back to the public cluster otherwise. The no-chain tier now
+ * configures a (dead) gateway — `dev:fast` — so a matcher naming only the public cluster silently
+ * stops matching, every probe fails, and the panel renders as though the account were empty.
+ * Matching BOTH is what makes this test a statement about the app rather than about which
+ * endpoint the build happened to pick.
+ */
+const SOLANA_RPC_MATCH = /api\.mainnet-beta\.solana\.com|\/v1\/solana/
 
 /**
  * Record every request body the page sends, so a test can assert the secret was not among
@@ -209,6 +217,19 @@ describe('Legacy account recovery — other chains (spec 063)', () => {
       req.reply({ jsonrpc: '2.0', id, result: null })
     }).as('solana')
 
+    /*
+     * REFUSE the Bitcoin gateway explicitly, rather than relying on the build not configuring one.
+     *
+     * This test used to depend on `VITE_RELAYER_URL` being unset in the tier's dev server. It no
+     * longer is — `dev:fast` points it at a port nothing serves so Predict, Collect and Perps are
+     * reachable at all — and the consequence was not a changed Bitcoin message but a BROKEN SCAN:
+     * the leg sat on a dead port until its 12s client timeout, so the Solana results had not
+     * rendered when the assertions ran. A stub answers instantly and, more importantly, makes the
+     * claim independent of how the tier happens to be configured.
+     */
+    cy.intercept({ method: 'POST', url: /\/v1\/bitcoin\// }, { statusCode: 503, body: { error: { code: 'upstream_unavailable' } } })
+    cy.intercept({ method: 'GET', url: /\/v1\/bitcoin\// }, { statusCode: 503, body: { error: { code: 'upstream_unavailable' } } })
+
     cy.openLegacyRecovery({ onBeforeLoad: recordNetwork })
     cy.importLegacyKey({ secret: LEGACY_WORDS, passphrase: PASSPHRASE })
     cy.get('.action-sheet').within(() => cy.contains('button', 'Done').click())
@@ -227,11 +248,18 @@ describe('Legacy account recovery — other chains (spec 063)', () => {
         cy.contains('button', 'Send').should('be.visible')
       })
 
-      // Bitcoin: VITE_RELAYER_URL is unset in this build, so there is no gateway to ask. The
-      // row must say that. "No funds found" here would be a fabricated zero — the member would
-      // read "your BTC is gone" from a configuration gap.
+      /*
+       * Bitcoin: the gateway refused, so nothing is known about this account's BTC. The row must
+       * say so. "No funds found" here would be a fabricated zero — the member would read "your
+       * BTC is gone" from a configuration or reachability gap, which is the one reading this
+       * surface must never produce.
+       *
+       * Either honest wording satisfies it: the panel distinguishes "no gateway configured"
+       * (Gateway unavailable) from "configured but did not answer" (Couldn't check), and which
+       * one appears is a property of the deployment, not of this member's money.
+       */
       cy.contains('.lkr-asset-row', 'Bitcoin').within(() => {
-        cy.contains(/gateway unavailable/i).should('be.visible')
+        cy.contains(/gateway unavailable|couldn.t check/i).should('be.visible')
         cy.contains(/no funds found/i).should('not.exist')
       })
     })
