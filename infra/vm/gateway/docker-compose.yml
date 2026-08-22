@@ -58,7 +58,7 @@ services:
       # COMMENTED UNTIL THE IMAGE PIN ADVANCES: the pinned image above predates the memberApi
       # module, and this file's own perps history shows what a flag with no code behind it looks
       # like. Enable procedure (image build → push → repin → uncomment → converge) is
-      # docs/runbooks/member-api-operations.md § "Enabling on the gateway VM". The reference-chain
+      # docs/runbooks/member-api-operations.md §3.1 "Enable the Member API". The reference-chain
       # pin is LOAD-BEARING: ENABLED_CHAIN_IDS starts with 63, and the default reference chain is
       # the FIRST enabled chain with a recorded membershipManager — Mordor also has one, so leaving
       # this unset silently pins membership + ERC-1271 auth to testnet on a mainnet-serving gateway.

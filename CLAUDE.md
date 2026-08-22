@@ -679,9 +679,28 @@ artifacts live under `specs/<feature>/`.
   (`services/mcp-server/`) is DEPENDENCY-FREE and deliberately NOT a workspace member (lockfile
   hazard, spec 075) — do not add it to `workspaces` or give it dependencies; it consumes the API
   with the member's own token and cannot sign. Mini-app packages still cannot sign — the api-access
-  console deep-links to the host Settings card for every key ceremony. See
-  `docs/developer-guide/member-api.md` + `docs/developer-guide/mcp-server.md` +
-  `docs/developer-guide/agentic-chat.md` + `specs/095-member-api-agentic-access/`.
+  console deep-links to the host Settings card for every key ceremony.
+  **Spec 096 adds a SECOND rail on those same operations — x402 pay-per-request
+  (`services/relay-gateway/src/x402/`, `X402_ENABLED`, default off) — and it NEVER applies to a
+  member: the bearer token is checked first, so a valid `fw1` token never reaches the paywall even
+  with an `X-PAYMENT` attached, and `openapi.json`, `/me`, `/membership` and the key routes are never priced.** An
+  unauthenticated call to a priced op answers **402** with an x402-v2 offer (CAIP-2 network, string
+  base-unit amount, the chain's `paymentToken`, and the **TOKEN's** EIP-712 domain in `extra` — from
+  `chains.js#tokenDomain` and `@fairwins/intent-types`, never a local copy); the payer signs
+  **`TransferWithAuthorization`** (not `Receive…`), and the gateway verifies EVERYTHING before it
+  settles — so a refused payment is never submitted and costs nothing, and an engine outage is
+  `503 settlement_unavailable`, never a free serve. Settlement rides the EXISTING engine client (no
+  new key, no custody, no facilitator, no credits/balances, and deliberately no FeeRouter service —
+  this is not a member fee); acceptance is **broadcast, not finality**, on every surface. The payer
+  is sanctions-screened fail-closed and the request is served AS THE PAYER (built intents force the
+  actor to the payer address); prices are env config per op class with **`0` = not offered, never
+  free**; replay protection is in-process and honest about it (the token's own `authorizationState`
+  is the durable guarantee). Contract-account payers are EOA-only refusals whose **reason
+  says so** (a 1271 check would pass here and revert at the token). The MCP server surfaces a 402 whole
+  and forwards `X-PAYMENT` byte-for-byte — it holds no key and **cannot pay**, and a payment is never
+  a tool argument. See `docs/developer-guide/member-api.md` + `docs/developer-guide/mcp-server.md` +
+  `docs/developer-guide/agentic-chat.md` + `docs/developer-guide/agentic-payments.md` +
+  `specs/095-member-api-agentic-access/` + `specs/096-x402-agentic-payments/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

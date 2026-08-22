@@ -11,6 +11,13 @@
  * logged, never written into a URL. That is what lets ONE process serve several members without
  * holding any of their credentials: the caller brings their own token per call.
  *
+ * PER-REQUEST PAYMENT (spec 096). `X-PAYMENT` on the POST is forwarded upstream unaltered, and the
+ * gateway's `X-PAYMENT-RESPONSE` settlement receipt is returned on this response. This is the ONLY
+ * mode in which a payment can travel: stdio has no per-call header, and an environment variable
+ * cannot carry a single-use, per-request authorization — a payment payload that could be reused
+ * from configuration would be a standing withdrawal, not a payment. The stdio path therefore
+ * documents its absence rather than approximating it.
+ *
  * WHY THERE IS NO CORS HEADER, AND WHY THAT IS NOT AN OVERSIGHT.
  * MCP clients are agents and editors, not browsers: they speak HTTP directly and never perform a
  * preflight, so CORS buys this endpoint nothing. What it would cost is real. An
@@ -100,6 +107,26 @@ const LINE_TERMINATORS = ['\n', '\r', '\u2028', '\u2029']
  * sent, and Node will hand us up to `--max-http-header-size` bytes of it before this function is
  * ever called. The scan below is a single pass.
  */
+/**
+ * Extract an `X-PAYMENT` payload, or null (spec 096).
+ *
+ * The value is an opaque base64 PaymentPayload that only the gateway and the token contract can
+ * interpret, so it is taken as-is after a shape check and forwarded upstream unaltered. This server
+ * neither builds nor validates a payment — it carries one.
+ *
+ * A payment payload is a signed authorization to move a caller's money. It is therefore treated with
+ * the same care as the bearer token: read from a header, never from a URL or a tool argument, never
+ * logged, and never echoed into a tool result.
+ */
+export function paymentFrom(headers) {
+  const raw = headers?.['x-payment'] ?? headers?.['X-Payment']
+  if (typeof raw !== 'string') return null
+  const value = raw.trim()
+  if (!value) return null
+  if (LINE_TERMINATORS.some((c) => value.includes(c))) return null
+  return value
+}
+
 export function bearerFrom(headers) {
   const raw = headers?.authorization ?? headers?.Authorization
   if (typeof raw !== 'string') return null
@@ -164,10 +191,16 @@ export function createHttpTransport({ handle, parse, onParseError, maxBodyBytes 
 
       try {
         // The per-request token wins over the process's own. It travels no further than the
-        // upstream call this request makes.
-        const response = await handle(message, { token: bearerFrom(req.headers) })
-        if (!response) return res.writeHead(202).end()
-        return sendJson(res, 200, response)
+        // upstream call this request makes. `xPayment` rides alongside it for exactly one hop, and
+        // `ctx.settlement` is where the upstream receipt comes back — see below.
+        const ctx = { token: bearerFrom(req.headers), xPayment: paymentFrom(req.headers) }
+        const response = await handle(message, ctx)
+        // The settlement receipt goes back to whoever paid, as the ORIGINAL bytes the gateway sent.
+        // Re-encoding a receipt this server did not produce would put our signature-shaped claim
+        // where the gateway's belongs; the payer verifies the transaction, not our paraphrase of it.
+        const receipt = ctx.settlement?.raw ? { 'x-payment-response': ctx.settlement.raw } : {}
+        if (!response) return res.writeHead(202, receipt).end()
+        return sendJson(res, 200, response, receipt)
       } catch (err) {
         log(`[fairwins-mcp] request failed: ${err?.message ?? String(err)}`)
         return sendError(res, 500, 'internal_error', 'the request could not be handled')

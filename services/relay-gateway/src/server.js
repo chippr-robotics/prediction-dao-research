@@ -14,6 +14,9 @@
  *   GET  /v1/opensea/*        read-only collectibles proxy     (origin-locked; spec 055)
  *   GET  /v1/bridge/*         read-only Across quote/status    (origin-locked; spec 067)
  *   GET/POST /v1/member/*     member API: capability tokens    (origin-locked; spec 095)
+ *                             …and, on its PRICED ops only, x402 pay-per-request (spec 096):
+ *                             no token => 402 + PaymentRequirements; X-PAYMENT => verify, settle
+ *                             through the SAME engine, then serve. A valid token is never charged.
  */
 import crypto from 'node:crypto'
 import express from 'express'
@@ -48,6 +51,7 @@ import { createRevocationStore } from './memberApi/revocation.js'
 import { createMembershipReader } from './memberApi/membership.js'
 import { createWagerReader } from './memberApi/wagers.js'
 import { createAssistantClient } from './memberApi/assistant.js'
+import { createPaywall } from './x402/paywall.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
@@ -123,6 +127,7 @@ async function estimateCostWei(provider, chainCfg, { to, data }, defaultGasLimit
  *   memberApiMembership?: object,
  *   memberApiWagers?: object,
  *   memberApiAssistant?: object,
+ *   paywall?: object,                  // spec 096: the x402 paid rail seam
  * }} [deps]
  */
 export function createApp(config, deps = {}) {
@@ -850,6 +855,21 @@ export function createApp(config, deps = {}) {
       providers,
       quotas: memberApiQuotas,
       killSwitch,
+      // x402 pay-per-request (spec 096). Reuses THIS gateway's engine client, sanctions screen and
+      // member-API quotas — no second submission rail, no second screen, no key. Disabled by
+      // default, in which case `offers()` is false everywhere and the routes behave exactly as they
+      // did before the module existed.
+      paywall:
+        deps.paywall ??
+        createPaywall(config, {
+          providers,
+          screen,
+          engineClient,
+          quotas: memberApiQuotas,
+          killSwitch,
+          audit,
+          now,
+        }),
       feeRates,
       audit,
       now,
