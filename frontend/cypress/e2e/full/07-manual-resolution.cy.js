@@ -663,4 +663,257 @@ describe('Manual Resolution', () => {
       })
     })
   })
+
+  // ---------------------------------------------------------------------------
+  // RES-15 / RES-16 — DRAWS (spec 004). Both stakes go back, and one side alone
+  // can never make that happen.
+  // ---------------------------------------------------------------------------
+
+  it('[RES-15] An arbitrator declares a draw and BOTH stakes are returned', () => {
+    /*
+     * `Status.Draw` is not "resolved with no winner" — it is a refund of both sides, and the only
+     * assertion that proves it is the money. A status flag can be set by code that never moved a
+     * token; `_settleDraw` transfers each stake back to the account that put it up, so the test
+     * reads balances before and after and requires each side to be made whole.
+     *
+     * ThirdParty is the arbitrator path: their single call settles immediately, with no consent
+     * from either participant. That is the whole point of naming an arbitrator, and it is also
+     * why the participant path below must behave completely differently.
+     */
+    const STAKE = 2n * 10n ** 18n
+    cy.createAndAcceptWager({
+      description: 'RES-15: arbitrated draw',
+      resolutionType: 3, // ThirdParty
+      arbitrator: TEST_ACCOUNTS[2],
+      stake: String(STAKE),
+    }).then((wagerId) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is Active before the draw').to.equal(2)
+      })
+
+      // Balances with both stakes escrowed — the baseline the refund is measured against.
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).as('creatorBefore')
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).as('opponentBefore')
+
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 2 } }).then((r) => {
+        expect(r.ok, `the arbitrator can declare a draw (${r.error || ''})`).to.equal(true)
+      })
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'the wager settled as a Draw').to.equal(6)
+      })
+
+      // THE ASSERTION THIS TEST EXISTS FOR: each side got its own stake back, exactly.
+      cy.get('@creatorBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the creator was refunded their stake').to.equal(STAKE)
+        })
+      })
+      cy.get('@opponentBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the opponent was refunded their stake').to.equal(STAKE)
+        })
+      })
+
+      // Settled means settled: a second declaration finds nothing Active to draw.
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 2 } }).then((r) => {
+        expect(r.ok, 'a settled wager cannot be drawn again').to.equal(false)
+      })
+    })
+  })
+
+  it('[RES-16] One participant alone cannot force a draw — it takes both, and consent can be revoked', () => {
+    /*
+     * THE RULE WITH TEETH.
+     *
+     * On participant-resolved wagers a draw is MUTUAL: `_declareDraw` records one consent bit and
+     * settles only at `_CONSENT_BOTH`. If a single declaration settled, either party could void a
+     * wager they were losing at no cost — which is not a draw, it is a unilateral exit from a bet
+     * whose outcome had stopped being convenient.
+     *
+     * So the load-bearing assertion here is a NEGATIVE one: after the creator declares, the wager
+     * is still Active and nobody has been paid.
+     */
+    const STAKE = 2n * 10n ** 18n
+    cy.createAndAcceptWager({
+      description: 'RES-16: mutual draw consent',
+      resolutionType: 0, // Either — a participant-resolved type
+      stake: String(STAKE),
+    }).then((wagerId) => {
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).as('creatorBefore')
+
+      // One side proposes. Accepted as a PROPOSAL — and nothing else moves.
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'the creator may propose a draw').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'one consent is NOT a draw — the wager is still Active').to.equal(2)
+      })
+      cy.get('@creatorBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((after) => {
+          expect(BigInt(after.balance), 'no stake moved on a one-sided proposal').to.equal(BigInt(before.balance))
+        })
+      })
+
+      /*
+       * And the proposal is withdrawable. A member who offered a draw and then changed their mind
+       * must be able to take it back while the wager is still live — otherwise the offer is a
+       * one-way door that the other side can walk through at any later moment of their choosing.
+       */
+      cy.task('chainTx', { action: 'revokeDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'a draw proposal can be revoked while the wager is Active').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, 'the opponent may now propose').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(
+          i.status,
+          'the revoked consent did not count — one live proposal is still not a draw',
+        ).to.equal(2)
+      })
+
+      // Both sides agreeing IS a draw, and the money follows.
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).as('opponentBefore')
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'the creator declares again, completing mutual consent').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'both sides agreeing settles the wager as a Draw').to.equal(6)
+      })
+      cy.get('@opponentBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the opponent was refunded their stake').to.equal(STAKE)
+        })
+      })
+    })
+  })
+
+
+  // ---------------------------------------------------------------------------
+  // RES-17 / RES-18 / RES-19 — RELAYED INTENTS (spec 035). Someone else pays the
+  // gas; nobody else gains the authority.
+  // ---------------------------------------------------------------------------
+
+  it('[RES-17] A relayer submits the member\'s signed intent — the member acts, the relayer pays', () => {
+    /*
+     * The whole promise of the intent rail in one assertion pair.
+     *
+     * `declareWinnerWithSig` is a PUBLIC function: anyone may call it. What makes that safe is
+     * that the acting identity is not `msg.sender` but the address recovered from the signature,
+     * and every authorisation check runs against THAT. So a relayer can pay the gas for a member
+     * who has none, without acquiring any of the member's rights.
+     *
+     * The test proves both halves at once: the resolution succeeds when submitted by an account
+     * that has no authority over the wager, and the outcome is the one the MEMBER signed.
+     */
+    cy.createAndAcceptWager({
+      description: 'RES-17: relayed resolution',
+      resolutionType: 1, // Creator-only — so the relayer plainly cannot resolve it themselves
+    }).then((wagerId) => {
+      /*
+       * Positive control first. Account #3 is the relayer, and on a Creator-only wager it has no
+       * standing at all — if this direct call were to succeed, the test below would prove nothing
+       * about signatures.
+       */
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 3, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'the relayer has no authority of its own over this wager').to.equal(false)
+      })
+
+      // The same account submits the same outcome, now carrying the creator's signature.
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3 },
+      }).then((r) => {
+        expect(r.ok, `the relayer may submit an intent the creator signed (${r.error || ''})`).to.equal(true)
+      })
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'the wager resolved').to.equal(3)
+        expect(i.winner, 'the outcome is the one the MEMBER signed').to.equal(TEST_ACCOUNTS[0])
+      })
+    })
+  })
+
+  it('[RES-18] A relayed intent cannot be replayed, and cannot be re-pointed at another signer', () => {
+    /*
+     * Two ways a public, signature-carrying entrypoint goes wrong, and the guards for each.
+     *
+     * REPLAY: the intent is visible on chain the moment it is submitted. Without a spent-nonce
+     * check, anyone could resubmit it — harmless on a settled wager, not harmless on a repeatable
+     * action, and the guard belongs to the rail rather than to each action.
+     *
+     * SUBSTITUTION: `signer` is passed as a plain argument alongside the signature. If it were
+     * trusted rather than verified against the recovered address, a relayer could name any member
+     * as the actor and act as them. The digest binds the signer, so a mismatched pair must fail.
+     */
+    cy.createAndAcceptWager({ description: 'RES-18: replay + substitution', resolutionType: 1 }).then((wagerId) => {
+      const NONCE = '0x' + '11'.repeat(32)
+
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3, nonce: NONCE },
+      }).then((r) => {
+        expect(r.ok, 'the first submission lands').to.equal(true)
+      })
+
+      // Replay of the identical intent, by the same relayer.
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3, nonce: NONCE },
+      }).then((r) => {
+        expect(r.ok, 'the same intent cannot be submitted twice').to.equal(false)
+      })
+
+      // Substitution: a signature made by #1, presented as though #0 had signed it.
+      cy.createAndAcceptWager({ description: 'RES-18b: substitution', resolutionType: 1 }).then((otherId) => {
+        cy.task('chainTx', {
+          action: 'declareWinnerWithSig',
+          args: {
+            wagerId: otherId,
+            winner: TEST_ACCOUNTS[1],
+            signerIndex: 1,
+            relayerIndex: 3,
+            signerAddressOverride: TEST_ACCOUNTS[0],
+          },
+        }).then((r) => {
+          expect(
+            r.ok,
+            'naming a different signer than the one who signed does not make them the actor',
+          ).to.equal(false)
+        })
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: otherId } }).then((i) => {
+          expect(i.status, 'the wager was not resolved by the substitution attempt').to.equal(2)
+        })
+      })
+    })
+  })
+
+  it('[RES-19] The self-submit fallback reaches the same outcome without any relayer', () => {
+    /*
+     * THE NEVER-STRANDED RULE (spec 036). The relayer is OPTIONAL infrastructure: when it is
+     * unavailable the member submits the same action themselves and pays their own gas.
+     *
+     * A test cannot take down a relayer that this tier never runs, and asserting on a stubbed
+     * gateway would only prove the stub was called. What IS on chain, and what the rule actually
+     * depends on, is that the direct entrypoint remains open and produces the identical result —
+     * so a member with gas is never blocked by infrastructure being down.
+     */
+    cy.createAndAcceptWager({ description: 'RES-19: self-submit fallback', resolutionType: 1 }).then((wagerId) => {
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 0, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'the member can always submit for themselves — no relayer required').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'self-submission resolves the wager').to.equal(3)
+        expect(i.winner, 'and reaches the same outcome the relayed path would have').to.equal(TEST_ACCOUNTS[0])
+      })
+    })
+  })
+
 })
