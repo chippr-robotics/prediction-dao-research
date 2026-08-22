@@ -19,7 +19,7 @@ export function WalletProvider({ children }) {
   // Wagmi hooks for wallet connection
   const { address, isConnected, connector: activeConnector, status: accountStatus } = useAccount()
   const { connect, connectAsync, connectors } = useConnect()
-  const { disconnect } = useDisconnect()
+  const { disconnect, disconnectAsync } = useDisconnect()
   // The WALLET's chain, never the one wagmi's config settled on (issue #1030). Identical to the
   // old `useChainId()` for every configured chain and for every passkey session; it differs only
   // when the wallet sits on a chain the app does not configure — the case this context has to be
@@ -664,8 +664,17 @@ export function WalletProvider({ children }) {
   }, [connect, connectAsync, connectors, openConnectModal])
 
   // Disconnect wallet
-  const disconnectWallet = useCallback(() => {
-    disconnect()
+  const disconnectWallet = useCallback(async () => {
+    // Grab the provider we are signing out of BEFORE the teardown: afterwards there is no
+    // connection left to ask, and it is what scopes the shim flags written at the end.
+    const activeProvider = await Promise.resolve()
+      .then(() => activeConnector?.getProvider?.())
+      .catch(() => undefined)
+
+    // Await the real outcome where wagmi offers it: the shim flags written below must land
+    // AFTER wagmi has finished tearing the connection down, or the teardown overwrites them.
+    if (disconnectAsync) await disconnectAsync().catch(() => {})
+    else disconnect()
     setRoles([])
     setBalances({ native: '0', wnative: '0', tokens: {} })
 
@@ -678,7 +687,6 @@ export function WalletProvider({ children }) {
         'wagmi.wallet',
         'wagmi.connected',
         'wagmi.recentConnectorId',
-        'wagmi.injected.shimDisconnect'
       ]
 
       // Clear from both localStorage and sessionStorage
@@ -705,7 +713,39 @@ export function WalletProvider({ children }) {
     } catch (error) {
       console.error('Error clearing wallet persistence:', error)
     }
-  }, [disconnect])
+
+    /*
+     * TELL THE WALLET'S OTHER CONNECTOR IT IS DISCONNECTED TOO.
+     *
+     * wagmi's `shimDisconnect` flag is PER CONNECTOR — `wagmi.<connector id>.disconnected` — and
+     * this app reaches one browser wallet through TWO connectors: the targetless `injected()`
+     * configured in wagmi.js, and the one wagmi discovers for the same wallet over EIP-6963.
+     * Disconnecting flags only the connector the member happened to connect through. On the next
+     * load `reconnect()` walks the remaining connectors, finds the sibling pointed at the very
+     * same provider with no flag of its own and a non-empty `eth_accounts`, and reconnects — so a
+     * member who signs out and refreshes is silently signed back in. Measured; WAL-05 asserts it.
+     *
+     * (wagmi's own dedupe does not save us: reconnect() records a provider as "already checked"
+     * only for connectors that CONNECTED, so a connector that declined on isAuthorized() leaves
+     * its provider open for the next one to try.)
+     *
+     * Scoped BY PROVIDER IDENTITY, not to every injected connector. A member with two wallets
+     * installed has an announced connector for each, and signing out of one is not consent to
+     * revoke this site's permissions on the other — `disconnect()` asks the wallet to do exactly
+     * that (`wallet_revokePermissions`, MIP-2). Only connectors backed by the very provider the
+     * member was connected through are told anything.
+     */
+    if (activeProvider) {
+      await Promise.all(
+        (connectors || [])
+          .filter((c) => c?.type === 'injected')
+          .map((c) => Promise.resolve()
+            .then(() => c.getProvider?.())
+            .then((p) => (p && p === activeProvider ? c.disconnect?.() : undefined))
+            .catch(() => { /* connector already gone; its flag is moot */ }))
+      )
+    }
+  }, [disconnect, disconnectAsync, connectors, activeConnector])
 
   // Switch to the configured primary network (Polygon Amoy). Invoked from
   // the network-error banner / "Switch Network" button when the user is on
