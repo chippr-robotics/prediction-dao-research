@@ -20,7 +20,7 @@
  * key that was just minted. A cold start, a new device and a chain switch all re-baseline, so
  * nothing is ever retroactively announced.
  */
-import { listApiKeys, shortKeyId } from '../../../lib/apiAccess/apiKeys'
+import { listKeyRecords, shortKeyId } from '../../../lib/apiAccess/apiKeys'
 import { loadAssistantPrefs } from '../../../lib/assistant/assistantPrefs'
 
 const EMPTY = { ok: true, entries: [], nextSnapshots: {}, nextAux: {}, currentIds: [], actionNeededById: {} }
@@ -44,7 +44,7 @@ export const accessSource = {
     const priorSnapshots = prior?.snapshots || {}
     const seeded = prior?.aux?.seeded === true
 
-    const keys = listApiKeys(account)
+    const keys = listKeyRecords(account)
     const assistant = loadAssistantPrefs(account)
 
     const nextSnapshots = {}

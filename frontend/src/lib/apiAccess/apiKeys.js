@@ -233,10 +233,16 @@ function writeAll(account, records) {
 }
 
 /**
- * Every key this device knows this account minted, newest first.
+ * Every key this device knows this account minted, newest first — as metadata RECORDS
+ * (`{keyId, label, scopes, issuedAt, expiresAt, revokedAt, revocationDelivered}`), which is the
+ * whole point of the name: the tokens themselves are shown once at minting and never stored, so a
+ * function that could "list API keys" cannot exist here. (The old name claimed otherwise, and
+ * CodeQL's credential-name heuristic agreed with the claim — flagging every write of this metadata
+ * to localStorage as clear-text credential storage. The rename is the honest fix, not a dodge:
+ * the data really is non-sensitive, and now the name says so.)
  * Returns `[]` for a missing account — this is a local list, so "no wallet" genuinely is "no list".
  */
-export function listApiKeys(account) {
+export function listKeyRecords(account) {
   if (!account) return []
   const raw = getUserPreference(account, API_KEYS_STORAGE_KEY, [], true)
   if (!Array.isArray(raw)) return []
@@ -260,7 +266,7 @@ export function recordApiKey(account, grant) {
     revokedAt: null,
   })
   if (!account || !record) throw new Error('recordApiKey: an account and a well-formed grant are required')
-  const existing = listApiKeys(account).filter((r) => r.keyId !== record.keyId)
+  const existing = listKeyRecords(account).filter((r) => r.keyId !== record.keyId)
   writeAll(account, [...existing.slice().sort((a, b) => a.issuedAt - b.issuedAt), record])
   return record
 }
@@ -272,7 +278,7 @@ export function recordApiKey(account, grant) {
 export function markApiKeyRevoked(account, keyId, revokedAt, { delivered = true } = {}) {
   if (!account) return
   const at = Math.floor(Number(revokedAt) || Date.now() / 1000)
-  const next = listApiKeys(account)
+  const next = listKeyRecords(account)
     .map((r) =>
       r.keyId === keyId
         ? {
@@ -291,7 +297,7 @@ export function markApiKeyRevoked(account, keyId, revokedAt, { delivered = true 
 /** Forget a key's metadata on this device. Does not (and cannot) un-issue the grant. */
 export function forgetApiKey(account, keyId) {
   if (!account) return
-  const next = listApiKeys(account)
+  const next = listKeyRecords(account)
     .filter((r) => r.keyId !== keyId)
     .sort((a, b) => a.issuedAt - b.issuedAt)
   writeAll(account, next)

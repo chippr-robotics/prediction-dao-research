@@ -26,7 +26,7 @@ vi.mock('../hooks/useRoleDetails', () => ({
 vi.mock('../lib/relay/intentClient', () => ({ relayerBaseUrl: () => gatewayUrl }))
 
 import ApiAccessPanel from '../components/account/ApiAccessPanel'
-import { API_KEYS_STORAGE_KEY, buildGrant, listApiKeys, recordApiKey } from '../lib/apiAccess/apiKeys'
+import { API_KEYS_STORAGE_KEY, buildGrant, listKeyRecords, recordApiKey } from '../lib/apiAccess/apiKeys'
 
 const ACTIVE = { isActive: true, tier: 1, tierName: 'Bronze', readable: true, hasRole: true }
 const INACTIVE = { isActive: false, tier: 0, tierName: 'None', readable: true, hasRole: false }
@@ -199,7 +199,7 @@ describe('revoking a key', () => {
     // The part that DOES survive is always stated beside it.
     expect(notice).toHaveTextContent(/also expires on its own/i)
 
-    expect(listApiKeys(wallet.address)[0].revokedAt).toBeTruthy()
+    expect(listKeyRecords(wallet.address)[0].revokedAt).toBeTruthy()
   })
 
   it('is honest when the gateway could not be reached: signed and noted, but NOT registered', async () => {

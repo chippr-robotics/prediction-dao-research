@@ -41,7 +41,7 @@ import {
   grantTypedData,
   keyState,
   keyStateLabel,
-  listApiKeys,
+  listKeyRecords,
   markApiKeyRevoked,
   recordApiKey,
   revocationRequestBody,
@@ -115,7 +115,7 @@ export default function ApiAccessPanel() {
   const [copied, setCopied] = useState(null)
   const [showSnippet, setShowSnippet] = useState(false)
 
-  const keys = useMemo(() => (account ? listApiKeys(account) : []), [account, revision])
+  const keys = useMemo(() => (account ? listKeyRecords(account) : []), [account, revision])
   const activeKeyCount = keys.filter((k) => keyState(k) === 'active').length
 
   const selectedScopes = useMemo(

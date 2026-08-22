@@ -28,7 +28,7 @@ import {
   forgetApiKey,
   grantTypedData,
   keyState,
-  listApiKeys,
+  listKeyRecords,
   markApiKeyRevoked,
   recordApiKey,
   revocationRequestBody,
@@ -173,7 +173,7 @@ describe('metadata store', () => {
   it('lists keys newest first and reports each key’s state', () => {
     recordApiKey(ACCOUNT, buildGrant({ account: ACCOUNT, scopes: ['read:profile'], ttlDays: 7, label: 'older', nowSeconds: 1000 }))
     recordApiKey(ACCOUNT, buildGrant({ account: ACCOUNT, scopes: ['read:profile'], ttlDays: 7, label: 'newer', nowSeconds: 2000 }))
-    const keys = listApiKeys(ACCOUNT)
+    const keys = listKeyRecords(ACCOUNT)
     expect(keys.map((k) => k.label)).toEqual(['newer', 'older'])
     // Both were issued in 1970 by the injected clock, so both have expired by now.
     expect(keyState(keys[0])).toBe('expired')
@@ -184,10 +184,10 @@ describe('metadata store', () => {
     recordApiKey(ACCOUNT, grant)
 
     markApiKeyRevoked(ACCOUNT, grant.keyId, 1_750_000_500)
-    expect(keyState(listApiKeys(ACCOUNT)[0])).toBe('revoked')
+    expect(keyState(listKeyRecords(ACCOUNT)[0])).toBe('revoked')
 
     forgetApiKey(ACCOUNT, grant.keyId)
-    expect(listApiKeys(ACCOUNT)).toHaveLength(0)
+    expect(listKeyRecords(ACCOUNT)).toHaveLength(0)
   })
 
   it('drops a foreign or malformed stored entry rather than trusting it', () => {
@@ -200,13 +200,13 @@ describe('metadata store', () => {
         { keyId: '0x' + 'ef'.repeat(32), scopes: ['read:profile'], issuedAt: 1, expiresAt: 2 },
       ])
     )
-    const keys = listApiKeys(ACCOUNT)
+    const keys = listKeyRecords(ACCOUNT)
     expect(keys).toHaveLength(1)
     expect(keys[0].keyId).toBe('0x' + 'ef'.repeat(32))
   })
 
   it('returns an empty list without a wallet instead of throwing', () => {
-    expect(listApiKeys(null)).toEqual([])
+    expect(listKeyRecords(null)).toEqual([])
   })
 
   it('shortens a key id for display without pretending it is a secret', () => {
