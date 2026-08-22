@@ -17,6 +17,7 @@
  */
 import crypto from 'node:crypto'
 import express from 'express'
+import { rateLimit } from 'express-rate-limit'
 import helmet from 'helmet'
 import { loadConfig } from './config/index.js'
 import { buildProviders } from './config/providers.js'
@@ -163,6 +164,33 @@ export function createApp(config, deps = {}) {
   const app = express()
   app.disable('x-powered-by')
   app.use(helmet())
+
+  // ---- Coarse per-IP route limiters (spec 095 hardening). These sit in FRONT of the fine-grained
+  // quota layer, which stays the real per-member control (it keys on the RECOVERED SIGNER — a fact
+  // an attacker cannot vary for free — where an IP is spoof-cheap and, on the VM deployment, the
+  // nginx proxy's address for every caller). What these buy is an outer bound on the two places
+  // that do real work BEFORE any quota can key: the health snapshot's edge-auth comparison and the
+  // intent pipeline's signature recovery. A limit of 0 disables that limiter (an empty middleware
+  // keeps the registration sites uniform). 429s use the gateway's error body + Retry-After.
+  const makeRouteLimiter = (perMin, scope) =>
+    perMin > 0
+      ? rateLimit({
+          windowMs: 60_000,
+          limit: perMin,
+          standardHeaders: 'draft-7',
+          legacyHeaders: false,
+          // `trust proxy` is deliberately unset (changing it would re-key every IP-scoped quota in
+          // one move — see the bitcoin/bridge/perps modules), and nginx sets X-Forwarded-For on the
+          // VM. Without this, express-rate-limit's startup validation refuses that combination.
+          validate: { xForwardedForHeader: false },
+          handler: (_req, res) =>
+            res
+              .status(429)
+              .json({ error: { code: 'rate_limited', reason: `${scope} rate limit exceeded — retry shortly` } }),
+        })
+      : (_req, _res, next) => next()
+  const healthLimiter = makeRouteLimiter(config.rateLimit.healthPerMin, 'health')
+  const intentsLimiter = makeRouteLimiter(config.rateLimit.intentsPerMin, 'intents')
 
   // ---- CORS: the SPA calls the gateway cross-origin (fairwins.app -> relay.fairwins.app). Echo an
   // allow-listed Origin and answer preflight BEFORE the origin lock — browsers cannot attach
@@ -351,11 +379,11 @@ export function createApp(config, deps = {}) {
     const memberApi = memberApiStatus(config, { killSwitch, assistantConfigured: memberApiAssistant.configured })
     res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi })
   }
-  app.get('/healthz', healthHandler)
-  app.get('/status', healthHandler)
+  app.get('/healthz', healthLimiter, healthHandler)
+  app.get('/status', healthLimiter, healthHandler)
 
   // ---- POST /v1/intents --------------------------------------------------------------------
-  app.post('/v1/intents', async (req, res) => {
+  app.post('/v1/intents', intentsLimiter, async (req, res) => {
     let reserved = null // {chainId, marker} released on any post-reservation rejection
     try {
       // Kill switch first: when active the gateway cleanly stops ACCEPTING intents (FR-015).

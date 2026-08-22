@@ -89,6 +89,8 @@ module is enabled, so an unconfigured module can never take the gateway down.
 | `ASSISTANT_MODEL` | `claude-sonnet-5` | Model id for the assistant proxy |
 | `ASSISTANT_MAX_TOKENS` | `1024` | Response ceiling per chat turn |
 | `ANTHROPIC_API_KEY` | — | **SECRET.** Model-provider credential. Missing ⇒ `503 assistant_unconfigured` |
+| `RATE_LIMIT_HEALTH_PER_MIN` | `600` | Coarse per-IP limiter on `/healthz` + `/status` (`0` = off). The signer-keyed quotas remain the real per-member control; on the VM deployment nginx fronts the container and `trust proxy` is unset, so this acts as an aggregate ceiling there |
+| `RATE_LIMIT_INTENTS_PER_MIN` | `300` | Coarse per-IP limiter on `POST /v1/intents` (`0` = off), bounding signature-recovery work ahead of the signer quota; same aggregate-ceiling caveat |
 
 !!! danger "`ANTHROPIC_API_KEY` is the only secret this feature adds"
     Deliver it through Secret Manager and `infra/vm/common/fetch-secrets.sh`

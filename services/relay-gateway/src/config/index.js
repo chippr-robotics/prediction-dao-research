@@ -21,6 +21,8 @@
  *   KILL_SWITCH                'true' => boot with the kill switch active (FR-015)
  *   SIGNER_QUOTA_PER_MIN       per-signer intents/min (default 12)
  *   GLOBAL_QUOTA_PER_MIN       global intents/min (default 120)
+ *   RATE_LIMIT_HEALTH_PER_MIN  outer per-IP limiter on /healthz + /status (default 600; 0 = off)
+ *   RATE_LIMIT_INTENTS_PER_MIN outer per-IP limiter on POST /v1/intents (default 300; 0 = off)
  *   MAX_QUEUE_DEPTH            bounded in-flight queue (default 100) — back-pressure past this (FR-009)
  *   GAS_SPEND_CAP_WEI_<id>     per-chain per-window gas spend cap (default 0.5 native / hour, FR-014)
  *   SPEND_WINDOW_MS            spend-cap window (default 3600000)
@@ -364,6 +366,18 @@ export function loadConfig(env = process.env, opts = {}) {
       signerPerWindow: int(env, 'SIGNER_QUOTA_PER_MIN', 12),
       globalPerWindow: int(env, 'GLOBAL_QUOTA_PER_MIN', 120),
       windowMs: int(env, 'QUOTA_WINDOW_MS', 60_000),
+    },
+    // Coarse per-IP route limiters (express-rate-limit) in FRONT of the fine-grained quotas above.
+    // The quotas remain the real per-member control (they key on the RECOVERED SIGNER, which an
+    // attacker cannot vary for free); these middlewares are an outer DoS bound on the routes that
+    // do work before any quota can key — the health snapshot's edge-auth comparison and the intent
+    // pipeline's signature recovery. NOTE the production caveat from the module docs: `trust proxy`
+    // is deliberately unset and nginx fronts the VM container, so `req.ip` is the proxy there and
+    // each limiter is effectively an AGGREGATE ceiling — defaults are sized for that, and set to 0
+    // to disable a limiter entirely.
+    rateLimit: {
+      healthPerMin: int(env, 'RATE_LIMIT_HEALTH_PER_MIN', 600),
+      intentsPerMin: int(env, 'RATE_LIMIT_INTENTS_PER_MIN', 300),
     },
     // Sponsored-paymaster (spec 050): sponsorship signer + per-op ceilings + burst quotas. The
     // killswitch and sanctions screen are shared with the intent path; these are the paymaster-only
