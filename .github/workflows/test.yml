@@ -539,15 +539,27 @@ jobs:
     # it belongs — admission rule 1 forbids spending on-chain-tier wall clock proving a control is
     # reachable at 390px. `desktop` is 1280×720, exactly what every existing spec was written
     # against, so that leg is a no-op change and any diff in it is a real regression.
-    name: Cypress Fast E2E (${{ matrix.viewport }})
+    #
+    # SHARDED SIX WAYS PER PROFILE (#1249). This tier had become the merge gate's critical path at
+    # 34:29 of Cypress on the desktop leg, against 09:53–17:09 for the on-chain shards that compile
+    # contracts, boot a chain and send real transactions. The cause was structural, not the work:
+    # that tier was sharded four ways and this one was a single leg. Six is the first count where
+    # BOTH profiles fit the policy's < 6 min budget (predicted 349s desktop / 315s phone); seven and
+    # eight buy little, because the floor is the longest single spec (34-member-surfaces, 192s).
+    #
+    # Runner minutes are ~neutral: 2 legs × ~37 min ≈ 74, against 12 legs × (≈50s setup + ≈6 min)
+    # ≈ 82. This tier installs only frontend deps — no contract compile, no chain — so the per-job
+    # overhead sharding adds is small next to the wall clock it removes.
+    name: Cypress Fast E2E (${{ matrix.viewport }} ${{ matrix.shard }})
     runs-on: ubuntu-latest
 
     strategy:
-      # Both legs always run: a phone-only failure is information, not a reason to stop measuring
-      # the desktop one.
+      # Every leg always runs: a phone-only or one-shard failure is information, not a reason to
+      # stop measuring the rest.
       fail-fast: false
       matrix:
         viewport: [desktop, phone]
+        shard: [0, 1, 2, 3, 4, 5]
 
     defaults:
       run:
@@ -579,14 +591,22 @@ jobs:
       # a single sub-5-minute run, and running it twice would contradict the policy this feature
       # just wrote down. It goes in the desktop leg — the width every one of its specs was authored
       # against.
+      # The spec list for this leg. Computed into an env var rather than inlined in the run command
+      # so the job log shows exactly which specs the leg claimed — a shard that silently ran nothing
+      # would otherwise report the same green as one that ran six specs. (Same reasoning, and the
+      # same empty-list guard, as the on-chain tier's shard selection.)
       - name: Select this leg's specs
         id: specs
+        working-directory: .
         run: |
-          if [ "${{ matrix.viewport }}" = "desktop" ]; then
-            echo 'specs=cypress/e2e/fast/**/*.cy.js,cypress/e2e/passkey/**/*.cy.js' >> $GITHUB_OUTPUT
-          else
-            echo 'specs=cypress/e2e/fast/**/*.cy.js' >> $GITHUB_OUTPUT
+          SPECS=$(node scripts/e2e/split-fast-tier.js \
+            --profile ${{ matrix.viewport }} --shards 6 --index ${{ matrix.shard }} --csv)
+          if [ -z "$SPECS" ]; then
+            echo "::error::Fast-tier ${{ matrix.viewport }} shard ${{ matrix.shard }} resolved to an empty spec list — refusing to report a pass for running nothing."
+            exit 1
           fi
+          echo "${{ matrix.viewport }} shard ${{ matrix.shard }} specs: $SPECS"
+          echo "specs=$SPECS" >> $GITHUB_OUTPUT
 
       - name: Run fast E2E tests
         env:
@@ -607,7 +627,7 @@ jobs:
       - name: Summarize E2E results
         if: always()
         run: |
-          echo "### Cypress Fast E2E (${{ matrix.viewport }} viewport)" >> $GITHUB_STEP_SUMMARY
+          echo "### Cypress Fast E2E — ${{ matrix.viewport }} viewport, shard ${{ matrix.shard }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Parse the RUN-TOTAL row of Cypress's own summary table. The previous version preferred
@@ -685,7 +705,9 @@ jobs:
         uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: cypress-fast-screenshots-${{ matrix.viewport }}
+          # Sharded (#1249): the name must carry the shard or six legs of the same profile
+          # collide on one artifact name and the upload fails.
+          name: cypress-fast-screenshots-${{ matrix.viewport }}-${{ matrix.shard }}
           path: frontend/cypress/screenshots
           retention-days: 7
 
@@ -696,7 +718,7 @@ jobs:
         # artifact API into rate-limiting.
         if: failure()
         with:
-          name: cypress-fast-videos-${{ matrix.viewport }}
+          name: cypress-fast-videos-${{ matrix.viewport }}-${{ matrix.shard }}
           path: frontend/cypress/videos
           retention-days: 7
 
@@ -704,7 +726,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: cypress-fast-results-${{ matrix.viewport }}
+          name: cypress-fast-results-${{ matrix.viewport }}-${{ matrix.shard }}
           path: frontend/cypress-output.txt
           retention-days: 7
 
