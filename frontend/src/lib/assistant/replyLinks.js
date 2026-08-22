@@ -31,7 +31,24 @@ const ROUTED_SEGMENTS = new Set([
 // A path starts at a boundary and runs to the first whitespace or closing punctuation. Trailing
 // sentence punctuation is trimmed after the match, because "…open /wallet?tab=earn." is the normal
 // way a sentence ends and `.` is not part of the route.
-const PATH_RE = /(?:^|[\s("'`])(\/[A-Za-z0-9\-_\/?&=#.%]*)/g
+const PATH_RE = /(?:^|[\s("'`])(\/[A-Za-z0-9\-_/?&=#.%]*)/g
+
+/** Sentence punctuation a path may collect on its way into a sentence. */
+const TRAILING_PUNCTUATION = new Set(['.', ',', ';', ':', '!', '?', ')', ']', '}', "'", '"', '`'])
+
+/**
+ * Drop the trailing run of sentence punctuation.
+ *
+ * SCANNED, NOT MATCHED. The obvious `replace(/[.,;:!?)\]}'"`]+$/, '')` is quadratic on a rejecting
+ * input — a long run of dots followed by anything else makes the engine restart the run at every
+ * position — and this string comes out of a model's reply, which is the least controlled text this
+ * app handles. Walking backwards from the end is one pass and produces the identical result.
+ */
+function stripTrailingPunctuation(value) {
+  let end = value.length
+  while (end > 0 && TRAILING_PUNCTUATION.has(value[end - 1])) end -= 1
+  return value.slice(0, end)
+}
 
 /**
  * @param {string} text
@@ -42,7 +59,7 @@ export function extractInAppLinks(text) {
   const out = []
   const seen = new Set()
   for (const match of text.matchAll(PATH_RE)) {
-    let path = match[1].replace(/[.,;:!?)\]}'"`]+$/, '')
+    let path = stripTrailingPunctuation(match[1])
     if (path.length < 2) continue
     const segment = path.slice(1).split(/[/?#]/, 1)[0].toLowerCase()
     if (!ROUTED_SEGMENTS.has(segment)) continue

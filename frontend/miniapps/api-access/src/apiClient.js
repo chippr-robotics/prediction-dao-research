@@ -26,6 +26,19 @@ export const DEFAULT_BASE_URL = 'https://relay.fairwins.app'
 export const OPENAPI_PATH = '/v1/member/openapi.json'
 
 /**
+ * Drop the trailing run of `/`.
+ *
+ * SCANNED, NOT MATCHED. `replace(/\/+$/, '')` is quadratic on a rejecting input — a long run of
+ * slashes followed by anything else makes the engine restart the run at every position — and both
+ * callers below are handed a string the member typed. Walking back from the end is one pass.
+ */
+function stripTrailingSlashes(value) {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/') end -= 1
+  return value.slice(0, end)
+}
+
+/**
  * Turn whatever the member typed into a base URL, or explain why it is not one.
  *
  * A bare host (`relay.fairwins.app`) is accepted and read as https — typing a scheme is not a
@@ -52,13 +65,13 @@ export function normalizeBaseUrl(raw) {
     return { ok: false, reason: `${url.protocol}// is not supported — use https (or http for a gateway on this machine).` }
   }
   // Keep any path prefix (a gateway behind `/api`), drop the trailing slash so joins stay clean.
-  const trimmedPath = url.pathname.replace(/\/+$/, '')
+  const trimmedPath = stripTrailingSlashes(url.pathname)
   return { ok: true, baseUrl: `${url.origin}${trimmedPath}` }
 }
 
 /** Join a normalized base with an absolute API path. */
 export function apiUrl(baseUrl, path) {
-  return `${String(baseUrl || '').replace(/\/+$/, '')}${path}`
+  return `${stripTrailingSlashes(String(baseUrl || ''))}${path}`
 }
 
 /**

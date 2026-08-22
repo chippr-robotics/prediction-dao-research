@@ -81,12 +81,37 @@ function readBody(req, maxBytes) {
   })
 }
 
-/** Extract a bearer token, or null. A malformed header is treated as absent, never as an error. */
+/** The one authentication scheme this endpoint understands, matched case-insensitively. */
+const BEARER_SCHEME = 'bearer'
+
+/**
+ * Characters a `.` cannot match. A credential containing one never matched the scheme grammar, so
+ * it stays a rejection here rather than becoming a token with a newline in it.
+ */
+const LINE_TERMINATORS = ['\n', '\r', '\u2028', '\u2029']
+
+/**
+ * Extract a bearer token, or null. A malformed header is treated as absent, never as an error.
+ *
+ * MATCHED BY HAND, NOT WITH A REGULAR EXPRESSION, AND THAT IS THE POINT. The obvious spelling —
+ * `/^Bearer\s+(.+)$/i` — takes quadratic time on a rejecting header, because `\s+` and `.+` both
+ * match a space: for `Bearer` followed by n spaces and then something `.+` cannot reach the end of,
+ * the engine retries every one of the n ways to split that run. This value is whatever a caller
+ * sent, and Node will hand us up to `--max-http-header-size` bytes of it before this function is
+ * ever called. The scan below is a single pass.
+ */
 export function bearerFrom(headers) {
   const raw = headers?.authorization ?? headers?.Authorization
   if (typeof raw !== 'string') return null
-  const match = /^Bearer\s+(.+)$/i.exec(raw.trim())
-  return match ? match[1].trim() : null
+  const trimmed = raw.trim()
+  if (trimmed.slice(0, BEARER_SCHEME.length).toLowerCase() !== BEARER_SCHEME) return null
+  const rest = trimmed.slice(BEARER_SCHEME.length)
+  const token = rest.trimStart()
+  // Empty is "Bearer" with nothing after it; unchanged length is "Bearerfoo", where the scheme and
+  // the credential were never separated. Both are malformed, and both are absence.
+  if (token.length === 0 || token.length === rest.length) return null
+  if (LINE_TERMINATORS.some((c) => token.includes(c))) return null
+  return token
 }
 
 /**

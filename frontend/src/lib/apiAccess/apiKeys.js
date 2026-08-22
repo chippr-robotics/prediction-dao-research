@@ -218,6 +218,13 @@ function toRecord(raw) {
     issuedAt,
     expiresAt,
     revokedAt: Number.isFinite(revokedAt) && revokedAt > 0 ? revokedAt : null,
+    // Tri-state, carried through the sanitizer deliberately: `false` means the member signed a
+    // withdrawal the gateway never heard (rendered "revocation signed — not delivered"), `true`
+    // means it was registered, and `null` (records written before the flag existed) reads as
+    // delivered so old notes keep their meaning. Dropping this field here silently promoted every
+    // undelivered revocation to a plain "revoked" — the exact claim the flag exists to prevent.
+    revocationDelivered:
+      raw.revocationDelivered === false ? false : raw.revocationDelivered === true ? true : null,
   }
 }
 

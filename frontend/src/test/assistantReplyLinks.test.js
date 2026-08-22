@@ -42,6 +42,29 @@ describe('extractInAppLinks', () => {
     expect(paths('Visit //evil.example/app')).toEqual([])
   })
 
+  it('trims a whole run of trailing punctuation, not just the last character', () => {
+    expect(paths('Open /apps!!!')).toEqual(['/apps'])
+    expect(paths('(see /privacy).')).toEqual(['/privacy'])
+  })
+
+  it('stays linear on a reply built to make punctuation trimming backtrack', () => {
+    // A long run of dots that never ends the match is the rejecting input a
+    // `replace(/[.,;:!?)\]}'"`]+$/, '')` costs quadratic time on. The text here is a model's
+    // reply — the least controlled string this app renders — so the trim has to be a single pass.
+    const hostile = (n) => `/wallet?q=${'.'.repeat(n)}x`
+    expect(paths(hostile(50))).toEqual([hostile(50)])
+
+    const elapsed = (n) => {
+      const started = performance.now()
+      extractInAppLinks(hostile(n))
+      return performance.now() - started
+    }
+    elapsed(2000) // warm up
+    const small = Math.max(elapsed(20000), 0.05)
+    const large = elapsed(80000)
+    expect(large).toBeLessThan(small * 8)
+  })
+
   it('handles empty and non-string input', () => {
     expect(extractInAppLinks('')).toEqual([])
     expect(extractInAppLinks(null)).toEqual([])

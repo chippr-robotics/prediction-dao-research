@@ -39,9 +39,21 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Drop the trailing run of `/`.
+ *
+ * Scanned rather than matched: `replace(/\/+$/, '')` is quadratic on a rejecting input, and this
+ * runs over configuration a caller supplies. One pass, same result.
+ */
+function stripTrailingSlashes(value) {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/') end -= 1
+  return value.slice(0, end)
+}
+
 /** Normalise a base URL, or return null when it is unusable. Never throws — absence is a state. */
 export function normalizeBaseUrl(value) {
-  const raw = typeof value === 'string' ? value.trim().replace(/\/+$/, '') : ''
+  const raw = typeof value === 'string' ? stripTrailingSlashes(value.trim()) : ''
   if (!raw) return null
   let parsed
   try {

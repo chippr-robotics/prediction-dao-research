@@ -126,4 +126,32 @@ test('bearerFrom reads the header case-insensitively and treats a malformed one 
   assert.equal(bearerFrom({ authorization: 'Basic abc' }), null)
   assert.equal(bearerFrom({}), null)
   assert.equal(bearerFrom({ authorization: 'Bearer' }), null)
+  // The scheme and the credential have to be separated — "Bearerabc" is not a bearer header.
+  assert.equal(bearerFrom({ authorization: 'Bearerabc' }), null)
+  assert.equal(bearerFrom({ authorization: 'Bearer  a b  ' }), 'a b')
+  assert.equal(bearerFrom({ Authorization: 'BEARER abc' }), 'abc')
+  assert.equal(bearerFrom({ authorization: 42 }), null)
+})
+
+test('bearerFrom stays linear on a hostile header rather than backtracking over it', () => {
+  // A long run of spaces followed by a credential `.` cannot match to the end is the rejecting
+  // input a `/^Bearer\s+(.+)$/` costs quadratic time on: every one of the n ways to split the run
+  // between `\s+` and `.+` is tried and fails. Node hands us up to --max-http-header-size bytes of
+  // whatever a caller sent, so the answer has to be cheap as well as correct.
+  const hostile = (n) => `Bearer${' '.repeat(n)}a\nb`
+  assert.equal(bearerFrom({ authorization: hostile(16) }), null)
+  // A line terminator INSIDE the separating whitespace was always fine, and still is.
+  assert.equal(bearerFrom({ authorization: 'Bearer \n x' }), 'x')
+
+  const elapsed = (n) => {
+    const started = process.hrtime.bigint()
+    bearerFrom({ authorization: hostile(n) })
+    return Number(process.hrtime.bigint() - started)
+  }
+  elapsed(1000) // warm the function up so the first measurement is not the compile
+  const small = Math.max(elapsed(20_000), 1)
+  const large = elapsed(80_000)
+  // Four times the input. Quadratic would be ~16x; the generous ceiling here is about proving the
+  // shape of the curve, not about timing precision on a shared runner.
+  assert.ok(large < small * 8, `expected linear-ish growth, got ${small}ns -> ${large}ns`)
 })

@@ -309,9 +309,13 @@ describe('API access (spec 095)', () => {
     cy.get('[data-testid="api-access-upgrade"]').should('not.exist')
     cy.get('[data-testid="api-access-console"]').should('not.exist')
 
-    // Now a chain that answers, with nothing to report. The later intercept wins.
+    // Now a chain that answers, with nothing to report. The later intercept wins for every request
+    // made after this line — and the transition is driven through the card's own "Try again"
+    // control rather than a second cy.visit: visiting the SAME URL is a no-op in Cypress (no
+    // reload, no refetch), which left the phase-1 state on screen and failed this test's first CI
+    // run. Clicking retry also proves the recovery affordance actually recovers.
     stubMembership({ membership: encodeMembership({ tier: 0, expiresAt: 0 }) })
-    openApiAccess({ mock: false })
+    cy.get('[data-testid="api-access-unreadable"]').contains('button', 'Try again').click()
 
     cy.get('[data-testid="api-access-upgrade"]', { timeout: 40000 })
       .should('be.visible')

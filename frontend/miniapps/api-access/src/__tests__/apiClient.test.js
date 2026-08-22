@@ -39,6 +39,27 @@ describe('apiUrl', () => {
   it('joins without doubling a slash', () => {
     expect(apiUrl('https://example.test/', '/v1/member/me')).toBe('https://example.test/v1/member/me')
   })
+
+  it('drops a whole run of trailing slashes, not just the last one', () => {
+    expect(apiUrl('https://example.test///', '/v1/member/me')).toBe('https://example.test/v1/member/me')
+    expect(normalizeBaseUrl('https://example.test/api///')).toEqual({ ok: true, baseUrl: 'https://example.test/api' })
+  })
+
+  it('stays linear on a base built to make the trailing-slash trim backtrack', () => {
+    // The rejecting input a `replace(/\/+$/, '')` costs quadratic time on: a long run of slashes
+    // that is not at the end. The member types this string, so it is worth one pass and no more.
+    const hostile = (n) => `https://example.test/${'/'.repeat(n)}a`
+    expect(apiUrl(hostile(8), '/x')).toBe(`${hostile(8)}/x`)
+
+    const elapsed = (n) => {
+      const started = performance.now()
+      apiUrl(hostile(n), '/x')
+      return performance.now() - started
+    }
+    elapsed(2000) // warm up
+    const small = Math.max(elapsed(20000), 0.05)
+    expect(elapsed(80000)).toBeLessThan(small * 8)
+  })
 })
 
 describe('requestJson', () => {
