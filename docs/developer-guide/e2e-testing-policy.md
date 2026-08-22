@@ -11,7 +11,7 @@ carries the anti-patterns that made the current suite report coverage it did not
 
 | Tier | Directory | Needs | Runs | Budget |
 |---|---|---|---|---|
-| **no-chain** | `frontend/cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile | **< 6 min per leg** — ⚠️ **currently missed**: measured 11:20 desktop / 11:30 phone (#1249) |
+| **no-chain** | `frontend/cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile, **6 shards each** | **< 6 min per leg** — predicted 349s desktop / 315s phone after sharding (#1249); unsharded it had reached 34:29 |
 | **on-chain** | `frontend/cypress/e2e/full/` | A local chain, a deploy and a seed | Every push, 4 shards in parallel | **< 15 min per shard** (measured: 6:37 / 7:51 / 6:29 / 6:09) |
 | **account-native** | `frontend/cypress/e2e/passkey/` | The WebAuthn harness | Every push, **once** — it rides the no-chain job's desktop leg for a runner, not because it is a viewport question | **< 5 min** |
 
@@ -191,21 +191,59 @@ the job green — the same shape as every gate this repo has had to repair.
 
 ## Runtime budgets and sharding
 
-The on-chain tier is split across 4 shard legs, each with its own chain. Per-spec durations live in
-`frontend/cypress/coverage/full-tier-weights.json` and the split is longest-first
-(`scripts/e2e/split-full-tier.js`), because balancing spec *count* leaves the critical path almost
-unchanged — the specs are nowhere near equal.
+**Both** Cypress tiers are split longest-first, because balancing spec *count* leaves the critical
+path almost unchanged — the specs are nowhere near equal, and one spec can cost a hundred times
+another. The packing lives once, in `scripts/e2e/lib/tier-split.js`; each tier has its own entry
+point and its own measured weights:
+
+| Tier | Legs | Splitter | Weights |
+|---|---|---|---|
+| on-chain | 4, one private chain each | `scripts/e2e/split-full-tier.js` | `full-tier-weights.json` |
+| no-chain | 6 **per viewport profile** | `scripts/e2e/split-fast-tier.js --profile <desktop\|phone>` | `fast-tier-weights.json` |
+
+The no-chain tier's two profiles do not run the same specs — the account-native (passkey) specs
+ride the desktop leg only — so its splitter takes a `--profile` and packs the right set. Passing an
+unknown profile is a hard error rather than a default: a phone leg packing the desktop set would
+schedule passkey specs on a leg that never sets `PASSKEY_ENABLED`, and they would report as pending
+rather than as a mistake.
+
+A spec with no recorded weight is estimated at the file mean and **announced** as a CI warning. It is
+never dropped: a spec silently leaving the merge gate is the failure this feature exists to prevent.
 
 A tier over budget is a backlog item: split it, trim it, or move flows to a cheaper tier. Raising the
 number is a decision that gets written down with its reason.
 
-**The no-chain tier is over budget today** — 11:20 and 11:30 a leg against the 6 minutes stated
-above. That budget was set from an assumption before this tier had ever run at two profiles, and the
-first measurement contradicted it by roughly a factor of two. It is left as written, with the
-measured value beside it and #1249 tracking the gap, rather than quietly rewritten to match what CI
-happens to produce — a budget edited to fit its measurement is not a budget.
+### What the no-chain tier cost before it was split (#1249)
 
-The on-chain tier is inside its budget: 6:37 / 7:51 / 6:29 / 6:09 against 15 minutes a shard.
+Left unsharded, it became the merge gate's critical path — **34:29** of Cypress on the desktop leg,
+against 09:53–17:09 for the on-chain shards that compile contracts, boot a chain and send real
+transactions. The tier that starts no chain was more than twice as slow as the tier that does.
+
+Nothing about the work explains that; the cause was structural. It is worth stating plainly because
+the instinct on reading "the fast tier is slow" is to hunt for a slow spec, and there isn't one — the
+per-spec spread is ordinary. **The on-chain tier was sharded four ways and this one was a single leg
+per profile.**
+
+Six is the first shard count at which both profiles fit the 6-minute budget (predicted 349s desktop /
+315s phone). Seven and eight buy little: the floor is the longest single spec, and
+`34-member-surfaces` alone is 192s. Runner minutes are roughly neutral — 2 legs × ~37 min ≈ 74
+against 12 legs × (≈50s setup + ≈6 min) ≈ 82 — because this tier installs only frontend
+dependencies, with no contract compile and no chain, so the per-job overhead sharding adds is small
+next to the wall clock it removes.
+
+### Keeping the weights honest
+
+Weights are wall clock as Cypress reported it, re-recorded from CI. They decay: by the time #1249 was
+measured, `29-protect-custody` had become the heaviest spec in the on-chain tier at **326s** while the
+splitter was still estimating it at the ~110s file mean, so shard 1 carried roughly three times its
+assumed load and ran 17:09 against 09:53 for the lightest leg. Balanced sharding is not a
+set-and-forget property; a weights table that has stopped matching reality produces a split that
+looks balanced and is not.
+
+One trap when re-recording from a job log: Cypress **wraps long spec names across two lines** in its
+summary table, so a `grep` for a duration on the same line as a name silently drops those rows. The
+check is arithmetic — the per-spec durations should sum to close to the reported run total. Two
+missing rows showed up as 161s of "unattributed overhead"; with them, it is 9s.
 
 ## Adding coverage
 
