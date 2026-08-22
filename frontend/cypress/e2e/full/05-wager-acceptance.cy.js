@@ -461,4 +461,120 @@ describe('Wager Acceptance', () => {
       })
     })
   })
+
+  // ---------------------------------------------------------------------------
+  // ACC-14 / ACC-15 — OPEN CHALLENGES (spec 024). No named opponent: whoever
+  // holds the four-word code can take it, and only for themselves.
+  // ---------------------------------------------------------------------------
+
+  it('[ACC-14] A code holder takes an open challenge, and their stake actually moves', () => {
+    /*
+     * An open challenge names no opponent. Possession of the four-word code IS the authority to
+     * take it: the client derives a keypair from the phrase, and the taker presents an EIP-712
+     * signature from that key. These tests stand a generated keypair in for the phrase, because
+     * what is under test is the on-chain acceptance rule, not the word list.
+     *
+     * The assertion that matters is the money. A wager flipping to Active proves a status write;
+     * it does not prove the taker paid. `_settleAccept` pulls the opponent stake, so the test
+     * reads the taker's balance either side and requires exactly the stake to have left.
+     */
+    const STAKE = 2n * 10n ** 18n
+    const taker = TEST_ACCOUNTS[1]
+    cy.task('chainTx', { action: 'fund', args: { address: TEST_ACCOUNTS[0] } })
+    cy.task('chainTx', { action: 'fund', args: { address: taker } })
+    cy.task('chainTx', { action: 'approve', args: { index: 0 } })
+    cy.task('chainTx', { action: 'approve', args: { index: 1 } })
+    cy.task('chainTx', { action: 'grantMembership', args: { address: TEST_ACCOUNTS[0], tier: 4, durationDays: 365 } })
+    cy.task('chainTx', { action: 'grantMembership', args: { address: taker, tier: 4, durationDays: 365 } })
+
+    cy.task('chainTx', { action: 'createOpenWager', args: { creatorIndex: 0, stake: String(STAKE) } }).then((open) => {
+      expect(open.ok, 'the open challenge was created').to.equal(true)
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: open.wagerId } }).then((i) => {
+        expect(i.status, 'it starts Open').to.equal(1)
+        expect(
+          i.opponent,
+          'an open challenge names NO opponent — that is what makes it open',
+        ).to.equal('0x0000000000000000000000000000000000000000')
+      })
+
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: taker } }).as('takerBefore')
+
+      cy.task('chainTx', {
+        action: 'acceptOpenWager',
+        args: { wagerId: open.wagerId, claimKey: open.claimKey, takerIndex: 1 },
+      }).then((r) => {
+        expect(r.ok, `the code holder can take the challenge (${r.error || ''})`).to.equal(true)
+      })
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: open.wagerId } }).then((i) => {
+        expect(i.status, 'the challenge is Active once taken').to.equal(2)
+        expect(i.opponent, 'the taker is now the opponent').to.equal(taker)
+      })
+
+      cy.get('@takerBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: taker } }).then((after) => {
+          expect(
+            BigInt(before.balance) - BigInt(after.balance),
+            'the taker actually staked — Active is not the same as paid',
+          ).to.equal(STAKE)
+        })
+      })
+    })
+  })
+
+  it('[ACC-15] A signature for one taker cannot be reused by another — the code is not a bearer token in the mempool', () => {
+    /*
+     * THE FRONT-RUNNING RULE, and the reason the signature commits to the taker at all.
+     *
+     * `acceptOpenWager` is a public call carrying a signature. If that signature authorised "this
+     * challenge" rather than "this challenge, for this person", anyone watching the mempool could
+     * copy it out of a pending transaction and take the wager first — and the legitimate holder
+     * of the code would lose a challenge that was theirs to accept.
+     *
+     * So the digest is `OpenAccept(wagerId, taker)`, and this test proves the binding by lifting a
+     * valid signature made for account #1 and submitting it as account #2. It must be refused,
+     * and the challenge must still be Open afterwards for its rightful taker.
+     */
+    const STAKE = 2n * 10n ** 18n
+    const rightful = TEST_ACCOUNTS[1]
+    const frontRunner = TEST_ACCOUNTS[2]
+    ;[TEST_ACCOUNTS[0], rightful, frontRunner].forEach((address, idx) => {
+      cy.task('chainTx', { action: 'fund', args: { address } })
+      cy.task('chainTx', { action: 'approve', args: { index: idx } })
+      cy.task('chainTx', { action: 'grantMembership', args: { address, tier: 4, durationDays: 365 } })
+    })
+
+    cy.task('chainTx', { action: 'createOpenWager', args: { creatorIndex: 0, stake: String(STAKE) } }).then((open) => {
+      expect(open.ok, 'the open challenge was created').to.equal(true)
+
+      /*
+       * The front-runner submits, as themselves, a signature that was issued for the rightful
+       * taker. `taker` is what the digest commits to; `takerIndex` is who sends the transaction.
+       */
+      cy.task('chainTx', {
+        action: 'acceptOpenWager',
+        args: { wagerId: open.wagerId, claimKey: open.claimKey, takerIndex: 2, taker: rightful },
+      }).then((r) => {
+        expect(r.ok, "a signature issued for someone else does not let a third party take the challenge").to.equal(false)
+      })
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: open.wagerId } }).then((i) => {
+        expect(i.status, 'the challenge is still Open — nobody took it').to.equal(1)
+        expect(i.opponent, 'and it still names no opponent').to.equal('0x0000000000000000000000000000000000000000')
+      })
+
+      // And the rightful holder can still take it afterwards: the failed attempt cost them nothing.
+      cy.task('chainTx', {
+        action: 'acceptOpenWager',
+        args: { wagerId: open.wagerId, claimKey: open.claimKey, takerIndex: 1 },
+      }).then((r) => {
+        expect(r.ok, `the rightful taker is unaffected by the attempt (${r.error || ''})`).to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: open.wagerId } }).then((i) => {
+        expect(i.opponent, 'the challenge went to the person the code was shared with').to.equal(rightful)
+      })
+    })
+  })
+
 })

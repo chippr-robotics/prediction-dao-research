@@ -595,16 +595,14 @@
         {
           "id": "wagers.accept-open-challenge",
           "name": "Accept someone else's open challenge",
-          "status": "partial",
+          "status": "covered",
           "tier": "on-chain",
-          "depth": "smoke",
+          "depth": "settled",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-08",
-            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-09"
-          ],
-          "missing": "the acceptance branch is guarded by a precondition that can be absent and ends in an unconditional truth, so the stake transfer is never read back",
-          "issue": "#1244"
+            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-14",
+            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-15"
+          ]
         }
       ]
     },

@@ -24,6 +24,12 @@ const REGISTRY_ABI = [
   'function nextWagerId() view returns (uint256)',
   'function createWager(address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,bytes32 polymarketConditionId,bool creatorIsYes,bytes32 metadataHash,string metadataUri) returns (uint256)',
   'function acceptWager(uint256 wagerId)',
+  // Spec 024 open challenges: no named opponent. The taker proves possession of the four-word
+  // code by presenting an EIP-712 signature from the code-derived claim authority, and that
+  // signature is bound to the TAKER, so it cannot be lifted from the mempool and reused.
+  'function createOpenWager(address claimAuthority,address arbitrator,address token,uint128 stake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,bytes32 oracleConditionId,bool creatorIsYes,bytes32 metadataHash,string metadataUri) returns (uint256)',
+  'function acceptOpenWager(uint256 wagerId, bytes signature)',
+  'function openWagerIdForClaim(address authority) view returns (uint256)',
   'function declareWinner(uint256 wagerId, address winner)',
   // Spec 004 draws. ThirdParty settles on the arbitrator's single call; participant types
   // accumulate MUTUAL consent and settle only when both sides have declared.
@@ -391,6 +397,51 @@ export default defineConfig({
               const rw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
               tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, rw)
                 .declareWinner(args.wagerId, args.winner)
+              break
+            }
+            case 'createOpenWager': {
+              /*
+               * The claim authority stands in for the four-word code: the client derives a
+               * keypair from the phrase, and possession of the phrase IS possession of the key.
+               * The test generates one and keeps the private key so it can sign as the holder.
+               */
+              const ow = new ethers.Wallet(ACCOUNT_KEYS[args.creatorIndex ?? 0], provider)
+              const authority = ethers.Wallet.createRandom()
+              const oreg = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, ow)
+              const onow = (await provider.getBlock('latest')).timestamp
+              const osent = await oreg.createOpenWager(
+                authority.address, args.arbitrator || ethers.ZeroAddress, d.paymentToken,
+                BigInt(args.stake ?? (10n ** 18n)),
+                onow + (args.acceptIn ?? 3600), onow + (args.resolveIn ?? 7200),
+                args.resolutionType ?? 0, args.conditionId ?? ethers.ZeroHash,
+                args.creatorIsYes ?? false, ethers.id('e2e-open'), ''
+              )
+              const orc = await osent.wait(1)
+              const oread = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
+              return {
+                ok: orc.status === 1,
+                wagerId: Number(await oread.nextWagerId()) - 1,
+                claimAuthority: authority.address,
+                claimKey: authority.privateKey,
+              }
+            }
+            case 'acceptOpenWager': {
+              // Sign OpenAccept(wagerId, taker) as the code holder, then submit AS the taker.
+              const tw = new ethers.Wallet(ACCOUNT_KEYS[args.takerIndex ?? 1], provider)
+              const holder = new ethers.Wallet(args.claimKey)
+              const net = await provider.getNetwork()
+              const sig = await holder.signTypedData(
+                {
+                  name: 'FairWins WagerRegistry',
+                  version: '1',
+                  chainId: Number(net.chainId),
+                  verifyingContract: d.contracts.wagerRegistry,
+                },
+                { OpenAccept: [{ name: 'wagerId', type: 'uint256' }, { name: 'taker', type: 'address' }] },
+                { wagerId: args.wagerId, taker: args.taker ?? tw.address },
+              )
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, tw)
+                .acceptOpenWager(args.wagerId, args.signatureOverride ?? sig)
               break
             }
             case 'declareDraw': {

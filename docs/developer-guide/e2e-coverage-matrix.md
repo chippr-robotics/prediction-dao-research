@@ -29,8 +29,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 131 |
-| 🟢 covered | 117 |
-| 🟡 partial | 3 |
+| 🟢 covered | 118 |
+| 🟡 partial | 2 |
 | 🔴 absent | 5 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 41 · 🟡 2 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 42 · 🟡 1 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -74,7 +74,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `wagers.create-open-challenge` | Post a wager anyone may accept | 🟢 covered | settled | `on-chain` | `04-wager-creation-tx.cy.js` (CRE-09, CRE-10) |  |
-| `wagers.accept-open-challenge` | Accept someone else's open challenge | 🟡 partial | smoke | `on-chain` | `05-wager-acceptance.cy.js` (ACC-08, ACC-09) | the acceptance branch is guarded by a precondition that can be absent and ends in an unconditional truth, so the stake transfer is never read back |
+| `wagers.accept-open-challenge` | Accept someone else's open challenge | 🟢 covered | settled | `on-chain` | `05-wager-acceptance.cy.js` (ACC-14, ACC-15) |  |
 
 ### `026-membership-vouchers` — Membership vouchers
 
