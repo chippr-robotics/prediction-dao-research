@@ -59,11 +59,16 @@
   align-items: flex-end;
 }
 
+/* The width cap is what makes the alignment below MEAN anything: a bubble free to fill the row is
+   flush left and flush right at once, so `align-items: flex-end` on a user turn had no visible
+   effect on any message longer than a few words and the two speakers were told apart by colour
+   alone. */
 .assistant-panel__bubble {
   border-radius: var(--radius-md);
   font-size: 0.9rem;
   line-height: 1.5;
   margin: 0;
+  max-width: 88%;
   padding: 0.55rem 0.7rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -129,6 +134,12 @@
   margin: 0 0 0.4rem;
 }
 
+/* A terminal state (`unset` / `unconfigured`) has no retry button, so the last paragraph's bottom
+   margin had nothing under it and left the box visibly bottom-heavy. */
+.assistant-panel__error p:last-child {
+  margin-bottom: 0;
+}
+
 .assistant-panel__hint {
   color: var(--text-secondary);
   font-size: 0.8rem;
@@ -145,6 +156,11 @@
 
 .assistant-panel__composer textarea {
   background: var(--bg-primary);
+  /* NOT a restated face — the opposite. `button` gets `font-family: inherit` in index.css but
+     `textarea` does not, so this one control fell back to the UA's monospace default and the
+     composer was the only thing on the surface not set in the brand sans. Inheriting is what makes
+     the brand face apply. */
+  font-family: inherit;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-primary);

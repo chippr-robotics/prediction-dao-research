@@ -75,6 +75,10 @@
 }
 
 .api-access__scope input {
+  /* Without this a native checkbox paints itself in the UA's own blue, which is off-palette in both
+     themes and was the one colour on this card that no token chose. Every other checkbox-bearing
+     settings panel (Home, Navigation, Notification profiles) sets exactly this. */
+  accent-color: var(--brand-primary);
   margin-top: 0.2rem;
   min-height: 18px;
   min-width: 18px;
@@ -134,8 +138,14 @@
   word-break: normal;
 }
 
+/* `display: inline-block` alone does NOT hug here: this <code> is a flex item of a column-flex
+   parent, whose default `align-items: stretch` made a 16-character key id span the whole card and
+   read as a disabled text input. `align-self` is what the declaration above was already asking
+   for. */
 .api-access__key-id {
+  align-self: flex-start;
   display: inline-block;
+  max-width: 100%;
   padding: 0.2rem 0.4rem;
   word-break: normal;
 }
@@ -254,6 +264,11 @@
 /* There is no global `.btn`, only scoped ones, and src/index.css's global `button` rule would
    otherwise paint primary and destructive identically. Scoped to this panel. */
 .api-access-panel .btn {
+  /* Every button on this card hugs its label. Without this the ones that are direct children of a
+     column-flex block (Try again, Go to Membership, Create key, Show/Hide setup snippet, Copy
+     snippet) stretched edge to edge, while the ones inside `.api-access__actions` sized to their
+     text — two button widths in one card, with no rule a reader could state. */
+  align-self: flex-start;
   background: var(--surface-color);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -264,6 +279,12 @@
   min-height: 36px;
   padding: 0.45rem 0.85rem;
   transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+/* `.api-access__actions` is a ROW and sizes its own children, so it opts back out of the
+   hug above — otherwise nothing changes for Revoke / Remove from list / Copy key. */
+.api-access__actions .btn {
+  align-self: auto;
 }
 
 .api-access-panel .btn:hover:not(:disabled) {

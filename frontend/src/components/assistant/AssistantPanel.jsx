@@ -252,6 +252,17 @@ export default function AssistantPanel({ open, onClose, surface = null }) {
               {error.state === 'quota' && error.retryAfterSeconds ? (
                 <p className="assistant-panel__hint">Try again in about {error.retryAfterSeconds} seconds.</p>
               ) : null}
+              {/* The two TERMINAL states offer no retry, because retrying cannot change them. A bare
+                  sentence over a still-live composer reads as "try again anyway", so say what this
+                  is instead: nothing on this member's side is wrong, and nothing they do here will
+                  fix it. */}
+              {error.state === 'unset' || error.state === 'unconfigured' ? (
+                <p className="assistant-panel__hint">
+                  Nothing is wrong with your account or your key — the assistant is switched off for
+                  this app right now, so sending again will get the same answer. Everything else in
+                  the app works as usual.
+                </p>
+              ) : null}
               {error.state === 'unauthorized' ? (
                 <button type="button" className="btn" onClick={authorize} disabled={authorizing}>
                   Authorize again
