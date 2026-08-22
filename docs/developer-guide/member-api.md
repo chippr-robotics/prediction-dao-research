@@ -179,6 +179,18 @@ module answers `503 member_api_unconfigured` rather than 404 — an operator can
 `GET /status` gains a `memberApi: { enabled, killSwitch, assistant: { configured } }` block,
 spliced in the same way as the perps block.
 
+### A second rail: pay-per-request (spec 096)
+
+The operations above also accept a **per-request payment** from a caller with no token, using the
+x402 protocol — the request is answered `402` with a machine-readable price, the agent signs an
+EIP-3009 transfer to the platform treasury, retries with an `X-PAYMENT` header, and is served **as the
+payer**. It is off by default and lives in its own module (`src/x402/`), so the member API is spec 095
+exactly when it is disabled.
+
+**The bearer token is checked first, and a member is never charged** — a request carrying a valid
+token never reaches the payment path, even with a payment attached. `openapi.json` and the key routes
+are never priced. See [Agentic payments](agentic-payments.md).
+
 ### The OpenAPI document is JavaScript, on purpose
 
 `src/memberApi/openapi.js` exports the document as an object rather than shipping a static
@@ -285,6 +297,7 @@ lock is unchanged.
 
 ## Related
 
+- [Agentic payments](agentic-payments.md) — the x402 pay-per-request rail on these same operations.
 - [MCP Server](mcp-server.md) — the reference consumer of this API.
 - [Agentic Assistant](agentic-chat.md) — the one endpoint here that talks to a model provider.
 - [Member API Operations](../runbooks/member-api-operations.md) — enabling, killswitch, incidents.

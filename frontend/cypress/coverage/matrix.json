@@ -2394,6 +2394,13 @@
           "issue": "#1285"
         }
       ]
+    },
+    {
+      "id": "096-x402-agentic-payments",
+      "title": "x402 pay-per-request access to the member API",
+      "memberFacing": false,
+      "reason": "An agent-facing HTTP rail with no member surface: an unauthenticated caller is answered 402 with a price, pays with an X-PAYMENT header, and is served as the payer. No component, route or member journey changes, and a member holding a capability token never enters the path. Its gate is the gateway vitest suite (services/relay-gateway/test/x402.test.js) plus the spec-095 suites passing unchanged with the rail enabled, and node:test coverage of the MCP server's 402 surfacing and payment passthrough.",
+      "flows": []
     }
   ]
 }

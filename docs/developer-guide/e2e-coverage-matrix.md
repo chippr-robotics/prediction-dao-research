@@ -26,7 +26,7 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 97 |
+| Spec directories | 98 |
 | With a member-facing flow | 80 |
 | Member-facing flows | 137 |
 | 🟢 covered | 125 |
@@ -684,6 +684,7 @@ Listed so the gate can tell "correctly omitted" from "forgotten".
 | `090-chippr-brand-alignment` — Chippr brand alignment | Design tokens; member-visible but with no journey to drive. Gated by the four brand tests in frontend/src/test/brand/. |
 | `091-neutral-token-consolidation` — Neutral token consolidation | Design tokens; gated by noHardcodedColors and noUndefinedTokens. |
 | `094-e2e-coverage-expansion` — E2E coverage expansion | This feature: the matrix, the tiering policy and the suite's own gates. Its subject is the coverage of every other row. |
+| `096-x402-agentic-payments` — x402 pay-per-request access to the member API | An agent-facing HTTP rail with no member surface: an unauthenticated caller is answered 402 with a price, pays with an X-PAYMENT header, and is served as the payer. No component, route or member journey changes, and a member holding a capability token never enters the path. Its gate is the gateway vitest suite (services/relay-gateway/test/x402.test.js) plus the spec-095 suites passing unchanged with the rail enabled, and node:test coverage of the MCP server's 402 surfacing and payment passthrough. |
 
 ## Covered but not proven
 
