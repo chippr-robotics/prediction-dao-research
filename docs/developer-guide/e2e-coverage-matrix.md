@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 98 |
 | With a member-facing flow | 80 |
 | Member-facing flows | 137 |
-| 🟢 covered | 125 |
+| 🟢 covered | 126 |
 | 🟡 partial | 2 |
-| 🔴 absent | 4 |
+| 🔴 absent | 3 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -321,7 +321,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-42 flows — 🟢 38 · 🟡 2 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
+42 flows — 🟢 39 · 🟡 2 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -344,7 +344,7 @@ establish the outcome. They are listed in full at the end of this document.
 | `compliance.sanctioned-address-refused` | A screened address is refused before any transaction is offered | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CM-01) |  |
 | `compliance.frozen-account-blocked` | A frozen account cannot create a wager, and unfreezing restores it | 🟢 covered | settled | `on-chain` | `18-frozen-accounts.cy.js` (FRZ-01, FRZ-02) |  |
 | `compliance.paused-protocol-blocked` | A paused protocol refuses new wagers, and unpausing restores them | 🟢 covered | settled | `on-chain` | `19-paused-protocol.cy.js` (PAU-01, PAU-02) |  |
-| `compliance.passkey-account-parity` | A passkey account meets the same compliance gates as a classic wallet | 🔴 absent | skipped | `account-native` | `compliance.cy.js` (CP-02, CP-03) | both tests are PERMANENTLY PENDING and would fail if allowed to run: they gate on PASSKEY_FULL_STACK, which nothing sets, they call a `flagAddress` cypress task that is not registered, and they read a `[data-testid="passkey-account-address"]` the app does not render. The gates themselves ARE covered for classic wallets (compliance.sanctioned-address-refused, compliance.frozen-account-blocked); what is absent is the parity claim for the passkey rail |
+| `compliance.passkey-account-parity` | A passkey account meets the same compliance gates as a classic wallet | 🟢 covered | settled | `on-chain` | `compliance.cy.js` (CP-01); `38-passkey-compliance.cy.js` (CP-02, CP-03) |  |
 
 ### `008-runtime-chain-consistency` — Runtime chain consistency
 
