@@ -22,6 +22,7 @@ import {
   hasExistingCredential,
 } from '../lib/passkey/credentials'
 import { deriveAddress, publicKeyToOwnerBytes, readControllers } from '../lib/passkey/smartAccount'
+import { getCurrentChainId } from '../config/networks'
 
 export const PASSKEY_CONNECTOR_ID = 'fairwinsPasskey'
 const SESSION_KEY = 'fairwins.passkey.session.v1'
@@ -83,6 +84,34 @@ export function passkeyConnector(options = {}) {
    * Reads proxy the configured transport. Writes are refused here BY DESIGN: this connector holds
    * no key, and a passkey transaction is a UserOp assembled by the submission router.
    */
+  /*
+   * The chain a passkey session is on when nothing has said otherwise (#1286).
+   *
+   * NOT `config.chains[0]`. That is Polygon by construction — wagmi.js orders the list so mainnet
+   * is wagmi's default "no wallet connected" chain — so every passkey session reported 137 whatever
+   * the build was for. On a mainnet build that is right by accident; on a testnet-cohort build the
+   * app then took chain-scoped reads against MAINNET while the member sat on the testnet, which is
+   * the cohort-crossing read constitution III forbids.
+   *
+   * What it cost in practice: `useChainId()` fed the wrong chain to the KeyRegistry lookup on the
+   * create path, the opponent's key came back empty, and the form told the member
+   * "your opponent has not registered their encryption key" — a definite claim about someone else,
+   * produced by reading the wrong chain. Encryption is mandatory there, so passkey members could
+   * not create a wager at all off Polygon. (Measured against a local 80002 chain that held a valid
+   * 32-byte key for that exact opponent; a classic session on the identical state created it.)
+   *
+   * `getCurrentChainId()` is the app's own answer to "which network is this build for" — env
+   * `VITE_NETWORK_ID`, else the primary. On a mainnet build it still yields Polygon, so that path
+   * is byte-for-byte unchanged.
+   *
+   * Guarded on registration: a chain wagmi does not know cannot serve `config.getClient`, so an
+   * unregistered id falls back rather than trading a wrong-chain read for a broken client.
+   */
+  const defaultChainId = () => {
+    const current = getCurrentChainId()
+    return config.chains.some((c) => c.id === current) ? current : config.chains[0]?.id
+  }
+
   const provider = deps.provider ?? {
     async request({ method, params } = {}) {
       if (PASSKEY_WRITE_METHODS.has(method)) {
@@ -92,7 +121,7 @@ export function passkeyConnector(options = {}) {
         )
       }
       const session = readSession(deps.storage)
-      const chainId = session?.chainId ?? config.chains[0]?.id
+      const chainId = session?.chainId ?? defaultChainId()
       if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
         return session ? [getAddress(session.address)] : []
       }
@@ -114,7 +143,7 @@ export function passkeyConnector(options = {}) {
     },
 
     async connect({ chainId, isReconnecting, credentialId, discoverable, mode: requestedMode } = {}) {
-      const targetChain = chainId ?? config.chains[0]?.id
+      const targetChain = chainId ?? defaultChainId()
       // NO network gate here, deliberately. Signing in is a WebAuthn ceremony plus a local address
       // derivation — it needs no bundler, no EntryPoint and no RPC. Gating it on submission support
       // locked members out: selecting a network without a bundler persisted in the session, and on
@@ -221,7 +250,7 @@ export function passkeyConnector(options = {}) {
 
     async getChainId() {
       const session = readSession(deps.storage)
-      return session?.chainId ?? config.chains[0]?.id
+      return session?.chainId ?? defaultChainId()
     },
 
     async isAuthorized() {
