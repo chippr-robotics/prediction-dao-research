@@ -641,9 +641,19 @@ artifacts live under `specs/<feature>/`.
   in the on-chain tier, and a flow where a member signs something that **costs them money must** have
   on-chain coverage. The no-chain tier runs twice — `CYPRESS_VIEWPORT_PROFILE` = `desktop` (1280×720)
   and `phone` (390×844), applied from a GLOBAL `beforeEach` so a new spec is covered at both widths
-  with no author action; the on-chain tier is **4 shards with a private chain each**
-  (`scripts/e2e/split-full-tier.js`, longest-first) — measured at 6:37 / 7:51 / 6:29 / 6:09 a leg
-  against ~27 minutes serial, which is what keeps it affordable on every push. Accessibility uses `cy.a11yScan` — the
+  with no author action. **BOTH tiers are sharded longest-first**, and the packing lives once in
+  `scripts/e2e/lib/tier-split.js`: the on-chain tier is **4 legs with a private chain each**
+  (`split-full-tier.js`), the no-chain tier **6 legs per viewport profile**
+  (`split-fast-tier.js --profile desktop|phone`, where the profile decides whether the `passkey/`
+  specs are in the set — they ride desktop only). Sharding the no-chain tier is #1249: left as one
+  leg it had reached **34:29**, making the tier that starts NO chain the merge gate's critical path,
+  slower than the on-chain shards that compile contracts and send real transactions — a structural
+  fact, not a slow spec. Weights (`full-tier-weights.json`, `fast-tier-weights.json`) are CI-measured
+  and **decay**: `29-protect-custody` had grown to 326s while the splitter still estimated it at the
+  ~110s file mean, so one shard silently carried 3× its assumed load. An unmeasured spec is estimated
+  and ANNOUNCED, never dropped, and `frontend/src/test/e2e-policy/tierSharding.test.js` proves every
+  leg's union is exactly the specs on disk — a spec falling out of every shard fails nothing on its
+  own, because each leg still reports its own green. Accessibility uses `cy.a11yScan` — the
   **already-installed `axe-core`, injected by the runner, never imported from `frontend/src`** (adding
   `cypress-axe` would touch the lockfile; see spec 075) — failing on serious/critical, scoped to an
   open modal's root because the app portals its modals, and every suppression names its issue.

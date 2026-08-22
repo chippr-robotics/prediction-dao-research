@@ -346,7 +346,8 @@ export function supportedAssetsForChain(chainId, registry) {
  * used at send time are sized from that estimate.
  *
  * @returns {Promise<{ from: string, holdings: Array<{ asset: object, balance: bigint }>,
- *   nativeGasReserve: bigint, nativeGasLimit: bigint, gasPrice: bigint, hasNative: boolean }>}
+ *   nativeGasReserve: bigint, nativeGasLimit: bigint, gasPrice: bigint,
+ *   maxPriorityFeePerGas: bigint|null, hasNative: boolean }>}
  */
 export async function quoteAllAssets({ kind, secret, chainId, provider, registry, to }) {
   if (!provider) throw new Error('No network connection to read balances.')
@@ -374,6 +375,13 @@ export async function quoteAllAssets({ kind, secret, chainId, provider, registry
 
   const feeData = await provider.getFeeData()
   const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n
+  /*
+   * The tip that goes with that price, or null on a chain that priced in legacy `gasPrice`.
+   * Carried out of the quote because the native send PINS the fee to the price the reserve was
+   * sized from (see sweepAllAssets) — and a type-2 transaction needs both halves to do that.
+   */
+  const maxPriorityFeePerGas =
+    feeData.maxFeePerGas != null ? (feeData.maxPriorityFeePerGas ?? 0n) : null
 
   // Estimate the native-transfer gas against the real destination so a smart
   // account (contract) recipient is funded for its receive()/fallback; fall back
@@ -393,7 +401,7 @@ export async function quoteAllAssets({ kind, secret, chainId, provider, registry
   // ERC-20s first, native last (native pays the gas for every transfer).
   const holdings = [...erc20Holdings]
   if (hasNative) holdings.push(nativeRead)
-  return { from, holdings, nativeGasReserve, nativeGasLimit, gasPrice, hasNative }
+  return { from, holdings, nativeGasReserve, nativeGasLimit, gasPrice, maxPriorityFeePerGas, hasNative }
 }
 
 /**
@@ -464,22 +472,47 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
        * Never reserve LESS than the quote did: a falling fee is not a reason to cut the margin the
        * member was quoted, and `max` keeps this strictly safer than the value it replaces.
        */
-      let reserve = quote.nativeGasReserve
+      let price = quote.gasPrice
+      let priority = quote.maxPriorityFeePerGas
       try {
         const freshFee = await provider.getFeeData()
-        const freshGasPrice = freshFee?.maxFeePerGas ?? freshFee?.gasPrice ?? 0n
-        const freshReserve = quote.nativeGasLimit * freshGasPrice
-        if (freshReserve > reserve) reserve = freshReserve
+        const freshPrice = freshFee?.maxFeePerGas ?? freshFee?.gasPrice ?? 0n
+        if (freshPrice > price) {
+          price = freshPrice
+          priority = freshFee?.maxFeePerGas != null ? (freshFee.maxPriorityFeePerGas ?? 0n) : null
+        }
       } catch {
         /* fee unavailable — the quote's reserve stands, which is what shipped before this */
       }
+      const reserve = quote.nativeGasLimit * price
       const sendable = current > reserve ? current - reserve : 0n
       if (sendable <= 0n) {
         record({ asset, status: 'skipped', error: 'Not enough to cover the network fee.' })
         continue
       }
+      /*
+       * PIN the fee to the price the reserve was just sized from.
+       *
+       * `value` is `balance - gasLimit * price`, so the node's funding check
+       * (`value + gasLimit * maxFeePerGas <= balance`) holds only while the price the transaction
+       * carries is no higher than `price`. Left to ethers, that price is read AGAIN during
+       * populate — a second read, at a later moment, with no margin between it and the reserve.
+       * Whenever it comes back higher the coin is refused for insufficient funds and reported as
+       * a failure the member could do nothing about, which is the whole failure this reserve
+       * exists to prevent. Sending the price explicitly turns that inequality into an identity.
+       *
+       * Pinning is safe as well as exact: `price` is a max fee (base * 2 + tip on an EIP-1559
+       * chain), so it still covers a base fee that climbs after the transaction is signed.
+       * A chain that reported no fee at all (price 0) is left to ethers as before — an explicit
+       * zero would be a worse guess than the library's.
+       */
+      const feeFields = price === 0n
+        ? {}
+        : priority == null
+          ? { gasPrice: price }
+          : { maxFeePerGas: price, maxPriorityFeePerGas: priority > price ? price : priority }
       try {
-        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: quote.nativeGasLimit, nonce })
+        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: quote.nativeGasLimit, nonce, ...feeFields })
         nonce += 1
         await tx.wait()
         record({ asset, status: 'sent', txHash: tx.hash })

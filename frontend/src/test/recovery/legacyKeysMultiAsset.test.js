@@ -32,7 +32,16 @@ vi.mock('ethers', async () => {
     async sendTransaction(tx) {
       if (this.provider?._failNative) throw new Error('native reverted')
       this.provider?._nonces?.push({ asset: 'native', nonce: tx?.nonce })
-      this.provider?._sent?.push({ address: 'native', to: tx?.to, value: tx?.value })
+      this.provider?._sent?.push({
+        address: 'native',
+        to: tx?.to,
+        value: tx?.value,
+        gasLimit: tx?.gasLimit,
+        // The fee the sweep asked for, or undefined where it left the choice to the library.
+        maxFeePerGas: tx?.maxFeePerGas,
+        maxPriorityFeePerGas: tx?.maxPriorityFeePerGas,
+        gasPrice: tx?.gasPrice,
+      })
       return { hash: '0xnative', wait: async () => ({ status: 1 }) }
     }
   }
@@ -242,6 +251,58 @@ describe('sweepAllAssets — the native reserve tracks a rising fee', () => {
       nativeSend.value + nativeGasLimit * LATER,
       'what is sent plus what the CURRENT fee will cost must fit in the balance',
     ).toBeLessThanOrEqual(balance)
+  })
+
+  /*
+   * The reserve leaves ZERO margin by construction: `value` is `balance - gasLimit * price`, so
+   * the node's funding check (`value + gasLimit * maxFeePerGas <= balance`) is satisfied only
+   * while the price on the transaction is no higher than the price the reserve was sized from.
+   *
+   * Left to the library that price is read a THIRD time, during populate — after the sweep's own
+   * re-read, with nothing between them. A fee that ticks up in that window refuses the coin for
+   * insufficient funds and reports it as a failure the member could do nothing about: the exact
+   * outcome the reserve exists to prevent, reached by a narrower door. Pinning the fee to the
+   * reserved price turns the inequality into an identity, so there is no window left to lose.
+   */
+  it('sends the coin at the price its reserve was sized from, leaving no window to lose', async () => {
+    const balance = 10n ** 17n
+    const provider = makeProvider({ native: balance, [USDC]: 5_000_000n })
+
+    await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const nativeSend = provider._sent.find((s) => s.address === 'native')
+    const nativeGasLimit = (21000n * 12n) / 10n
+    expect(nativeSend.maxFeePerGas, 'the fee is stated, not left to be read again').toBe(GAS)
+    expect(
+      nativeSend.value + nativeGasLimit * nativeSend.maxFeePerGas,
+      'what is sent plus what the stated fee can cost is exactly the balance',
+    ).toBe(balance)
+  })
+
+  it('pins the RISEN price when the fee moved between the quote and the send', async () => {
+    const LATER = GAS * 3n
+    const balance = 10n ** 17n
+    const provider = risingFeeProvider({ native: balance, [USDC]: 5_000_000n }, { first: GAS, later: LATER })
+
+    await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const nativeSend = provider._sent.find((s) => s.address === 'native')
+    expect(nativeSend.maxFeePerGas, 'the transaction carries the fee that was reserved').toBe(LATER)
+  })
+
+  it('pins gasPrice on a chain that prices in gasPrice, and no 1559 fields', async () => {
+    // A chain with no EIP-1559 fee data must not be handed maxFeePerGas — the node would reject
+    // a type-2 transaction it cannot price. The reserve is the same arithmetic either way.
+    const balance = 10n ** 17n
+    const provider = makeProvider({ native: balance }, {
+      getFeeData: async () => ({ maxFeePerGas: null, gasPrice: GAS }),
+    })
+
+    await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const nativeSend = provider._sent.find((s) => s.address === 'native')
+    expect(nativeSend.gasPrice, 'the legacy price is stated').toBe(GAS)
+    expect(nativeSend.maxFeePerGas, 'no 1559 fields on a legacy-priced chain').toBeUndefined()
   })
 
   it('never reserves less than the quote did when the fee falls', async () => {

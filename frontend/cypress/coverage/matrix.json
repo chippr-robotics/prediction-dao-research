@@ -119,16 +119,14 @@
         {
           "id": "wagers.declare-draw",
           "name": "An arbitrator declares a draw and both stakes are returned",
-          "status": "partial",
+          "status": "covered",
           "tier": "on-chain",
-          "depth": "smoke",
+          "depth": "settled",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-13",
-            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-14"
-          ],
-          "missing": "the draw branch sits behind a precondition guard that ends in an unconditional truth, so the refunded balances are never read back",
-          "issue": "#1244"
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-15",
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-16"
+          ]
         }
       ]
     },
@@ -346,13 +344,14 @@
         {
           "id": "notifications.wager-state-change",
           "name": "Be notified when a wager you are in changes state",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/full/36-wager-notifications.cy.js::NOT-01",
+            "frontend/cypress/e2e/full/36-wager-notifications.cy.js::NOT-02"
+          ]
         }
       ]
     },
@@ -597,16 +596,14 @@
         {
           "id": "wagers.accept-open-challenge",
           "name": "Accept someone else's open challenge",
-          "status": "partial",
+          "status": "covered",
           "tier": "on-chain",
-          "depth": "smoke",
+          "depth": "settled",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-08",
-            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-09"
-          ],
-          "missing": "the acceptance branch is guarded by a precondition that can be absent and ends in an unconditional truth, so the stake transfer is never read back",
-          "issue": "#1244"
+            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-14",
+            "frontend/cypress/e2e/full/05-wager-acceptance.cy.js::ACC-15"
+          ]
         }
       ]
     },
@@ -800,15 +797,15 @@
         {
           "id": "intents.sign-and-relay",
           "name": "Authorize an action by signature and have a relayer submit it",
-          "status": "partial",
+          "status": "covered",
           "tier": "on-chain",
-          "depth": "smoke",
+          "depth": "settled",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-13"
-          ],
-          "missing": "no test drives the relayed path end to end, and none exercises the self-submit fallback when the relayer is unavailable — the never-stranded rule is unproven",
-          "issue": "#1244"
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-17",
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-18",
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-19"
+          ]
         }
       ]
     },

@@ -80,15 +80,30 @@ function openTransferFor(privateKey, destination = DEST) {
   })
 }
 
-/** Read each rendered outcome as `SYMBOL:status`, in the order the sweep produced them. */
-function outcomeRows() {
-  return cy.get('.lkr-outcome').then(($rows) =>
-    [...$rows].map((row) => {
-      const symbol = row.querySelector('.lkr-outcome__sym').textContent.trim()
-      const status = row.className.replace(/.*lkr-outcome--(\w+).*/, '$1')
-      return `${symbol}:${status}`
-    }),
-  )
+/**
+ * Assert the rendered outcomes read `SYMBOL:status`, in the order the sweep produced them.
+ *
+ * The panel renders a failure's REASON next to it, and that reason is the whole diagnostic value
+ * of this spec: `expected [Array(3)] to deeply equal [Array(3)]` says an asset did not move but
+ * not why, which is what a CI-only failure leaves you with. So the assertion carries the rows as
+ * rendered — reasons included — in its message.
+ *
+ * Not `.should()`: the caller has already waited for all three rows, and a row is only rendered
+ * once its own transfer settled, so there is nothing left to retry towards.
+ */
+function expectOutcomes(expected) {
+  cy.get('.lkr-outcome').then(($rows) => {
+    const rows = [...$rows].map((row) => ({
+      key: `${row.querySelector('.lkr-outcome__sym').textContent.trim()}:${
+        row.className.replace(/.*lkr-outcome--(\w+).*/, '$1')
+      }`,
+      text: row.textContent.replace(/\s+/g, ' ').trim(),
+    }))
+    expect(
+      rows.map((r) => r.key),
+      `outcomes as rendered: ${rows.map((r) => r.text).join(' | ')}`,
+    ).to.deep.equal(expected)
+  })
 }
 
 describe('Legacy account recovery — moving the funds (spec 062)', () => {
@@ -104,6 +119,16 @@ describe('Legacy account recovery — moving the funds (spec 062)', () => {
       expect(String(paymentToken).toLowerCase(), 'the deployed stablecoin is the one the app scans')
         .to.equal(APP_STABLECOIN.toLowerCase())
     })
+  })
+
+  /*
+   * Put the wrapped coin's real code back. LKR-S2 overwrites it to make one transfer refuse, and
+   * the spec-level chain checkpoint only rewinds within a single `cypress run` — a node reused
+   * for a second run would hand LKR-S1 a coin that refuses every transfer, failing the one test
+   * that arms nothing.
+   */
+  after(() => {
+    fixture('restoreTokenCode', { token: APP_WRAPPED_NATIVE })
   })
 
   beforeEach(() => {
@@ -150,7 +175,7 @@ describe('Legacy account recovery — moving the funds (spec 062)', () => {
 
       // Each asset reports its own outcome, in the order the sweep must use: the coin pays for
       // every transfer, so it can only go last.
-      outcomeRows().should('deep.equal', ASSET_ORDER.map((symbol) => `${symbol}:sent`))
+      expectOutcomes(ASSET_ORDER.map((symbol) => `${symbol}:sent`))
       cy.get('.action-sheet').contains(/funds moved/i).should('be.visible')
 
       // Judged by chain state, not by the dialog's wording.
@@ -201,7 +226,7 @@ describe('Legacy account recovery — moving the funds (spec 062)', () => {
 
       // The refusal is named against the asset it belongs to, and BOTH assets behind it moved —
       // a failure part-way through the portfolio does not abort what follows it.
-      outcomeRows().should('deep.equal', [
+      expectOutcomes([
         `${WRAPPED_SYMBOL}:failed`,
         `${STABLE_SYMBOL}:sent`,
         `${NATIVE_SYMBOL}:sent`,

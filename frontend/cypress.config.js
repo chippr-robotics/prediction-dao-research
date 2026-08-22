@@ -24,7 +24,21 @@ const REGISTRY_ABI = [
   'function nextWagerId() view returns (uint256)',
   'function createWager(address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,bytes32 polymarketConditionId,bool creatorIsYes,bytes32 metadataHash,string metadataUri) returns (uint256)',
   'function acceptWager(uint256 wagerId)',
+  // Spec 024 open challenges: no named opponent. The taker proves possession of the four-word
+  // code by presenting an EIP-712 signature from the code-derived claim authority, and that
+  // signature is bound to the TAKER, so it cannot be lifted from the mempool and reused.
+  'function createOpenWager(address claimAuthority,address arbitrator,address token,uint128 stake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,bytes32 oracleConditionId,bool creatorIsYes,bytes32 metadataHash,string metadataUri) returns (uint256)',
+  'function acceptOpenWager(uint256 wagerId, bytes signature)',
+  'function openWagerIdForClaim(address authority) view returns (uint256)',
   'function declareWinner(uint256 wagerId, address winner)',
+  // Spec 035 intent twin. The RELAYER is msg.sender; the acting identity is the recovered
+  // signer, which is what makes the rail gasless for the member without giving the relayer
+  // authority. Served via the proxy's fallback from WagerRegistryIntents.
+  'function declareWinnerWithSig(uint256 wagerId,address winner,address signer,bytes32 nonce,uint256 validAfter,uint256 validBefore,bytes sig)',
+  // Spec 004 draws. ThirdParty settles on the arbitrator's single call; participant types
+  // accumulate MUTUAL consent and settle only when both sides have declared.
+  'function declareDraw(uint256 wagerId)',
+  'function revokeDraw(uint256 wagerId)',
   'function claimRefund(uint256 wagerId)',
   'function claimPayout(uint256 wagerId)',
   'function cancelOpen(uint256 wagerId)',
@@ -299,6 +313,13 @@ export default defineConfig({
        */
       let chainSnapshotId = null
 
+      /*
+       * Runtime code displaced by `legacyFixture: makeTokenRefuse`, keyed by lowercased address,
+       * so `restoreTokenCode` can put it back. Lives out here with the snapshot id for the same
+       * reason: the plugin process spans the whole `cypress run`.
+       */
+      const originalTokenCode = new Map()
+
       on('task', {
         log(message) {
           console.log(message)
@@ -387,6 +408,110 @@ export default defineConfig({
               const rw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
               tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, rw)
                 .declareWinner(args.wagerId, args.winner)
+              break
+            }
+            case 'declareWinnerWithSig': {
+              /*
+               * Sign as the MEMBER, submit as the RELAYER. `signerIndex` is who authorises;
+               * `relayerIndex` is who pays gas and appears as msg.sender. The gap between those
+               * two accounts is the entire point of the intent rail.
+               */
+              const member = new ethers.Wallet(ACCOUNT_KEYS[args.signerIndex ?? 0], provider)
+              const relayer = new ethers.Wallet(ACCOUNT_KEYS[args.relayerIndex ?? 3], provider)
+              const inet = await provider.getNetwork()
+              const nonce = args.nonce ?? ethers.hexlify(ethers.randomBytes(32))
+              const inow = (await provider.getBlock('latest')).timestamp
+              const validAfter = args.validAfter ?? 0
+              const validBefore = args.validBefore ?? (inow + 3600)
+              const message = {
+                wagerId: args.wagerId,
+                winner: args.winner,
+                actor: args.actorOverride ?? member.address,
+                nonce,
+                validAfter,
+                validBefore,
+              }
+              const isig = await member.signTypedData(
+                {
+                  name: 'FairWins WagerRegistry',
+                  version: '1',
+                  chainId: Number(inet.chainId),
+                  verifyingContract: d.contracts.wagerRegistry,
+                },
+                {
+                  DeclareWinnerIntent: [
+                    { name: 'wagerId', type: 'uint256' },
+                    { name: 'winner', type: 'address' },
+                    { name: 'actor', type: 'address' },
+                    { name: 'nonce', type: 'bytes32' },
+                    { name: 'validAfter', type: 'uint256' },
+                    { name: 'validBefore', type: 'uint256' },
+                  ],
+                },
+                message,
+              )
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, relayer)
+                .declareWinnerWithSig(
+                  args.wagerId, args.winner, args.signerAddressOverride ?? member.address,
+                  nonce, validAfter, validBefore, isig,
+                )
+              break
+            }
+            case 'createOpenWager': {
+              /*
+               * The claim authority stands in for the four-word code: the client derives a
+               * keypair from the phrase, and possession of the phrase IS possession of the key.
+               * The test generates one and keeps the private key so it can sign as the holder.
+               */
+              const ow = new ethers.Wallet(ACCOUNT_KEYS[args.creatorIndex ?? 0], provider)
+              const authority = ethers.Wallet.createRandom()
+              const oreg = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, ow)
+              const onow = (await provider.getBlock('latest')).timestamp
+              const osent = await oreg.createOpenWager(
+                authority.address, args.arbitrator || ethers.ZeroAddress, d.paymentToken,
+                BigInt(args.stake ?? (10n ** 18n)),
+                onow + (args.acceptIn ?? 3600), onow + (args.resolveIn ?? 7200),
+                args.resolutionType ?? 0, args.conditionId ?? ethers.ZeroHash,
+                args.creatorIsYes ?? false, ethers.id('e2e-open'), ''
+              )
+              const orc = await osent.wait(1)
+              const oread = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
+              return {
+                ok: orc.status === 1,
+                wagerId: Number(await oread.nextWagerId()) - 1,
+                claimAuthority: authority.address,
+                claimKey: authority.privateKey,
+              }
+            }
+            case 'acceptOpenWager': {
+              // Sign OpenAccept(wagerId, taker) as the code holder, then submit AS the taker.
+              const tw = new ethers.Wallet(ACCOUNT_KEYS[args.takerIndex ?? 1], provider)
+              const holder = new ethers.Wallet(args.claimKey)
+              const net = await provider.getNetwork()
+              const sig = await holder.signTypedData(
+                {
+                  name: 'FairWins WagerRegistry',
+                  version: '1',
+                  chainId: Number(net.chainId),
+                  verifyingContract: d.contracts.wagerRegistry,
+                },
+                { OpenAccept: [{ name: 'wagerId', type: 'uint256' }, { name: 'taker', type: 'address' }] },
+                { wagerId: args.wagerId, taker: args.taker ?? tw.address },
+              )
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, tw)
+                .acceptOpenWager(args.wagerId, args.signatureOverride ?? sig)
+              break
+            }
+            case 'declareDraw': {
+              const dw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, dw)
+                .declareDraw(args.wagerId)
+              break
+            }
+            case 'revokeDraw': {
+              const rvw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, rvw)
+                .revokeDraw(args.wagerId)
               break
             }
             case 'claimRefund': {
@@ -732,8 +857,8 @@ export default defineConfig({
          * `makeTokenRefuse` is how ONE asset is failed without disturbing the others — see its
          * own comment for why a drained balance cannot do that job.
          *
-         * action ∈ newAccount | makeTokenRefuse | fundNative | mintToken | balances |
-         *          deploymentAddresses
+         * action ∈ newAccount | makeTokenRefuse | restoreTokenCode | fundNative | mintToken |
+         *          balances | deploymentAddresses
          */
         /**
          * Fixtures for bridge + supplied liquidity (spec 067).
@@ -2107,11 +2232,17 @@ export default defineConfig({
                  * Deploy ReentrantToken, copy its RUNTIME code over the token's, and arm it to
                  * re-enter the token itself with an unknown selector — the token has no fallback,
                  * so that call reverts and the transfer reverts with it. Only the code changes:
-                 * ERC-20 storage lives in the same slots, so who holds what is unchanged, and the
-                 * per-spec chain checkpoint puts the original code back.
+                 * ERC-20 storage lives in the same slots, so who holds what is unchanged.
                  *
                  * This is the only way to fail one asset and not the others: `sweepAllAssets`
                  * re-reads balances itself, so emptying a token just drops it from the run.
+                 *
+                 * The original runtime code is captured here and put back by `restoreTokenCode`,
+                 * which the spec calls in an `after` hook. The chain checkpoint is NOT enough on
+                 * its own: it only rewinds within one `cypress run` process, so a node reused for
+                 * a second run starts it with a wrapped coin that refuses every transfer — and the
+                 * spec then fails in LKR-S1, which arms nothing and is innocent. (Reproduced: a
+                 * shard rerun against a node left over from a single-spec run.)
                  */
                 const artifactPath = resolve(
                   __dirname, '..', 'artifacts', 'contracts', 'mocks', 'ReentrantToken.sol', 'ReentrantToken.json',
@@ -2119,6 +2250,11 @@ export default defineConfig({
                 const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'))
                 const deployed = await new ethers.ContractFactory(artifact.abi, artifact.bytecode, funder).deploy()
                 await deployed.waitForDeployment()
+                // Capture BEFORE overwriting, and only the first time: a second arm of the same
+                // token must not record the reentrant code as if it were the original.
+                if (!originalTokenCode.has(tokenAddress.toLowerCase())) {
+                  originalTokenCode.set(tokenAddress.toLowerCase(), await provider.getCode(tokenAddress))
+                }
                 await provider.send('hardhat_setCode', [
                   tokenAddress,
                   await provider.getCode(await deployed.getAddress()),
@@ -2126,6 +2262,14 @@ export default defineConfig({
                 const rc = await (await new ethers.Contract(tokenAddress, ARMED_TOKEN_ABI, funder)
                   .arm(tokenAddress, '0xdeadbeef')).wait(1)
                 return { ok: rc.status === 1, address: tokenAddress }
+              }
+              case 'restoreTokenCode': {
+                // Idempotent: a spec that never armed the token still calls this in `after`.
+                const saved = originalTokenCode.get(tokenAddress.toLowerCase())
+                if (!saved) return { ok: true, restored: false }
+                await provider.send('hardhat_setCode', [tokenAddress, saved])
+                originalTokenCode.delete(tokenAddress.toLowerCase())
+                return { ok: true, restored: true }
               }
               case 'fundNative': {
                 const tx = await funder.sendTransaction({

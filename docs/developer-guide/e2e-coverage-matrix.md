@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 97 |
 | With a member-facing flow | 80 |
 | Member-facing flows | 137 |
-| 🟢 covered | 121 |
-| 🟡 partial | 5 |
-| 🔴 absent | 5 |
+| 🟢 covered | 125 |
+| 🟡 partial | 2 |
+| 🔴 absent | 4 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 40 · 🟡 3 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 43 · 🟡 0 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -61,7 +61,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `wagers.declare-draw` | An arbitrator declares a draw and both stakes are returned | 🟡 partial | smoke | `on-chain` | `07-manual-resolution.cy.js` (RES-13, RES-14) | the draw branch sits behind a precondition guard that ends in an unconditional truth, so the refunded balances are never read back |
+| `wagers.declare-draw` | An arbitrator declares a draw and both stakes are returned | 🟢 covered | settled | `on-chain` | `07-manual-resolution.cy.js` (RES-15, RES-16) |  |
 
 ### `022-membership-purchase-progress` — Membership purchase progress
 
@@ -74,7 +74,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `wagers.create-open-challenge` | Post a wager anyone may accept | 🟢 covered | settled | `on-chain` | `04-wager-creation-tx.cy.js` (CRE-09, CRE-10) |  |
-| `wagers.accept-open-challenge` | Accept someone else's open challenge | 🟡 partial | smoke | `on-chain` | `05-wager-acceptance.cy.js` (ACC-08, ACC-09) | the acceptance branch is guarded by a precondition that can be absent and ends in an unconditional truth, so the stake transfer is never read back |
+| `wagers.accept-open-challenge` | Accept someone else's open challenge | 🟢 covered | settled | `on-chain` | `05-wager-acceptance.cy.js` (ACC-14, ACC-15) |  |
 
 ### `026-membership-vouchers` — Membership vouchers
 
@@ -113,7 +113,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `intents.sign-and-relay` | Authorize an action by signature and have a relayer submit it | 🟡 partial | smoke | `on-chain` | `04-wager-creation-tx.cy.js` (CRE-13) | no test drives the relayed path end to end, and none exercises the self-submit fallback when the relayer is unavailable — the never-stranded rule is unproven |
+| `intents.sign-and-relay` | Authorize an action by signature and have a relayer submit it | 🟢 covered | settled | `on-chain` | `07-manual-resolution.cy.js` (RES-17, RES-18, RES-19) |  |
 
 ### `036-relayer-infrastructure` — Relayer gateway
 
@@ -472,7 +472,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 31 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 32 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -502,7 +502,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `notifications.wager-state-change` | Be notified when a wager you are in changes state | 🔴 absent | none | — (proposed: on-chain) | #1245 |  |
+| `notifications.wager-state-change` | Be notified when a wager you are in changes state | 🟢 covered | flow | `on-chain` | `36-wager-notifications.cy.js` (NOT-01, NOT-02) |  |
 
 ### `013-polymarket-search-filter` — Polymarket search and filter
 
