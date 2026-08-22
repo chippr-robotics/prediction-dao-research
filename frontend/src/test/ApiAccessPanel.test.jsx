@@ -51,7 +51,8 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   vi.clearAllMocks()
-  wallet = ethers.Wallet.createRandom()
+// Fixed key (Wallet.createRandom's mnemonic path hits an ethers/jsdom crypto quirk under vitest).
+  wallet = new ethers.Wallet('0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d')
   walletState = {
     address: wallet.address,
     signer: wallet,

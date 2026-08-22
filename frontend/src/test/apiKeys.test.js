@@ -83,7 +83,8 @@ describe('buildGrant', () => {
 
 describe('grant typed data', () => {
   it('signs and verifies against the same tables the gateway uses', async () => {
-    const wallet = ethers.Wallet.createRandom()
+// Fixed key (Wallet.createRandom's mnemonic path hits an ethers/jsdom crypto quirk under vitest).
+    const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d')
     const grant = buildGrant({
       account: wallet.address,
       scopes: ['assistant:chat', 'read:profile'],
@@ -104,7 +105,8 @@ describe('grant typed data', () => {
   })
 
   it('builds a revocation the same account can sign', async () => {
-    const wallet = ethers.Wallet.createRandom()
+// Fixed key (Wallet.createRandom's mnemonic path hits an ethers/jsdom crypto quirk under vitest).
+    const wallet = new ethers.Wallet('0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a')
     const revocation = buildRevocation({ account: wallet.address, keyId: '0x' + 'ab'.repeat(32), nowSeconds: 1_750_000_100 })
     const { domain, types, message } = revocationTypedData(revocation)
     expect(types).toBe(MEMBER_API_REVOCATION_TYPES)
@@ -119,7 +121,8 @@ describe('grant typed data', () => {
 
 describe('token codec', () => {
   it('round-trips a grant and signature through the fw1 wire format', async () => {
-    const wallet = ethers.Wallet.createRandom()
+// Fixed key (Wallet.createRandom's mnemonic path hits an ethers/jsdom crypto quirk under vitest).
+    const wallet = new ethers.Wallet('0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6')
     const grant = buildGrant({ account: wallet.address, scopes: ['read:profile'], ttlDays: 7, label: 'round trip' })
     const { domain, types, message } = grantTypedData(grant)
     const signature = await wallet.signTypedData(domain, types, message)
@@ -149,7 +152,8 @@ describe('token codec', () => {
 
 describe('metadata store', () => {
   it('stores metadata only — the token is never written to storage', async () => {
-    const wallet = ethers.Wallet.createRandom()
+// Fixed key (Wallet.createRandom's mnemonic path hits an ethers/jsdom crypto quirk under vitest).
+    const wallet = new ethers.Wallet('0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a')
     const grant = buildGrant({ account: ACCOUNT, scopes: ['read:profile'], ttlDays: 7, label: 'agent' })
     const { domain, types, message } = grantTypedData(grant)
     const signature = await wallet.signTypedData(domain, types, message)

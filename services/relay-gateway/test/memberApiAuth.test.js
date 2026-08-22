@@ -20,7 +20,7 @@ import { MEMBER_API_ENV, memberApiProviders, memberToken } from './memberApiHelp
 import { parseToken } from '../src/memberApi/auth.js'
 
 /** A stand-in smart account: it has no key, so nothing ever ECDSA-recovers to it. */
-const CONTRACT_ACCOUNT = '0xAbC0000000000000000000000000000000000001'
+const CONTRACT_ACCOUNT = '0xabc0000000000000000000000000000000000001'
 
 function build({ env = {}, providerOpts = {}, killSwitch = createKillSwitch(false) } = {}) {
   const config = testConfig({ ...MEMBER_API_ENV, ...env })
