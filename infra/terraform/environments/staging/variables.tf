@@ -16,7 +16,7 @@ variable "artifact_registry_repository" {
 }
 
 variable "staging_max_instances" {
-  description = "Scaling ceiling for both staging services. Lower than production on purpose — staging is a mirror, not a load test."
+  description = "Scaling ceiling for the two staging SPA services. Lower than production on purpose — staging is a mirror, not a load test. The MCP server states its own ceiling, mirroring prod."
   type        = number
   default     = 10
 }

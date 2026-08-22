@@ -2312,6 +2312,88 @@
       "memberFacing": false,
       "reason": "This feature: the matrix, the tiering policy and the suite's own gates. Its subject is the coverage of every other row.",
       "flows": []
+    },
+    {
+      "id": "095-member-api-agentic-access",
+      "title": "Member API, private API keys and the opt-in assistant",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "assistant.opt-in",
+          "name": "The assistant does not exist until Settings turns it on, and stops existing when it is turned off",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-01"
+          ],
+          "note": "default OFF is the absence of the feature, not a UI state, so it is proved by absence at both ends — before the switch and after it is switched back"
+        },
+        {
+          "id": "assistant.honest-unreachable",
+          "name": "An unreachable assistant service is named and retryable, and never answered for",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-02"
+          ],
+          "note": "no intercept — the no-chain dev server points VITE_RELAYER_URL at a dead port, so the transport failure is real; the test asserts the named error, the retry, and the ABSENCE of an assistant bubble"
+        },
+        {
+          "id": "assistant.memory-clear",
+          "name": "Conversation memory is device-local, counted in Settings, and clearable to nothing",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-03"
+          ],
+          "note": "the count is read back from the wallet-scoped store the panel wrote, not from the panel's own state"
+        },
+        {
+          "id": "api-access.create-key",
+          "name": "A member-signed grant is revealed once, persisted nowhere, and leaves only metadata",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/39-api-access.cy.js::API-01",
+            "frontend/cypress/e2e/fast/39-api-access.cy.js::API-05"
+          ],
+          "note": "cy.assertNoClearSecret sweeps every storage key and the whole DOM after the reveal is dismissed; the metadata record is re-read after a reload. API-05 holds the three-state gate in both directions — an unreadable membership offers a retry, a chain that answered tier 0 offers the upgrade route, and neither is the console."
+        },
+        {
+          "id": "api-access.revoke-key",
+          "name": "A signed revocation is registered without overstating what registration means",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/39-api-access.cy.js::API-02",
+            "frontend/cypress/e2e/fast/39-api-access.cy.js::API-03"
+          ],
+          "note": "the gateway holds revocations in process memory, so API-02 asserts the panel says the revocation does not survive a restart and names the expiry that does; API-03 asserts an undelivered revocation never reads as a registered one"
+        },
+        {
+          "id": "api-access.console",
+          "name": "The api-access developer console: OpenAPI explorer, token introspection and MCP setup",
+          "status": "partial",
+          "tier": "no-chain",
+          "depth": "smoke",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/39-api-access.cy.js::API-04"
+          ],
+          "missing": "Only the HOST card is exercised — the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them.",
+          "issue": "#1285"
+        }
+      ]
     }
   ]
 }

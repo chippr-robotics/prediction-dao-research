@@ -99,6 +99,7 @@ nav:
     - Private Wager Encryption: user-guide/private-market-encryption.md
     - Address Book & Screening: user-guide/address-book.md
     - Callsigns: user-guide/callsigns.md
+    - Assistant & API Access: user-guide/assistant-and-api.md
     - FAQ: user-guide/faq.md
   - Developer Guide:
     - Setup: developer-guide/setup.md
@@ -111,6 +112,9 @@ nav:
     - Perps (specs 082 + 083): developer-guide/perps.md
     - Platform Fees (FeeRouter): developer-guide/platform-fees.md
     - Mini-Apps (spec 073): developer-guide/miniapps.md
+    - Member API (spec 095): developer-guide/member-api.md
+    - MCP Server (spec 095): developer-guide/mcp-server.md
+    - Agentic Assistant (spec 095): developer-guide/agentic-chat.md
     - Message Signing (Protect ▸ Verify): developer-guide/message-signing.md
     - Hardware Wallets (Protect ▸ Off chain): developer-guide/hardware-wallets.md
     - Account Cards & Identity (spec 086): developer-guide/account-cards.md
@@ -153,6 +157,7 @@ nav:
     - Fee Operations: runbooks/fee-operations.md
     - Perps Operations: runbooks/perps-operations.md
     - Mini-App Registry Operations: runbooks/miniapp-registry-operations.md
+    - Member API Operations (spec 095): runbooks/member-api-operations.md
     - Staking Operations: runbooks/staking-operations.md
     - Contract Upgrades: runbooks/contract-upgrades.md
     - Relayer Mordor Deploy: runbooks/relayer-mordor-deploy.md

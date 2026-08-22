@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import WalletPage from '../pages/WalletPage'
 import { WalletContext, UIContext } from '../contexts'
@@ -300,6 +300,11 @@ describe('WalletPage — Settings tab', () => {
       'Portfolio',
       'Privacy',
       'Notifications',
+      // Spec 095 — the opt-in assistant and programmatic access sit with the other
+      // privacy-shaped cards: one decides what leaves this device, the other what can
+      // reach this account.
+      'Assistant',
+      'API access',
       'Markets',
       'Install app',
       'Software update',
@@ -337,11 +342,15 @@ describe('WalletPage — Settings tab', () => {
   })
 
   it('lists all four legal/policy links in the Legal & policies card', () => {
-    renderPage(connectedWalletContext, SETTINGS_ROUTE)
+    const { container } = renderPage(connectedWalletContext, SETTINGS_ROUTE)
     fireEvent.click(screen.getByRole('button', { name: /legal & policies/i }))
 
+    // Scoped to the card's own region: the Assistant card (spec 095) also links the Privacy
+    // Policy from its data-use disclosure, so a page-wide role query now matches twice.
+    const region = container.querySelector('#legal-policies-region')
+    expect(region).not.toBeNull()
     for (const { label, href } of LEGAL_LINKS) {
-      expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toHaveAttribute('href', href)
+      expect(within(region).getByRole('link', { name: new RegExp(label, 'i') })).toHaveAttribute('href', href)
     }
   })
 

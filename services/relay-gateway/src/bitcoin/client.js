@@ -14,6 +14,8 @@
  * The gateway holds no Bitcoin keys of any kind — these are pure data reads plus a raw-tx
  * broadcast relay of a transaction the member signed client-side.
  */
+import { stripTrailingSlashes } from '../strings.js'
+
 
 /** Upstream unreachable / persistent 5xx / upstream 429 — routes answer 502 upstream_unavailable. */
 export class BitcoinUnavailableError extends Error {
@@ -38,7 +40,7 @@ export class BitcoinRequestError extends Error {
  * JSON everywhere else), bounded timeout, retries only when `retryable`.
  */
 function createRequester({ baseUrl, timeoutMs, retries, fetchImpl, label }) {
-  const base = baseUrl.replace(/\/+$/, '')
+  const base = stripTrailingSlashes(baseUrl)
 
   async function text(path, { method = 'GET', body, contentType, retryable = method === 'GET' } = {}) {
     const attempts = retryable ? retries + 1 : 1

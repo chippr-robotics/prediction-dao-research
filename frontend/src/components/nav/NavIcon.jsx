@@ -72,6 +72,9 @@ const ICON_PATHS = {
   // Home bottom bar (spec 058) — Wager: head-to-head, two parties facing off
   // (visually consistent with the create view's EitherSideIcon).
   headToHead: <><circle cx="7" cy="9" r="2.5" /><circle cx="17" cy="9" r="2.5" /><path d="M2.5 19v-.8a4 4 0 0 1 4-4h1" /><path d="M21.5 19v-.8a4 4 0 0 0-4-4h-1" /><path d="M10.5 12.5h3" /><path d="m12 11 1.5 1.5L12 14" /></>,
+  // Assistant (spec 095) — a speech bubble with a tail, drawn on the same 24×24 grid and stroked
+  // like the rest of the set. Used by the floating launcher and the Assistant settings card.
+  chat: <><path d="M20 12.5a7 7 0 0 1-7 7H8.6L4.5 21.5l.9-3.4A7 7 0 0 1 11 5h2a7 7 0 0 1 7 7v.5Z" /><path d="M9 11.5h6M9 14.5h3.5" /></>,
 }
 
 export default function NavIcon({ name, size = 18, className = '' }) {

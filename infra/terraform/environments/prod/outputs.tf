@@ -16,6 +16,11 @@ output "spa_service_uri" {
   value       = module.spa.service_uri
 }
 
+output "mcp_server_service_uri" {
+  description = "MCP server URI (spec 095). No Cloudflare hostname is declared for it, so this run.app address is what an MCP client is configured with — and unlike the SPA it is not behind the origin lock, because agents call it directly."
+  value       = module.mcp_server.service_uri
+}
+
 output "uptime_check_ids" {
   description = "Uptime check ids, for cross-referencing alert policies."
   value       = module.monitoring.uptime_check_ids

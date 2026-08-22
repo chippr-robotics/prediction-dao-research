@@ -107,6 +107,9 @@ case "$ROLE" in
     emit "$GW" POLYMARKET_API_SECRET     POLYMARKET_API_SECRET       latest optional
     emit "$GW" POLYMARKET_API_PASSPHRASE POLYMARKET_API_PASSPHRASE   latest optional
     emit "$GW" POLYMARKET_API_ADDRESS    POLYMARKET_API_ADDRESS      latest optional
+    # spec 095: member-assistant model credential. OPTIONAL — absent leaves the assistant route
+    # failing closed with 503 assistant_unconfigured; the member API and relay path keep serving.
+    emit "$GW" ANTHROPIC_API_KEY         anthropic-api-key           latest optional
 
     log "engine container:"
     emit "$EN" API_KEY                   relay-engine-api-key        2      required

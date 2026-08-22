@@ -79,6 +79,10 @@ If any provision of a more specific step (membership attestation, signed message
 
 **4.6 Automated and AI components.** Portions of the Service are developed, maintained, and operated with the assistance of automated systems and AI agents. You acknowledge this and accept the associated risks described in the Risk Disclosure.
 
+The Service may also make available, at your option, **member-facing AI features** — an in-app assistant, and private API keys that allow programs you authorise, including AI agents, to access your own data. **These features are off unless you enable them.** They are provided **"as is"**, they are **informational only and are not advice of any kind**, and their output may be inaccurate. **You remain solely responsible for every transaction you sign.** No AI feature of the Service signs, submits, or authorises a transaction, holds or transfers your assets, or acts at any Trading Venue on your behalf, and nothing an AI feature outputs creates any obligation on us or any entitlement for you.
+
+**Safeguarding an API key you create is your responsibility.** A key is created by **your own wallet signature**; FairWins does not issue, hold, or store it, and cannot recover, reissue, or extend it. **Any use of the Service by a person or program presenting your key is treated as authorised by you, and you are responsible for it**, including for what any third-party program or agent you connect does with the access you granted. A key confers only the read and quotation permissions you selected when you signed it; **it cannot move funds, sign a transaction, or bind you to a Wager.** Revocation takes effect on the live Service but is **not guaranteed to persist across a Service restart** — the binding limit on a key is the **expiry time you signed into it**, after which it stops working. You are responsible for choosing an appropriate expiry and permission set, and for revoking any key you no longer use or believe to be exposed.
+
 ## 5. Eligibility
 
 You may use the Service only if you meet **all** of the following at all times. By using the Service you represent and warrant that:
