@@ -7,6 +7,8 @@
  * writes (`post`, spec 056) do NOT — publishing an order is not idempotent, so a retry could
  * double-post a listing.
  */
+import { stripTrailingSlashes } from '../strings.js'
+
 
 /** OpenSea unreachable / persistent 5xx / upstream 429 — routes serve stale or 503 upstream_unavailable. */
 export class OpenSeaUnavailableError extends Error {
@@ -30,7 +32,7 @@ export class OpenSeaRequestError extends Error {
  * @param {{baseUrl: string, apiKey?: string|null, timeoutMs?: number, retries?: number, fetchImpl?: typeof fetch}} opts
  */
 export function createOpenSeaClient({ baseUrl, apiKey = null, timeoutMs = 5000, retries = 1, fetchImpl = fetch }) {
-  const base = baseUrl.replace(/\/+$/, '')
+  const base = stripTrailingSlashes(baseUrl)
 
   return {
     /**

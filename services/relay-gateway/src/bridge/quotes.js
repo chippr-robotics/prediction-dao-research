@@ -15,6 +15,8 @@
  * without the gateway (the client's on-chain event fallback, research R7), so an outage here can
  * never strand value in flight.
  */
+import { stripTrailingSlashes } from '../strings.js'
+
 
 /** Across unreachable / persistent 5xx / upstream 429 — routes answer 503 upstream_unavailable. */
 export class AcrossUnavailableError extends Error {
@@ -79,7 +81,7 @@ function feeLeg(o) {
  * @param {{baseUrl: string, timeoutMs?: number, retries?: number, fetchImpl?: typeof fetch}} opts
  */
 export function createAcrossClient({ baseUrl, timeoutMs = 5000, retries = 1, fetchImpl = fetch }) {
-  const base = baseUrl.replace(/\/+$/, '')
+  const base = stripTrailingSlashes(baseUrl)
 
   return {
     /**
