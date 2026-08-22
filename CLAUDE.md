@@ -661,6 +661,27 @@ artifacts live under `specs/<feature>/`.
   fails** (`scripts/e2e/check-lighthouse-coverage.js`) — `lhci` asserts only over URLs it collected, so
   a route that never loaded otherwise leaves the job green. Uncovered flows are sub-issues of #1228,
   not lines in a document. See `specs/094-e2e-coverage-expansion/`.
+- **The member API (spec 095) authenticates with member-SIGNED capability tokens, and nothing on it
+  signs or moves value.** A "private API key" is an off-chain EIP-712 `ApiKeyGrant` the member signs
+  in-app (Settings ▸ API access) — the gateway stores nothing to issue one; the struct/domain have
+  ONE source, `@fairwins/intent-types/offchain` (deliberately OUTSIDE `CONTRACT_VERIFIED_TYPES`: the
+  parity gate would demand Solidity that must not exist; `services/relay-gateway/test/memberApiAuth.test.js`
+  is their gate instead). The gateway module (`services/relay-gateway/src/memberApi/`,
+  `MEMBER_API_ENABLED`) is optional and mounts unconditionally (503 `member_api_unconfigured` off);
+  scopes cover reads, typed-data BUILDS and the opt-in assistant — never relay, never custody, and
+  the actor field of every built intent is forced to the token account. Three verdicts are absolute:
+  `auth_unverifiable` and `membership_unreadable` are retryable 503s, NEVER denials (an RPC timeout
+  is not a forged signature; unreadable is not tier 0). Revocation is in-process (`durable: false`
+  on every answer — every surface says so; expiry is the binding limit, TTL-capped at
+  `MEMBER_API_MAX_TTL_DAYS`). The assistant is OPT-IN and default-OFF, memory is device-local and
+  member-clearable (deliberately absent from `syncedObjects.js`), the session token lives in module
+  memory only, and message content never reaches logs or audit fields. The MCP server
+  (`services/mcp-server/`) is DEPENDENCY-FREE and deliberately NOT a workspace member (lockfile
+  hazard, spec 075) — do not add it to `workspaces` or give it dependencies; it consumes the API
+  with the member's own token and cannot sign. Mini-app packages still cannot sign — the api-access
+  console deep-links to the host Settings card for every key ceremony. See
+  `docs/developer-guide/member-api.md` + `docs/developer-guide/mcp-server.md` +
+  `docs/developer-guide/agentic-chat.md` + `specs/095-member-api-agentic-access/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

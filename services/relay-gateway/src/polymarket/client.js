@@ -13,6 +13,7 @@
  * process (FR-016).
  */
 import crypto from 'node:crypto'
+import { stripTrailingSlashes } from '../strings.js'
 
 /** Polymarket unreachable / persistent 5xx / upstream 429 — routes serve stale or 503 upstream_unavailable. */
 export class PolymarketUnavailableError extends Error {
@@ -66,7 +67,7 @@ export function createPolymarketClient({
   fetchImpl = fetch,
   now = () => Date.now(),
 }) {
-  const base = baseUrl.replace(/\/+$/, '')
+  const base = stripTrailingSlashes(baseUrl)
   const creds = { apiKey, apiSecret, apiPassphrase, apiAddress }
   const nowSec = () => Math.floor(now() / 1000)
 

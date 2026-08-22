@@ -50,8 +50,15 @@ export const STYLE_FILENAME = 'style.css'
  */
 export const APP_ID_PATTERN = /^[a-z][a-z0-9-]{1,30}$/
 
-/** Display version (`manifest.version`); the registry `uint64` is the authoritative ordering. */
-export const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*$/
+/**
+ * Display version (`manifest.version`); the registry `uint64` is the authoritative ordering.
+ *
+ * Kept byte-identical with `frontend/src/lib/miniapps/manifest.js` (deliberate mirrors — the
+ * package boundary forbids a shared import). Block boundaries are forced at `+` ONLY: the previous
+ * `(?:[-+][0-9A-Za-z.-]+)*` was exponentially ambiguous under backtracking because `-` could start
+ * a block and sit inside one. Same accepted language, verified by 500k-input differential fuzz.
+ */
+export const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+(?:\+[0-9A-Za-z.-]+)*)?$/
 
 /** Declared shared-state key pattern (`manifest.storeKeys`). */
 export const STORE_KEY_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/

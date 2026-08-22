@@ -32,6 +32,7 @@ import ActivityNotificationBridge from './components/notifications/ActivityNotif
 import SignerRequestHost from './components/account/SignerRequestHost'
 import AppNavDrawer from './components/nav/AppNavDrawer'
 import AttentionFocus from './components/nav/AttentionFocus'
+import AssistantLauncher from './components/assistant/AssistantLauncher'
 
 //admin
 import ControlRoom from './components/admin/ControlRoom'
@@ -68,6 +69,13 @@ function AppLayout() {
         <div className="app-shell">
           <Header appMode />
           <AppNavDrawer />
+          {/* Spec 095: the opt-in assistant's floating entry point. Renders NOTHING unless the
+              tenant enables it, a wallet is connected, that account opted in (default off), and its
+              membership reads back active — so for most sessions this mounts and returns null. It
+              sits beside the drawer because this is the only place that renders on every in-app
+              route and on no landing page; z-index 1300 keeps it above the bottom nav (1200) and
+              below the drawer backdrop (1400). */}
+          <AssistantLauncher />
           {/* A menu-search result deep-links with `?focus=<id>`; this briefly highlights whatever
               carries the matching `data-attention` marker, so the member can see the thing they
               searched for on a screen they may never have opened before. */}

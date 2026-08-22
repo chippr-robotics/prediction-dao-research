@@ -5,7 +5,11 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+const { currentChainId } = vi.hoisted(() => ({ currentChainId: vi.fn(() => 80002) }))
 vi.mock('../../config/networks', () => ({
+  // The build's own network — what `VITE_NETWORK_ID` resolves to. The connector uses it as the
+  // chain a session defaults to (#1286); it must NOT fall back to wagmi's first chain.
+  getCurrentChainId: currentChainId,
   getNetwork: vi.fn((chainId) =>
     chainId === 80002
       ? {
@@ -51,7 +55,7 @@ function makeConnector(overrides = {}) {
     ...overrides,
   }
   const config = {
-    chains: [{ id: 80002 }, { id: 137 }],
+    chains: overrides.chains ?? [{ id: 80002 }, { id: 137 }],
     emitter: { emit: vi.fn() },
   }
   const connector = passkeyConnector({ deps, ...overrides.options })(config)
@@ -413,5 +417,50 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
     })
     const out = await connector.connect({ chainId: 80002, mode: 'sign-in' })
     expect(out.accounts).toHaveLength(1)
+  })
+})
+
+/*
+ * #1286 — which chain a passkey session is on when nothing has said otherwise.
+ *
+ * `config.chains[0]` is Polygon by construction (wagmi.js orders the list so mainnet is wagmi's
+ * default "no wallet connected" chain), so using it here made EVERY passkey session report 137
+ * whatever the build was for. On a mainnet build that is right by accident; on a testnet build the
+ * app then took chain-scoped reads against mainnet while the member sat on the testnet.
+ *
+ * It is not a cosmetic mislabel. `WalletContext` derives its read provider from `getNetwork(chainId)`
+ * and PREFERS the RPC provider for passkey sessions, so a wrong chain id hands every read a
+ * provider pointed at the wrong network. Measured: the create path's KeyRegistry lookup went to
+ * Polygon for an 80002 member, came back empty, and the form told them their opponent had not
+ * registered an encryption key.
+ */
+describe('#1286 — the chain a session defaults to', () => {
+  it('reports the BUILD network, not wagmi first chain, when no session says otherwise', async () => {
+    currentChainId.mockReturnValue(80002)
+    // Ordered as production orders them: Polygon first.
+    const { connector } = makeConnector({ chains: [{ id: 137 }, { id: 80002 }] })
+    expect(await connector.getChainId()).toBe(80002)
+  })
+
+  it('a stored session still wins — switching chains is remembered', async () => {
+    currentChainId.mockReturnValue(80002)
+    const { connector } = makeConnector({ chains: [{ id: 137 }, { id: 80002 }] })
+    writeSession({ address: ACCOUNT, credentialId: 'cred-1', loginMethod: 'passkey', chainId: 137 })
+    expect(await connector.getChainId()).toBe(137)
+  })
+
+  it('connect() without an explicit chain targets the build network', async () => {
+    currentChainId.mockReturnValue(80002)
+    const { connector } = makeConnector({ chains: [{ id: 137 }, { id: 80002 }] })
+    const out = await connector.connect()
+    expect(out.chainId).toBe(80002)
+  })
+
+  it('falls back to wagmi first chain when the build network is not registered', async () => {
+    // A chain wagmi does not know cannot serve `config.getClient`, so an unregistered id would
+    // trade a wrong-chain read for a broken client. Falling back is the lesser failure.
+    currentChainId.mockReturnValue(999999)
+    const { connector } = makeConnector({ chains: [{ id: 137 }, { id: 80002 }] })
+    expect(await connector.getChainId()).toBe(137)
   })
 })

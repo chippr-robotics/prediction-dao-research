@@ -87,6 +87,13 @@ function check({ base, head }) {
   for (const app of apps()) {
     const before = versionAt(base, app);
     const after = versionAt(head, app);
+    // First appearance: the package did not exist at base, so its first version and its first
+    // recorded bytes have no prior pairing to check against. Both directions of the gate would
+    // otherwise misread "new" as "changed without a bump" (spec 095 added the third package).
+    if (before === null && after !== null) {
+      notes.push(`${app}: new package at ${after} — no base pairing to verify`);
+      continue;
+    }
     const versionMoved = before !== null && after !== null && before !== after;
     const moved = bytesChanged(baseBaseline, headBaseline, app);
 

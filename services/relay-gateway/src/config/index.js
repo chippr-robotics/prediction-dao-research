@@ -21,6 +21,8 @@
  *   KILL_SWITCH                'true' => boot with the kill switch active (FR-015)
  *   SIGNER_QUOTA_PER_MIN       per-signer intents/min (default 12)
  *   GLOBAL_QUOTA_PER_MIN       global intents/min (default 120)
+ *   RATE_LIMIT_HEALTH_PER_MIN  outer per-IP limiter on /healthz + /status (default 600; 0 = off)
+ *   RATE_LIMIT_INTENTS_PER_MIN outer per-IP limiter on POST /v1/intents (default 300; 0 = off)
  *   MAX_QUEUE_DEPTH            bounded in-flight queue (default 100) — back-pressure past this (FR-009)
  *   GAS_SPEND_CAP_WEI_<id>     per-chain per-window gas spend cap (default 0.5 native / hour, FR-014)
  *   SPEND_WINDOW_MS            spend-cap window (default 3600000)
@@ -110,6 +112,35 @@
  *   PERPS_HL_BUILDER_ADDRESS   PUBLIC attribution: FairWins Hyperliquid builder wallet
  *   PERPS_HL_BUILDER_FEE_BPS   HL builder fee FALLBACK bps (live source: FeeRouter
  *                              perps.hyperliquid.builder). Boot fails above the 10 bps HL perps cap.
+ *   MEMBER_API_ENABLED         'true' enables the /v1/member/* member API (spec 095; default false).
+ *                              Disabled => every route answers 503 member_api_unconfigured, including
+ *                              the OpenAPI document, so a client can tell "turned off" from "too old"
+ *   MEMBER_API_KILLSWITCH      'true' => all /v1/member/* routes answer 503 member_api_killed (ops kill)
+ *   MEMBER_API_MAX_TTL_DAYS    longest lifetime a member-signed key may claim (default 90). A grant
+ *                              asking for more is refused with 401 token_ttl_exceeded. This is the
+ *                              REAL bound on a leaked key: revocations are in-process (Phase 1) and do
+ *                              not survive a restart, and every revocation answer says `durable:false`
+ *   MEMBER_API_REFERENCE_CHAIN_ID  chain membership + ERC-1271 signature checks are read on. Defaults
+ *                              to the first enabled chain with a membershipManager recorded. Membership
+ *                              has ONE home per cohort — reading the caller's chain would let a testnet
+ *                              answer stand in for a mainnet fact
+ *   MEMBER_API_MEMBERSHIP_CACHE_MS  per-account membership cache (default 60000). Successes only —
+ *                              caching a failure would turn one bad moment into a minute of them
+ *   MEMBER_API_CLOCK_SKEW_SEC  tolerance for a client clock ahead of ours (default 300)
+ *   MEMBER_API_REVOCATION_MAX  revocation records held in memory (default 50000)
+ *   MEMBER_API_SUBGRAPH_<chainId>  wager indexer (The Graph) endpoint per chain. UNSET => that chain
+ *                              answers `not-configured` — which is NOT an empty wager list; the
+ *                              question was never asked
+ *   MEMBER_API_TIMEOUT_MS      upstream (subgraph) request timeout (default 5000)
+ *   MEMBER_API_QUOTA_PER_ACCOUNT / _GLOBAL / _WINDOW_MS   read quotas keyed by the RECOVERED account
+ *                              (defaults 120/600/60000) — not by IP, which is the proxy in production
+ *   ASSISTANT_ENABLED          'true' enables POST /v1/member/assistant/chat (default false)
+ *   ANTHROPIC_API_KEY          SECRET. Model-provider credential for the assistant. Unset => that one
+ *                              route answers 503 assistant_unconfigured; nothing else is affected
+ *   ASSISTANT_BASE_URL         model provider base (default https://api.anthropic.com)
+ *   ASSISTANT_MODEL            model id (default claude-sonnet-5)
+ *   ASSISTANT_MAX_TOKENS       reply cap (default 1024)
+ *   ASSISTANT_TIMEOUT_MS       upstream request timeout (default 30000)
  *   FEE_ROUTER_ADDRESS         FeeRouter proxy (spec 060) serving the LIVE polymarket.taker/.maker bps.
  *                              Defaults to the deployment record's feeRouter for FEE_ROUTER_CHAIN_ID;
  *                              a set value that CONTRADICTS the record fails boot loudly. Unset and not
@@ -335,6 +366,18 @@ export function loadConfig(env = process.env, opts = {}) {
       signerPerWindow: int(env, 'SIGNER_QUOTA_PER_MIN', 12),
       globalPerWindow: int(env, 'GLOBAL_QUOTA_PER_MIN', 120),
       windowMs: int(env, 'QUOTA_WINDOW_MS', 60_000),
+    },
+    // Coarse per-IP route limiters (express-rate-limit) in FRONT of the fine-grained quotas above.
+    // The quotas remain the real per-member control (they key on the RECOVERED SIGNER, which an
+    // attacker cannot vary for free); these middlewares are an outer DoS bound on the routes that
+    // do work before any quota can key — the health snapshot's edge-auth comparison and the intent
+    // pipeline's signature recovery. NOTE the production caveat from the module docs: `trust proxy`
+    // is deliberately unset and nginx fronts the VM container, so `req.ip` is the proxy there and
+    // each limiter is effectively an AGGREGATE ceiling — defaults are sized for that, and set to 0
+    // to disable a limiter entirely.
+    rateLimit: {
+      healthPerMin: int(env, 'RATE_LIMIT_HEALTH_PER_MIN', 600),
+      intentsPerMin: int(env, 'RATE_LIMIT_INTENTS_PER_MIN', 300),
     },
     // Sponsored-paymaster (spec 050): sponsorship signer + per-op ceilings + burst quotas. The
     // killswitch and sanctions screen are shared with the intent path; these are the paymaster-only
@@ -630,6 +673,107 @@ export function loadConfig(env = process.env, opts = {}) {
         quotaGlobal: int(env, 'PERPS_QUOTA_GLOBAL', 300),
         quotaWindowMs: int(env, 'PERPS_QUOTA_WINDOW_MS', 60_000),
         killSwitch: opt(env, 'PERPS_KILLSWITCH', 'false').toLowerCase() === 'true',
+      }
+    })(),
+    // Member API (spec 095): member-signed capability tokens granting custody-free, scoped access to
+    // a member's OWN data plus unsigned typed-data quotes. Optional like the bitcoin/bridge/perps
+    // proxies — disabled means every /v1/member/* route (including the OpenAPI document) answers
+    // 503 member_api_unconfigured, and boot is unaffected. Fail-loud validation applies only when
+    // the module is ENABLED, same philosophy as the blocks above.
+    //
+    // THE GATEWAY STORES NOTHING TO ISSUE A KEY. A key is an EIP-712 grant the MEMBER signs; this
+    // process verifies the signature on every request and keeps no copy. That is why there is no
+    // key-store config here — and why MEMBER_API_MAX_TTL_DAYS matters: the grant's own expiry is
+    // the real bound on a leaked token, since revocations are in-process (Phase 1) and every
+    // revocation response says `durable: false` rather than implying otherwise.
+    memberApi: (() => {
+      const enabled = opt(env, 'MEMBER_API_ENABLED', 'false').toLowerCase() === 'true'
+      const maxTtlDays = int(env, 'MEMBER_API_MAX_TTL_DAYS', 90)
+
+      // Membership has ONE home per environment cohort, so signature fallback (ERC-1271) and the
+      // tier read both happen on ONE named chain. Default: the first enabled chain that records a
+      // membershipManager — FR-025 requires every enabled chain to have one, so this is simply the
+      // first enabled chain unless an operator names another.
+      const defaultReference = enabledChainIds.find((id) => Boolean(chains[id]?.targetsByKey?.membershipManager))
+      const referenceChainId = int(env, 'MEMBER_API_REFERENCE_CHAIN_ID', defaultReference ?? enabledChainIds[0])
+
+      // Per-chain wager indexers. An UNSET chain resolves `not-configured`, which is a different
+      // fact from an empty wager list — the question was never asked (never `[]`).
+      const subgraphUrls = {}
+      for (const chainId of enabledChainIds) {
+        const url = opt(env, `MEMBER_API_SUBGRAPH_${chainId}`, null)
+        if (url) subgraphUrls[chainId] = url
+      }
+
+      const assistantEnabled = opt(env, 'ASSISTANT_ENABLED', 'false').toLowerCase() === 'true'
+      const assistantBaseUrl = opt(env, 'ASSISTANT_BASE_URL', 'https://api.anthropic.com')
+      const assistantMaxTokens = int(env, 'ASSISTANT_MAX_TOKENS', 1024)
+
+      if (enabled) {
+        if (maxTtlDays < 1) {
+          throw new Error(`[relay-gateway] MEMBER_API_MAX_TTL_DAYS=${maxTtlDays} must be >= 1 day`)
+        }
+        // A reference chain that is not enabled, or has no membershipManager, means EVERY request
+        // would 503 membership_unreadable — a module that cannot authenticate anyone must not boot
+        // pretending it can.
+        if (!chains[referenceChainId]?.targetsByKey?.membershipManager) {
+          throw new Error(
+            `[relay-gateway] MEMBER_API_REFERENCE_CHAIN_ID=${referenceChainId} is not an enabled chain with a recorded ` +
+              `membershipManager (enabled: ${enabledChainIds.join(', ')}). Refusing to start: no member could be authenticated.`
+          )
+        }
+        for (const [chainId, url] of Object.entries(subgraphUrls)) {
+          let ok = false
+          try {
+            ok = ['http:', 'https:'].includes(new URL(url).protocol)
+          } catch {
+            ok = false
+          }
+          if (!ok) throw new Error(`[relay-gateway] MEMBER_API_SUBGRAPH_${chainId}=${url} is not a valid http(s) URL`)
+        }
+        if (assistantEnabled) {
+          let ok = false
+          try {
+            ok = ['http:', 'https:'].includes(new URL(assistantBaseUrl).protocol)
+          } catch {
+            ok = false
+          }
+          if (!ok) throw new Error(`[relay-gateway] ASSISTANT_BASE_URL=${assistantBaseUrl} is not a valid http(s) URL`)
+          if (assistantMaxTokens < 1) {
+            throw new Error(`[relay-gateway] ASSISTANT_MAX_TOKENS=${assistantMaxTokens} must be >= 1`)
+          }
+          // A missing ANTHROPIC_API_KEY is deliberately NOT a boot failure: it is an optional
+          // feature credential, so that one route fails closed with 503 assistant_unconfigured
+          // exactly like the OpenSea/Polymarket keys — losing the assistant must never take down
+          // the gateway (fetch-secrets.sh invariant 5).
+        }
+      }
+
+      return {
+        enabled,
+        killSwitch: opt(env, 'MEMBER_API_KILLSWITCH', 'false').toLowerCase() === 'true',
+        maxTtlDays,
+        referenceChainId,
+        subgraphUrls,
+        membershipCacheTtlMs: int(env, 'MEMBER_API_MEMBERSHIP_CACHE_MS', 60_000),
+        clockSkewSec: int(env, 'MEMBER_API_CLOCK_SKEW_SEC', 300),
+        revocationMaxEntries: int(env, 'MEMBER_API_REVOCATION_MAX', 50_000),
+        timeoutMs: int(env, 'MEMBER_API_TIMEOUT_MS', 5000),
+        // Keyed by the RECOVERED account, not by caller IP: `trust proxy` is unset and nginx fronts
+        // the container, so an IP key would pool every member into one bucket. Reads are cheap and
+        // an agent polls, so the per-account allowance is more generous than the intent quota.
+        quotaPerAccount: int(env, 'MEMBER_API_QUOTA_PER_ACCOUNT', 120),
+        quotaGlobal: int(env, 'MEMBER_API_QUOTA_GLOBAL', 600),
+        quotaWindowMs: int(env, 'MEMBER_API_QUOTA_WINDOW_MS', 60_000),
+        assistant: {
+          enabled: assistantEnabled,
+          // SECRET. Never logged, never echoed, never part of any response.
+          apiKey: opt(env, 'ANTHROPIC_API_KEY', null),
+          baseUrl: assistantBaseUrl,
+          model: opt(env, 'ASSISTANT_MODEL', 'claude-sonnet-5'),
+          maxTokens: assistantMaxTokens,
+          timeoutMs: int(env, 'ASSISTANT_TIMEOUT_MS', 30_000),
+        },
       }
     })(),
     // FeeRouter (spec 060): the on-chain source of truth for the Polymarket builder bps. The env

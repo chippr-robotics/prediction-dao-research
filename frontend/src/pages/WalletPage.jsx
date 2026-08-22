@@ -26,6 +26,8 @@ import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPr
 import PortfolioPreferencesPanel from '../components/account/PortfolioPreferencesPanel'
 import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPanel'
 import NavigationPreferencesPanel from '../components/account/NavigationPreferencesPanel'
+import ApiAccessPanel from '../components/account/ApiAccessPanel'
+import AssistantPreferencesPanel from '../components/account/AssistantPreferencesPanel'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import CallsignPanel from '../components/account/CallsignPanel'
 import BackupPanel from '../components/account/BackupPanel'
@@ -588,6 +590,11 @@ function WalletPage() {
                       <PortfolioPreferencesPanel />
                       <PrivacyPreferencesPanel />
                       <NotificationProfilesPanel />
+                      {/* Spec 095 — programmatic access and the opt-in assistant. Both sit with the
+                          other privacy-shaped preferences: one decides what can reach this account,
+                          the other what leaves this device. */}
+                      <AssistantPreferencesPanel />
+                      <ApiAccessPanel />
 
                       <AccordionSection
                         id="markets"
