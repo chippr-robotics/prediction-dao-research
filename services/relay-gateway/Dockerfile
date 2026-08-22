@@ -5,7 +5,7 @@
 #
 # Holds NO keys: the gas hot key lives in the engine (Secret Manager); this container only
 # needs the origin-lock + webhook shared secrets injected at runtime (never baked in).
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 # Spec 075: this service is an npm WORKSPACE member, so its dependencies live in the single root
 # lockfile. Copy the root manifest+lock plus this workspace's manifest, then install only this
@@ -22,7 +22,7 @@ COPY packages/intent-types/package.json ./packages/intent-types/
 RUN npm ci --omit=dev --no-audit --no-fund \
       --workspace fairwins-relay-gateway --include-workspace-root=false
 
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules

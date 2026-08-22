@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { seedFromMnemonic } from '../../bitcoin/legacyDerivation'
 import { deriveSolanaKeypair, signSolana } from '../derivation'
 import { encodeSolanaAddress, isValidSolanaAddress } from '../address'
-import { ed25519 } from '@noble/curves/ed25519'
+import { ed25519 } from '@noble/curves/ed25519.js'
 
 const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
