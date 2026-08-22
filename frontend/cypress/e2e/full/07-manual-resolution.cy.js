@@ -663,4 +663,130 @@ describe('Manual Resolution', () => {
       })
     })
   })
+
+  // ---------------------------------------------------------------------------
+  // RES-15 / RES-16 — DRAWS (spec 004). Both stakes go back, and one side alone
+  // can never make that happen.
+  // ---------------------------------------------------------------------------
+
+  it('[RES-15] An arbitrator declares a draw and BOTH stakes are returned', () => {
+    /*
+     * `Status.Draw` is not "resolved with no winner" — it is a refund of both sides, and the only
+     * assertion that proves it is the money. A status flag can be set by code that never moved a
+     * token; `_settleDraw` transfers each stake back to the account that put it up, so the test
+     * reads balances before and after and requires each side to be made whole.
+     *
+     * ThirdParty is the arbitrator path: their single call settles immediately, with no consent
+     * from either participant. That is the whole point of naming an arbitrator, and it is also
+     * why the participant path below must behave completely differently.
+     */
+    const STAKE = 2n * 10n ** 18n
+    cy.createAndAcceptWager({
+      description: 'RES-15: arbitrated draw',
+      resolutionType: 3, // ThirdParty
+      arbitrator: TEST_ACCOUNTS[2],
+      stake: String(STAKE),
+    }).then((wagerId) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is Active before the draw').to.equal(2)
+      })
+
+      // Balances with both stakes escrowed — the baseline the refund is measured against.
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).as('creatorBefore')
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).as('opponentBefore')
+
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 2 } }).then((r) => {
+        expect(r.ok, `the arbitrator can declare a draw (${r.error || ''})`).to.equal(true)
+      })
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'the wager settled as a Draw').to.equal(6)
+      })
+
+      // THE ASSERTION THIS TEST EXISTS FOR: each side got its own stake back, exactly.
+      cy.get('@creatorBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the creator was refunded their stake').to.equal(STAKE)
+        })
+      })
+      cy.get('@opponentBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the opponent was refunded their stake').to.equal(STAKE)
+        })
+      })
+
+      // Settled means settled: a second declaration finds nothing Active to draw.
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 2 } }).then((r) => {
+        expect(r.ok, 'a settled wager cannot be drawn again').to.equal(false)
+      })
+    })
+  })
+
+  it('[RES-16] One participant alone cannot force a draw — it takes both, and consent can be revoked', () => {
+    /*
+     * THE RULE WITH TEETH.
+     *
+     * On participant-resolved wagers a draw is MUTUAL: `_declareDraw` records one consent bit and
+     * settles only at `_CONSENT_BOTH`. If a single declaration settled, either party could void a
+     * wager they were losing at no cost — which is not a draw, it is a unilateral exit from a bet
+     * whose outcome had stopped being convenient.
+     *
+     * So the load-bearing assertion here is a NEGATIVE one: after the creator declares, the wager
+     * is still Active and nobody has been paid.
+     */
+    const STAKE = 2n * 10n ** 18n
+    cy.createAndAcceptWager({
+      description: 'RES-16: mutual draw consent',
+      resolutionType: 0, // Either — a participant-resolved type
+      stake: String(STAKE),
+    }).then((wagerId) => {
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).as('creatorBefore')
+
+      // One side proposes. Accepted as a PROPOSAL — and nothing else moves.
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'the creator may propose a draw').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'one consent is NOT a draw — the wager is still Active').to.equal(2)
+      })
+      cy.get('@creatorBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((after) => {
+          expect(BigInt(after.balance), 'no stake moved on a one-sided proposal').to.equal(BigInt(before.balance))
+        })
+      })
+
+      /*
+       * And the proposal is withdrawable. A member who offered a draw and then changed their mind
+       * must be able to take it back while the wager is still live — otherwise the offer is a
+       * one-way door that the other side can walk through at any later moment of their choosing.
+       */
+      cy.task('chainTx', { action: 'revokeDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'a draw proposal can be revoked while the wager is Active').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, 'the opponent may now propose').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(
+          i.status,
+          'the revoked consent did not count — one live proposal is still not a draw',
+        ).to.equal(2)
+      })
+
+      // Both sides agreeing IS a draw, and the money follows.
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).as('opponentBefore')
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'the creator declares again, completing mutual consent').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'both sides agreeing settles the wager as a Draw').to.equal(6)
+      })
+      cy.get('@opponentBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the opponent was refunded their stake').to.equal(STAKE)
+        })
+      })
+    })
+  })
+
 })

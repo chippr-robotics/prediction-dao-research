@@ -29,8 +29,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 131 |
-| 🟢 covered | 116 |
-| 🟡 partial | 4 |
+| 🟢 covered | 117 |
+| 🟡 partial | 3 |
 | 🔴 absent | 5 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 40 · 🟡 3 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 41 · 🟡 2 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -61,7 +61,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `wagers.declare-draw` | An arbitrator declares a draw and both stakes are returned | 🟡 partial | smoke | `on-chain` | `07-manual-resolution.cy.js` (RES-13, RES-14) | the draw branch sits behind a precondition guard that ends in an unconditional truth, so the refunded balances are never read back |
+| `wagers.declare-draw` | An arbitrator declares a draw and both stakes are returned | 🟢 covered | settled | `on-chain` | `07-manual-resolution.cy.js` (RES-15, RES-16) |  |
 
 ### `022-membership-purchase-progress` — Membership purchase progress
 

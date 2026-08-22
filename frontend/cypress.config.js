@@ -25,6 +25,10 @@ const REGISTRY_ABI = [
   'function createWager(address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,bytes32 polymarketConditionId,bool creatorIsYes,bytes32 metadataHash,string metadataUri) returns (uint256)',
   'function acceptWager(uint256 wagerId)',
   'function declareWinner(uint256 wagerId, address winner)',
+  // Spec 004 draws. ThirdParty settles on the arbitrator's single call; participant types
+  // accumulate MUTUAL consent and settle only when both sides have declared.
+  'function declareDraw(uint256 wagerId)',
+  'function revokeDraw(uint256 wagerId)',
   'function claimRefund(uint256 wagerId)',
   'function claimPayout(uint256 wagerId)',
   'function cancelOpen(uint256 wagerId)',
@@ -387,6 +391,18 @@ export default defineConfig({
               const rw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
               tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, rw)
                 .declareWinner(args.wagerId, args.winner)
+              break
+            }
+            case 'declareDraw': {
+              const dw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, dw)
+                .declareDraw(args.wagerId)
+              break
+            }
+            case 'revokeDraw': {
+              const rvw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, rvw)
+                .revokeDraw(args.wagerId)
               break
             }
             case 'claimRefund': {

@@ -119,16 +119,14 @@
         {
           "id": "wagers.declare-draw",
           "name": "An arbitrator declares a draw and both stakes are returned",
-          "status": "partial",
+          "status": "covered",
           "tier": "on-chain",
-          "depth": "smoke",
+          "depth": "settled",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-13",
-            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-14"
-          ],
-          "missing": "the draw branch sits behind a precondition guard that ends in an unconditional truth, so the refunded balances are never read back",
-          "issue": "#1244"
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-15",
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-16"
+          ]
         }
       ]
     },
