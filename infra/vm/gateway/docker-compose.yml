@@ -54,6 +54,27 @@ services:
       POLYMARKET_BUILDER_CODE: "0x6e0316783960e149b53466f0f2c5fdbaf5ce11ba15669491de980f6dedc493a3"
       POLYMARKET_BUILDER_TAKER_FEE_BPS: "50"
       POLYMARKET_BUILDER_MAKER_FEE_BPS: "0"
+      # ---- Member API + assistant (spec 095) and x402 agentic payments (spec 096) ----
+      # COMMENTED UNTIL THE IMAGE PIN ADVANCES: the pinned image above predates the memberApi
+      # module, and this file's own perps history shows what a flag with no code behind it looks
+      # like. Enable procedure (image build → push → repin → uncomment → converge) is
+      # docs/runbooks/member-api-operations.md § "Enabling on the gateway VM". The reference-chain
+      # pin is LOAD-BEARING: ENABLED_CHAIN_IDS starts with 63, and the default reference chain is
+      # the FIRST enabled chain with a recorded membershipManager — Mordor also has one, so leaving
+      # this unset silently pins membership + ERC-1271 auth to testnet on a mainnet-serving gateway.
+      # The 137 subgraph is pinned to a version, never /version/latest (networks.js precedent);
+      # Mordor deliberately has no MEMBER_API_SUBGRAPH_63 — no subgraph exists there, and
+      # `not-configured` is the honest answer. ANTHROPIC_API_KEY arrives via fetch-secrets
+      # (optional): absent ⇒ the assistant route answers 503 assistant_unconfigured, nothing else
+      # degrades. x402 (spec 096) additionally needs X402_PAY_TO — the treasury that RECEIVES agent
+      # payments; it has no default on purpose and enabling it is a funds decision, not a flag flip.
+      # MEMBER_API_ENABLED: "true"
+      # MEMBER_API_REFERENCE_CHAIN_ID: "137"
+      # MEMBER_API_SUBGRAPH_137: "https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.3.0"
+      # ASSISTANT_ENABLED: "true"
+      # X402_ENABLED: "true"
+      # X402_CHAIN_ID: "137"
+      # X402_PAY_TO: "<treasury address — REQUIRED, no default>"
       # ---- Perps read proxy (specs 082 + 083) ----
       # READ-ONLY BY CONSTRUCTION: this module has no write route at all. It proxies three PUBLIC
       # venue APIs (Gains, GMX, Hyperliquid) for market data and a member's own positions, and holds
