@@ -29,8 +29,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 131 |
-| 🟢 covered | 120 |
-| 🟡 partial | 1 |
+| 🟢 covered | 121 |
+| 🟡 partial | 0 |
 | 🔴 absent | 4 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-39 flows — 🟢 36 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
+39 flows — 🟢 37 · 🟡 0 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -360,7 +360,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟡 partial | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (BK-01, BK-02) | the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for — admission rule 2 puts that half in the on-chain tier |
+| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟢 covered | settled | `on-chain` | `35-navigation-and-lookup.cy.js` (BK-01, BK-02); `37-backup-roundtrip.cy.js` (BKC-01, BKC-02) |  |
 
 ### `037-unified-pool-challenge-lookup` — Unified pool and challenge lookup
 

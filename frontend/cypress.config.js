@@ -85,6 +85,13 @@ const KEYREG_ABI = [
   'function hasKey(address user) view returns (bool)',
   'function getPublicKey(address user) view returns (bytes)',
 ]
+// Spec 032 — the unified backup pointer. Read-only here: what a member's device recorded is the
+// fact the round-trip spec checks, and reading it from CHAIN is the only way to know a backup
+// happened rather than that a dialog said so.
+const BACKUP_POINTER_ABI = [
+  'function getPointer(address owner) view returns (string)',
+  'function hasPointer(address owner) view returns (bool)',
+]
 /*
  * Spec 060 platform fees (#1233). `Service` is returned as a struct, so the fragment must spell
  * the tuple out — a bare `returns (uint16,uint16,uint8)` decodes a DIFFERENT calldata shape and
@@ -541,6 +548,31 @@ export default defineConfig({
             case 'hasKey': {
               const kr = new ethers.Contract(d.contracts.keyRegistry, KEYREG_ABI, provider)
               return { ok: true, registered: await kr.hasKey(args.address) }
+            }
+            case 'clearBackupPointer': {
+              /*
+               * Reset the member's pointer so a spec can start from a KNOWN absence.
+               *
+               * Needed because the mock IPFS CIDs come from a per-run counter, so two runs against
+               * one node pin the same CID — "the pointer changed" is therefore not a claim a spec
+               * can make, and "there is none yet" is only true on a fresh chain. Clearing makes the
+               * starting state explicit instead of assumed. `setPointer("")` is the contract's own
+               * clear, signed by the owner, exactly as a member removing their backup would.
+               */
+              const clearAddr = d.contracts.backupPointerRegistry
+              if (!clearAddr) return { ok: false, error: 'backupPointerRegistry is not in the local deployment record' }
+              const ow = new ethers.Wallet(ACCOUNT_KEYS[args.ownerIndex ?? 0], provider)
+              const rc = await (await new ethers.Contract(clearAddr, ['function setPointer(string cid)'], ow)
+                .setPointer('')).wait(1)
+              return { ok: rc.status === 1 }
+            }
+            case 'backupPointer': {
+              // Absent registry is reported as such rather than as "no pointer": the two have
+              // opposite remedies, and a spec that cannot tell them apart proves neither.
+              const addr = d.contracts.backupPointerRegistry
+              if (!addr) return { ok: false, error: 'backupPointerRegistry is not in the local deployment record' }
+              const bp = new ethers.Contract(addr, BACKUP_POINTER_ABI, provider)
+              return { ok: true, cid: await bp.getPointer(args.address), has: await bp.hasPointer(args.address) }
             }
             case 'tokenBalance': {
               const t = new ethers.Contract(args.token || d.paymentToken, TOKEN_ABI, provider)
