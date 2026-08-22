@@ -16,14 +16,75 @@
  * parameter: the account is whichever one signed the bearer token. A tool that accepted an address
  * would be inviting an agent to ask about someone else, and the gateway would refuse it anyway —
  * better that the shape make it unaskable.
+ *
+ * PAYMENT IS SOMETHING THESE TOOLS REPORT, NEVER SOMETHING THEY DO (spec 096). A priced operation
+ * called without an accepted payment answers `402` with a machine-readable offer, and that offer is
+ * handed to the agent WHOLE — this process cannot sign it. An agent that can pay retries the same
+ * tool with an `X-PAYMENT` header (HTTP mode), which is forwarded upstream verbatim. No tool takes a
+ * payment as an ARGUMENT: an argument is model-authored text, and the one thing a model must never
+ * be able to author on its own is a transfer authorization.
  */
-import { ApiError } from './api.js'
+import { ApiError, PaymentRequiredError } from './api.js'
 
-/** A tool result: plain text content, which every MCP client can render. */
-function ok(value) {
+/**
+ * A tool result: plain text content, which every MCP client can render.
+ *
+ * When the call spent a payment (spec 096), the receipt is a SECOND content block rather than
+ * something merged into the data — the first block stays exactly what the gateway answered. The
+ * receipt says "broadcast", not "final", because that is all the gateway can honestly claim at the
+ * moment it serves the request: the settlement transaction has been accepted by the relay engine,
+ * and a chain has not yet confirmed it.
+ */
+function ok(value, settlement = null) {
+  const content = [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }]
+  if (settlement) {
+    content.push({
+      type: 'text',
+      text:
+        'A payment was settled for this call (x402). Receipt, as the gateway reported it:\n' +
+        `${JSON.stringify(settlement.decoded ?? { opaque: settlement.raw }, null, 2)}\n\n` +
+        'The transaction has been BROADCAST, not confirmed. Do not describe it to a member as final, ' +
+        'and do not retry this call on the assumption that nothing was charged.',
+    })
+  }
+  return { content, isError: false }
+}
+
+/**
+ * A `402 Payment Required` answer, said plainly (spec 096).
+ *
+ * The whole `accepts` list goes back verbatim, because the agent has to sign against exactly those
+ * values — the amount, the asset, the recipient, the network and the token's own EIP-712 domain.
+ * Summarising it would be inviting the agent to sign something slightly different, which the gateway
+ * would then refuse.
+ *
+ * `isError: true` is correct here: no data was served. But it is a PRICE, not an outage, so the text
+ * says which it is — an agent that reads this as a failed read will report "unavailable" about a
+ * resource that is available for a tenth of a cent.
+ */
+function paymentRequired(err) {
+  const why = err.paymentError ? `\nThe gateway named this reason: ${err.paymentError}.` : ''
   return {
-    content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
-    isError: false,
+    content: [
+      {
+        type: 'text',
+        text:
+          'This operation is PRICED and no accepted payment accompanied the request (HTTP 402, x402 ' +
+          `protocol version ${err.x402Version ?? 'unstated'}).${why}\n\n` +
+          'THIS SERVER CANNOT PAY. It holds no key and signs nothing, so it can neither create the ' +
+          'payment authorization below nor authorise one on anybody’s behalf.\n\n' +
+          'If you can sign, you may settle this yourself per the x402 protocol: sign an EIP-3009 ' +
+          '`transferWithAuthorization` for one of the offers below, under that token’s own EIP-712 ' +
+          'domain (`extra.name` / `extra.version`), and retry the SAME call with the resulting ' +
+          'base64 PaymentPayload in an `X-PAYMENT` header — this server forwards it upstream ' +
+          'unaltered and returns the settlement receipt. Otherwise a FairWins member can hand you a ' +
+          'capability token instead (Settings ▸ API access): a valid token is checked first and is ' +
+          'never charged.\n\n' +
+          `Resource: ${JSON.stringify(err.resource ?? null)}\n` +
+          `accepts: ${JSON.stringify(err.accepts, null, 2)}`,
+      },
+    ],
+    isError: true,
   }
 }
 
@@ -35,6 +96,7 @@ function ok(value) {
  * still not conclude that the answer was "none".
  */
 function failed(err) {
+  if (err instanceof PaymentRequiredError) return paymentRequired(err)
   const code = err instanceof ApiError ? err.code : 'tool_failed'
   const reason = err instanceof ApiError ? err.reason : (err?.message ?? String(err))
   const retry = err instanceof ApiError && err.retryAfterSec ? ` Retry after ${err.retryAfterSec}s.` : ''
@@ -52,10 +114,17 @@ function failed(err) {
   }
 }
 
-/** Run a tool body, turning any thrown failure into an honest `isError` result. */
-async function attempt(fn) {
+/**
+ * Run a tool body, turning any thrown failure into an honest `isError` result.
+ *
+ * `ctx` is the per-request context the transport built. `opts()` parks any settlement receipt on it,
+ * so this reads it back after a success and the HTTP transport can return the original header bytes
+ * to whoever paid.
+ */
+async function attempt(fn, ctx) {
   try {
-    return ok(await fn())
+    const value = await fn()
+    return ok(value, ctx?.settlement ?? null)
   } catch (err) {
     return failed(err)
   }
@@ -68,8 +137,16 @@ const NO_INPUT = Object.freeze({ type: 'object', properties: {}, additionalPrope
  * @returns {Array<{name: string, title: string, description: string, inputSchema: object, call: Function}>}
  */
 export function createTools({ api }) {
-  /** Per-call context carries the HTTP transport's per-request token override, if there was one. */
-  const opts = (ctx) => ({ token: ctx?.token })
+  /**
+   * Per-call context carries the HTTP transport's per-request token override, if there was one —
+   * and, since spec 096, an `X-PAYMENT` payload the caller wants forwarded and a place to park the
+   * settlement receipt that comes back. Both are per-request and neither is ever stored.
+   */
+  const opts = (ctx) => ({
+    token: ctx?.token,
+    xPayment: ctx?.xPayment,
+    onSettlement: ctx ? (settlement) => { ctx.settlement = settlement } : null,
+  })
 
   return [
     {
@@ -81,7 +158,7 @@ export function createTools({ api }) {
         'key has been revoked on the live gateway. Start here to confirm which member you are acting for. ' +
         'Requires the read:profile scope.',
       inputSchema: NO_INPUT,
-      call: (_args, ctx) => attempt(() => api.get('/v1/member/me', opts(ctx))),
+      call: (_args, ctx) => attempt(() => api.get('/v1/member/me', opts(ctx)), ctx),
     },
     {
       name: 'get_membership',
@@ -92,7 +169,7 @@ export function createTools({ api }) {
         'either read or unreadable — an unreadable tier is never reported as "no membership". ' +
         'Requires the read:membership scope.',
       inputSchema: NO_INPUT,
-      call: (_args, ctx) => attempt(() => api.get('/v1/member/membership', opts(ctx))),
+      call: (_args, ctx) => attempt(() => api.get('/v1/member/membership', opts(ctx)), ctx),
     },
     {
       name: 'get_wagers',
@@ -119,8 +196,9 @@ export function createTools({ api }) {
         additionalProperties: false,
       },
       call: (args, ctx) =>
-        attempt(() =>
-          api.get('/v1/member/wagers', { ...opts(ctx), query: { chainId: args?.chainId, first: args?.first } })
+        attempt(
+          () => api.get('/v1/member/wagers', { ...opts(ctx), query: { chainId: args?.chainId, first: args?.first } }),
+          ctx
         ),
     },
     {
@@ -132,7 +210,7 @@ export function createTools({ api }) {
         'router was unset or unreachable). Quote a rate to a member only with its source; a rate that could ' +
         'not be confirmed must be described that way, never as zero. Requires the read:fees scope.',
       inputSchema: NO_INPUT,
-      call: (_args, ctx) => attempt(() => api.get('/v1/member/fees', opts(ctx))),
+      call: (_args, ctx) => attempt(() => api.get('/v1/member/fees', opts(ctx)), ctx),
     },
     {
       name: 'build_intent',
@@ -166,11 +244,13 @@ export function createTools({ api }) {
         additionalProperties: false,
       },
       call: (args, ctx) =>
-        attempt(() =>
-          api.post('/v1/member/intents/build', {
-            ...opts(ctx),
-            body: { action: args?.action, chainId: args?.chainId, params: args?.params ?? {} },
-          })
+        attempt(
+          () =>
+            api.post('/v1/member/intents/build', {
+              ...opts(ctx),
+              body: { action: args?.action, chainId: args?.chainId, params: args?.params ?? {} },
+            }),
+          ctx
         ),
     },
     {
@@ -179,7 +259,9 @@ export function createTools({ api }) {
       description:
         'Read the FairWins gateway’s public /status: which optional modules are enabled right now, and whether ' +
         'a killswitch is active. Needs no token. Use it to tell "the member has nothing" apart from "this ' +
-        'feature is switched off on this gateway" before reporting either.',
+        'feature is switched off on this gateway" before reporting either. It also reports whether ' +
+        'pay-per-request access (x402) is offered and what each operation class costs — which is how an agent ' +
+        'holding no member token can learn the price WITHOUT spending anything.',
       inputSchema: NO_INPUT,
       call: (_args, _ctx) => attempt(() => api.get('/status', { auth: 'none' })),
     },

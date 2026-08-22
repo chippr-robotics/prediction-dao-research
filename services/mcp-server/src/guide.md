@@ -41,7 +41,8 @@ If something claims otherwise, it is not FairWins.
 | `FAIRWINS_API_TOKEN` | for member tools | The member's own token. Public tools (`get_gateway_status`, `get_prediction_markets`, `get_perps_pairs`) work without it. |
 
 In HTTP mode a per-request `Authorization: Bearer <token>` header overrides the environment token,
-so one process can serve several members without any of their tokens being stored in it.
+so one process can serve several members without any of their tokens being stored in it. A
+per-request `X-PAYMENT` header is forwarded the same way — see **Paying per request** below.
 
 ## Scopes
 
@@ -56,6 +57,39 @@ A token carries only the scopes the member ticked when they created it:
 
 A tool called without its scope fails with `insufficient_scope`. That is the member declining, not
 an outage: ask them to create a token with the scope, rather than retrying.
+
+## Paying per request instead (x402)
+
+A gateway may offer **pay-per-request** access to priced operations, for an agent that holds no
+member token at all. It is an alternative to membership, not an addition to it: **a valid token is
+checked first and is never charged.**
+
+**This server cannot pay.** It holds no key and signs nothing, so it can neither create a payment
+nor authorise one. What it does is carry them:
+
+1. **Find the price without spending anything.** `get_gateway_status` reports whether x402 is
+   offered, on which network, and what each operation class costs. Nothing is charged for asking.
+   Only `get_wagers`, `get_fees` and `build_intent` can be priced. `get_profile` and
+   `get_membership` never are — they answer questions about a token and a membership, and a paying
+   caller has neither — and the public tools are free by construction.
+2. **Call the tool.** If the operation is priced and no accepted payment came with it, the tool
+   answers `isError: true` with the whole offer — the amount in the token's base units, the asset
+   address, who to pay, the network as a CAIP-2 id, and the token's own EIP-712 domain under
+   `extra`. **This is a price, not an outage.** Do not tell a member the data is unavailable.
+3. **Settle it yourself, if you can sign.** Sign an EIP-3009 `transferWithAuthorization` matching
+   one of the offers, under that token's own EIP-712 domain — not FairWins' domain; the token
+   contract is what verifies it.
+4. **Retry the same call with an `X-PAYMENT` header** carrying the base64 payment payload. HTTP mode
+   only: stdio has no per-call header, and an environment variable cannot carry a single-use
+   authorization — one that could be replayed from configuration would be a standing withdrawal
+   rather than a payment. The header is forwarded upstream unaltered.
+5. **Read the receipt.** On success the answer carries the settlement — the transaction hash, the
+   network, the payer and the amount — and says it was **broadcast, not confirmed**. Treat it that
+   way, and do **not** retry the call on the assumption that nothing was charged.
+
+Verification happens before settlement, so a payment that is refused costs nothing and serves
+nothing; the refusal names its reason. Nothing about this rail lets an agent act as a member: a
+payment buys the answer to one request, screened and served as the **payer's** own account.
 
 ## Reading results honestly
 

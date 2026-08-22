@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ensurePasskeyEncryptionKeys, resolveMasterSeed } from '../encryption'
 import { blobStore } from '../prfKeys'
-import { x25519 } from '@noble/curves/ed25519'
+import { x25519 } from '@noble/curves/ed25519.js'
 
 const ACCOUNT = '0x00000000000000000000000000000000000000aa'
 const CRED_A = 'cred-A'

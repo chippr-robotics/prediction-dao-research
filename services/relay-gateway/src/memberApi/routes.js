@@ -28,6 +28,8 @@ import {
   PERPS_HL_BUILDER_CAP_BPS,
   TAKER_CAP_BPS as POLYMARKET_TAKER_CAP_BPS,
 } from '../fees/onchain.js'
+import { PaymentRequiredError } from '../x402/requirements.js'
+import { x402Status } from '../x402/paywall.js'
 import { ERROR_CODES, ROUTES, SCOPES, routeOf } from './contract.js'
 import { verifyRevocation } from './auth.js'
 import { buildIntent } from './intents.js'
@@ -48,6 +50,7 @@ const MAX_PAGE = 200
  *   providers: Record<number, object>,
  *   quotas: {hit: Function},
  *   killSwitch: {isActive: () => boolean},
+ *   paywall: {offers: Function, settleOrChallenge: Function},   // spec 096; see guard() below
  *   feeRates?: object|null,
  *   audit?: (fields: object) => void,
  *   now?: () => number,   // unix SECONDS, matching the gateway-wide clock
@@ -66,12 +69,20 @@ export function createMemberApiRouter(config, {
   providers,
   quotas,
   killSwitch,
+  paywall,
   feeRates = null,
   audit = () => {},
   now = () => Math.floor(Date.now() / 1000),
 }) {
   const memberApi = config.memberApi
   const router = express.Router()
+
+  // The paid rail's seam is required even when x402 is switched off — off means `offers()` answers
+  // false, which is a decision this module must be able to ASK for. A missing dep would surface as a
+  // TypeError inside a request handler and be laundered into a generic 503, so it fails the BOOT.
+  if (!paywall || typeof paywall.offers !== 'function' || typeof paywall.settleOrChallenge !== 'function') {
+    throw new Error('[relay-gateway] member API requires an x402 paywall dep (see src/x402/paywall.js)')
+  }
 
   /**
    * Mount one route BY ITS CONTRACT ID, so the method and the path can only ever come from
@@ -113,13 +124,99 @@ export function createMemberApiRouter(config, {
     }
   }
 
-  /** Authenticated guard: liveness, then the full six-step token check (which also hits quotas). */
-  async function guard(req, scope) {
+  /**
+   * Verdicts on a presented token that the x402 paid rail may STAND IN FOR (spec 096).
+   *
+   * The set is deliberately narrow, and what is missing matters more than what is here:
+   *   · every 503 is absent — `auth_unverifiable`, `membership_unreadable`, `screening_unavailable`
+   *     all mean a fact could NOT BE ESTABLISHED. Answering 402 there would invite an agent to pay
+   *     because our RPC was slow, which is charging for our own outage.
+   *   · `sanctioned_signer` is absent — there is no amount that makes a screened-out account
+   *     servable, and offering one would be an offer to sell exactly the thing screening refuses.
+   *   · `insufficient_scope` is absent — that caller HAS a working key; the fix is a wider key,
+   *     which is free. Charging them for a scope they could mint would be a worse answer than 403.
+   *   · `quota_exceeded` is absent — the rate limit is not a price.
+   * `membership_required` IS here, and is the point of the whole rail: pay-per-request substitutes
+   * membership for one operation.
+   */
+  const PAYWALL_FALLTHROUGH_CODES = new Set([
+    'invalid_token',
+    'invalid_signature',
+    'token_expired',
+    'token_ttl_exceeded',
+    'token_revoked',
+    'membership_required',
+  ])
+
+  /**
+   * Authenticated guard: liveness, then the full six-step token check (which also hits quotas).
+   *
+   * SPEC 096 — THE BEARER PATH IS TRIED FIRST, ALWAYS. A member with a working key never reaches the
+   * paywall, is never charged, and never sees a 402: on that path not one line of the x402 module
+   * runs. The paid rail is consulted only when there is no Authorization header at all, or when the
+   * token produced one of the verdicts above — and only for a route that carries an `opClass` on a
+   * gateway where that class is priced. Everywhere else this function behaves exactly as it did
+   * before spec 096 existed.
+   */
+  async function guard(req, res, scope, routeId) {
     requireLive()
-    return auth.authenticate(req, scope)
+    const opClass = routeOf(routeId).opClass
+    const priced = Boolean(opClass) && paywall.offers(opClass)
+
+    if (!req.get('authorization')) {
+      // No credential. With the paid rail off (or this route unpriced) this is byte-identical to
+      // before: `authenticate` throws 401 invalid_token "missing bearer token".
+      if (!priced) return auth.authenticate(req, scope)
+      return paidPrincipal(req, res, { opClass, routeId, scope })
+    }
+
+    try {
+      return await auth.authenticate(req, scope)
+    } catch (err) {
+      if (priced && err instanceof GatewayError && PAYWALL_FALLTHROUGH_CODES.has(err.code)) {
+        // The 402 body carries the AUTH verdict as its `error`, so the diagnostic ("your key
+        // expired") survives instead of being replaced by a generic "pay me".
+        return paidPrincipal(req, res, { opClass, routeId, scope, error: err.code, reason: err.reason })
+      }
+      throw err
+    }
+  }
+
+  /**
+   * The principal a SETTLED PAYMENT produces.
+   *
+   * Shaped like an authenticated token so every handler below is unchanged, but it is not one and
+   * says so: no `keyId`, no window, no membership — a payer presented no key and this gateway will
+   * not invent an identity for them. `scopes` is exactly the ONE scope the route being served
+   * requires: a payment buys the operation it was quoted for and nothing adjacent.
+   */
+  async function paidPrincipal(req, res, { opClass, routeId, scope, error, reason }) {
+    const route = routeOf(routeId)
+    const { payer, settlement } = await paywall.settleOrChallenge(req, res, {
+      opClass,
+      routeId,
+      description: route.summary,
+      error,
+      reason,
+    })
+    return {
+      account: payer,
+      keyId: null,
+      label: null,
+      scopes: scope ? [scope] : [],
+      issuedAt: null,
+      expiresAt: null,
+      membership: null,
+      paid: settlement,
+    }
   }
 
   function handleError(res, err) {
+    // A 402 is the PROTOCOL's body, not the gateway's `{ error: { code, reason } }` — it has to
+    // carry the offer, or a client learns it was refused without learning what it could pay.
+    if (err instanceof PaymentRequiredError) {
+      return res.status(402).json(err.body)
+    }
     if (err instanceof GatewayError) {
       if (err.retryAfterSec != null) res.set('Retry-After', String(err.retryAfterSec))
       return res.status(err.status).json(err.toBody())
@@ -152,7 +249,7 @@ export function createMemberApiRouter(config, {
   // ---- GET /v1/member/me ---------------------------------------------------------------------
   mount('me', async (req, res) => {
     try {
-      const token = await guard(req, SCOPES.readProfile)
+      const token = await guard(req, res, SCOPES.readProfile, 'me')
       res.json({
         account: token.account,
         keyId: token.keyId,
@@ -205,7 +302,7 @@ export function createMemberApiRouter(config, {
   // ---- GET /v1/member/keys/status?keyId= -----------------------------------------------------
   mount('keyStatus', async (req, res) => {
     try {
-      const token = await guard(req, SCOPES.readProfile)
+      const token = await guard(req, res, SCOPES.readProfile, 'keyStatus')
       const keyId = typeof req.query.keyId === 'string' ? req.query.keyId : ''
       if (!BYTES32_RE.test(keyId)) {
         throw new GatewayError(400, 'bad_request', 'keyId must be a 0x-prefixed 32-byte hex value')
@@ -230,7 +327,7 @@ export function createMemberApiRouter(config, {
   // ---- GET /v1/member/membership --------------------------------------------------------------
   mount('membership', async (req, res) => {
     try {
-      const token = await guard(req, SCOPES.readMembership)
+      const token = await guard(req, res, SCOPES.readMembership, 'membership')
       // Reaching this line means the authenticator already read membership successfully — an
       // unreadable one would have 503'd there — so this serves that same read rather than making a
       // second call that could disagree with the first.
@@ -243,7 +340,7 @@ export function createMemberApiRouter(config, {
   // ---- GET /v1/member/wagers?chainId=&first= ---------------------------------------------------
   mount('wagers', async (req, res) => {
     try {
-      const token = await guard(req, SCOPES.readWagers)
+      const token = await guard(req, res, SCOPES.readWagers, 'wagers')
 
       let chainIds = config.enabledChainIds
       if (req.query.chainId != null && req.query.chainId !== '') {
@@ -286,7 +383,7 @@ export function createMemberApiRouter(config, {
   // so a failed read must never be served as 0.
   mount('fees', async (req, res) => {
     try {
-      await guard(req, SCOPES.readFees)
+      await guard(req, res, SCOPES.readFees, 'fees')
       const routerConfigured = Boolean(feeRates?.enabled)
       const fallbackSource = routerConfigured ? 'unreadable' : 'env-fallback'
       const entry = (live, fallbackBps, capBps) =>
@@ -317,7 +414,7 @@ export function createMemberApiRouter(config, {
   // ---- POST /v1/member/intents/build -----------------------------------------------------------
   mount('buildIntent', async (req, res) => {
     try {
-      const token = await guard(req, SCOPES.buildIntents)
+      const token = await guard(req, res, SCOPES.buildIntents, 'buildIntent')
       const body = req.body ?? {}
       const chainId = Number.parseInt(String(body.chainId), 10)
       if (!Number.isInteger(chainId)) throw new GatewayError(400, 'bad_request', 'body.chainId must be an integer')
@@ -333,7 +430,7 @@ export function createMemberApiRouter(config, {
   // ---- POST /v1/member/assistant/chat ----------------------------------------------------------
   mount('assistantChat', async (req, res) => {
     try {
-      const token = await guard(req, SCOPES.assistantChat)
+      const token = await guard(req, res, SCOPES.assistantChat, 'assistantChat')
       const { messages, surface } = parseChatRequest(req.body ?? {})
       const result = await assistant.chat({ messages, surface })
       // COUNTS ONLY. Not one character of the conversation reaches the log — on this path or any
@@ -382,6 +479,9 @@ export function memberApiStatus(config, { killSwitch, assistantConfigured = fals
     killSwitch: Boolean(memberApi.killSwitch),
     // A boolean, never the credential and never the model id's provenance.
     assistant: { configured: Boolean(assistantConfigured) },
+    // Spec 096. PUBLIC CONFIG ONLY — the prices and the network are already in every 402 body, and
+    // the treasury's BALANCE is deliberately not here (see x402Status).
+    x402: x402Status(config, { killSwitch }),
   }
 }
 

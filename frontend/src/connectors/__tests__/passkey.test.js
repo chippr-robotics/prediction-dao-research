@@ -36,7 +36,7 @@ import { passkeyConnector, readSession, writeSession, PASSKEY_CONNECTOR_ID } fro
 import { ChainNotSupportedError } from '../../lib/passkey/smartAccount'
 import { rememberCredential, knownCredentials, isTransactComplete } from '../../lib/passkey/credentials'
 import { computeAccountAddress, publicKeyToOwnerBytes } from '../../lib/passkey/smartAccount'
-import { p256 } from '@noble/curves/p256.js'
+import { p256 } from '@noble/curves/nist.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 
 const ACCOUNT = '0x00000000000000000000000000000000000a11CE'
@@ -319,8 +319,11 @@ describe('cross-device sign-in (fresh browser, synced passkey)', () => {
   const makeAssertion = (priv, challenge) => {
     const authenticatorData = concat(sha256(enc('fairwins.app')), new Uint8Array([0x05]), new Uint8Array([0, 0, 0, 1]))
     const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
-    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false })
-    const der = sig.toDERRawBytes ? sig.toDERRawBytes() : sig.toBytes('der')
+    // prehash:false — an authenticator signs the DIGEST, and @noble/curves v2 prehashes by default.
+    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false, prehash: false })
+    // @noble/curves v2 returns compact BYTES here; v1 returned a Signature instance.
+    const sigObj = sig instanceof Uint8Array ? p256.Signature.fromBytes(sig) : sig
+    const der = sigObj.toDERRawBytes ? sigObj.toDERRawBytes() : sigObj.toBytes('der')
     return { credentialId: 'cred-phone', authenticatorData, clientDataJSON, signature: new Uint8Array(der) }
   }
 
@@ -378,12 +381,15 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
   const makeAssertion = (priv, challenge) => {
     const authenticatorData = concat(sha256(enc('fairwins.app')), new Uint8Array([0x05]), new Uint8Array([0, 0, 0, 1]))
     const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
-    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false })
+    // prehash:false — an authenticator signs the DIGEST, and @noble/curves v2 prehashes by default.
+    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false, prehash: false })
+    // @noble/curves v2 returns compact BYTES here; v1 returned a Signature instance.
+    const sigObj = sig instanceof Uint8Array ? p256.Signature.fromBytes(sig) : sig
     return {
       credentialId: 'cred-phone',
       authenticatorData,
       clientDataJSON,
-      signature: new Uint8Array(sig.toDERRawBytes ? sig.toDERRawBytes() : sig.toBytes('der')),
+      signature: new Uint8Array(sigObj.toDERRawBytes ? sigObj.toDERRawBytes() : sigObj.toBytes('der')),
     }
   }
 

@@ -538,6 +538,30 @@ export default defineConfig({
                 .declineWager(args.wagerId)
               break
             }
+            case 'registerKey': {
+              /*
+               * Register an encryption key for a hardhat account, signed by that account.
+               *
+               * `cy.ensureEncryptionKeys` does this through the UI, which connects the injected
+               * mock and leaves an authorized session behind — harmless for a spec that wants a
+               * classic wallet, fatal for one that then signs in with a PASSKEY, because the mock
+               * auto-reconnects over it and the passkey session never happens. `registerKey` is
+               * self-callable on the contract, so a fixture can do it without a browser at all.
+               *
+               * The key's VALUE is not under test here (X25519 material is generated client-side);
+               * what the create path needs is a registered 32-byte key for the opponent.
+               */
+              const kw = new ethers.Wallet(ACCOUNT_KEYS[args.index ?? 0], provider)
+              const kr = new ethers.Contract(
+                d.contracts.keyRegistry,
+                ['function registerKey(bytes publicKey)', 'function hasKey(address) view returns (bool)'],
+                kw,
+              )
+              if (await kr.hasKey(kw.address)) return { ok: true, address: kw.address, noop: true }
+              const pub = args.publicKey || ethers.hexlify(ethers.randomBytes(32))
+              const rc = await (await kr.registerKey(pub)).wait(1)
+              return { ok: rc.status === 1, address: kw.address }
+            }
             case 'hasKey': {
               const kr = new ethers.Contract(d.contracts.keyRegistry, KEYREG_ABI, provider)
               return { ok: true, registered: await kr.hasKey(args.address) }

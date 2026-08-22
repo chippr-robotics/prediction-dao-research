@@ -30,7 +30,7 @@
     "cypress/e2e/fast/37-predict-and-collect.cy.js": 155,
     "cypress/e2e/passkey/bitcoin-receive.cy.js": 53,
     "cypress/e2e/passkey/bitcoin-send-fee.cy.js": 28,
-    "cypress/e2e/passkey/compliance.cy.js": 1,
+    "cypress/e2e/passkey/compliance.cy.js": 21,
     "cypress/e2e/passkey/controllers.cy.js": 1,
     "cypress/e2e/passkey/onboarding-journey.cy.js": 13,
     "cypress/e2e/passkey/paymaster-disclosure.cy.js": 40,

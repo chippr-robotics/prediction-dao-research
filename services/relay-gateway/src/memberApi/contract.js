@@ -99,6 +99,22 @@ export const ERROR_CODES = Object.freeze({
  *   'bearer'    — a capability token in `Authorization: Bearer`, carrying `scope`.
  *   'signature' — the request body carries its own member signature and authorises itself; there is
  *                 no bearer token, because you revoke a key precisely when the token is compromised.
+ *
+ * `opClass` (spec 096) — which x402 price a request to this route would pay, when the caller has no
+ * usable member token AND the paid rail is enabled. `null` means the route is NEVER priced.
+ *
+ * FIVE ROUTES ARE DELIBERATELY UNPRICED, for three different reasons:
+ *   · `openapi` — a client must be able to read the specification before it can decide to pay for
+ *     anything. Charging for the description of the price is a closed loop.
+ *   · `revoke` — this is how a member withdraws a leaked key. Putting a price between a member and
+ *     that action would be the single worst place on this API to put one.
+ *   · `me` / `keyStatus` — these introspect a TOKEN. A paid caller has no token, so there is nothing
+ *     for them to answer; pricing them would mean inventing an identity for someone who presented
+ *     none. `membership` is unpriced for the same reason one level along: the paid rail exists
+ *     precisely BECAUSE the payer has no membership to read, and answering it would either fabricate
+ *     a state or make a chain read the payer already paid for fail after settlement.
+ * What IS priced is the DATA and the WORK: the account's own wagers, the live fee rates, a typed-data
+ * build, and an assistant message.
  */
 export const ROUTES = Object.freeze([
   Object.freeze({
@@ -107,6 +123,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/openapi.json',
     auth: 'none',
     scope: null,
+    opClass: null,
     operationId: 'getOpenApiDocument',
     summary: 'The OpenAPI 3.1 description of this API',
     description:
@@ -120,6 +137,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/me',
     auth: 'bearer',
     scope: SCOPES.readProfile,
+    opClass: null,
     operationId: 'getMe',
     summary: 'Introspect the presented token',
     description:
@@ -132,6 +150,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/keys/revoke',
     auth: 'signature',
     scope: null,
+    opClass: null,
     operationId: 'revokeKey',
     summary: 'Withdraw a key by member signature',
     description:
@@ -147,6 +166,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/keys/status',
     auth: 'bearer',
     scope: SCOPES.readProfile,
+    opClass: null,
     operationId: 'getKeyStatus',
     summary: 'Whether a key is revoked on this gateway',
     description:
@@ -159,6 +179,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/membership',
     auth: 'bearer',
     scope: SCOPES.readMembership,
+    opClass: null,
     operationId: 'getMembership',
     summary: 'Membership tier on the reference chain',
     description:
@@ -171,6 +192,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/wagers',
     auth: 'bearer',
     scope: SCOPES.readWagers,
+    opClass: 'read',
     operationId: 'listWagers',
     summary: 'The token account’s wagers, per chain',
     description:
@@ -184,6 +206,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/fees',
     auth: 'bearer',
     scope: SCOPES.readFees,
+    opClass: 'read',
     operationId: 'getFees',
     summary: 'Live platform fee rates',
     description:
@@ -197,6 +220,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/intents/build',
     auth: 'bearer',
     scope: SCOPES.buildIntents,
+    opClass: 'build',
     operationId: 'buildIntent',
     summary: 'Build unsigned EIP-712 typed data for a platform action',
     description:
@@ -212,6 +236,7 @@ export const ROUTES = Object.freeze([
     path: '/v1/member/assistant/chat',
     auth: 'bearer',
     scope: SCOPES.assistantChat,
+    opClass: 'assistant',
     operationId: 'assistantChat',
     summary: 'Ask the FairWins assistant',
     description:

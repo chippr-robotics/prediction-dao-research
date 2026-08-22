@@ -7,7 +7,7 @@
  * keypairs, and a full X-Wing encrypt→decrypt round-trip against a seed-derived key.
  */
 import { describe, it, expect } from 'vitest'
-import { x25519 } from '@noble/curves/ed25519'
+import { x25519 } from '@noble/curves/ed25519.js'
 import {
   deriveKeyPairFromSeed,
   deriveXWingKeyPairFromSeed,
