@@ -29,8 +29,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 131 |
-| 🟢 covered | 115 |
-| 🟡 partial | 5 |
+| 🟢 covered | 116 |
+| 🟡 partial | 4 |
 | 🔴 absent | 5 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 39 · 🟡 4 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 40 · 🟡 3 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -208,7 +208,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `recovery.sweep-across-chains` | Sweep a recovered account on more than one chain | 🟡 partial | flow | `no-chain` | `28-legacy-recovery.cy.js` (LKR-05) | the SEND is never driven — discovery finds the Solana funds and offers the control, but no SOL or BTC leaves the account; retiered from the proposed on-chain because both venues are non-EVM and reached over HTTP |
+| `recovery.sweep-across-chains` | Sweep a recovered account on more than one chain | 🟢 covered | flow | `no-chain` | `28-legacy-recovery.cy.js` (LKR-05, LKR-06) |  |
 
 ### `065-liquid-delegated-staking` — Liquid delegated staking
 

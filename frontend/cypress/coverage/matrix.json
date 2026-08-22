@@ -1618,16 +1618,14 @@
         {
           "id": "recovery.sweep-across-chains",
           "name": "Sweep a recovered account on more than one chain",
-          "status": "partial",
+          "status": "covered",
           "tier": "no-chain",
-          "proposedTier": "on-chain",
           "depth": "flow",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/fast/28-legacy-recovery.cy.js::LKR-05"
-          ],
-          "missing": "the SEND is never driven — discovery finds the Solana funds and offers the control, but no SOL or BTC leaves the account; retiered from the proposed on-chain because both venues are non-EVM and reached over HTTP",
-          "issue": "#1228"
+            "frontend/cypress/e2e/fast/28-legacy-recovery.cy.js::LKR-05",
+            "frontend/cypress/e2e/fast/28-legacy-recovery.cy.js::LKR-06"
+          ]
         }
       ]
     },

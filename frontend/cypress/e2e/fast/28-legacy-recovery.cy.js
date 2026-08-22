@@ -40,6 +40,8 @@ const PASSPHRASE = 'correct-horse-battery'
  * Matching BOTH is what makes this test a statement about the app rather than about which
  * endpoint the build happened to pick.
  */
+const SOL_RECIPIENT = '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM'
+const SOL_SIGNATURE = '5wHu1qwD4kLoYoMYJdLZFDgXBTe4B3vTaLuHNQKvJfvcHJNQqR3PMoWBcCUvGmDsCbtvfmBsGH2yFbmbGgVDMwZk'
 const SOLANA_RPC_MATCH = /api\.mainnet-beta\.solana\.com|\/v1\/solana/
 
 /**
@@ -269,4 +271,92 @@ describe('Legacy account recovery — other chains (spec 063)', () => {
     cy.assertNoClearSecret(LEGACY_WORDS)
     assertSecretNotSent(LEGACY_WORDS)
   })
+
+  // ---------------------------------------------------------------------------
+  // LKR-06 — the SWEEP itself: value actually leaves the recovered account
+  // ---------------------------------------------------------------------------
+  it('[LKR-06] sweeps recovered SOL with a signed transfer, and the seed still never leaves the device', () => {
+    /*
+     * Spec 063's point. LKR-05 proves the funds are FOUND; finding them is not recovering them,
+     * and the matrix recorded this flow partial for exactly that reason — the control was offered
+     * and never driven.
+     *
+     * The send is one JSON-RPC call (`sendTransaction`) on the same endpoint discovery uses, so
+     * the whole path — derive, build, sign, broadcast — runs in the no-chain tier without a
+     * validator. Nothing here is a real transfer: the cluster is stubbed. What IS real is the
+     * signing, and that is the part worth pinning, because the secret being swept is a recovered
+     * seed the member typed in.
+     */
+    let funded = null
+    const submitted = []
+    cy.intercept({ method: 'POST', url: SOLANA_RPC_MATCH }, (req) => {
+      const { method, params, id } = req.body
+      if (method === 'getBalance') {
+        const address = params[0]
+        if (!funded) funded = address
+        req.reply({ jsonrpc: '2.0', id, result: { value: address === funded ? 2500000000 : 0 } })
+        return
+      }
+      if (method === 'getSignaturesForAddress') { req.reply({ jsonrpc: '2.0', id, result: [] }); return }
+      if (method === 'getLatestBlockhash') {
+        req.reply({
+          jsonrpc: '2.0',
+          id,
+          result: { context: { slot: 1 }, value: { blockhash: '11111111111111111111111111111111', lastValidBlockHeight: 100 } },
+        })
+        return
+      }
+      if (method === 'sendTransaction') {
+        submitted.push(params[0])
+        req.reply({ jsonrpc: '2.0', id, result: SOL_SIGNATURE })
+        return
+      }
+      req.reply({ jsonrpc: '2.0', id, result: null })
+    }).as('solana')
+
+    // No gateway to ask about Bitcoin — this test is about the Solana leg.
+    cy.intercept({ method: 'POST', url: /\/v1\/bitcoin\// }, { statusCode: 503, body: {} })
+    cy.intercept({ method: 'GET', url: /\/v1\/bitcoin\// }, { statusCode: 503, body: {} })
+
+    cy.openLegacyRecovery({ onBeforeLoad: recordNetwork })
+    cy.importLegacyKey({ secret: LEGACY_WORDS, passphrase: PASSPHRASE })
+    cy.get('.action-sheet').within(() => cy.contains('button', 'Done').click())
+
+    cy.get('.lkr-stored__item').first().contains('button', 'Other chains').click()
+    cy.get('.lkr-crosschain').within(() => {
+      cy.get('input[aria-label="Passphrase"]').type(PASSPHRASE, { log: false })
+      cy.contains('button', 'Scan for funds').click()
+
+      cy.contains('.lkr-asset-row', 'Solana').contains('button', 'Send').click()
+
+      // The cost is disclosed BEFORE the amount is entered: a sweep off a recovered account is
+      // never gasless, and the member pays out of the balance they are moving.
+      cy.get('.lkr-send-form').should('contain.text', 'you pay the network fee')
+
+      cy.get('input[aria-label="Recipient Solana address"]').type(SOL_RECIPIENT, { delay: 0 })
+      cy.get('input[aria-label="Amount in SOL"]').type('1.5', { delay: 0 })
+      cy.get('.lkr-send-form').contains('button', 'Send').click()
+    })
+
+    // The receipt names the signature — not a bare "done", which would leave the member unable to
+    // look the transfer up anywhere.
+    cy.contains(SOL_SIGNATURE, { timeout: 20000 }).should('be.visible')
+
+    /*
+     * A SIGNED transaction reached the cluster. Asserted on the wire rather than on the receipt,
+     * because a receipt is something the app writes and a submitted transaction is something it
+     * did.
+     */
+    cy.then(() => {
+      expect(submitted, 'exactly one transaction was broadcast').to.have.length(1)
+      expect(submitted[0], 'the broadcast payload is a base64 wire transaction').to.match(/^[A-Za-z0-9+/=]+$/)
+      expect(submitted[0].length, 'it carries a signature and a message, not a stub').to.be.greaterThan(100)
+    })
+
+    // FR-021, on the SEND path this time: signing happens on the device, so the seed must not be
+    // anywhere in what crossed the wire — including inside the transaction we just submitted.
+    cy.assertNoClearSecret(LEGACY_WORDS)
+    assertSecretNotSent(LEGACY_WORDS)
+  })
+
 })
