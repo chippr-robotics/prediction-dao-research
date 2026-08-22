@@ -31,6 +31,10 @@ const REGISTRY_ABI = [
   'function acceptOpenWager(uint256 wagerId, bytes signature)',
   'function openWagerIdForClaim(address authority) view returns (uint256)',
   'function declareWinner(uint256 wagerId, address winner)',
+  // Spec 035 intent twin. The RELAYER is msg.sender; the acting identity is the recovered
+  // signer, which is what makes the rail gasless for the member without giving the relayer
+  // authority. Served via the proxy's fallback from WagerRegistryIntents.
+  'function declareWinnerWithSig(uint256 wagerId,address winner,address signer,bytes32 nonce,uint256 validAfter,uint256 validBefore,bytes sig)',
   // Spec 004 draws. ThirdParty settles on the arbitrator's single call; participant types
   // accumulate MUTUAL consent and settle only when both sides have declared.
   'function declareDraw(uint256 wagerId)',
@@ -397,6 +401,53 @@ export default defineConfig({
               const rw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
               tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, rw)
                 .declareWinner(args.wagerId, args.winner)
+              break
+            }
+            case 'declareWinnerWithSig': {
+              /*
+               * Sign as the MEMBER, submit as the RELAYER. `signerIndex` is who authorises;
+               * `relayerIndex` is who pays gas and appears as msg.sender. The gap between those
+               * two accounts is the entire point of the intent rail.
+               */
+              const member = new ethers.Wallet(ACCOUNT_KEYS[args.signerIndex ?? 0], provider)
+              const relayer = new ethers.Wallet(ACCOUNT_KEYS[args.relayerIndex ?? 3], provider)
+              const inet = await provider.getNetwork()
+              const nonce = args.nonce ?? ethers.hexlify(ethers.randomBytes(32))
+              const inow = (await provider.getBlock('latest')).timestamp
+              const validAfter = args.validAfter ?? 0
+              const validBefore = args.validBefore ?? (inow + 3600)
+              const message = {
+                wagerId: args.wagerId,
+                winner: args.winner,
+                actor: args.actorOverride ?? member.address,
+                nonce,
+                validAfter,
+                validBefore,
+              }
+              const isig = await member.signTypedData(
+                {
+                  name: 'FairWins WagerRegistry',
+                  version: '1',
+                  chainId: Number(inet.chainId),
+                  verifyingContract: d.contracts.wagerRegistry,
+                },
+                {
+                  DeclareWinnerIntent: [
+                    { name: 'wagerId', type: 'uint256' },
+                    { name: 'winner', type: 'address' },
+                    { name: 'actor', type: 'address' },
+                    { name: 'nonce', type: 'bytes32' },
+                    { name: 'validAfter', type: 'uint256' },
+                    { name: 'validBefore', type: 'uint256' },
+                  ],
+                },
+                message,
+              )
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, relayer)
+                .declareWinnerWithSig(
+                  args.wagerId, args.winner, args.signerAddressOverride ?? member.address,
+                  nonce, validAfter, validBefore, isig,
+                )
               break
             }
             case 'createOpenWager': {

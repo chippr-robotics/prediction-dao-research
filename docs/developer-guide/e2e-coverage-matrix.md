@@ -29,8 +29,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 131 |
-| 🟢 covered | 118 |
-| 🟡 partial | 2 |
+| 🟢 covered | 119 |
+| 🟡 partial | 1 |
 | 🔴 absent | 5 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 42 · 🟡 1 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 43 · 🟡 0 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -113,7 +113,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `intents.sign-and-relay` | Authorize an action by signature and have a relayer submit it | 🟡 partial | smoke | `on-chain` | `04-wager-creation-tx.cy.js` (CRE-13) | no test drives the relayed path end to end, and none exercises the self-submit fallback when the relayer is unavailable — the never-stranded rule is unproven |
+| `intents.sign-and-relay` | Authorize an action by signature and have a relayer submit it | 🟢 covered | settled | `on-chain` | `07-manual-resolution.cy.js` (RES-17, RES-18, RES-19) |  |
 
 ### `036-relayer-infrastructure` — Relayer gateway
 

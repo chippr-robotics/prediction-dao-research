@@ -789,4 +789,131 @@ describe('Manual Resolution', () => {
     })
   })
 
+
+  // ---------------------------------------------------------------------------
+  // RES-17 / RES-18 / RES-19 — RELAYED INTENTS (spec 035). Someone else pays the
+  // gas; nobody else gains the authority.
+  // ---------------------------------------------------------------------------
+
+  it('[RES-17] A relayer submits the member\'s signed intent — the member acts, the relayer pays', () => {
+    /*
+     * The whole promise of the intent rail in one assertion pair.
+     *
+     * `declareWinnerWithSig` is a PUBLIC function: anyone may call it. What makes that safe is
+     * that the acting identity is not `msg.sender` but the address recovered from the signature,
+     * and every authorisation check runs against THAT. So a relayer can pay the gas for a member
+     * who has none, without acquiring any of the member's rights.
+     *
+     * The test proves both halves at once: the resolution succeeds when submitted by an account
+     * that has no authority over the wager, and the outcome is the one the MEMBER signed.
+     */
+    cy.createAndAcceptWager({
+      description: 'RES-17: relayed resolution',
+      resolutionType: 1, // Creator-only — so the relayer plainly cannot resolve it themselves
+    }).then((wagerId) => {
+      /*
+       * Positive control first. Account #3 is the relayer, and on a Creator-only wager it has no
+       * standing at all — if this direct call were to succeed, the test below would prove nothing
+       * about signatures.
+       */
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 3, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'the relayer has no authority of its own over this wager').to.equal(false)
+      })
+
+      // The same account submits the same outcome, now carrying the creator's signature.
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3 },
+      }).then((r) => {
+        expect(r.ok, `the relayer may submit an intent the creator signed (${r.error || ''})`).to.equal(true)
+      })
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'the wager resolved').to.equal(3)
+        expect(i.winner, 'the outcome is the one the MEMBER signed').to.equal(TEST_ACCOUNTS[0])
+      })
+    })
+  })
+
+  it('[RES-18] A relayed intent cannot be replayed, and cannot be re-pointed at another signer', () => {
+    /*
+     * Two ways a public, signature-carrying entrypoint goes wrong, and the guards for each.
+     *
+     * REPLAY: the intent is visible on chain the moment it is submitted. Without a spent-nonce
+     * check, anyone could resubmit it — harmless on a settled wager, not harmless on a repeatable
+     * action, and the guard belongs to the rail rather than to each action.
+     *
+     * SUBSTITUTION: `signer` is passed as a plain argument alongside the signature. If it were
+     * trusted rather than verified against the recovered address, a relayer could name any member
+     * as the actor and act as them. The digest binds the signer, so a mismatched pair must fail.
+     */
+    cy.createAndAcceptWager({ description: 'RES-18: replay + substitution', resolutionType: 1 }).then((wagerId) => {
+      const NONCE = '0x' + '11'.repeat(32)
+
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3, nonce: NONCE },
+      }).then((r) => {
+        expect(r.ok, 'the first submission lands').to.equal(true)
+      })
+
+      // Replay of the identical intent, by the same relayer.
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3, nonce: NONCE },
+      }).then((r) => {
+        expect(r.ok, 'the same intent cannot be submitted twice').to.equal(false)
+      })
+
+      // Substitution: a signature made by #1, presented as though #0 had signed it.
+      cy.createAndAcceptWager({ description: 'RES-18b: substitution', resolutionType: 1 }).then((otherId) => {
+        cy.task('chainTx', {
+          action: 'declareWinnerWithSig',
+          args: {
+            wagerId: otherId,
+            winner: TEST_ACCOUNTS[1],
+            signerIndex: 1,
+            relayerIndex: 3,
+            signerAddressOverride: TEST_ACCOUNTS[0],
+          },
+        }).then((r) => {
+          expect(
+            r.ok,
+            'naming a different signer than the one who signed does not make them the actor',
+          ).to.equal(false)
+        })
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: otherId } }).then((i) => {
+          expect(i.status, 'the wager was not resolved by the substitution attempt').to.equal(2)
+        })
+      })
+    })
+  })
+
+  it('[RES-19] The self-submit fallback reaches the same outcome without any relayer', () => {
+    /*
+     * THE NEVER-STRANDED RULE (spec 036). The relayer is OPTIONAL infrastructure: when it is
+     * unavailable the member submits the same action themselves and pays their own gas.
+     *
+     * A test cannot take down a relayer that this tier never runs, and asserting on a stubbed
+     * gateway would only prove the stub was called. What IS on chain, and what the rule actually
+     * depends on, is that the direct entrypoint remains open and produces the identical result —
+     * so a member with gas is never blocked by infrastructure being down.
+     */
+    cy.createAndAcceptWager({ description: 'RES-19: self-submit fallback', resolutionType: 1 }).then((wagerId) => {
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 0, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'the member can always submit for themselves — no relayer required').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'self-submission resolves the wager').to.equal(3)
+        expect(i.winner, 'and reaches the same outcome the relayed path would have').to.equal(TEST_ACCOUNTS[0])
+      })
+    })
+  })
+
 })

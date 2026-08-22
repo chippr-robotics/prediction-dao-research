@@ -796,15 +796,15 @@
         {
           "id": "intents.sign-and-relay",
           "name": "Authorize an action by signature and have a relayer submit it",
-          "status": "partial",
+          "status": "covered",
           "tier": "on-chain",
-          "depth": "smoke",
+          "depth": "settled",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/full/04-wager-creation-tx.cy.js::CRE-13"
-          ],
-          "missing": "no test drives the relayed path end to end, and none exercises the self-submit fallback when the relayer is unavailable — the never-stranded rule is unproven",
-          "issue": "#1244"
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-17",
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-18",
+            "frontend/cypress/e2e/full/07-manual-resolution.cy.js::RES-19"
+          ]
         }
       ]
     },
