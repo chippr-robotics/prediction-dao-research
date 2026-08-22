@@ -57,3 +57,42 @@ module "staging_testnet" {
 
   secret_env = var.staging_testnet_secret_env
 }
+
+/**
+ * MCP server, staging (spec 095).
+ *
+ * ONE SERVICE, NOT TWO, and the reason is the same reason the SPA needs two. The cohort split above
+ * exists because Vite folds VITE_NETWORK_ID into the bundle: the cohort is a build-time fact there.
+ * This service folds nothing — it reads its upstream from `FAIRWINS_API_URL` at runtime, and both
+ * staging SPAs already point at the same relay host (cloudbuild.staging.yaml). A second copy would
+ * be two identical services, which is a maintenance seam bought for no isolation.
+ *
+ * Stateless and secretless exactly as in prod: no `secret_env`, no runtime service account, and the
+ * member's own capability token — never anything held here — is what authorizes a call. See the
+ * comment on `module "mcp_server"` in environments/prod/main.tf for the full reasoning.
+ *
+ * ⚠ THIS POINTS AT THE MAINNET-COHORT STAGING RELAY, which touches real funds. It is a rehearsal of
+ * the production wiring, not a sandbox.
+ */
+module "mcp_server_staging" {
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+
+  project_id = var.project_id
+  region     = var.region
+  name       = "fairwins-mcp-server-staging"
+
+  image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/fairwins-mcp-server/fairwins-mcp-server-staging:latest"
+
+  # Mirrors production's ceiling rather than `var.staging_max_instances`: a promotion mirror should
+  # reproduce the shape it is rehearsing, and 4 is already the smaller of the two numbers.
+  min_instances         = 0
+  max_instances         = 4
+  cpu                   = "1"
+  memory                = "256Mi"
+  cpu_idle              = true
+  allow_unauthenticated = true
+
+  env = {
+    FAIRWINS_API_URL = "https://relay-staging.fairwins.app"
+  }
+}

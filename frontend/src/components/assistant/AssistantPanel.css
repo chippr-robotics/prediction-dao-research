@@ -1,0 +1,169 @@
+/* Assistant panel (spec 095) — content styling only.
+
+   The shell (backdrop z-1500, mobile rise, focus trap, safe-area padding, close button) belongs to
+   ActionSheet.css and is not re-stated here; this file scopes itself under `.assistant-sheet`, the
+   className the panel passes, so nothing here can leak into the other sheets.
+
+   Colours are theme tokens only. Small text and links use --accent-color (Teal 700), not
+   --brand-primary, which is a large-text-and-fill colour. */
+
+.action-sheet.assistant-sheet {
+  display: flex;
+  flex-direction: column;
+  max-width: 520px;
+}
+
+.assistant-panel__lead,
+.assistant-panel__empty {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 0.7rem;
+}
+
+.assistant-panel__list {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  margin: 0 0 0.9rem;
+  padding-left: 1.1rem;
+}
+
+.assistant-panel__list li {
+  margin-bottom: 0.3rem;
+}
+
+.assistant-panel__list code {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+/* --- Thread --------------------------------------------------------------- */
+.assistant-panel__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.assistant-panel__message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 100%;
+}
+
+.assistant-panel__message--user {
+  align-items: flex-end;
+}
+
+.assistant-panel__bubble {
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.assistant-panel__message--user .assistant-panel__bubble {
+  background: var(--primary-button);
+  color: var(--primary-button-text);
+}
+
+.assistant-panel__message--assistant .assistant-panel__bubble {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.assistant-panel__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.assistant-panel__link {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  color: var(--accent-color);
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+  text-decoration: none;
+}
+
+.assistant-panel__link:hover {
+  border-color: var(--border-hover);
+}
+
+/* Repeated under every reply, on purpose: a single notice at the top scrolls away. */
+.assistant-panel__disclaimer {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.assistant-panel__pending {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* --- Errors --------------------------------------------------------------- */
+.assistant-panel__error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-color);
+  border-radius: var(--radius-md);
+  color: var(--danger-text);
+  margin-top: 0.7rem;
+  padding: 0.6rem 0.7rem;
+}
+
+.assistant-panel__error p {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  margin: 0 0 0.4rem;
+}
+
+.assistant-panel__hint {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* --- Composer ------------------------------------------------------------- */
+.assistant-panel__composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.assistant-panel__composer textarea {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  padding: 0.55rem 0.65rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.assistant-panel__composer-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* ActionSheet paints `.btn` tones already; only the reduced-motion contract for the thread's own
+   scroll behaviour belongs here. */
+@media (prefers-reduced-motion: reduce) {
+  .assistant-panel__thread {
+    scroll-behavior: auto;
+  }
+}

@@ -1,0 +1,228 @@
+/**
+ * ApiAccessPanel (spec 095) — the Settings card that mints capability tokens.
+ *
+ * Four things are pinned here, each because getting it wrong is invisible until it matters:
+ *   · membership gating has THREE states and an unreadable read is never a denial;
+ *   · creating a key produces an `fw1.` token in the UI and metadata WITHOUT it in storage;
+ *   · the token is shown once — dismissing it destroys the only copy;
+ *   · revoking posts the signed revocation and reports what that actually bought, including the
+ *     grant's own expiry, rather than implying a durable withdrawal.
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { ethers } from 'ethers'
+
+let walletState
+let membershipState
+let gatewayUrl
+const refresh = vi.fn()
+
+vi.mock('../hooks/useWalletManagement', () => ({ useWallet: () => walletState }))
+vi.mock('../hooks/useRoleDetails', () => ({
+  default: () => ({ getRoleDetails: () => membershipState, refresh }),
+  MembershipTier: { NONE: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 },
+}))
+vi.mock('../lib/relay/intentClient', () => ({ relayerBaseUrl: () => gatewayUrl }))
+
+import ApiAccessPanel from '../components/account/ApiAccessPanel'
+import { API_KEYS_STORAGE_KEY, buildGrant, listApiKeys, recordApiKey } from '../lib/apiAccess/apiKeys'
+
+const ACTIVE = { isActive: true, tier: 1, tierName: 'Bronze', readable: true, hasRole: true }
+const INACTIVE = { isActive: false, tier: 0, tierName: 'None', readable: true, hasRole: false }
+const UNREADABLE = { isActive: false, tier: 0, tierName: 'Unknown', readable: false, hasRole: false }
+
+let wallet
+
+function renderPanel() {
+  return render(
+    <MemoryRouter>
+      <ApiAccessPanel />
+    </MemoryRouter>
+  )
+}
+
+/** Cards are collapsed by default; open the one under test. */
+function openCard() {
+  fireEvent.click(screen.getByRole('button', { name: /api access/i }))
+}
+
+beforeEach(() => {
+  localStorage.clear()
+  sessionStorage.clear()
+  vi.clearAllMocks()
+  wallet = ethers.Wallet.createRandom()
+  walletState = {
+    address: wallet.address,
+    signer: wallet,
+    loginMethod: 'injected',
+    chainId: 137,
+    isConnected: true,
+  }
+  membershipState = ACTIVE
+  gatewayUrl = 'https://relay.example'
+  global.fetch = vi.fn()
+})
+
+describe('membership gating (three states, never two)', () => {
+  it('says it is checking while the first read is in flight', () => {
+    membershipState = null
+    renderPanel()
+    openCard()
+    expect(screen.getByText(/checking your membership/i)).toBeInTheDocument()
+  })
+
+  it('offers a route to upgrade — never a dead disabled control', () => {
+    membershipState = INACTIVE
+    renderPanel()
+    openCard()
+    expect(screen.getByTestId('api-access-upgrade')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /go to membership/i })).toBeEnabled()
+    expect(screen.queryByTestId('api-access-console')).not.toBeInTheDocument()
+  })
+
+  it('treats an UNREADABLE membership as unknown, not as "not a member"', () => {
+    membershipState = UNREADABLE
+    renderPanel()
+    openCard()
+    const node = screen.getByTestId('api-access-unreadable')
+    expect(node).toHaveTextContent(/could not read your membership/i)
+    expect(node).toHaveTextContent(/not an answer about your account/i)
+    // Emphatically NOT the upgrade prompt: that would tell a member with a slow RPC they own nothing.
+    expect(screen.queryByTestId('api-access-upgrade')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }))
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it('shows the console to an active member', () => {
+    renderPanel()
+    openCard()
+    expect(screen.getByTestId('api-access-console')).toBeInTheDocument()
+  })
+})
+
+describe('creating a key', () => {
+  it('mints an fw1 token, shows it once, and stores metadata without it', async () => {
+    renderPanel()
+    openCard()
+
+    fireEvent.change(screen.getByLabelText(/name \(only you see this\)/i), { target: { value: 'my agent' } })
+    fireEvent.click(screen.getByRole('button', { name: /^create key$/i }))
+
+    const token = await screen.findByTestId('api-access-token')
+    expect(token.textContent.startsWith('fw1.')).toBe(true)
+
+    // Metadata is stored; the token is not — asserted against the RAW storage string.
+    const raw = localStorage.getItem(`fw_user_${wallet.address.toLowerCase()}_${API_KEYS_STORAGE_KEY}`)
+    expect(raw).toBeTruthy()
+    expect(raw).not.toContain(token.textContent)
+    expect(raw).not.toContain('fw1.')
+    expect(JSON.parse(raw)[0].label).toBe('my agent')
+
+    // The reveal states plainly that this is the only showing.
+    expect(screen.getByTestId('api-access-reveal')).toHaveTextContent(/only time it is shown/i)
+    expect(screen.getByTestId('api-access-reveal')).toHaveTextContent(/not saved/i)
+  })
+
+  it('destroys the only copy when the member dismisses the reveal', async () => {
+    renderPanel()
+    openCard()
+    fireEvent.click(screen.getByRole('button', { name: /^create key$/i }))
+    await screen.findByTestId('api-access-token')
+
+    fireEvent.click(screen.getByRole('button', { name: /i have stored it/i }))
+
+    expect(screen.queryByTestId('api-access-token')).not.toBeInTheDocument()
+    // There is no "show it again" — only the create form comes back.
+    expect(screen.getByTestId('api-access-create')).toBeInTheDocument()
+    expect(screen.getAllByTestId('api-access-key')).toHaveLength(1)
+  })
+
+  it('refuses to sign a key that may do nothing', async () => {
+    renderPanel()
+    openCard()
+    for (const box of screen.getAllByRole('checkbox')) {
+      if (box.checked) fireEvent.click(box)
+    }
+    expect(screen.getByRole('button', { name: /^create key$/i })).toBeDisabled()
+  })
+
+  it('still creates a key with no gateway configured, and says what is unavailable', async () => {
+    gatewayUrl = ''
+    renderPanel()
+    openCard()
+
+    expect(screen.getByTestId('api-access-no-gateway')).toHaveTextContent(/no fairwins api gateway configured/i)
+    // Signing is local, so the button is live rather than disabled with no explanation.
+    fireEvent.click(screen.getByRole('button', { name: /^create key$/i }))
+    expect((await screen.findByTestId('api-access-token')).textContent.startsWith('fw1.')).toBe(true)
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('revoking a key', () => {
+  beforeEach(() => {
+    recordApiKey(
+      wallet.address,
+      buildGrant({
+        account: wallet.address,
+        scopes: ['read:profile'],
+        ttlDays: 30,
+        label: 'leaked agent',
+        nowSeconds: Math.floor(Date.now() / 1000),
+      })
+    )
+  })
+
+  it('posts the signed revocation and reports the honest, non-durable result', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({ revoked: true, durable: false, reason: 'in-process only' }),
+    })
+
+    renderPanel()
+    openCard()
+    fireEvent.click(screen.getByRole('button', { name: /^revoke$/i }))
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled())
+    const [url, options] = global.fetch.mock.calls[0]
+    expect(url).toBe('https://relay.example/v1/member/keys/revoke')
+    const body = JSON.parse(options.body)
+    expect(body.revocation.account.toLowerCase()).toBe(wallet.address.toLowerCase())
+    expect(body.signature).toMatch(/^0x[0-9a-f]+$/i)
+
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent(/does NOT survive a gateway restart/i)
+    // The part that DOES survive is always stated beside it.
+    expect(notice).toHaveTextContent(/also expires on its own/i)
+
+    expect(listApiKeys(wallet.address)[0].revokedAt).toBeTruthy()
+  })
+
+  it('is honest when the gateway could not be reached: signed and noted, but NOT registered', async () => {
+    global.fetch.mockRejectedValue(new Error('connection refused'))
+
+    renderPanel()
+    openCard()
+    fireEvent.click(screen.getByRole('button', { name: /^revoke$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/not registered/i)
+    expect(alert).toHaveTextContent(/still works until it is registered or expires/i)
+  })
+})
+
+describe('MCP setup', () => {
+  it('generates a snippet with a token PLACEHOLDER, never a real token', async () => {
+    renderPanel()
+    openCard()
+    fireEvent.click(screen.getByRole('button', { name: /show setup snippet/i }))
+
+    const snippet = screen.getByTestId('api-access-snippet').textContent
+    expect(snippet).toContain('PASTE_YOUR_FW1_TOKEN_HERE')
+    expect(snippet).toContain('https://relay.example')
+    expect(snippet).not.toContain('fw1.')
+  })
+})

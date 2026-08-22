@@ -23,6 +23,9 @@ gateway_secret_ids = [
   "finops-cloudflare-token",
   "finops-quicknode-key",
   "finops-grafana-cloud-token",
+  # spec 095. OPTIONAL: absent ⇒ the assistant route answers 503 assistant_unconfigured while the
+  # rest of the member API (and the gasless relay path) keeps serving — the never-stranded rule.
+  "anthropic-api-key",
 ]
 
 # Secret CONTAINERS under management. Versions and payloads are never declared (guardrail G-04).
@@ -36,6 +39,9 @@ managed_secret_ids = [
   "finops-cloudflare-token",
   "finops-quicknode-key",
   "finops-grafana-cloud-token",
+  # spec 095. Container only — the payload (the Anthropic API key for the member assistant) is
+  # created out of band (guardrail G-04) and read solely by the gateway container.
+  "anthropic-api-key",
 ]
 
 # The billing export the FinOps exporter reads. It is the ONLY source of `billed` (as opposed to

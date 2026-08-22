@@ -300,6 +300,11 @@ describe('WalletPage — Settings tab', () => {
       'Portfolio',
       'Privacy',
       'Notifications',
+      // Spec 095 — the opt-in assistant and programmatic access sit with the other
+      // privacy-shaped cards: one decides what leaves this device, the other what can
+      // reach this account.
+      'Assistant',
+      'API access',
       'Markets',
       'Install app',
       'Software update',

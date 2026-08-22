@@ -72,6 +72,49 @@ Contract addresses are **not** environment variables — they're generated into
 `frontend/src/config/contracts.js` from `deployments/` records via
 `npm run sync:frontend-contracts`.
 
+## Member API and assistant (gateway)
+
+Set on the **relay gateway** (`services/relay-gateway`), spec 095. The module is
+mounted unconditionally and gates itself: disabled means `503
+member_api_unconfigured`, never a 404. Boot-failing validation runs only when the
+module is enabled, so an unconfigured module can never take the gateway down.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MEMBER_API_ENABLED` | `false` | Master switch for `/v1/member/*` |
+| `MEMBER_API_KILLSWITCH` | `false` | Module-scoped stop → `503 member_api_killed` (distinct from the gateway-wide `killswitch_active`) |
+| `MEMBER_API_MAX_TTL_DAYS` | `90` | Ceiling on a capability grant's lifetime; a longer grant is rejected `401 token_ttl_exceeded` |
+| `MEMBER_API_SUBGRAPH_<chainId>` | unset | Subgraph URL used by `/v1/member/wagers` for that chain. Unset ⇒ that chain reports `not-configured` (an honest absence, not an outage) |
+| `ASSISTANT_ENABLED` | `false` | Sub-config of the Member API module. Off ⇒ `503 assistant_unconfigured` |
+| `ASSISTANT_MODEL` | `claude-sonnet-5` | Model id for the assistant proxy |
+| `ASSISTANT_MAX_TOKENS` | `1024` | Response ceiling per chat turn |
+| `ANTHROPIC_API_KEY` | — | **SECRET.** Model-provider credential. Missing ⇒ `503 assistant_unconfigured` |
+
+!!! danger "`ANTHROPIC_API_KEY` is the only secret this feature adds"
+    Deliver it through Secret Manager and `infra/vm/common/fetch-secrets.sh`
+    (declared **optional**, so a missing key degrades the assistant instead of
+    aborting the gateway boot). Never place it in `docker-compose.yml`, a build
+    arg, a Terraform variable, or any `VITE_` variable. Secrets are read at boot —
+    a new version does nothing until the unit restarts. See
+    [Member API Operations](../runbooks/member-api-operations.md#32-enable-the-assistant).
+
+Member API tokens are **not** configuration: a member signs their own EIP-712
+capability grant in the app and the gateway stores nothing. There is no key,
+table, or credential on the server side to configure, back up, or rotate.
+
+## MCP server
+
+Set on the `fairwins-mcp-server` service (`services/mcp-server`), or in a member's
+own MCP client configuration when they run it locally.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `FAIRWINS_API_URL` | — | Gateway base URL (e.g. `https://relay.fairwins.app`). Unset ⇒ the server still starts and lists tools, and each call returns an honest error |
+| `FAIRWINS_API_TOKEN` | — | **SECRET (the member's own token).** In `--http` mode a per-request `Authorization: Bearer` header overrides it, which is what lets one hosted instance serve several members without holding anyone's credential |
+
+The service holds no other secret and no service account of its own — authorization
+arrives with each request.
+
 ## Updating configuration
 
 - **Tier prices/limits** — `DEFAULT_ADMIN_ROLE` on `MembershipManager`

@@ -13,6 +13,7 @@
  *   GET  /healthz             liveness/readiness               (origin-lock EXEMPT)
  *   GET  /v1/opensea/*        read-only collectibles proxy     (origin-locked; spec 055)
  *   GET  /v1/bridge/*         read-only Across quote/status    (origin-locked; spec 067)
+ *   GET/POST /v1/member/*     member API: capability tokens    (origin-locked; spec 095)
  */
 import crypto from 'node:crypto'
 import express from 'express'
@@ -40,6 +41,12 @@ import { createPerpsClients } from './perps/client.js'
 import { createPerpsRouter, perpsStatus } from './perps/routes.js'
 import { createAcrossClient } from './bridge/quotes.js'
 import { createBridgeRouter } from './bridge/routes.js'
+import { createMemberApiRouter, memberApiStatus } from './memberApi/routes.js'
+import { createMemberAuth } from './memberApi/auth.js'
+import { createRevocationStore } from './memberApi/revocation.js'
+import { createMembershipReader } from './memberApi/membership.js'
+import { createWagerReader } from './memberApi/wagers.js'
+import { createAssistantClient } from './memberApi/assistant.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
@@ -110,6 +117,11 @@ async function estimateCostWei(provider, chainCfg, { to, data }, defaultGasLimit
  *   now?: () => number,            // unix seconds
  *   killSwitch?: ReturnType<typeof createKillSwitch>,
  *   auditSink?: (line: string) => void,
+ *   memberApiFetch?: typeof fetch,     // spec 095: subgraph + assistant upstreams
+ *   memberApiRevocations?: object,
+ *   memberApiMembership?: object,
+ *   memberApiWagers?: object,
+ *   memberApiAssistant?: object,
  * }} [deps]
  */
 export function createApp(config, deps = {}) {
@@ -161,7 +173,14 @@ export function createApp(config, deps = {}) {
       res.setHeader('Access-Control-Allow-Origin', origin)
       res.setHeader('Vary', 'Origin')
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+      // `Authorization` is here for the spec-095 member API: a browser cannot send a bearer token
+      // at all unless preflight allows the header, and the SPA's own API-access console and
+      // assistant call these routes cross-origin. It changes nothing for the existing modules —
+      // no route added it as a requirement, no credentials mode is enabled, no cookie is ever set,
+      // the origin allow-list is unchanged, and the X-Origin-Auth edge lock still applies to every
+      // client route. Allowing a request header only permits a browser to SEND it; what it
+      // authorises is decided entirely by the member-signed grant it carries.
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
       res.setHeader('Access-Control-Max-Age', '600')
     }
     if (req.method === 'OPTIONS') return res.status(204).end()
@@ -326,7 +345,11 @@ export function createApp(config, deps = {}) {
     // Perps read-proxy visibility (spec 082, FR-014): venue/attribution config state only —
     // no member data, and the live HL builder bps already surfaces via /v1/perps/config.
     const perps = perpsStatus(config, { killSwitch })
-    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps })
+    // Member API visibility (spec 095): module state + which chains can answer a wager read + whether
+    // the assistant has a credential. No member data, no key material, nothing about any token.
+    // `memberApiAssistant` is declared further down; this closure only runs at request time.
+    const memberApi = memberApiStatus(config, { killSwitch, assistantConfigured: memberApiAssistant.configured })
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi })
   }
   app.get('/healthz', healthHandler)
   app.get('/status', healthHandler)
@@ -746,6 +769,62 @@ export function createApp(config, deps = {}) {
       killSwitch,
       feeRates,
       now: nowMs,
+    })
+  )
+
+  // ---- GET/POST /v1/member/* (spec 095 member API; origin-locked via middleware) ---------------
+  // Member-signed capability tokens granting custody-free, scoped access to a member's OWN data,
+  // plus unsigned typed-data quotes and a conversational assistant. NOTHING here moves value: the
+  // strongest response is a payload the MEMBER then signs, and relaying a signed intent stays on
+  // the existing public POST /v1/intents, which recovers the signer itself.
+  //
+  // Quotas are keyed by the RECOVERED ACCOUNT rather than caller IP — `trust proxy` is unset and
+  // nginx fronts this container, so an IP key would pool every member into one bucket. The two
+  // unauthenticated routes (the OpenAPI document and the self-authorizing revocation) fall back to
+  // an `ip:`-prefixed key in the same instance, where the GLOBAL window is the real bound.
+  //
+  // Mounting is unconditional so a disabled module answers 503 member_api_unconfigured with a
+  // machine-readable code, never a bare 404 — same reasoning as the bitcoin/bridge/perps proxies.
+  const memberApiQuotas = createQuotas({
+    signerPerWindow: config.memberApi.quotaPerAccount,
+    globalPerWindow: config.memberApi.quotaGlobal,
+    windowMs: config.memberApi.quotaWindowMs,
+    now: nowMs,
+  })
+  const memberApiRevocations =
+    deps.memberApiRevocations ??
+    createRevocationStore({
+      maxTtlDays: config.memberApi.maxTtlDays,
+      maxEntries: config.memberApi.revocationMaxEntries,
+      now: nowMs,
+    })
+  const memberApiMembership =
+    deps.memberApiMembership ?? createMembershipReader(config, providers, { now: nowMs })
+  const memberApiWagers =
+    deps.memberApiWagers ??
+    createWagerReader(config, deps.memberApiFetch ? { fetchImpl: deps.memberApiFetch } : {})
+  const memberApiAssistant =
+    deps.memberApiAssistant ??
+    createAssistantClient(config, deps.memberApiFetch ? { fetchImpl: deps.memberApiFetch } : {})
+  app.use(
+    createMemberApiRouter(config, {
+      auth: createMemberAuth(config, {
+        providers,
+        screen,
+        revocations: memberApiRevocations,
+        membership: memberApiMembership,
+        quotas: memberApiQuotas,
+        now,
+      }),
+      revocations: memberApiRevocations,
+      wagerReader: memberApiWagers,
+      assistant: memberApiAssistant,
+      providers,
+      quotas: memberApiQuotas,
+      killSwitch,
+      feeRates,
+      audit,
+      now,
     })
   )
 

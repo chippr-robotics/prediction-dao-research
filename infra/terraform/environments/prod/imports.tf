@@ -114,6 +114,19 @@
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research"
 # }
 
+# `module.mcp_server` (spec 095) has NO import block, and that absence is deliberate rather than an
+# omission: `fairwins-mcp-server` has never been deployed by hand, so there is nothing to adopt. The
+# first apply CREATES it, and its correctness condition is the ordinary one — the plan that follows
+# reports no changes. An import block for a resource that does not exist fails the plan outright.
+#
+# If the service is ever deployed out of band before that apply, adopt it here instead of letting
+# Terraform create a second one:
+#
+# import {
+#   to = module.mcp_server.google_cloud_run_v2_service.this
+#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/fairwins-mcp-server"
+# }
+
 # ── Phase E: edge ─────────────────────────────────────────────────────────────────────────────
 #
 # Adopted LAST, on purpose: both rulesets are authoritative for their phase, so the first apply

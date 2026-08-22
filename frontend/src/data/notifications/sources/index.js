@@ -20,6 +20,9 @@ import { bridgeSource } from './bridgeSource'
 import { liquiditySource } from './liquiditySource'
 // Spec 082: read-only snapshot-diff of the member's open perp positions per venue.
 import { perpsSource } from './perpsSource'
+// Spec 095: API keys minted/withdrawn and the assistant switch. Purely local — no network read, so
+// it can never contribute to the "couldn't refresh" notice.
+import { accessSource } from './accessSource'
 
 export const activitySources = [
   wagerSource,
@@ -33,6 +36,7 @@ export const activitySources = [
   bridgeSource,
   liquiditySource,
   perpsSource,
+  accessSource,
 ]
 
 export default activitySources
