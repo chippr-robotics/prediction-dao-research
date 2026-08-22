@@ -313,6 +313,13 @@ export default defineConfig({
        */
       let chainSnapshotId = null
 
+      /*
+       * Runtime code displaced by `legacyFixture: makeTokenRefuse`, keyed by lowercased address,
+       * so `restoreTokenCode` can put it back. Lives out here with the snapshot id for the same
+       * reason: the plugin process spans the whole `cypress run`.
+       */
+      const originalTokenCode = new Map()
+
       on('task', {
         log(message) {
           console.log(message)
@@ -850,8 +857,8 @@ export default defineConfig({
          * `makeTokenRefuse` is how ONE asset is failed without disturbing the others — see its
          * own comment for why a drained balance cannot do that job.
          *
-         * action ∈ newAccount | makeTokenRefuse | fundNative | mintToken | balances |
-         *          deploymentAddresses
+         * action ∈ newAccount | makeTokenRefuse | restoreTokenCode | fundNative | mintToken |
+         *          balances | deploymentAddresses
          */
         /**
          * Fixtures for bridge + supplied liquidity (spec 067).
@@ -2225,11 +2232,17 @@ export default defineConfig({
                  * Deploy ReentrantToken, copy its RUNTIME code over the token's, and arm it to
                  * re-enter the token itself with an unknown selector — the token has no fallback,
                  * so that call reverts and the transfer reverts with it. Only the code changes:
-                 * ERC-20 storage lives in the same slots, so who holds what is unchanged, and the
-                 * per-spec chain checkpoint puts the original code back.
+                 * ERC-20 storage lives in the same slots, so who holds what is unchanged.
                  *
                  * This is the only way to fail one asset and not the others: `sweepAllAssets`
                  * re-reads balances itself, so emptying a token just drops it from the run.
+                 *
+                 * The original runtime code is captured here and put back by `restoreTokenCode`,
+                 * which the spec calls in an `after` hook. The chain checkpoint is NOT enough on
+                 * its own: it only rewinds within one `cypress run` process, so a node reused for
+                 * a second run starts it with a wrapped coin that refuses every transfer — and the
+                 * spec then fails in LKR-S1, which arms nothing and is innocent. (Reproduced: a
+                 * shard rerun against a node left over from a single-spec run.)
                  */
                 const artifactPath = resolve(
                   __dirname, '..', 'artifacts', 'contracts', 'mocks', 'ReentrantToken.sol', 'ReentrantToken.json',
@@ -2237,6 +2250,11 @@ export default defineConfig({
                 const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'))
                 const deployed = await new ethers.ContractFactory(artifact.abi, artifact.bytecode, funder).deploy()
                 await deployed.waitForDeployment()
+                // Capture BEFORE overwriting, and only the first time: a second arm of the same
+                // token must not record the reentrant code as if it were the original.
+                if (!originalTokenCode.has(tokenAddress.toLowerCase())) {
+                  originalTokenCode.set(tokenAddress.toLowerCase(), await provider.getCode(tokenAddress))
+                }
                 await provider.send('hardhat_setCode', [
                   tokenAddress,
                   await provider.getCode(await deployed.getAddress()),
@@ -2244,6 +2262,14 @@ export default defineConfig({
                 const rc = await (await new ethers.Contract(tokenAddress, ARMED_TOKEN_ABI, funder)
                   .arm(tokenAddress, '0xdeadbeef')).wait(1)
                 return { ok: rc.status === 1, address: tokenAddress }
+              }
+              case 'restoreTokenCode': {
+                // Idempotent: a spec that never armed the token still calls this in `after`.
+                const saved = originalTokenCode.get(tokenAddress.toLowerCase())
+                if (!saved) return { ok: true, restored: false }
+                await provider.send('hardhat_setCode', [tokenAddress, saved])
+                originalTokenCode.delete(tokenAddress.toLowerCase())
+                return { ok: true, restored: true }
               }
               case 'fundNative': {
                 const tx = await funder.sendTransaction({
