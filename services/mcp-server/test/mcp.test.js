@@ -30,7 +30,9 @@ test('initialize answers with the protocol version, all three capabilities, and 
     assert.equal(res.result.protocolVersion, '2025-06-18')
     assert.deepEqual(Object.keys(res.result.capabilities).sort(), ['prompts', 'resources', 'tools'])
     assert.equal(res.result.serverInfo.name, 'fairwins-mcp')
-    assert.match(res.result.serverInfo.version, /^\d+\.\d+\.\d+$/)
+    // The manifest carries no version field (release-computed, spec 076 FR-008; this package is
+    // never published), so an unreleased checkout reports the literal 'unreleased'.
+    assert.match(res.result.serverInfo.version, /^(\d+\.\d+\.\d+|unreleased)$/)
     // The instructions must state the custody position, because a client shows them to the model.
     assert.match(res.result.instructions, /never ask the member for a private key/i)
   })

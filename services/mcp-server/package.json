@@ -10,6 +10,5 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test test/*.test.js"
-  },
-  "version": "1.10.1"
+  }
 }

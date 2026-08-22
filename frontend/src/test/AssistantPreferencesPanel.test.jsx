@@ -5,7 +5,7 @@
  * saying what off MEANS leaves the member to assume. "Off — nothing is sent" is a claim the code
  * has to keep, and this pins it to the actual preference rather than to a label.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
 let walletState

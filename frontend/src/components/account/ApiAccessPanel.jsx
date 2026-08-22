@@ -293,7 +293,7 @@ export default function ApiAccessPanel() {
   )
 
   // --------------------------------------------------------------- summary
-  let summary = 'Members only'
+  let summary
   if (!isConnected || !account) summary = 'Connect a wallet'
   else if (tierPending) summary = 'Checking your membership…'
   else if (membershipUnreadable) summary = 'Membership could not be checked'

@@ -29,6 +29,9 @@ import { startStdioTransport } from './transport/stdio.js'
 import { createHttpTransport } from './transport/http.js'
 
 const PKG = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'))
+// Versions are computed at release time (spec 076, FR-008) and this package is never published,
+// so its manifest deliberately carries NO version field — the running build reports "unreleased".
+const VERSION = PKG.version ?? 'unreleased'
 const DEFAULT_HTTP_PORT = 8790
 
 /** Human-facing output. stderr always — see the header. */
@@ -63,7 +66,7 @@ export function parseArgs(argv = [], env = process.env) {
   return args
 }
 
-const USAGE = `fairwins-mcp ${PKG.version} — the FairWins member API as an MCP server
+const USAGE = `fairwins-mcp ${VERSION} — the FairWins member API as an MCP server
 
 Usage:
   node src/server.js                 speak MCP over stdio (default; what an MCP client spawns)
@@ -87,15 +90,15 @@ export function buildServer({ env = process.env, fetchImpl = globalThis.fetch } 
     token: env.FAIRWINS_API_TOKEN,
     fetchImpl,
     ...(Number.isInteger(timeoutRaw) && timeoutRaw > 0 ? { timeoutMs: timeoutRaw } : {}),
-    userAgent: `fairwins-mcp/${PKG.version}`,
+    userAgent: `fairwins-mcp/${VERSION}`,
   })
 
   const tools = createTools({ api })
   const resources = createResources({ api })
   const prompts = createPrompts()
-  const handler = createMcpHandler({ api, tools, resources, prompts, version: PKG.version })
+  const handler = createMcpHandler({ api, tools, resources, prompts, version: VERSION })
 
-  return { api, tools, resources, prompts, handler, version: PKG.version }
+  return { api, tools, resources, prompts, handler, version: VERSION }
 }
 
 /**
@@ -144,7 +147,7 @@ export async function main({
     return { exitCode: 0 }
   }
   if (args.version) {
-    stdout.write(`${PKG.version}\n`)
+    stdout.write(`${VERSION}\n`)
     return { exitCode: 0 }
   }
 
