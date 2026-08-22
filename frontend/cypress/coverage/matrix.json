@@ -4,7 +4,7 @@
   "specs": [
     {
       "id": "001-cypress-e2e-flows",
-      "title": "Core wager lifecycle (create → accept → resolve → claim/refund)",
+      "title": "Core wager lifecycle (create \u2192 accept \u2192 resolve \u2192 claim/refund)",
       "memberFacing": true,
       "flows": [
         {
@@ -243,16 +243,16 @@
         {
           "id": "compliance.passkey-account-parity",
           "name": "A passkey account meets the same compliance gates as a classic wallet",
-          "status": "absent",
-          "tier": "account-native",
-          "depth": "skipped",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-02",
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-03"
+            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-01",
+            "frontend/cypress/e2e/full/38-passkey-compliance.cy.js::CP-02",
+            "frontend/cypress/e2e/full/38-passkey-compliance.cy.js::CP-03"
           ],
-          "issue": "#1271",
-          "missing": "both tests are PERMANENTLY PENDING and would fail if allowed to run: they gate on PASSKEY_FULL_STACK, which nothing sets, they call a `flagAddress` cypress task that is not registered, and they read a `[data-testid=\"passkey-account-address\"]` the app does not render. The gates themselves ARE covered for classic wallets (compliance.sanctioned-address-refused, compliance.frozen-account-blocked); what is absent is the parity claim for the passkey rail"
+          "note": "CP-01 is no-chain (the entry gate is a browser decision and passkey sign-in needs no chain): it proves the gate is not bypassable by the passkey route, asserted by OCCLUSION rather than absence, and that entering then lets the passkey session complete. CP-02/CP-03 need chain state: screening (SanctionsGuard) and the membership gate. CP-02 grants membership BEFORE flagging so the membership gate cannot explain the refusal, and attributes it to screening by a control \u2014 lifting only the flag makes the pre-submission refusal disappear. It cannot yet assert the refusal's WORDING because the guard's custom error is not decoded (#1292)."
         }
       ]
     },
@@ -675,7 +675,7 @@
           "tests": [
             "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-06"
           ],
-          "missing": "the flow covers what ships — registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does",
+          "missing": "the flow covers what ships \u2014 registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does",
           "issue": "#1268"
         }
       ]
@@ -715,7 +715,7 @@
             "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-02"
           ],
           "issue": "#1228",
-          "missing": "the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for — admission rule 2 puts that half in the on-chain tier"
+          "missing": "the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for \u2014 admission rule 2 puts that half in the on-chain tier"
         }
       ]
     },
@@ -823,7 +823,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "reason": "The gateway is a separate service with its own test suite; driving it from the browser suite would test the deployment, not the product. The member-visible half — the self-submit fallback — is tracked under intents.sign-and-relay."
+          "reason": "The gateway is a separate service with its own test suite; driving it from the browser suite would test the deployment, not the product. The member-visible half \u2014 the self-submit fallback \u2014 is tracked under intents.sign-and-relay."
         }
       ]
     },
@@ -983,7 +983,7 @@
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-03"
           ],
           "issue": "#1271",
-          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
+          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
         },
         {
           "id": "passkey.recover-account",
@@ -996,7 +996,7 @@
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-01",
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-04"
           ],
-          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
+          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
           "issue": "#1271"
         }
       ]
@@ -1186,7 +1186,7 @@
     },
     {
       "id": "050-earn-lending-rewards",
-      "title": "Earn — lending",
+      "title": "Earn \u2014 lending",
       "memberFacing": true,
       "flows": [
         {
@@ -1230,7 +1230,7 @@
           "risk": "custody",
           "tests": [],
           "issue": "#1240",
-          "missing": "the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver). Actually sending a sponsored UserOp needs a live ERC-4337 bundler and the KMS-signed /v1/paymaster endpoint, neither of which any test tier runs — and a stub would assert that the stub was called, not that a member paid nothing"
+          "missing": "the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver). Actually sending a sponsored UserOp needs a live ERC-4337 bundler and the KMS-signed /v1/paymaster endpoint, neither of which any test tier runs \u2014 and a stub would assert that the stub was called, not that a member paid nothing"
         },
         {
           "id": "paymaster.fallback-disclosed",
@@ -1374,7 +1374,7 @@
     },
     {
       "id": "055-collectibles-portfolio",
-      "title": "Collect — buy side",
+      "title": "Collect \u2014 buy side",
       "memberFacing": true,
       "flows": [
         {
@@ -1393,7 +1393,7 @@
     },
     {
       "id": "056-collectibles-sell-side",
-      "title": "Collect — sell side",
+      "title": "Collect \u2014 sell side",
       "memberFacing": true,
       "flows": [
         {
@@ -1411,7 +1411,7 @@
     },
     {
       "id": "057-predict-polymarket",
-      "title": "Predict — Polymarket",
+      "title": "Predict \u2014 Polymarket",
       "memberFacing": true,
       "flows": [
         {
@@ -1435,7 +1435,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "reason": "The order book is a third-party venue with no local stand-in; the member-visible half — quoting, fee disclosure and the Polygon-only gate — is drivable and tracked as predict.builder-fee-disclosed."
+          "reason": "The order book is a third-party venue with no local stand-in; the member-visible half \u2014 quoting, fee disclosure and the Polygon-only gate \u2014 is drivable and tracked as predict.builder-fee-disclosed."
         },
         {
           "id": "predict.hidden-off-polygon",
@@ -1751,7 +1751,7 @@
     },
     {
       "id": "068-protect-multi-chain-policies",
-      "title": "Protect — policy v2",
+      "title": "Protect \u2014 policy v2",
       "memberFacing": true,
       "flows": [
         {
@@ -2132,7 +2132,7 @@
       "flows": [
         {
           "id": "verify.three-verdicts",
-          "name": "Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout",
+          "name": "Verify a signature and get valid, invalid, or unverifiable \u2014 never a forged-looking result from an RPC timeout",
           "status": "covered",
           "tier": "no-chain",
           "proposedTier": "no-chain",
@@ -2279,7 +2279,7 @@
       "flows": [
         {
           "id": "admin.control-room-gating",
-          "name": "An operator sees granted, denied, or could-not-verify — never a silent denial",
+          "name": "An operator sees granted, denied, or could-not-verify \u2014 never a silent denial",
           "status": "covered",
           "tier": "no-chain",
           "depth": "settled",
@@ -2328,7 +2328,7 @@
           "tests": [
             "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-01"
           ],
-          "note": "default OFF is the absence of the feature, not a UI state, so it is proved by absence at both ends — before the switch and after it is switched back"
+          "note": "default OFF is the absence of the feature, not a UI state, so it is proved by absence at both ends \u2014 before the switch and after it is switched back"
         },
         {
           "id": "assistant.honest-unreachable",
@@ -2340,7 +2340,7 @@
           "tests": [
             "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-02"
           ],
-          "note": "no intercept — the no-chain dev server points VITE_RELAYER_URL at a dead port, so the transport failure is real; the test asserts the named error, the retry, and the ABSENCE of an assistant bubble"
+          "note": "no intercept \u2014 the no-chain dev server points VITE_RELAYER_URL at a dead port, so the transport failure is real; the test asserts the named error, the retry, and the ABSENCE of an assistant bubble"
         },
         {
           "id": "assistant.memory-clear",
@@ -2365,7 +2365,7 @@
             "frontend/cypress/e2e/fast/39-api-access.cy.js::API-01",
             "frontend/cypress/e2e/fast/39-api-access.cy.js::API-05"
           ],
-          "note": "cy.assertNoClearSecret sweeps every storage key and the whole DOM after the reveal is dismissed; the metadata record is re-read after a reload. API-05 holds the three-state gate in both directions — an unreadable membership offers a retry, a chain that answered tier 0 offers the upgrade route, and neither is the console."
+          "note": "cy.assertNoClearSecret sweeps every storage key and the whole DOM after the reveal is dismissed; the metadata record is re-read after a reload. API-05 holds the three-state gate in both directions \u2014 an unreadable membership offers a retry, a chain that answered tier 0 offers the upgrade route, and neither is the console."
         },
         {
           "id": "api-access.revoke-key",
@@ -2390,7 +2390,7 @@
           "tests": [
             "frontend/cypress/e2e/fast/39-api-access.cy.js::API-04"
           ],
-          "missing": "Only the HOST card is exercised — the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them.",
+          "missing": "Only the HOST card is exercised \u2014 the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them.",
           "issue": "#1285"
         }
       ]
