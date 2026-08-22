@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
 | Member-facing flows | 131 |
-| 🟢 covered | 119 |
+| 🟢 covered | 120 |
 | 🟡 partial | 1 |
-| 🔴 absent | 5 |
+| 🔴 absent | 4 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -456,7 +456,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 31 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 32 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -486,7 +486,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `notifications.wager-state-change` | Be notified when a wager you are in changes state | 🔴 absent | none | — (proposed: on-chain) | #1245 |  |
+| `notifications.wager-state-change` | Be notified when a wager you are in changes state | 🟢 covered | flow | `on-chain` | `36-wager-notifications.cy.js` (NOT-01, NOT-02) |  |
 
 ### `013-polymarket-search-filter` — Polymarket search and filter
 

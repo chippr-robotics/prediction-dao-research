@@ -344,13 +344,14 @@
         {
           "id": "notifications.wager-state-change",
           "name": "Be notified when a wager you are in changes state",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/full/36-wager-notifications.cy.js::NOT-01",
+            "frontend/cypress/e2e/full/36-wager-notifications.cy.js::NOT-02"
+          ]
         }
       ]
     },
