@@ -5,7 +5,7 @@
   "description": "FairWins intent relay gateway (spec 036): policy front-end for the OSS submission engine. Recovers/screens the SIGNER, validates intent binding, dedups, rate-limits, then hands built calldata to OpenZeppelin Relayer. Untrusted-by-design: can censor, never steal.",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "main": "src/server.js",
   "scripts": {
