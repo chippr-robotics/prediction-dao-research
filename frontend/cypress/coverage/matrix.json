@@ -197,17 +197,14 @@
         {
           "id": "compliance.accept-terms-before-entry",
           "name": "Read and accept the versioned terms before reaching the app",
-          "status": "absent",
-          "tier": "account-native",
-          "depth": "skipped",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-01",
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-02",
-            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-03"
-          ],
-          "issue": "#1271",
-          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::CG-01",
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::CG-02"
+          ]
         },
         {
           "id": "compliance.sanctioned-address-refused",
@@ -244,6 +241,20 @@
             "frontend/cypress/e2e/full/19-paused-protocol.cy.js::PAU-01",
             "frontend/cypress/e2e/full/19-paused-protocol.cy.js::PAU-02"
           ]
+        },
+        {
+          "id": "compliance.passkey-account-parity",
+          "name": "A passkey account meets the same compliance gates as a classic wallet",
+          "status": "absent",
+          "tier": "account-native",
+          "depth": "skipped",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-02",
+            "frontend/cypress/e2e/passkey/compliance.cy.js::CP-03"
+          ],
+          "issue": "#1271",
+          "missing": "both tests are PERMANENTLY PENDING and would fail if allowed to run: they gate on PASSKEY_FULL_STACK, which nothing sets, they call a `flagAddress` cypress task that is not registered, and they read a `[data-testid=\"passkey-account-address\"]` the app does not render. The gates themselves ARE covered for classic wallets (compliance.sanctioned-address-refused, compliance.frozen-account-blocked); what is absent is the parity claim for the passkey rail"
         }
       ]
     },
@@ -353,13 +364,13 @@
         {
           "id": "predict.search-markets",
           "name": "Search and filter Polymarket markets when choosing a condition",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "information",
-          "tests": [],
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::PR-01"
+          ]
         }
       ]
     },
@@ -556,13 +567,13 @@
         {
           "id": "oracle.graph-unavailable-degrades",
           "name": "See an honest degraded state when the oracle index is unreachable",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1245"
+          "tests": [
+            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::OG-01"
+          ]
         }
       ]
     },
@@ -700,13 +711,14 @@
           "name": "Back up local data encrypted and restore it on another device",
           "status": "partial",
           "tier": "no-chain",
-          "depth": "smoke",
+          "depth": "flow",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-01"
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-01",
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-02"
           ],
-          "issue": "#1245",
-          "missing": "asserts the surface renders and prints no key material; the encrypt/restore round-trip itself is not driven"
+          "issue": "#1228",
+          "missing": "the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for — admission rule 2 puts that half in the on-chain tier"
         }
       ]
     },
@@ -1220,18 +1232,20 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "issue": "#1240"
+          "issue": "#1240",
+          "missing": "the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver). Actually sending a sponsored UserOp needs a live ERC-4337 bundler and the KMS-signed /v1/paymaster endpoint, neither of which any test tier runs — and a stub would assert that the stub was called, not that a member paid nothing"
         },
         {
           "id": "paymaster.fallback-disclosed",
           "name": "When sponsorship is unavailable, be told honestly that you are paying the fee",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "account-native",
-          "depth": "none",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
           "risk": "disclosure",
-          "tests": [],
-          "issue": "#1240"
+          "tests": [
+            "frontend/cypress/e2e/passkey/paymaster-disclosure.cy.js::PM-01",
+            "frontend/cypress/e2e/passkey/paymaster-disclosure.cy.js::PM-02"
+          ]
         }
       ]
     },
@@ -1369,13 +1383,14 @@
         {
           "id": "collect.browse-and-buy",
           "name": "Browse collectibles and buy one",
-          "status": "partial",
+          "status": "covered",
           "tier": "no-chain",
-          "depth": "none",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "missing": "nothing drives the buy side at any tier; the OpenSea order itself is out of scope but the disclosure and confirm path is drivable",
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::CO-01",
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::CO-03"
+          ]
         }
       ]
     },
@@ -1387,13 +1402,13 @@
         {
           "id": "collect.list-for-sale",
           "name": "List a collectible for sale and see the fee disclosure",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "disclosure",
-          "tests": [],
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::CO-02"
+          ]
         }
       ]
     },
@@ -1405,13 +1420,14 @@
         {
           "id": "predict.builder-fee-disclosed",
           "name": "See the additive builder fee as its own line before signing an order",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "disclosure",
-          "tests": [],
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::PR-02",
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::PR-04"
+          ]
         },
         {
           "id": "predict.place-order",
@@ -1427,13 +1443,13 @@
         {
           "id": "predict.hidden-off-polygon",
           "name": "See the Predict tab hidden on a chain Polymarket does not serve",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1239"
+          "tests": [
+            "frontend/cypress/e2e/fast/37-predict-and-collect.cy.js::PR-03"
+          ]
         }
       ]
     },
@@ -1536,24 +1552,25 @@
         {
           "id": "bitcoin.receive-address-rotates",
           "name": "Get a fresh receive address that is never reissued",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1243"
+          "tests": [
+            "frontend/cypress/e2e/passkey/bitcoin-receive.cy.js::BTC-01",
+            "frontend/cypress/e2e/passkey/bitcoin-receive.cy.js::BTC-02"
+          ]
         },
         {
           "id": "bitcoin.fee-quote-expiry",
           "name": "Be refused a stale fee quote rather than signing at the wrong fee",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
           "risk": "disclosure",
-          "tests": [],
-          "issue": "#1243"
+          "tests": [
+            "frontend/cypress/e2e/passkey/bitcoin-send-fee.cy.js::BTC-03"
+          ]
         }
       ]
     },
@@ -1601,16 +1618,14 @@
         {
           "id": "recovery.sweep-across-chains",
           "name": "Sweep a recovered account on more than one chain",
-          "status": "partial",
+          "status": "covered",
           "tier": "no-chain",
-          "proposedTier": "on-chain",
           "depth": "flow",
           "risk": "custody",
           "tests": [
-            "frontend/cypress/e2e/fast/28-legacy-recovery.cy.js::LKR-05"
-          ],
-          "missing": "the SEND is never driven — discovery finds the Solana funds and offers the control, but no SOL or BTC leaves the account; retiered from the proposed on-chain because both venues are non-EVM and reached over HTTP",
-          "issue": "#1228"
+            "frontend/cypress/e2e/fast/28-legacy-recovery.cy.js::LKR-05",
+            "frontend/cypress/e2e/fast/28-legacy-recovery.cy.js::LKR-06"
+          ]
         }
       ]
     },
@@ -2073,15 +2088,14 @@
         {
           "id": "perps.degraded-venue-named",
           "name": "A degraded venue is named and its pairs omitted, never shown as zeros",
-          "status": "partial",
+          "status": "covered",
           "tier": "no-chain",
-          "depth": "smoke",
+          "depth": "flow",
           "risk": "information",
           "tests": [
-            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-04"
-          ],
-          "missing": "no assertion proves a missing metric renders as an em dash rather than a zero, which is the invariant the spec turns on",
-          "issue": "#1244"
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-01",
+            "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-06"
+          ]
         }
       ]
     },
@@ -2135,14 +2149,13 @@
         {
           "id": "verify.refused-while-operating-as-vault",
           "name": "Be refused message signing while acting as a vault",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "access",
-          "tests": [],
-          "issue": "#1274",
-          "missing": "the refusal itself is one client-side branch, but reaching it needs a vault, operate-as mode (offered only in TransferForm) and in-app navigation that preserves the memory-only active identity — a test-reachability problem, not a product one"
+          "tests": [
+            "frontend/cypress/e2e/fast/30-verify-message.cy.js::VF-03"
+          ]
         }
       ]
     },
@@ -2211,14 +2224,14 @@
       "flows": [
         {
           "id": "account.act-immediately-after-create",
-          "name": "Act on a newly created account without waiting for a deploy",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "account-native",
-          "depth": "none",
+          "name": "Switch to an acting account and use it immediately, with no ceremony at switch time",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1240"
+          "tests": [
+            "frontend/cypress/e2e/fast/33-account-surfaces.cy.js::AA-01"
+          ]
         }
       ]
     },
@@ -2251,15 +2264,14 @@
         {
           "id": "activity.multi-chain-history",
           "name": "See activity across chains, with an unreadable chain named rather than empty",
-          "status": "partial",
+          "status": "covered",
           "tier": "no-chain",
           "depth": "flow",
           "risk": "information",
           "tests": [
-            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::MC-01"
-          ],
-          "issue": "#1280",
-          "missing": "the empty-state honesty is covered; the all-networks-unreachable disclosure is NOT — under a total RPC refusal the panel renders \"No activity yet\" and \"Updated 50s ago\" (#1280), and whether that is a product bug or an unmodelled stub is unresolved. The per-network filter renders over entries, so it needs seeded history."
+            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::MC-01",
+            "frontend/cypress/e2e/fast/36-activity-and-oracle-gating.cy.js::MC-02"
+          ]
         }
       ]
     },

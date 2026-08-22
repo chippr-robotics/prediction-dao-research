@@ -57,10 +57,23 @@ function MyAccountView() {
   // snapshot cache warms — the moment My Account opens, whichever view shows.
   const portfolio = usePortfolio(isActingAccount ? { accountAddress: actingAddress } : undefined)
   const activeTotalUsd = portfolio.status === 'ready' ? portfolio.totalUsd : null
+  /*
+   * The list-valued fields are defaulted HERE, once, rather than guarded at each use.
+   *
+   * This component is rendered by several suites that mock `useAccountStats` with only the fields
+   * their own assertion needs, and a bare `x.length` on a field a mock happened to omit throws
+   * during render — which does not fail one assertion, it takes down every test that renders the
+   * Account section. That is how a ledger change broke mini-app deep-link and collectibles tests
+   * (#1280 follow-up). Defaulting at the seam makes a partial mock a partial mock, not a crash.
+   */
   const {
-    summary, series, setRange, breakdowns, activity, staleClasses, prunedByChain,
-    partialChains, chainId, isLoading, isEmpty, error, freshness, refresh,
+    summary, series, setRange, breakdowns, chainId, isLoading, isEmpty, error, freshness, refresh,
+    activity: activityRaw, staleClasses: staleClassesRaw, prunedByChain,
+    partialChains: partialChainsRaw,
   } = stats
+  const activity = activityRaw || []
+  const staleClasses = staleClassesRaw || []
+  const partialChains = partialChainsRaw || []
 
   const handleDisconnect = () => {
     disconnectWallet()
@@ -94,12 +107,30 @@ function MyAccountView() {
   // could not be read is disclosed by name instead (`partialChains`), and an
   // all-chains failure surfaces the hook's error with last-known data kept.
   const allNetworksFailed = Boolean(error) && partialChains.length > 0 && activity.length === 0
+  /*
+   * An empty feed is only "no activity" if everything that feeds it answered.
+   *
+   * The ledger gathers its sources per chain with `allSettled`, so a member whose on-chain reads
+   * all failed while their device-local sources answered "nothing" lands here with zero entries
+   * and a populated `staleClasses` — and used to be shown the clean empty state, which says
+   * "your wagers, transfers, earn, pool, and membership activity will appear here" and so claims
+   * every one of those was checked. The classes that failed are named instead (#1280).
+   */
+  const partiallyUnread = staleClasses.length > 0
   const activityHonestState = () => {
     if (allNetworksFailed) {
       return (
         <EmptyState
           title="Your networks could not be read"
           message={`None of your networks answered: ${partialChains.join(', ')}. Nothing is shown rather than an empty history that isn't true.`}
+        />
+      )
+    }
+    if (isEmpty && partiallyUnread) {
+      return (
+        <EmptyState
+          title="Some of your history could not be read"
+          message={`Nothing is shown for ${staleClasses.join(', ')} — those could not be read just now, so an empty history would not be true. Anything else recorded for this account is already here.`}
         />
       )
     }
@@ -131,6 +162,15 @@ function MyAccountView() {
           compact
           title="Your networks could not be read"
           message={`None of your networks answered: ${partialChains.join(', ')}. Figures are withheld rather than shown as zeros.`}
+        />
+      )
+    }
+    if (isEmpty && partiallyUnread) {
+      return (
+        <EmptyState
+          compact
+          title="Some of your history could not be read"
+          message={`Figures exclude ${staleClasses.join(', ')} — those could not be read just now, so they are withheld rather than counted as zero.`}
         />
       )
     }

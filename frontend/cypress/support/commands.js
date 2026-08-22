@@ -1360,7 +1360,23 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
   return originalFn(url, {
     ...rest,
     onBeforeLoad(win) {
-      if (acknowledgeEntryGate) {
+      /*
+       * THREE states, not two.
+       *
+       *   true (default) — seed an acknowledgement, so the gate never covers the surface a spec
+       *                    is actually about.
+       *   false          — clear it, so the spec meets a browser that has never entered.
+       *   'preserve'     — leave whatever is there alone.
+       *
+       * The third exists because the second made one thing untestable: whether entering ONCE is
+       * enough. A spec that pressed Enter and then re-visited with `false` had its own
+       * acknowledgement wiped on load, so the gate reappeared no matter what the app did — the
+       * "returning visitor" assertion could not fail, and its mirror image ("declining still
+       * asks next time") could not fail either. Both are the point of an entry gate.
+       */
+      if (acknowledgeEntryGate === 'preserve') {
+        // deliberately neither seed nor clear
+      } else if (acknowledgeEntryGate) {
         try {
           win.localStorage.setItem(ENTRY_GATE_ACK_KEY, JSON.stringify(entryGateAckRecord()))
         } catch {

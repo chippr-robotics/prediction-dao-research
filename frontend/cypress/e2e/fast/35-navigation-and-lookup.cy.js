@@ -190,4 +190,45 @@ describe('Getting around, and finding a wager (specs 081 / 064 / 037 / 032)', ()
       expect(text, 'a private key must never be rendered').to.not.match(/0x[0-9a-fA-F]{64}/)
     })
   })
+
+  it('[BK-02] backup.encrypted-sync-roundtrip — a pointer read that did not complete is not reported as "no backup"', () => {
+    /*
+     * Spec 032's status read, and the estate rule applied to the one thing a member checks this
+     * screen for.
+     *
+     * `readPointer` deliberately separates "" (this wallet genuinely has no pointer) from `null`
+     * (the canonical network did not answer). Collapsing them is not a cosmetic inaccuracy,
+     * because the two states have OPPOSITE remedies: a member told they have no backup pays gas
+     * to record one they may already have, or gives up on restoring one that exists.
+     *
+     * Every chain read is refused here, so the pointer read cannot settle. What the panel must
+     * NOT do is answer the question anyway.
+     */
+    chainWorld('refuse')
+    connect()
+    cy.visit('/wallet?tab=security')
+    waitForAccount()
+
+    cy.get('#backup-header', { timeout: 40000 }).should('exist').click()
+
+    cy.get('.backup-panel', { timeout: 20000 }).should(($p) => {
+      const text = $p.text()
+      expect(text, 'an unsettled read is disclosed as one').to.match(/Couldn.t check/i)
+      expect(text, 'and is never rendered as a known absence').to.not.match(/None found/i)
+      // The consequences-of-having-none warning is a claim about having none.
+      expect(text, 'no consequences are asserted for an absence nobody established').to.not.match(
+        /Without a backup/i,
+      )
+    })
+
+    // The attention badge is earned by a KNOWN absence. "Not backed up" over a failed read is the
+    // app telling a member something untrue about their own safety net.
+    cy.get('.backup-panel, .accordion-section').should('not.contain.text', 'Not backed up')
+
+    // Still no secret material anywhere on the surface (the original BK-01 claim, unchanged).
+    cy.get('.tab-content').should(($c) => {
+      expect($c.text(), 'a private key must never be rendered').to.not.match(/0x[0-9a-fA-F]{64}/)
+    })
+  })
+
 })

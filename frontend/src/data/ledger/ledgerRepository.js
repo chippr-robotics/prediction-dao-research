@@ -109,7 +109,8 @@ export function compareEntries(a, b) {
 export function createLedgerRepository({ sources = [], enrich = defaultEnrich, getPrunedBefore } = {}) {
   /**
    * @param {object} q - { account, chainId, filter?, period?, provider?, signal? }
-   * @returns {Promise<{entries: Array, staleClasses: string[], prunedBefore: number|null}>}
+   * @returns {Promise<{entries: Array, staleClasses: string[], prunedBefore: number|null,
+   *                     readState: 'read'|'unreadable'}>}
    */
   async function listEntries(q) {
     const ctx = { account: String(q.account || '').toLowerCase(), chainId: Number(q.chainId) }
@@ -143,9 +144,27 @@ export function createLedgerRepository({ sources = [], enrich = defaultEnrich, g
     const filtered = enriched.filter((e) => matchesFilter(e, q.filter) && inPeriod(e, q.period))
     filtered.sort(compareEntries)
 
+    /*
+     * READ vs UNREADABLE, and why this is not just `staleClasses` again.
+     *
+     * Sources are gathered with `allSettled` so ONE bad source degrades to stale instead of
+     * poisoning the whole ledger — which is right, and is why this function does not throw. But it
+     * means a chain whose sources ALL failed returns exactly what a chain with nothing on it
+     * returns: an empty array. The caller then has no way to tell "this account has no history
+     * here" from "we could not ask", and every caller downstream rendered the first.
+     *
+     * A partial failure is already disclosed by `staleClasses`. A TOTAL one is a different fact:
+     * there is no basis for any statement about this chain at all. `sources.length > 0` matters —
+     * a chain with no sources configured has nothing to fail, and is genuinely empty rather than
+     * unreadable.
+     */
+    const readState =
+      sources.length > 0 && staleClasses.length === sources.length ? 'unreadable' : 'read'
+
     return {
       entries: filtered,
       staleClasses,
+      readState,
       prunedBefore: typeof getPrunedBefore === 'function' ? getPrunedBefore(ctx) ?? null : null }
   }
 

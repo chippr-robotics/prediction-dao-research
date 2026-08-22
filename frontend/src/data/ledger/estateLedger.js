@@ -45,6 +45,17 @@ export function createEstateLedger({ listEntries, readProviderFor, isInCohort, c
         }
         try {
           const res = await listEntries({ account: q.account, chainId, provider })
+          /*
+           * `listEntries` does not throw when a chain's sources fail — it gathers them with
+           * `allSettled` so one bad source degrades to stale rather than taking the ledger down.
+           * A chain whose sources ALL failed therefore arrives here looking exactly like a chain
+           * with no history: an empty array. Reporting that as `read` is what made the
+           * every-chain-unreachable disclosure unreachable in practice (#1280) — the panel said
+           * "No activity yet" about networks it had not managed to read.
+           */
+          if (res.readState === 'unreadable') {
+            return { chainId, state: 'unreachable', reason: 'no source on this network could be read' }
+          }
           return {
             chainId,
             state: 'read',

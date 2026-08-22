@@ -191,4 +191,87 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
     cy.contains('a', 'Privacy Policy', { timeout: 40000 }).should('have.attr', 'href', '/privacy')
     cy.contains('a', 'Terms & Conditions').should('have.attr', 'href', '/terms')
   })
+
+  it('[CG-01] compliance.accept-terms-before-entry — the gate blocks entry, and records WHICH text was agreed to', () => {
+    /*
+     * Spec 007. The entry gate is a legal control, and the thing that makes it one rather than a
+     * splash screen is the record it leaves: an acknowledgement that does not say which version of
+     * the Terms it covers proves nothing later, because the text it referred to can be edited
+     * afterwards. MS-05 asserts the policies carry their hashes; this asserts the ACK carries them
+     * too — the same fact from the other end.
+     *
+     * `acknowledgeEntryGate: false` opts out of the suite-wide seed. Every other spec in this tier
+     * pre-acknowledges so the gate does not sit over the surface under test; this one exists to
+     * meet a browser that has never entered.
+     */
+    cy.visit('/fairwins', { acknowledgeEntryGate: false })
+
+    const gate = () => cy.get('[role="dialog"][aria-labelledby="entry-gate-title"]', { timeout: 40000 })
+    gate().should('be.visible')
+
+    // What is being confirmed is stated, not buried behind a link: age, jurisdiction, sanctions,
+    // and that the member — not FairWins — is responsible for their local law.
+    gate().should('contain.text', '21 years old')
+    gate().should('contain.text', 'restricted jurisdiction')
+    gate().should('contain.text', 'sanctions')
+    // Self-custody is disclosed here, before entry, rather than only in the Terms.
+    gate().should('contain.text', 'never your counterparty')
+
+    // The gate is MODAL. A member who has not entered cannot reach the app behind it.
+    gate().should('have.attr', 'aria-modal', 'true')
+
+    cy.contains('button', /^Enter$/).click()
+    gate().should('not.exist')
+
+    /*
+     * The record. `terms` and `risk` carry the version hashes of the exact documents shown — the
+     * whole point of the acknowledgement.
+     */
+    cy.window().then((win) => {
+      const raw = win.localStorage.getItem('fairwins.entryGate.ack.v1')
+      expect(raw, 'entering recorded an acknowledgement').to.be.a('string')
+      const ack = JSON.parse(raw)
+      expect(ack.at, 'the acknowledgement is timestamped').to.be.a('string')
+      expect(
+        ack.terms || ack.risk,
+        'the acknowledgement names the policy version it covers, not just that something was agreed',
+      ).to.be.a('string')
+    })
+
+    /*
+     * Entering ONCE is enough: a returning visit is not re-gated.
+     *
+     * `'preserve'` is what makes this assertion capable of failing. `false` clears the key on
+     * load, so the gate would reappear whatever the app did, and `true` seeds one, so it would
+     * be absent whatever the app did. Only leaving the member's own record alone tests the app.
+     */
+    cy.visit('/fairwins', { acknowledgeEntryGate: 'preserve' })
+    cy.get('[role="dialog"][aria-labelledby="entry-gate-title"]').should('not.exist')
+  })
+
+  it('[CG-02] compliance.accept-terms-before-entry — declining records nothing, and never reads as consent', () => {
+    /*
+     * The half that matters legally. "Leave" is a refusal, and a refusal that writes an
+     * acknowledgement — or that lets the next visit through — would be the app recording consent
+     * the member explicitly withheld.
+     */
+    cy.clearLocalStorage()
+    cy.visit('/fairwins', { acknowledgeEntryGate: false })
+    cy.get('[role="dialog"][aria-labelledby="entry-gate-title"]', { timeout: 40000 }).should('be.visible')
+
+    cy.contains('button', /^Leave$/).click()
+
+    cy.window().then((win) => {
+      expect(
+        win.localStorage.getItem('fairwins.entryGate.ack.v1'),
+        'declining wrote no acknowledgement',
+      ).to.equal(null)
+    })
+
+    // And coming back still asks. A refusal is not a smaller yes — and `'preserve'` is again what
+    // makes that provable: under `false` the gate would show because the harness cleared the key.
+    cy.visit('/fairwins', { acknowledgeEntryGate: 'preserve' })
+    cy.get('[role="dialog"][aria-labelledby="entry-gate-title"]', { timeout: 40000 }).should('be.visible')
+  })
+
 })

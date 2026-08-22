@@ -602,7 +602,7 @@ jobs:
           CYPRESS_PASSKEY_ENABLED: ${{ matrix.viewport == 'desktop' && '1' || '' }}
         run: |
           set -o pipefail
-          npx start-server-and-test dev http://localhost:5173 'cypress run --spec "${{ steps.specs.outputs.specs }}" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
+          npx start-server-and-test dev:fast http://localhost:5173 'cypress run --spec "${{ steps.specs.outputs.specs }}" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
 
       - name: Summarize E2E results
         if: always()

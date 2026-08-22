@@ -14,6 +14,7 @@
  */
 import { createReportDataSource } from '../../reports/reportDataSource'
 import { getDefaultWagerRepository } from '../../wagers/WagerRepository'
+import { getContractAddressForChain } from '../../../config/contracts'
 import { deriveTransfersFromWagers } from '../../../lib/account/deriveTransfers'
 import { hydrateWagerTimestamps } from '../timestamps'
 import { subgraphEntryId, derivedWagerEntryId, wagerDedupKey } from '../identity'
@@ -96,6 +97,23 @@ export function createWagerLedgerSource(deps = {}) {
   return {
     class: LEDGER_CLASS.WAGER,
     async list({ account, chainId, provider }) {
+      /*
+       * NOT DEPLOYED is not the same as COULD NOT BE READ (the estate rule; `loadWagersAcrossEstate`
+       * has always made this distinction and this source did not).
+       *
+       * With no escrow on a chain there is no wager history there to have — it is a knowable,
+       * complete absence. Left to fall through, `RegistrySource` throws "wagerRegistry not deployed
+       * on chain N", the repository catches it as a failed source, and the class is reported stale:
+       * the app then tells the member their wager history on Ethereum could not be read, when what
+       * is true is that FairWins wagers do not exist there. Naming a gap that is not one is the
+       * same error as hiding one that is.
+       */
+      const escrowConfigured = Boolean(
+        getContractAddressForChain('wagerRegistry', chainId) ||
+        getContractAddressForChain('friendGroupMarketFactory', chainId),
+      )
+      if (!escrowConfigured) return []
+
       const listTransfers =
         deps.listTransfers ||
         ((q) => createReportDataSource({ chainId, provider }).listTransfers(q))

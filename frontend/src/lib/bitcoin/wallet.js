@@ -121,6 +121,17 @@ export function createBitcoinWallet({
     const state = load()
     const allUtxos = []
     let anyStale = false
+    /*
+     * Everything THIS scan finds, tracked separately from `state`.
+     *
+     * `state` is read once, before a long series of awaited gateway round trips. Writing it back
+     * wholesale at the end discards anything issued during them — and the thing most likely to be
+     * issued during them is a receive address, because discovery runs on unlock and the receive
+     * surface is what the member opened. The cursor would then go BACKWARDS, and the next
+     * issuance would hand out an address already shown: the one guarantee this wallet makes.
+     * A merge at write time is the whole fix (see `save` below).
+     */
+    const discoveredThisScan = []
 
     for (const type of types) {
       const known = new Map(
@@ -164,6 +175,7 @@ export function createBitcoinWallet({
               }
               known.set(i, discovered)
               state.issued = [...state.issued, discovered]
+              discoveredThisScan.push(discovered)
             }
             for (const u of entry.utxos ?? []) {
               allUtxos.push({ ...u, address, scriptType: type === 'taproot' ? 'p2tr' : 'p2wpkh' })
@@ -177,8 +189,20 @@ export function createBitcoinWallet({
       }
     }
 
-    save(state)
-    return { ok: !anyStale, stale: anyStale, addresses: state.issued.slice(), utxos: allUtxos }
+    /*
+     * MERGE, never overwrite. Re-read the ledger as it stands NOW and append only what this scan
+     * discovered and the ledger does not already have. `preferredType` is taken from the current
+     * state too — a member who switched type while the scan was in flight chose that after we
+     * read ours.
+     */
+    const latest = load()
+    const have = new Set(latest.issued.map((a) => `${a.type}:${a.index}`))
+    latest.issued = [
+      ...latest.issued,
+      ...discoveredThisScan.filter((a) => !have.has(`${a.type}:${a.index}`)),
+    ]
+    save(latest)
+    return { ok: !anyStale, stale: anyStale, addresses: latest.issued.slice(), utxos: allUtxos }
   }
 
   return {

@@ -28,10 +28,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 96 |
 | With a member-facing flow | 79 |
-| Member-facing flows | 130 |
-| 🟢 covered | 101 |
-| 🟡 partial | 8 |
-| 🔴 absent | 15 |
+| Member-facing flows | 131 |
+| 🟢 covered | 116 |
+| 🟡 partial | 4 |
+| 🔴 absent | 5 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 36 · 🟡 5 · 🔴 4 · ⚪ 6 · covered-but-not-proven 0
+51 flows — 🟢 40 · 🟡 3 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -158,7 +158,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `paymaster.sponsored-userop` | Send a passkey transaction with the fee sponsored | 🔴 absent | none | — (proposed: account-native) | #1240 |  |
+| `paymaster.sponsored-userop` | Send a passkey transaction with the fee sponsored | 🔴 absent | none | — (proposed: account-native) | #1240 | the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver). Actually sending a sponsored UserOp needs a live ERC-4337 bundler and the KMS-signed /v1/paymaster endpoint, neither of which any test tier runs — and a stub would assert that the stub was called, not that a member paid nothing |
 
 ### `052-payments-style-wager-create` — Payments-style wager create
 
@@ -176,7 +176,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `collect.browse-and-buy` | Browse collectibles and buy one | 🟡 partial | none | `no-chain` | #1239 | nothing drives the buy side at any tier; the OpenSea order itself is out of scope but the disclosure and confirm path is drivable |
+| `collect.browse-and-buy` | Browse collectibles and buy one | 🟢 covered | flow | `no-chain` | `37-predict-and-collect.cy.js` (CO-01, CO-03) |  |
 
 ### `057-predict-polymarket` — Predict — Polymarket
 
@@ -195,7 +195,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `bitcoin.send` | Send bitcoin, paying the network fee you confirmed | ⚪ out-of-scope | none | — (proposed: on-chain) | — | No local regtest node exists in the harness, so nothing can settle a Bitcoin send. Standing up one is the work; until then this is a named gap rather than a silent skip. |
-| `bitcoin.receive-address-rotates` | Get a fresh receive address that is never reissued | 🔴 absent | none | — (proposed: no-chain) | #1243 |  |
+| `bitcoin.receive-address-rotates` | Get a fresh receive address that is never reissued | 🟢 covered | flow | `account-native` | `bitcoin-receive.cy.js` (BTC-01, BTC-02) |  |
 
 ### `062-legacy-account-recovery` — Legacy account recovery
 
@@ -208,7 +208,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `recovery.sweep-across-chains` | Sweep a recovered account on more than one chain | 🟡 partial | flow | `no-chain` | `28-legacy-recovery.cy.js` (LKR-05) | the SEND is never driven — discovery finds the Solana funds and offers the control, but no SOL or BTC leaves the account; retiered from the proposed on-chain because both venues are non-EVM and reached over HTTP |
+| `recovery.sweep-across-chains` | Sweep a recovered account on more than one chain | 🟢 covered | flow | `no-chain` | `28-legacy-recovery.cy.js` (LKR-05, LKR-06) |  |
 
 ### `065-liquid-delegated-staking` — Liquid delegated staking
 
@@ -261,17 +261,17 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `account.act-immediately-after-create` | Act on a newly created account without waiting for a deploy | 🔴 absent | none | — (proposed: account-native) | #1240 |  |
+| `account.act-immediately-after-create` | Switch to an acting account and use it immediately, with no ceremony at switch time | 🟢 covered | flow | `no-chain` | `33-account-surfaces.cy.js` (AA-01) |  |
 
 ## Disclosure — a member consents to a cost
 
-9 flows — 🟢 5 · 🟡 0 · 🔴 4 · ⚪ 0 · covered-but-not-proven 0
+9 flows — 🟢 9 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `paymaster.fallback-disclosed` | When sponsorship is unavailable, be told honestly that you are paying the fee | 🔴 absent | none | — (proposed: account-native) | #1240 |  |
+| `paymaster.fallback-disclosed` | When sponsorship is unavailable, be told honestly that you are paying the fee | 🟢 covered | flow | `account-native` | `paymaster-disclosure.cy.js` (PM-01, PM-02) |  |
 
 ### `052-payments-style-wager-create` — Payments-style wager create
 
@@ -283,13 +283,13 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `collect.list-for-sale` | List a collectible for sale and see the fee disclosure | 🔴 absent | none | — (proposed: no-chain) | #1239 |  |
+| `collect.list-for-sale` | List a collectible for sale and see the fee disclosure | 🟢 covered | flow | `no-chain` | `37-predict-and-collect.cy.js` (CO-02) |  |
 
 ### `057-predict-polymarket` — Predict — Polymarket
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `predict.builder-fee-disclosed` | See the additive builder fee as its own line before signing an order | 🔴 absent | none | — (proposed: no-chain) | #1239 |  |
+| `predict.builder-fee-disclosed` | See the additive builder fee as its own line before signing an order | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-02, PR-04) |  |
 
 ### `060-platform-fee-wrapper` — Platform fees
 
@@ -303,7 +303,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `bitcoin.fee-quote-expiry` | Be refused a stale fee quote rather than signing at the wrong fee | 🔴 absent | none | — (proposed: no-chain) | #1243 |  |
+| `bitcoin.fee-quote-expiry` | Be refused a stale fee quote rather than signing at the wrong fee | 🟢 covered | flow | `account-native` | `bitcoin-send-fee.cy.js` (BTC-03) |  |
 
 ### `067-bridge-pool-liquidity` — Bridge and supplied liquidity
 
@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-38 flows — 🟢 33 · 🟡 1 · 🔴 4 · ⚪ 0 · covered-but-not-proven 1
+39 flows — 🟢 36 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -332,10 +332,11 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `compliance.accept-terms-before-entry` | Read and accept the versioned terms before reaching the app | 🔴 absent | skipped | `account-native` | `compliance.cy.js` (CP-01, CP-02, CP-03) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
+| `compliance.accept-terms-before-entry` | Read and accept the versioned terms before reaching the app | 🟢 covered | flow | `no-chain` | `34-member-surfaces.cy.js` (CG-01, CG-02) |  |
 | `compliance.sanctioned-address-refused` | A screened address is refused before any transaction is offered | 🟢 covered | settled | `no-chain` | `31-identity-access.cy.js` (CM-01) |  |
 | `compliance.frozen-account-blocked` | A frozen account cannot create a wager, and unfreezing restores it | 🟢 covered | settled | `on-chain` | `18-frozen-accounts.cy.js` (FRZ-01, FRZ-02) |  |
 | `compliance.paused-protocol-blocked` | A paused protocol refuses new wagers, and unpausing restores them | 🟢 covered | settled | `on-chain` | `19-paused-protocol.cy.js` (PAU-01, PAU-02) |  |
+| `compliance.passkey-account-parity` | A passkey account meets the same compliance gates as a classic wallet | 🔴 absent | skipped | `account-native` | `compliance.cy.js` (CP-02, CP-03) | both tests are PERMANENTLY PENDING and would fail if allowed to run: they gate on PASSKEY_FULL_STACK, which nothing sets, they call a `flagAddress` cypress task that is not registered, and they read a `[data-testid="passkey-account-address"]` the app does not render. The gates themselves ARE covered for classic wallets (compliance.sanctioned-address-refused, compliance.frozen-account-blocked); what is absent is the parity claim for the passkey rail |
 
 ### `008-runtime-chain-consistency` — Runtime chain consistency
 
@@ -359,7 +360,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟡 partial | smoke | `no-chain` | `35-navigation-and-lookup.cy.js` (BK-01) | asserts the surface renders and prints no key material; the encrypt/restore round-trip itself is not driven |
+| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟡 partial | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (BK-01, BK-02) | the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for — admission rule 2 puts that half in the on-chain tier |
 
 ### `037-unified-pool-challenge-lookup` — Unified pool and challenge lookup
 
@@ -402,7 +403,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `predict.hidden-off-polygon` | See the Predict tab hidden on a chain Polymarket does not serve | 🔴 absent | none | — (proposed: no-chain) | #1239 |  |
+| `predict.hidden-off-polygon` | See the Predict tab hidden on a chain Polymarket does not serve | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-03) |  |
 
 ### `066-staking-admin-controls` — Staking admin controls
 
@@ -444,7 +445,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `verify.three-verdicts` | Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout | 🟢 covered | settled | `no-chain` | `30-verify-message.cy.js` (VF-01, VF-02) |  |
-| `verify.refused-while-operating-as-vault` | Be refused message signing while acting as a vault | 🔴 absent | none | — (proposed: no-chain) | #1274 | the refusal itself is one client-side branch, but reaching it needs a vault, operate-as mode (offered only in TransferForm) and in-app navigation that preserves the memory-only active identity — a test-reachability problem, not a product one |
+| `verify.refused-while-operating-as-vault` | Be refused message signing while acting as a vault | 🟢 covered | flow | `no-chain` | `30-verify-message.cy.js` (VF-03) |  |
 
 ### `093-admin-mini-apps` — Admin mini-apps
 
@@ -455,7 +456,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 27 · 🟡 2 · 🔴 3 · ⚪ 0 · covered-but-not-proven 12
+32 flows — 🟢 31 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -491,7 +492,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `predict.search-markets` | Search and filter Polymarket markets when choosing a condition | 🔴 absent | none | — (proposed: no-chain) | #1239 |  |
+| `predict.search-markets` | Search and filter Polymarket markets when choosing a condition | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-01) |  |
 
 ### `014-quick-action-dashboard` — Quick-action dashboard
 
@@ -533,7 +534,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `oracle.graph-unavailable-degrades` | See an honest degraded state when the oracle index is unreachable | 🔴 absent | none | — (proposed: no-chain) | #1245 |  |
+| `oracle.graph-unavailable-degrades` | See an honest degraded state when the oracle index is unreachable | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (OG-01) |  |
 
 ### `031-platform-notifications` — Platform notifications
 
@@ -624,7 +625,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `perps.browse-venues` | Compare perpetuals pairs across venues | 🟢 covered | flow | `no-chain` | `24-perps.cy.js` (PERPS-01, PERPS-02, PERPS-03, PERPS-04, PERPS-05) |  |
-| `perps.degraded-venue-named` | A degraded venue is named and its pairs omitted, never shown as zeros | 🟡 partial | smoke | `no-chain` | `24-perps.cy.js` (PERPS-04) | no assertion proves a missing metric renders as an em dash rather than a zero, which is the invariant the spec turns on |
+| `perps.degraded-venue-named` | A degraded venue is named and its pairs omitted, never shown as zeros | 🟢 covered | flow | `no-chain` | `24-perps.cy.js` (PERPS-01, PERPS-06) |  |
 
 ### `083-perps-position-management` — Perps positions
 
@@ -642,7 +643,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟡 partial | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01) | the empty-state honesty is covered; the all-networks-unreachable disclosure is NOT — under a total RPC refusal the panel renders "No activity yet" and "Updated 50s ago" (#1280), and whether that is a product bug or an unmodelled stub is unresolved. The per-network filter renders over entries, so it needs seeded history. |
+| `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01, MC-02) |  |
 
 ## No member-facing flow
 
