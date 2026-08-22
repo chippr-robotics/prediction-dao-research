@@ -13,12 +13,22 @@
  * of them have a wager indexer, which chain membership is read on, and whether the assistant is
  * configured. A generic document would force every client to discover those by trial.
  */
+import { X402_ERROR_CODES, X402_GATEWAY_ERROR_CODES, X402_VERSION, buildRequirement, caip2 } from '../x402/requirements.js'
 import { ALL_SCOPES, ERROR_CODES, ROUTES, SCOPE_DESCRIPTIONS, TOKEN_PREFIX } from './contract.js'
 import { buildableActions, REFUSED_ACTIONS } from './intents.js'
 import { MAX_MESSAGES, MAX_MESSAGE_CHARS } from './assistant.js'
 
 /** A `$ref` to one of the error responses defined once in `components.responses`. */
 const errRef = (name) => ({ $ref: `#/components/responses/${name}` })
+
+/**
+ * Every code that can appear in a HOUSE error body here, including spec 096's.
+ *
+ * The x402 codes are merged for the SUMMARY lookup only — whether they appear in the published
+ * `enum` is decided per-gateway below, so a deployment with the paid rail off serves a document
+ * byte-identical to a pre-096 one.
+ */
+const ALL_ERROR_CODES = { ...ERROR_CODES, ...X402_GATEWAY_ERROR_CODES }
 
 /** One `components.responses` entry: the shared error body plus the codes that can appear in it. */
 function errorResponse(description, codes) {
@@ -30,7 +40,7 @@ function errorResponse(description, codes) {
         examples: Object.fromEntries(
           codes.map((code) => [
             code,
-            { summary: ERROR_CODES[code].summary, value: { error: { code, reason: ERROR_CODES[code].summary } } },
+            { summary: ALL_ERROR_CODES[code].summary, value: { error: { code, reason: ALL_ERROR_CODES[code].summary } } },
           ])
         ),
       },
@@ -48,6 +58,17 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
   const memberApi = config.memberApi
   const indexedChainIds = config.enabledChainIds.filter((id) => Boolean(memberApi.subgraphUrls[id]))
   const actions = buildableActions()
+
+  // Spec 096. EVERY x402 addition below is behind this flag, so a gateway with the paid rail off
+  // publishes exactly the document it published before spec 096 existed — the specification must
+  // describe THIS gateway, and advertising a 402 that can never happen is a lie an agent would
+  // write retry code against.
+  const x402Enabled = Boolean(config.x402?.enabled)
+  const x402Chain = x402Enabled ? config.chains[config.x402.chainId] : null
+  const pricedRoutes = x402Enabled ? ROUTES.filter((r) => r.opClass && buildRequirement(config, { opClass: r.opClass })) : []
+  const errorCodeNames = x402Enabled
+    ? [...Object.keys(ERROR_CODES), ...Object.keys(X402_GATEWAY_ERROR_CODES)]
+    : Object.keys(ERROR_CODES)
 
   const doc = {
     openapi: '3.1.0',
@@ -124,6 +145,39 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
       { name: 'reads', description: 'The member’s own data. Three-state, never fabricated.' },
       { name: 'build', description: 'Unsigned typed data for a platform action. Signing stays with the member.' },
       { name: 'assistant', description: 'Conversational help. Answers questions; never acts.' },
+      ...(x402Enabled
+        ? [
+            {
+              name: 'x402',
+              description: [
+                'Pay-per-request access, for an agent that holds no member key.',
+                '',
+                'A **priced** operation called without a usable member token answers `402` with a',
+                'machine-readable offer. You pay by signing an EIP-3009 `TransferWithAuthorization` on',
+                `${x402Chain?.tokenDomain?.name ?? 'the platform token'} (${x402Chain?.paymentToken}) to the`,
+                'platform treasury and retrying with an `X-PAYMENT` header; the gateway verifies the',
+                'authorization, settles it through its existing submission engine, and then serves the',
+                'request **as the payer**.',
+                '',
+                'Four things are worth knowing before you build against this:',
+                '',
+                '1. **A working member token is never charged.** The bearer path is checked first; if your',
+                '   token authenticates, no payment is asked for and none is possible. Paying substitutes',
+                '   for MEMBERSHIP on one operation — it is not an alternative way to use a key you have.',
+                '2. **Verification strictly precedes settlement.** A payment that fails any check is never',
+                '   submitted, so a refused request costs you nothing. If settlement itself cannot happen',
+                '   you get `503 settlement_unavailable` and *nothing is served and nothing is charged*.',
+                '3. **`success` means broadcast, not finality.** `X-PAYMENT-RESPONSE` reports the settlement',
+                '   the engine accepted, and says `settlement: "broadcast"` for exactly that reason.',
+                '4. **The payer is screened.** Sanctions screening runs against `authorization.from`,',
+                '   fail-closed, before anything settles — a `403 sanctioned_signer` is not re-quotable.',
+                '',
+                'Signatures must be **EOA (ECDSA)**. A smart-account (ERC-1271) signature would pass a',
+                'server-side check and then revert at the token, so it is refused up front.',
+              ].join('\n'),
+            },
+          ]
+        : []),
     ],
     security: [{ memberToken: [] }],
     components: {
@@ -158,7 +212,7 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
               required: ['code', 'reason'],
               additionalProperties: false,
               properties: {
-                code: { type: 'string', enum: Object.keys(ERROR_CODES), description: 'Machine-readable. Branch on this, never on the prose.' },
+                code: { type: 'string', enum: errorCodeNames, description: 'Machine-readable. Branch on this, never on the prose.' },
                 reason: { type: 'string', description: 'A specific, actionable sentence. Safe to show a member.' },
               },
             },
@@ -450,8 +504,131 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
             },
           },
         },
+        ...(x402Enabled
+          ? {
+              PaymentRequirement: {
+                type: 'object',
+                required: ['scheme', 'network', 'amount', 'asset', 'payTo', 'maxTimeoutSeconds', 'extra'],
+                description: 'One way this gateway will accept payment for the operation you asked for.',
+                properties: {
+                  scheme: { type: 'string', const: 'exact', description: 'Pay exactly `amount`. This gateway offers no other scheme.' },
+                  network: { type: 'string', description: 'CAIP-2, e.g. `eip155:137`.', examples: [caip2(config.x402.chainId)] },
+                  amount: { type: 'string', description: 'Token BASE UNITS as a decimal string — 10000 is $0.01 of a 6-decimal USDC.' },
+                  asset: { $ref: '#/components/schemas/Address' },
+                  payTo: { $ref: '#/components/schemas/Address' },
+                  maxTimeoutSeconds: { type: 'integer', description: 'How long this offer is worth acting on.' },
+                  extra: {
+                    type: 'object',
+                    required: ['assetTransferMethod', 'name', 'version'],
+                    description:
+                      'What you need to build the signature. `name`/`version` are the TOKEN’s own EIP-712 ' +
+                      'domain fields — sign under `{ name, version, chainId, verifyingContract: asset }`.',
+                    properties: {
+                      assetTransferMethod: { type: 'string', const: 'eip3009' },
+                      name: { type: 'string' },
+                      version: { type: 'string' },
+                    },
+                  },
+                },
+              },
+              PaymentRequired: {
+                type: 'object',
+                required: ['x402Version', 'error', 'resource', 'accepts'],
+                description: 'The x402 v2 PaymentRequired body. This is the PROTOCOL’s shape, not the gateway’s error body.',
+                properties: {
+                  x402Version: { type: 'integer', const: X402_VERSION },
+                  error: {
+                    type: 'string',
+                    enum: [...Object.keys(X402_ERROR_CODES), 'invalid_token', 'invalid_signature', 'token_expired', 'token_ttl_exceeded', 'token_revoked', 'membership_required'],
+                    description:
+                      'Why you are seeing this. `payment_required` means nothing was presented; a ' +
+                      '`payment_*` code names the one thing wrong with what you did present; an auth code ' +
+                      '(e.g. `token_expired`) means your TOKEN did not admit the request and payment is ' +
+                      'offered instead — the diagnostic is kept rather than replaced.',
+                  },
+                  errorReason: { type: 'string', description: 'The same fact as a sentence. Show this; branch on `error`.' },
+                  resource: {
+                    type: 'object',
+                    required: ['url', 'description', 'mimeType'],
+                    properties: {
+                      url: { type: 'string' },
+                      description: { type: 'string' },
+                      mimeType: { type: 'string' },
+                    },
+                  },
+                  accepts: {
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/PaymentRequirement' },
+                    description: 'Always an array. Empty only if the operation stopped being offered between your two requests.',
+                  },
+                },
+              },
+              PaymentPayload: {
+                type: 'object',
+                required: ['x402Version', 'accepted', 'payload'],
+                description:
+                  'What you base64-encode into the `X-PAYMENT` header. `accepted` is the `accepts[]` entry ' +
+                  'you chose; the gateway checks your choice against its OWN offer, so editing it cannot ' +
+                  'produce a cheaper price.',
+                properties: {
+                  x402Version: { type: 'integer', const: X402_VERSION },
+                  accepted: { $ref: '#/components/schemas/PaymentRequirement' },
+                  payload: {
+                    type: 'object',
+                    required: ['signature', 'authorization'],
+                    properties: {
+                      signature: { type: 'string', pattern: '^0x[0-9a-fA-F]{130}$', description: '65-byte EOA signature over `TransferWithAuthorization`.' },
+                      authorization: {
+                        type: 'object',
+                        required: ['from', 'to', 'value', 'validAfter', 'validBefore', 'nonce'],
+                        properties: {
+                          from: { $ref: '#/components/schemas/Address' },
+                          to: { $ref: '#/components/schemas/Address' },
+                          value: { type: 'string', description: 'Base units, decimal string. Must be >= the offer’s amount.' },
+                          validAfter: { type: 'string', description: 'Unix seconds, decimal string. Must already have passed.' },
+                          validBefore: { type: 'string', description: `Unix seconds. Must be at least ${config.x402.settleBufferSeconds}s in the future, or settlement could not complete.` },
+                          nonce: { $ref: '#/components/schemas/Bytes32' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              SettlementResponse: {
+                type: 'object',
+                required: ['success', 'transaction', 'network', 'payer', 'amount', 'settlement'],
+                description: 'base64-decoded `X-PAYMENT-RESPONSE`. Present only on a request a payment paid for.',
+                properties: {
+                  success: { type: 'boolean', const: true },
+                  transaction: { type: ['string', 'null'], description: 'Transaction hash, or null if the engine has not assigned one yet.' },
+                  transactionId: { type: 'string', description: 'The engine’s own id for the submission.' },
+                  network: { type: 'string' },
+                  payer: { $ref: '#/components/schemas/Address' },
+                  amount: { type: 'string' },
+                  settlement: {
+                    type: 'string',
+                    const: 'broadcast',
+                    description:
+                      'Said out loud: the engine ACCEPTED this settlement, which is not the same as a chain ' +
+                      'having mined it. Do not read `success: true` as finality.',
+                  },
+                },
+              },
+            }
+          : {}),
       },
       responses: {
+        ...(x402Enabled
+          ? {
+              PaymentRequired: {
+                description:
+                  'This operation is priced and you presented no usable member token. The body describes ' +
+                  'what would be accepted; sign one entry of `accepts` and retry with `X-PAYMENT`. Nothing ' +
+                  'has been charged.',
+                content: { 'application/json': { schema: { $ref: '#/components/schemas/PaymentRequired' } } },
+              },
+            }
+          : {}),
         Unauthorized: errorResponse(
           'The token is missing, malformed, expired, over the lifetime cap, revoked, or not signed by the account it ' +
             'names. Note `invalid_signature` is a KNOWN negative — the account was asked and declined; when it could ' +
@@ -477,7 +654,16 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
           'Temporarily unavailable — RETRY. None of these is a rejection: `auth_unverifiable` and ' +
             '`membership_unreadable` in particular mean a fact could not be established, not that it was ' +
             'established against you.',
-          ['member_api_unconfigured', 'member_api_killed', 'killswitch_active', 'auth_unverifiable', 'membership_unreadable', 'screening_unavailable', 'upstream_unavailable']
+          [
+            'member_api_unconfigured',
+            'member_api_killed',
+            'killswitch_active',
+            'auth_unverifiable',
+            'membership_unreadable',
+            'screening_unavailable',
+            'upstream_unavailable',
+            ...(x402Enabled ? ['settlement_unavailable'] : []),
+          ]
         ),
         AssistantUnavailable: errorResponse(
           'Everything the shared 503 covers, plus the two assistant-specific states: the assistant is ' +
@@ -572,17 +758,64 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
     },
   }
 
+  // ---- spec 096: the priced operations, and only those ----------------------------------------
+  // An `X-PAYMENT` parameter, a 402 response and an `X-PAYMENT-RESPONSE` header are added to a route
+  // ONLY when this gateway would actually price it. A route documented as 402-able on a deployment
+  // that never answers 402 sends an agent down a branch that cannot execute.
+  const pricedIds = new Set(pricedRoutes.map((r) => r.id))
+  const paymentParameter = {
+    name: 'X-PAYMENT',
+    in: 'header',
+    required: false,
+    schema: { type: 'string' },
+    description:
+      'base64(JSON `PaymentPayload`). Send this to pay for the request after a 402. Omitted with a ' +
+      'valid member token — a token that authenticates is never charged.',
+  }
+  const paymentResponseHeader = {
+    'X-PAYMENT-RESPONSE': {
+      schema: { type: 'string' },
+      description:
+        'base64(JSON `SettlementResponse`) — present only when a payment paid for this response. Reports ' +
+        'the settlement the engine ACCEPTED (`settlement: "broadcast"`), not a mined transaction.',
+    },
+  }
+
   for (const route of ROUTES) {
     const detail = DETAIL[route.id]
     if (!detail) throw new Error(`[relay-gateway] member-API route "${route.id}" has no OpenAPI detail`)
-    doc.paths[route.path] ??= {}
-    doc.paths[route.path][route.method] = {
+    const priced = pricedIds.has(route.id)
+    const priceAmount = priced ? buildRequirement(config, { opClass: route.opClass }).amount : null
+    const operation = {
       operationId: route.operationId,
       summary: route.summary,
-      description: route.description + (route.scope ? `\n\nRequires scope \`${route.scope}\`.` : ''),
+      description:
+        route.description +
+        (route.scope ? `\n\nRequires scope \`${route.scope}\`.` : '') +
+        (priced
+          ? `\n\nAlso available **without a member key** for \`${priceAmount}\` base units of ` +
+            `\`${x402Chain.paymentToken}\` on \`${caip2(config.x402.chainId)}\` — see the \`x402\` tag. ` +
+            'A working member token is never charged for this.'
+          : ''),
       ...(route.scope ? { security: [{ memberToken: [route.scope] }], 'x-fairwins-scope': route.scope } : {}),
       ...detail,
+      ...(priced
+        ? {
+            tags: [...detail.tags, 'x402'],
+            'x-fairwins-x402-op-class': route.opClass,
+            parameters: [...(detail.parameters ?? []), paymentParameter],
+            responses: {
+              ...detail.responses,
+              // Merge into the 200 rather than replacing it: the header is additional information
+              // about the SAME success, not a different one.
+              200: { ...detail.responses[200], headers: { ...(detail.responses[200]?.headers ?? {}), ...paymentResponseHeader } },
+              402: errRef('PaymentRequired'),
+            },
+          }
+        : {}),
     }
+    doc.paths[route.path] ??= {}
+    doc.paths[route.path][route.method] = operation
   }
 
   // Actions that exist on the platform but are deliberately NOT buildable here. Documented rather
@@ -595,6 +828,29 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
     '',
     ...Object.entries(REFUSED_ACTIONS).map(([action, reason]) => `- \`${action}\` — ${reason}`),
   ].join('\n')
+
+  // Spec 096. Appended only when the paid rail is live on THIS gateway.
+  if (x402Enabled) {
+    doc.info.description += [
+      '',
+      '',
+      '## Paying per request (x402)',
+      '',
+      'Some operations here can be bought one call at a time by an agent with **no member key**, using',
+      `the x402 v${X402_VERSION} protocol. This does not replace a key — it replaces MEMBERSHIP, for one`,
+      'operation. If your bearer token works, you are served on it and never charged.',
+      '',
+      `- Settled on \`${caip2(config.x402.chainId)}\` in \`${x402Chain.paymentToken}\` (${x402Chain.tokenDomain.name} v${x402Chain.tokenDomain.version})`,
+      `- Paid to \`${config.x402.payTo}\``,
+      ...pricedRoutes.map(
+        (r) => `- \`${r.method.toUpperCase()} ${r.path}\` — ${buildRequirement(config, { opClass: r.opClass }).amount} base units (${r.opClass})`
+      ),
+      '',
+      'Everything else on this API is **not** purchasable. Reading this document is free, and so is',
+      'revoking a key — putting a price between a member and the withdrawal of a leaked credential',
+      'would be the worst place on this API to put one.',
+    ].join('\n')
+  }
 
   return doc
 }

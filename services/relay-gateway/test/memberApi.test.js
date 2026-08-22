@@ -578,6 +578,9 @@ describe('/status member API block', () => {
       enabled: true,
       killSwitch: false,
       assistant: { configured: false },
+      // Spec 096 added a public-config-only x402 block. Off here, and `network: null` says so —
+      // the configured prices stay visible so an operator can read what WOULD be charged.
+      x402: { enabled: false, killSwitch: false, network: null, priced: { read: '10000', build: '50000', assistant: '100000' } },
     })
   })
 

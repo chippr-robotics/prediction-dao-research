@@ -22,6 +22,14 @@
  *
  *   EVERY CALL IS BOUNDED. `AbortController` plus a timer, always cleared. An agent waiting forever
  *   on a hung socket is indistinguishable from one that has crashed.
+ *
+ * X402 (spec 096): THIS SERVER CARRIES PAYMENTS, IT NEVER MAKES THEM. The gateway may answer a
+ * priced operation with `402 Payment Required` and a machine-readable list of what it would accept.
+ * That answer is surfaced to the calling agent whole (see `PaymentRequiredError`) — this process
+ * holds no key, so it cannot sign the EIP-3009 authorization the offer asks for, and there is no
+ * configuration that changes that. An agent that CAN sign sends the resulting `X-PAYMENT` header
+ * back in and it is forwarded upstream verbatim; the settlement receipt the gateway returns
+ * (`X-PAYMENT-RESPONSE`) is handed back the same way.
  */
 
 /** The default per-request budget. The gateway's own upstream reads are bounded well inside this. */
@@ -36,6 +44,46 @@ export class ApiError extends Error {
     this.reason = reason
     this.status = status
     this.retryAfterSec = retryAfterSec
+  }
+}
+
+/**
+ * A `402 Payment Required` answer, carried whole (spec 096).
+ *
+ * It is an `ApiError` so every existing failure path keeps working unchanged, and it adds the one
+ * thing a paying agent needs: the offer itself. `accepts` is passed through EXACTLY as the gateway
+ * wrote it — amounts, asset address, `payTo`, the network in CAIP-2 form and the token's own EIP-712
+ * domain in `extra`. Rewriting, rounding or "helpfully" normalising any of that would change what
+ * the agent signs, and a payment authorization that does not match the offer is simply refused.
+ *
+ * This is NOT a failed read. It is a priced answer the caller has not paid for yet, which is why it
+ * carries its own code rather than reusing `http_402`.
+ */
+export class PaymentRequiredError extends ApiError {
+  constructor({ x402Version = null, accepts = [], resource = null, error = null, status = 402 } = {}) {
+    super('payment_required', 'this operation is priced and no payment accompanied the request', { status })
+    this.name = 'PaymentRequiredError'
+    this.x402Version = x402Version
+    this.accepts = Array.isArray(accepts) ? accepts : []
+    this.resource = resource
+    /** The gateway's own machine code for WHY, when it named one (e.g. a rejected payment). */
+    this.paymentError = error
+  }
+}
+
+/**
+ * Decode a base64 `X-PAYMENT-RESPONSE` settlement receipt, or return null.
+ *
+ * Never throws: a receipt this process cannot read is a receipt it reports as opaque, not a reason
+ * to fail a call whose data already arrived. The raw header is kept alongside so the HTTP transport
+ * can hand the original bytes back to the agent that paid, unaltered.
+ */
+export function decodeSettlement(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return null
+  try {
+    return JSON.parse(Buffer.from(raw.trim(), 'base64').toString('utf8'))
+  } catch {
+    return null
   }
 }
 
@@ -120,11 +168,33 @@ export function createApiClient({
       'token_missing',
       'No member API token was supplied. Set FAIRWINS_API_TOKEN to a token created in the FairWins app ' +
         '(Settings ▸ API access), or send one per request as an Authorization: Bearer header in HTTP mode. ' +
-        'This server never creates a token — only the member’s own wallet can sign one.'
+        'This server never creates a token — only the member’s own wallet can sign one. ' +
+        'If this gateway offers pay-per-request access (x402), an agent that can sign a USDC payment may ' +
+        'call this tool with an X-PAYMENT header instead of a token; call get_gateway_status first to see ' +
+        'whether it is enabled and what each operation class costs, and read fairwins://guide for the flow.'
     )
   }
 
-  async function call(method, path, { query = null, body = null, auth = 'required', token: override } = {}) {
+  /**
+   * Normalise a caller-supplied `X-PAYMENT` value, or return null.
+   *
+   * The header is opaque to this server — base64 JSON that only the gateway and the token contract
+   * interpret — so it is forwarded byte-for-byte after a shape check. A value carrying a line
+   * terminator never was a header value and is dropped rather than smuggled into the request.
+   */
+  function paymentHeader(value) {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    if (/[\r\n\u2028\u2029]/.test(trimmed)) return null
+    return trimmed
+  }
+
+  async function call(
+    method,
+    path,
+    { query = null, body = null, auth = 'required', token: override, xPayment = null, onSettlement = null } = {}
+  ) {
     const root = requireBase()
     const url = new URL(root + path)
     if (query) {
@@ -135,9 +205,17 @@ export function createApiClient({
     }
 
     const headers = { accept: 'application/json', 'user-agent': userAgent }
+    const payment = paymentHeader(xPayment)
     // The token rides in a header. It is never put in the URL, never logged, and never echoed back
     // into a tool result.
-    if (auth === 'required') headers.authorization = `Bearer ${bearerFor(override)}`
+    //
+    // A supplied payment SUBSTITUTES for the token on this call and no Authorization is sent: on the
+    // paid rail the gateway serves the request as the PAYER, so presenting somebody else's bearer
+    // alongside a payment would be asking two different questions in one request. Sending both would
+    // also be the shape in which a member is quietly charged for a request their membership already
+    // covers — the bearer path is checked first upstream and is never priced.
+    if (payment) headers['x-payment'] = payment
+    else if (auth === 'required') headers.authorization = `Bearer ${bearerFor(override)}`
     if (body != null) headers['content-type'] = 'application/json'
 
     const controller = new AbortController()
@@ -169,6 +247,20 @@ export function createApiClient({
       }
     }
 
+    // x402: a 402 is an OFFER, not a failed read, so it is decoded before the generic error mapping —
+    // which would otherwise flatten the whole `accepts` list into the string "http_402" and leave the
+    // agent with a price it cannot see. A 402 whose body is not an x402 offer falls through to the
+    // ordinary mapping rather than being reported as an offer with nothing in it.
+    if (res.status === 402 && parsed && typeof parsed === 'object' && Array.isArray(parsed.accepts)) {
+      throw new PaymentRequiredError({
+        x402Version: parsed.x402Version ?? null,
+        accepts: parsed.accepts,
+        resource: parsed.resource ?? null,
+        error: typeof parsed.error === 'string' ? parsed.error : (parsed.error?.code ?? null),
+        status: res.status,
+      })
+    }
+
     if (!res.ok) {
       const { code, reason } = readErrorBody(parsed, res.status)
       const retryAfter = Number.parseInt(res.headers?.get?.('retry-after') ?? '', 10)
@@ -179,6 +271,14 @@ export function createApiClient({
     }
     if (parsed === null) {
       throw new ApiError('invalid_response', `the gateway answered ${method} ${path} with a body that is not JSON`)
+    }
+
+    // The settlement receipt for a payment that was just spent. Reported through the caller's sink
+    // rather than folded into the body: the body is the gateway's answer and must stay exactly what
+    // the gateway said. The raw header is kept so the HTTP transport can return the original bytes.
+    if (typeof onSettlement === 'function') {
+      const raw = res.headers?.get?.('x-payment-response') ?? null
+      if (raw) onSettlement({ raw, decoded: decodeSettlement(raw) })
     }
     return parsed
   }

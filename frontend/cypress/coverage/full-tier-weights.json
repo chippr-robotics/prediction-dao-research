@@ -29,6 +29,7 @@
     "cypress/e2e/full/33-transfers-swap-vouchers.cy.js": 75,
     "cypress/e2e/full/34-callsign-registration.cy.js": 23,
     "cypress/e2e/full/35-admin-single-chain-write.cy.js": 27,
-    "cypress/e2e/full/36-wager-notifications.cy.js": 41
+    "cypress/e2e/full/36-wager-notifications.cy.js": 41,
+    "cypress/e2e/full/38-passkey-compliance.cy.js": 90
   }
 }
