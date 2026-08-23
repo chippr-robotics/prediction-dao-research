@@ -159,6 +159,53 @@ describe('gap-limit discovery (research R5, FR-003)', () => {
     expect(wallet.nextReceiveAddress('segwit').index).toBe(2)
   })
 
+  /*
+   * THE CONCURRENT CASE, which the cached-entries test above does not reach.
+   *
+   * `discover` reads the ledger once and then awaits a series of gateway round trips. It used to
+   * write that pre-await snapshot back wholesale at the end, so an address issued DURING the scan
+   * was silently dropped and the cursor went backwards — the next issuance handed out an address
+   * the member had already been shown, which is the one thing this wallet promises not to do.
+   *
+   * The window is not narrow, and it is widest exactly where it matters: discovery runs on unlock,
+   * the receive surface is what the member opened to get an address, and a healthy gateway means
+   * MORE round trips to be interrupted, not fewer.
+   */
+  it('an address issued DURING a scan survives it, and the cursor does not roll back', async () => {
+    const store = ledgerStore(memoryStorage())
+    let wallet
+    let issuedMidScan = null
+    const racingGateway = {
+      async lookupAddresses(_networkId, addresses) {
+        // The member taps "New address" while the scan is in flight.
+        if (!issuedMidScan) issuedMidScan = wallet.nextReceiveAddress('segwit')
+        return {
+          ok: true,
+          results: addresses.map((address) => ({ address, confirmedSats: 0, pendingSats: 0, utxos: [] })),
+        }
+      },
+    }
+    wallet = createBitcoinWallet({
+      account: ACCOUNT,
+      networkId: 'bitcoin-testnet',
+      deriveAddress,
+      gateway: racingGateway,
+      store,
+      now: () => '2026-07-20T00:00:00.000Z',
+    })
+
+    await wallet.discover(['segwit'])
+
+    const issued = wallet.issuedAddresses()
+    expect(issuedMidScan, 'the mid-scan issuance happened').to.not.equal(null)
+    expect(
+      issued.some((a) => a.address === issuedMidScan.address),
+      'the address issued during the scan is still in the ledger',
+    ).toBe(true)
+    // And the cursor is past it — never back onto an address already shown.
+    expect(wallet.nextReceiveAddress('segwit').index).toBeGreaterThan(issuedMidScan.index)
+  })
+
   it('gateway failure yields stale (cached ledger), never an empty reset', async () => {
     const store = ledgerStore(memoryStorage())
     const w1 = makeWallet({ store })

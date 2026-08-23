@@ -27,6 +27,20 @@
  */
 
 /**
+ * OFF-CHAIN definitions (spec 095) live in ./offchain.js and are re-exported here so both trees
+ * keep one import specifier — `@fairwins/intent-types`. They are in a SEPARATE FILE, and are
+ * deliberately absent from `CONTRACT_VERIFIED_TYPES` / `CONTRACT_DOMAINS`, because no Solidity
+ * verifies them: the member-API capability token is checked by the relay gateway alone. Read that
+ * file's header before adding anything beside them.
+ */
+export {
+  MEMBER_API_DOMAIN,
+  MEMBER_API_GRANT_TYPES,
+  MEMBER_API_REVOCATION_TYPES,
+  canonicalScopeString,
+} from './offchain.js'
+
+/**
  * EIP-712 DOMAINS, keyed by the `getContractAddressForChain` key of the contract that verifies the
  * signature. `chainId` and `verifyingContract` are runtime values, so only the two STATIC halves
  * live here — they are what the contract fixed at `__EIP712_init(name, version)` and can never be

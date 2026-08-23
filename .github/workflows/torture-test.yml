@@ -424,6 +424,35 @@ jobs:
           echo "Contract deployment completed and app addresses verified"
         continue-on-error: false
 
+      # Spec 034 Wager Pools: a targeted, append-only deploy on top of the core record above (never
+      # part of `deploy:local` itself — see scripts/deploy/deploy-wager-pool-factory.js). Required for
+      # the full-tier pools spec (#1232); CREATE2 addresses are deterministic, so this lands at the
+      # same address every run.
+      - name: Deploy WagerPools factory to local network
+        run: |
+          echo "Deploying WagerPoolFactory to local Hardhat network..."
+          npx hardhat run scripts/deploy/deploy-wager-pool-factory.js --network localhost
+          echo "WagerPoolFactory deployment completed"
+        continue-on-error: false
+
+      # Spec 060 platform fees, AFTER the pools factory and in exactly the order `setup:e2e` uses:
+      # both are nonce-derived plain-CREATE deploys, so the sequence is what fixes the addresses
+      # hardcoded in HARDHAT_CONTRACTS. The mock ERC-4626 vault is what `depositToVaultWithFee`
+      # wraps — there is no Morpho on a local chain, so without it the full-tier fee spec (#1233)
+      # has no charge path to settle against.
+      - name: Deploy the fee router and its local Earn vault
+        run: |
+          npm run deploy:local:fees
+          npm run deploy:local:earn-vault
+        continue-on-error: false
+
+      # Picks up wagerPoolFactory/poolImpl/feeRouter (and anything else re-resolved) from the
+      # deployment record just written above into the frontend's HARDHAT_CONTRACTS, so
+      # `getContractAddressForChain` resolves them for the Cypress dev server.
+      - name: Sync frontend contract addresses
+        run: npm run sync:frontend-contracts:local
+        continue-on-error: false
+
       # Constitution IV: must fail the pipeline on error. Do NOT reintroduce `continue-on-error`
       # (spec 075, FR-007/FR-008). `set -o pipefail` is load-bearing — the command pipes into
       # `tee`, so without it the step's status is tee's (always 0).

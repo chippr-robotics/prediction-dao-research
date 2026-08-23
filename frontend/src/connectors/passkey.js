@@ -27,6 +27,17 @@ import { getCurrentChainId } from '../config/networks'
 export const PASSKEY_CONNECTOR_ID = 'fairwinsPasskey'
 const SESSION_KEY = 'fairwins.passkey.session.v1'
 
+/** Methods the facade refuses: this connector holds no key (see getProvider). */
+const PASSKEY_WRITE_METHODS = new Set([
+  'eth_sendTransaction',
+  'eth_signTransaction',
+  'eth_sign',
+  'personal_sign',
+  'eth_signTypedData',
+  'eth_signTypedData_v3',
+  'eth_signTypedData_v4',
+])
+
 /**
  * The chain a passkey session reports when nothing else names one (issue #1286).
  *
@@ -107,7 +118,54 @@ export function writeSession(session, storage = globalThis.localStorage) {
 export function passkeyConnector(options = {}) {
   const deps = options.deps ?? {}
 
-  return createConnector((config) => ({
+  return createConnector((config) => {
+  /*
+   * THE EIP-1193 FACADE, AND WHY IT MAY NEVER BE NULL AGAIN.
+   *
+   * wagmi's `reconnect` skips any connector whose provider is falsy, BEFORE it ever asks whether
+   * the connector is authorized:
+   *
+   *     const provider = await connector.getProvider().catch(() => undefined)
+   *     if (!provider) continue
+   *
+   * `getProvider` used to answer `deps.provider ?? null`, so with no provider injected wagmi
+   * silently skipped the passkey connector on every reconnect and every passkey member was signed
+   * out by a page reload — with a complete session and credential record sitting in storage, and
+   * FR-003's "silent restore, no ceremony on reload" never once happening in a browser. Nothing
+   * reported it: wagmi swallows reconnect failures, and the connector's own unit tests exercise
+   * `connect({ isReconnecting: true })` directly, which works.
+   *
+   * Built ONCE per connector instance, because wagmi also dedupes providers by reference
+   * (`providers.some((x) => x === provider)`) — a fresh object per call makes two connectors look
+   * distinct when they are not.
+   *
+   * Reads proxy the configured transport. Writes are refused here BY DESIGN: this connector holds
+   * no key, and a passkey transaction is a UserOp assembled by the submission router.
+   *
+   * The chain it reports comes from `sessionChainId`, not a stored value taken on trust, so the
+   * facade and `getChainId()` cannot disagree about which chain the session is on (#1286).
+   */
+  const provider = deps.provider ?? {
+    async request({ method, params } = {}) {
+      if (PASSKEY_WRITE_METHODS.has(method)) {
+        throw new Error(
+          `${method} is not signed by the passkey connector — passkey writes are assembled by the ` +
+            'submission router (lib/passkey/submission), not sent as a raw transaction.',
+        )
+      }
+      const session = readSession(deps.storage)
+      const chainId = sessionChainId(session, config)
+      if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
+        return session ? [getAddress(session.address)] : []
+      }
+      if (method === 'eth_chainId') return `0x${Number(chainId).toString(16)}`
+      return config.getClient({ chainId }).request({ method, params })
+    },
+    on() {},
+    removeListener() {},
+  }
+
+  return {
     id: PASSKEY_CONNECTOR_ID,
     name: 'Passkey',
     type: 'passkey',
@@ -261,11 +319,8 @@ export function passkeyConnector(options = {}) {
     },
 
     async getProvider() {
-      // EIP-1193 facade: reads proxy the chain RPC; writes are fulfilled by the
-      // submission router (lib/passkey/submission) via WalletContext's sendCalls
-      // abstraction — never a naive eth_sendTransaction from a key this
-      // connector doesn't have.
-      return deps.provider ?? null
+      // NEVER null — see the facade above. wagmi's reconnect drops any connector without one.
+      return provider
     },
 
     onAccountsChanged() {},
@@ -273,7 +328,8 @@ export function passkeyConnector(options = {}) {
     onDisconnect() {
       writeSession(null, deps.storage)
     },
-  }))
+  }
+  })
 }
 
 /**

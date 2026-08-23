@@ -16,7 +16,7 @@ const fs = require("fs");
 const path = require("path");
 const hre = require("hardhat");
 const { ethers } = hre;
-const { deployDeterministic, generateSalt } = require("./lib/helpers");
+const { deployDeterministic, generateSalt, getDeploymentFilename } = require("./lib/helpers");
 const { SALT_PREFIXES } = require("./lib/constants");
 
 async function main() {
@@ -24,14 +24,22 @@ async function main() {
   const chainId = Number(net.chainId);
 
   const deploymentsDir = path.join(__dirname, "..", "..", "deployments");
-  const fileByChain = {
-    80002: "amoy-chain80002-v2.json",
-    63: "mordor-chain63-v2.json",
-    137: "polygon-chain137-v2.json",
-  };
-  const fileName = fileByChain[chainId];
-  if (!fileName) throw new Error(`No deployment record mapping for chainId ${chainId}`);
+  /*
+   * The record is named from the NETWORK, not from a chainId lookup table.
+   *
+   * A `chainId -> filename` map cannot tell a local chain from the public one it impersonates: the
+   * E2E chain runs as 80002, so the old map sent it to `amoy-chain80002-v2.json` and a local deploy
+   * would have written a localhost address into the real Amoy record — silently, since the script
+   * updates surgically and preserves every other field. `getDeploymentFilename` is what deploy.js
+   * itself uses and yields the identical names for amoy/mordor/polygon, plus the right one here.
+   */
+  const fileName = getDeploymentFilename(net, "v2");
   const recordPath = path.join(deploymentsDir, fileName);
+  if (!fs.existsSync(recordPath)) {
+    throw new Error(
+      `No deployment record at deployments/${fileName} — deploy the stack for this network first.`
+    );
+  }
   const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
 
   const [deployer] = await ethers.getSigners();
@@ -67,8 +75,8 @@ async function main() {
 
   console.log(`\n✓ BackupPointerRegistry deployed: ${address}`);
   console.log(`  recorded in deployments/${fileName}${deployBlock ? ` (deployBlock ${deployBlock})` : ""}`);
-  console.log(`\nNext: npm run sync:frontend-contracts -- --network ${record.network} --chainId ${chainId}`);
-  console.log(`      npx hardhat verify --network ${record.network} ${address}`);
+  console.log(`\nNext: npm run sync:frontend-contracts -- --network ${hre.network.name} --chainId ${chainId}`);
+  console.log(`      npx hardhat verify --network ${hre.network.name} ${address}`);
 }
 
 main().catch((e) => { console.error(e); process.exitCode = 1; });

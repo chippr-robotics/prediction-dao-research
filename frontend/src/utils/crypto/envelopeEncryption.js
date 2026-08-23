@@ -14,7 +14,7 @@
  * - Appropriate for static content (not ongoing messaging)
  */
 
-import { x25519 } from '@noble/curves/ed25519'
+import { x25519 } from '@noble/curves/ed25519.js'
 import { ml_kem768 } from '@noble/post-quantum/ml-kem.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'

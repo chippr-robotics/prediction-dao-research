@@ -93,6 +93,16 @@ Other participants may have more or better information than you, including non-p
 
 Portions of the Service are developed, maintained, and operated with the assistance of automated systems and AI agents. **These systems may behave unexpectedly, contain errors, or produce unintended results.** You accept the risks arising from the use of automated and AI components in the development and operation of the Service.
 
+The Service may also offer you **optional AI features of your own** — an in-app assistant, and private API keys that let programs you authorise, including AI agents, read your data on your behalf. **Both are off until you turn them on.** Neither can sign a transaction or move your funds. The risks below apply if you choose to use them.
+
+**AI output can be wrong, and it is not advice.** Anything the assistant tells you is generated text. It may be inaccurate, incomplete, out of date, or confidently wrong about a fee, a deadline, a balance, or a rule. **Verify it before you sign anything.** It is not financial, legal, or tax advice, and it is not a substitute for reading what you are about to sign.
+
+**The assistant never signs and never submits.** It cannot enter, accept, resolve, or claim a Wager, cannot spend or transfer your assets, and cannot act at any Trading Venue. Every transaction is signed by you, in your own wallet. **Nothing in the Service will ever ask you for a private key, seed phrase, or recovery information** — if anything appears to, stop and do not provide it.
+
+**An API key is a credential, and guarding it is your responsibility.** A key you create lets whoever holds it read the data you granted access to and build unsigned transactions for you, for as long as the key lasts. **Anyone who obtains it obtains that access.** Revoking a key takes effect on the live Service, but a revocation is **not guaranteed to survive a Service restart** — the durable limit on a key is the **expiry you signed into it**. Choose short expiries, grant the fewest permissions that work, and use a separate key for each program.
+
+**Third-party agents behave in ways no one controls.** If you connect an external AI agent or program to your account, its behaviour is not ours, and its own provider's terms and privacy practices govern what it does with what it reads. **FairWins does not vet, supervise, or stand behind any third-party agent, and is not responsible for what one does with a key you gave it.**
+
 ## 14. Membership-Fee Risk
 
 A Membership Pass is a non-refundable fee for access only. Its practical value depends on the continued availability of the Service, which is not guaranteed. **If the Service is restricted, suspended, modified, or discontinued, you will not be refunded.**

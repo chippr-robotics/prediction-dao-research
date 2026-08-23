@@ -15,6 +15,17 @@
  */
 
 describe('Refund & Timeout', () => {
+  /*
+   * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`.
+   *
+   * Encryption is mandatory on the create path, so useFriendMarketCreation always calls
+   * uploadEncryptedEnvelope, and a create that cannot pin its metadata throws BEFORE it reaches
+   * WagerRegistry. Registered per-test rather than in `before` because cy.intercept is cleared
+   * between tests.
+   */
+  beforeEach(() => {
+    cy.interceptIpfs()
+  })
   it('[REF-01] an unaccepted wager refunds the creator only after the accept deadline', () => {
     cy.createAndAcceptWager({ accept: false, acceptIn: 60, resolveIn: 7200 }).then((wagerId) => {
       cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {

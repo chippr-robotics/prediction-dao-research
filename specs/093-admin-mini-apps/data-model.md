@@ -64,8 +64,11 @@ protocol-config ← staking pause; infrastructure ← gateway status; others `no
 
 ## ChartSeries / ChartDatum (chart kit inputs)
 
-`AdminSparkline`: `{ points: number[], label: string, latestLabel: string }` — rendered only
-when `points.length > 0`; empty ⇒ explicit "No recorded activity" state.
+`AdminSparkline`: `{ points: [{ x, y }], ariaLabel, caption, latestLabel, hint, emptyLabel }` —
+rendered only when `points.length >= 2`; fewer ⇒ explicit "No recorded activity" state. Two is the
+floor because one point is not a trend: drawing it as a flat line would invent a shape the data
+does not carry. `x` is whatever clock the caller's data uses (block number, event index) — the
+component never claims calendar time, so the caption should say which.
 
 `AdminBarList`: `{ items: [{ label, value, display }], partial?: { missing: string[] } }` —
 values always printed as text; `partial` renders a named "missing" annotation.

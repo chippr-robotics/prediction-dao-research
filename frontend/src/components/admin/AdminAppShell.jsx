@@ -33,7 +33,7 @@ export default function AdminAppShell({ app, access, renderView, dashboard }) {
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile)
 
-  const { flags, entryState } = access
+  const { flags, entryState, settled } = access
 
   // Entitled views for THIS operator — the same predicate the Control Room
   // tile used, so the rail can never offer a view the config would not.
@@ -74,7 +74,13 @@ export default function AdminAppShell({ app, access, renderView, dashboard }) {
   // Unentitled operators never see the app's interior — but only once access
   // has actually resolved to 'granted'; the gate below renders the honest
   // denied/unverified screens for everything else.
-  if (entryState === 'granted' && !entitledApp) {
+  //
+  // AND only once it has finished resolving. Entry can be granted by the curator authority
+  // (one read) before the role sweep (a read per role per cohort chain) returns, and in that
+  // window every flag is still false — so this redirect fired on an operator who was entitled
+  // all along, and a deep link to an admin app bounced to the Control Room. `settled` is what
+  // makes the absence of a flag mean something.
+  if (entryState === 'granted' && settled && !entitledApp) {
     return <Navigate to="/admin" replace />
   }
 

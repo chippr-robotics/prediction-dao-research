@@ -1,10 +1,29 @@
 # API Reference
 
-Practical guide to interacting with the FairWins contracts from JavaScript
-(ethers.js v6). Every interaction is an on-chain transaction or view call —
-there is no HTTP API and no backend.
+FairWins exposes two interfaces, and they do different jobs.
 
-For exact signatures see [Contract Interfaces](contracts.md); for addresses
+**The contracts are the system of record.** Everything that moves value — creating,
+accepting, resolving, claiming, refunding a wager; buying or redeeming a membership —
+is an on-chain transaction or view call, signed by the member's own wallet. **The rest
+of this page is that interface**, from JavaScript (ethers.js v6). No server sits between
+you and it, and none can.
+
+**The member HTTP API is a read-and-quote surface**, added in spec 095. A member may sign
+a scoped, expiring capability token in the app and hand it to a program — including an AI
+agent over the [MCP server](../developer-guide/mcp-server.md) — to read their own wagers,
+membership, and live fee rates, and to have **unsigned** typed data built for them. It
+holds no key and can sign nothing: every write still returns to the member's wallet. See
+[Member API](../developer-guide/member-api.md) for the token format, the verification
+order, and the endpoints; the served OpenAPI 3.1 document is the machine-readable
+contract, at `GET /v1/member/openapi.json` on the relay gateway (for example
+`https://relay.fairwins.app/v1/member/openapi.json`, when the module is enabled).
+
+Two other HTTP surfaces exist and are not member APIs: the relay gateway's public
+read proxies and its optional gasless relay ([Gasless Intents](../developer-guide/gasless-intents.md)).
+Neither is required — every gasless flow keeps a self-submit fallback, and every proxy
+degrades to an honest unavailable state.
+
+For exact contract signatures see [Contract Interfaces](contracts.md); for addresses
 see the [Smart Contracts guide](../developer-guide/smart-contracts.md#deployed-addresses).
 
 ## Setup

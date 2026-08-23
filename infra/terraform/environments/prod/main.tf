@@ -252,6 +252,61 @@ module "spa" {
   secret_env = var.spa_secret_env
 }
 
+/**
+ * MCP server (spec 095). Speaks the Model Context Protocol over HTTP so an AI agent can reach the
+ * member API on a member's behalf.
+ *
+ * STATELESS AND SECRETLESS, which is why this block is as short as it is. The service holds no
+ * credential of its own: every request carries the MEMBER's own capability token in its
+ * `Authorization` header and the service forwards it upstream. Hence:
+ *
+ *   - no `secret_env`. There is nothing to wire, and wiring something would give a public service
+ *     a credential worth stealing — the whole point of a member-signed token is that the platform
+ *     never holds one.
+ *   - no `service_account_email`. The Cloud Run default account is deliberate: this service needs
+ *     no GCP permission at all, and a dedicated runtime account would have to be added to the
+ *     enumerated actAs list `fairwins-tf-apply@` holds (bootstrap/main.tf) — a widening of the
+ *     apply identity bought for nothing.
+ *
+ * `allow_unauthenticated = true` is therefore not a hole. An invoker check proves only that the
+ * caller holds a Google identity, which says nothing about WHICH FairWins member is asking; the
+ * member token is the authorization and the member API verifies it on every call (signature,
+ * expiry, revocation, membership, sanctions, scope).
+ *
+ * SINGLE CONTAINER ON PURPOSE. The module's `ignore_changes` indexes into
+ * `template[0].containers[0]`. A second container moves the index out from under the entry that
+ * protects the image, and the pipeline is back to fighting Terraform on every deploy.
+ *
+ * The image must listen on the port Cloud Run injects as `PORT` — the module declares no `ports`
+ * block, so the default container port applies and a hardcoded listener would never pass a probe.
+ */
+module "mcp_server" {
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+
+  project_id = var.project_id
+  region     = var.region
+  name       = "fairwins-mcp-server"
+
+  # Required by the provider, then ignored. The pipeline publishes :latest alongside the SHA tag.
+  image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/fairwins-mcp-server/fairwins-mcp-server:latest"
+
+  # Agent traffic is thin and bursty, and every request is a proxy hop to the member API. A low
+  # ceiling bounds what a runaway client can spend without capping a real workload.
+  min_instances         = 0
+  max_instances         = 4
+  cpu                   = "1"
+  memory                = "256Mi"
+  cpu_idle              = true
+  allow_unauthenticated = true
+
+  # Plain configuration only. `env` is rendered verbatim into the revision, so a secret here would
+  # be readable by anyone who can describe the service — secrets belong in `secret_env`, and this
+  # service has none.
+  env = {
+    FAIRWINS_API_URL = "https://relay.fairwins.app"
+  }
+}
+
 # ── edge ──────────────────────────────────────────────────────────────────────────────────────
 
 /**

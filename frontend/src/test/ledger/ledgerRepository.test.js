@@ -253,3 +253,47 @@ describe('ledgerRepository.listEntries', () => {
     expect(prunedBefore).toBe(12345)
   })
 })
+
+/*
+ * Spec 051 / #1280 — read vs unreadable.
+ *
+ * `listEntries` gathers sources with `allSettled` so one bad source degrades to stale instead of
+ * poisoning the ledger. The cost of that, until this was added, is that a chain whose sources ALL
+ * failed returned exactly what a chain with no history returns — an empty array — and every caller
+ * downstream rendered "no activity" about networks it had never managed to read.
+ */
+describe('ledgerRepository.listEntries — read vs unreadable', () => {
+  const dead = (cls) => ({ class: cls, list: async () => { throw new Error('rpc down') } })
+
+  it('a chain with sources that all answered is "read", even with nothing to show', async () => {
+    const repo = createLedgerRepository({ sources: [source('wager', []), source('pool', [])], enrich: passThroughEnrich })
+    const res = await repo.listEntries(CTX)
+    expect(res.readState).toBe('read')
+    expect(res.entries).toHaveLength(0)
+    expect(res.staleClasses).toHaveLength(0)
+  })
+
+  it('a PARTIAL failure stays "read" — some of it is known, and staleClasses names the rest', async () => {
+    const repo = createLedgerRepository({
+      sources: [source('wager', [preItem()]), dead('pool')],
+      enrich: passThroughEnrich,
+    })
+    const res = await repo.listEntries(CTX)
+    expect(res.readState).toBe('read')
+    expect(res.entries).toHaveLength(1)
+    expect(res.staleClasses).toEqual(['pool'])
+  })
+
+  it('a TOTAL failure is "unreadable" — an empty array here states nothing', async () => {
+    const repo = createLedgerRepository({ sources: [dead('wager'), dead('pool')], enrich: passThroughEnrich })
+    const res = await repo.listEntries(CTX)
+    expect(res.readState).toBe('unreadable')
+    expect(res.entries).toHaveLength(0)
+  })
+
+  it('NO sources configured is "read" — nothing failed, there was simply nothing to ask', async () => {
+    const repo = createLedgerRepository({ sources: [], enrich: passThroughEnrich })
+    const res = await repo.listEntries(CTX)
+    expect(res.readState).toBe('read')
+  })
+})

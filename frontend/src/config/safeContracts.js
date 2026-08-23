@@ -22,6 +22,22 @@ const SAFE_V1_4_1 = {
 // contracts (safeProposalHub + the policy engine) are verified live on it — otherwise Protect would
 // offer vaults on a chain where proposals cannot be discovered. Every entry below was checked
 // on-chain by scripts/ops/preflight-policy-guard-v2.js and deployed in spec 068.
+/*
+ * The full-E2E local node impersonates Amoy (80002) so membership can settle on its reference
+ * chain, and Custody is genuinely NOT offered on real Polygon Amoy. Rather than leave the whole
+ * custody surface undrivable end to end, the local impersonation resolves Safe there too, and
+ * `scripts/e2e/setup-custody-fixtures.js` places the canonical v1.4.1 code on that node so the
+ * addresses below actually answer.
+ *
+ * DEV-guarded exactly like the sibling seams (`NETWORK_CONTRACTS[80002]` in contracts.js, `earn`
+ * in networks.js): `import.meta.env.DEV &&` makes the branch dead code in any production bundle,
+ * so a shipped build offers custody on Amoy no more than it does today, even with the flag set.
+ * Real Amoy joins the map above — not here — if and when Safe and our custody contracts are
+ * verified live on it.
+ */
+const E2E_AMOY_LOCAL =
+  Boolean(import.meta.env?.DEV) && import.meta.env?.VITE_E2E_AMOY_LOCAL === '1'
+
 export const SAFE_CONTRACTS = {
   10: SAFE_V1_4_1, // Optimism
   61: SAFE_V1_4_1, // Ethereum Classic
@@ -29,6 +45,7 @@ export const SAFE_CONTRACTS = {
   137: SAFE_V1_4_1, // Polygon
   8453: SAFE_V1_4_1, // Base
   42161: SAFE_V1_4_1, // Arbitrum One
+  ...(E2E_AMOY_LOCAL ? { 80002: SAFE_V1_4_1 } : {}), // local full-E2E impersonation only
 }
 
 /** Supported custody chain ids (those with a Safe deployment configured above). */

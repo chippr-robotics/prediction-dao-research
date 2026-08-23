@@ -1,0 +1,309 @@
+/* API access (spec 095) — the Settings card that mints member-signed capability tokens.
+
+   Every colour is a theme token: src/theme.css is the only shipped stylesheet that may state one,
+   and src/test/brand/noHardcodedColors.test.js walks this file. Status surfaces are OPAQUE (a tint's
+   contrast depends on whatever is painted behind it), and small text uses --accent-color rather than
+   --brand-primary, which is a large-text-and-fill colour. */
+
+.api-access-panel .acc__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.api-access__lead,
+.api-access__gate p,
+.api-access__mcp p,
+.api-access__empty {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.api-access__console,
+.api-access__gate,
+.api-access__create,
+.api-access__reveal,
+.api-access__keys,
+.api-access__mcp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.api-access__console h4,
+.api-access__gate h4 {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.api-access__create label,
+.api-access__scopes legend {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.api-access__create input[type='text'],
+.api-access__create select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 0.5rem 0.6rem;
+  width: 100%;
+}
+
+.api-access__scopes {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+}
+
+.api-access__scope {
+  align-items: flex-start;
+  cursor: pointer;
+  display: flex;
+  font-weight: 400;
+  gap: 0.6rem;
+}
+
+.api-access__scope input {
+  /* Without this a native checkbox paints itself in the UA's own blue, which is off-palette in both
+     themes and was the one colour on this card that no token chose. Every other checkbox-bearing
+     settings panel (Home, Navigation, Notification profiles) sets exactly this. */
+  accent-color: var(--brand-primary);
+  margin-top: 0.2rem;
+  min-height: 18px;
+  min-width: 18px;
+}
+
+.api-access__scope-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.api-access__scope-label {
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.api-access__scope-desc {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* --- One-time reveal ------------------------------------------------------ */
+.api-access__reveal {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+  padding: 0.8rem;
+}
+
+.api-access__warn {
+  color: var(--warning-text);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.api-access__token,
+.api-access__key-id,
+.api-access__snippet {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  display: block;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  padding: 0.6rem;
+  word-break: break-all;
+}
+
+.api-access__snippet {
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+  word-break: normal;
+}
+
+/* `display: inline-block` alone does NOT hug here: this <code> is a flex item of a column-flex
+   parent, whose default `align-items: stretch` made a 16-character key id span the whole card and
+   read as a disabled text input. `align-self` is what the declaration above was already asking
+   for. */
+.api-access__key-id {
+  align-self: flex-start;
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.2rem 0.4rem;
+  word-break: normal;
+}
+
+.api-access__hint {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* --- Key list ------------------------------------------------------------- */
+.api-access__key-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.api-access__key {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem;
+}
+
+.api-access__key-head {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.api-access__key-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.api-access__key-meta {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Opaque chips: an alpha tint would measure differently over the page and over a raised panel. */
+.api-access__chip {
+  border-radius: var(--radius-full, 999px);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  text-transform: uppercase;
+}
+
+.api-access__chip--active {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.api-access__chip--expired {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.api-access__chip--revoked {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+/* The member signed the withdrawal but the gateway never heard it — the grant may still be
+   honoured there, so this must read as a warning, not as the settled "revoked" state. */
+.api-access__chip--revocation-signed {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+/* --- Notices -------------------------------------------------------------- */
+.api-access__notice {
+  border-radius: var(--radius-md);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+}
+
+.api-access__notice--info {
+  background: var(--info-bg);
+  border: 1px solid var(--info-color);
+  color: var(--info-text);
+}
+
+.api-access__notice--success {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+}
+
+.api-access__notice--error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-color);
+  color: var(--danger-text);
+}
+
+/* --- Buttons -------------------------------------------------------------- */
+.api-access__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* There is no global `.btn`, only scoped ones, and src/index.css's global `button` rule would
+   otherwise paint primary and destructive identically. Scoped to this panel. */
+.api-access-panel .btn {
+  /* Every button on this card hugs its label. Without this the ones that are direct children of a
+     column-flex block (Try again, Go to Membership, Create key, Show/Hide setup snippet, Copy
+     snippet) stretched edge to edge, while the ones inside `.api-access__actions` sized to their
+     text — two button widths in one card, with no rule a reader could state. */
+  align-self: flex-start;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  min-height: 36px;
+  padding: 0.45rem 0.85rem;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+/* `.api-access__actions` is a ROW and sizes its own children, so it opts back out of the
+   hug above — otherwise nothing changes for Revoke / Remove from list / Copy key. */
+.api-access__actions .btn {
+  align-self: auto;
+}
+
+.api-access-panel .btn:hover:not(:disabled) {
+  border-color: var(--border-hover);
+}
+
+.api-access-panel .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.api-access-panel .btn-primary {
+  background: var(--primary-button);
+  border-color: var(--primary-button);
+  color: var(--primary-button-text);
+}
+
+.api-access-panel .btn-danger {
+  background: var(--danger-color);
+  border-color: var(--danger-color);
+  color: var(--text-on-brand);
+}

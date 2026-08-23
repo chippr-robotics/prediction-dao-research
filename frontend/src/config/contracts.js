@@ -72,22 +72,15 @@ const MORDOR_CONTRACTS = {
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
-//
-// THESE ARE GATED (issue #1298). `npm run setup:e2e` deploys the local chain and then runs
-// `npm run check:e2e-addresses`, which compares every value below against
-// deployments/localhost-chain1337-v2.json and FAILS the run on a disagreement — the E2E suite is
-// pointed here, not at the record, so a stale constant is an app calling an address with no code.
-// Re-derive rather than hand-edit: with a local node running,
-//   npm run deploy:local && npm run deploy:local:callsign && npm run sync:frontend-contracts:local
-// then commit this file. Two things move an address: a change to a contract's init code (CREATE2 —
-// most of these) and an extra deployer transaction sequenced before a plain-CREATE deploy
-// (wagerRegistry / membershipManager / tokenFactory / callsignRegistry). Last re-derived 2026-08-23.
 const HARDHAT_CONTRACTS = {
   deployer: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
   treasury: '',
   wagerRegistry: '0x9A676e781A523b5d0C0e43731313A708CB607508',
   membershipManager: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707',
   keyRegistry: '0xA5EB1dEB58Ebc18D334d72EDDED5406e612D042A',
+  // Spec 032 backup pointer. Deterministic (CREATE2) so a fresh local chain reproduces it;
+  // deployed by `npm run deploy:local:backup-pointer` inside setup:e2e.
+  backupPointerRegistry: '0x73722720e024fED5840361437f55dfd44acc5460',
   sanctionsGuard: '0xA3Fd27637C50a407E43B2CF889E83CdABF070D17',
   polymarketAdapter: '0xeA913b1a96D9447080bBfA7Cb7C397ae0A0fcADB',
   paymentToken: '0xbc4D54AE49ED9C6075770CD6acA930A728dcf526',
@@ -99,22 +92,79 @@ const HARDHAT_CONTRACTS = {
   safePolicyGuardV2: '0xc01E5F3EAFd2C0138e98382A3F54B6CeB3dc05cf',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
-  // spec 054 — %callsign naming registry. Deployed locally by `npm run deploy:local:callsign`,
-  // which `setup:e2e` runs after the core deploy (it appends to the same record). Empty here used
-  // to mean the local app hid every callsign surface while the E2E suite expected one — the CR-01
-  // shape in issue #1298 — and the gate now fails on exactly that.
-  callsignRegistry: '0xc5a5C42992dECbae36851359345FE25997F5C42d',
-  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
-  stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
+  /*
+   * spec 073 — the mini-app catalog registry, the trust boundary for which packages the host
+   * fetches, verifies and EXECUTES. On a shipped build this key is empty here and the catalog
+   * resolves to Polygon or Mordor; the local node gets one so the 073 flows can submit a package,
+   * approve it, and swap it under the curator — none of which is possible against a public chain.
+   * Deployed by `scripts/deploy/deploy-miniapp-registry.js`, which `setup:e2e` runs LAST so no
+   * earlier nonce-derived address moves. See `miniAppChainId()` in config/networks.js.
+   */
+  miniAppRegistry: '0x5081a39b8A5f0E35a8D959395a630b68B74Dd30f',
+  /*
+   * spec 066 — the staking control surface. Deployed on the local node by
+   * `scripts/deploy/deploy-staking-router.js` (which also stands up the Lido/sPOL/Polygon
+   * doubles it points at), so the specs 065/066 flows have a router to read, pause and
+   * curate. NONCE-DERIVED from the `setup:e2e` order, like every address in this block.
+   */
+  stakingRouter: '0xB0D4afd8879eD9F52b28595d31B441D079B2Ca07',
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
   // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
   // per-network empty state (FR-051) — never invented availability.
-  bridgeRouter: '',
-  liquidityRouter: '',
+  /*
+   * Spec 067 routers. NONCE-DERIVED like the two entries at the bottom of this map, and for the
+   * same reason: `deploy-bridge-liquidity.js` runs as a targeted deploy inside `setup:e2e` (after
+   * the custody fixtures, before the seed) and `deployProxy` uses plain CREATE. Inserting or
+   * reordering a deploy in that script silently repoints these at addresses nothing was deployed
+   * to — `frontend/cypress/e2e/full/30-bridge-liquidity.cy.js` asserts both against the chain, so
+   * a reordering fails saying so rather than as "the Bridge surface is unavailable".
+   *
+   * On a local chain the routers point at contracts/mocks stand-ins for Across and Uniswap, which
+   * that same script deploys. They are test doubles and cannot reach a real network.
+   */
+  bridgeRouter: '0x4c5859f0F772848b2D91F1D83E2Fe57935348029',
+  liquidityRouter: '0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154',
   membershipVoucher: '0xF2fc5Ac192E7e48B2EE95D3528870c6ED26908e4',
   voucherBatchMinter: '0xE0b0F625F876f7D78413cc6c402FB92C8E47Ea05',
   tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
+  /*
+   * spec 030 — ClearPath's ExternalDAORegistry. NONCE-DERIVED, and it is the LAST deploy
+   * `setup:e2e` performs (after the seed, deliberately: appending there left every address
+   * above it byte-identical). It exists locally because the ClearPath mini-app declares
+   * `externalDAORegistry` in its manifest, and `host.contracts(name)` THROWS for a declared
+   * name it cannot resolve — so without this entry the app's own Register surface would refuse
+   * before reaching the chain, and the e2e flow would be measuring a missing constant.
+   */
+  externalDAORegistry: '0x36b58F5C1969B7b6591D752ea6F5486D069010AB',
+  /*
+   * spec 054 — the %callsign registry. NONCE-DERIVED, deployed by `deploy:local:callsigns`, which
+   * runs after the swap doubles and before the package publish. Registration is Gold-gated and
+   * commit→reveal, so the on-chain flow needs a registry it can actually write to; a shipped build
+   * still resolves this from the per-network maps above (Polygon has one, Mordor does not yet).
+   */
+  callsignRegistry: '0x7A9Ec1d04904907De0ED7b6839CcdD59c3716AC9',
+  /*
+   * THE TWO ENTRIES BELOW ARE NONCE-DERIVED, AND THEIR ORDER IS THE `setup:e2e` ORDER.
+   *
+   * Both come from targeted deploys that run AFTER `deploy:local` (`deploy:local:pools`, then
+   * `deploy:local:fees`), and `deployProxy` uses plain CREATE — so each address is a function of
+   * the deployer's nonce at that moment. Inserting or reordering a deploy in `setup:local` /
+   * `setup:e2e` silently repoints these at addresses nothing was deployed to; the note beside
+   * those scripts in package.json says the same thing from the other end.
+   *
+   * They are hardcoded rather than synced because the E2E tier deliberately does not run
+   * `sync:frontend-contracts` (it would overwrite AMOY_CONTRACTS' real addresses with local
+   * ones), so these constants are what the app actually resolves.
+   */
+  // spec 034 — Wager Pools factory (address-based, no Semaphore).
+  wagerPoolFactory: '0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690',
+  /*
+   * spec 060 — the platform-fee source of truth.
+   * `frontend/cypress/e2e/full/25-platform-fees.cy.js` asserts this against the address the chain
+   * actually holds, so a reordering fails with the reason rather than as "deposits are paused".
+   */
+  feeRouter: '0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9',
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)
@@ -259,9 +309,24 @@ const ARBITRUM_CONTRACTS = {
   accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
 }
 
+/*
+ * Full-E2E seam (spec 071 collision): the tier's local hardhat node boots AS chainId 80002 so
+ * the local chain is the app's membership home — membershipChainId() is deliberately not
+ * runtime-configurable, so the node impersonates Amoy rather than the app trusting a new chain.
+ * On that node the deployed addresses are byte-identical to HARDHAT_CONTRACTS (local deploys
+ * are deterministic by deployer+nonce, which is chain-id-independent), so 80002 resolves to the
+ * hardhat set.
+ *
+ * DEV-guarded like the spec-085 hardware test adapter: `import.meta.env.DEV &&` makes the whole
+ * branch dead code in any production bundle — a shipped build cannot be pointed at this even
+ * with the variable set.
+ */
+const E2E_AMOY_LOCAL =
+  Boolean(import.meta.env?.DEV) && import.meta.env?.VITE_E2E_AMOY_LOCAL === '1'
+
 const NETWORK_CONTRACTS = {
   63: MORDOR_CONTRACTS,     // Mordor (Ethereum Classic testnet, v2 core-only)
-  80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
+  80002: E2E_AMOY_LOCAL ? HARDHAT_CONTRACTS : AMOY_CONTRACTS, // Polygon Amoy (v2) — or the local impersonation (E2E)
   137: POLYGON_CONTRACTS,   // Polygon mainnet (v2) — LIVE
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
   // Spec 068 — custody only (Protect vaults + policy engine; no wager/membership here).
@@ -313,7 +378,35 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   10: { safeProposalHub: 154753770 }, // Optimism
   8453: { safeProposalHub: 49158472 }, // Base
   42161: { safeProposalHub: 488059169 }, // Arbitrum One
-  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024, miniAppRegistry: 0 },
+  80002: {
+    friendGroupMarketFactory: 0,
+    wagerRegistry: 0,
+    membershipVoucher: 40521024,
+    miniAppRegistry: 0,
+    /*
+     * Custody on Amoy exists ONLY in the local full-E2E impersonation (see the matching seams in
+     * safeContracts.js and networks.js), where the chain is a few hundred blocks old and the hub's
+     * code is placed by scripts/e2e/setup-custody-fixtures.js. Block 1 scans all of it.
+     *
+     * The value has to be non-zero: `useVaultProposals` reads 0 as "no recorded block" and refuses
+     * to scan rather than sweeping from genesis on a real chain — which is the right default, and
+     * is why the local impersonation has to say a block rather than inherit one. DEV-guarded, so a
+     * production build still reports nothing here and Amoy proposal discovery stays off.
+     */
+    // Same seam, same reason: the registry exists on Amoy only in the local impersonation, and
+    // its catalog reads scan from a recorded block. 1 covers a chain a few hundred blocks old.
+    /*
+     * The full-E2E impersonation runs on a local node ~100 blocks long, so every REAL Amoy block
+     * number above is a starting point in the far future: a bounded scan from it finds nothing and
+     * the surface renders an honest-looking empty list for a holding that exists. `membershipVoucher`
+     * is the one that bit — `useVouchers#listMyVouchers` derives holdings from a Transfer-log scan,
+     * so the Vouchers page showed "you don't have any vouchers to redeem" for a wallet holding one.
+     *
+     * Zero is safe HERE and only here: the "never scan from genesis" rule (#703/#704) is about
+     * public chains with millions of blocks behind them.
+     */
+    ...(E2E_AMOY_LOCAL ? { safeProposalHub: 1, miniAppRegistry: 1, membershipVoucher: 0 } : {}),
+  },
   // Polygon. Blocks marked (measured) were bisected with `eth_getCode` against an archive node
   // rather than taken from a deploy script's report — the two disagreed by up to ten blocks, and
   // a recorded block LATER than the real creation silently drops any event in between. The

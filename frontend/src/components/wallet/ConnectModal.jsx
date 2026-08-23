@@ -132,16 +132,24 @@ function ConnectModalDialog() {
     // Issue #849: whenever this browser knows at least one passkey, present the
     // chooser instead of silently pinning to the first (index 0). The picker
     // lets the member select any known passkey, reach a different one on the
-    // device via "Use a different passkey…", or create another account — the
-    // three acceptance scenarios. Only a browser with an empty book skips
-    // straight to sign-up (there is nothing yet to choose between).
-    if (known.length >= 1) {
-      setPickerAccounts(known)
-      setStep('picker')
-      return
-    }
-    doConnect(PASSKEY_CONNECTOR_ID, undefined)
-  }, [doConnect])
+    // device via "Use a different passkey…", or create another account.
+    //
+    // AN EMPTY BOOK GETS THE CHOOSER TOO, and that is the whole point of this
+    // branch no longer existing. It used to skip straight to sign-up, on the
+    // reasoning that there was "nothing yet to choose between" — true of THIS
+    // BROWSER'S book, and false of the member. A passkey that synced through
+    // iCloud/Google (the sync this flow's own explainer advertises) lives on
+    // the device while the book is empty, so a member opening FairWins on a new
+    // browser was signed UP: a second account, and their funds apparently gone.
+    // "Use a different passkey…" was the recovery, and it rendered only here —
+    // i.e. nowhere they could reach without first minting the stray account.
+    //
+    // The site cannot know whether a discoverable credential exists; the
+    // authenticator can. So we ask the member rather than guessing, which costs
+    // a first-time signer one click and costs a returning one nothing.
+    setPickerAccounts(known)
+    setStep('picker')
+  }, [])
 
   const handleSelect = useCallback(
     (connector) => {
@@ -278,9 +286,11 @@ function ConnectModalDialog() {
         {step === 'picker' && (
           <div className="connect-modal__list" data-testid="passkey-picker">
             <p className="connect-modal__hint">
-              {pickerAccounts.length > 1
-                ? 'This browser knows several passkey accounts. Pick the one to sign into — the app never guesses.'
-                : 'Pick a passkey to sign into, use another passkey on this device, or create a new account.'}
+              {pickerAccounts.length === 0
+                ? 'This browser does not know a passkey yet. If you already have a FairWins passkey — on this device, or synced from another — sign in with it. Otherwise create a new account.'
+                : pickerAccounts.length > 1
+                  ? 'This browser knows several passkey accounts. Pick the one to sign into — the app never guesses.'
+                  : 'Pick a passkey to sign into, use another passkey on this device, or create a new account.'}
             </p>
             {pickerAccounts.map((cred) => (
               <div key={cred.credentialId} className="connect-modal__account-row">
@@ -312,7 +322,7 @@ function ConnectModalDialog() {
               disabled={pendingId !== null}
               onClick={() => doConnect(PASSKEY_CONNECTOR_ID, { mode: 'sign-in', discoverable: true })}
             >
-              Use a different passkey…
+              {pickerAccounts.length === 0 ? 'I already have a passkey' : 'Use a different passkey…'}
             </button>
             <button
               type="button"

@@ -15,3 +15,12 @@
 #   to = module.staging_testnet.google_cloud_run_v2_service.this
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/services/staging-testnet"
 # }
+
+# `module.mcp_server_staging` (spec 095) is deliberately absent here: the service is new, created by
+# the first apply, with nothing to adopt. Same note as prod — if it is ever deployed out of band
+# first, adopt it rather than letting Terraform create a second one:
+#
+# import {
+#   to = module.mcp_server_staging.google_cloud_run_v2_service.this
+#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/fairwins-mcp-server-staging"
+# }

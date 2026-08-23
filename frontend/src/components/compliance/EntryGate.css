@@ -7,10 +7,21 @@
  * theme.css tokens so light and dark both keep WCAG-AA contrast.
  */
 
+/*
+ * ABOVE EVERY APP CHROME. The gate is a legal control (spec 007), not a notice: nothing behind it
+ * may be reached, and its two actions must always be pressable.
+ *
+ * At 1000 it sat BELOW the mobile bottom icon nav (1200), which on a phone covered the Enter and
+ * Leave buttons and left the nav itself tappable — so a visitor could move around the app without
+ * ever passing a dialog that claims `aria-modal="true"`. 1600 clears the icon nav (1200), the
+ * connect modal (1100/1500) and the action sheet (1500); the toast/dev layers above it are
+ * non-interactive. Caught by CG-01/CG-02 at the phone profile, where the click was refused as
+ * "covered by another element".
+ */
 .entry-gate-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 1600;
   display: flex;
   align-items: flex-start;
   justify-content: center;
