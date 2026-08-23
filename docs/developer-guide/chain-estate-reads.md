@@ -156,6 +156,20 @@ wires the default repository and providers). The full contract is
   stale", and a broken subgraph is not "Polygon unreachable".
 - **Empty ≠ failed.** A chain that read fine and found nothing is `read` with `entryCount: 0`;
   gate "no activity" language on state, never on count.
+- **A chain whose sources ALL failed is `unreachable`, not an empty read (#1280).** The
+  repository degrades per source rather than throwing, so a total outage used to arrive at the
+  merge as an ordinary empty list — indistinguishable from a member with no history, which meant
+  `allUnreachable` (and its honest disclosure) could never fire. `listEntries` now returns a
+  three-state `readState` (`read` / `unreadable`) and the merge maps `unreadable` to
+  `unreachable`. A source failing because its contract is **not deployed** on that chain is not a
+  failed read — `wagerLedgerSource` checks the escrow address first, or every un-deployed chain
+  would report the wager class stale forever.
+- **Freshness is a claim about what was READ.** `useAccountStats` only stamps
+  `{ lastUpdated: now, status: 'fresh' }` on the ledger-derived sections (summary/series/activity)
+  when the whole estate answered; with a chain or a class unread they stay `stale` on their
+  previous `lastUpdated`. "Updated 50s ago" beside a panel that just disclosed a failed read is
+  the same fabrication as an empty history. The wallet-balance section is unaffected — it reads
+  the connected wallet on its active chain, not the estate.
 - Dedup is by `entryId` (identity embeds chainId), which also collapses reference-chain sources
   (membership) answering from several scopes.
 - Wager lookups downstream are keyed `(chainId, wagerId)` — wager #12 exists independently on

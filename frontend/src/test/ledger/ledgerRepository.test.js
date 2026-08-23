@@ -59,9 +59,39 @@ describe('ledgerRepository.listEntries', () => {
       ],
       enrich: passThroughEnrich,
     })
-    const { entries, staleClasses } = await repo.listEntries(CTX)
+    const { entries, staleClasses, readState } = await repo.listEntries(CTX)
     expect(entries).toHaveLength(1)
     expect(staleClasses).toEqual(['earn'])
+    // One source answered, so the read happened — just not completely.
+    expect(readState).toBe('read')
+  })
+
+  // Issue #1280 — the empty list a total failure returns is byte-identical to
+  // the empty list of an account with no history. `readState` is what keeps
+  // them apart, so the caller never renders a failed read as an empty record.
+  it('reports readState "unreadable" when EVERY source failed', async () => {
+    const repo = createLedgerRepository({
+      sources: [
+        { class: 'wager', list: async () => { throw new Error('rpc 503') } },
+        { class: 'transfer', list: async () => { throw new Error('rpc 503') } },
+      ],
+      enrich: passThroughEnrich,
+    })
+    const { entries, staleClasses, readState } = await repo.listEntries(CTX)
+    expect(entries).toEqual([])
+    expect(staleClasses).toEqual(['wager', 'transfer'])
+    expect(readState).toBe('unreadable')
+  })
+
+  it('an account with genuinely no history is readState "read", not unreadable', async () => {
+    const repo = createLedgerRepository({
+      sources: [source('wager', []), source('transfer', [])],
+      enrich: passThroughEnrich,
+    })
+    const { entries, staleClasses, readState } = await repo.listEntries(CTX)
+    expect(entries).toEqual([])
+    expect(staleClasses).toEqual([])
+    expect(readState).toBe('read')
   })
 
   it('dedups the same underlying event across sources (oc beats dv)', async () => {

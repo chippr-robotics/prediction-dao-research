@@ -94,12 +94,34 @@ function MyAccountView() {
   // could not be read is disclosed by name instead (`partialChains`), and an
   // all-chains failure surfaces the hook's error with last-known data kept.
   const allNetworksFailed = Boolean(error) && partialChains.length > 0 && activity.length === 0
+  // #1280: an empty feed is only "no activity yet" when everything that feeds
+  // it actually answered. With a chain or a class unread, the record we hold
+  // is silent about them — and "your wagers, transfers, earn, pool, and
+  // membership activity will appear here" claims all five were checked. Name
+  // what could not be read instead; the disclosure is what makes the empty
+  // list honest, so it must not be swallowed by the empty state.
+  const unreadSources = [...partialChains, ...staleClasses]
+  const partiallyUnread = !allNetworksFailed && activity.length === 0 && unreadSources.length > 0
+  // Stats keeps its own condition: figures computed from wager records that DID
+  // arrive must still render, so the note replaces them only when there is
+  // nothing to compute from (`isEmpty`) AND something went unread.
+  const wagerStatsPartiallyUnread = !allNetworksFailed && isEmpty && unreadSources.length > 0
+  const unreadNote = `Could not be read: ${unreadSources.join(', ')}. Anything recorded there is missing from this list rather than absent.`
+
   const activityHonestState = () => {
     if (allNetworksFailed) {
       return (
         <EmptyState
           title="Your networks could not be read"
           message={`None of your networks answered: ${partialChains.join(', ')}. Nothing is shown rather than an empty history that isn't true.`}
+        />
+      )
+    }
+    if (partiallyUnread) {
+      return (
+        <EmptyState
+          title="Some of your activity could not be read"
+          message={unreadNote}
         />
       )
     }
@@ -131,6 +153,15 @@ function MyAccountView() {
           compact
           title="Your networks could not be read"
           message={`None of your networks answered: ${partialChains.join(', ')}. Figures are withheld rather than shown as zeros.`}
+        />
+      )
+    }
+    if (wagerStatsPartiallyUnread) {
+      return (
+        <EmptyState
+          compact
+          title="Some of your activity could not be read"
+          message={`Could not be read: ${unreadSources.join(', ')}. Figures are withheld for those rather than shown as zeros.`}
         />
       )
     }
@@ -189,7 +220,10 @@ function MyAccountView() {
       {view === 'activity' && (
         <div role="tabpanel" aria-label="Activity" className="my-account-panel">
           <div className="my-account-freshness">
-            <FreshnessIndicator state={freshness?.summary} onRefresh={refresh} />
+            {/* The activity panel's own section state (#1280): the indicator
+                describes the data beneath it, so a ledger that could not be
+                read fully must not be labelled with the summary's freshness. */}
+            <FreshnessIndicator state={freshness?.activity ?? freshness?.summary} onRefresh={refresh} />
           </div>
           {activityState || (
             <RecentActivityFeed

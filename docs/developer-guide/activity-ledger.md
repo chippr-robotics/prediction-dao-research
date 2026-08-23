@@ -24,7 +24,9 @@ sources/*.js  ──► ledgerRepository ──► useActivityLedger ──► A
   one `(account, chainId)`, normalizes (invariants below), dedups, enriches
   token meta + USD, filters (class/status/kind/period), sorts newest-first.
   A failing source degrades to `staleClasses` (disclosed in the UI) instead
-  of failing the ledger.
+  of failing the ledger. When EVERY source fails the result also carries
+  `readState: 'unreadable'` — the empty entry list is then silence, not an
+  empty history, and no consumer may render it as "nothing here yet" (#1280).
 - **Sources** (`frontend/src/data/ledger/sources/`) implement the adapter
   contract in `specs/051-unified-activity-ledger/contracts/ledger-source.md`:
   - `wagerLedgerSource` — subgraph `WagerTransfer` rows (primary; real

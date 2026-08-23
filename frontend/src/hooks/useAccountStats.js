@@ -238,11 +238,10 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE, accountAd
       setWagers(wagerEstate.wagers)
       setLedgerEntries(ledger.entries)
       // Per-class staleness now names its network: "earn on Polygon".
-      setStaleClasses(
-        [...ledger.staleByChain.entries()].flatMap(([cid, classes]) =>
-          classes.map((c) => `${c} on ${networkName(cid)}`),
-        ),
+      const staleLabels = [...ledger.staleByChain.entries()].flatMap(([cid, classes]) =>
+        classes.map((c) => `${c} on ${networkName(cid)}`),
       )
+      setStaleClasses(staleLabels)
       setPrunedByChain(
         [...ledger.prunedByChain.entries()].map(([cid, before]) => ({
           chainId: cid,
@@ -254,7 +253,21 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE, accountAd
       setPartialChains(partialIds.map((id) => networkName(id)))
       const now = Date.now()
       const fresh = { lastUpdated: now, status: 'fresh' }
-      setFreshness({ summary: fresh, series: fresh, balances: fresh, activity: fresh })
+      // #1280: freshness is a claim about what was READ, not about when the
+      // load finished. A partially-unread estate — a chain that did not answer,
+      // or a class that could not be refreshed — leaves the ledger-derived
+      // sections on last-known data, so they stay `stale` and keep their
+      // previous `lastUpdated` rather than asserting "Updated 0s ago" beside a
+      // panel that just disclosed a failed read. The balances tile reads the
+      // connected wallet on its active chain, so it is unaffected by the
+      // estate's history reads.
+      const ledgerIncomplete = staleLabels.length > 0 || partialIds.length > 0
+      setFreshness((f) => ({
+        summary: ledgerIncomplete ? { ...f.summary, status: 'stale' } : fresh,
+        series: ledgerIncomplete ? { ...f.series, status: 'stale' } : fresh,
+        balances: fresh,
+        activity: ledgerIncomplete ? { ...f.activity, status: 'stale' } : fresh,
+      }))
     } catch (err) {
       if (reqId !== reqIdRef.current) return
       setError(err?.message || 'Failed to load account stats')

@@ -7,6 +7,10 @@
  * (`staleClasses`) instead of failing the ledger — the UI discloses staleness
  * honestly (constitution III) rather than blanking or fabricating.
  *
+ * The read is three-state (`readState`): `read` when at least one source
+ * answered, `unreadable` when every source failed. An `unreadable` result's
+ * empty entry list is NOT an empty history — see #1280.
+ *
  * Failed entries are INCLUDED here; excluding them from financial totals is
  * the summary helpers' job (FR-003), not the repository's.
  */
@@ -109,7 +113,7 @@ export function compareEntries(a, b) {
 export function createLedgerRepository({ sources = [], enrich = defaultEnrich, getPrunedBefore } = {}) {
   /**
    * @param {object} q - { account, chainId, filter?, period?, provider?, signal? }
-   * @returns {Promise<{entries: Array, staleClasses: string[], prunedBefore: number|null}>}
+   * @returns {Promise<{entries: Array, readState: 'read'|'unreadable', staleClasses: string[], prunedBefore: number|null}>}
    */
   async function listEntries(q) {
     const ctx = { account: String(q.account || '').toLowerCase(), chainId: Number(q.chainId) }
@@ -130,10 +134,22 @@ export function createLedgerRepository({ sources = [], enrich = defaultEnrich, g
     )
 
     const collected = []
+    let failedSources = 0
     settled.forEach((res, i) => {
       if (res.status === 'fulfilled') collected.push(...res.value)
-      else staleClasses.push(sources[i].class)
+      else {
+        failedSources++
+        staleClasses.push(sources[i].class)
+      }
     })
+
+    // Three-state read (constitution III, issue #1280). Per-source degradation
+    // is right, but it has one blind spot: when EVERY source fails the caller
+    // gets the same empty array a chain with no history returns, and cannot
+    // tell "nothing happened" from "nothing was read". Say so here, where the
+    // distinction is knowable. `unreadable` never means empty — it means the
+    // entry list below carries no information at all.
+    const readState = sources.length > 0 && failedSources === sources.length ? 'unreadable' : 'read'
 
     // Dedup across sources, then collapse every observation of one bridge into
     // the single movement it is — a bridge spans two networks and two
@@ -145,6 +161,7 @@ export function createLedgerRepository({ sources = [], enrich = defaultEnrich, g
 
     return {
       entries: filtered,
+      readState,
       staleClasses,
       prunedBefore: typeof getPrunedBefore === 'function' ? getPrunedBefore(ctx) ?? null : null }
   }
