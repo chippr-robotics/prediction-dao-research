@@ -102,6 +102,12 @@ jobs:
         with:
           node-version: '22'
 
+      # A gate that silently passes everything is worse than no gate. These drive each C2b rule
+      # against a fixture that MUST be rejected — including the catalogue with the x402 entry
+      # removed, which is the state this gate was green in before the rule existed.
+      - name: Test the coverage gate's own rules
+        run: npm run test:finops-gate
+
       - name: Check FinOps source coverage
         run: npm run check:finops
 

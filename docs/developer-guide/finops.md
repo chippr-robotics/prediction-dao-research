@@ -114,26 +114,79 @@ npm run check:finops
 | Check | Fails when |
 |---|---|
 | C1 | a catalogue entry is malformed |
-| C2 | a `FeeRouter` service exists in the platform with no catalogue entry (or vice versa) |
+| C2a | a `FeeRouter` service exists in the platform with no catalogue entry (or vice versa) |
+| C2b | the relay gateway configures a platform payee no catalogue entry claims |
 | C3 | a catalogued metric is one no collector emits |
 | C4 | a catalogued source has no dashboard panel |
 | C5 | the committed `infra/grafana/` tree is stale |
 
-Every failure names the file and the edit that resolves it. C2 reads the fee services out of
+Every failure names the file and the edit that resolves it. C2a reads the fee services out of
 `frontend/src/lib/fees/feeQuote.js` and `services/relay-gateway/src/fees/onchain.js`, both of which
 are themselves checked against the contracts by the spec-060 suite — so the loop closes at the chain.
+
+### C2b: money paths that are not FeeRouter services
+
+C2a is a complete answer for one kind of revenue and a blind spot for every other. Its whole
+discovery surface is `keccakId('x.y')` over two files, so it enumerates FeeRouter services and
+nothing else — and the x402 rail (spec 096) takes USDC straight to the platform treasury without
+registering a service id. It was invisible to this gate *by construction*: the catalogue could stay
+silent about it forever and CI would stay green. **A gate that cannot see the source is not
+protection.**
+
+C2b widens the question from "is every fee service catalogued" to "is every place the platform is
+named as a recipient of funds catalogued". The gateway holds no key and hardcodes no address, so a
+recipient we control arrives as configuration — an env var, read from the environment, whose name
+ends in a payee suffix (`_PAY_TO`, `_TREASURY`, `_REFERRAL_ADDRESS`, `_REF_CODE`, …). A payee
+written into source as a literal address is caught too, so skipping the env var does not skip the
+gate.
+
+Each discovered namespace must be claimed by a catalogue entry:
+
+```js
+moneyPath: { namespace: 'x402', payeeEnv: 'X402_PAY_TO', enableEnv: 'X402_ENABLED' },
+```
+
+Five namespaces exist today (`opensea`, `polymarket`, `perps-gains`, `perps-gmx`, `x402`); four were
+catalogued long before this rule, which is what says it is a general rule rather than a plug for one
+hole. C2b also refuses to let a **`planned`** entry keep claiming there is nothing to read once a
+committed deployment file sets its payee or its enable flag — see
+[planned-sources](../runbooks/finops-operations.md#planned-sources).
+
+What C2b deliberately does **not** match is a bare `recipient`: the gateway is full of them (Across
+quotes, intent structs, Seaport orders) and every one is the *member's* address. The discriminator is
+not "an address is named" but "an address we control is named".
+
+Discovery is one-sided, and the header of `check-finops-coverage.js` says so at length: a new vendor
+**cost** leaves no mechanical trace, because `fetch(vendor)` is identical whether the vendor meters
+the call or serves free public data. The cost side is held by C1's mandatory `basis` and by review.
+
+`npm run test:finops-gate` drives every C2b rule against a fixture that must be rejected — including
+the catalogue with the x402 entry removed, which is the state this gate was green in.
 
 **Never hand-edit `infra/grafana/`.** It is generated, and C5 will tell you so.
 
 ## What is deliberately not live
 
-`miniapp-licenses` and `wager-platform-fee` are catalogued with `status: 'planned'`. Both were named
-in the brief as revenue streams and neither exists on chain: `MiniAppRegistry` has no fee, price or
-`payable` function, and `WagerRegistry` takes no platform cut.
-
 A planned source declares **no metric**, emits no value, and is excluded from every total. It renders
 as *NOT YET LIVE*. The alternative — showing `$0` — is indistinguishable from a shipped source
 earning nothing, and would quietly close a question that is still open.
+
+Four sources are `status: 'planned'`, in two groups:
+
+**Does not exist anywhere.** `miniapp-licenses` and `wager-platform-fee` were named in the brief as
+revenue streams and neither exists on chain: `MiniAppRegistry` has no fee, price or `payable`
+function, and `WagerRegistry` takes no platform cut.
+
+**Built, offered nowhere.** `x402-agent-payments` (revenue) and `assistant-model-api` (cost) are
+complete, tested code behind flags that are commented out in the only production deployment, so not
+one payment and not one billed token exists. `planned` is still the honest status — reporting `$0`
+would say "offered, and nobody used it" — but because enabling them is a *config* change rather than
+a code change, each declares a `moneyPath` and C2b turns that enable into a build failure. That is
+the point: switching on a revenue rail is precisely the moment nobody remembers the dashboard.
+
+`assistant-model-api` declares `basis: 'modelled'` now, while nothing is at stake. This exporter
+holds no Anthropic billing credential, so any dollar figure it ever publishes will be token counts
+times a rate typed into a config file. Only GCP is `billed`.
 
 ## Deployment
 

@@ -15,7 +15,9 @@
  * Five checks. A new fee service fails at least three of them.
  *
  *   C1  catalogue schema is valid                          (FR-002)
- *   C2  every on-chain fee service has a catalogue entry    (FR-019)
+ *   C2  every money path in the platform has an entry       (FR-019)
+ *         C2a  on-chain FeeRouter services
+ *         C2b  configured platform payees in the relay gateway
  *   C3  every catalogued metric is one a collector emits    (FR-021)
  *   C4  every catalogued source has a dashboard panel       (FR-020)
  *   C5  committed dashboards match a fresh generation       (regenerate-and-diff)
@@ -23,13 +25,37 @@
  * Every failure message names the exact file and the edit that resolves it (FR-023). A gate that
  * fails without saying how to satisfy it is a gate somebody disables.
  *
+ * ── WHAT THIS GATE STILL CANNOT SEE ──────────────────────────────────────────────────────────
+ *
+ * Stated plainly, because a gate whose limits are unwritten gets read as covering everything.
+ *
+ * DISCOVERY IS ONE-SIDED. C2 finds new REVENUE, because revenue leaves a mechanical trace — a fee
+ * service id, or an address we control written into configuration. A new vendor COST leaves none:
+ * `fetch(vendor)` is byte-for-byte the same call whether the vendor meters it or serves free public
+ * data, and this gateway does both (the perps module proxies three free venue APIs; the assistant
+ * calls a metered one). Any heuristic over outbound calls would fire on the free ones, and a gate
+ * that is wrong on its first run is a gate somebody adds `continue-on-error` to.
+ *
+ *   A credential-based rule was considered and rejected: a paid vendor account almost always
+ *   arrives as a secret, and `infra/vm/common/fetch-secrets.sh` enumerates every secret the gateway
+ *   receives — it would have caught ANTHROPIC_API_KEY. It does not ship because the catalogue's
+ *   `credential` values are descriptive names ('quicknode-api-key') while fetch-secrets uses the
+ *   Secret Manager ids ('finops-quicknode-key'), so joining them means agreeing on a convention that
+ *   nothing enforces. Making those two naming schemes agree is the prerequisite, and it is a
+ *   separate change from this one.
+ *
+ * So the cost side is held by C1's mandatory `basis` and by review, not by discovery. What C2b DOES
+ * give the cost side is dormancy honesty: a catalogued-but-`planned` cost cannot be switched on in a
+ * committed deployment while still claiming there is nothing to read.
+ *
  * Usage: node scripts/finops/check-finops-coverage.js [--json]
  */
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { SOURCES, FEE_SERVICE_LABELS, validateCatalogue, METRIC_FAMILIES } from '../../packages/finops-catalogue/src/index.js'
+import { discoverMoneyPaths, unclaimedMoneyPaths, staleClaims, dormantPathsSwitchedOn } from './lib/moneyPaths.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const CATALOGUE = 'packages/finops-catalogue/src/sources.js'
@@ -39,13 +65,34 @@ const fail = (check, message, fix) => violations.push({ check, message, fix })
 
 const readIfExists = (rel) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), 'utf8') : null)
 
+/** Every file under `rel` matching `test`, as `{ path (repo-relative), text }`. */
+function readTree(rel, test) {
+  const abs = join(ROOT, rel)
+  if (!existsSync(abs)) return []
+  const out = []
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      // node_modules is not our source. Walking it here would be slow and would let a dependency's
+      // fixture answer a question about OUR platform.
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules') walk(join(dir, entry.name))
+      } else if (test(entry.name)) {
+        const p = join(dir, entry.name)
+        out.push({ path: relative(ROOT, p), text: readFileSync(p, 'utf8') })
+      }
+    }
+  }
+  walk(abs)
+  return out
+}
+
 // ── C1: schema ───────────────────────────────────────────────────────────────────────────────
 
 for (const problem of validateCatalogue(SOURCES)) {
   fail('C1', problem, `Edit ${CATALOGUE}.`)
 }
 
-// ── C2: on-chain fee services vs the catalogue (FR-019) ──────────────────────────────────────
+// ── C2a: on-chain fee services vs the catalogue (FR-019) ─────────────────────────────────────
 //
 // The fee services are read from TWO independent places and both must agree with the catalogue:
 // the frontend's FEE_SERVICES table and the gateway's FEE_SERVICE_IDS. Checking only one would let
@@ -70,7 +117,7 @@ const catalogued = new Set(FEE_SERVICE_LABELS)
 for (const label of [...platformFees].sort()) {
   if (!catalogued.has(label)) {
     fail(
-      'C2',
+      'C2a',
       `FeeRouter service '${label}' exists in the platform but has NO catalogue entry, so it earns revenue that appears on no dashboard.`,
       `Add an entry to the FEE_SERVICES array in ${CATALOGUE} with serviceLabel: '${label}', then run \`npm run finops:generate\`.`,
     )
@@ -82,11 +129,77 @@ for (const label of [...platformFees].sort()) {
 for (const label of [...catalogued].sort()) {
   if (platformFees.size && !platformFees.has(label)) {
     fail(
-      'C2',
+      'C2a',
       `Catalogued fee service '${label}' is not referenced by the frontend fee table or the gateway fee reader. Its panel will show "No data" forever, which reads as "earned nothing".`,
       `Either restore the service in the platform, or set that entry's status to 'retired' in ${CATALOGUE}.`,
     )
   }
+}
+
+// ── C2b: configured platform payees vs the catalogue (FR-019) ────────────────────────────────
+//
+// WHY THIS EXISTS. C2a above is a complete answer for one KIND of revenue and a blind spot for
+// every other: its whole discovery surface is `keccakId('x.y')` over two files, so it enumerates
+// FeeRouter services and nothing else. The x402 rail (spec 096) takes USDC straight to the platform
+// treasury and registers no service id, so it was invisible to this gate BY CONSTRUCTION — the
+// catalogue could stay silent about a live revenue stream forever and CI would stay green. A gate
+// that cannot see the source is not protection.
+//
+// So this widens the question from "is every fee service catalogued" to "is every place the
+// PLATFORM is named as a recipient of funds catalogued". The signal is a configured payee: the
+// gateway holds no key and hardcodes no address, so a recipient we control arrives as an env var.
+// See scripts/finops/lib/moneyPaths.js for the detection rules and, importantly, for what is
+// deliberately NOT detected and why.
+
+const gatewaySources = readTree('services/relay-gateway/src', (f) => f.endsWith('.js'))
+const moneyPaths = discoverMoneyPaths(gatewaySources)
+
+for (const { namespace, evidence } of unclaimedMoneyPaths(moneyPaths, SOURCES)) {
+  fail(
+    'C2b',
+    `The relay gateway configures a platform payee under '${namespace}' (${evidence.join(', ')}), but NO catalogue entry claims it. ` +
+      `Money can arrive at an address we control and appear on no dashboard — which is the exact gap that let the x402 rail ship uncatalogued.`,
+    `Add a source to ${CATALOGUE} with moneyPath: { namespace: '${namespace}', payeeEnv: '…' }. If it is built but not offered on any ` +
+      `deployment, catalogue it as status 'planned' with no metric — it must be NAMED either way, so that switching it on is a gate failure ` +
+      `rather than a silent event.`,
+  )
+}
+
+// The reverse: an entry claiming an env var the gateway no longer reads. Its claim is stale, so the
+// path it was watching may have moved somewhere nothing is watching.
+for (const source of staleClaims(moneyPaths, SOURCES, gatewaySources)) {
+  const payeeEnv = source.moneyPath.payeeEnv
+  fail(
+    'C2b',
+    `Source '${source.id}' claims the payee '${payeeEnv}', which the relay gateway no longer reads. The claim is stale, so whatever replaced it is unwatched.`,
+    `Point moneyPath.payeeEnv at the variable that configures the recipient now, or set the entry's status to 'retired' in ${CATALOGUE}.`,
+  )
+}
+
+// ── C2b (dormancy honesty): a `planned` money path that a deployment has switched on ─────────
+//
+// `planned` is a claim about the world: there is nothing to read. It is the right answer for a path
+// that is built but offered nowhere — reporting $0 would say "offered, and nobody used it". What
+// makes it decay is that turning such a path ON is a one-line config change in a deployment file,
+// and nothing in this gate used to look at deployment files at all. So the entry would keep saying
+// NOT YET LIVE while real money moved, and the dashboard would under-report by exactly that source.
+//
+// Enabling is therefore where promotion to `live` (with a collector) becomes non-optional. That is
+// deliberate: switching on a revenue rail is precisely the moment nobody remembers the dashboard.
+
+const deploymentConfigs = [
+  ...readTree('infra/vm', (f) => /\.(ya?ml|env)$/.test(f)),
+  ...readTree('services', (f) => /\.ya?ml$/.test(f)).filter(({ path }) => path.includes('/deploy/')),
+]
+
+for (const { source, what, hit } of dormantPathsSwitchedOn(SOURCES, deploymentConfigs)) {
+  fail(
+    'C2b',
+    `Source '${source.id}' is catalogued 'planned' — "nothing to read" — but ${what} in ${hit.path}:${hit.line}. ` +
+      `The path is being offered, so that claim is no longer true and every total silently omits it.`,
+    `Promote '${source.id}' to status 'live' in ${CATALOGUE}: give it a metric, a collector under ` +
+      `services/finops-exporter/src/collectors/ that reports read | not-configured | unreadable, then run \`npm run finops:generate\`.`,
+  )
 }
 
 // ── C3: catalogued metrics vs what the exporter can emit (FR-021) ────────────────────────────
@@ -215,7 +328,10 @@ if (process.argv.includes('--json')) {
 if (!violations.length) {
   const live = SOURCES.filter((s) => s.status === 'live').length
   const planned = SOURCES.filter((s) => s.status === 'planned').length
-  console.log(`FinOps coverage OK — ${live} live source(s), ${planned} planned, all catalogued, emitted and panelled.`)
+  console.log(
+    `FinOps coverage OK — ${live} live source(s), ${planned} planned, all catalogued, emitted and panelled.\n` +
+      `  ${platformFees.size} FeeRouter service(s) and ${moneyPaths.size} configured gateway payee(s) claimed by the catalogue.`,
+  )
   process.exit(0)
 }
 
