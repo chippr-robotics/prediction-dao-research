@@ -706,16 +706,17 @@
         {
           "id": "backup.encrypted-sync-roundtrip",
           "name": "Back up local data encrypted and restore it on another device",
-          "status": "partial",
-          "tier": "no-chain",
-          "depth": "flow",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "access",
           "tests": [
             "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-01",
-            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-02"
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-02",
+            "frontend/cypress/e2e/full/37-backup-roundtrip.cy.js::BKC-01",
+            "frontend/cypress/e2e/full/37-backup-roundtrip.cy.js::BKC-02"
           ],
-          "issue": "#1228",
-          "missing": "the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for \u2014 admission rule 2 puts that half in the on-chain tier"
+          "note": "The no-chain half pins the honest-state rules (no secret material rendered; an unsettled pointer read is never reported as \"no backup\"). The on-chain half is the round trip itself: recording the pointer is a transaction the member pays gas for, so admission rule 2 puts it there \u2014 BKC-01 reads the pointer back from chain and checks it names the blob that was pinned (and that the pinned bytes are ciphertext), BKC-02 wipes the device and restores from that pointer."
         }
       ]
     },
