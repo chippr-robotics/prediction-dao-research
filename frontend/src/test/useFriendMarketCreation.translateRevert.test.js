@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { translateRevert, revertReasonFrom, ResolutionType, ORACLE_RESOLUTION_TYPES } from '../hooks/useFriendMarketCreation'
+import fs from 'node:fs'
+import path from 'node:path'
+import { ethers } from 'ethers'
+import {
+  translateRevert,
+  revertReasonFrom,
+  SANCTIONED_ADDRESS_SELECTOR,
+  ResolutionType,
+  ORACLE_RESOLUTION_TYPES,
+} from '../hooks/useFriendMarketCreation'
 
 // Light unit tests for the hook surface that's deterministic + pure:
 //  - `translateRevert(reason)` maps contract revert reasons to user-friendly strings.
@@ -61,6 +70,16 @@ describe('useFriendMarketCreation: translateRevert', () => {
     expect(message).not.toMatch(/transaction will fail/i)
   })
 
+  it('does not tell a screened member that nothing was submitted on-chain (#1292)', () => {
+    // The guard screens `_createWager` only. On the self-submit leg the stake approval — and the
+    // `batchExpireOpen` cleanup — are sent, awaited and PAID FOR before the create simulation that
+    // produces this message ever runs, so "nothing was submitted" would be false exactly when a
+    // member has just confirmed a wallet prompt. "The wager was not created" is true on every leg.
+    const message = translateRevert('execution reverted: SanctionedAddress')
+    expect(message).not.toMatch(/nothing was (submitted|sent|moved)/i)
+    expect(message).toMatch(/wager was not created/i)
+  })
+
   it('maps EitherRequiresEqualStakes to equal-stakes guidance', () => {
     expect(translateRevert('execution reverted: EitherRequiresEqualStakes'))
       .toMatch(/equal-stakes \(non-leveraged\)/i)
@@ -83,8 +102,27 @@ describe('useFriendMarketCreation: revertReasonFrom', () => {
   // *through* the registry call), so ethers can only say "execution reverted (unknown custom
   // error)". Recover the name from the selector — otherwise no `reason.includes('SanctionedAddress')`
   // check could ever fire. (#1292)
-  const SANCTIONED = '0x80279111' // keccak256('SanctionedAddress(address)')[0:4]
-  const sanctionedData = `${SANCTIONED}${'0'.repeat(24)}${'11'.repeat(20)}`
+  const sanctionedData = `${SANCTIONED_ADDRESS_SELECTOR}${'0'.repeat(24)}${'11'.repeat(20)}`
+
+  it('matches the selector of the error this repo actually compiles', () => {
+    // The hardcoded selector is only defensible while it agrees with the Solidity in this build.
+    // Derive it from the interface source (the parity pattern of `test/intent/TypehashParity.test.js`):
+    // renaming `SanctionedAddress` or changing its arity must fail HERE, not silently return every
+    // screened member to "execution reverted (unknown custom error)" with the suite still green.
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../../contracts/interfaces/ISanctionsGuard.sol'),
+      'utf8',
+    )
+    const declaration = source.match(/error\s+SanctionedAddress\s*\(([^)]*)\)\s*;/)
+    expect(declaration, 'ISanctionsGuard no longer declares SanctionedAddress').not.toBeNull()
+
+    const types = declaration[1]
+      .split(',')
+      .map((param) => param.trim().split(/\s+/)[0])
+      .filter(Boolean)
+    const signature = `SanctionedAddress(${types.join(',')})`
+    expect(ethers.id(signature).slice(0, 10)).toBe(SANCTIONED_ADDRESS_SELECTOR)
+  })
 
   it('names SanctionedAddress from the revert selector on error.data', () => {
     const err = { data: sanctionedData, shortMessage: 'execution reverted (unknown custom error)' }

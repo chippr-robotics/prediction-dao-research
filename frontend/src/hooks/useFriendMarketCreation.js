@@ -617,9 +617,21 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 // registry's own ABI — ethers has nothing to decode them with. Map the selectors a member can
 // realistically hit back to their error names so `translateRevert` can speak to them.
 // (selector = first 4 bytes of keccak256 of the error signature.)
+//
+// The signature is compiled in this very build, so the selector is checked against
+// `contracts/interfaces/ISanctionsGuard.sol` by
+// `frontend/src/test/useFriendMarketCreation.translateRevert.test.js` — renaming the error or
+// changing its arity fails there rather than silently returning members to the raw fallback.
+export const SANCTIONED_ADDRESS_SELECTOR = '0x80279111' // ISanctionsGuard.SanctionedAddress(address)
+
 const UNDECODABLE_ERROR_BY_SELECTOR = {
-  '0x80279111': 'SanctionedAddress', // ISanctionsGuard.SanctionedAddress(address)
+  [SANCTIONED_ADDRESS_SELECTOR]: 'SanctionedAddress',
 }
+
+/** What a screened member is told on the create path. See `translateRevert` for what it must not say. */
+export const SCREENED_ADDRESS_MESSAGE =
+  'This account is flagged by sanctions screening and cannot transact, so the wager was not created. ' +
+  'If you believe this is an error, contact support with the address you are using.'
 
 /**
  * The revert reason for a call/simulation error, naming the custom errors the frontend ABI cannot
@@ -642,7 +654,13 @@ export function translateRevert(reason) {
   }
   // Compliance screening (spec 007 FR-054) — the first Check in `_createWager`. Name it: the
   // member is otherwise told only that the transaction will fail.
-  if (reason.includes('SanctionedAddress')) return 'This account is flagged by sanctions screening and cannot transact. Nothing was submitted on-chain. If you believe this is an error, contact support with the address you are using.'
+  //
+  // Deliberately does NOT say "nothing was submitted on-chain". The guard screens `_createWager`
+  // only, so on the self-submit leg the stake-token approval and the stale-wager cleanup
+  // (`batchExpireOpen`) are real transactions already sent, confirmed and PAID FOR by the time this
+  // simulation reverts. "The wager was not created" is the strongest claim that is true on every
+  // leg; telling a member who just confirmed a wallet prompt that nothing happened is not.
+  if (reason.includes('SanctionedAddress')) return SCREENED_ADDRESS_MESSAGE
   if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
   if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WMATIC.'

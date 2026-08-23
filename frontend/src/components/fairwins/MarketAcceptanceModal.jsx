@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useGaslessWrite } from '../../lib/relay/useGaslessWrite'
+import { SANCTIONED_ADDRESS_SELECTOR } from '../../hooks/useFriendMarketCreation'
 import { useEncryption } from '../../hooks/useEncryption'
 import { fetchEncryptedEnvelope } from '../../utils/ipfsService'
 import {
@@ -439,9 +440,22 @@ function MarketAcceptanceModal({
       console.error('Error accepting offer:', err)
 
       // v2 WagerRegistry custom-error string matches (selectors omitted — ethers v6
-      // already surfaces the named error in err.shortMessage / err.reason)
-      const errorSelectors = {}
+      // already surfaces the named error in err.shortMessage / err.reason).
+      //
+      // The one exception is the sanctions guard: `_acceptWager` screens the acceptor through the
+      // same ISanctionsGuard as `_createWager`, and its errors are NOT in the registry ABI the
+      // frontend ships (they bubble up *through* the registry call), so ethers can only say
+      // "unknown custom error" — which fell through to "check your balance and allowance", telling a
+      // screened member to fix two things that are both fine (#1292). Copy stops at "not accepted":
+      // a stake approval may already have been sent and paid for before this revert.
+      const SCREENED_ACCEPTOR_MESSAGE =
+        'This account is flagged by sanctions screening and cannot transact, so the wager was not accepted. ' +
+        'If you believe this is an error, contact support with the address you are using.'
+      const errorSelectors = {
+        [SANCTIONED_ADDRESS_SELECTOR]: SCREENED_ACCEPTOR_MESSAGE,
+      }
       const knownRevertReasons = {
+        'SanctionedAddress': SCREENED_ACCEPTOR_MESSAGE,
         'NotOpen': 'Wager is not open. It may have already been accepted or cancelled.',
         'NotOpponent': 'You are not the named opponent for this wager.',
         'AcceptExpired': 'Acceptance deadline has passed; this offer has expired.',
@@ -469,7 +483,10 @@ function MarketAcceptanceModal({
 
       // Check for common error patterns in the message
       if (errorMessage.includes('missing revert data') || errorMessage.includes('unknown custom error')) {
-        const txData = err.transaction?.data || err.info?.error?.data
+        // REVERT data first: `err.transaction.data` is the CALLDATA we sent, not what came back, so
+        // it is present on almost every failure and would shadow the nested RPC revert data that
+        // actually carries the custom-error selector.
+        const txData = err.info?.error?.data || err.error?.data || err.transaction?.data
         if (txData) {
           const selector = typeof txData === 'string' ? txData.slice(0, 10) : null
           if (selector && errorSelectors[selector]) {

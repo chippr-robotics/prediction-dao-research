@@ -32,6 +32,13 @@ function addAuthenticator() {
   })
 
   it('[CP-02] a flagged passkey ACCOUNT is blocked from gated actions', () => {
+    // #1292 asked that this assert the screening refusal by name now that the create path has one
+    // (`SCREENED_ADDRESS_MESSAGE` in useFriendMarketCreation). It deliberately still does not: this
+    // test stops at opening the create surface and never submits, so the refusal it observes is the
+    // pre-flight notice, not the message the create simulation produces. Pinning that sentence here
+    // would assert copy this test never reaches. The sentence is pinned as a unit, against the
+    // selector the deployed guard actually reverts with, in
+    // `src/test/useFriendMarketCreation.translateRevert.test.js`.
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
     cy.contains(/^passkey$/i).click()
