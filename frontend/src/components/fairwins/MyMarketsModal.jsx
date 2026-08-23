@@ -947,8 +947,25 @@ function MyMarketsModal({
         ? await sendRegistryCall(sendCalls, chainId, 'claimRefund', [wagerId])
         : await claimRefundRowTx.run(wagerId)
       if (result?.error) throw result.error
+      // A txHash is the ONLY evidence the refund landed. The relay rail can also
+      // come back `{status:'pending'}` (poll budget exhausted) or
+      // `{status:'expired'}` (the signed intent passed validBefore and can now
+      // never execute) — neither carries `error`, and neither is a refund. Since
+      // dismissal here is one-way (nothing calls restoreMarket) and the row is the
+      // creator's last route to a stake that is still escrowed, an unconfirmed
+      // reclaim leaves the row exactly where it is and says so (#1297).
+      if (!result?.txHash) {
+        setRefundError({
+          id,
+          message: result?.status === 'expired'
+            ? 'The reclaim request expired before it was submitted. Please try again.'
+            : 'Reclaim submitted — still confirming. This offer stays here until your stake is back.',
+        })
+        await refreshFriendMarkets?.()
+        return
+      }
       markWagerRead?.(id)
-      fireToast(result?.txHash ? 'Stake reclaimed' : 'Reclaim submitted — confirming…')
+      fireToast('Stake reclaimed')
       dismissMarket(market.id)
       await refreshFriendMarkets?.()
     } catch (err) {

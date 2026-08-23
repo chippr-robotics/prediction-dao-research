@@ -411,8 +411,15 @@ describe('Dashboard', () => {
     cy.get('[role="dialog"], .my-markets-modal', { timeout: 5000 }).should('be.visible')
   }
 
-  /** Build a synthetic friend-market record for an opponent-side expired offer. */
-  function expiredOfferAsOpponent(id = 'exp-1', label = 'DSH-14') {
+  /**
+   * Build a synthetic friend-market record for an opponent-side expired offer.
+   *
+   * The description is per-test on purpose: a row renders the wager's
+   * description plus "Wager ID #<id>", so with one shared literal a
+   * `cy.contains('.mm-table-row', 'DSH-15')` matches nothing — the case id
+   * appears nowhere in the row.
+   */
+  function expiredOfferAsOpponent(id = 'exp-1', description = 'DSH-14 Expired Friend Offer') {
     return {
       id,
       uniqueId: `0xMOCK-${id}`,
@@ -420,7 +427,7 @@ describe('Dashboard', () => {
       creator: '0x00000000000000000000000000000000000000aa', // not the test account
       opponent: TEST_ACCOUNT,
       participants: ['0x00000000000000000000000000000000000000aa', TEST_ACCOUNT],
-      description: `${label} Expired Friend Offer`,
+      description,
       status: 'pending_acceptance',
       acceptanceDeadline: Date.now() - 60 * 60 * 1000,
       endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -442,7 +449,7 @@ describe('Dashboard', () => {
   // still Open on chain, so "Pending Acceptance" is the filter that surfaces it
   // and the route to its Clear / Reclaim & Clear action (#1297).
   it('[DSH-15] Pending Acceptance filter surfaces expired offers with "Expired" time-left and a Clear button', () => {
-    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-15', 'DSH-15')])
+    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-15', 'DSH-15 Expired Friend Offer')])
 
     cy.get('.mm-filter-bar .mm-filter-select').last().select('pending_acceptance')
     cy.get('.mm-filter-bar .mm-filter-select').last().should('have.value', 'pending_acceptance')
@@ -461,7 +468,7 @@ describe('Dashboard', () => {
   // member has nothing escrowed and Clear really is just "hide it" — the
   // creator's variant reclaims the stake first and is covered in the unit suite.
   it('[DSH-16] Clear button dismisses an expired offer and persists to localStorage', () => {
-    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-16', 'DSH-16')])
+    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-16', 'DSH-16 Expired Friend Offer')])
 
     cy.get('.mm-filter-bar .mm-filter-select').last().select('pending_acceptance')
     cy.contains('.mm-table-row', 'DSH-16').should('be.visible').within(() => {

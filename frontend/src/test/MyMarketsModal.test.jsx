@@ -658,10 +658,12 @@ describe('MyMarketsModal', () => {
       })
 
       // The detail view, not the empty state — and it carries the reclaim.
+      // Query the heading specifically: the detail view renders the title twice
+      // (the <h3> and the description block), so a bare getByText is ambiguous.
       await waitFor(() => {
-        // The title renders in both the list row and the opened detail — either proves the
-        // by-id route surfaced the expired offer, so tolerate more than one match.
-        expect(screen.getAllByText('Reached From The Feed').length).toBeGreaterThan(0)
+        expect(
+          screen.getByRole('heading', { name: 'Reached From The Feed' })
+        ).toBeInTheDocument()
       })
       expect(screen.queryByText(/No Active Positions/i)).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /claim refund/i })).toBeInTheDocument()
