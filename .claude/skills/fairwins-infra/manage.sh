@@ -147,9 +147,14 @@ bundler_config() {  # warn if the critical env vars have been clobbered (see the
        The live config is the VM's compose env: infra/vm/bundler/docker-compose.yml, applied by
        'sudo systemctl restart fairwins-stack@bundler'. To check it for real:
          gcloud compute ssh fairwins-bundler --zone $VM_ZONE --tunnel-through-iap \\
-           --command 'sudo docker inspect fairwins-bundler-alto --format "{{json .Config.Env}}"'
-       Watch for: ALTO_RPC_URL must NOT be publicnode (archive-403 breaks receipts),
-       ALTO_DEPLOY_SIMULATIONS_CONTRACT=true, and ALTO_GAS_PRICE_MULTIPLIERS set.
+           --command 'sudo docker inspect fairwins-bundler-alto --format "{{json .Config.Env}}" \\
+             | sed -E "s#(quiknode\\.pro)/[A-Za-z0-9_/-]+#\\1/<redacted>#g"'
+       ⚠ THE SED IS NOT OPTIONAL. ALTO_RPC_URL is now a KEYED QuickNode URL delivered from
+       Secret Manager (QUICKNODE_POLYGON_API), and its token is in the path — a raw dump of
+       .Config.Env prints the credential to your terminal and your shell history.
+       Watch for: ALTO_RPC_URL must be the quiknode.pro host and must NOT be publicnode
+       (archive-403 breaks receipts), ALTO_DEPLOY_SIMULATIONS_CONTRACT=true, and
+       ALTO_GAS_PRICE_MULTIPLIERS set.
 EOF
     return 0
   fi

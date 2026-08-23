@@ -81,7 +81,10 @@ module "bundler" {
   service_account_display_name = "FairWins alto bundler (VM)"
   service_account_description  = "Minimal: read two secrets, pull images, write logs/metrics. No project-level editor."
 
-  secret_accessor_secrets      = ["alto-executor-key-137", "origin-lock-secret"]
+  # QUICKNODE_POLYGON_API is the bundler's ONLY RPC (ALTO_RPC_URL). alto takes one endpoint and has
+  # no failover, so this grant is what stands between the bundler and the tokenless shared free tier
+  # it used to point at — see infra/vm/bundler/docker-compose.yml.
+  secret_accessor_secrets      = ["alto-executor-key-137", "origin-lock-secret", "QUICKNODE_POLYGON_API"]
   artifact_registry_repository = var.artifact_registry_repository
 
   # run.viewer is required by single-alto-gate.sh, which must be able to read whether a Cloud Run

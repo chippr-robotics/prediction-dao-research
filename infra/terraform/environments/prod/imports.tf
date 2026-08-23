@@ -100,6 +100,44 @@
 #   id = "projects/chippr-bots-site-wp/secrets/alto-executor-key-137"
 # }
 #
+# ── the QuickNode Multi-Chain RPC credentials ─────────────────────────────────────────────────
+#
+# ADOPTED, NEVER RECREATED. All four were hand-created at the console on 2026-08-21 and carry no
+# `goog-terraform-provisioned` label. Verified 2026-08-23 before writing these blocks: each exists,
+# each has exactly one ENABLED version, and each replicates `automatic` — which is what
+# `google_secret_manager_secret.managed` declares, so adoption is a plain import with no diff. A
+# user-managed replication policy would instead have planned a REPLACEMENT, and replacing a secret
+# container destroys every version it holds (which is what `prevent_destroy` is there to refuse).
+#
+# All four are imported even though only QUICKNODE_POLYGON_API is granted to anything. An
+# unmanaged secret is invisible; a managed one with a deliberately empty IAM policy is a recorded
+# decision. See terraform.tfvars for why the other three have no reader.
+
+# import {
+#   to = google_secret_manager_secret.managed["QUICKNODE_POLYGON_API"]
+#   id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_POLYGON_API"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["QUICKNODE_POLYGON_WSS"]
+#   id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_POLYGON_WSS"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["QUICKNODE_AMOY_API"]
+#   id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_AMOY_API"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["QUICKNODE_AMOY_WSS"]
+#   id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_AMOY_WSS"
+# }
+#
+# The accessor bindings are deliberately NOT imported: the four secrets have COMPLETELY EMPTY IAM
+# policies today (`gcloud secrets get-iam-policy` returns an etag and nothing else), so
+# `module.gateway.google_secret_manager_secret_iam_member.node["QUICKNODE_POLYGON_API"]` and its
+# bundler twin are genuine CREATES. Importing a binding that does not exist fails the plan.
+#
 # import {
 #   to = google_artifact_registry_repository.cloud_run_source_deploy
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/repositories/cloud-run-source-deploy"

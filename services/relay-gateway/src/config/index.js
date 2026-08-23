@@ -12,6 +12,10 @@
  *                              contracts only (no wagerRegistry), so enabling it fails the
  *                              startup check by design until the full target set is pinned)
  *   RPC_URLS_<chainId>         comma list, failover order (default: built-in public pair, FR-007)
+ *   RPC_URL_PRIMARY_<chainId>  ONE endpoint, PREPENDED to RPC_URLS_<chainId>. It exists so a
+ *                              credential-bearing URL can be delivered from Secret Manager while
+ *                              the public failover list stays readable in the compose file. Unset
+ *                              => RPC_URLS_<chainId> is used exactly as written
  *   ORIGIN_AUTH_SECRET         origin-lock shared secret (X-Origin-Auth). Unset => lock DISABLED
  *                              (dev only; production must set it — research.md §4 / SC-016)
  *   WEBHOOK_SHARED_SECRET      engine webhook shared secret. Unset => webhook rejects everything (fail closed)
@@ -312,10 +316,22 @@ export function loadConfig(env = process.env, opts = {}) {
       targetsByKey.wagerPoolFactory = c.wagerPoolFactory
     }
 
-    const rpcUrls = opt(env, `RPC_URLS_${chainId}`, def.defaultRpcUrls.join(','))
+    const listedRpcUrls = opt(env, `RPC_URLS_${chainId}`, def.defaultRpcUrls.join(','))
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean)
+
+    // A credential-bearing primary, delivered by fetch-secrets.sh rather than written into the
+    // compose file. Prepending it (instead of replacing the list) is what keeps FR-007 true: the
+    // public endpoints stay behind it as failover, so a keyed endpoint rate-limiting or expiring
+    // degrades to a slower route rather than taking the chain down.
+    //
+    // De-duplicated, because the same URL appearing twice is not two independent endpoints — it is
+    // one endpoint that would be retried against itself and would make the `< 2` warning below lie.
+    const primaryRpcUrl = opt(env, `RPC_URL_PRIMARY_${chainId}`, null)
+    const rpcUrls = primaryRpcUrl
+      ? [primaryRpcUrl, ...listedRpcUrls.filter((u) => u !== primaryRpcUrl)]
+      : listedRpcUrls
     if (rpcUrls.length === 0) throw new Error(`[relay-gateway] RPC_URLS_${chainId} must list at least one endpoint`)
     if (rpcUrls.length < 2) {
       // FR-007 wants >=2 independent endpoints; tolerate 1 for local dev but say so loudly.

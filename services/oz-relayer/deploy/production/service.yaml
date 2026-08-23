@@ -1,3 +1,11 @@
+# ⚠ THIS SERVICE IS DECOMMISSIONED. `fairwins-relay-gateway` was deleted from Cloud Run when the
+# gasless stack moved to GCE (~$202 → ~$32/mo); verified absent from `gcloud run services list`
+# 2026-08-23. The LIVE gateway configuration is infra/vm/gateway/docker-compose.yml.
+#
+# This manifest is kept as the reconciliation record and as the recovery path, which is exactly why
+# it must not be allowed to drift: `gcloud run services replace` from a stale copy would recreate
+# the service pointing at endpoints that no longer work. Keep the env here in step with the compose
+# file, or delete the file — do not leave it half-true.
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
@@ -42,8 +50,17 @@ spec:
               value: "polygon-137"
             - name: GAS_WALLET_137
               value: "0x3BB28b184b8a748dE22aBD076634F85adADA82db"
+            # PUBLIC FAILOVER ONLY — polygon.llamarpc.com removed 2026-08-23 (it no longer
+            # resolves at all, so this was a one-entry list). The keyed QuickNode archive endpoint
+            # is prepended at runtime from RPC_URL_PRIMARY_137 below; never write it here.
             - name: RPC_URLS_137
-              value: "https://polygon-bor-rpc.publicnode.com,https://polygon.llamarpc.com"
+              value: "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"
+            # Keyed Polygon archive RPC. The payload is a URL with the token IN ITS PATH, so it is
+            # injected as a secret, not an env value. Optional in effect: absent, the gateway uses
+            # RPC_URLS_137 as written.
+            - name: RPC_URL_PRIMARY_137
+              valueFrom:
+                secretKeyRef: { name: QUICKNODE_POLYGON_API, key: latest }
             - name: ORIGIN_AUTH_SECRET
               valueFrom:
                 secretKeyRef: { name: origin-lock-secret, key: latest }
