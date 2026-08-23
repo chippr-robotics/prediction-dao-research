@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
-import { ethers } from 'ethers'
 import {
   translateRevert,
-  revertReasonFrom,
-  SANCTIONED_ADDRESS_SELECTOR,
   ResolutionType,
   ORACLE_RESOLUTION_TYPES,
 } from '../hooks/useFriendMarketCreation'
@@ -63,21 +58,13 @@ describe('useFriendMarketCreation: translateRevert', () => {
   })
 
   it('names sanctions screening instead of falling through to the raw reason (#1292)', () => {
+    // What the message may and may not CLAIM (fail-closed screening, already-paid-for approvals) is
+    // pinned once, for all four screened entrypoints, in `test/wagers/sanctionsRevert.test.js`.
     const message = translateRevert('execution reverted: SanctionedAddress')
     expect(message).toMatch(/sanctions screening/i)
-    expect(message).toMatch(/cannot transact/i)
+    expect(message).toMatch(/wager was not created/i)
     // The screened member must not be shown the raw fallback.
     expect(message).not.toMatch(/transaction will fail/i)
-  })
-
-  it('does not tell a screened member that nothing was submitted on-chain (#1292)', () => {
-    // The guard screens `_createWager` only. On the self-submit leg the stake approval — and the
-    // `batchExpireOpen` cleanup — are sent, awaited and PAID FOR before the create simulation that
-    // produces this message ever runs, so "nothing was submitted" would be false exactly when a
-    // member has just confirmed a wallet prompt. "The wager was not created" is true on every leg.
-    const message = translateRevert('execution reverted: SanctionedAddress')
-    expect(message).not.toMatch(/nothing was (submitted|sent|moved)/i)
-    expect(message).toMatch(/wager was not created/i)
   })
 
   it('maps EitherRequiresEqualStakes to equal-stakes guidance', () => {
@@ -94,66 +81,6 @@ describe('useFriendMarketCreation: translateRevert', () => {
     expect(translateRevert('')).toBe('Unknown contract error.')
     expect(translateRevert(null)).toBe('Unknown contract error.')
     expect(translateRevert(undefined)).toBe('Unknown contract error.')
-  })
-})
-
-describe('useFriendMarketCreation: revertReasonFrom', () => {
-  // ISanctionsGuard's errors are not in the registry ABI the frontend ships (the guard reverts
-  // *through* the registry call), so ethers can only say "execution reverted (unknown custom
-  // error)". Recover the name from the selector — otherwise no `reason.includes('SanctionedAddress')`
-  // check could ever fire. (#1292)
-  const sanctionedData = `${SANCTIONED_ADDRESS_SELECTOR}${'0'.repeat(24)}${'11'.repeat(20)}`
-
-  it('matches the selector of the error this repo actually compiles', () => {
-    // The hardcoded selector is only defensible while it agrees with the Solidity in this build.
-    // Derive it from the interface source (the parity pattern of `test/intent/TypehashParity.test.js`):
-    // renaming `SanctionedAddress` or changing its arity must fail HERE, not silently return every
-    // screened member to "execution reverted (unknown custom error)" with the suite still green.
-    const source = fs.readFileSync(
-      path.resolve(__dirname, '../../../contracts/interfaces/ISanctionsGuard.sol'),
-      'utf8',
-    )
-    const declaration = source.match(/error\s+SanctionedAddress\s*\(([^)]*)\)\s*;/)
-    expect(declaration, 'ISanctionsGuard no longer declares SanctionedAddress').not.toBeNull()
-
-    const types = declaration[1]
-      .split(',')
-      .map((param) => param.trim().split(/\s+/)[0])
-      .filter(Boolean)
-    const signature = `SanctionedAddress(${types.join(',')})`
-    expect(ethers.id(signature).slice(0, 10)).toBe(SANCTIONED_ADDRESS_SELECTOR)
-  })
-
-  it('names SanctionedAddress from the revert selector on error.data', () => {
-    const err = { data: sanctionedData, shortMessage: 'execution reverted (unknown custom error)' }
-    expect(revertReasonFrom(err)).toBe('SanctionedAddress')
-    expect(translateRevert(revertReasonFrom(err))).toMatch(/sanctions screening/i)
-  })
-
-  it('finds the selector on the nested RPC error shapes ethers uses', () => {
-    expect(revertReasonFrom({ info: { error: { data: sanctionedData } } })).toBe('SanctionedAddress')
-    expect(revertReasonFrom({ error: { data: sanctionedData } })).toBe('SanctionedAddress')
-  })
-
-  it('finds the selector on the wallet shapes that nest the payload deeper', () => {
-    // MetaMask leaves the node payload under `data.data` (err.data is an OBJECT there),
-    // and wrapped providers double the `error` nesting — the shapes the shared
-    // `rawRevertData` walk exists for.
-    expect(revertReasonFrom({ data: { data: sanctionedData } })).toBe('SanctionedAddress')
-    expect(revertReasonFrom({ error: { error: { data: sanctionedData } } })).toBe('SanctionedAddress')
-  })
-
-  it('falls back to the reason ethers already decoded', () => {
-    expect(revertReasonFrom({ reason: 'MembershipDenied', data: '0xdeadbeef' })).toBe('MembershipDenied')
-    expect(revertReasonFrom({ shortMessage: 'execution reverted: ZeroStake' }))
-      .toBe('execution reverted: ZeroStake')
-    expect(revertReasonFrom({ message: 'network error' })).toBe('network error')
-  })
-
-  it('returns an empty reason for an error carrying nothing usable', () => {
-    expect(revertReasonFrom({})).toBe('')
-    expect(revertReasonFrom(null)).toBe('')
-    expect(revertReasonFrom(undefined)).toBe('')
   })
 })
 

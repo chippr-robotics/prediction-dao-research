@@ -12,8 +12,8 @@ import {
   buildEncryptedIpfsReference
 } from '../utils/ipfsService'
 import { getFeeOverrides } from '../utils/feeOverrides'
-import { rawRevertData } from '../lib/chain/revertError'
 import { getCurrentDocument } from '../utils/legalDocs'
+import { revertReasonFrom, screenedActorMessage } from '../lib/wagers/sanctionsRevert'
 
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
@@ -612,41 +612,17 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }
 
-// Custom-error selectors the frontend's WagerRegistry ABI doesn't carry, so a revert shows as
-// "execution reverted (unknown custom error)". The sanctions guard's errors are declared on
-// ISanctionsGuard and only bubble up *through* the registry call, so solc never emits them into the
-// registry's own ABI — ethers has nothing to decode them with. Map the selectors a member can
-// realistically hit back to their error names so `translateRevert` can speak to them.
-// (selector = first 4 bytes of keccak256 of the error signature.)
-//
-// The signature is compiled in this very build, so the selector is checked against
-// `contracts/interfaces/ISanctionsGuard.sol` by
-// `frontend/src/test/useFriendMarketCreation.translateRevert.test.js` — renaming the error or
-// changing its arity fails there rather than silently returning members to the raw fallback.
-export const SANCTIONED_ADDRESS_SELECTOR = '0x80279111' // ISanctionsGuard.SanctionedAddress(address)
-
-const UNDECODABLE_ERROR_BY_SELECTOR = {
-  [SANCTIONED_ADDRESS_SELECTOR]: 'SanctionedAddress',
-}
-
-/** What a screened member is told on the create path. See `translateRevert` for what it must not say. */
-export const SCREENED_ADDRESS_MESSAGE =
-  'This account is flagged by sanctions screening and cannot transact, so the wager was not created. ' +
-  'If you believe this is an error, contact support with the address you are using.'
-
 /**
- * The revert reason for a call/simulation error, naming the custom errors the frontend ABI cannot
- * decode on its own. Feed the result to {@link translateRevert}.
+ * What a screened member is told on the create path. `_createWager` screens the CREATOR only
+ * (contracts/wagers/WagerRegistryCore.sol) — the acting member — so "your account" is unambiguous
+ * here in a way it is not on the accept paths, which screen both parties.
+ *
+ * The outcome clause deliberately does NOT say "nothing was submitted on-chain": the guard screens
+ * `_createWager` only, so on the self-submit leg the stake-token approval and the stale-wager cleanup
+ * (`batchExpireOpen`) are real transactions already sent, confirmed and PAID FOR by the time this
+ * simulation reverts. "The wager was not created" is the strongest claim true on every leg.
  */
-export function revertReasonFrom(error) {
-  // The shared walk covers the nested shapes wallets actually produce (MetaMask's `data.data`,
-  // wrapped providers' `error.error.data`) — anything narrower lets a screened member fall
-  // through to the raw fallback depending on which wallet forwarded the revert.
-  const data = rawRevertData(error)
-  const selector = data ? data.slice(0, 10).toLowerCase() : null
-  if (selector && UNDECODABLE_ERROR_BY_SELECTOR[selector]) return UNDECODABLE_ERROR_BY_SELECTOR[selector]
-  return error?.reason || error?.shortMessage || error?.message || ''
-}
+export const SCREENED_ADDRESS_MESSAGE = screenedActorMessage('the wager was not created')
 
 export function translateRevert(reason) {
   if (!reason) return 'Unknown contract error.'
@@ -657,13 +633,7 @@ export function translateRevert(reason) {
     return 'Insufficient token balance to cover your stake.'
   }
   // Compliance screening (spec 007 FR-054) — the first Check in `_createWager`. Name it: the
-  // member is otherwise told only that the transaction will fail.
-  //
-  // Deliberately does NOT say "nothing was submitted on-chain". The guard screens `_createWager`
-  // only, so on the self-submit leg the stake-token approval and the stale-wager cleanup
-  // (`batchExpireOpen`) are real transactions already sent, confirmed and PAID FOR by the time this
-  // simulation reverts. "The wager was not created" is the strongest claim that is true on every
-  // leg; telling a member who just confirmed a wallet prompt that nothing happened is not.
+  // member is otherwise told only that the transaction will fail. See SCREENED_ADDRESS_MESSAGE.
   if (reason.includes('SanctionedAddress')) return SCREENED_ADDRESS_MESSAGE
   if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
