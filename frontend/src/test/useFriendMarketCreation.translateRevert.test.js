@@ -135,6 +135,14 @@ describe('useFriendMarketCreation: revertReasonFrom', () => {
     expect(revertReasonFrom({ error: { data: sanctionedData } })).toBe('SanctionedAddress')
   })
 
+  it('finds the selector on the wallet shapes that nest the payload deeper', () => {
+    // MetaMask leaves the node payload under `data.data` (err.data is an OBJECT there),
+    // and wrapped providers double the `error` nesting — the shapes the shared
+    // `rawRevertData` walk exists for.
+    expect(revertReasonFrom({ data: { data: sanctionedData } })).toBe('SanctionedAddress')
+    expect(revertReasonFrom({ error: { error: { data: sanctionedData } } })).toBe('SanctionedAddress')
+  })
+
   it('falls back to the reason ethers already decoded', () => {
     expect(revertReasonFrom({ reason: 'MembershipDenied', data: '0xdeadbeef' })).toBe('MembershipDenied')
     expect(revertReasonFrom({ shortMessage: 'execution reverted: ZeroStake' }))

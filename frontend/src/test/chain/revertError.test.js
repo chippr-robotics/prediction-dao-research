@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest'
 import { ethers } from 'ethers'
 
-import { describeRevert, extractRevert } from '../../lib/chain/revertError'
+import { describeRevert, extractRevert, rawRevertData } from '../../lib/chain/revertError'
 
 const IFACE = new ethers.Interface([
   'error StaleProposal(bytes32 expected, bytes32 actual)',
@@ -91,6 +91,23 @@ describe('extractRevert', () => {
 
   it('is synchronous — no provider, no promise', () => {
     expect(extractRevert({ data: STALE_DATA }, IFACE)).not.toBeInstanceOf(Promise)
+  })
+})
+
+describe('rawRevertData', () => {
+  it('returns the payload from every observed nesting, outermost first', () => {
+    expect(rawRevertData({ data: STALE_DATA })).toBe(STALE_DATA)
+    expect(rawRevertData({ data: { data: STALE_DATA } })).toBe(STALE_DATA)
+    expect(rawRevertData({ info: { error: { data: STALE_DATA } } })).toBe(STALE_DATA)
+    expect(rawRevertData({ error: { data: STALE_DATA } })).toBe(STALE_DATA)
+    expect(rawRevertData({ error: { error: { data: STALE_DATA } } })).toBe(STALE_DATA)
+  })
+
+  it('skips non-hex and sub-selector payloads rather than returning them', () => {
+    expect(rawRevertData({ data: 'execution reverted' })).toBeNull()
+    expect(rawRevertData({ data: '0x1234' })).toBeNull()
+    expect(rawRevertData({})).toBeNull()
+    expect(rawRevertData(null)).toBeNull()
   })
 })
 

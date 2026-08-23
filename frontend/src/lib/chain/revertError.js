@@ -33,6 +33,25 @@ function rawRevertCandidates(error) {
 }
 
 /**
+ * The first raw revert payload found on a failure, or `null`.
+ *
+ * For callers that map SELECTORS by hand (errors whose fragment their own ABI does not carry,
+ * e.g. `ISanctionsGuard.SanctionedAddress` on the wager paths) and therefore cannot use
+ * {@link extractRevert}. Walking anything narrower than `rawRevertCandidates` misses the shapes
+ * MetaMask (`data.data`) and wrapped providers (`error.error.data`) actually produce.
+ *
+ * @param {unknown} error the thrown failure
+ * @returns {string|null} `0x…` bytes at least a selector long, or `null`
+ */
+export function rawRevertData(error) {
+  if (!error) return null
+  for (const data of rawRevertCandidates(error)) {
+    if (typeof data === 'string' && data.startsWith('0x') && data.length >= 10) return data
+  }
+  return null
+}
+
+/**
  * Pull a decoded custom error out of a failure, whether it arrived pre-decoded on `.revert`, on
  * the older `errorName`/`errorArgs` pair, or as raw selector bytes somewhere in an RPC payload.
  *

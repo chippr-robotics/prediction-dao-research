@@ -12,6 +12,7 @@ import {
   buildEncryptedIpfsReference
 } from '../utils/ipfsService'
 import { getFeeOverrides } from '../utils/feeOverrides'
+import { rawRevertData } from '../lib/chain/revertError'
 import { getCurrentDocument } from '../utils/legalDocs'
 
 const ERC20_ABI = [
@@ -638,8 +639,11 @@ export const SCREENED_ADDRESS_MESSAGE =
  * decode on its own. Feed the result to {@link translateRevert}.
  */
 export function revertReasonFrom(error) {
-  const data = error?.data ?? error?.info?.error?.data ?? error?.error?.data
-  const selector = typeof data === 'string' && data.length >= 10 ? data.slice(0, 10).toLowerCase() : null
+  // The shared walk covers the nested shapes wallets actually produce (MetaMask's `data.data`,
+  // wrapped providers' `error.error.data`) — anything narrower lets a screened member fall
+  // through to the raw fallback depending on which wallet forwarded the revert.
+  const data = rawRevertData(error)
+  const selector = data ? data.slice(0, 10).toLowerCase() : null
   if (selector && UNDECODABLE_ERROR_BY_SELECTOR[selector]) return UNDECODABLE_ERROR_BY_SELECTOR[selector]
   return error?.reason || error?.shortMessage || error?.message || ''
 }

@@ -4,6 +4,7 @@ import { useWallet, useWeb3 } from '../../hooks'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useGaslessWrite } from '../../lib/relay/useGaslessWrite'
 import { SANCTIONED_ADDRESS_SELECTOR } from '../../hooks/useFriendMarketCreation'
+import { rawRevertData } from '../../lib/chain/revertError'
 import { useEncryption } from '../../hooks/useEncryption'
 import { fetchEncryptedEnvelope } from '../../utils/ipfsService'
 import {
@@ -473,22 +474,24 @@ function MarketAcceptanceModal({
         }
       }
 
-      // Try to decode error data if available
-      if (err.data) {
-        const selector = typeof err.data === 'string' ? err.data.slice(0, 10) : null
-        if (selector && errorSelectors[selector]) {
-          errorMessage = errorSelectors[selector]
-        }
+      // Try to decode error data if available. The shared walk covers the nested shapes wallets
+      // actually produce — MetaMask leaves the node payload under `data.data`, wrapped providers
+      // under `error.error.data` — where reading `err.data` alone sees an object and misses the
+      // selector entirely.
+      const revertData = rawRevertData(err)
+      const revertSelector = revertData ? revertData.slice(0, 10).toLowerCase() : null
+      if (revertSelector && errorSelectors[revertSelector]) {
+        errorMessage = errorSelectors[revertSelector]
       }
 
       // Check for common error patterns in the message
       if (errorMessage.includes('missing revert data') || errorMessage.includes('unknown custom error')) {
-        // REVERT data first: `err.transaction.data` is the CALLDATA we sent, not what came back, so
-        // it is present on almost every failure and would shadow the nested RPC revert data that
-        // actually carries the custom-error selector.
-        const txData = err.info?.error?.data || err.error?.data || err.transaction?.data
+        // REVERT data first (rawRevertData above): `err.transaction.data` is the CALLDATA we sent,
+        // not what came back, so it is present on almost every failure and would shadow the nested
+        // RPC revert data that actually carries the custom-error selector. It stays a last resort.
+        const txData = revertData || err.transaction?.data
         if (txData) {
-          const selector = typeof txData === 'string' ? txData.slice(0, 10) : null
+          const selector = typeof txData === 'string' ? txData.slice(0, 10).toLowerCase() : null
           if (selector && errorSelectors[selector]) {
             errorMessage = errorSelectors[selector]
           }
