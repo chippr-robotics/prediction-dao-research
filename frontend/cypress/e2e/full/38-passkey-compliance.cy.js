@@ -41,7 +41,10 @@ const OPPONENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // hardhat #1
  * reverts with, in `src/test/useFriendMarketCreation.translateRevert.test.js`. This end of it only
  * has to prove the member reaches the screening message rather than the generic fallback.
  */
-const SCREENED = /flagged by sanctions screening/i
+// The copy says screening "did not clear" the account rather than that the account is flagged:
+// the guard is fail-closed (an oracle outage reverts too), so "flagged" would assert something
+// the revert does not establish — see lib/wagers/sanctionsRevert.js.
+const SCREENED = /sanctions screening did not clear/i
 const MEMBERSHIP = /membership|upgrade|purchase|wager participant/i
 
 ;(isChromium ? describe : describe.skip)('Compliance parity for passkey accounts — on chain (spec 041)', () => {
