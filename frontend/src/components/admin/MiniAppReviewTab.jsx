@@ -49,6 +49,7 @@ import { ethers } from 'ethers'
 
 import { APP_CATEGORY_LABELS, AppStatus, MINI_APP_REGISTRY_ABI } from '../../abis/miniAppRegistry'
 import { captureMiniAppLog } from '../../data/ledger/sources/miniAppSource'
+import { extractRevert } from '../../lib/chain/revertError'
 import { networkName } from '../../lib/chains/estate'
 import { VERIFICATION_FAILURE, verifyMiniAppPackage } from '../../lib/miniapps/loader'
 import {
@@ -106,18 +107,42 @@ function formatTimestamp(seconds) {
 }
 
 /**
+ * Passed to every registry write so `runTx` can name the OTHER refusals — `NotVendor`,
+ * `InvalidStatus`, `AppNotFound` — instead of reporting "unknown custom error" for a revert this
+ * ABI describes (issue #1267). `StaleProposal` is intercepted before that, because it is an
+ * outcome with consequences rather than only a message.
+ */
+const registryTxOptions = Object.freeze({ errorAbi: MINI_APP_REGISTRY_ABI })
+
+/**
+ * The registry's own fragments, used to decode a revert the wallet did not decode for us.
+ *
+ * Built on first failure rather than at import: a curator who never hits a revert never pays for
+ * it, and nothing at module scope depends on it.
+ */
+let registryErrorInterface = null
+function registryInterface() {
+  if (!registryErrorInterface) registryErrorInterface = new ethers.Interface(MINI_APP_REGISTRY_ABI)
+  return registryErrorInterface
+}
+
+/**
  * Decode `StaleProposal(bytes32 expected, bytes32 actual)` off a failed write, or null.
  *
- * ethers puts a decoded custom error on `error.revert` when the ABI carries the selector (it
- * does); older/wrapped shapes surface it as `errorName`/`errorArgs`. Anything else is NOT a
- * stale proposal — reading a generic revert as one would tell a curator the vendor swapped the
- * package when in fact the transaction ran out of gas.
+ * ethers puts a decoded custom error on `error.revert` only when it held the ABI where the call
+ * failed — true of a `staticCall`, NOT of a write through the injected wallet, which forwards the
+ * node's revert as raw bytes on `error.data` (issue #1267). Reading `.revert` alone therefore lost
+ * this message on the exact path a curator uses, so raw bytes are decoded against the registry ABI
+ * too — the ABI already carries the fragment, so this is a decode, not new data.
+ *
+ * Anything that does not decode to `StaleProposal` is NOT a stale proposal — reading a generic
+ * revert as one would tell a curator the vendor swapped the package when the transaction in fact
+ * ran out of gas.
  */
 function decodeStaleProposal(error) {
-  const revert = error?.revert
-  const name = revert?.name || error?.errorName
-  if (name !== 'StaleProposal') return null
-  const args = revert?.args ?? error?.errorArgs ?? []
+  const revert = extractRevert(error, registryInterface())
+  if (revert?.name !== 'StaleProposal') return null
+  const args = revert.args ?? []
   const expected = args[0] != null ? String(args[0]) : null
   const actual = args[1] != null ? String(args[1]) : null
   return { expected, actual }
@@ -366,7 +391,7 @@ export default function MiniAppReviewTab({ signer, account, chainId, runTx, pend
           }
           throw error
         }
-      }, actionSummary(action, app, registryChainId))
+      }, actionSummary(action, app, registryChainId), registryTxOptions)
 
       if (stale) {
         setStaleNotices((current) => ({ ...current, [app.id]: stale }))
