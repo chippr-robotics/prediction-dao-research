@@ -66,14 +66,19 @@ describe('Unified login surface (US2)', () => {
     cy.contains(/^passkey$/i).should('not.exist')
   })
 
-  // PENDING (#1019): waits for the address text `/0xf39F/i`, which WalletButton renders only inside the opened dropdown (same question as WAL-03).
-  it.skip('[UL-02] classic-wallet flows are untouched by the login manager (SC-004 smoke)', () => {
+  /*
+   * Un-skipped (#1019). There is no question to settle here: WalletButton deliberately renders the
+   * address only inside the opened dropdown, and `cy.assertActiveAccount` is the helper that
+   * exists for exactly that — it opens the dropdown, checks, and closes it again, and it also
+   * handles the fixed-header scroll trap this surface has bitten several specs with.
+   */
+  it('[UL-02] classic-wallet flows are untouched by the login manager (SC-004 smoke)', () => {
     cy.mockWeb3Provider({ account: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' })
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
     cy.selectInjectedConnector()
     // Connected header state renders exactly as the pre-041 suite expects.
-    cy.contains(/0xf39F/i, { timeout: 15000 }).should('exist')
+    cy.assertActiveAccount('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
   })
 
   /*
@@ -120,13 +125,24 @@ describe('Unified login surface (US2)', () => {
     })
   })
 
-  // PENDING (#1019): same address-behind-the-dropdown question as UL-02.
-  it.skip('[UL-04] no cross-account bleed: switching identities resets address-keyed UI state (FR-024)', () => {
+  /*
+   * Un-skipped (#1019), and its assertion strengthened rather than merely unblocked.
+   *
+   * Both of this test's address checks were reading a collapsed header, where NO address renders.
+   * The positive one therefore timed out; the negative one — `cy.contains(passkey address)
+   * .should('not.exist')` — did the opposite and passed unconditionally, because a bleed would
+   * have been just as invisible as no bleed. A test named "no cross-account bleed" that cannot
+   * observe a bleed is worse than no test.
+   *
+   * So the check now opens the dropdown, where the app does render one address, and asserts BOTH
+   * halves against it: the classic account is shown AND the stale passkey account is not.
+   */
+  it('[UL-04] no cross-account bleed: switching identities resets address-keyed UI state (FR-024)', () => {
     cy.mockWeb3Provider({ account: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' })
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
     cy.selectInjectedConnector()
-    cy.contains(/0xf39F/i, { timeout: 15000 }).should('exist')
+    cy.assertActiveAccount('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
     // A stale passkey session from another identity must not leak into view.
     cy.window().then((win) => {
       win.localStorage.setItem(
@@ -135,7 +151,19 @@ describe('Unified login surface (US2)', () => {
       )
     })
     cy.reload()
-    // The wagmi-active classic session wins; the passkey address never renders.
-    cy.contains(new RegExp(ACCOUNT.slice(0, 6), 'i')).should('not.exist')
+    /*
+     * The wagmi-active classic session wins. Asserted where an address actually renders — inside
+     * the open dropdown — so "the passkey address is absent" is a claim about what the app SHOWS,
+     * not about a collapsed button that shows no address either way.
+     */
+    cy.scrollTo('top', { ensureScrollable: false })
+    cy.get('.wallet-account-button', { timeout: 20000 }).should('be.visible').click()
+    cy.get('.account-address-value', { timeout: 10000 })
+      .invoke('text')
+      .should((t) => {
+        const text = t.toLowerCase()
+        expect(text, 'shows the classic account').to.include('0xf39f')
+        expect(text, 'does not show the stale passkey account').to.not.include(ACCOUNT.slice(0, 6).toLowerCase())
+      })
   })
 })
