@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { translateRevert, ResolutionType, ORACLE_RESOLUTION_TYPES } from '../hooks/useFriendMarketCreation'
+import { translateRevert, revertReasonFrom, ResolutionType, ORACLE_RESOLUTION_TYPES } from '../hooks/useFriendMarketCreation'
 
 // Light unit tests for the hook surface that's deterministic + pure:
 //  - `translateRevert(reason)` maps contract revert reasons to user-friendly strings.
@@ -53,6 +53,14 @@ describe('useFriendMarketCreation: translateRevert', () => {
       .toMatch(/insufficient token balance/i)
   })
 
+  it('names sanctions screening instead of falling through to the raw reason (#1292)', () => {
+    const message = translateRevert('execution reverted: SanctionedAddress')
+    expect(message).toMatch(/sanctions screening/i)
+    expect(message).toMatch(/cannot transact/i)
+    // The screened member must not be shown the raw fallback.
+    expect(message).not.toMatch(/transaction will fail/i)
+  })
+
   it('maps EitherRequiresEqualStakes to equal-stakes guidance', () => {
     expect(translateRevert('execution reverted: EitherRequiresEqualStakes'))
       .toMatch(/equal-stakes \(non-leveraged\)/i)
@@ -67,6 +75,39 @@ describe('useFriendMarketCreation: translateRevert', () => {
     expect(translateRevert('')).toBe('Unknown contract error.')
     expect(translateRevert(null)).toBe('Unknown contract error.')
     expect(translateRevert(undefined)).toBe('Unknown contract error.')
+  })
+})
+
+describe('useFriendMarketCreation: revertReasonFrom', () => {
+  // ISanctionsGuard's errors are not in the registry ABI the frontend ships (the guard reverts
+  // *through* the registry call), so ethers can only say "execution reverted (unknown custom
+  // error)". Recover the name from the selector — otherwise no `reason.includes('SanctionedAddress')`
+  // check could ever fire. (#1292)
+  const SANCTIONED = '0x80279111' // keccak256('SanctionedAddress(address)')[0:4]
+  const sanctionedData = `${SANCTIONED}${'0'.repeat(24)}${'11'.repeat(20)}`
+
+  it('names SanctionedAddress from the revert selector on error.data', () => {
+    const err = { data: sanctionedData, shortMessage: 'execution reverted (unknown custom error)' }
+    expect(revertReasonFrom(err)).toBe('SanctionedAddress')
+    expect(translateRevert(revertReasonFrom(err))).toMatch(/sanctions screening/i)
+  })
+
+  it('finds the selector on the nested RPC error shapes ethers uses', () => {
+    expect(revertReasonFrom({ info: { error: { data: sanctionedData } } })).toBe('SanctionedAddress')
+    expect(revertReasonFrom({ error: { data: sanctionedData } })).toBe('SanctionedAddress')
+  })
+
+  it('falls back to the reason ethers already decoded', () => {
+    expect(revertReasonFrom({ reason: 'MembershipDenied', data: '0xdeadbeef' })).toBe('MembershipDenied')
+    expect(revertReasonFrom({ shortMessage: 'execution reverted: ZeroStake' }))
+      .toBe('execution reverted: ZeroStake')
+    expect(revertReasonFrom({ message: 'network error' })).toBe('network error')
+  })
+
+  it('returns an empty reason for an error carrying nothing usable', () => {
+    expect(revertReasonFrom({})).toBe('')
+    expect(revertReasonFrom(null)).toBe('')
+    expect(revertReasonFrom(undefined)).toBe('')
   })
 })
 

@@ -446,8 +446,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           onProgress({ step: 'create', message: 'Validating transaction...' })
           await registry[createMethod].staticCall(...createArgs)
         } catch (simError) {
-          const reason = simError.reason || simError.shortMessage || simError.message || ''
-          throw new Error(translateRevert(reason), { cause: simError })
+          throw new Error(translateRevert(revertReasonFrom(simError)), { cause: simError })
         }
 
         onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
@@ -505,7 +504,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           onProgress({ step: 'create', message: 'Validating transaction...' })
           await registry[createMethod].staticCall(...createArgs, { from: userAddress })
         } catch (simError) {
-          throw new Error(translateRevert(simError.reason || simError.shortMessage || simError.message || ''), { cause: simError })
+          throw new Error(translateRevert(revertReasonFrom(simError)), { cause: simError })
         }
         calls.push({
           target: wagerRegistryAddress,
@@ -612,6 +611,27 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }
 
+// Custom-error selectors the frontend's WagerRegistry ABI doesn't carry, so a revert shows as
+// "execution reverted (unknown custom error)". The sanctions guard's errors are declared on
+// ISanctionsGuard and only bubble up *through* the registry call, so solc never emits them into the
+// registry's own ABI — ethers has nothing to decode them with. Map the selectors a member can
+// realistically hit back to their error names so `translateRevert` can speak to them.
+// (selector = first 4 bytes of keccak256 of the error signature.)
+const UNDECODABLE_ERROR_BY_SELECTOR = {
+  '0x80279111': 'SanctionedAddress', // ISanctionsGuard.SanctionedAddress(address)
+}
+
+/**
+ * The revert reason for a call/simulation error, naming the custom errors the frontend ABI cannot
+ * decode on its own. Feed the result to {@link translateRevert}.
+ */
+export function revertReasonFrom(error) {
+  const data = error?.data ?? error?.info?.error?.data ?? error?.error?.data
+  const selector = typeof data === 'string' && data.length >= 10 ? data.slice(0, 10).toLowerCase() : null
+  if (selector && UNDECODABLE_ERROR_BY_SELECTOR[selector]) return UNDECODABLE_ERROR_BY_SELECTOR[selector]
+  return error?.reason || error?.shortMessage || error?.message || ''
+}
+
 export function translateRevert(reason) {
   if (!reason) return 'Unknown contract error.'
   if (reason.includes('insufficient allowance') || reason.includes('exceeds allowance')) {
@@ -620,6 +640,9 @@ export function translateRevert(reason) {
   if (reason.includes('insufficient balance') || reason.includes('exceeds balance')) {
     return 'Insufficient token balance to cover your stake.'
   }
+  // Compliance screening (spec 007 FR-054) — the first Check in `_createWager`. Name it: the
+  // member is otherwise told only that the transaction will fail.
+  if (reason.includes('SanctionedAddress')) return 'This account is flagged by sanctions screening and cannot transact. Nothing was submitted on-chain. If you believe this is an error, contact support with the address you are using.'
   if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
   if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WMATIC.'
