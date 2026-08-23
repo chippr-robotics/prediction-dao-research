@@ -166,11 +166,21 @@ function loadFloppyKeysSync(allowFallback = false) {
 //
 // The air-gapped floppy ceremony existed because the deploy key WAS the admin: it held
 // DEFAULT_ADMIN_ROLE and UPGRADER_ROLE on every live contract, so compromising it meant losing the
-// protocol. That is no longer the model. Admin authority belongs to the multisig Safe
-// (deployments/admin-safe.json — 0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa, 2-of-3, same address
+// protocol. The INTENDED model is that admin authority belongs to the multisig Safe
+// (deployments/admin-safe.json — 0xcf76db7aa9Fb1BFe08E010468F3344bB45830447, 2-of-3, same address
 // on every supported chain), and the deploy key is a DEPLOYMENT VEHICLE: it pays gas and calls
 // CREATE2. Contract addresses are deterministic and independent of who sends the transaction, so a
 // compromised deploy key can waste gas and deploy junk — it cannot touch a deployed contract.
+//
+// THAT MIGRATION IS NOT FINISHED. An earlier version of this comment stated it in the past tense,
+// which was wrong and made the blast radius of this key look smaller than it is. Measured: the
+// deploy key still holds DEFAULT_ADMIN/UPGRADER and equivalent authority on ~260 (contract, role)
+// pairs across eight chains, and is `owner()` on ten Ownable contracts. Granting the Safe was done
+// at deploy time on most chains; REVOKING the EOA was never done. Until `scripts/ops/transfer-roles.js`
+// has renounced on every chain, this key remains a full admin key — treat it as one.
+//
+// The superseded Safe 0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa still co-holds those roles and is
+// still `feeRouter.treasury()` on chains 1/10/8453/42161; see the `superseded` block in the record.
 //
 // If the floppy is mounted it is still used, so an operator who wants the ceremony keeps it. If it
 // is not, PRIVATE_KEY is used without complaint. What is gone is the per-command warning noise for
@@ -511,7 +521,10 @@ module.exports = {
       ...(process.env.GAS_PRICE_WEI ? { gasPrice: Number(process.env.GAS_PRICE_WEI) } : {}),
     },
     amoy: {
-      url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+      // rpc-amoy.polygon.technology no longer resolves at all (ENOTFOUND, not a 4xx), so it is a
+      // dead default that fails every Amoy run before a request is even made. publicnode answers
+      // eth_chainId 0x13882 and serves state + logs.
+      url: process.env.AMOY_RPC_URL || "https://polygon-amoy-bor-rpc.publicnode.com",
       chainId: 80002,
       accounts: floppyKeys,
       ...(process.env.GAS_PRICE_WEI ? { gasPrice: Number(process.env.GAS_PRICE_WEI) } : {}),

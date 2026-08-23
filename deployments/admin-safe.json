@@ -1,74 +1,95 @@
 {
   "chains": {
     "1": {
-      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "address": "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447",
       "threshold": 2,
       "owners": [
-        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A",
         "0x1215185387E70a48b07D73AcB67002A073F18575",
-        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+        "0x48cBca63f764615f3f372e62d480a98F56462275"
       ]
     },
     "10": {
-      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "address": "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447",
       "threshold": 2,
       "owners": [
-        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A",
         "0x1215185387E70a48b07D73AcB67002A073F18575",
-        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+        "0x48cBca63f764615f3f372e62d480a98F56462275"
       ]
     },
     "61": {
-      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "address": "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447",
       "threshold": 2,
       "owners": [
-        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A",
         "0x1215185387E70a48b07D73AcB67002A073F18575",
-        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+        "0x48cBca63f764615f3f372e62d480a98F56462275"
       ]
     },
     "63": {
-      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "address": "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447",
       "threshold": 2,
       "owners": [
-        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A",
         "0x1215185387E70a48b07D73AcB67002A073F18575",
-        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+        "0x48cBca63f764615f3f372e62d480a98F56462275"
       ]
     },
     "137": {
-      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "address": "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447",
       "threshold": 2,
       "owners": [
-        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A",
         "0x1215185387E70a48b07D73AcB67002A073F18575",
-        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+        "0x48cBca63f764615f3f372e62d480a98F56462275"
       ]
     },
     "8453": {
-      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "address": "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447",
       "threshold": 2,
       "owners": [
-        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A",
         "0x1215185387E70a48b07D73AcB67002A073F18575",
-        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+        "0x48cBca63f764615f3f372e62d480a98F56462275"
       ]
     },
     "42161": {
-      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "address": "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447",
       "threshold": 2,
       "owners": [
-        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A",
         "0x1215185387E70a48b07D73AcB67002A073F18575",
-        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+        "0x48cBca63f764615f3f372e62d480a98F56462275"
       ]
     }
   },
   "owners": [
-    "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+    "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A",
     "0x1215185387E70a48b07D73AcB67002A073F18575",
-    "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+    "0x48cBca63f764615f3f372e62d480a98F56462275"
   ],
   "threshold": 2,
-  "saltNonce": "68"
+  "saltNonce": "68",
+  "superseded": {
+    "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+    "reason": "Owner set included a compromised hot EOA and a passkey CONTRACT that only had code on Polygon, leaving an effective 2-of-2 off Polygon. Replaced 2026-08-22 by 0xcf76db7aa9Fb1BFe08E010468F3344bB45830447 (KMS HSM + Ledger + Trezor, all EOAs, so all three sign on every chain).",
+    "owners": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0x1215185387E70a48b07D73AcB67002A073F18575",
+      "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+    ],
+    "threshold": 2,
+    "saltNonce": "68",
+    "chains": [
+      "1",
+      "10",
+      "61",
+      "63",
+      "137",
+      "8453",
+      "42161"
+    ],
+    "stillHolds": "NOT decommissioned. Co-holds DEFAULT_ADMIN/UPGRADER and related roles on the fee/bridge/liquidity routers on chains 1/10/8453/42161 and on several Polygon 137 and Mordor 63 contracts, and is feeRouter.treasury() on chains 1/10/8453/42161. Do not delete this block until those are moved and verified."
+  }
 }
