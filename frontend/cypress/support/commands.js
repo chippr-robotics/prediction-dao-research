@@ -48,6 +48,17 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
    */
 
   /*
+   * `rejectConnect: true` models the member pressing Cancel on the wallet's connect prompt:
+   * `eth_requestAccounts` rejects with EIP-1193 4001 and the wallet grants nothing.
+   *
+   * It has to live HERE rather than in a spec's own `window:before:load`, which is what WAL-07
+   * used to do. That handler assigned its own `win.ethereum` wholesale, so it raced this mock's
+   * handler for the same window — and, more decisively, it announced nothing over EIP-6963, so
+   * wagmi never discovered it and the connect modal offered no connector to decline with. A
+   * refusal is a property of the wallet this mock already announces, not of a second wallet.
+   */
+
+  /*
    * This call's wallet state. ONE object per mockWeb3Provider() CALL, closed over by the
    * handler below — so it SURVIVES page loads (that persistence is load-bearing: connect once,
    * and every later cy.visit auto-restores the session because `authorized` is still true).
@@ -58,6 +69,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
     activeChainId: Number(networkId),
     authorized: options.preAuthorized === true,
     rejectChainSwitch: options.rejectChainSwitch === true,
+    rejectConnect: options.rejectConnect === true,
     /*
      * `eth_getBalance` answers a FIXED 100 ETH by default, which is fine while a spec only needs
      * the connected account to look funded. It is a fabrication the moment a spec reads the
@@ -149,6 +161,14 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         return new Promise((resolve, reject) => {
           switch (method) {
             case 'eth_requestAccounts':
+              if (S().rejectConnect) {
+                // The member pressed Cancel in the wallet. EIP-1193 4001, and NOTHING is
+                // granted — `authorized` stays false, so a later eth_accounts is still empty.
+                const rejected = new Error('User rejected the request.')
+                rejected.code = 4001
+                reject(rejected)
+                break
+              }
               // The user pressing Connect. Grants access for the rest of this page load.
               S().authorized = true
               resolve([S().activeAccount])
@@ -1430,7 +1450,23 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
      * Escape is used rather than clicking the backdrop: the backdrop is the element under test in
      * some specs, and ConnectModal binds Escape to the same `close` handler.
      */
-    if (autoDismissConnectModal) {
+    if (autoDismissConnectModal) dismissAutoConnectPrompt()
+    return win
+  })
+})
+
+/*
+ * Close the auto-opened connect dialog, if one appeared.
+ *
+ * Extracted from the `visit` override so it can be reached from a RELOAD too. `cy.reload()` is not
+ * `cy.visit()` and never ran this, so a spec that reloaded into a disconnected state got the
+ * prompt back with nothing to close it — and the backdrop then covered the very control the spec
+ * was asserting on. That is how WAL-05 failed on the phone profile while passing on desktop.
+ *
+ * Exposed as `cy.dismissAutoConnectPrompt()` for those cases. The `visit` override's behaviour and
+ * timing are unchanged: it calls exactly this, exactly where it used to.
+ */
+function dismissAutoConnectPrompt() {
       /*
        * The prompt opens ASYNCHRONOUSLY — AutoConnectPrompt waits for `connectionStatus` to settle,
        * and WalletContext waits for wallet detection before that. An immediate DOM check races it,
@@ -1477,10 +1513,9 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
           )
         }),
       )
-    }
-    return win
-  })
-})
+}
+
+Cypress.Commands.add('dismissAutoConnectPrompt', dismissAutoConnectPrompt)
 
 
 /**
