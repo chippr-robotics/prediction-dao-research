@@ -411,14 +411,23 @@ function MyMarketsModal({
         drawProposedBy: drawProposerById[String(market.id)] ?? null,
       }
 
-      // Apply status filter. The default ("all") view also hides expired
-      // offers so they don't clutter the list — pick "Expired" explicitly
-      // to see them.
-      if (statusFilter === 'all') {
-        if (status === MarketStatus.EXPIRED) return
-      } else if (status !== statusFilter) {
-        return
-      }
+      // Apply status filter. The default ("all") view hides expired offers so
+      // they don't clutter the list (spec 040 US6) — pick "Pending Acceptance"
+      // to see them alongside the offers still inside their accept window.
+      //
+      // EXPIRED here means exactly one thing (see getMarketStatus above): an
+      // offer nobody accepted before the accept deadline. On-chain it is still
+      // Open and the creator's stake is still escrowed until claimRefund, so
+      // "Pending Acceptance" is its honest home in this vocabulary — and the
+      // only reachable route to its "Reclaim & Clear" action, which is how the
+      // creator asks for that stake back (#1297). The dedicated "Expired"
+      // option was removed with nothing replacing it, which stranded the row.
+      const matchesFilter =
+        statusFilter === 'all'
+          ? status !== MarketStatus.EXPIRED
+          : status === statusFilter ||
+            (statusFilter === MarketStatus.PENDING_ACCEPTANCE && status === MarketStatus.EXPIRED)
+      if (!matchesFilter) return
 
       // Terminal markets go to history
       if (
@@ -1052,11 +1061,14 @@ function MyMarketsModal({
               onChange={(e) => setStatusFilter(e.target.value)}
               className="mm-filter-select"
             >
-              {/* Disputed and Expired options removed (spec 040 US6): Expired is
-                  hidden from the default view, and Disputed is not a reachable
-                  state here — offering them returned empty/misleading results. */}
+              {/* Disputed and Expired options removed (spec 040 US6): Disputed is
+                  not a reachable state here, and a standalone Expired option
+                  returned empty/misleading results. Expired offers are not
+                  dropped, though — they are still Open on-chain with the
+                  creator's stake escrowed, so "Pending Acceptance" shows them
+                  too and is the route to their "Reclaim & Clear" (#1297). */}
               <option value="all">All Status</option>
-              <option value={MarketStatus.PENDING_ACCEPTANCE}>Pending Acceptance</option>
+              <option value={MarketStatus.PENDING_ACCEPTANCE}>Pending Acceptance (incl. expired)</option>
               <option value={MarketStatus.ACTIVE}>Active</option>
               <option value={MarketStatus.PENDING_RESOLUTION}>Pending Resolution</option>
               <option value={MarketStatus.RESOLVED}>Resolved</option>

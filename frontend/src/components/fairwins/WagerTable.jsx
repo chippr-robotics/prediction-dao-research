@@ -110,13 +110,26 @@ export default function WagerTable({
   const activity = useWagerActivityOptional()
   const actionNeededByWagerId = activity?.actionNeededByWagerId
 
-  const expiredMarkets = useMemo(
-    () => markets.filter(m => m.computedStatus === MarketStatus.EXPIRED),
-    [markets]
-  )
+  // Expired offers the member can safely bulk-dismiss: the ones they did NOT
+  // create. Bulk clear only hides rows — it never reclaims — and dismissal is
+  // one-way in this UI, so sweeping away an offer the member created would take
+  // the "Reclaim & Clear" route to their still-escrowed stake with it (#1297).
+  // Those rows stay per-row, where the action refunds before it dismisses.
+  const clearableExpired = useMemo(() => {
+    const me = account?.toLowerCase()
+    if (!me) return []
+    return markets.filter(
+      m => m.computedStatus === MarketStatus.EXPIRED && m.creator?.toLowerCase?.() !== me
+    )
+  }, [markets, account])
+  // Offered only in a view the member deliberately filtered to, so it can't
+  // sweep rows they were not looking at. Expired offers reach that view under
+  // "Pending Acceptance" — they are still Open on-chain (#1297) — and
+  // MarketStatus.EXPIRED stays accepted for any caller still passing it.
   const showClearAll =
-    statusFilter === MarketStatus.EXPIRED &&
-    expiredMarkets.length > 0 &&
+    (statusFilter === MarketStatus.EXPIRED ||
+      statusFilter === MarketStatus.PENDING_ACCEPTANCE) &&
+    clearableExpired.length > 0 &&
     typeof onClearAllExpired === 'function'
 
   const ctx = {
@@ -275,10 +288,10 @@ export default function WagerTable({
           <button
             type="button"
             className="mm-btn-secondary mm-btn-small"
-            onClick={() => onClearAllExpired(expiredMarkets)}
-            title="Hide all expired offers from this list"
+            onClick={() => onClearAllExpired(clearableExpired)}
+            title="Hide expired offers you did not create from this list"
           >
-            Clear all expired ({expiredMarkets.length})
+            Clear all expired ({clearableExpired.length})
           </button>
         </div>
       )}
