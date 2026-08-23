@@ -199,6 +199,15 @@ describe('Wallet Connection', () => {
     cy.get('.wallet-connect-button', { timeout: 10000 }).should('be.visible')
 
     cy.reload()
+    /*
+     * The app OPENS THE CONNECT DIALOG here, and that is corroboration rather than an obstacle:
+     * AutoConnectPrompt only fires for a disconnected visitor, so the prompt appearing already
+     * says the reload did not restore the session. It has to be closed before asserting on the
+     * header, though — its backdrop covers the fixed control, which is what failed this test on
+     * the phone profile while it passed on desktop. `cy.visit` closes it automatically;
+     * `cy.reload` is not `cy.visit` and never did.
+     */
+    cy.dismissAutoConnectPrompt()
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 20000 })
       .should('be.visible')
     /*

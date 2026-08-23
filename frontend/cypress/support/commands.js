@@ -1450,7 +1450,23 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
      * Escape is used rather than clicking the backdrop: the backdrop is the element under test in
      * some specs, and ConnectModal binds Escape to the same `close` handler.
      */
-    if (autoDismissConnectModal) {
+    if (autoDismissConnectModal) dismissAutoConnectPrompt()
+    return win
+  })
+})
+
+/*
+ * Close the auto-opened connect dialog, if one appeared.
+ *
+ * Extracted from the `visit` override so it can be reached from a RELOAD too. `cy.reload()` is not
+ * `cy.visit()` and never ran this, so a spec that reloaded into a disconnected state got the
+ * prompt back with nothing to close it — and the backdrop then covered the very control the spec
+ * was asserting on. That is how WAL-05 failed on the phone profile while passing on desktop.
+ *
+ * Exposed as `cy.dismissAutoConnectPrompt()` for those cases. The `visit` override's behaviour and
+ * timing are unchanged: it calls exactly this, exactly where it used to.
+ */
+function dismissAutoConnectPrompt() {
       /*
        * The prompt opens ASYNCHRONOUSLY — AutoConnectPrompt waits for `connectionStatus` to settle,
        * and WalletContext waits for wallet detection before that. An immediate DOM check races it,
@@ -1497,10 +1513,9 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
           )
         }),
       )
-    }
-    return win
-  })
-})
+}
+
+Cypress.Commands.add('dismissAutoConnectPrompt', dismissAutoConnectPrompt)
 
 
 /**
