@@ -24,6 +24,9 @@ vi.mock('../../../hooks/useWalletManagement', () => ({ useWallet: () => mockWall
 
 vi.mock('../../../config/networks', () => ({
   getNetwork: () => ({ name: 'Polygon', nativeCurrency: { symbol: 'MATIC' }, explorer: { baseUrl: 'https://polygonscan.com' } }),
+  // The panel pulls in connectors/passkey (readSession), which resolves a passkey session's
+  // chain from the build's home network (issue #1286).
+  getCurrentChainId: () => 137,
 }))
 
 vi.mock('../../ui/AddressInput', () => ({

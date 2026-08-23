@@ -302,23 +302,66 @@ describe('the chain a session reports (issue #1286)', () => {
     expect((await connector.connect({ chainId: 63 })).chainId).toBe(63)
   })
 
-  it('falls back to wagmi’s default when the build chain is not a configured chain', async () => {
+  it('falls back to wagmi’s default when the build chain is not a configured chain — LOUDLY', async () => {
     // wagmi refuses to store an unconfigured chain id, so reporting one would leave the
-    // session claiming a chain the config cannot represent.
+    // session claiming a chain the config cannot represent. But this fallback is the very
+    // state the fix exists to prevent (a non-numeric VITE_NETWORK_ID parses to NaN and lands
+    // a testnet build back on Polygon), so it must never happen silently.
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     build.chainId = 999999
     const { connector } = makeConnector({ chains: POLYGON_FIRST })
     expect((await connector.connect()).chainId).toBe(137)
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('999999'))
+    err.mockRestore()
   })
 
-  it('never overrides the chain the member actually switched to', async () => {
-    // The Testnet/Mainnet toggle deliberately crosses the pair, so a stored chainId is a
-    // member choice and is honoured verbatim on reconnect — only its ABSENCE resolves here.
+  it('honours a chain the member SWITCHED to, across reloads and the cohort', async () => {
+    // The Testnet/Mainnet toggle deliberately crosses the pair, so a member's own switch
+    // outranks the build default forever — clamping it here would snap them back.
+    build.chainId = 80002
+    rememberCompleteRecord()
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    await connector.connect()
+    await connector.switchChain({ chainId: 137 })
+    expect(readSession().chainChosen).toBe(true)
+    expect(await connector.getChainId()).toBe(137)
+    expect((await connector.connect({ isReconnecting: true })).chainId).toBe(137)
+  })
+
+  it('re-derives a session written BEFORE this fix instead of trusting its stored 137', async () => {
+    // The population that produced the issue: sessions the old default stamped with 137, on a
+    // testnet build. The session has no expiry by design, and 137 is a *supported* id so
+    // WalletContext's auto-switch leaves it alone — nothing else would ever correct it. A
+    // stored chain with no `chainChosen` is ours, not the member's, so it resolves again.
     build.chainId = 80002
     rememberCompleteRecord()
     writeSession({ address: ACCOUNT, chainId: 137, credentialId: 'cred-1', loginMethod: 'passkey' })
     const { connector } = makeConnector({ chains: POLYGON_FIRST })
-    expect((await connector.connect({ isReconnecting: true })).chainId).toBe(137)
-    expect(await connector.getChainId()).toBe(137)
+    expect(await connector.getChainId()).toBe(80002)
+    expect((await connector.connect({ isReconnecting: true })).chainId).toBe(80002)
+    // …and the stale row is healed, so nothing downstream can read 137 out of storage.
+    expect(readSession().chainId).toBe(80002)
+    expect(readSession().chainChosen).toBeUndefined()
+  })
+
+  it('re-derives when the BUILD moves under an existing session (staging repointed)', async () => {
+    build.chainId = 80002
+    rememberCompleteRecord()
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    await connector.connect()
+    expect(readSession().chainChosen).toBeUndefined() // nobody chose it — we derived it
+
+    build.chainId = 63 // same build, repointed to Mordor
+    const { connector: next } = makeConnector({ chains: POLYGON_FIRST })
+    expect(await next.getChainId()).toBe(63)
+  })
+
+  it('remembers an explicitly requested chain as a choice', async () => {
+    build.chainId = 80002
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    await connector.connect({ chainId: 63 })
+    expect(readSession().chainChosen).toBe(true)
+    expect(await connector.getChainId()).toBe(63)
   })
 })
 
