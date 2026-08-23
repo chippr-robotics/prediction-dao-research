@@ -63,6 +63,13 @@ jobs:
       - name: Run market-template tooling tests
         run: npm run test:market-templates
 
+      # The E2E deploy-order gate (issue #1298). It only runs in the full/torture tier, where a
+      # broken gate would be invisible until the next time someone inserts a deploy — so its own
+      # suite runs here, in the tier every push hits. Dependency-free: node:test plus two files
+      # read off disk, no chain, no npm ci.
+      - name: Run E2E address-gate tests
+        run: npm run test:e2e-addresses
+
   # Gate (spec 075, FR-003/FR-015): version skew across manifests and undeclared (phantom)
   # imports. Both invariants were fixed by hand once and had nothing preventing recurrence, which
   # is precisely the failure mode spec 075 exists to remove. Dependency-free, so no npm ci.

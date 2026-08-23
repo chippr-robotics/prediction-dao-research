@@ -390,11 +390,18 @@ jobs:
             --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
             http://localhost:8545 || echo "Hardhat node may not be ready yet"
 
-      - name: Deploy contracts to local network
+      # `setup:e2e` is the ONE entrypoint for the local chain: the ordered deploys, then
+      # `check:e2e-addresses`. Do not call `deploy:local` directly here — the deploys use plain
+      # CREATE, so their addresses are a function of the deployer's nonce, and the app reads the
+      # HARDCODED HARDHAT_CONTRACTS map rather than the deployment record. A deploy inserted
+      # mid-list instead of appended shifts every later address by one slot and repoints the app
+      # at an address nothing was deployed to; nothing reverts, and it surfaces 10-15 minutes
+      # later as unrelated-looking Cypress timeouts (issue #1298, found via #1289).
+      - name: Deploy contracts to local network (with deploy-order address gate)
         run: |
           echo "Deploying contracts to local Hardhat network..."
-          npm run deploy:local
-          echo "Contract deployment completed"
+          npm run setup:e2e
+          echo "Contract deployment completed and app addresses verified"
         continue-on-error: false
 
       # Constitution IV: must fail the pipeline on error. Do NOT reintroduce `continue-on-error`
