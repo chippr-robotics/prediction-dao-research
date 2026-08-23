@@ -38,7 +38,13 @@ import { passkeyConnector, readSession, writeSession, PASSKEY_CONNECTOR_ID } fro
 import { ChainNotSupportedError } from '../../lib/passkey/smartAccount'
 import { rememberCredential, knownCredentials, isTransactComplete } from '../../lib/passkey/credentials'
 import { computeAccountAddress, publicKeyToOwnerBytes } from '../../lib/passkey/smartAccount'
-import { p256 } from '@noble/curves/p256.js'
+/*
+ * `@noble/curves/nist.js`, not `p256.js`. The dependabot bump to @noble/curves 2.x (#1157)
+ * removed the per-curve subpath, so `p256.js` is not in the package's exports map any more and the
+ * whole FILE fails to load — 0 tests run, which reads as a suite failure rather than a resolution
+ * one. Every other passkey test in the tree was already migrated; this branch predates the bump.
+ */
+import { p256 } from '@noble/curves/nist.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 
 const ACCOUNT = '0x00000000000000000000000000000000000a11CE'
@@ -271,6 +277,55 @@ describe('session lifecycle', () => {
  * the wager create path read the wrong KeyRegistry, found nothing, and told the member their
  * opponent had not registered an encryption key.
  */
+describe('the provider facade wagmi actually consults', () => {
+  /*
+   * THE REGRESSION THAT COST EVERY PASSKEY MEMBER THEIR SESSION ON RELOAD.
+   *
+   * wagmi's `reconnect` filters connectors BEFORE it asks whether they are authorized:
+   *
+   *     const provider = await connector.getProvider().catch(() => undefined)
+   *     if (!provider) continue
+   *
+   * `getProvider()` returned null, so the passkey connector was skipped every time and the
+   * session-restore tests — which have always passed — were never reached in a real browser. The
+   * unit test proving the restore works is exactly what made the breakage invisible, so these
+   * assert the precondition wagmi actually applies.
+   *
+   * Carried over from staging when the two branches' passkey suites were merged: they cover the
+   * connector's contract with wagmi rather than either branch's chain derivation, so they belong
+   * with whichever implementation wins.
+   */
+  it('exposes a provider at all, because wagmi skips connectors without one', async () => {
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    expect(provider, 'a null provider makes reconnect unreachable').toBeTruthy()
+  })
+
+  it('keeps provider identity stable — wagmi dedupes providers by reference', async () => {
+    const { connector } = makeConnector()
+    expect(await connector.getProvider()).toBe(await connector.getProvider())
+  })
+
+  it('refuses to sign from the facade: this connector holds no key', async () => {
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    await expect(provider.request({ method: 'eth_sendTransaction', params: [{}] })).rejects.toThrow(
+      /submission router/,
+    )
+    await expect(provider.request({ method: 'personal_sign', params: [] })).rejects.toThrow(
+      /submission router/,
+    )
+  })
+
+  it('answers eth_accounts from the session, so the facade agrees with the connector', async () => {
+    rememberCompleteRecord()
+    writeSession({ address: ACCOUNT, chainId: 80002, credentialId: 'cred-1', loginMethod: 'passkey' })
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    expect(await provider.request({ method: 'eth_accounts' })).toEqual(await connector.getAccounts())
+  })
+})
+
 describe('the chain a session reports (issue #1286)', () => {
   const POLYGON_FIRST = [{ id: 137 }, { id: 80002 }, { id: 63 }]
 
@@ -385,8 +440,11 @@ describe('cross-device sign-in (fresh browser, synced passkey)', () => {
   const makeAssertion = (priv, challenge) => {
     const authenticatorData = concat(sha256(enc('fairwins.app')), new Uint8Array([0x05]), new Uint8Array([0, 0, 0, 1]))
     const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
-    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false })
-    const der = sig.toDERRawBytes ? sig.toDERRawBytes() : sig.toBytes('der')
+    // prehash:false — an authenticator signs the DIGEST, and @noble/curves v2 prehashes by default.
+    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false, prehash: false })
+    // v2 returns compact BYTES here; v1 returned a Signature instance.
+    const sigObj = sig instanceof Uint8Array ? p256.Signature.fromBytes(sig) : sig
+    const der = sigObj.toDERRawBytes ? sigObj.toDERRawBytes() : sigObj.toBytes('der')
     return { credentialId: 'cred-phone', authenticatorData, clientDataJSON, signature: new Uint8Array(der) }
   }
 
@@ -444,12 +502,14 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
   const makeAssertion = (priv, challenge) => {
     const authenticatorData = concat(sha256(enc('fairwins.app')), new Uint8Array([0x05]), new Uint8Array([0, 0, 0, 1]))
     const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
-    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false })
+    // See the note above: v2 prehashes by default and returns compact bytes.
+    const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false, prehash: false })
+    const sigObj = sig instanceof Uint8Array ? p256.Signature.fromBytes(sig) : sig
     return {
       credentialId: 'cred-phone',
       authenticatorData,
       clientDataJSON,
-      signature: new Uint8Array(sig.toDERRawBytes ? sig.toDERRawBytes() : sig.toBytes('der')),
+      signature: new Uint8Array(sigObj.toDERRawBytes ? sigObj.toDERRawBytes() : sigObj.toBytes('der')),
     }
   }
 
