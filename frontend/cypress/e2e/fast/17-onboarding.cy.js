@@ -11,17 +11,35 @@ describe('Onboarding', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
-    cy.window().then((win) => {
-      win.sessionStorage.clear()
-    })
+    /*
+     * cy.clearAllSessionStorage(), NOT cy.window().then(win => win.sessionStorage.clear()).
+     *
+     * This hook runs before any cy.visit, so there is no application window to reach — the
+     * cy.window() it used to call timed out every time, taking the whole spec with it. Cypress's
+     * own command clears session storage across origins without needing a loaded page.
+     */
+    cy.clearAllSessionStorage()
   })
 
   // ---------------------------------------------------------------------------
   // ONB-01: Landing page loads
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): LandingRoute forwards to /app once the entry gate is acked and wagmi reports reconnecting. `/?stay=1` holds the page but the beforeEach then times out in cy.window() (called before any visit) — two separate questions.
-  it.skip('[ONB-01] Landing page loads', () => {
-    cy.visit('/')
+  /*
+   * `/?stay=1` is the app's OWN escape hatch (LandingRoute: "Escape hatches, both honoured for the
+   * rest of the tab session"), not a test-only trapdoor — which is why this uses it rather than
+   * fighting the redirect.
+   *
+   * The redirect is real and fires even with no wallet: LandingRoute treats a `connecting` /
+   * `reconnecting` wagmi status as a returning member, and wagmi's reconnect-on-mount passes
+   * through that status on every load. So a visitor who has acknowledged the entry gate is
+   * forwarded to the app before the landing page can be asserted on.
+   *
+   * Not `acknowledgeEntryGate: false`, which would also stop the redirect: it stops it by leaving
+   * the entry gate UNACKNOWLEDGED, and the gate's overlay then covers the hero this test is about.
+   * One overlay traded for another.
+   */
+  it('[ONB-01] Landing page loads', () => {
+    cy.visit('/?stay=1')
     cy.get('body', { timeout: 10000 }).should('be.visible')
 
     // The landing page should show the hero section.
@@ -38,20 +56,44 @@ describe('Onboarding', () => {
   // ---------------------------------------------------------------------------
   // ONB-02: Launch app from landing page
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): same redirect + beforeEach ordering as ONB-01.
-  it.skip('[ONB-02] Launch app from landing page', () => {
-    cy.visit('/')
+  // Same escape hatch as ONB-01, for the same reason.
+  it('[ONB-02] Launch app from landing page', () => {
+    cy.visit('/?stay=1')
     cy.get('body', { timeout: 10000 }).should('be.visible')
 
-    // Click "Launch App" button in the hero section.
-    cy.contains('button, a', /launch app/i, { timeout: 10000 })
-      .first()
+    /*
+     * The LANDING PAGE's own hero CTA (`.hero-cta-primary`), not the first "Launch App" in the
+     * document. There are three: two in Header.jsx (the desktop nav bar and the mobile menu) and
+     * this one. A `.first()` over the whole page picked the header's, which is display:none at
+     * phone width — so the test failed on "not visible" at 390px while passing at 1280px, for a
+     * reason that had nothing to do with what it is testing.
+     *
+     * The hero button is the landing page's primary call to action and renders at both widths,
+     * which is what makes it the right target for a test about the landing page.
+     *
+     * Scoped to `#hero` because `.hero-cta-primary` is used twice — once here and once by the
+     * closing CTA near the foot of the page (`.hero-cta-primary.cta-large`). Both run the same
+     * handler, so either would exercise the flow, but an unscoped selector matches two elements
+     * and cy.click() refuses that outright.
+     */
+    cy.get('#hero .hero-cta-primary', { timeout: 10000 })
       .should('be.visible')
+      .and('contain.text', 'Launch App')
       .click()
 
-    // Should navigate to /app or /fairwins.
+    /*
+     * Launch App lands on whichever surface `landingViewPreference` resolves, and there are
+     * exactly two: HOME_ITEM.to ('/app') and PORTFOLIO_PATH ('/wallet?tab=account&view=portfolio'),
+     * chosen by device width (mobile -> Home, larger -> Portfolio) unless Preferences overrides it.
+     *
+     * This spec runs at BOTH viewport profiles, so it has to accept either — but accepting either
+     * is not the same as accepting anything. The old expectation, /(app|main|fairwins)/, was stale
+     * (the destination moved to the unified account view) and also loose enough that '/main' and
+     * '/fairwins' would have satisfied it despite neither being reachable from this button.
+     * Matching the two real constants fails if the button goes somewhere else, or nowhere.
+     */
     cy.url({ timeout: 10000 })
-      .should('match', /\/(app|main|fairwins)/)
+      .should('match', /(\/app$|\/wallet\?tab=account&view=portfolio$)/)
   })
 
   // ---------------------------------------------------------------------------

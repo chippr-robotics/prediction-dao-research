@@ -46,27 +46,61 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-01: Quick action cards visible
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): 9 quick-action cards render, the test asserts 6 — decide the intended grouping first.
-  it.skip('[DSH-01] Quick action cards visible, grouped by intent (create / track / QR)', () => {
+  /*
+   * Rewritten (#1019). The pending note said "9 render, the test asserts 6 — decide the intended
+   * grouping first", but there is no grouping decision to make: Dashboard.jsx declares TEN quick
+   * actions and filters exactly one of them, `oracle-open-challenge`, on
+   * `capabilities.polymarketSidebets` — a chain without an on-chain oracle does not get the Open
+   * Oracle Challenge card (the plain Open Challenge stays). Nine is that rule's answer on this
+   * tier, not a mystery.
+   *
+   * So this asserts the RULE and the cards' IDENTITY, never a count and never a position. The old
+   * body did both — `should('have.length', 6)` and `.eq(0..5)` against titles — which is why
+   * adding a tile broke it and why it would have kept breaking on every reorder. A count is also a
+   * weak assertion in its own right: six of the wrong cards would have satisfied it.
+   *
+   * Membership is checked BOTH ways. Each expected card must be there exactly once, and no tile
+   * may render that is not a known quick action — that second half is what a count was really
+   * reaching for, and it names the stranger instead of just disagreeing about a number.
+   */
+  it('[DSH-01] Quick action cards visible, grouped by intent (create / track / QR)', () => {
     connectAndVisitDashboard()
 
-    // The quick-actions-grid holds the six action tiles, ordered by their
-    // intent group: three "Create a wager" tiles, then "Track & share"
-    // (My Wagers, Scan QR, Share Account).
+    // Present on every chain.
+    const ALWAYS_PRESENT = [
+      'Friends Decide (1v1)',
+      'Oracle Settles (1v1)',
+      'Make an Offer',
+      'Open Challenge',
+      'Group Pool',
+      'Enter Words',
+      'My Wagers',
+      'Scan QR Code',
+      'Share Account',
+    ]
+    // Rendered only where the chain advertises an on-chain oracle (Dashboard.jsx
+    // `visibleCreateActions`). Allowed, not required — this tier has no oracle.
+    const CAPABILITY_GATED = 'Open Oracle Challenge'
+
     cy.get('.quick-actions-grid', { timeout: 10000 }).should('be.visible')
-    cy.get('.quick-action-card').should('have.length', 6)
 
-    // Verify each action card title in group order.
-    cy.get('.quick-action-card').eq(0).should('contain.text', 'Friends Decide (1v1)')
-    cy.get('.quick-action-card').eq(1).should('contain.text', 'Oracle Settles (1v1)')
-    cy.get('.quick-action-card').eq(2).should('contain.text', 'Make an Offer')
-    cy.get('.quick-action-card').eq(3).should('contain.text', 'My Wagers')
-    cy.get('.quick-action-card').eq(4).should('contain.text', 'Scan QR Code')
-    cy.get('.quick-action-card').eq(5).should('contain.text', 'Share Account')
+    ALWAYS_PRESENT.forEach((title) => {
+      cy.get('.quick-action-card')
+        .filter(`:contains("${title}")`)
+        .should('have.length', 1)
+    })
 
-    // The two intent groups are labeled.
-    cy.get('.qa-group-eyebrow').should('contain.text', 'Start a wager')
-    cy.get('.qa-group-eyebrow').should('contain.text', 'Track & share')
+    cy.get('.quick-action-card').then(($cards) => {
+      const known = new Set([...ALWAYS_PRESENT, CAPABILITY_GATED])
+      const rendered = [...$cards].map((el) => el.querySelector('h4')?.textContent?.trim())
+      const strangers = rendered.filter((t) => !known.has(t))
+      expect(strangers, 'every rendered tile is a known quick action').to.deep.equal([])
+    })
+
+    // The two intent groups are labelled. A group header only renders when it still has a card
+    // under it, so these also prove neither group was emptied by the capability filter.
+    cy.contains('.qa-group-eyebrow', 'Start a wager').should('exist')
+    cy.contains('.qa-group-eyebrow', 'Track & share').should('exist')
   })
 
   // ---------------------------------------------------------------------------
