@@ -22,9 +22,39 @@ import {
   hasExistingCredential,
 } from '../lib/passkey/credentials'
 import { deriveAddress, publicKeyToOwnerBytes, readControllers } from '../lib/passkey/smartAccount'
+import { getCurrentChainId } from '../config/networks'
 
 export const PASSKEY_CONNECTOR_ID = 'fairwinsPasskey'
 const SESSION_KEY = 'fairwins.passkey.session.v1'
+
+/**
+ * The chain a passkey session reports when nothing else names one (issue #1286).
+ *
+ * NOT `config.chains[0].id`. That list is ordered Polygon-first in `wagmi.js` so 137 is
+ * wagmi's default chain, and using it here made EVERY passkey session claim 137 whatever
+ * the build was for. A classic wallet is unaffected because an injected connector reports
+ * its own chain; a passkey account has no wallet to ask, so the connector is the only thing
+ * that can answer — and it was answering with a constant.
+ *
+ * On a mainnet build 137 was accidentally right, which is why it went unnoticed. On a
+ * testnet-cohort build it is a read across the testnet/mainnet boundary that constitution
+ * III forbids outright, and it reached members as a false statement: the wager create path
+ * looked up the opponent's X25519 key in the WRONG chain's KeyRegistry, found nothing, and
+ * told the member their opponent had not registered a key.
+ *
+ * `getCurrentChainId()` is the build's own home network (`VITE_NETWORK_ID`, else
+ * `PRIMARY_CHAIN_ID`) and the same value `buildIsTestnet()` derives the cohort from — so this
+ * stays truthful per build without a second literal `137` to drift, exactly as
+ * `membershipChainId()` avoids one.
+ *
+ * Falls back to wagmi's default only when the build chain is not registered in `chains`:
+ * wagmi refuses to store an unconfigured chain id, so reporting one would leave the session
+ * claiming a chain the config cannot represent.
+ */
+function buildDefaultChainId(config) {
+  const target = getCurrentChainId()
+  return config.chains?.some((c) => c.id === target) ? target : config.chains?.[0]?.id
+}
 
 export function readSession(storage = globalThis.localStorage) {
   try {
@@ -58,7 +88,7 @@ export function passkeyConnector(options = {}) {
     },
 
     async connect({ chainId, isReconnecting, credentialId, discoverable, mode: requestedMode } = {}) {
-      const targetChain = chainId ?? config.chains[0]?.id
+      const targetChain = chainId ?? buildDefaultChainId(config)
       // NO network gate here, deliberately. Signing in is a WebAuthn ceremony plus a local address
       // derivation — it needs no bundler, no EntryPoint and no RPC. Gating it on submission support
       // locked members out: selecting a network without a bundler persisted in the session, and on
@@ -165,7 +195,10 @@ export function passkeyConnector(options = {}) {
 
     async getChainId() {
       const session = readSession(deps.storage)
-      return session?.chainId ?? config.chains[0]?.id
+      // A stored chainId is the member's own switch and is honoured verbatim — the
+      // Testnet/Mainnet toggle deliberately crosses the pair, so clamping it here would
+      // snap them back. Only the ABSENCE of a choice resolves to the build's chain.
+      return session?.chainId ?? buildDefaultChainId(config)
     },
 
     async isAuthorized() {

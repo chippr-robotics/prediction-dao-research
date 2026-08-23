@@ -5,7 +5,13 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+// The build's home network (`VITE_NETWORK_ID`, else `PRIMARY_CHAIN_ID`). Mutable so a test can
+// stand up a testnet-cohort build and a mainnet one without rebuilding the module graph.
+// `vi.hoisted` because the mock factory below is hoisted above every declaration in this file.
+const build = vi.hoisted(() => ({ chainId: 80002 }))
+
 vi.mock('../../config/networks', () => ({
+  getCurrentChainId: vi.fn(() => build.chainId),
   getNetwork: vi.fn((chainId) =>
     chainId === 80002
       ? {
@@ -51,7 +57,7 @@ function makeConnector(overrides = {}) {
     ...overrides,
   }
   const config = {
-    chains: [{ id: 80002 }, { id: 137 }],
+    chains: overrides.chains ?? [{ id: 80002 }, { id: 137 }],
     emitter: { emit: vi.fn() },
   }
   const connector = passkeyConnector({ deps, ...overrides.options })(config)
@@ -63,7 +69,10 @@ function rememberCompleteRecord(credentialId = 'cred-1') {
   rememberCredential({ credentialId, publicKey: PUBLIC_KEY, prfCapable: true, address: ACCOUNT })
 }
 
-beforeEach(() => localStorage.clear())
+beforeEach(() => {
+  localStorage.clear()
+  build.chainId = 80002
+})
 
 describe('connect', () => {
   it('sign-up: creates a credential, derives the counterfactual address, persists the session', async () => {
@@ -249,6 +258,67 @@ describe('session lifecycle', () => {
     const { connector } = makeConnector()
     expect(connector.id).toBe(PASSKEY_CONNECTOR_ID)
     expect(connector.type).toBe('passkey')
+  })
+})
+
+/**
+ * Issue #1286 — the chain a passkey session reports.
+ *
+ * `chains` here is ordered Polygon-FIRST on purpose: that is `src/wagmi.js`'s real order, and
+ * `config.chains[0].id` was the old fallback. A passkey account has no wallet to ask its chain,
+ * so the connector is the only thing that can answer — and it answered 137 whatever the build
+ * was for. On a testnet build every chain-scoped read taken under that session went to mainnet;
+ * the wager create path read the wrong KeyRegistry, found nothing, and told the member their
+ * opponent had not registered an encryption key.
+ */
+describe('the chain a session reports (issue #1286)', () => {
+  const POLYGON_FIRST = [{ id: 137 }, { id: 80002 }, { id: 63 }]
+
+  it('a testnet-cohort build reports the TESTNET chain, not wagmi default Polygon', async () => {
+    build.chainId = 80002
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    const out = await connector.connect()
+    expect(out.chainId).toBe(80002)
+    expect(readSession().chainId).toBe(80002)
+    expect(await connector.getChainId()).toBe(80002)
+  })
+
+  it('reports the build chain before any session exists (nothing to read yet)', async () => {
+    build.chainId = 80002
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect(readSession()).toBeNull()
+    expect(await connector.getChainId()).toBe(80002)
+  })
+
+  it('a mainnet build still reports 137 (the case that was accidentally right)', async () => {
+    build.chainId = 137
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect((await connector.connect()).chainId).toBe(137)
+  })
+
+  it('an explicitly requested chain still wins over the build default', async () => {
+    build.chainId = 80002
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect((await connector.connect({ chainId: 63 })).chainId).toBe(63)
+  })
+
+  it('falls back to wagmi’s default when the build chain is not a configured chain', async () => {
+    // wagmi refuses to store an unconfigured chain id, so reporting one would leave the
+    // session claiming a chain the config cannot represent.
+    build.chainId = 999999
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect((await connector.connect()).chainId).toBe(137)
+  })
+
+  it('never overrides the chain the member actually switched to', async () => {
+    // The Testnet/Mainnet toggle deliberately crosses the pair, so a stored chainId is a
+    // member choice and is honoured verbatim on reconnect — only its ABSENCE resolves here.
+    build.chainId = 80002
+    rememberCompleteRecord()
+    writeSession({ address: ACCOUNT, chainId: 137, credentialId: 'cred-1', loginMethod: 'passkey' })
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect((await connector.connect({ isReconnecting: true })).chainId).toBe(137)
+    expect(await connector.getChainId()).toBe(137)
   })
 })
 
