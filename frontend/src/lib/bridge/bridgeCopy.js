@@ -192,7 +192,10 @@ export const BRIDGE_UNAVAILABLE = Object.freeze({
 export function bridgeUnavailableCopy(chainId) {
   if (isBitcoinNetworkId(chainId)) return BRIDGE_UNAVAILABLE.bitcoin
   const net = chainId != null ? NETWORKS[chainId] : null
-  if (net?.capabilities?.bridge) return null
+  // Membership of the ROSTER, not the raw capability flag (#1265). The roster is what the
+  // Bridge form offers and what `BridgeStatusList` reads, so answering "bridging is
+  // available here" (null) about a network outside it would contradict both.
+  if (net && bridgeNetworks().some((n) => n.chainId === net.chainId)) return null
   const where = bridgeNetworkList()
   const here = net?.name ? `Bridging is not available on ${net.name}.` : 'Bridging is not available on this network.'
   return where

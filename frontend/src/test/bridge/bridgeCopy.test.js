@@ -123,8 +123,17 @@ describe('honest unavailable copy (FR-006/FR-006c/FR-051)', () => {
     for (const net of bridgeNetworks()) expect(isInCohort(net.chainId)).toBe(true)
   })
 
-  it('returns null on a network where bridging is available', () => {
-    expect(bridgeUnavailableCopy(137)).toBe(null)
+  it('returns null on a network in the roster, and copy on one outside it (#1265)', () => {
+    const roster = bridgeNetworks()
+    // Null means "bridging works here" — so it is owed to the roster, not to the raw
+    // capability flag. Polygon is bridge-capable in every build; whether THIS build
+    // bridges there is the question the member is actually asking.
+    for (const net of roster) expect(bridgeUnavailableCopy(net.chainId)).toBe(null)
+    const outside = listSupportedChainIds().filter(
+      (id) => !roster.some((n) => n.chainId === id),
+    )
+    expect(outside.length).toBeGreaterThan(0)
+    for (const id of outside) expect(typeof bridgeUnavailableCopy(id)).toBe('string')
   })
 
   it('says so plainly on ETC/Mordor and points at where it works', () => {

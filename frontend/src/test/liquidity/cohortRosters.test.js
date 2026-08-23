@@ -36,8 +36,17 @@ import {
   bridgeLiquidityNetworks as bridgeLiquidityCopyNetworks,
   tradingLiquidityNetworks,
 } from '../../lib/liquidity/liquidityCopy'
-import { bridgeLiquidityNetworks } from '../../lib/liquidity/acrossLpPositions'
-import { bridgeNetworks } from '../../lib/bridge/bridgeCopy'
+import { bridgeLiquiditySupport, bridgeLiquidityNetworks } from '../../lib/liquidity/acrossLpPositions'
+import {
+  bridgeNetworks,
+  bridgeUnavailableCopy,
+  noBridgeDestinationCopy,
+} from '../../lib/bridge/bridgeCopy'
+import {
+  NO_POOLS_COPY,
+  liquidityAvailabilityCopy,
+  liquidityUnavailableCopy,
+} from '../../lib/liquidity/liquidityCopy'
 
 /** Every roster spec 067 derives, by the name the surface knows it as. */
 const ROSTERS = [
@@ -82,6 +91,83 @@ describe('spec 067 rosters are cohort-bounded (#1265, constitution III)', () => 
     // about the cohort bound rather than about nothing being deployed anywhere.
     const deployed = listSupportedChainIds().filter((id) => Boolean(getLiquidityRouterAddress(id)))
     expect(deployed.some((id) => SPEC_067_MAINNETS.includes(id))).toBe(true)
+  })
+})
+
+// ── The SENTENCES, because a roster is only ever met through one ────────────────────
+
+/**
+ * Every member-facing sentence spec 067 builds out of a roster.
+ *
+ * The suites that own these files assert the shape of each sentence ("names a network, or
+ * says there is none to name"), which stays true whichever roster is behind it — so none of
+ * them would catch the roster naming Polygon in a testnet build. This does: whatever these
+ * sentences say, they may not NAME a network outside the cohort. Falsifiable on either side
+ * of the boundary, which is what the shape assertions cannot be.
+ *
+ * Each is asked about an in-cohort chain spec 067 has shipped NOTHING on, so every helper
+ * returns its "not here — here is where it is" sentence rather than `null`. The chain is
+ * chosen rather than fixed, so this file states its premise instead of encoding one build's
+ * chain list.
+ */
+const IN_COHORT_CHAIN = cohortChainIds().find(
+  (id) =>
+    !NETWORKS[id].capabilities?.bridge &&
+    !NETWORKS[id].bridge?.hubPool &&
+    !getLiquidityRouterAddress(id),
+)
+
+const SENTENCES = [
+  ['liquidityAvailabilityCopy()', () => liquidityAvailabilityCopy()],
+  ['NO_POOLS_COPY', () => NO_POOLS_COPY],
+  ['liquidityUnavailableCopy(<in-cohort>)', () => liquidityUnavailableCopy(IN_COHORT_CHAIN)],
+  ["liquidityUnavailableCopy('bitcoin')", () => liquidityUnavailableCopy('bitcoin')],
+  ['bridgeUnavailableCopy(<in-cohort>)', () => bridgeUnavailableCopy(IN_COHORT_CHAIN)],
+  ["noBridgeDestinationCopy('USDC')", () => noBridgeDestinationCopy('USDC')],
+  [
+    'bridgeLiquiditySupport(<in-cohort>).reason',
+    () => bridgeLiquiditySupport(IN_COHORT_CHAIN).reason,
+  ],
+]
+
+describe('spec 067 availability copy names no out-of-cohort network (#1265)', () => {
+  // Every sentence above is asked about an IN-COHORT chain (or about none), so the only
+  // network it has any business naming is one this build can reach. Asking about chain 137
+  // would be a different question — naming Polygon back is then the honest answer.
+
+  /**
+   * The copy with every in-cohort network name blanked, longest first.
+   *
+   * Necessary, not decorative: `Ethereum Classic Mordor` CONTAINS `Ethereum`, and
+   * `Polygon Amoy` contains `Polygon`, so a bare substring test would fail on copy that
+   * correctly names only the testnet. Blanking the legitimate names first leaves any
+   * genuine mainnet mention standing alone.
+   */
+  const inCohortNames = cohortChainIds()
+    .map((id) => NETWORKS[id].name)
+    .sort((a, b) => b.length - a.length)
+  const scrub = (copy) => inCohortNames.reduce((s, name) => s.split(name).join('·'), copy)
+
+  const outOfCohort = listSupportedChainIds()
+    .filter((id) => !isInCohort(id))
+    .map((id) => NETWORKS[id].name)
+
+  it('there ARE such networks here, so the assertions below are about something', () => {
+    expect(IN_COHORT_CHAIN).toBeDefined()
+    expect(outOfCohort.length).toBeGreaterThan(0)
+    expect(outOfCohort).toContain(NETWORKS[MAINNET_CHAIN_ID].name)
+    // …and the scrubber keeps a real mainnet mention visible rather than eating it.
+    expect(scrub(`Supported on ${NETWORKS[MAINNET_CHAIN_ID].name}.`)).toContain(
+      NETWORKS[MAINNET_CHAIN_ID].name,
+    )
+  })
+
+  it.each(SENTENCES)('%s', (_label, sentence) => {
+    const copy = sentence()
+    expect(typeof copy).toBe('string')
+    expect(copy.length).toBeGreaterThan(0)
+    const scrubbed = scrub(copy)
+    for (const name of outOfCohort) expect(scrubbed).not.toContain(name)
   })
 })
 

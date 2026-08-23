@@ -25,11 +25,20 @@
  * every bridge-capable network rather than the wallet's active one: a member never
  * has to switch networks to see a transfer they started somewhere else (FR-059).
  *
- * "Every bridge-capable network" is `bridgeNetworks()`, which since #1265 is bounded
- * by the build's cohort — constitution III forbids a read crossing the testnet/mainnet
- * boundary, and this loop is a read. When that roster is EMPTY the list has looked
- * nowhere, so it says that rather than "no transfers yet": the second is a claim about
- * the member's history that nothing here checked.
+ * Since #1265 that splits into TWO rosters, and keeping them apart is the point:
+ *
+ *   · what is READ over the network is `bridgeNetworks()`, bounded by the build's cohort,
+ *     because constitution III forbids a read crossing the testnet/mainnet boundary;
+ *   · what is LISTED is that roster PLUS every origin chain the member's own ledger
+ *     actually has a bridge on (`listBridgeChainIds`), which is local storage and not a
+ *     network read at all.
+ *
+ * Listing from the read roster alone would let a configuration change hide a transfer that
+ * is already moving, which FR-053 forbids outright — the in-flight list renders underneath
+ * the form in every case precisely so a member can always see where their money is. A row
+ * whose origin chain is outside the read roster therefore renders with its recorded state
+ * and says plainly that this build did not check it; that is rule 3 of this file doing its
+ * job, and it is the opposite of an invented "no transfers yet".
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits } from 'ethers'
@@ -38,7 +47,11 @@ import { NETWORKS } from '../../config/networks'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import InfoTip from '../ui/InfoTip'
 import AssetLogo from './AssetLogo'
-import { BRIDGE_STATE, listBridgeEntries } from '../../data/ledger/sources/bridgeLedgerSource'
+import {
+  BRIDGE_STATE,
+  listBridgeChainIds,
+  listBridgeEntries,
+} from '../../data/ledger/sources/bridgeLedgerSource'
 import {
   BRIDGE_POLL_INTERVAL_MS,
   BRIDGE_STATUS_SOURCE,
@@ -71,6 +84,14 @@ const SOURCE_LABEL = Object.freeze({
   [BRIDGE_STATUS_SOURCE.CHAIN]: 'read from the networks',
   [BRIDGE_STATUS_SOURCE.NONE]: 'not confirmed — neither the bridge service nor the networks could be read',
 })
+
+/**
+ * Shown instead of an "as of" line on a transfer whose origin network this build does not
+ * read (#1265). It states the last recorded status is not fresh and where to settle it —
+ * strictly more honest than a timestamp for a check that never happened.
+ */
+const NOT_CHECKED_NOTE =
+  'This build does not check that network, so this is the last status recorded here — open the sending transaction below to confirm where it is.'
 
 /**
  * The state to RENDER, which is never ahead of the evidence on the entry.
@@ -140,7 +161,15 @@ function TxLink({ chainId, txHash, label }) {
  */
 export default function BridgeStatusList({ autoRefresh = true, refreshKey = 0 }) {
   const { address } = useWallet() || {}
-  const chainIds = useMemo(() => bridgeNetworks().map((net) => net.chainId), [])
+  /** Networks this build may read over the network — cohort-bounded (#1265). */
+  const readChainIds = useMemo(() => bridgeNetworks().map((net) => net.chainId), [])
+  /** …plus wherever the member's own ledger says they already have a transfer (FR-053). */
+  const chainIds = useMemo(() => {
+    const ids = new Set(readChainIds.map(Number))
+    for (const id of listBridgeChainIds(address)) ids.add(id)
+    return [...ids]
+  }, [readChainIds, address])
+  const readable = useMemo(() => new Set(readChainIds.map(Number)), [readChainIds])
 
   const [entries, setEntries] = useState([])
   const [reads, setReads] = useState(() => new Map())
@@ -157,7 +186,7 @@ export default function BridgeStatusList({ autoRefresh = true, refreshKey = 0 })
     // `reconcileBridges` never throws and never blocks: a gateway that is off or a
     // network that cannot be read simply lowers what we can claim (FR-053).
     const nextReads = new Map()
-    for (const chainId of chainIds) {
+    for (const chainId of readChainIds) {
       const results = await reconcileBridges(address, chainId)
       for (const result of results) {
         if (!result?.depositId) continue
@@ -171,7 +200,7 @@ export default function BridgeStatusList({ autoRefresh = true, refreshKey = 0 })
     setReads(nextReads)
     setEntries(sortEntries(chainIds.flatMap((chainId) => listBridgeEntries(address, chainId))))
     setStatus('ready')
-  }, [address, chainIds])
+  }, [address, chainIds, readChainIds])
 
   // Account change: hard reset so another account's transfers never render.
   useEffect(() => {
@@ -201,13 +230,14 @@ export default function BridgeStatusList({ autoRefresh = true, refreshKey = 0 })
 
   if (status === 'loading') return <p className="bridge-status-state">Loading your transfers…</p>
 
-  // No network to read means no answer about the member's transfers — never an
-  // empty history, which is a different (and unearned) claim.
-  if (chainIds.length === 0) {
+  // `chainIds` is empty only when the build bridges nowhere AND the member's own ledger
+  // holds no bridge on any chain — so "none recorded" is something we looked for and did
+  // not find, not something a roster let us assume.
+  if (entries.length === 0 && readChainIds.length === 0) {
     return (
       <p className="bridge-status-state">
-        No network is set up for bridging in this build, so there are no cross-network transfers to
-        show here.
+        No network is set up for bridging in this build, and you have no cross-network transfers
+        recorded here.
       </p>
     )
   }
@@ -318,13 +348,19 @@ export default function BridgeStatusList({ autoRefresh = true, refreshKey = 0 })
                   {entry.settlementProtocol
                     ? `Settled by ${entry.settlementProtocol} Protocol.`
                     : BRIDGE_ACTIVITY_SETTLEMENT_NOTE}
-                  {!isTerminalBridgeState(state) && (
-                    <>
-                      {' '}
-                      · Status as of {readAt || 'this session'}
-                      {read ? ` (${SOURCE_LABEL[read.source] || SOURCE_LABEL[BRIDGE_STATUS_SOURCE.NONE]})` : ''}
-                    </>
-                  )}
+                  {!isTerminalBridgeState(state) &&
+                    (readable.has(Number(entry.originChainId)) ? (
+                      <>
+                        {' '}
+                        · Status as of {readAt || 'this session'}
+                        {read ? ` (${SOURCE_LABEL[read.source] || SOURCE_LABEL[BRIDGE_STATUS_SOURCE.NONE]})` : ''}
+                      </>
+                    ) : (
+                      // The row is shown because it is the member's (FR-053); the status on it
+                      // is the last one recorded and nothing here refreshed it. Saying "as of
+                      // this session" would claim a check this build did not make (#1265).
+                      <> · {NOT_CHECKED_NOTE}</>
+                    ))}
                 </p>
               </div>
             </li>

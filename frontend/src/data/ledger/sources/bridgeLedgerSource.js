@@ -36,7 +36,11 @@
  * mirrors written alongside them are for consumers reading the store directly
  * (`readBridgeEntry` prefers `refs` and falls back to those, so both paths agree).
  */
-import { listClientRecords, appendClientRecord } from '../ledgerClientStore'
+import {
+  listClientRecords,
+  listClientRecordsAllChains,
+  appendClientRecord,
+} from '../ledgerClientStore'
 import { clientEntryId } from '../identity'
 import { LEDGER_CLASS, LEDGER_STATUS, LEDGER_DIRECTION, PROVENANCE, TS_PROVENANCE } from '../constants'
 
@@ -319,6 +323,27 @@ export function readBridgeEntry(record) {
     settlementProtocol: refs.settlementProtocol || DEFAULT_SETTLEMENT_PROTOCOL,
     timestamp: record.timestamp ?? null,
   }
+}
+
+/**
+ * Every ORIGIN chain this account has a bridge recorded on, ascending.
+ *
+ * Reads the member's own local ledger — no network, no roster, no cohort. It exists so a
+ * surface can enumerate the transfers a member ACTUALLY has rather than the transfers a
+ * configuration roster predicts they could have (#1265): the two stopped agreeing the
+ * moment the bridge roster became cohort-bounded, and FR-053's rule is that a transfer
+ * already moving is never hidden. A chain here is a fact about what was recorded; whether
+ * this build may READ that chain is a separate question the caller answers separately.
+ */
+export function listBridgeChainIds(account) {
+  if (!account) return []
+  const ids = new Set()
+  for (const record of listClientRecordsAllChains(account)) {
+    if (record?.class !== LEDGER_CLASS.BRIDGE) continue
+    const origin = evmChainId(record.refs?.originChainId ?? record.chainId)
+    if (origin != null) ids.add(origin)
+  }
+  return [...ids].sort((a, b) => a - b)
 }
 
 /** Every bridge the account has on `chainId` as origin, latest state per bridge. */
