@@ -123,12 +123,11 @@ export default function WagerTable({
     )
   }, [markets, account])
   // Offered only in a view the member deliberately filtered to, so it can't
-  // sweep rows they were not looking at. Expired offers reach that view under
-  // "Pending Acceptance" — they are still Open on-chain (#1297) — and
-  // MarketStatus.EXPIRED stays accepted for any caller still passing it.
+  // sweep rows they were not looking at. That view is "Pending Acceptance":
+  // expired offers are still Open on-chain and show there (#1297), and no
+  // caller can pass MarketStatus.EXPIRED — the option no longer exists.
   const showClearAll =
-    (statusFilter === MarketStatus.EXPIRED ||
-      statusFilter === MarketStatus.PENDING_ACCEPTANCE) &&
+    statusFilter === MarketStatus.PENDING_ACCEPTANCE &&
     clearableExpired.length > 0 &&
     typeof onClearAllExpired === 'function'
 
