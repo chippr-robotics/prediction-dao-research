@@ -72,16 +72,26 @@ const MORDOR_CONTRACTS = {
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
+//
+// THESE ARE GATED (issue #1298). `npm run setup:e2e` deploys the local chain and then runs
+// `npm run check:e2e-addresses`, which compares every value below against
+// deployments/localhost-chain1337-v2.json and FAILS the run on a disagreement — the E2E suite is
+// pointed here, not at the record, so a stale constant is an app calling an address with no code.
+// Re-derive rather than hand-edit: with a local node running,
+//   npm run deploy:local && npm run deploy:local:callsign && npm run sync:frontend-contracts:local
+// then commit this file. Two things move an address: a change to a contract's init code (CREATE2 —
+// most of these) and an extra deployer transaction sequenced before a plain-CREATE deploy
+// (wagerRegistry / membershipManager / tokenFactory / callsignRegistry). Last re-derived 2026-08-23.
 const HARDHAT_CONTRACTS = {
   deployer: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
   treasury: '',
   wagerRegistry: '0x9A676e781A523b5d0C0e43731313A708CB607508',
   membershipManager: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707',
-  keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
-  sanctionsGuard: '0xA29BCB4a6355Ec3e2e62B280Bf0cA76C7927A207',
-  polymarketAdapter: '0x19D004863fB8F5A1707091C120e08aA1FEE8d65F',
-  paymentToken: '0x065606eeE0D7BB3d2e7959D56c3ca177625385a7',
-  wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
+  keyRegistry: '0xA5EB1dEB58Ebc18D334d72EDDED5406e612D042A',
+  sanctionsGuard: '0xA3Fd27637C50a407E43B2CF889E83CdABF070D17',
+  polymarketAdapter: '0xeA913b1a96D9447080bBfA7Cb7C397ae0A0fcADB',
+  paymentToken: '0xbc4D54AE49ED9C6075770CD6acA930A728dcf526',
+  wmatic: '0x007e106a5664D48e02f571b58694B74c9D5c22a1',
   // spec 049 — multisig policy engine (synced from deployments/hardhat-chain1337-v2.json)
   safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
   // Spec 068 ordered rule engine; deployed alongside v1 (both guards stay live — vaults adopt V2
@@ -89,7 +99,11 @@ const HARDHAT_CONTRACTS = {
   safePolicyGuardV2: '0xc01E5F3EAFd2C0138e98382A3F54B6CeB3dc05cf',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
-  callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
+  // spec 054 — %callsign naming registry. Deployed locally by `npm run deploy:local:callsign`,
+  // which `setup:e2e` runs after the core deploy (it appends to the same record). Empty here used
+  // to mean the local app hid every callsign surface while the E2E suite expected one — the CR-01
+  // shape in issue #1298 — and the gate now fails on exactly that.
+  callsignRegistry: '0xc5a5C42992dECbae36851359345FE25997F5C42d',
   miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
@@ -98,8 +112,8 @@ const HARDHAT_CONTRACTS = {
   // per-network empty state (FR-051) — never invented availability.
   bridgeRouter: '',
   liquidityRouter: '',
-  membershipVoucher: '0x4a1d81F8c3cd56b44d09a2abB42EeB7Ed83cfBf4',
-  voucherBatchMinter: '0xD238Dd92FdEF481DdFF65B396099EE9FB368684F',
+  membershipVoucher: '0xF2fc5Ac192E7e48B2EE95D3528870c6ED26908e4',
+  voucherBatchMinter: '0xE0b0F625F876f7D78413cc6c402FB92C8E47Ea05',
   tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
 }
 

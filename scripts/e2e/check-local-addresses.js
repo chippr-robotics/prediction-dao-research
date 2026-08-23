@@ -6,19 +6,34 @@
  * The frontend does NOT read the local chain's deployed addresses back. It uses the hardcoded
  * block in frontend/src/config/contracts.js that `NETWORK_CONTRACTS` maps the chain id to. So the
  * app is only pointed at the right contracts for as long as those constants happen to equal what
- * the deploys produced — and some of those addresses move when the deploy sequence changes.
+ * the deploys produced — and those addresses move both when a contract changes and when the deploy
+ * sequence does.
  *
- * WHICH ADDRESSES MOVE, AND WHY
- * Most of scripts/deploy/deploy.js goes through `deployDeterministic` — CREATE2 via the singleton
- * factory — so those addresses are a function of the salt and the init code, NOT of the deployer's
- * nonce. They do not move when the sequence changes.
+ * WHICH ADDRESSES MOVE, AND WHY — TWO MECHANISMS, NOT ONE
+ * Both are common, they have DIFFERENT remedies, and an earlier draft of this gate named only the
+ * first. A report that blames deploy order for an address that moved because a constructor arg
+ * changed sends the reader to the wrong file.
  *
- * The exceptions are the ones that bite. `upgrades.deployProxy` (scripts/deploy/lib/upgradeable.js)
- * deploys with plain CREATE, so each proxy's address is a function of the DEPLOYER'S NONCE at the
- * moment that transaction is sent: `membershipManager`, `wagerRegistry` and `tokenFactory`. Any
- * additional deployer transaction inserted BEFORE one of those calls — another deploy, a role
- * grant, a mock — shifts that proxy's address by a nonce slot. The same holds for any plain-CREATE
- * deploy run outside deploy.js against the same chain (the swap mocks are deployed that way).
+ *   1. INIT CODE (CREATE2). Most of scripts/deploy/deploy.js goes through `deployDeterministic` —
+ *      CREATE2 via the singleton factory — so the address is keccak over the salt AND THE INIT
+ *      CODE. It does not care about the deployer's nonce, but it moves the moment the init code
+ *      changes: an edit to the contract's own source or anything it inherits, a compiler/optimizer
+ *      settings change, or a different CONSTRUCTOR ARGUMENT. This is the ordinary case — every
+ *      contract change moves its address — and the remedy is to re-derive the constants
+ *      (`npm run sync:frontend-contracts:local`) and commit them, not to reorder anything.
+ *
+ *   2. DEPLOYER NONCE (plain CREATE). `upgrades.deployProxy` (scripts/deploy/lib/upgradeable.js)
+ *      deploys with plain CREATE, so each proxy's address is a function of the DEPLOYER'S NONCE at
+ *      the moment that transaction is sent: `membershipManager`, `wagerRegistry` and `tokenFactory`
+ *      in deploy.js, `callsignRegistry` in deploy-callsign-registry.js, plus every `…Impl` behind
+ *      them. Any additional deployer transaction inserted BEFORE one of those calls — another
+ *      deploy, a role grant, a mock — shifts it by a nonce slot. This is #1289, and the remedy is
+ *      to APPEND rather than insert (then re-sync).
+ *
+ * The two are not independent: a CREATE2 contract whose constructor takes one of those proxies
+ * (`membershipVoucher` takes `membershipManager`) has the nonce hazard fed into its init code, so
+ * an inserted deploy moves it too. That is why the gate classifies each mismatch by mechanism
+ * rather than asserting one cause for all of them.
  *
  * Nothing about the resulting failure names its cause. A read against an address with no code
  * returns empty rather than reverting, so nothing throws and the UI simply never renders. It
@@ -59,29 +74,36 @@
  * Addresses the record carries that the app's block has no key for at all are listed too
  * ("unmapped"), because that is how a newly added deploy shows up before anyone wires it in.
  *
- * WHAT THIS GATE DOES **NOT** COVER (deferred, deliberately — issue #1298 names three sources)
- * The third source in the issue is `frontend/package.json` `dev:e2e`'s VITE_AMOY_UNISWAP_FACTORY /
- * _SWAP_ROUTER / _QUOTER / _POSITION_MANAGER and VITE_AMOY_WMATIC, consumed by the `dex` block in
+ * THE THIRD SOURCE (issue #1298 names three), AND WHAT IS HONESTLY NOT COVERABLE HERE
+ * The third source is `frontend/package.json` `dev:e2e`'s VITE_AMOY_UNISWAP_FACTORY / _SWAP_ROUTER
+ * / _QUOTER / _POSITION_MANAGER and VITE_AMOY_WMATIC, consumed by the `dex` block in
  * frontend/src/config/networks.js. Those values are the same hazard in a second place, and they
  * are what produced the issue's SW-01 (".trade-summary never found") failure.
  *
- * They are only PARTIALLY covered here, and the reason is structural: at this commit there is no
- * `dev:e2e` script in frontend/package.json and no `deploy:local:swap` in package.json, so the
- * swap mocks are not deployed by anything in this repo and no record carries their addresses. As
- * the issue says, a value that exists solely in stdout cannot be checked by anything. Closing that
- * hole needs the swap-mock deploy to WRITE its addresses into the deployment record; that is a
- * change to a script that does not exist yet, so it is not made here.
+ * Two halves, and only one of them can be built at this commit:
  *
- * What is here instead: if those env vars are set when this gate runs, they are compared against
- * the record (see SWAP_ENV_KEYS) — a mismatch is fatal like any other. If they are set and the
- * record does not carry the corresponding key, that is reported as UNRECORDED, naming the missing
- * piece, rather than passing. The gate therefore starts enforcing the third source the moment the
- * swap deploy records anything, and says plainly that it cannot before then.
+ *   what the app will use — covered. `collectSwapValues` reads those names from the environment
+ *     AND from `frontend/package.json`'s script strings, so a hardcoded `VITE_AMOY_UNISWAP_QUOTER=0x…`
+ *     in a `dev:e2e` script is checked without anyone having to export it first. (An earlier draft
+ *     read only `process.env`, which made this whole leg inert in CI, where nothing sets them.)
+ *
+ *   what actually deployed — NOT coverable here, and not by writing more code in this file. There
+ *     is no `deploy:local:swap` in package.json, no swap-mock deploy script under scripts/deploy/,
+ *     and no MockUniswapFactory/Quoter/SwapRouter under contracts/mocks/ (only MockUniswapV3Pool).
+ *     The mocks the issue measured do not exist in this tree, so there is nothing to record and
+ *     nothing to compare against. The issue's ask — "deploy:local:swap should record its addresses
+ *     instead of only logging them" — belongs to the commit that reintroduces that deploy; the
+ *     record key it must write under is listed in SWAP_ENV_KEYS below so that commit has one place
+ *     to look.
+ *
+ * Until then a swap value that is set but has no counterpart in the record is reported UNRECORDED,
+ * naming the missing piece — never passed and never silently skipped. The gate starts enforcing
+ * the third source the moment the swap deploy records anything.
  *
  * Usage:
  *   node scripts/e2e/check-local-addresses.js [--network localhost] [--chainId 1337]
  *                                             [--deployment <path>] [--contractsFile <path>]
- *                                             [--json]
+ *                                             [--frontendPackage <path>] [--json]
  *
  * Exit code 0 = every hardcoded address the record can speak to matches. 1 = at least one mismatch
  * or a deployed-but-unset contract, or the comparison could not be made at all (missing record,
@@ -112,6 +134,33 @@ const TOP_LEVEL_PROVENANCE_FIELDS = ["deployer", "treasury"];
  * `provenance` is excluded: nothing breaks because the app does not know the treasury address.
  */
 const DEPLOYED_SECTIONS = new Set(["contracts", "mocks", "token"]);
+
+/**
+ * The keys whose address is a function of the DEPLOYER'S NONCE rather than of init code — i.e. the
+ * plain-CREATE deploys. Derived from the `deployProxy` call sites: three in scripts/deploy/deploy.js
+ * (membershipManager, wagerRegistry, tokenFactory) and one in deploy-callsign-registry.js, each of
+ * which deploys an implementation and then its proxy. Everything else in those scripts goes through
+ * `deployDeterministic` (CREATE2).
+ *
+ * This is used only to LABEL a mismatch with the mechanism that can have moved it, so a stale entry
+ * misdirects a reader rather than passing a bad address. Add a key here whenever a new
+ * `deployProxy` call joins the local deploy sequence.
+ */
+const NONCE_ORDERED_KEYS = new Set([
+  "membershipManager",
+  "membershipManagerImpl",
+  "wagerRegistry",
+  "wagerRegistryImpl",
+  "tokenFactory",
+  "tokenFactoryImpl",
+  "callsignRegistry",
+  "callsignRegistryImpl",
+]);
+
+/** "nonce" for the plain-CREATE deploys, "create2" for everything else. See NONCE_ORDERED_KEYS. */
+function mechanismFor(key) {
+  return NONCE_ORDERED_KEYS.has(key) ? "nonce" : "create2";
+}
 
 /**
  * The issue's third source: `dev:e2e`'s swap env vars → the record key(s) that would hold the same
@@ -281,19 +330,67 @@ function compareAddresses(hardcoded, deployed) {
 }
 
 /**
- * The issue's third source, as far as it can be checked here. Only env vars that are actually SET
- * are considered; an unset var means the app's `dex` block is off, which is not a mispoint.
+ * Where the app's swap values can come from, in the order a build would see them:
+ *
+ *   1. the environment this gate runs in (a shell export, a workflow `env:` block)
+ *   2. `frontend/package.json`'s script strings — `"dev:e2e": "VITE_AMOY_UNISWAP_QUOTER=0x… vite"`
+ *
+ * (2) is the one the issue names, and reading only (1) is what made this leg inert: nothing in
+ * .github/workflows/torture-test.yml sets these, so an env-only check reports "not set" on exactly
+ * the run it was written for. A value written into a script string is just as much a hardcoded
+ * address as anything in contracts.js, and is checkable without an environment at all.
+ *
+ * Returns { VAR: { value, source } } for the names in SWAP_ENV_KEYS only; the environment wins,
+ * because it is what a build would actually see.
+ */
+function collectSwapValues(env = {}, frontendPackageFile) {
+  const values = {};
+
+  const pkgPath =
+    frontendPackageFile || path.join(ROOT, "frontend", "package.json");
+  if (fs.existsSync(pkgPath)) {
+    let scripts = {};
+    try {
+      scripts = JSON.parse(fs.readFileSync(pkgPath, "utf8")).scripts || {};
+    } catch {
+      scripts = {}; // an unreadable package.json is not this gate's failure to report
+    }
+    for (const [scriptName, body] of Object.entries(scripts)) {
+      if (typeof body !== "string") continue;
+      for (const varName of Object.keys(SWAP_ENV_KEYS)) {
+        const m = new RegExp(`${varName}\\s*=\\s*['"]?(0x[0-9a-fA-F]{40})`).exec(body);
+        if (m) values[varName] = { value: m[1], source: `frontend/package.json → ${scriptName}` };
+      }
+    }
+  }
+
+  for (const varName of Object.keys(SWAP_ENV_KEYS)) {
+    if (env[varName]) values[varName] = { value: String(env[varName]), source: "environment" };
+  }
+
+  return values;
+}
+
+/**
+ * The issue's third source, as far as it can be checked here. Only values that are actually SET are
+ * considered; an unset one means the app's `dex` block is off, which is not a mispoint.
+ *
+ * `values` is what collectSwapValues returns (`VAR → { value, source }`); a flat `VAR → address`
+ * map is also accepted and treated as coming from the environment.
  *
  * Returns { mismatches, unrecorded, matched }: `mismatches` is fatal, `unrecorded` names a value
- * the record cannot speak to (see the deferral note in the file header) and is reported only.
+ * the record cannot speak to (see the third-source note in the file header) and is reported only.
  */
-function checkSwapEnv(env, deployed) {
+function checkSwapEnv(values, deployed) {
   const mismatches = [];
   const unrecorded = [];
   let matched = 0;
 
   for (const [varName, candidates] of Object.entries(SWAP_ENV_KEYS)) {
-    const configured = env[varName];
+    const raw = values[varName];
+    if (!raw) continue;
+    const configured = typeof raw === "string" ? raw : raw.value;
+    const source = typeof raw === "string" ? "environment" : raw.source;
     if (!configured) continue;
 
     const hit = candidates
@@ -305,11 +402,11 @@ function checkSwapEnv(env, deployed) {
       .find(Boolean);
 
     if (!hit) {
-      unrecorded.push({ varName, configured, candidates });
+      unrecorded.push({ varName, configured, candidates, source });
       continue;
     }
     if (hit.address.toLowerCase() !== String(configured).toLowerCase()) {
-      mismatches.push({ varName, key: hit.key, configured, actual: hit.address });
+      mismatches.push({ varName, key: hit.key, configured, actual: hit.address, source });
       continue;
     }
     matched++;
@@ -321,21 +418,32 @@ function checkSwapEnv(env, deployed) {
 // ── reporting ──────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Printed on every failure. It describes the mechanism rather than a house rule, because the
- * previous wording ("append new deploys at the END of the list") sent the reader to a list of
- * deploy scripts that does not exist, and named plain CREATE as the mechanism for deploys that
- * actually go through CREATE2 and cannot move at all.
+ * The two mechanisms, printed on failure — only the one(s) that can explain the keys that actually
+ * failed. Getting this wrong is not cosmetic: an earlier draft asserted that CREATE2 addresses
+ * "do NOT move" and sent every reader to the deployProxy sequence, which then contradicted its own
+ * finding list on the common case (a contract edit moving seven CREATE2 addresses at once) and
+ * named a remedy — reordering — that would have fixed nothing.
  */
-const ORDER_RULE = [
-  "WHY AN ADDRESS MOVES. Most of these deploys go through deployDeterministic (CREATE2 via the",
-  "singleton factory), so their addresses are a function of the salt and the init code and do NOT",
-  "move. The ones that move are the plain-CREATE deploys, whose address is a function of the",
-  "deployer's NONCE when the transaction is sent: the three upgrades.deployProxy calls in",
-  "scripts/deploy/deploy.js (membershipManager, wagerRegistry, tokenFactory), plus any",
-  "plain-CREATE deploy run against this chain from another script. ANY extra deployer transaction",
-  "inserted BEFORE one of those — a deploy, a role grant, a mock — shifts that address by a nonce",
-  "slot, and the app keeps using the hardcoded constant. Sequence new work AFTER every",
-  "deployProxy call, or re-derive and update the constants named above.",
+const CAUSE_CREATE2 = [
+  "CREATE2 (deployDeterministic, via the singleton factory). The address is keccak over the salt",
+  "AND THE INIT CODE, so the deployer's nonce is irrelevant but ANY change to the init code moves",
+  "it: an edit to the contract or something it inherits, a compiler/optimizer settings change, or",
+  "a different CONSTRUCTOR ARGUMENT (which is how the nonce hazard below leaks in — e.g.",
+  "membershipVoucher takes membershipManager's address).",
+  "  FIX: this is the ordinary case, and it is a re-derive, NOT a reorder. Run",
+  "       `npm run sync:frontend-contracts:local` and COMMIT frontend/src/config/contracts.js.",
+  "       If you did not change any of those contracts, find out what did before syncing.",
+].join("\n  ");
+
+const CAUSE_NONCE = [
+  "PLAIN CREATE (upgrades.deployProxy, scripts/deploy/lib/upgradeable.js). The address is a",
+  "function of the DEPLOYER'S NONCE when that transaction is sent — membershipManager,",
+  "wagerRegistry, tokenFactory (deploy.js) and callsignRegistry (deploy-callsign-registry.js),",
+  "plus their implementations. ANY extra deployer transaction sequenced BEFORE one of them — a",
+  "deploy, a role grant, a mock — slides it by a nonce slot while the app keeps using the",
+  "hardcoded constant. This is #1289.",
+  "  FIX: APPEND new deployer work after every deployProxy call rather than inserting it, then",
+  "       re-derive as above. If the new ordering is the intended one, re-derive and commit.",
 ].join("\n  ");
 
 function formatReport(result, { blockName, contractsFile, deploymentFile, swap }) {
@@ -368,9 +476,10 @@ function formatReport(result, { blockName, contractsFile, deploymentFile, swap }
         `is supposed to use looks exactly like this until someone adds its key.`
     );
   }
-  for (const { varName, configured, candidates } of swapResult.unrecorded) {
+  for (const { varName, configured, candidates, source } of swapResult.unrecorded) {
     lines.push(
-      `  warn  ${varName}=${configured} is UNRECORDED: ${rel(deploymentFile)} carries none of ` +
+      `  warn  ${varName}=${configured} (from ${source || "environment"}) is UNRECORDED: ` +
+        `${rel(deploymentFile)} carries none of ` +
         `${candidates.join(", ")}, so nothing can check it. The swap-mock deploy must write its ` +
         `addresses into the deployment record (issue #1298, third source) — a value that exists ` +
         `only in stdout is uncheckable.`
@@ -378,8 +487,9 @@ function formatReport(result, { blockName, contractsFile, deploymentFile, swap }
   }
   if (swapResult.matched === 0 && swapResult.unrecorded.length === 0) {
     lines.push(
-      `  note  no VITE_AMOY_UNISWAP_* / VITE_AMOY_WMATIC values are set in this environment, so the ` +
-        `swap-mock addresses (issue #1298, third source) were not checked.`
+      `  note  no VITE_AMOY_UNISWAP_* / VITE_AMOY_WMATIC value is set in the environment or written ` +
+        `into a frontend/package.json script, so the swap-mock addresses (issue #1298, third ` +
+        `source) were not checked. Nothing in this repo deploys those mocks at present.`
     );
   }
 
@@ -401,8 +511,15 @@ function formatReport(result, { blockName, contractsFile, deploymentFile, swap }
   lines.push(`  expected = ${rel(contractsFile)} → ${blockName} (what the app will use)`);
   lines.push(`  actual   = ${rel(deploymentFile)} (what was actually deployed just now)`);
   lines.push("");
+  // Each mismatch is labelled with the mechanism that can have moved THAT key, so the reader is
+  // never handed a cause that does not apply to the thing in front of them.
+  const label = (key) =>
+    mechanismFor(key) === "nonce"
+      ? "plain CREATE — deployer nonce"
+      : "CREATE2 — salt + init code";
+
   for (const { key, configured, actual } of mismatches) {
-    lines.push(`  ${key}  — points at an address this deploy did not use`);
+    lines.push(`  ${key}  — points at an address this deploy did not use   [${label(key)}]`);
     lines.push(`        expected  ${configured}`);
     lines.push(`        actual    ${actual}`);
   }
@@ -411,13 +528,48 @@ function formatReport(result, { blockName, contractsFile, deploymentFile, swap }
     lines.push(`        expected  ${actual}   (set the constant to this)`);
     lines.push(`        actual    '' — the app's "not deployed on this chain" state`);
   }
-  for (const { varName, key, configured, actual } of swapResult.mismatches) {
-    lines.push(`  ${varName}  — env value does not match the deployed ${key}`);
+  for (const { varName, key, configured, actual, source } of swapResult.mismatches) {
+    lines.push(
+      `  ${varName}  — value from ${source || "environment"} does not match the deployed ${key}` +
+        `   [${label(key)}]`
+    );
     lines.push(`        expected  ${configured}`);
     lines.push(`        actual    ${actual}`);
   }
-  lines.push("");
-  lines.push(`  ${ORDER_RULE}`);
+
+  // Only the mechanisms that can explain these findings. A deployed-but-unset key is neither: the
+  // address did not move, the constant was never written.
+  const movedKeys = [
+    ...mismatches.map((m) => m.key),
+    ...swapResult.mismatches.map((m) => m.key),
+  ];
+  const causes = [];
+  if (movedKeys.some((k) => mechanismFor(k) === "create2")) causes.push(CAUSE_CREATE2);
+  if (movedKeys.some((k) => mechanismFor(k) === "nonce")) causes.push(CAUSE_NONCE);
+
+  if (causes.length > 0) {
+    lines.push("");
+    lines.push(
+      `  WHY AN ADDRESS MOVES — ${causes.length === 1 ? "the mechanism" : "the two mechanisms"} ` +
+        `behind the mismatch${mismatches.length + swapResult.mismatches.length === 1 ? "" : "es"} above:`
+    );
+    for (const cause of causes) {
+      lines.push("");
+      lines.push(`  ${cause}`);
+    }
+  }
+  if (fatalUnset.length > 0) {
+    lines.push("");
+    lines.push(
+      `  The DEPLOYED-but-empty key${fatalUnset.length === 1 ? "" : "s"} above did not move: the ` +
+        `deploy put a contract on this chain and`
+    );
+    lines.push(
+      `  ${blockName} never got the address. Copy each "expected" value into ` +
+        `${rel(contractsFile)} (or run`
+    );
+    lines.push("  `npm run sync:frontend-contracts:local`, which writes exactly that).");
+  }
   lines.push("");
   lines.push("  Do not start the E2E suite against this chain. The app would call addresses with no");
   lines.push("  code, or skip a contract that exists: nothing reverts, the UI simply never renders, and");
@@ -448,6 +600,7 @@ function parseArgs(argv) {
     else if (a === "--chainId") out.chainId = Number(argv[++i]);
     else if (a === "--deployment") out.deployment = argv[++i];
     else if (a === "--contractsFile") out.contractsFile = argv[++i];
+    else if (a === "--frontendPackage") out.frontendPackage = argv[++i];
     else if (a === "--json") out.json = true;
   }
   return out;
@@ -502,7 +655,7 @@ function main(argv, env = process.env) {
 
   const deployed = flattenDeployment(record);
   const result = compareAddresses(hardcoded, deployed);
-  const swap = checkSwapEnv(env, deployed);
+  const swap = checkSwapEnv(collectSwapValues(env, args.frontendPackage), deployed);
   const failing = isFailing(result, swap);
 
   if (args.json) {
@@ -520,13 +673,16 @@ if (require.main === module) process.exit(main(process.argv.slice(2)));
 
 module.exports = {
   checkSwapEnv,
+  collectSwapValues,
   compareAddresses,
   flattenDeployment,
   formatReport,
   isFailing,
+  mechanismFor,
   objectLiteralBody,
   parseContractsBlock,
   resolveBlockName,
   main,
+  NONCE_ORDERED_KEYS,
   SWAP_ENV_KEYS,
 };

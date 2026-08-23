@@ -390,25 +390,33 @@ jobs:
             --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
             http://localhost:8545 || echo "Hardhat node may not be ready yet"
 
-      # `setup:e2e` is the ONE entrypoint for the local chain: `deploy:local`, then the address
-      # gate (`check:e2e-addresses`). Do not call `deploy:local` directly here — the app reads the
-      # HARDCODED block in frontend/src/config/contracts.js, not the deployment record, so it is
-      # only pointed at the right contracts while those constants happen to match.
+      # `setup:e2e` is the ONE entrypoint for the local chain: `deploy:local`, then
+      # `deploy:local:callsign` (spec 054 — its own script, appended to the same record), then the
+      # address gate (`check:e2e-addresses`). Do not call `deploy:local` directly here — the app
+      # reads the HARDCODED block in frontend/src/config/contracts.js, not the deployment record,
+      # so it is only pointed at the right contracts while those constants happen to match.
       #
-      # Most of deploy.js goes through CREATE2 (the singleton factory) and cannot move. What moves
-      # is the plain-CREATE deploys, whose address is a function of the deployer's NONCE: the three
-      # `upgrades.deployProxy` calls (membershipManager, wagerRegistry, tokenFactory), plus any
-      # plain-CREATE deploy another script runs against this chain. Any extra deployer transaction
-      # sequenced BEFORE one of those shifts its address by a nonce slot, and the app then calls an
-      # address with no code — nothing reverts, and it surfaces 10-15 minutes later as
-      # unrelated-looking Cypress timeouts (issue #1298, found via #1289). The gate also fails when
-      # a contract deployed here is left empty in the app's block, which is the same silent failure
-      # from the other direction.
+      # TWO different things move an address, and they have different fixes:
+      #   * init code (CREATE2, most of deploy.js) — a contract edit, a compiler setting, or a
+      #     changed constructor arg. Ordinary, and the fix is to re-derive the constants
+      #     (`npm run sync:frontend-contracts:local`) and commit them.
+      #   * the deployer's nonce (plain CREATE: the `upgrades.deployProxy` proxies —
+      #     membershipManager, wagerRegistry, tokenFactory, callsignRegistry). An extra deployer
+      #     transaction sequenced BEFORE one of them slides it a slot. That is #1289.
+      # Either way the app then calls an address with no code: nothing reverts, and it surfaces
+      # 10-15 minutes later as unrelated-looking Cypress timeouts (issue #1298). The gate labels
+      # each mismatch with the mechanism that applies to it, and also fails when a contract
+      # deployed here is left empty in the app's block — the same silent failure from the other
+      # direction, and the shape the issue's CR-01 callsign failure took.
       #
-      # NOT covered: `dev:e2e`'s VITE_AMOY_UNISWAP_* / VITE_AMOY_WMATIC values (issue #1298's third
-      # source). They are compared when set, but the swap mocks are not deployed by anything in
-      # this repo at present and no record carries their addresses, so there is nothing to compare
-      # against yet — see the deferral note in scripts/e2e/check-local-addresses.js.
+      # A deploy step must never rewrite contracts.js to make itself pass: the gate compares the
+      # COMMITTED constants, so re-syncing here would guarantee a green tick and check nothing.
+      #
+      # PARTIALLY covered: `dev:e2e`'s VITE_AMOY_UNISWAP_* / VITE_AMOY_WMATIC values (issue #1298's
+      # third source). The gate reads them from the environment and from frontend/package.json's
+      # script strings, but nothing in this repo deploys those swap mocks, so no record carries
+      # their addresses to compare against — see the third-source note in
+      # scripts/e2e/check-local-addresses.js, which names the record keys that deploy must write.
       - name: Deploy contracts to local network (with deploy-order address gate)
         run: |
           echo "Deploying contracts to local Hardhat network..."

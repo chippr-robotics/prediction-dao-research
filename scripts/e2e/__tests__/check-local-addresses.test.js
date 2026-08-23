@@ -11,6 +11,12 @@
  * deployed but the app's constant is empty" was skipped outright, so the issue's own leading
  * failure (CR-01, `callsignRegistry`) passed the gate. An empty constant is a CLAIM about the
  * chain, and the record can contradict it.
+ *
+ * The third is the round after that: the gate correctly found seven mismatches on a clean deploy
+ * and then EXPLAINED them wrongly, telling the reader every CREATE2 address is immovable and to go
+ * look at the deploy order. All seven were CREATE2 addresses moved by changed init code. A gate
+ * that fires accurately and diagnoses wrongly costs a debugging session per firing, so the
+ * mechanism labelling is asserted per key here, in both directions.
  */
 const { test } = require("node:test");
 const assert = require("node:assert");
@@ -20,13 +26,16 @@ const path = require("path");
 
 const {
   checkSwapEnv,
+  collectSwapValues,
   compareAddresses,
   flattenDeployment,
   formatReport,
   isFailing,
+  mechanismFor,
   parseContractsBlock,
   resolveBlockName,
   main,
+  NONCE_ORDERED_KEYS,
 } = require("../check-local-addresses.js");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -66,7 +75,7 @@ test("rejects the shifted addresses an inserted (rather than appended) deploy pr
   assert.equal(rates.actual, INSERTED.mockUniswapRates);
 });
 
-test("the shifted-address report names each key, expected, actual, and the real mechanism", () => {
+test("the shifted-address report names each key, expected and actual", () => {
   const result = compareAddresses(APPENDED, INSERTED);
   const report = formatReport(result, REPORT_CONTEXT);
 
@@ -75,13 +84,103 @@ test("the shifted-address report names each key, expected, actual, and the real 
   assert.match(report, new RegExp(INSERTED.callsignRegistry));
   assert.match(report, /expected/);
   assert.match(report, /actual/);
+  assert.doesNotMatch(report, /APPEND new deploys at the END/);
+});
 
-  // The rule must describe the mechanism that actually moves an address. CREATE2 deploys cannot
-  // move, so a message blaming "plain CREATE" for all of them sends the reader somewhere useless.
+// ── which mechanism moved it ───────────────────────────────────────────────────────────────────
+//
+// The first round of this gate asserted ONE cause: "CREATE2 addresses do not move, so look at the
+// deployProxy sequence". That is false, and measurably so — a clean deploy at the commit this gate
+// landed on moved seven CREATE2 addresses (keyRegistry, sanctionsGuard, polymarketAdapter,
+// paymentToken, wmatic, membershipVoucher, voucherBatchMinter) because their init code had changed
+// since the constants were last synced, and none of them because of ordering. A report that names
+// deploy order for those sends the reader to the wrong file and the wrong fix. These tests exist so
+// the message cannot regress to a single cause.
+
+test("a mismatch on a CREATE2 deploy is explained as init code, not as deploy order", () => {
+  // keyRegistry is `deployDeterministic` — the exact case the real failing run produced.
+  const result = compareAddresses(
+    { keyRegistry: APPENDED.mockUniswapRates },
+    { keyRegistry: INSERTED.mockUniswapRates }
+  );
+  const report = formatReport(result, REPORT_CONTEXT);
+
+  assert.match(report, /keyRegistry.*\[CREATE2 — salt \+ init code\]/);
+  assert.match(report, /init code/i);
+  assert.match(report, /CONSTRUCTOR ARGUMENT/);
+  assert.match(report, /sync:frontend-contracts:local/, "the remedy is a re-derive");
+  assert.doesNotMatch(
+    report,
+    /deployProxy/,
+    "nothing here moved by nonce, so the proxy sequence must not be offered as the cause"
+  );
+});
+
+test("a mismatch on a plain-CREATE proxy is explained as the deployer's nonce", () => {
+  const result = compareAddresses(
+    { wagerRegistry: APPENDED.callsignRegistry },
+    { wagerRegistry: INSERTED.callsignRegistry }
+  );
+  const report = formatReport(result, REPORT_CONTEXT);
+
+  assert.match(report, /wagerRegistry.*\[plain CREATE — deployer nonce\]/);
   assert.match(report, /deployProxy/);
   assert.match(report, /nonce/i);
-  assert.match(report, /CREATE2/);
-  assert.doesNotMatch(report, /APPEND new deploys at the END/);
+  assert.match(report, /#1289/);
+});
+
+test("a mixed failure names both mechanisms, each against the keys it explains", () => {
+  const result = compareAddresses(
+    { keyRegistry: APPENDED.mockUniswapRates, tokenFactory: APPENDED.callsignRegistry },
+    { keyRegistry: INSERTED.mockUniswapRates, tokenFactory: INSERTED.callsignRegistry }
+  );
+  const report = formatReport(result, REPORT_CONTEXT);
+
+  assert.match(report, /keyRegistry.*\[CREATE2 — salt \+ init code\]/);
+  assert.match(report, /tokenFactory.*\[plain CREATE — deployer nonce\]/);
+  assert.match(report, /the two mechanisms/);
+});
+
+test("mechanismFor knows the plain-CREATE deploys and treats everything else as CREATE2", () => {
+  for (const key of ["wagerRegistry", "membershipManager", "tokenFactory", "callsignRegistry"]) {
+    assert.equal(mechanismFor(key), "nonce", `${key} is deployed by upgrades.deployProxy`);
+  }
+  for (const key of ["keyRegistry", "sanctionsGuard", "membershipVoucher", "paymentToken"]) {
+    assert.equal(mechanismFor(key), "create2", `${key} is deployed by deployDeterministic`);
+  }
+});
+
+test("NONCE_ORDERED_KEYS still covers every deployProxy call in the local deploy sequence", () => {
+  // The set is a hand-kept mirror of the call sites, and a stale mirror mislabels a failure. This
+  // fails the moment a proxy joins the sequence without being listed.
+  const countProxies = (file) =>
+    (fs.readFileSync(path.join(ROOT, file), "utf8").match(/deployProxy\(\{/g) || []).length;
+
+  assert.equal(
+    countProxies("scripts/deploy/deploy.js"),
+    3,
+    "deploy.js gained/lost a deployProxy — add its proxy and impl keys to NONCE_ORDERED_KEYS"
+  );
+  assert.equal(
+    countProxies("scripts/deploy/deploy-callsign-registry.js"),
+    1,
+    "the callsign deploy gained/lost a deployProxy — update NONCE_ORDERED_KEYS"
+  );
+  for (const key of ["wagerRegistry", "wagerRegistryImpl", "callsignRegistry", "callsignRegistryImpl"]) {
+    assert.ok(NONCE_ORDERED_KEYS.has(key), `${key} must be listed as nonce-ordered`);
+  }
+});
+
+test("a deployed-but-empty constant is not blamed on an address moving", () => {
+  // Nothing moved: the deploy put a contract on the chain and the constant was never written.
+  const result = compareAddresses(
+    { callsignRegistry: "" },
+    flattenDeployment({ contracts: { callsignRegistry: APPENDED.callsignRegistry } })
+  );
+  const report = formatReport(result, REPORT_CONTEXT);
+
+  assert.match(report, /did not move/);
+  assert.doesNotMatch(report, /WHY AN ADDRESS MOVES/);
 });
 
 test("passes when every hardcoded address is where the deploy put it", () => {
@@ -226,6 +325,64 @@ test("a swap env var no record can speak to is UNRECORDED, never a silent pass",
   assert.match(report, /PASS/, "unrecorded is reported, not failed");
 });
 
+test("a swap value hardcoded in a frontend/package.json script is collected, not just env vars", () => {
+  // The issue names `frontend/package.json` `dev:e2e` as the third source. Reading only
+  // process.env made this leg inert on the one run it was written for: nothing in
+  // torture-test.yml exports these, so an env-only check reports "not set" and moves on.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fw-e2e-swap-"));
+  const pkg = path.join(dir, "package.json");
+  fs.writeFileSync(
+    pkg,
+    JSON.stringify({
+      scripts: {
+        dev: "vite",
+        "dev:e2e": `VITE_AMOY_UNISWAP_QUOTER=${APPENDED.mockUniswapQuoter} VITE_AMOY_WMATIC=${APPENDED.mockUniswapRates} vite`,
+      },
+    })
+  );
+
+  const values = collectSwapValues({}, pkg);
+  assert.equal(values.VITE_AMOY_UNISWAP_QUOTER.value, APPENDED.mockUniswapQuoter);
+  assert.match(values.VITE_AMOY_UNISWAP_QUOTER.source, /dev:e2e/);
+  assert.equal(values.VITE_AMOY_WMATIC.value, APPENDED.mockUniswapRates);
+  assert.ok(!("VITE_AMOY_UNISWAP_FACTORY" in values), "only what is actually written is collected");
+
+  // …and it is checked like any other value: a script-hardcoded address that disagrees with the
+  // record fails, with the script named so the reader knows where to edit.
+  const deployed = flattenDeployment({ mocks: { mockUniswapQuoter: INSERTED.mockUniswapQuoter } });
+  const swap = checkSwapEnv(values, deployed);
+  assert.equal(swap.mismatches.length, 1);
+  assert.match(formatReport(compareAddresses({}, {}), { ...REPORT_CONTEXT, swap }), /dev:e2e/);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the environment wins over a frontend/package.json script — it is what a build would see", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fw-e2e-swap-"));
+  const pkg = path.join(dir, "package.json");
+  fs.writeFileSync(
+    pkg,
+    JSON.stringify({ scripts: { "dev:e2e": `VITE_AMOY_UNISWAP_QUOTER=${INSERTED.mockUniswapQuoter} vite` } })
+  );
+
+  const values = collectSwapValues({ VITE_AMOY_UNISWAP_QUOTER: APPENDED.mockUniswapQuoter }, pkg);
+  assert.equal(values.VITE_AMOY_UNISWAP_QUOTER.value, APPENDED.mockUniswapQuoter);
+  assert.equal(values.VITE_AMOY_UNISWAP_QUOTER.source, "environment");
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("collectSwapValues survives a missing or unreadable package.json", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fw-e2e-swap-"));
+  assert.deepEqual(collectSwapValues({}, path.join(dir, "nope.json")), {});
+
+  const broken = path.join(dir, "package.json");
+  fs.writeFileSync(broken, "{ not json");
+  assert.deepEqual(collectSwapValues({}, broken), {});
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("unset swap env vars are reported as not checked rather than as verified", () => {
   const swap = checkSwapEnv({}, flattenDeployment({ mocks: { mockUniswapQuoter: APPENDED.mockUniswapQuoter } }));
   assert.equal(swap.matched, 0);
@@ -295,7 +452,25 @@ test("the local chain's block is readable and holds real addresses", () => {
   const source = fs.readFileSync(CONTRACTS_FILE, "utf8");
   const hardhat = parseContractsBlock(source, resolveBlockName(source, 1337));
   assert.ok(hardhat, "HARDHAT_CONTRACTS must stay parseable — the gate reads it, not the module");
-  assert.match(hardhat.wagerRegistry, /^0x[0-9a-fA-F]{40}$/);
+
+  // Every contract `setup:e2e` deploys must be non-empty here, or the app hides a surface the E2E
+  // suite is about to exercise. callsignRegistry is in this list because it was the issue's own
+  // leading failure (CR-01) and it is now deployed by `deploy:local:callsign`.
+  for (const key of [
+    "wagerRegistry",
+    "membershipManager",
+    "keyRegistry",
+    "sanctionsGuard",
+    "tokenFactory",
+    "paymentToken",
+    "callsignRegistry",
+  ]) {
+    assert.match(
+      hardhat[key] || "",
+      /^0x[0-9a-fA-F]{40}$/,
+      `${key} is deployed by setup:e2e, so the committed constant must hold its address`
+    );
+  }
 });
 
 // ── the CLI ────────────────────────────────────────────────────────────────────────────────────
