@@ -13,8 +13,11 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   font-size: 0.95rem;
   font-weight: 500;
-  /* Note: This banner overlays the top portion of the header when present.
-     When dismissed, the header appears at top: 0 normally. */
+  /* Note: the banner is out of flow, so it reserves its space through the
+     --dev-banner-height custom property the component publishes on <html> and the header
+     offsets itself by. That height is MEASURED from this element (issue #1248) — this copy
+     wraps at narrow widths, so nothing here may be assumed to be one line tall.
+     When dismissed, the property is 0px and the header appears at top: 0 normally. */
 }
 
 .dev-warning-content {
