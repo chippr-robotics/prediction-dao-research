@@ -503,7 +503,7 @@
 
 /* Send Button */
 .send-btn {
-  background: var(--brand-primary);
+  background: var(--primary-button);
   border: none;
   border-radius: 12px;
   padding: 0.875rem;

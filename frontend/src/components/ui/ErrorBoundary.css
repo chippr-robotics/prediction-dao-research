@@ -92,8 +92,8 @@
 }
 
 .reset-button {
-  background: var(--gradient-brand);
-  color: white;
+  background: var(--gradient-primary-button);
+  color: var(--primary-button-text);
 }
 
 .reset-button:hover {

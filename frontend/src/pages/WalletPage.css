@@ -417,8 +417,8 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: white;
-  background: var(--brand-primary);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -488,8 +488,8 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: white;
-  background: var(--color-primary);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -791,9 +791,9 @@
 }
 
 .reports-section .report-quick-btn {
-  background: var(--color-primary);
-  color: #fff;
-  border: 1px solid var(--color-primary);
+  background: var(--primary-button);
+  color: var(--primary-button-text);
+  border: 1px solid var(--primary-button);
   font-weight: 600;
 }
 
@@ -1074,8 +1074,8 @@
 }
 
 .key-action-btn.primary {
-  color: white;
-  background: var(--color-primary, var(--brand-primary));
+  color: var(--primary-button-text);
+  background: var(--primary-button);
 }
 
 .key-action-btn.primary:hover {
@@ -1243,8 +1243,8 @@
   padding: 16px 24px;
   font-size: 16px;
   font-weight: 600;
-  color: white;
-  background: var(--color-primary);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -1339,8 +1339,8 @@
   padding: 10px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: white;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  color: var(--primary-button-text);
+  background: var(--gradient-primary-button);
   border: none;
   border-radius: 8px;
   cursor: pointer;

@@ -157,9 +157,15 @@ describe('Decline and Cancel Wagers', () => {
     // Open My Wagers → Created tab
     cy.openMyWagers('created')
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
+    /*
+     * This test CREATED the wager above, so the row is a precondition, not a probe:
+     * assert it retryably (waits out the useFriendMarkets scan) and fail HERE if it
+     * never lists, rather than no-oping through a one-shot snapshot (#1250).
+     */
+    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+      .find('.mm-table-row', { timeout: 20000 })
+      .should('have.length.greaterThan', 0)
+      .then((rows) => {
         // Click on the first wager to view details
         cy.wrap(rows.first()).click()
 
@@ -190,10 +196,7 @@ describe('Decline and Cancel Wagers', () => {
             })
           }
         })
-      } else {
-        cy.get('.mm-empty-state').should('exist')
-      }
-    })
+      })
   })
 
   // ---------------------------------------------------------------------------
@@ -260,8 +263,10 @@ describe('Decline and Cancel Wagers', () => {
 
     cy.openMyWagers('created')
 
-    // Look for an active wager
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
+    // Look for an active wager. This is a genuine probe (the test did not arrange an
+    // ACCEPTED wager), so settle the fetch first — a bare panel snapshot reads the
+    // in-flight empty state as "no active wagers" (#1250).
+    cy.settledWagerPanel().then(($panel) => {
       /*
        * Open the row that is actually ACTIVE.
        *

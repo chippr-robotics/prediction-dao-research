@@ -80,8 +80,8 @@
   white-space: nowrap;
 }
 .statement-primary-btn {
-  background: var(--brand-primary);
-  border: 1px solid var(--brand-primary);
+  background: var(--primary-button);
+  border: 1px solid var(--primary-button);
   color: var(--primary-button-text);
 }
 .statement-primary-btn:hover:not(:disabled) {

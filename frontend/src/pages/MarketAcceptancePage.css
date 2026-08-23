@@ -66,10 +66,10 @@
 
 .map-btn {
   padding: 0.875rem 2rem;
-  background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
+  background: var(--gradient-primary-button);
   border: none;
   border-radius: 8px;
-  color: white;
+  color: var(--primary-button-text);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;

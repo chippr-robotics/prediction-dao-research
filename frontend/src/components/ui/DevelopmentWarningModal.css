@@ -150,8 +150,8 @@
 
 .dev-warning-modal-button {
   padding: 0.875rem 2rem;
-  background: var(--brand-primary);
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   border: none;
   border-radius: var(--radius-md);
   font-size: 1rem;

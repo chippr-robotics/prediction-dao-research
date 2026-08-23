@@ -38,7 +38,7 @@ role. This is enforced, not merely encouraged — see [Guards](#guards).
 **Retired.** `#2FA043` (the 2017 Chippr green) and the outgoing FairWins hues `#36B37E`, `#4C9AFF`,
 `#7BDCB5` and their variants. These fail CI if reintroduced.
 
-## Two things that are easy to get wrong
+## Three things that are easy to get wrong
 
 ### 1. Chippr Teal is a large-text and fill colour
 
@@ -59,6 +59,71 @@ never fills a large area.
 
 - Amber as a **fill or border** → `--warning-color`.
 - Amber-toned **text** → `--warning-text` (a dark amber on light, Amber itself on dark).
+
+### 3. A brand fill never states its own label colour
+
+```css
+/* WRONG — 2.16:1 in dark mode, and it was written 66 times (issue #1260) */
+.earn-btn.primary { background: var(--brand-primary); color: #fff; }
+
+/* RIGHT */
+.earn-btn.primary { background: var(--primary-button); color: var(--primary-button-text); }
+```
+
+`--primary-button` / `--primary-button-text` are a **matched pair**, and the reason they exist is
+that the label has to invert where the fill does:
+
+| | fill | label | ratio |
+|---|---|---|---|
+| light | `#2E7D8C` Chippr Teal | `#FFFFFF` | 4.7:1 |
+| dark | `#6FAEBB` Teal 300 | `#1C333B` Gunmetal | 5.3:1 |
+
+A hardcoded `#fff` cannot do that. On dark, `--brand-primary` lifts to `#83B9C4` and a white label
+measures **2.16:1** — below AA and below even the 3:1 large-text floor. The fix is the pair, never
+darkening `--brand-primary`: Chippr Teal is a fill colour by the guidelines' own table, and re-toning
+it to pass one contrast row takes the whole brand off palette.
+
+Decorative fills — a step number, a success glyph, a role badge — take the **same** pair. They are
+not exempt just because nobody clicks them: a badge often sits inside a control that can be disabled
+(the count chip in `.mm-tab` is inside a `<button>` with a `:disabled` state), and the rule below is
+what keeps it legible there. The one fill that carries **no** label is `--gradient-brand-soft`: its
+Teal 100 stop is 2.5:1 under white and 3.0:1 under Gunmetal, so nothing readable fits on it.
+
+**Disabled controls change hue, not alpha.** `opacity: 0.55` over a pale teal is not a state a member
+can read. `index.css` re-points the fill/label set on any disabled button:
+
+```css
+button:disabled, button[disabled], button[aria-disabled='true'] {
+  --primary-button: var(--disabled-bg);
+  --primary-button-hover: var(--disabled-bg);
+  --primary-button-text: var(--disabled-text);
+  --gradient-primary-button: linear-gradient(135deg, var(--disabled-bg) 0%, var(--disabled-bg) 100%);
+}
+```
+
+It is done with custom properties rather than a `background` declaration on purpose: a property set
+on the element beats the inherited one whatever specificity the component's own rule has, where a
+`background` here would win on some surfaces and lose on others.
+
+Two consequences, and both have already been got wrong:
+
+**The fill and the label move together or not at all.** A control only follows the remap for the
+tokens it actually reads, so a rule that fills from `--brand-primary` and labels from
+`--primary-button-text` gets `--disabled-text` on a full-strength teal — **1.27:1 in light, 1.06:1 in
+dark**, against 4.74:1 for the `#fff` it replaced. That is a regression in *both* themes, and it
+lands on every primary `Button` while a transaction is in flight (`disabled={disabled || loading}`).
+A fill that is a **status** colour keeps its colour when disabled, so it labels with
+`--status-fill-text` — same values as `--primary-button-text` per theme, deliberately outside the
+remap. `disabledControlState.test.js` enforces the pairing in both directions.
+
+**`--gradient-primary-button` is re-pointed, not inherited-and-re-resolved.** A custom property's
+computed value is its specified value *with `var()` already substituted*, resolved on the element the
+declaration applies to. The gradient is declared at `:root`, so its stops resolve there against the
+**enabled** tokens and descendants inherit that finished string — re-pointing `--primary-button` on
+the button cannot reach back into it. Drop that fourth line and 18 gradient-filled controls keep
+their teal under a grey label. The same reasoning applies to the compatibility aliases
+(`--text-on-brand`, `--color-on-primary`): they resolve at `:root` too, so they never follow the
+remap, and a rule using one must fill from something that also does not.
 
 ## Status colours
 
@@ -99,7 +164,7 @@ brand face silently does not apply — that is why 62 of them had to be swept.
 
 ## Guards
 
-Four Vitest suites in `frontend/src/test/brand/`, all gating CI:
+Six Vitest suites in `frontend/src/test/brand/`, all gating CI:
 
 | Guard | What it prevents |
 |---|---|
@@ -107,14 +172,24 @@ Four Vitest suites in `frontend/src/test/brand/`, all gating CI:
 | `noLegacyBrandColors.test.js` | A retired brand hue reappearing, named specifically |
 | `tokenContrast.test.js` | A token pairing dropping below WCAG 2.1 AA, in **both** themes |
 | `noUndefinedTokens.test.js` | `var(--nonexistent, #hardcoded)` — see below |
+| `noBrandFillOwnLabel.test.js` | A brand fill that states its own label colour — the **usage** gap the four above are blind to |
+| `disabledControlState.test.js` | A disabled control that is only a faded copy of the enabled one |
+
+The fifth exists because the first four all look adjacent to issue #1260 and none of them sees it.
+`tokenContrast` audits the *palette*, not who uses it, so 66 rules that never named the pair were
+invisible to it. `noHardcodedColors` exempts `#fff` as an absolute — precisely the literal being
+used. `cy.a11yScan()` would have caught it in dark mode, but the fast tier runs one theme. The
+missing check was never about the palette or the literal; it was about the **pairing**.
 
 ### What the literal gate allows, and why
 
 Two exemptions, each stated in the test with a reason:
 
-- **White and black.** Not palette colours. `#fff` on a brand fill is not `--surface-color`, and
-  `#000` at 6% alpha is a shadow. Forcing ~100 call sites through tokens would make them less
-  honest, not more.
+- **White and black.** Not palette colours. `#000` at 6% alpha is a shadow, and white on a fixed
+  surface is not `--surface-color`. Forcing ~100 such call sites through tokens would make them less
+  honest, not more. This exemption is also how issue #1260 hid for four specs: `#fff` **on a brand
+  fill** is a real bug and this gate cannot see it, which is what `noBrandFillOwnLabel.test.js` is
+  for.
 - **Third-party identity.** `NetworkPill.css` (Polygon purple, Ethereum indigo) and Bitcoin's
   `#F7931A`. A network pill rendered in teal is not on-brand — it is **wrong**, because it tells the
   member something untrue about which chain they are on.

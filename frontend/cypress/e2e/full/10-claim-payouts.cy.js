@@ -144,7 +144,9 @@ function createAcceptAndResolve(config = {}) {
     .find('.mm-action-resolve, .mm-table-row, button:contains("Resolve")', { timeout: 20000 })
     .should('have.length.greaterThan', 0)
 
-  cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
+  // The assertion above proved something actable is listed; settle the fetch as well so
+  // the snapshot below reads the final rows rather than a mid-render frame (#1250).
+  cy.settledWagerPanel().then(($panel) => {
     const resolveBtn = $panel.find('.mm-action-resolve, button:contains("Resolve")')
     if (resolveBtn.length > 0) {
       cy.wrap(resolveBtn.first()).click({ force: true })

@@ -349,8 +349,8 @@
 }
 
 .correlated-horizon-btn.active {
-  background: var(--brand-primary);
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   box-shadow: 0 2px 4px rgba(var(--brand-primary-rgb), 0.3);
 }
 
@@ -634,8 +634,8 @@
 }
 
 .view-details-btn {
-  background: var(--primary-bg, var(--brand-primary));
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   font-weight: 600;
 }
 
