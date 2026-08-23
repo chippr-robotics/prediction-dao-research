@@ -160,19 +160,27 @@ const OBLIGATIONS = [
   ['--accent-color', CARD_SURFACES.concat('--bg-primary'), 4.5, 'links render at body size (FR-017)'],
   ['--primary-button-text', ['--primary-button'], 4.5, 'button label'],
   ['--primary-button-text', ['--primary-button-hover'], 4.5, 'button label, hovered'],
-  // --primary-button-text is now the label on every brand fill in the tree, not
-  // just on the button token (issue #1260) — noBrandFillOwnLabel.test.js is what
-  // makes that true. Each fill it can land on has to be audited, or the usage
-  // guard would just be redirecting 66 rules onto an unmeasured pairing.
+  // --primary-button-text also reaches brand fills it does not name, through the
+  // compatibility aliases at the foot of theme.css: --text-on-brand and
+  // --color-on-primary both resolve to it, and the perps surfaces pair them with
+  // a --brand-primary fill. Those pairings are live, so they are audited here —
+  // an alias is not a smaller obligation than the token it aliases.
   //
   // --brand-accent is deliberately ABSENT: at Teal 300 (light) and Teal 100
   // (dark) it is 2.5:1 under white and 3.0:1 under Gunmetal, so no label fits on
   // it in either theme. That is why --gradient-brand-soft carries none, and why
   // .status-badge.live moved off it onto --success-color.
-  ['--primary-button-text', ['--brand-primary'], 4.5, 'label on a brand fill'],
+  ['--primary-button-text', ['--brand-primary'], 4.5, 'label on a brand fill (via --text-on-brand)'],
   ['--primary-button-text', ['--brand-secondary'], 4.5, 'label on the deep brand fill'],
   ['--primary-button-text', ['--info-color'], 4.5, 'label on an info fill'],
-  ['--primary-button-text', ['--success-color'], 4.5, 'label on a success fill'],
+  // The label on a SOLID STATUS FILL. It carries the same values as
+  // --primary-button-text in both themes and exists only so that it is NOT
+  // re-pointed on a disabled control — a status fill keeps its colour there, so
+  // greying its label alone would leave --disabled-text on a full red at 1.6:1
+  // (issue #1260). Consumers: .disconnect-btn, .admin-panel-btn,
+  // .status-badge.live, .fwum-mode-badge.live.
+  ['--status-fill-text', ['--danger-color'], 4.5, 'label on a destructive fill'],
+  ['--status-fill-text', ['--success-color'], 4.5, 'label on a success fill'],
   // A disabled control drops off the brand ladder onto a neutral rather than
   // fading (issue #1260). WCAG 1.4.3 exempts inactive controls, but a label a
   // member cannot read is still unreadable, so the pair is held to 4.5 too.

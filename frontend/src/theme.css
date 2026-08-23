@@ -174,11 +174,23 @@
    accepts a charge.
 
    So unavailability changes HUE, not just alpha: a disabled control drops off
-   the brand ladder onto a neutral. index.css re-points --primary-button and
-   --primary-button-text at these on any disabled control, which is why the 78
-   swept rules need no :disabled variant of their own — they already read the
-   pair. Opacity, where a component still sets it, now rides on top of a fill
-   that already says "not available".
+   the brand ladder onto a neutral. index.css re-points --primary-button,
+   --primary-button-hover, --primary-button-text AND --gradient-primary-button
+   at these on any disabled button, which is why the swept rules need no
+   :disabled variant of their own — they already read that set. Opacity, where a
+   component still sets it, now rides on top of a fill that already says "not
+   available".
+
+   THE FILL AND THE LABEL MUST MOVE TOGETHER. Re-pointing the label token alone
+   is worse than doing nothing: --disabled-text on a full-strength brand fill
+   measures 1.27:1 in light and 1.06:1 in dark, where the white it replaced was
+   4.74:1. So a rule may only label with --primary-button-text if it also fills
+   from one of the three re-pointed fill tokens. That is an invariant, not a
+   convention, and disabledControlState.test.js enforces it across the tree.
+
+   A fill that is NOT on the button ladder — a destructive red, a success green
+   — keeps its colour when disabled, so its label must not follow the remap
+   either. Those use --status-fill-text below.
 
    WCAG 1.4.3 exempts inactive controls from contrast, but a label nobody can
    read is still a label nobody can read, so the pair is audited at 4.5:1 like
@@ -195,6 +207,20 @@
   --disabled-bg: #2A3D45;       /* Gunmetal → Steel; sits below every surface */
   --disabled-text: #9DACB2;     /* 4.9:1 on --disabled-bg */
   --disabled-border: #35505A;
+}
+
+/* The label on a SOLID STATUS FILL (danger, success). Its values are identical
+   to --primary-button-text in both themes; the separate name exists for one
+   reason, and it is a behavioural one: a status fill is not re-pointed on a
+   disabled control, so its label must not be re-pointed either. Sharing the
+   button token would put --disabled-text on a full-strength red — 1.6:1, and
+   unreadable exactly when a destructive control is unavailable. */
+:root {
+  --status-fill-text: #FFFFFF;  /* 5.4:1 on --danger-color, 5.3:1 on --success-color */
+}
+
+.theme-dark {
+  --status-fill-text: #1C333B;  /* Gunmetal — 5.6:1 on danger, 6.3:1 on success */
 }
 
 /* ===================================
@@ -287,10 +313,21 @@
   --gradient-brand-soft: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-primary) 100%);
   --gradient-gold: linear-gradient(135deg, var(--tier-gold), var(--tier-gold-sheen));
   /* A gradient a LABEL can sit on. Both stops are the audited button pair, so
-     --primary-button-text clears 4.5:1 against either end in both themes, and a
-     disabled control flattens it to one neutral because both stops move
-     together (issue #1260). --gradient-brand is the decorative one: it is safe
-     to write on too, but it does not track the disabled state, and
+     --primary-button-text clears 4.5:1 against either end in both themes.
+
+     THIS TOKEN DOES NOT TRACK THE DISABLED STATE BY ITSELF, and the reason is
+     worth stating because it is the opposite of what the button pair does. A
+     custom property's computed value is its specified value WITH var() ALREADY
+     SUBSTITUTED, computed on the element the declaration applies to — here
+     :root. A descendant inherits the resolved string, so re-pointing
+     --primary-button on a disabled <button> cannot make an inherited gradient
+     resolve again. index.css therefore re-points THIS token on the disabled
+     element too; a rule that fills from it and labels from
+     --primary-button-text is covered, one that hand-rolls the same gradient
+     inline is not.
+
+     --gradient-brand is the decorative one: it is safe to write on, but it is
+     not re-pointed, so it must not fill a control that can be disabled.
      --gradient-brand-soft carries NO label at all — its Teal 100 stop is 2.5:1
      under white and 3.0:1 under Gunmetal, so nothing readable fits on it. */
   --gradient-primary-button: linear-gradient(135deg, var(--primary-button) 0%, var(--primary-button-hover) 100%);

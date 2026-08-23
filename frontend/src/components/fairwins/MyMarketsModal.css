@@ -189,8 +189,12 @@
   color: var(--text-secondary);
 }
 
+/* The count chip sits INSIDE .mm-tab, which is a <button> with a :disabled
+   state. It has to fill from the button token, not --brand-secondary: on a
+   disabled tab the label token greys and an unremapped fill would not, leaving
+   grey-on-teal (issue #1260). */
 .mm-tab.active .mm-tab-count {
-  background: var(--brand-secondary);
+  background: var(--primary-button);
   color: var(--primary-button-text);
 }
 

@@ -866,7 +866,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--brand-primary);
+  background: var(--primary-button);
   color: var(--primary-button-text);
   border-radius: 8px;
   font-weight: 700;

@@ -83,18 +83,47 @@ measures **2.16:1** — below AA and below even the 3:1 large-text floor. The fi
 darkening `--brand-primary`: Chippr Teal is a fill colour by the guidelines' own table, and re-toning
 it to pass one contrast row takes the whole brand off palette.
 
-Fills that are **decorative rather than interactive** — a step number, a success glyph, a role badge
-— keep `var(--brand-primary)` (or `var(--gradient-brand)`) and take their label from
-`--primary-button-text` too; that pairing is audited on both brand steps. The one fill that carries
-**no** label is `--gradient-brand-soft`: its Teal 100 stop is 2.5:1 under white and 3.0:1 under
-Gunmetal, so nothing readable fits on it.
+Decorative fills — a step number, a success glyph, a role badge — take the **same** pair. They are
+not exempt just because nobody clicks them: a badge often sits inside a control that can be disabled
+(the count chip in `.mm-tab` is inside a `<button>` with a `:disabled` state), and the rule below is
+what keeps it legible there. The one fill that carries **no** label is `--gradient-brand-soft`: its
+Teal 100 stop is 2.5:1 under white and 3.0:1 under Gunmetal, so nothing readable fits on it.
 
 **Disabled controls change hue, not alpha.** `opacity: 0.55` over a pale teal is not a state a member
-can read. `index.css` re-points the pair at `--disabled-bg` / `--disabled-text` on any disabled
-button, so every control that fills from `var(--primary-button)` drops off the brand ladder for free.
+can read. `index.css` re-points the fill/label set on any disabled button:
+
+```css
+button:disabled, button[disabled], button[aria-disabled='true'] {
+  --primary-button: var(--disabled-bg);
+  --primary-button-hover: var(--disabled-bg);
+  --primary-button-text: var(--disabled-text);
+  --gradient-primary-button: linear-gradient(135deg, var(--disabled-bg) 0%, var(--disabled-bg) 100%);
+}
+```
+
 It is done with custom properties rather than a `background` declaration on purpose: a property set
 on the element beats the inherited one whatever specificity the component's own rule has, where a
 `background` here would win on some surfaces and lose on others.
+
+Two consequences, and both have already been got wrong:
+
+**The fill and the label move together or not at all.** A control only follows the remap for the
+tokens it actually reads, so a rule that fills from `--brand-primary` and labels from
+`--primary-button-text` gets `--disabled-text` on a full-strength teal — **1.27:1 in light, 1.06:1 in
+dark**, against 4.74:1 for the `#fff` it replaced. That is a regression in *both* themes, and it
+lands on every primary `Button` while a transaction is in flight (`disabled={disabled || loading}`).
+A fill that is a **status** colour keeps its colour when disabled, so it labels with
+`--status-fill-text` — same values as `--primary-button-text` per theme, deliberately outside the
+remap. `disabledControlState.test.js` enforces the pairing in both directions.
+
+**`--gradient-primary-button` is re-pointed, not inherited-and-re-resolved.** A custom property's
+computed value is its specified value *with `var()` already substituted*, resolved on the element the
+declaration applies to. The gradient is declared at `:root`, so its stops resolve there against the
+**enabled** tokens and descendants inherit that finished string — re-pointing `--primary-button` on
+the button cannot reach back into it. Drop that fourth line and 18 gradient-filled controls keep
+their teal under a grey label. The same reasoning applies to the compatibility aliases
+(`--text-on-brand`, `--color-on-primary`): they resolve at `:root` too, so they never follow the
+remap, and a rule using one must fill from something that also does not.
 
 ## Status colours
 

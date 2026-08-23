@@ -321,13 +321,13 @@
 }
 
 .fwum-mode-badge.demo {
-  background: var(--gradient-brand);
+  background: var(--gradient-primary-button);
   color: var(--primary-button-text);
 }
 
 .fwum-mode-badge.live {
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-color) 100%);
-  color: white;
+  background: var(--success-color);
+  color: var(--status-fill-text);
 }
 
 .fwum-timestamp {

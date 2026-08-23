@@ -90,7 +90,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.025em;
-  background: var(--brand-primary);
+  background: var(--primary-button);
   color: var(--primary-button-text);
   border-radius: var(--radius-full);
 }

@@ -82,8 +82,8 @@
 }
 
 .tp-step.current .tp-step-indicator {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: var(--primary-button);
+  border-color: var(--primary-button);
   color: var(--primary-button-text);
 }
 
@@ -308,7 +308,7 @@
 }
 
 .tp-btn-primary {
-  background: var(--brand-primary, var(--primary-button));
+  background: var(--primary-button);
   color: var(--primary-button-text);
 }
 
