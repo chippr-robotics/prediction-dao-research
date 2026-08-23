@@ -29,13 +29,19 @@ const OPPONENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // hardhat #1
  * registry call, so a denied account fails SIMULATION — before anything is signed or submitted —
  * and the modal states that the transaction will fail.
  *
- * Matching the WORDING of a screening refusal is not possible today: the app renders
- * "Transaction will fail: execution reverted (unknown custom error)" because the registry's custom
- * error is not decoded on this path (#1292). That is a disclosure defect, not a gating one — the
- * gate holds — so this spec proves the gate by a CONTROL rather than by copy that would have to
- * change when the defect is fixed.
+ * The wording IS matchable now. #1292 is fixed: the registry's custom error is decoded on this
+ * path and `translateRevert` names it, so a screened member is told they were screened instead of
+ * reading "execution reverted (unknown custom error)". This spec asserts that sentence, which is
+ * what the issue asked for once the defect was closed.
+ *
+ * A fragment rather than the whole sentence, and deliberately not imported from
+ * `useFriendMarketCreation`: a Cypress spec cannot import that module (its transitive
+ * `virtual:tenant` import has no resolver in the preprocessor — see `commands.js`'s WAGERS_PATH
+ * note). The EXACT sentence is pinned as a unit, against the selector the deployed guard really
+ * reverts with, in `src/test/useFriendMarketCreation.translateRevert.test.js`. This end of it only
+ * has to prove the member reaches the screening message rather than the generic fallback.
  */
-const WILL_FAIL = /transaction will fail/i
+const SCREENED = /flagged by sanctions screening/i
 const MEMBERSHIP = /membership|upgrade|purchase|wager participant/i
 
 ;(isChromium ? describe : describe.skip)('Compliance parity for passkey accounts — on chain (spec 041)', () => {
@@ -104,9 +110,11 @@ const MEMBERSHIP = /membership|upgrade|purchase|wager participant/i
       cy.visitWagers()
       cy.attemptCreateWager({ opponent: OPPONENT, stake: 2 })
 
-      // Refused before anything is submitted — the guard fails the simulation.
+      // Refused before anything is submitted — the guard fails the simulation — and the member is
+      // told WHY. Asserting the screening sentence rather than a generic failure is the difference
+      // between "something went wrong" and a disclosure the member can act on (#1292).
       cy.get('body', { timeout: 60000 }).should(($b) => {
-        expect($b.text(), 'the member is told the transaction will not succeed').to.match(WILL_FAIL)
+        expect($b.text(), 'the member is told they were screened, not just that it failed').to.match(SCREENED)
       })
 
       /*
@@ -134,7 +142,7 @@ const MEMBERSHIP = /membership|upgrade|purchase|wager participant/i
     cy.visitWagers()
     cy.attemptCreateWager({ opponent: OPPONENT, stake: 2 })
     cy.get('body', { timeout: 60000 }).should(($b) => {
-      expect($b.text(), 'with the flag lifted the simulation no longer refuses').to.not.match(WILL_FAIL)
+      expect($b.text(), 'with the flag lifted the screening refusal is gone').to.not.match(SCREENED)
     })
   })
 
