@@ -35,7 +35,12 @@ a blank value counts as unset, so **a deployment that sets only
 `VITE_RELAYER_URL` is unaffected by this variable existing** (issue #1263). Set
 the Bitcoin-specific name when a build should reach the Bitcoin proxy without
 also turning on the other gateway-backed clients (Predict, Perps, Collect,
-Solana RPC, intent relay) — or the reverse.
+Solana RPC, intent relay, bridge quotes).
+
+**It does not run the other way.** Because blank falls through, there is no
+value of `VITE_BITCOIN_GATEWAY_URL` that leaves Bitcoin unconfigured while
+`VITE_RELAYER_URL` is set. To build with the Bitcoin client dark — which is
+what a "gateway unavailable" e2e row needs — leave **both** names unset.
 
 With neither set the client is unconfigured and every Bitcoin surface says so;
 it never renders a zero balance. Note this is a client-side switch only:

@@ -54,10 +54,11 @@ ARG VITE_SUBGRAPH_URL
 ARG VITE_WAGER_SOURCE
 # Gasless relayer base URL (spec 036). Unset => gasless disabled, everything self-submits.
 ARG VITE_RELAYER_URL
-# Bitcoin gateway base URL (spec 061 / issue #1263). Optional: unset falls back to
+# Bitcoin gateway base URL (spec 061 / issue #1263). Optional: unset (or blank) falls back to
 # VITE_RELAYER_URL, so an image that sets only that one is byte-identical. Set it to point the
-# Bitcoin client at a gateway without turning on the other gateway-backed clients, or to leave
-# Bitcoin honestly unconfigured while the shared relayer is on.
+# Bitcoin client at a gateway without turning on the other gateway-backed clients. It cannot turn
+# Bitcoin OFF — blank means "fall through", so an image with VITE_RELAYER_URL set has a configured
+# Bitcoin client either way; leaving Bitcoin unconfigured means leaving both names unset.
 ARG VITE_BITCOIN_GATEWAY_URL
 # Passkey ERC-4337 bundler URL(s), comma-separated (spec 041). Unset => passkeyConfig(137) is null,
 # so passkey smart accounts stay disabled on Polygon.

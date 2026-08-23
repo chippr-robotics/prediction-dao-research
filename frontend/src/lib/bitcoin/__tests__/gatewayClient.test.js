@@ -51,6 +51,9 @@ describe('base URL resolution', () => {
     expect(bitcoinGatewayUrl()).toBe(BITCOIN_BASE)
   })
 
+  // The fallback is one-way by design: blank means "fall through", so there is no value of the
+  // Bitcoin var that disables Bitcoin while VITE_RELAYER_URL is set. Leaving the client dark means
+  // leaving both unset (asserted below). Docs must not promise an off-switch this shape can't give.
   it('treats a blank Bitcoin var as unset and falls back, so a relayer-only environment is unchanged', () => {
     vi.stubEnv('VITE_BITCOIN_GATEWAY_URL', '  ')
     vi.stubEnv('VITE_RELAYER_URL', BASE)

@@ -68,9 +68,14 @@ Resolution lives in exactly one place, `bitcoinGatewayUrl()` in
 `lib/bitcoin/gatewayClient.js`: `VITE_BITCOIN_GATEWAY_URL` → `VITE_RELAYER_URL`
 → `''`. A blank value counts as unset and falls through, so **an environment
 that sets only `VITE_RELAYER_URL` is unchanged** — this name exists so a build
-can turn the Bitcoin client on or off without dragging Predict, Perps, Collect,
-Solana RPC and the intent relayer with it (issue #1263). With neither set the
-client resolves `''` and every method reports
+can point the Bitcoin client at a gateway without dragging Predict, Perps,
+Collect, Solana RPC, the intent relayer and the bridge quote proxy with it
+(issue #1263).
+
+The switch runs one way on purpose: since blank falls through, no value of
+`VITE_BITCOIN_GATEWAY_URL` disables Bitcoin while `VITE_RELAYER_URL` is set. A
+build that wants the Bitcoin client dark leaves **both** unset. With neither set
+the client resolves `''` and every method reports
 `{ ok: false, error: 'unconfigured', disabled: true }`; surfaces say "gateway
 unavailable" rather than rendering an empty wallet.
 

@@ -20,10 +20,16 @@
  * Base URL: the relay-gateway is one host for all proxy modules, but WHICH
  * client surfaces a build turns on is per-surface — so Bitcoin reads its own
  * VITE_BITCOIN_GATEWAY_URL first and falls back to the shared VITE_RELAYER_URL
- * (issue #1263, same shape the bridge quote proxy took in #1236). A deployment
- * that sets only VITE_RELAYER_URL keeps working byte-identically; a build that
- * wants a Bitcoin gateway WITHOUT turning on every other proxy client — or the
- * reverse, which is what the spec-094 e2e matrix needs — now has a name for it.
+ * (issue #1263). A deployment that sets only VITE_RELAYER_URL keeps working
+ * byte-identically; a build that wants a Bitcoin gateway WITHOUT turning on
+ * every other proxy client now has a name for it.
+ *
+ * That switch runs ONE way, deliberately. A blank value falls through, so no
+ * value of VITE_BITCOIN_GATEWAY_URL leaves Bitcoin unconfigured while
+ * VITE_RELAYER_URL is set — turning the Bitcoin client OFF still means leaving
+ * BOTH unset. An explicit disable sentinel would be a new feature, with its own
+ * test, not an implication of this fallback.
+ *
  * The constructor stays injectable (baseUrl + fetchImpl) for tests and
  * non-default wiring.
  */
