@@ -11,6 +11,19 @@
  * nothing fetches) until access is granted.
  */
 import { networkName } from '../../lib/chains/estate'
+import { ADMIN_ROLES, ROLE_INFO } from '../../contexts/RoleContext'
+
+/*
+ * DERIVED, never restated. This hint used to hard-code five role names while
+ * `useAdminAccess` granted entry on eight roles plus the app-curator authority
+ * — so an operator holding Fee, Staking or Liquidity Administrator was told
+ * their role was not one that opens the area, which is the opposite of true.
+ *
+ * Reading ADMIN_ROLES means adding a role to the gate adds it to the hint, and
+ * the two cannot drift again. The curator path is named separately because it
+ * is not an ADMIN_ROLES entry — it is read from the registry contract.
+ */
+const OPERATOR_ROLE_NAMES = ADMIN_ROLES.map((r) => ROLE_INFO[r]?.name).filter(Boolean)
 
 export default function AdminAccessGate({ access, children }) {
   const { entryState, estateRead, retry } = access
@@ -42,9 +55,13 @@ export default function AdminAccessGate({ access, children }) {
           <>
             <p>The operations control plane is only accessible to users with operator privileges.</p>
             <p className="unauthorized-hint">
-              Operator roles include: Administrator, Emergency Guardian, Account Moderator, Role
-              Manager, and Compliance Officer. Checked across{' '}
+              Operator roles: {OPERATOR_ROLE_NAMES.join(', ')} — or the mini-app curator
+              authority. Checked across{' '}
               {estateRead?.read?.length ?? 0} network{(estateRead?.read?.length ?? 0) === 1 ? '' : 's'}
+              {estateRead?.notDeployed?.length > 0 &&
+                ` (${estateRead.notDeployed.map(networkName).join(', ')} carr${
+                  estateRead.notDeployed.length === 1 ? 'ies' : 'y'
+                } no operator contracts)`}
               {estateRead?.unreadable?.length > 0 &&
                 ` (${estateRead.unreadable.map(networkName).join(', ')} could not be read)`}
               .

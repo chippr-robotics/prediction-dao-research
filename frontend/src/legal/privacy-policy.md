@@ -27,6 +27,20 @@ operate a traditional user-account database.
   use these logs as the record of geographic and eligibility enforcement.
 - **Local browser state.** Your acknowledgement of the entry gate and the document
   versions you acknowledged are stored in your browser (local storage), not on our servers.
+- **Assistant conversations — only while you enable the assistant.** The in-app assistant is
+  **off by default**, and while it is off nothing you type is sent to us or to anyone else. If
+  you switch it on, the messages you send in it are transmitted to our gateway and to the AI
+  model provider that generates the reply, and are processed for that purpose only. **We do not
+  use your conversations to train models**, and we do not use or share them for advertising.
+  Your conversation **memory** is kept in your browser on the device you used, not on our
+  servers, and you can clear it at any time from the assistant's settings. Do not enter private
+  keys, recovery phrases, or other secrets into the assistant.
+- **API access grants — only if you create an API key.** If you create a private API key, we
+  process the grant you signed — your **public wallet address**, the **key identifier**, the
+  **permissions** it carries, and its **issue and expiry times** — in order to verify the key
+  when a program presents it, together with any **revocation** you submit. The key itself is
+  created by your own wallet signature and shown only to you: **we do not issue, hold, or store
+  it.**
 
 We do **not** collect names, government IDs, emails, or payment-card data through the
 Service, and we do not run third-party advertising trackers.
@@ -52,6 +66,11 @@ Service, and we do not run third-party advertising trackers.
 We share information only: with our infrastructure providers (edge/CDN, hosting, IPFS
 pinning) acting on our behalf; with on-chain sanctions-screening sources we read (e.g.,
 the Chainalysis on-chain oracle); and where required by law or to protect our rights.
+
+**Where you have enabled the assistant**, we also share the messages you send in it with the
+**AI model provider** that generates the reply (currently **Anthropic**), acting as our
+processor for that purpose and for no other. This sharing happens **only while you have the
+assistant enabled**, and stops when you turn it off.
 
 ## 6. Your Choices and Rights
 

@@ -39,6 +39,12 @@ distinction: granted / "Access Restricted" (a definite no) / "Could Not Verify A
 answered — never dressed as a denial). All data hooks mount *behind* the gate: a denied account
 fetches nothing.
 
+The redirect waits for **`access.settled`**. It acts on the ABSENCE of a role flag, and entry can
+be granted by the curator authority — one contract read — before the role sweep across the cohort
+returns, leaving every flag momentarily false. Without that guard a deep link to an app the
+operator *is* entitled to bounced them to the Control Room; `/admin/incident-response` doing that
+mid-incident is the case that matters. See `chain-estate-reads.md` §3.
+
 UI gating is presentation. The contracts' `onlyRole` checks are the security boundary; a
 hand-typed URL past the matrix reaches nothing (the shell refuses render) and would be refused
 on-chain regardless.
@@ -100,7 +106,12 @@ them — **derived client-side, never from the registry**:
 - `test/admin/adminApps.test.js` — matrix totality + per-flag gating (replaces `adminNav.test.js`).
 - `test/admin/ControlRoom.test.jsx` — render-gate ≡ config-gate per single flag (replaces the
   raw-source `adminLeastPrivilege` diff), tile-status honesty.
-- `test/admin/adminRoutes.test.jsx` — unknown-id redirect, `?view=` resolution, denied-at-depth.
+- `test/admin/adminRoutes.test.jsx` — unknown-id redirect, `?view=` resolution, denied-at-depth,
+  and no redirect while the sweep is still running.
+- `test/admin/estateSweepClassification.test.js` — the sweep's read / not-deployed / unreadable
+  classification, including the total-outage case that used to render as a denial.
+- `cypress/e2e/fast/32-admin-console.cy.js` — the three-way entry gate, the three-state estate
+  reads, and Maintenance's permissionless tile, answered at the RPC boundary (#1242).
 - `test/admin/adminEstateGuard.test.js` — recursive scan: no admin file resolves a contract from
   the wallet's chain, no cross-chain sums.
 - `test/admin/adminCharts.test.jsx`, `appDashboards.test.jsx` — three-state honesty + axe.

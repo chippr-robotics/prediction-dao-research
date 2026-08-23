@@ -27,6 +27,11 @@ export const DOMAIN_META = {
   // Spec 082/083 perpetual-futures events: orders the venue executed, rejected, froze or timed
   // out, plus position changes made on the venue's own app.
   perps: { label: 'Perps' },
+  // Spec 095 programmatic access: API keys the member minted or withdrew, and the assistant being
+  // switched on or off. "Access" rather than "API", because the assistant toggle is the same kind
+  // of fact — what can reach this account, and what leaves this device — and splitting them would
+  // give a member two switches for one question.
+  access: { label: 'Access' },
 }
 
 /** Display label for a domain key (falls back to the key itself for an unknown/future domain). */

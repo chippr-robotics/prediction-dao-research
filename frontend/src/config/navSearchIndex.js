@@ -362,6 +362,29 @@ export const NAV_DESTINATIONS = [
     hash: '#notification-profiles',
     keywords: ['notifications', 'alerts', 'push', 'profiles', 'quiet hours', 'reminders'],
   },
+  // Spec 095. The `id` of a Settings destination IS the AccordionSection's card id — that is what
+  // `accordionSectionForHash` returns and what `data-attention` matches — so these are named after
+  // the cards, not after the tab that holds them.
+  {
+    id: 'assistant-prefs',
+    navId: 'settings',
+    section: true,
+    label: 'Assistant',
+    summary: 'The AI assistant, what it sends, and what this device remembers.',
+    path: '/wallet?tab=settings',
+    hash: '#assistant-prefs',
+    keywords: ['ai', 'assistant', 'chat', 'agent', 'memory', 'privacy', 'bot', 'help'],
+  },
+  {
+    id: 'api-access',
+    navId: 'settings',
+    section: true,
+    label: 'API access',
+    summary: 'Private API keys for your own tools and AI agents.',
+    path: '/wallet?tab=settings',
+    hash: '#api-access',
+    keywords: ['api', 'key', 'api key', 'token', 'mcp', 'agent', 'programmatic', 'developer', 'openapi', 'integration'],
+  },
   {
     id: 'markets',
     navId: 'settings',

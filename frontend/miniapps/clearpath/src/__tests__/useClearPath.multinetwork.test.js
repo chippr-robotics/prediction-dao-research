@@ -66,3 +66,37 @@ describe('useClearPath on a registry-less network (spec 042)', () => {
     expect(onMainnet.find((d) => d.label === 'Uniswap')).toBeUndefined()
   })
 })
+
+/*
+ * `hasRegistryFor` is the prop `RegisterExternalDao` decides everything on: whether the surface
+ * says "Register an external DAO" or "Track a DAO", whether it writes on chain or to the device,
+ * and whether a target chain the wallet is not on demands a switch first. Every consumer's own
+ * test stubs it as `(chainId) => boolean`, so the hook handing out a `(host, chainId)` function
+ * was invisible to all of them — it returned `false` for every chain, and the surface reported no
+ * registry on a chain that has one while `trackDAO` sent a registration anyway.
+ *
+ * This asserts the ARITY CONTRACT from the hook's side, which is the side that was wrong.
+ */
+describe('useClearPath#hasRegistryFor is callable the way its consumers call it', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    resetHost({ chainId: 63 })
+  })
+
+  it('answers true for a chain that carries a registry, given only the chain id', () => {
+    const { result } = renderHook(() => useClearPath())
+    expect(result.current.hasRegistryFor(63)).toBe(true)
+  })
+
+  it('answers false for a chain that does not, and for one nothing knows about', () => {
+    const { result } = renderHook(() => useClearPath())
+    expect(result.current.hasRegistryFor(1)).toBe(false)
+    expect(result.current.hasRegistryFor(999999)).toBe(false)
+  })
+
+  /*
+   * Deliberately NOT asserted: `hasRegistryFor(undefined)`. The host resolves a missing chainId
+   * against the CONNECTED chain, so on Mordor that answers `true` — correctly. Writing it down as
+   * `false` here would encode a wish about the host rather than its contract.
+   */
+})

@@ -626,8 +626,84 @@ artifacts live under `specs/<feature>/`.
   re-recording a baseline, i.e. accepting that deployed bytecode or a published package changed.
   See `specs/075-monorepo-workspaces/`.
 
+- **End-to-end coverage has a source of truth, and assertion depth is a separate fact from coverage
+  (spec 094).** `frontend/cypress/coverage/matrix.json` maps EVERY directory under `specs/` — including
+  the ones with no member surface, which carry a reason instead of flows — to its member-facing flows,
+  each with status, **depth**, tier, money-at-risk and a tracking issue;
+  `docs/developer-guide/e2e-coverage-matrix.md` is GENERATED from it (`npm run e2e:matrix`,
+  regenerate-and-diff gated) and a spec directory with no row fails CI. Depth exists because a flow can
+  be `covered` by a test that cannot fail: 33 branches across four money-path specs end in
+  `expect(true).to.be.true` behind a precondition guard, which reports as coverage while proving
+  nothing. Those are annotated `// ASSERTION-DEBT: #1231` and counted by
+  `frontend/src/test/e2e-policy/assertionDepth.test.js`; a NEW unconditional truth fails the build
+  unless it carries `// EITHER-WAY: <reason>`. Two admission rules bind
+  (`docs/developer-guide/e2e-testing-policy.md`): a flow validatable **without a chain must not** live
+  in the on-chain tier, and a flow where a member signs something that **costs them money must** have
+  on-chain coverage. The no-chain tier runs twice — `CYPRESS_VIEWPORT_PROFILE` = `desktop` (1280×720)
+  and `phone` (390×844), applied from a GLOBAL `beforeEach` so a new spec is covered at both widths
+  with no author action. **BOTH tiers are sharded longest-first**, and the packing lives once in
+  `scripts/e2e/lib/tier-split.js`: the on-chain tier is **4 legs with a private chain each**
+  (`split-full-tier.js`), the no-chain tier **6 legs per viewport profile**
+  (`split-fast-tier.js --profile desktop|phone`, where the profile decides whether the `passkey/`
+  specs are in the set — they ride desktop only). Sharding the no-chain tier is #1249: left as one
+  leg it had reached **34:29**, making the tier that starts NO chain the merge gate's critical path,
+  slower than the on-chain shards that compile contracts and send real transactions — a structural
+  fact, not a slow spec. Weights (`full-tier-weights.json`, `fast-tier-weights.json`) are CI-measured
+  and **decay**: `29-protect-custody` had grown to 326s while the splitter still estimated it at the
+  ~110s file mean, so one shard silently carried 3× its assumed load. An unmeasured spec is estimated
+  and ANNOUNCED, never dropped, and `frontend/src/test/e2e-policy/tierSharding.test.js` proves every
+  leg's union is exactly the specs on disk — a spec falling out of every shard fails nothing on its
+  own, because each leg still reports its own green. Accessibility uses `cy.a11yScan` — the
+  **already-installed `axe-core`, injected by the runner, never imported from `frontend/src`** (adding
+  `cypress-axe` would touch the lockfile; see spec 075) — failing on serious/critical, scoped to an
+  open modal's root because the app portals its modals, and every suppression names its issue.
+  Lighthouse measures six routes on **both** profiles; budgets REPORT, but an **unmeasured route
+  fails** (`scripts/e2e/check-lighthouse-coverage.js`) — `lhci` asserts only over URLs it collected, so
+  a route that never loaded otherwise leaves the job green. Uncovered flows are sub-issues of #1228,
+  not lines in a document. See `specs/094-e2e-coverage-expansion/`.
+- **The member API (spec 095) authenticates with member-SIGNED capability tokens, and nothing on it
+  signs or moves value.** A "private API key" is an off-chain EIP-712 `ApiKeyGrant` the member signs
+  in-app (Settings ▸ API access) — the gateway stores nothing to issue one; the struct/domain have
+  ONE source, `@fairwins/intent-types/offchain` (deliberately OUTSIDE `CONTRACT_VERIFIED_TYPES`: the
+  parity gate would demand Solidity that must not exist; `services/relay-gateway/test/memberApiAuth.test.js`
+  is their gate instead). The gateway module (`services/relay-gateway/src/memberApi/`,
+  `MEMBER_API_ENABLED`) is optional and mounts unconditionally (503 `member_api_unconfigured` off);
+  scopes cover reads, typed-data BUILDS and the opt-in assistant — never relay, never custody, and
+  the actor field of every built intent is forced to the token account. Three verdicts are absolute:
+  `auth_unverifiable` and `membership_unreadable` are retryable 503s, NEVER denials (an RPC timeout
+  is not a forged signature; unreadable is not tier 0). Revocation is in-process (`durable: false`
+  on every answer — every surface says so; expiry is the binding limit, TTL-capped at
+  `MEMBER_API_MAX_TTL_DAYS`). The assistant is OPT-IN and default-OFF, memory is device-local and
+  member-clearable (deliberately absent from `syncedObjects.js`), the session token lives in module
+  memory only, and message content never reaches logs or audit fields. The MCP server
+  (`services/mcp-server/`) is DEPENDENCY-FREE and deliberately NOT a workspace member (lockfile
+  hazard, spec 075) — do not add it to `workspaces` or give it dependencies; it consumes the API
+  with the member's own token and cannot sign. Mini-app packages still cannot sign — the api-access
+  console deep-links to the host Settings card for every key ceremony.
+  **Spec 096 adds a SECOND rail on those same operations — x402 pay-per-request
+  (`services/relay-gateway/src/x402/`, `X402_ENABLED`, default off) — and it NEVER applies to a
+  member: the bearer token is checked first, so a valid `fw1` token never reaches the paywall even
+  with an `X-PAYMENT` attached, and `openapi.json`, `/me`, `/membership` and the key routes are never priced.** An
+  unauthenticated call to a priced op answers **402** with an x402-v2 offer (CAIP-2 network, string
+  base-unit amount, the chain's `paymentToken`, and the **TOKEN's** EIP-712 domain in `extra` — from
+  `chains.js#tokenDomain` and `@fairwins/intent-types`, never a local copy); the payer signs
+  **`TransferWithAuthorization`** (not `Receive…`), and the gateway verifies EVERYTHING before it
+  settles — so a refused payment is never submitted and costs nothing, and an engine outage is
+  `503 settlement_unavailable`, never a free serve. Settlement rides the EXISTING engine client (no
+  new key, no custody, no facilitator, no credits/balances, and deliberately no FeeRouter service —
+  this is not a member fee); acceptance is **broadcast, not finality**, on every surface. The payer
+  is sanctions-screened fail-closed and the request is served AS THE PAYER (built intents force the
+  actor to the payer address); prices are env config per op class with **`0` = not offered, never
+  free**; replay protection is in-process and honest about it (the token's own `authorizationState`
+  is the durable guarantee). Contract-account payers are EOA-only refusals whose **reason
+  says so** (a 1271 check would pass here and revert at the token). The MCP server surfaces a 402 whole
+  and forwards `X-PAYMENT` byte-for-byte — it holds no key and **cannot pay**, and a payment is never
+  a tool argument. See `docs/developer-guide/member-api.md` + `docs/developer-guide/mcp-server.md` +
+  `docs/developer-guide/agentic-chat.md` + `docs/developer-guide/agentic-payments.md` +
+  `specs/095-member-api-agentic-access/` + `specs/096-x402-agentic-payments/`.
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/093-admin-mini-apps/plan.md
+at specs/094-e2e-coverage-expansion/plan.md
 <!-- SPECKIT END -->

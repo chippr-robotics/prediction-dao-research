@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Interface, ZeroAddress, getAddress } from 'ethers'
+import { Interface, ZeroAddress, getAddress, parseEther } from 'ethers'
 import {
   ANY_ASSET,
   analyzeShadowing,
@@ -20,6 +20,7 @@ import {
   scopeEquals,
   validateRulesConfig,
 } from '../../lib/custody/policyV2'
+import { FIRST_MATCH_SCENARIOS } from '../fixtures/policyScenarios'
 import { SAFE_POLICY_GUARD_V2_ABI } from '../../abis/SafePolicyGuardV2'
 import { getContractAddressForChain } from '../../config/contracts'
 
@@ -37,6 +38,8 @@ const C = getAddress('0x3333333333333333333333333333333333333333')
 const TOKEN = getAddress('0x00000000000000000000000000000000000c0ffe')
 const DEST = getAddress('0x4444444444444444444444444444444444444444')
 const OTHER = getAddress('0x5555555555555555555555555555555555555555')
+/** Resolve the shared scenarios' symbolic destinations against this suite's addresses. */
+const addressFor = (name) => (name === 'payee' ? DEST : OTHER)
 
 const erc20 = new Interface([
   'function transfer(address to, uint256 amount)',
@@ -137,19 +140,32 @@ describe('policyV2 — match preview (mirrors on-chain first-match-governs)', ()
     expect(classifyPayload({ to: DEST, data: '0x' }).isTokenAction).toBe(false)
   })
 
-  it('governs with the lowest-numbered matching rule', () => {
-    const rules = [rule({ asset: NATIVE, perTxLimit: ONE }), rule({ asset: NATIVE, perTxLimit: 100n * ONE })]
-    expect(matchPreview(rules, { to: DEST, value: 5n * ONE })).toMatchObject({ matched: true, ruleIndex: 0 })
-  })
+  /*
+   * The SHARED scenarios (src/test/fixtures/policyScenarios.js), which the Solidity suite drives
+   * against the real guard in test/custody/PolicyScenarioParity.test.js and the full-tier Cypress
+   * spec composes in the UI. These cases used to be hand-copied here, so a divergence between the
+   * preview and enforcement would have shown up as two green suites disagreeing about what a vault
+   * does — which is exactly the drift this twin is supposed to be checked against.
+   *
+   * The preview reports WHICH rule decides, not whether the transaction passes: a rule that matches
+   * and then refuses on its limit is still that rule governing. So `matched` is asserted as
+   * "some rule owns this payload" (`ruleIndex !== null`), and the verdict itself is what the
+   * contract test and the chain-judged Cypress test assert.
+   */
+  describe.each(FIRST_MATCH_SCENARIOS)('$id — $summary', (scenario) => {
+    const rules = scenario.rules.map((r) =>
+      rule({
+        asset: r.asset === 'native' ? NATIVE : ANY_ASSET,
+        perTxLimit: parseEther(r.perTx ?? '0'),
+        banded: r.banded ?? false,
+        targets: (r.targets ?? []).map(addressFor),
+      }),
+    )
 
-  it('bands by amount so ordered rules form tiers', () => {
-    const rules = [
-      rule({ asset: NATIVE, perTxLimit: ONE, banded: true }),
-      rule({ asset: NATIVE, perTxLimit: 10n * ONE, banded: true }),
-    ]
-    expect(matchPreview(rules, { to: DEST, value: ONE }).ruleIndex).toBe(0)
-    expect(matchPreview(rules, { to: DEST, value: 5n * ONE }).ruleIndex).toBe(1)
-    expect(matchPreview(rules, { to: DEST, value: 50n * ONE }).matched).toBe(false)
+    it.each(scenario.attempts)('$amount to $to is decided by rule $ruleIndex', (attempt) => {
+      expect(matchPreview(rules, { to: addressFor(attempt.to), value: parseEther(attempt.amount) }))
+        .toMatchObject({ matched: attempt.ruleIndex !== null, ruleIndex: attempt.ruleIndex })
+    })
   })
 
   it('routes mixed native+token payloads to any-asset rules only', () => {

@@ -7,6 +7,7 @@
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
+    "./offchain": "./src/offchain.js",
     "./package.json": "./package.json"
   },
   "files": [
@@ -20,6 +21,12 @@
     "Solidity that verifies them and the gateway that implements them, both of which live outside",
     "this directory. The two gates that do that are:",
     "  test/intent/TypehashParity.test.js            (structs + domains vs the contracts, both ways)",
-    "  services/relay-gateway/test/actionCoverage.test.js (declared actions vs relayed actions)"
+    "  services/relay-gateway/test/actionCoverage.test.js (declared actions vs relayed actions)",
+    "src/offchain.js is outside BOTH gates on purpose: no contract verifies the member-API",
+    "capability token, so there is no typehash to compare it against. Its verifier is",
+    "services/relay-gateway/src/memberApi/auth.js, and the gate that covers it is",
+    "services/relay-gateway/test/memberApiAuth.test.js — which signs with THIS table and asserts",
+    "the gateway accepts it. Never merge those structs into CONTRACT_VERIFIED_TYPES: the parity",
+    "gate would then look for a Solidity counterpart that does not and should not exist."
   ]
 }

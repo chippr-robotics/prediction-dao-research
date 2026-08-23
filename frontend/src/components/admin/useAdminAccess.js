@@ -52,6 +52,18 @@ export function useAdminAccess() {
 
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES) || isAppCurator
 
+  /*
+   * Whether the access read has FINISHED — not the same question as whether it granted entry.
+   *
+   * `hasAdminAccess` can turn true before the role sweep lands: the curator authority is one
+   * contract read and resolves first, so for a moment an operator is granted entry while
+   * `flags` are still all-false. Anything that acts on the ABSENCE of a flag has to wait for
+   * this, or it acts on a fact that is not in yet — see the deep-link redirect in
+   * AdminAppShell, which bounced an entitled operator to the Control Room when they followed a
+   * link straight to an app.
+   */
+  const settled = Boolean(estateRead?.swept) && curatorAuthority !== null
+
   // FR-012: a refusal during a network outage must not read as a permissions
   // problem. No chain answered ⇒ the sweep proved nothing about what is held.
   const noChainAnswered =
@@ -62,6 +74,7 @@ export function useAdminAccess() {
     flags,
     hasAdminAccess,
     entryState,
+    settled,
     curatorAuthority,
     estateRead,
     chainsForRole,

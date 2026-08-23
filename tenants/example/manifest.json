@@ -64,7 +64,7 @@
   },
 
   "settings": {
-    "features": ["wagers", "pools", "predict"],
+    "features": ["wagers", "pools", "predict", "assistant"],
     "chains": {
       "mainnet": [137],
       "testnet": [80002]

@@ -46,27 +46,61 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-01: Quick action cards visible
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): 9 quick-action cards render, the test asserts 6 — decide the intended grouping first.
-  it.skip('[DSH-01] Quick action cards visible, grouped by intent (create / track / QR)', () => {
+  /*
+   * Rewritten (#1019). The pending note said "9 render, the test asserts 6 — decide the intended
+   * grouping first", but there is no grouping decision to make: Dashboard.jsx declares TEN quick
+   * actions and filters exactly one of them, `oracle-open-challenge`, on
+   * `capabilities.polymarketSidebets` — a chain without an on-chain oracle does not get the Open
+   * Oracle Challenge card (the plain Open Challenge stays). Nine is that rule's answer on this
+   * tier, not a mystery.
+   *
+   * So this asserts the RULE and the cards' IDENTITY, never a count and never a position. The old
+   * body did both — `should('have.length', 6)` and `.eq(0..5)` against titles — which is why
+   * adding a tile broke it and why it would have kept breaking on every reorder. A count is also a
+   * weak assertion in its own right: six of the wrong cards would have satisfied it.
+   *
+   * Membership is checked BOTH ways. Each expected card must be there exactly once, and no tile
+   * may render that is not a known quick action — that second half is what a count was really
+   * reaching for, and it names the stranger instead of just disagreeing about a number.
+   */
+  it('[DSH-01] Quick action cards visible, grouped by intent (create / track / QR)', () => {
     connectAndVisitDashboard()
 
-    // The quick-actions-grid holds the six action tiles, ordered by their
-    // intent group: three "Create a wager" tiles, then "Track & share"
-    // (My Wagers, Scan QR, Share Account).
+    // Present on every chain.
+    const ALWAYS_PRESENT = [
+      'Friends Decide (1v1)',
+      'Oracle Settles (1v1)',
+      'Make an Offer',
+      'Open Challenge',
+      'Group Pool',
+      'Enter Words',
+      'My Wagers',
+      'Scan QR Code',
+      'Share Account',
+    ]
+    // Rendered only where the chain advertises an on-chain oracle (Dashboard.jsx
+    // `visibleCreateActions`). Allowed, not required — this tier has no oracle.
+    const CAPABILITY_GATED = 'Open Oracle Challenge'
+
     cy.get('.quick-actions-grid', { timeout: 10000 }).should('be.visible')
-    cy.get('.quick-action-card').should('have.length', 6)
 
-    // Verify each action card title in group order.
-    cy.get('.quick-action-card').eq(0).should('contain.text', 'Friends Decide (1v1)')
-    cy.get('.quick-action-card').eq(1).should('contain.text', 'Oracle Settles (1v1)')
-    cy.get('.quick-action-card').eq(2).should('contain.text', 'Make an Offer')
-    cy.get('.quick-action-card').eq(3).should('contain.text', 'My Wagers')
-    cy.get('.quick-action-card').eq(4).should('contain.text', 'Scan QR Code')
-    cy.get('.quick-action-card').eq(5).should('contain.text', 'Share Account')
+    ALWAYS_PRESENT.forEach((title) => {
+      cy.get('.quick-action-card')
+        .filter(`:contains("${title}")`)
+        .should('have.length', 1)
+    })
 
-    // The two intent groups are labeled.
-    cy.get('.qa-group-eyebrow').should('contain.text', 'Start a wager')
-    cy.get('.qa-group-eyebrow').should('contain.text', 'Track & share')
+    cy.get('.quick-action-card').then(($cards) => {
+      const known = new Set([...ALWAYS_PRESENT, CAPABILITY_GATED])
+      const rendered = [...$cards].map((el) => el.querySelector('h4')?.textContent?.trim())
+      const strangers = rendered.filter((t) => !known.has(t))
+      expect(strangers, 'every rendered tile is a known quick action').to.deep.equal([])
+    })
+
+    // The two intent groups are labelled. A group header only renders when it still has a card
+    // under it, so these also prove neither group was emptied by the capability filter.
+    cy.contains('.qa-group-eyebrow', 'Start a wager').should('exist')
+    cy.contains('.qa-group-eyebrow', 'Track & share').should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -90,8 +124,21 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-03: My Wagers — Created tab
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): tab is a <span> without aria-selected; decide the tab role/a11y contract, then assert it.
-  it.skip('[DSH-03] My Wagers Created tab', () => {
+  /*
+   * Un-skipped (#1019). The recorded reason — "tab is a <span> without aria-selected" — described
+   * what the ASSERTION resolved to, not what the app renders. MyMarketsModal's tabs are buttons
+   * carrying `role="tab"` and `aria-selected`; the a11y contract is already there and needed no
+   * deciding.
+   *
+   * What went wrong is a Cypress shape: `cy.get('[role="tab"]').contains('Created')` returns the
+   * DEEPEST element containing the text, which is the inner `<span>Created</span>` — so the
+   * assertion looked for aria-selected on a span that will never have it. The selector-first form,
+   * `cy.contains('[role="tab"]', 'Created')`, yields the element matching the SELECTOR.
+   *
+   * The test was already using the correct form one line above, for the click. Only the assertion
+   * used the other one, which is why the tab genuinely switched and the check still failed.
+   */
+  it('[DSH-03] My Wagers Created tab', () => {
     connectAndVisitDashboard()
 
     cy.get('.quick-action-card').contains('My Wagers').click()
@@ -99,8 +146,12 @@ describe('Dashboard', () => {
 
     // Switch to Created tab.
     cy.contains('[role="tab"]', 'Created').click()
-    cy.get('[role="tab"]').contains('Created')
+    cy.contains('[role="tab"]', 'Created')
       .should('have.attr', 'aria-selected', 'true')
+    // Both sides. "Created is selected" alone would still pass if every tab claimed selection,
+    // which is a real way for a tablist to be wrong and the reason the marker existed.
+    cy.contains('[role="tab"]', 'Participating')
+      .should('have.attr', 'aria-selected', 'false')
 
     // The Created tabpanel should be visible.
     cy.get('[role="tabpanel"], .mm-panel').should('be.visible')
@@ -109,8 +160,8 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-04: My Wagers — History tab
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): same tab-role question as DSH-03.
-  it.skip('[DSH-04] My Wagers History tab', () => {
+  // Same Cypress shape as DSH-03 — see the note there.
+  it('[DSH-04] My Wagers History tab', () => {
     connectAndVisitDashboard()
 
     cy.get('.quick-action-card').contains('My Wagers').click()
@@ -118,8 +169,11 @@ describe('Dashboard', () => {
 
     // Switch to History tab.
     cy.contains('[role="tab"]', 'History').click()
-    cy.get('[role="tab"]').contains('History')
+    cy.contains('[role="tab"]', 'History')
       .should('have.attr', 'aria-selected', 'true')
+    // Both sides — see DSH-03.
+    cy.contains('[role="tab"]', 'Created')
+      .should('have.attr', 'aria-selected', 'false')
 
     cy.get('[role="tabpanel"], .mm-panel').should('be.visible')
   })
@@ -169,9 +223,9 @@ describe('Dashboard', () => {
         cy.get('.mm-detail, .mm-back-btn').should('be.visible')
         cy.get('.mm-detail-header, .mm-detail-title-row').should('be.visible')
       } else {
-        // No wagers — the empty state should be visible.
+        // No wagers — the empty state should be visible. This is the real assertion for this
+        // branch; the fast tier runs with no chain, so an empty list is the expected fact here.
         cy.get('.mm-empty-state').should('be.visible')
-        expect(true).to.be.true
       }
     })
   })
@@ -261,27 +315,23 @@ describe('Dashboard', () => {
   it('[DSH-10] Dashboard without membership shows CTA', () => {
     connectAndVisitDashboard()
 
-    // The CTA banner shows for connected users who lack WAGER_PARTICIPANT role.
-    // With mock provider (no real roles), the banner should appear.
-    cy.get('body').then(($body) => {
-      const banner = $body.find('.dashboard-cta-banner')
-      if (banner.length > 0) {
-        // Banner is visible — verify its content.
-        cy.get('.dashboard-cta-banner').should('be.visible')
-        cy.get('.dashboard-cta-banner')
-          .should('contain.text', 'Get access')
-          .or('contain.text', 'Wager Participant')
-
-        // Verify the "Get Membership" button exists.
-        cy.get('.cta-banner-btn.primary').should('be.visible')
-
-        // Verify the dismiss button exists.
-        cy.get('.cta-banner-dismiss').should('be.visible')
-      } else {
-        // Banner not shown — the user may already have the role. This is OK.
-        expect(true).to.be.true
-      }
+    /*
+     * This is deterministic in the fast tier, not either-way: RoleContext.syncRolesWithBlockchain
+     * calls hasRoleOnChain for WAGER_PARTICIPANT, which never throws (blockchainService.js
+     * catches every read failure and resolves `unread`/false) — so blockchainSynced flips true
+     * even with no chain running. A freshly cleared localStorage (this file's beforeEach) holds
+     * no local role either, so Dashboard.jsx's gate
+     * (isConnected && blockchainSynced && !bannerDismissed && !hasRole(WAGER_PARTICIPANT))
+     * is satisfied every time. The old `else` branch describing "the user may already have the
+     * role" could not happen here and silently covered for the banner never rendering at all.
+     */
+    cy.get('.dashboard-cta-banner', { timeout: 10000 }).should('be.visible')
+    cy.get('.dashboard-cta-banner').invoke('text').should((text) => {
+      expect(text.includes('Get access') || text.includes('Wager Participant'), text).to.be.true
     })
+
+    cy.get('.cta-banner-btn.primary').should('be.visible')
+    cy.get('.cta-banner-dismiss').should('be.visible')
   })
 
   // ---------------------------------------------------------------------------

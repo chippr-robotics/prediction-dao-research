@@ -128,7 +128,14 @@ describe('ConnectModal — single surface ordering (US2)', () => {
 })
 
 describe('ConnectModal — first-time passkey explainer (US4)', () => {
-  it('shows the explainer once, then proceeds to the ceremony on continue', async () => {
+  /*
+   * These two used to assert that an empty credential book connects IMMEDIATELY — the exact
+   * assumption that lost members their account. A browser with no record cannot tell a brand-new
+   * member from one whose passkey synced here from another device, so connecting immediately
+   * means signing the second one UP, into a different account, with their funds apparently gone.
+   * The chooser is now always the next step; only the member resolves the ambiguity.
+   */
+  it('shows the explainer once, then offers the chooser on continue', async () => {
     const user = userEvent.setup()
     render(<ConnectModal />)
     await user.click(screen.getByText('Passkey').closest('button'))
@@ -137,7 +144,26 @@ describe('ConnectModal — first-time passkey explainer (US4)', () => {
 
     await user.click(screen.getByText('Continue with passkey'))
     expect(hasSeenExplainer()).toBe(true)
-    expect(mockWallet.connectWallet).toHaveBeenCalledWith('fairwinsPasskey', undefined)
+    expect(screen.getByTestId('passkey-picker')).toBeInTheDocument()
+    // Still no ceremony: an empty book offers the choice rather than guessing at it.
+    expect(mockWallet.connectWallet).not.toHaveBeenCalled()
+
+    await user.click(screen.getByText('Create a new account'))
+    expect(mockWallet.connectWallet).toHaveBeenCalledWith('fairwinsPasskey', { mode: 'sign-up' })
+  })
+
+  it('offers the synced-passkey route from a browser that knows nothing', async () => {
+    const user = userEvent.setup()
+    render(<ConnectModal />)
+    await user.click(screen.getByText('Passkey').closest('button'))
+    await user.click(screen.getByText('Continue with passkey'))
+
+    // The route that did not exist before: reachable WITHOUT first minting a stray account.
+    await user.click(screen.getByText('I already have a passkey'))
+    expect(mockWallet.connectWallet).toHaveBeenCalledWith('fairwinsPasskey', {
+      mode: 'sign-in',
+      discoverable: true,
+    })
   })
 
   it('never re-shows after it was seen (FR-010)', async () => {
@@ -146,7 +172,7 @@ describe('ConnectModal — first-time passkey explainer (US4)', () => {
     render(<ConnectModal />)
     await user.click(screen.getByText('Passkey').closest('button'))
     expect(screen.queryByText(/What's a passkey\?/)).not.toBeInTheDocument()
-    expect(mockWallet.connectWallet).toHaveBeenCalled()
+    expect(screen.getByTestId('passkey-picker')).toBeInTheDocument()
   })
 
   it('dismissing counts as seen and returns to the methods list', async () => {

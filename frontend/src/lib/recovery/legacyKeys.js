@@ -346,7 +346,8 @@ export function supportedAssetsForChain(chainId, registry) {
  * used at send time are sized from that estimate.
  *
  * @returns {Promise<{ from: string, holdings: Array<{ asset: object, balance: bigint }>,
- *   nativeGasReserve: bigint, nativeGasLimit: bigint, gasPrice: bigint, hasNative: boolean }>}
+ *   nativeGasReserve: bigint, nativeGasLimit: bigint, gasPrice: bigint,
+ *   maxPriorityFeePerGas: bigint|null, hasNative: boolean }>}
  */
 export async function quoteAllAssets({ kind, secret, chainId, provider, registry, to }) {
   if (!provider) throw new Error('No network connection to read balances.')
@@ -374,6 +375,13 @@ export async function quoteAllAssets({ kind, secret, chainId, provider, registry
 
   const feeData = await provider.getFeeData()
   const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n
+  /*
+   * The tip that goes with that price, or null on a chain that priced in legacy `gasPrice`.
+   * Carried out of the quote because the native send PINS the fee to the price the reserve was
+   * sized from (see sweepAllAssets) — and a type-2 transaction needs both halves to do that.
+   */
+  const maxPriorityFeePerGas =
+    feeData.maxFeePerGas != null ? (feeData.maxPriorityFeePerGas ?? 0n) : null
 
   // Estimate the native-transfer gas against the real destination so a smart
   // account (contract) recipient is funded for its receive()/fallback; fall back
@@ -393,7 +401,7 @@ export async function quoteAllAssets({ kind, secret, chainId, provider, registry
   // ERC-20s first, native last (native pays the gas for every transfer).
   const holdings = [...erc20Holdings]
   if (hasNative) holdings.push(nativeRead)
-  return { from, holdings, nativeGasReserve, nativeGasLimit, gasPrice, hasNative }
+  return { from, holdings, nativeGasReserve, nativeGasLimit, gasPrice, maxPriorityFeePerGas, hasNative }
 }
 
 /**
@@ -420,15 +428,92 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
     if (onProgress) onProgress(o)
   }
 
+  /*
+   * The nonce is tracked HERE rather than left to the provider.
+   *
+   * Every leg is signed by the same account through one provider, which looks the nonce up per
+   * send — and that lookup can be stale. ethers caches it briefly, and a failover RPC pool
+   * (spec 069) can answer from a node that has not yet seen the previous transfer. Either way the
+   * next transfer reuses the previous nonce, the node rejects it as already used, and assets the
+   * member was told would move quietly do not — which is exactly the stranding this function
+   * exists to prevent. (Reproduced by the full-tier sweep spec on a fast local chain, where the
+   * first transfer confirms inside the cache window.)
+   *
+   * Read once, then advance ONLY when a transfer was actually broadcast: an asset that fails
+   * before broadcast consumes no nonce, and one that reverts after broadcast consumes its own,
+   * so the assets behind it never queue up behind a gap that will never be filled.
+   */
+  let nonce = await provider.getTransactionCount(quote.from, 'pending')
+
   for (const { asset, balance } of quote.holdings) {
     if (asset.kind === 'native') {
-      const sendable = balance > quote.nativeGasReserve ? balance - quote.nativeGasReserve : 0n
+      /*
+       * Re-read the coin balance instead of trusting the quote's.
+       *
+       * Every ERC-20 leg above paid its gas out of THIS balance, so by the time the native leg
+       * runs the quote's figure is stale by exactly that much — and the reserve only ever covered
+       * the native transfer's own gas. Sending `quotedBalance - reserve` therefore asks to spend
+       * more than the account still holds, and the node rejects it for insufficient funds: with
+       * any ERC-20 to move first, the coin was left behind every time, reported as a failure the
+       * member could do nothing about. (Found by the full-tier sweep spec; the unit suite could
+       * not see it, because a stubbed provider's balance never moves.)
+       */
+      const current = await provider.getBalance(quote.from)
+      /*
+       * Re-read the FEE for the same reason the balance is re-read, and it is a separate failure.
+       *
+       * `quote.nativeGasReserve` was derived from a fee read BEFORE any ERC-20 leg mined. On a
+       * chain whose base fee is rising the transaction's own max fee is larger than the reserve set
+       * aside for it, so `value + gas > balance` and the node refuses it for insufficient funds —
+       * the coin is left behind, reported as a failure the member could do nothing about. A
+       * REVERTING ERC-20 leg is the sharpest case, because a reverted transfer consumes its whole
+       * gas limit, which is exactly what fills a block and lifts the base fee.
+       *
+       * Never reserve LESS than the quote did: a falling fee is not a reason to cut the margin the
+       * member was quoted, and `max` keeps this strictly safer than the value it replaces.
+       */
+      let price = quote.gasPrice
+      let priority = quote.maxPriorityFeePerGas
+      try {
+        const freshFee = await provider.getFeeData()
+        const freshPrice = freshFee?.maxFeePerGas ?? freshFee?.gasPrice ?? 0n
+        if (freshPrice > price) {
+          price = freshPrice
+          priority = freshFee?.maxFeePerGas != null ? (freshFee.maxPriorityFeePerGas ?? 0n) : null
+        }
+      } catch {
+        /* fee unavailable — the quote's reserve stands, which is what shipped before this */
+      }
+      const reserve = quote.nativeGasLimit * price
+      const sendable = current > reserve ? current - reserve : 0n
       if (sendable <= 0n) {
         record({ asset, status: 'skipped', error: 'Not enough to cover the network fee.' })
         continue
       }
+      /*
+       * PIN the fee to the price the reserve was just sized from.
+       *
+       * `value` is `balance - gasLimit * price`, so the node's funding check
+       * (`value + gasLimit * maxFeePerGas <= balance`) holds only while the price the transaction
+       * carries is no higher than `price`. Left to ethers, that price is read AGAIN during
+       * populate — a second read, at a later moment, with no margin between it and the reserve.
+       * Whenever it comes back higher the coin is refused for insufficient funds and reported as
+       * a failure the member could do nothing about, which is the whole failure this reserve
+       * exists to prevent. Sending the price explicitly turns that inequality into an identity.
+       *
+       * Pinning is safe as well as exact: `price` is a max fee (base * 2 + tip on an EIP-1559
+       * chain), so it still covers a base fee that climbs after the transaction is signed.
+       * A chain that reported no fee at all (price 0) is left to ethers as before — an explicit
+       * zero would be a worse guess than the library's.
+       */
+      const feeFields = price === 0n
+        ? {}
+        : priority == null
+          ? { gasPrice: price }
+          : { maxFeePerGas: price, maxPriorityFeePerGas: priority > price ? price : priority }
       try {
-        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: quote.nativeGasLimit })
+        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: quote.nativeGasLimit, nonce, ...feeFields })
+        nonce += 1
         await tx.wait()
         record({ asset, status: 'sent', txHash: tx.hash })
       } catch (e) {
@@ -438,7 +523,8 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
     }
     try {
       const erc20 = new ethers.Contract(asset.address, TRANSFER_ABI, signer)
-      const tx = await erc20.transfer(to, balance)
+      const tx = await erc20.transfer(to, balance, { nonce })
+      nonce += 1
       await tx.wait()
       record({ asset, status: 'sent', txHash: tx.hash })
     } catch (e) {

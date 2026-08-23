@@ -315,6 +315,12 @@ export default function FeesTab({ signer, account, chainId, provider, runTx, pen
         ) : services?.length === 0 ? (
           <p className="card-info">No fee services are registered on this network yet.</p>
         ) : services?.length > 0 ? (
+          /* Scrolled, not clipped. The Enforcement column is what says whether a service COSTS a
+             member money (charged on-chain) or is only read off-chain, and at phone width it was
+             cut off mid-word with no way to reach it — an operator could read a rate without being
+             able to read what enforces it. `.admin-table-scroll` is the wrapper the other admin
+             tables already use. */
+          <div className="admin-table-scroll">
           <table className="admin-table" aria-label="Registered fee services">
             <thead>
               <tr>
@@ -335,6 +341,7 @@ export default function FeesTab({ signer, account, chainId, provider, runTx, pen
               ))}
             </tbody>
           </table>
+          </div>
         ) : null}
         <p className="card-info">
           Rates are read live by member surfaces — the confirm step always shows the rate in force,
@@ -482,6 +489,7 @@ export default function FeesTab({ signer, account, chainId, provider, runTx, pen
               : 'No fee changes recorded in the recent lookback window.'}
           </p>
         ) : (
+          <div className="admin-table-scroll">
           <table className="admin-table" aria-label="Fee change history">
             <thead>
               <tr>
@@ -502,6 +510,7 @@ export default function FeesTab({ signer, account, chainId, provider, runTx, pen
               ))}
             </tbody>
           </table>
+          </div>
         )}
         <p className="card-info">
           Every change is an on-chain event (who, when, old → new).{' '}

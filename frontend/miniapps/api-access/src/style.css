@@ -1,0 +1,266 @@
+/*
+ * API Access — the package's one stylesheet (spec 095).
+ *
+ * ONE FILE, because the build preset sets `cssCodeSplit: false` and `cssFileName: 'style'`: every
+ * sheet a package imports lands in `style.css`, which is one of the files the manifest hashes and
+ * the host verifies before injecting. A second source file would not produce a second output.
+ *
+ * Everything is scoped under `.api-access`, and the host additionally wraps this whole sheet in
+ * `@scope (#miniapp-root-…)` when it injects it, so no rule here can reach host chrome (FR-014).
+ *
+ * NO `@import` — the host's `@scope` wrapper makes one invalid (an `@import` is only legal at the
+ * top level of a stylesheet, so nested inside an at-rule block it is silently DROPPED), and a
+ * package whose appearance depends on a CDN answering is not really the bytes its hash says it is.
+ *
+ * Host theme custom properties are read WITH FALLBACKS. They cascade in from `:root` today, but
+ * nothing in the runtime contract promises them, and this package is frozen at an immutable CID —
+ * it can never be patched in step with a host theme refactor. A renamed token must degrade to a
+ * readable neutral, not to `unset`.
+ */
+
+.api-access {
+  --aa-accent: var(--accent-color, #1f6b78);
+  --aa-surface: var(--surface-color, #ffffff);
+  --aa-canvas: var(--bg-primary, #f6f7f9);
+  --aa-text: var(--text-primary, #14161a);
+  --aa-text-2: var(--text-secondary, #4a5058);
+  --aa-text-3: var(--text-muted, #6b7280);
+  --aa-border: var(--border-color, #e3e6ea);
+  --aa-danger: var(--error-color, #b3261e);
+  --aa-radius: var(--radius-md, 8px);
+  --aa-radius-lg: var(--radius-lg, 12px);
+  --aa-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  color: var(--aa-text);
+}
+
+.api-access h2,
+.api-access h3,
+.api-access h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.api-access code,
+.api-access .aa-mono {
+  font-family: var(--aa-mono);
+  font-size: 0.82em;
+  word-break: break-word;
+}
+
+.api-access p {
+  margin: 0.4rem 0;
+  line-height: 1.5;
+}
+
+.api-access .aa-intro {
+  color: var(--aa-text-2);
+  margin: 0.25rem 0 1.1rem;
+  max-width: 68ch;
+}
+
+/* ---- Cards ---- */
+.api-access .aa-card {
+  border: 1px solid var(--aa-border);
+  border-radius: var(--aa-radius-lg);
+  background: var(--aa-surface);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.api-access .aa-card-title {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.api-access .aa-help {
+  color: var(--aa-text-3);
+  font-size: 0.82rem;
+  margin: 0.35rem 0;
+  max-width: 72ch;
+}
+
+.api-access .aa-notes {
+  margin: 0.6rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--aa-text-2);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+.api-access .aa-notes li { margin-bottom: 0.35rem; }
+
+/* ---- Forms ---- */
+.api-access .aa-form { margin: 0; }
+.api-access .aa-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+.api-access .aa-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--aa-text-2);
+}
+.api-access .aa-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.api-access .aa-input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--aa-border);
+  border-radius: var(--aa-radius);
+  background: var(--aa-canvas);
+  color: var(--aa-text);
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+.api-access .aa-select { appearance: auto; }
+
+.api-access .aa-btn {
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--aa-radius);
+  border: 1px solid var(--aa-border);
+  background: var(--aa-surface);
+  color: var(--aa-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  /* A hard floor, matching the host's own interactive-target minimum. */
+  min-height: 36px;
+}
+.api-access .aa-btn:hover:not(:disabled) { border-color: var(--aa-accent); }
+.api-access .aa-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.api-access .aa-btn-primary {
+  background: var(--aa-accent);
+  border-color: var(--aa-accent);
+  color: #fff;
+}
+
+/* ---- Status surfaces ----
+ * OPAQUE backgrounds, never an alpha tint: a tint's contrast depends on whatever is behind it, and
+ * this sheet is injected into a surface it does not control.
+ */
+.api-access .aa-notice {
+  background: var(--aa-canvas);
+  color: var(--aa-text-2);
+  border: 1px solid var(--aa-border);
+  border-radius: var(--aa-radius);
+  padding: 0.6rem 0.8rem;
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+}
+.api-access .aa-error {
+  background: var(--aa-canvas);
+  color: var(--aa-danger);
+  border: 1px solid var(--aa-danger);
+  border-radius: var(--aa-radius);
+  padding: 0.6rem 0.8rem;
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+}
+.api-access .aa-error code { color: inherit; }
+.api-access .aa-error-title { font-weight: 700; margin-top: 0; }
+.api-access .aa-error .aa-help { color: var(--aa-text-2); }
+.api-access .aa-unknown { color: var(--aa-text-2); }
+
+/* ---- OpenAPI explorer ---- */
+.api-access .aa-spec-head { margin-bottom: 0.9rem; }
+.api-access .aa-spec-title { font-size: 0.95rem; }
+.api-access .aa-spec-summary { color: var(--aa-text-2); font-size: 0.86rem; max-width: 72ch; }
+
+.api-access .aa-tag-group { margin-bottom: 1.1rem; }
+.api-access .aa-tag-name {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aa-text-3);
+  margin-bottom: 0.3rem;
+}
+.api-access .aa-op-list { list-style: none; margin: 0; padding: 0; }
+.api-access .aa-op {
+  border: 1px solid var(--aa-border);
+  border-radius: var(--aa-radius);
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: var(--aa-canvas);
+}
+.api-access .aa-op-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.api-access .aa-method {
+  font-family: var(--aa-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--aa-border);
+  border-radius: 5px;
+  padding: 0.1rem 0.4rem;
+  background: var(--aa-surface);
+  color: var(--aa-text-2);
+}
+.api-access .aa-method-get { color: var(--aa-accent); border-color: var(--aa-accent); }
+.api-access .aa-op-path { font-weight: 600; }
+.api-access .aa-op-summary { color: var(--aa-text-2); font-size: 0.85rem; }
+.api-access .aa-op-scope { color: var(--aa-text-3); font-size: 0.8rem; }
+
+/* ---- Key/value list (token introspection) ---- */
+.api-access .aa-kv-list { margin: 0.8rem 0 0; }
+.api-access .aa-kv {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--aa-border);
+  flex-wrap: wrap;
+}
+.api-access .aa-kv:last-child { border-bottom: none; }
+.api-access .aa-kv dt {
+  color: var(--aa-text-3);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex: 0 0 auto;
+}
+.api-access .aa-kv dd {
+  margin: 0;
+  text-align: right;
+  font-size: 0.86rem;
+  min-width: 0;
+  flex: 1 1 60%;
+}
+.api-access .aa-scope-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* ---- Response bodies ---- */
+.api-access .aa-response { margin-top: 0.8rem; }
+.api-access .aa-response-status { font-size: 0.85rem; color: var(--aa-text-2); }
+.api-access .aa-json {
+  font-family: var(--aa-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  background: var(--aa-canvas);
+  border: 1px solid var(--aa-border);
+  border-radius: var(--aa-radius);
+  padding: 0.7rem 0.8rem;
+  margin: 0.5rem 0;
+  /* Wide bodies scroll inside their own box; the page must never scroll sideways. */
+  overflow-x: auto;
+  max-height: 22rem;
+  overflow-y: auto;
+  white-space: pre;
+}

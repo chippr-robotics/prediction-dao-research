@@ -26,6 +26,7 @@ on:
       - 'package-lock.json'
       - 'frontend/package.json'
       - 'services/relay-gateway/package.json'
+      - 'services/mcp-server/**'
       - 'packages/**'
       - 'tools/miniapp-build/**'
   push:
@@ -38,6 +39,7 @@ on:
       - 'Dockerfile'
       - '.dockerignore'
       - 'services/**/Dockerfile'
+      - 'services/mcp-server/**'
       - 'package.json'
       - 'package-lock.json'
       - 'packages/**'
@@ -129,3 +131,64 @@ jobs:
       - name: Stop the container
         if: always()
         run: docker ps -aq --filter "name=^gw$" | xargs -r docker rm -f
+
+  mcp-image:
+    name: MCP server image builds and boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Note the build context: `services/mcp-server`, NOT the repo root. That service has no
+      # dependencies, no workspace package and no install stage, so there is nothing outside its own
+      # directory to copy — and a root context would quietly re-admit the failure mode this job
+      # exists to catch elsewhere. If this build ever starts needing the root, the Dockerfile has
+      # gained a dependency and needs the spec-075 treatment the other two images have.
+      - name: Build the mcp-server image
+        run: docker build -f services/mcp-server/Dockerfile -t fairwins-mcp-server:ci services/mcp-server
+
+      # Building is not enough here either. The server is deliberately written to boot and speak MCP
+      # even when it is misconfigured — so the interesting assertion is that it SERVES with a dummy
+      # gateway URL that resolves to nothing: a start-up that depended on the gateway being reachable
+      # would strand every member behind an outage they have no way to diagnose.
+      - name: Boot the container and require /healthz to answer
+        run: |
+          set -euo pipefail
+          docker run -d --name mcp -p 8790:8790 \
+            -e FAIRWINS_API_URL=https://gateway.invalid \
+            fairwins-mcp-server:ci
+
+          healthy=0
+          for i in $(seq 1 30); do
+            if ! docker ps --filter name=mcp --filter status=running -q | grep -q .; then
+              echo "::error::the container exited during startup"
+              break
+            fi
+            if curl -fsS --max-time 2 http://127.0.0.1:8790/healthz >/dev/null 2>&1; then
+              healthy=1
+              echo "healthz answered after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$healthy" != 1 ]; then
+            echo "::error::the MCP server never served /healthz — see the container logs below"
+          fi
+          docker logs mcp
+          # Last command, so its status IS the step's. No `exit`, nothing to swallow.
+          test "$healthy" = 1
+
+      # The protocol is the product: an image that answers /healthz but not `initialize` is broken in
+      # the only way that matters to a client, and would ship green on the liveness probe alone.
+      - name: Require the MCP handshake over POST /mcp
+        run: |
+          set -euo pipefail
+          body='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}'
+          answer=$(curl -fsS --max-time 5 -H 'content-type: application/json' -d "$body" http://127.0.0.1:8790/mcp)
+          echo "$answer"
+          echo "$answer" | grep -q '"protocolVersion":"2025-06-18"'
+          echo "$answer" | grep -q '"name":"fairwins-mcp"'
+
+      - name: Stop the container
+        if: always()
+        run: docker ps -aq --filter "name=^mcp$" | xargs -r docker rm -f

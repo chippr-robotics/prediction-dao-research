@@ -16,7 +16,7 @@ import './BackupPanel.css'
  * made in one focused surface instead of unfolding more controls into the page.
  */
 function BackupPanel({ defaultOpen = false }) {
-  const { available, isConnected, onCanonical, canonicalChainId, canonicalName, status, lastBackupAt, hasRemote, refreshStatus, backup, restore, remove } = useDataBackup()
+  const { available, isConnected, onCanonical, canonicalChainId, canonicalName, status, lastBackupAt, remoteState, refreshStatus, backup, restore, remove } = useDataBackup()
   const [restoreOpen, setRestoreOpen] = useState(false)
   const [removeOpen, setRemoveOpen] = useState(false)
   const [mode, setMode] = useState('merge')
@@ -41,9 +41,11 @@ function BackupPanel({ defaultOpen = false }) {
     ? 'Not available on this network'
     : lastBackupAt
       ? `Last backup ${new Date(lastBackupAt).toLocaleDateString()}`
-      : hasRemote
+      : remoteState === 'yes'
         ? 'A backup exists for this account'
-        : 'No backup yet'
+        : remoteState === 'none'
+          ? 'No backup yet'
+          : 'Backup status unavailable'
 
   return (
     <>
@@ -51,7 +53,10 @@ function BackupPanel({ defaultOpen = false }) {
         id="backup"
         title="Data backup"
         summary={summary}
-        badge={available && !hasRemote ? 'Not backed up' : null}
+        /* A warning badge is a claim. It is earned by a KNOWN absence, never by a failed read —
+           "Not backed up" on an unreachable RPC is the app telling the member something untrue
+           about their own safety net. */
+        badge={available && remoteState === 'none' ? 'Not backed up' : null}
         badgeTone="warn"
         defaultOpen={defaultOpen}
         className="backup-panel"
@@ -79,11 +84,17 @@ function BackupPanel({ defaultOpen = false }) {
               </div>
               <div className="backup-status-row">
                 <dt>Stored backup</dt>
-                <dd>{hasRemote ? 'Yes — a backup exists for this wallet' : 'None found'}</dd>
+                <dd>
+                  {remoteState === 'yes'
+                    ? 'Yes — a backup exists for this wallet'
+                    : remoteState === 'none'
+                      ? 'None found'
+                      : 'Couldn’t check — the network didn’t answer'}
+                </dd>
               </div>
             </dl>
 
-            {!hasRemote && (
+            {remoteState === 'none' && (
               <p className="backup-notice" role="status">
                 Without a backup, device-local activity history — sent transfers, failed operations, and earn
                 actions — cannot be recovered if this device’s data is cleared. On-chain activity (wagers, pools,
@@ -105,7 +116,7 @@ function BackupPanel({ defaultOpen = false }) {
               <button type="button" className="backup-btn" onClick={() => setRestoreOpen(true)} disabled={!isConnected || busy} aria-haspopup="dialog">
                 Restore my data
               </button>
-              {hasRemote && (
+              {remoteState === 'yes' && (
                 <button type="button" className="backup-btn backup-btn-danger" onClick={() => setRemoveOpen(true)} disabled={!isConnected || busy} aria-haspopup="dialog">
                   Remove stored backup
                 </button>
