@@ -11,8 +11,8 @@ carries the anti-patterns that made the current suite report coverage it did not
 
 | Tier | Directory | Needs | Runs | Budget |
 |---|---|---|---|---|
-| **no-chain** | `frontend/cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile, **6 shards each** | **< 6 min per leg** — predicted 349s desktop / 315s phone after sharding (#1249); unsharded it had reached 34:29 |
-| **on-chain** | `frontend/cypress/e2e/full/` | A local chain, a deploy and a seed | Every push, 4 shards in parallel | **< 15 min per shard** (measured: 6:37 / 7:51 / 6:29 / 6:09) |
+| **no-chain** | `frontend/cypress/e2e/fast/` | A built app | Every push, twice — once per viewport profile, **6 shards each** | **< 7 min per leg** — revised from 6, with the reason recorded below (#1249). Measured 312–407s across the twelve legs |
+| **on-chain** | `frontend/cypress/e2e/full/` | A local chain, a deploy and a seed | Every push, 4 shards in parallel | **< 15 min per shard** (measured 9:53 / 10:04 / 12:31 / 13:36) |
 | **account-native** | `frontend/cypress/e2e/passkey/` | The WebAuthn harness | Every push, **once** — it rides the no-chain job's desktop leg for a runner, not because it is a viewport question | **< 5 min** |
 
 ## The two admission rules
@@ -212,6 +212,33 @@ never dropped: a spec silently leaving the merge gate is the failure this featur
 
 A tier over budget is a backlog item: split it, trim it, or move flows to a cheaper tier. Raising the
 number is a decision that gets written down with its reason.
+
+### The no-chain budget was raised from 6 to 7 minutes (#1249)
+
+Written down here because the rule above requires it, and because a budget nobody can reconstruct
+the reasoning for is a number rather than a budget.
+
+**What was measured.** After sharding, the twelve no-chain legs ran 312–407s — four of the six
+desktop legs above 360s, worst 407s (6:47). Phone was inside at every leg. Predictions had been 349s
+/ 315s, so the model runs 7–20% low; the per-spec weights do not account for the fixed cost a leg
+pays simply for existing (browser boot, support-file load, server warm-up), which a split into N
+legs pays N times.
+
+**Why the number moved rather than the shard count.** Both were on the table — 7 or 8 shards would
+have brought the worst leg comfortably under 360s. The reason not to is that **this tier is no
+longer the merge gate's critical path**. The gate is the on-chain tier at 13:36. Taking the no-chain
+tier from 407s to ~320s would cost four more runners and roughly twelve minutes of aggregate
+`npm ci`, and would not move the merge gate by one second. An optimisation that improves a number
+nobody is waiting on is not an improvement.
+
+**What would change the answer.** If the 6 minutes had meant "a leg should be quick enough to
+iterate against locally" rather than "the gate should be fast", more shards would be the right
+answer instead — the distinction is real, and this revision takes the second reading. Should the
+no-chain tier ever become the critical path again, revisit the shard count before the budget.
+
+**What did not change.** The budget is still enforced against measurement, and the tier is still
+sharded longest-first from CI-recorded weights. 7 minutes leaves ~53s of headroom over the worst
+observed leg, which covers the runner variance seen across a single run.
 
 ### What the no-chain tier cost before it was split (#1249)
 

@@ -78,6 +78,9 @@ const HARDHAT_CONTRACTS = {
   wagerRegistry: '0x9A676e781A523b5d0C0e43731313A708CB607508',
   membershipManager: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707',
   keyRegistry: '0xA5EB1dEB58Ebc18D334d72EDDED5406e612D042A',
+  // Spec 032 backup pointer. Deterministic (CREATE2) so a fresh local chain reproduces it;
+  // deployed by `npm run deploy:local:backup-pointer` inside setup:e2e.
+  backupPointerRegistry: '0x73722720e024fED5840361437f55dfd44acc5460',
   sanctionsGuard: '0xA3Fd27637C50a407E43B2CF889E83CdABF070D17',
   polymarketAdapter: '0xeA913b1a96D9447080bBfA7Cb7C397ae0A0fcADB',
   paymentToken: '0xbc4D54AE49ED9C6075770CD6acA930A728dcf526',
