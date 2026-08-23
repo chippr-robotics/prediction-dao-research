@@ -390,13 +390,25 @@ jobs:
             --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
             http://localhost:8545 || echo "Hardhat node may not be ready yet"
 
-      # `setup:e2e` is the ONE entrypoint for the local chain: the ordered deploys, then
-      # `check:e2e-addresses`. Do not call `deploy:local` directly here — the deploys use plain
-      # CREATE, so their addresses are a function of the deployer's nonce, and the app reads the
-      # HARDCODED HARDHAT_CONTRACTS map rather than the deployment record. A deploy inserted
-      # mid-list instead of appended shifts every later address by one slot and repoints the app
-      # at an address nothing was deployed to; nothing reverts, and it surfaces 10-15 minutes
-      # later as unrelated-looking Cypress timeouts (issue #1298, found via #1289).
+      # `setup:e2e` is the ONE entrypoint for the local chain: `deploy:local`, then the address
+      # gate (`check:e2e-addresses`). Do not call `deploy:local` directly here — the app reads the
+      # HARDCODED block in frontend/src/config/contracts.js, not the deployment record, so it is
+      # only pointed at the right contracts while those constants happen to match.
+      #
+      # Most of deploy.js goes through CREATE2 (the singleton factory) and cannot move. What moves
+      # is the plain-CREATE deploys, whose address is a function of the deployer's NONCE: the three
+      # `upgrades.deployProxy` calls (membershipManager, wagerRegistry, tokenFactory), plus any
+      # plain-CREATE deploy another script runs against this chain. Any extra deployer transaction
+      # sequenced BEFORE one of those shifts its address by a nonce slot, and the app then calls an
+      # address with no code — nothing reverts, and it surfaces 10-15 minutes later as
+      # unrelated-looking Cypress timeouts (issue #1298, found via #1289). The gate also fails when
+      # a contract deployed here is left empty in the app's block, which is the same silent failure
+      # from the other direction.
+      #
+      # NOT covered: `dev:e2e`'s VITE_AMOY_UNISWAP_* / VITE_AMOY_WMATIC values (issue #1298's third
+      # source). They are compared when set, but the swap mocks are not deployed by anything in
+      # this repo at present and no record carries their addresses, so there is nothing to compare
+      # against yet — see the deferral note in scripts/e2e/check-local-addresses.js.
       - name: Deploy contracts to local network (with deploy-order address gate)
         run: |
           echo "Deploying contracts to local Hardhat network..."
