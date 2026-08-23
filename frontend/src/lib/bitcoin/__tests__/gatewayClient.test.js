@@ -5,7 +5,7 @@
  * gateway is unconfigured or the module is disabled/killswitched.
  * fetch is fully mocked (injected fetchImpl) — no network.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { createBitcoinGatewayClient, bitcoinGatewayUrl } from '../gatewayClient'
 
 const BASE = 'https://relayer.fairwins.example'
@@ -23,12 +23,44 @@ function makeClient(fetchImpl, opts = {}) {
 }
 
 describe('base URL resolution', () => {
-  it('reads VITE_RELAYER_URL (same source as the other gateway clients), trimming the trailing slash', () => {
+  const BITCOIN_BASE = 'https://btc-gateway.fairwins.example'
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('reads VITE_RELAYER_URL (the shared gateway host) when no Bitcoin-specific var is set, trimming the trailing slash', () => {
+    vi.stubEnv('VITE_BITCOIN_GATEWAY_URL', '')
     vi.stubEnv('VITE_RELAYER_URL', `${BASE}/`)
     expect(bitcoinGatewayUrl()).toBe(BASE)
     vi.stubEnv('VITE_RELAYER_URL', '')
     expect(bitcoinGatewayUrl()).toBe('')
-    vi.unstubAllEnvs()
+  })
+
+  // Issue #1263: one name must not be a switch over unrelated surfaces. Bitcoin gets its own,
+  // with the shared relayer URL behind it so no deployment has to change.
+  it('prefers VITE_BITCOIN_GATEWAY_URL over VITE_RELAYER_URL, trimming the trailing slash', () => {
+    vi.stubEnv('VITE_BITCOIN_GATEWAY_URL', `${BITCOIN_BASE}/`)
+    vi.stubEnv('VITE_RELAYER_URL', BASE)
+    expect(bitcoinGatewayUrl()).toBe(BITCOIN_BASE)
+  })
+
+  it('turns Bitcoin on with VITE_BITCOIN_GATEWAY_URL alone (the shared relayer stays unset)', () => {
+    vi.stubEnv('VITE_BITCOIN_GATEWAY_URL', BITCOIN_BASE)
+    vi.stubEnv('VITE_RELAYER_URL', '')
+    expect(bitcoinGatewayUrl()).toBe(BITCOIN_BASE)
+  })
+
+  it('treats a blank Bitcoin var as unset and falls back, so a relayer-only environment is unchanged', () => {
+    vi.stubEnv('VITE_BITCOIN_GATEWAY_URL', '  ')
+    vi.stubEnv('VITE_RELAYER_URL', BASE)
+    expect(bitcoinGatewayUrl()).toBe(BASE)
+  })
+
+  it('neither var set ⇒ no gateway (capability-off), never a guessed host', () => {
+    vi.stubEnv('VITE_BITCOIN_GATEWAY_URL', '')
+    vi.stubEnv('VITE_RELAYER_URL', '')
+    expect(bitcoinGatewayUrl()).toBe('')
   })
 
   it('unconfigured gateway ⇒ capability-off result on every method, fetch never called', async () => {
