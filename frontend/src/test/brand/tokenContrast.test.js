@@ -160,6 +160,23 @@ const OBLIGATIONS = [
   ['--accent-color', CARD_SURFACES.concat('--bg-primary'), 4.5, 'links render at body size (FR-017)'],
   ['--primary-button-text', ['--primary-button'], 4.5, 'button label'],
   ['--primary-button-text', ['--primary-button-hover'], 4.5, 'button label, hovered'],
+  // --primary-button-text is now the label on every brand fill in the tree, not
+  // just on the button token (issue #1260) — noBrandFillOwnLabel.test.js is what
+  // makes that true. Each fill it can land on has to be audited, or the usage
+  // guard would just be redirecting 66 rules onto an unmeasured pairing.
+  //
+  // --brand-accent is deliberately ABSENT: at Teal 300 (light) and Teal 100
+  // (dark) it is 2.5:1 under white and 3.0:1 under Gunmetal, so no label fits on
+  // it in either theme. That is why --gradient-brand-soft carries none, and why
+  // .status-badge.live moved off it onto --success-color.
+  ['--primary-button-text', ['--brand-primary'], 4.5, 'label on a brand fill'],
+  ['--primary-button-text', ['--brand-secondary'], 4.5, 'label on the deep brand fill'],
+  ['--primary-button-text', ['--info-color'], 4.5, 'label on an info fill'],
+  ['--primary-button-text', ['--success-color'], 4.5, 'label on a success fill'],
+  // A disabled control drops off the brand ladder onto a neutral rather than
+  // fading (issue #1260). WCAG 1.4.3 exempts inactive controls, but a label a
+  // member cannot read is still unreadable, so the pair is held to 4.5 too.
+  ['--disabled-text', ['--disabled-bg'], 4.5, 'disabled control label'],
   ['--success-color', CARD_SURFACES, 4.5, 'status text'],
   ['--danger-color', CARD_SURFACES, 4.5, 'status text'],
   ['--info-color', CARD_SURFACES, 4.5, 'status text'],

@@ -233,9 +233,9 @@
 }
 
 .verify-primary {
-  border: 1px solid var(--brand-primary);
-  background: var(--brand-primary);
-  color: #fff;
+  border: 1px solid var(--primary-button);
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 /* Sits inside the tinted result block, where the plain `--border-color` (a near-black hairline in

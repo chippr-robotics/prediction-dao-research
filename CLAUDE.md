@@ -549,7 +549,12 @@ artifacts live under `specs/<feature>/`.
   off-brand. 091 also added tier metals (gold = Amber, so the estate keeps one yellow) and
   `--gradient-brand`; **a gradient built from two different semantic tokens is a bug** — a
   `--brand-primary → --success-color` button says something untrue about what it does, which is
-  exactly what the 091 screenshot round caught. FOUR guards now gate CI in
+  exactly what the 091 screenshot round caught. (6) **A brand fill NEVER states its own label
+  colour** (issue #1260): fill from `--primary-button` and label with `--primary-button-text`, a
+  matched pair that INVERTS on dark (Teal 300 fill, Gunmetal label) because `color: #fff` on
+  `--brand-primary` measures 2.16:1 there. A disabled control changes HUE — `index.css` re-points
+  that pair at `--disabled-bg`/`--disabled-text` on any disabled button — because `opacity: .55`
+  over a pale teal is not a state a member can read. SIX guards now gate CI in
   `frontend/src/test/brand/`. See `docs/developer-guide/brand-tokens.md` +
   `specs/090-chippr-brand-alignment/` + `specs/091-neutral-token-consolidation/`.
 - **FinOps (spec 089): the CATALOGUE is the source of truth, and a zero is never an absence.**

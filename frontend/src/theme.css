@@ -120,6 +120,33 @@
   --chart-series-e: #8FA0A6;
 }
 
+/* ===================================
+   INTERACTIVE — THE FILL/LABEL PAIR
+   --primary-button and --primary-button-text are a MATCHED PAIR and the only
+   sanctioned way to fill a control with brand colour and write on it. They are
+   audited together in both themes by tokenContrast.test.js, which is what makes
+   them safe where `background: var(--brand-primary); color: #fff` was not:
+   Chippr Teal lifts to #83B9C4 on dark, and a white label on that measures
+   2.16:1 (issue #1260). The dark half of the pair therefore inverts — a Teal 300
+   fill with a Gunmetal label, 5.3:1 — which a hardcoded `#fff` can never do.
+   Never darken --brand-primary to make a white label work: Chippr Teal is a
+   large-text-and-fill colour by the guidelines' own table (spec 090).
+
+   The light values are repeated on :root so the pair is DEFINED even before the
+   theme class lands on <html> (the pre-hydration script, and component tests
+   that render without a theme wrapper). An undefined custom property makes the
+   declaration that reads it invalid at computed-value time, so the label would
+   silently fall back to inherited text colour on a brand fill.
+   =================================== */
+
+:root {
+  --primary-button: #2E7D8C;
+  --primary-button-hover: #1F5966;
+  --primary-button-text: #FFFFFF;
+  --accent-color: #1F5966;
+  --highlight-color: #D9E9EC;
+}
+
 /* Interactive — light */
 .theme-light.platform-fairwins {
   --primary-button: #2E7D8C;         /* Chippr Teal; white label = 4.7:1 */
@@ -136,6 +163,38 @@
   --primary-button-text: #1C333B;    /* Gunmetal */
   --accent-color: #83B9C4;
   --highlight-color: #243F48;
+}
+
+/* ===================================
+   DISABLED CONTROLS (issue #1260)
+   A disabled primary button used to be the enabled one at `opacity: 0.55`. On
+   the light teal dark-mode fill that is not a state a member can read — the
+   screenshots in specs/060-platform-fee-wrapper/ show an enabled "Deposit" and
+   a disabled one that look alike, on the surface where the enabled control
+   accepts a charge.
+
+   So unavailability changes HUE, not just alpha: a disabled control drops off
+   the brand ladder onto a neutral. index.css re-points --primary-button and
+   --primary-button-text at these on any disabled control, which is why the 78
+   swept rules need no :disabled variant of their own — they already read the
+   pair. Opacity, where a component still sets it, now rides on top of a fill
+   that already says "not available".
+
+   WCAG 1.4.3 exempts inactive controls from contrast, but a label nobody can
+   read is still a label nobody can read, so the pair is audited at 4.5:1 like
+   any other (tokenContrast.test.js).
+   =================================== */
+
+:root {
+  --disabled-bg: #E3E7E9;       /* Cloud → Steel; reads as off, not as teal */
+  --disabled-text: #5A6569;     /* 4.8:1 on --disabled-bg */
+  --disabled-border: #D2D8DA;
+}
+
+.theme-dark {
+  --disabled-bg: #2A3D45;       /* Gunmetal → Steel; sits below every surface */
+  --disabled-text: #9DACB2;     /* 4.9:1 on --disabled-bg */
+  --disabled-border: #35505A;
 }
 
 /* ===================================
@@ -227,6 +286,14 @@
   --gradient-brand: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
   --gradient-brand-soft: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-primary) 100%);
   --gradient-gold: linear-gradient(135deg, var(--tier-gold), var(--tier-gold-sheen));
+  /* A gradient a LABEL can sit on. Both stops are the audited button pair, so
+     --primary-button-text clears 4.5:1 against either end in both themes, and a
+     disabled control flattens it to one neutral because both stops move
+     together (issue #1260). --gradient-brand is the decorative one: it is safe
+     to write on too, but it does not track the disabled state, and
+     --gradient-brand-soft carries NO label at all — its Teal 100 stop is 2.5:1
+     under white and 3.0:1 under Gunmetal, so nothing readable fits on it. */
+  --gradient-primary-button: linear-gradient(135deg, var(--primary-button) 0%, var(--primary-button-hover) 100%);
 }
 
 /* ===================================

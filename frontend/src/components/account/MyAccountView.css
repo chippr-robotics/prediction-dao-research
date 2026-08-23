@@ -82,8 +82,8 @@
 }
 
 .my-account-tab.active {
-  background: var(--brand-primary);
-  color: #ffffff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .my-account-tab:focus-visible {

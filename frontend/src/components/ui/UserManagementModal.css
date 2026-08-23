@@ -350,12 +350,12 @@
 
 .status-badge.demo {
   background: var(--gradient-brand);
-  color: white;
+  color: var(--primary-button-text);
 }
 
 .status-badge.live {
-  background: var(--gradient-brand-soft);
-  color: white;
+  background: var(--success-color);
+  color: var(--primary-button-text);
 }
 
 /* Preferences */
@@ -705,8 +705,8 @@
   padding: 16px 24px;
   font-size: 16px;
   font-weight: 600;
-  color: white;
-  background: var(--color-primary);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: 8px;
   cursor: pointer;

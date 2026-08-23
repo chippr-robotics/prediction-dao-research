@@ -58,8 +58,8 @@
 }
 
 .purchase-access-btn {
-  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
-  color: white;
+  background: var(--gradient-primary-button);
+  color: var(--primary-button-text);
   border: none;
   padding: 0.875rem 2rem;
   border-radius: 8px;

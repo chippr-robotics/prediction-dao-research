@@ -191,7 +191,7 @@
 
 .mm-tab.active .mm-tab-count {
   background: var(--brand-secondary);
-  color: #fff;
+  color: var(--primary-button-text);
 }
 
 .mm-tab:disabled {
@@ -698,8 +698,8 @@
 }
 
 .mm-action-btn.mm-action-resolve {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--primary-button-hover) 100%);
-  color: white;
+  background: var(--gradient-primary-button);
+  color: var(--primary-button-text);
 }
 
 .mm-action-btn.mm-action-resolve:hover {
@@ -736,23 +736,27 @@
 }
 
 .mm-action-btn.mm-action-claim {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--primary-button-hover) 100%);
-  color: white;
+  background: var(--gradient-primary-button);
+  color: var(--primary-button-text);
 }
 
 .mm-action-btn.mm-action-claim:hover:not(:disabled) {
   background: var(--gradient-brand);
 }
 
-/* Refund — returning your own stake (not winnings), so a neutral blue rather
-   than the green Claim treatment. */
+/* Refund — returning your own stake (not winnings). It used to be filled from
+   --brand-secondary, which is a fill the disabled remap in index.css cannot
+   neutralise, so a disabled Refund kept a teal fill under a grey label. It now
+   shares the button pair with Resolve and Claim; the three are told apart by
+   their labels, which is the rule anyway (spec 090 FR-009 — colour is never the
+   only channel). Draw keeps its attention amber. */
 .mm-action-btn.mm-action-refund {
-  background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--info-color) 100%);
-  color: white;
+  background: var(--gradient-primary-button);
+  color: var(--primary-button-text);
 }
 
 .mm-action-btn.mm-action-refund:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--info-color) 0%, var(--brand-secondary) 100%);
+  background: var(--gradient-brand);
 }
 
 /* Respond to Draw — a counterparty needs an answer, so an attention amber that
@@ -1151,10 +1155,10 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--info-color) 100%);
+  background: var(--gradient-primary-button);
   border: none;
   border-radius: 8px;
-  color: white;
+  color: var(--primary-button-text);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;

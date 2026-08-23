@@ -61,8 +61,8 @@
 }
 
 .cta-banner-btn.primary {
-  color: white;
-  background: var(--brand-primary);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
 }
 
 .cta-banner-btn.primary:hover {
@@ -191,6 +191,9 @@
 
 /* --- Group headers --- */
 
+/* The header states its own colour rather than inheriting one: it is a
+   role="presentation" wrapper, so whatever an ancestor happened to set was
+   being measured as the contrast of the text inside it (issue #1247). */
 .qa-group-header {
   grid-column: 1 / -1;
   display: flex;
@@ -198,12 +201,18 @@
   flex-wrap: wrap;
   gap: 0.25rem 0.75rem;
   margin-top: 0.75rem;
+  color: var(--text-primary);
 }
 
 .qa-group-header:first-child {
   margin-top: 0;
 }
 
+/* SMALL TEXT, so --accent-color (Teal 700) and not --brand-primary. Chippr
+   Teal is a large-text-and-fill colour: at 12.5px bold it needs 4.5:1 and
+   measures 4.01:1 on the Cloud page background — it only clears AA on pure
+   white, which is not what this sits on (issue #1247). Teal 700 is 7.2:1 here
+   and 7.6:1 in dark. Same reasoning for .qa-tag below at 10px. */
 .qa-group-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -212,7 +221,7 @@
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--brand-primary);
+  color: var(--accent-color);
 }
 
 .qa-group-sub {
@@ -227,6 +236,10 @@
      kept in sync so the rgba() tints match the solid color). */
   --qa-accent: var(--brand-primary);
   --qa-accent-rgb: var(--brand-primary-rgb);
+  /* The accent as TEXT. --qa-accent is a fill/icon colour (the rail, the 52px
+     icon, the hover glow) where the 3:1 UI-component floor applies; the tag
+     under it is 10px, so it takes the small-text step of the ladder. */
+  --qa-accent-text: var(--accent-color);
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -305,7 +318,7 @@
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--qa-accent, var(--brand-primary));
+  color: var(--qa-accent-text, var(--accent-color));
   margin-bottom: 0.2rem;
 }
 
@@ -559,7 +572,7 @@
   align-items: center;
   justify-content: center;
   background: var(--brand-primary);
-  color: white;
+  color: var(--primary-button-text);
   border-radius: 50%;
   font-size: 0.8rem;
   font-weight: 700;
@@ -769,8 +782,8 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.85rem 1.75rem;
-  background: var(--brand-primary);
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   border: none;
   border-radius: 10px;
   font-size: 1rem;
@@ -834,7 +847,7 @@
   align-items: center;
   justify-content: center;
   background: var(--brand-primary);
-  color: white;
+  color: var(--primary-button-text);
   border-radius: 50%;
   font-size: 0.7rem;
   font-weight: 700;

@@ -373,8 +373,8 @@
   flex: 1;
 }
 .pt-btn-primary {
-  background: var(--color-primary, var(--brand-primary));
-  color: #fff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 .pt-btn-primary:disabled {
   opacity: 0.5;

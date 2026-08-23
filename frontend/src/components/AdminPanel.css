@@ -91,7 +91,7 @@
   text-transform: uppercase;
   letter-spacing: 0.025em;
   background: var(--brand-primary);
-  color: white;
+  color: var(--primary-button-text);
   border-radius: var(--radius-full);
 }
 
@@ -716,8 +716,8 @@
 }
 
 .admin-btn.primary {
-  background: var(--brand-primary);
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .admin-btn.primary:hover:not(:disabled) {
@@ -989,8 +989,8 @@
 }
 
 .confirm-btn.primary {
-  background: var(--brand-primary);
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .confirm-btn.primary:hover:not(:disabled) {
@@ -1591,8 +1591,8 @@
 }
 
 .admin-btn.primary {
-  background: var(--accent-color);
-  color: #fff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .admin-btn.primary:hover:not(:disabled) {

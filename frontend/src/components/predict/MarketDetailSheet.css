@@ -97,9 +97,9 @@
   padding: 0.35rem 0.8rem;
 }
 .market-detail-buy {
-  background: var(--brand-primary);
+  background: var(--primary-button);
   border: 0;
-  color: #fff;
+  color: var(--primary-button-text);
 }
 .market-detail-sell {
   background: transparent;

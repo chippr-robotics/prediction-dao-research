@@ -35,7 +35,17 @@ const DEFAULT_FEE_CAP = 250;
 // Tokens the theme MUST resolve (mirrors frontend/src/utils/validateTheme.js:
 // the brand-scoped subset — neutrals live on :root, not on the platform class).
 const REQUIRED_BASE_TOKENS = ["--brand-primary", "--brand-secondary"];
-const REQUIRED_MODE_TOKENS = ["--primary-button", "--primary-button-hover"];
+// --primary-button-text is required per MODE, not merely present: it is the
+// label on every brand fill in the app (issue #1260) and it is the half of the
+// pair that INVERTS between themes — white in light, Gunmetal in dark. A tenant
+// declaring the fill but not the label would inherit the light label into its
+// dark theme and ship a 2.16:1 control, which is the exact bug that guard
+// exists to stop.
+const REQUIRED_MODE_TOKENS = [
+  "--primary-button",
+  "--primary-button-hover",
+  "--primary-button-text",
+];
 
 // Known chain ids per cohort (source: frontend/src/config/networks.js cohorts).
 const MAINNET_CHAINS = new Set([1, 10, 137, 8453, 42161, 61]);

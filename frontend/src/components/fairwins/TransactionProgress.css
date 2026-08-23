@@ -84,7 +84,7 @@
 .tp-step.current .tp-step-indicator {
   background: var(--primary-color);
   border-color: var(--primary-color);
-  color: #fff;
+  color: var(--primary-button-text);
 }
 
 .tp-step.complete .tp-step-indicator {

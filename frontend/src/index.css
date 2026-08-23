@@ -151,3 +151,36 @@ button:focus-visible {
 button:has(> svg:only-child) {
   padding: 0;
 }
+
+/* DISABLED CONTROLS (issue #1260).
+ *
+ * This does not paint anything. It re-points the button token pair on the
+ * disabled element, and every control that fills itself from
+ * `var(--primary-button)` then resolves that fill to the neutral instead —
+ * including the ~78 rules swept in this change and any written later.
+ *
+ * Doing it with custom properties rather than a `background` declaration is
+ * deliberate: a custom property set ON the element beats the value it would
+ * otherwise inherit from :root regardless of what specificity the component's
+ * own rule has. This selector is (0,1,1), so a `background: var(--disabled-bg)`
+ * here would beat `.pt-btn-primary` (0,1,0) and lose to `.earn-btn.primary`
+ * (0,2,0) — it would grey out some primary buttons and not others, which is
+ * worse than not applying at all.
+ *
+ * A control that does NOT fill from the pair reads none of these and is
+ * untouched, so this cannot grey out a secondary or ghost button.
+ *
+ * `aria-disabled` is included because a busy control keeps focus by staying
+ * enabled and saying so, and it should look unavailable while it is. The
+ * selector stays on <button> on purpose: --primary-button-hover is also the
+ * colour of a hovered LINK (`a:hover` in this file), so remapping it on anchors
+ * would repaint disabled links in the disabled FILL colour — a near-invisible
+ * grey on the page — rather than greying a fill.
+ */
+button:disabled,
+button[disabled],
+button[aria-disabled='true'] {
+  --primary-button: var(--disabled-bg);
+  --primary-button-hover: var(--disabled-bg);
+  --primary-button-text: var(--disabled-text);
+}

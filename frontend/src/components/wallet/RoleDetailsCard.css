@@ -357,8 +357,8 @@
 }
 
 .purchase-roles-btn {
-  background: var(--brand-primary, var(--primary-color));
-  color: #fff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   border: none;
   padding: 10px 20px;
   font-size: 13px;
