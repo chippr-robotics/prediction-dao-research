@@ -124,8 +124,21 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-03: My Wagers — Created tab
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): tab is a <span> without aria-selected; decide the tab role/a11y contract, then assert it.
-  it.skip('[DSH-03] My Wagers Created tab', () => {
+  /*
+   * Un-skipped (#1019). The recorded reason — "tab is a <span> without aria-selected" — described
+   * what the ASSERTION resolved to, not what the app renders. MyMarketsModal's tabs are buttons
+   * carrying `role="tab"` and `aria-selected`; the a11y contract is already there and needed no
+   * deciding.
+   *
+   * What went wrong is a Cypress shape: `cy.get('[role="tab"]').contains('Created')` returns the
+   * DEEPEST element containing the text, which is the inner `<span>Created</span>` — so the
+   * assertion looked for aria-selected on a span that will never have it. The selector-first form,
+   * `cy.contains('[role="tab"]', 'Created')`, yields the element matching the SELECTOR.
+   *
+   * The test was already using the correct form one line above, for the click. Only the assertion
+   * used the other one, which is why the tab genuinely switched and the check still failed.
+   */
+  it('[DSH-03] My Wagers Created tab', () => {
     connectAndVisitDashboard()
 
     cy.get('.quick-action-card').contains('My Wagers').click()
@@ -133,8 +146,12 @@ describe('Dashboard', () => {
 
     // Switch to Created tab.
     cy.contains('[role="tab"]', 'Created').click()
-    cy.get('[role="tab"]').contains('Created')
+    cy.contains('[role="tab"]', 'Created')
       .should('have.attr', 'aria-selected', 'true')
+    // Both sides. "Created is selected" alone would still pass if every tab claimed selection,
+    // which is a real way for a tablist to be wrong and the reason the marker existed.
+    cy.contains('[role="tab"]', 'Participating')
+      .should('have.attr', 'aria-selected', 'false')
 
     // The Created tabpanel should be visible.
     cy.get('[role="tabpanel"], .mm-panel').should('be.visible')
@@ -143,8 +160,8 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-04: My Wagers — History tab
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): same tab-role question as DSH-03.
-  it.skip('[DSH-04] My Wagers History tab', () => {
+  // Same Cypress shape as DSH-03 — see the note there.
+  it('[DSH-04] My Wagers History tab', () => {
     connectAndVisitDashboard()
 
     cy.get('.quick-action-card').contains('My Wagers').click()
@@ -152,8 +169,11 @@ describe('Dashboard', () => {
 
     // Switch to History tab.
     cy.contains('[role="tab"]', 'History').click()
-    cy.get('[role="tab"]').contains('History')
+    cy.contains('[role="tab"]', 'History')
       .should('have.attr', 'aria-selected', 'true')
+    // Both sides — see DSH-03.
+    cy.contains('[role="tab"]', 'Created')
+      .should('have.attr', 'aria-selected', 'false')
 
     cy.get('[role="tabpanel"], .mm-panel').should('be.visible')
   })
