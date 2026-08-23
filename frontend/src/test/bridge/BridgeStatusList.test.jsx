@@ -26,6 +26,20 @@ vi.mock('../../lib/bridge/bridgeStatus', async (importOriginal) => {
   return { ...actual, reconcileBridges: (...args) => mockReconcile.current(...args) }
 })
 
+/**
+ * The roster this list reads is `bridgeNetworks()`, which since #1265 is bounded by the
+ * build's cohort — and Across ships only on mainnets, so it is EMPTY in this (testnet,
+ * VITE_NETWORK_ID=63) test build. These tests are about what a member SEES for transfers
+ * that exist, so the roster is injected as the mainnet pair the fixtures below use. The
+ * empty roster is not swept under that: it has its own test, and it must say the build
+ * bridges nowhere rather than report an empty history it never looked for.
+ */
+const mockRoster = vi.hoisted(() => ({ current: [] }))
+vi.mock('../../lib/bridge/bridgeCopy', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, bridgeNetworks: () => mockRoster.current }
+})
+
 import BridgeStatusList from '../../components/wallet/BridgeStatusList'
 import {
   BRIDGE_STATE,
@@ -108,6 +122,10 @@ beforeEach(() => {
   localStorage.clear()
   mockWallet.current = { address: ACCOUNT, chainId: ORIGIN, isConnected: true }
   mockReconcile.current = vi.fn(async () => [])
+  mockRoster.current = [
+    { chainId: ORIGIN, name: 'Polygon' },
+    { chainId: DESTINATION, name: 'Base' },
+  ]
 })
 
 afterEach(() => {
@@ -269,6 +287,22 @@ describe('BridgeStatusList — ordering, empty state, polling', () => {
     render(<BridgeStatusList />)
     expect(await screen.findByText(/No cross-network transfers yet/)).toBeInTheDocument()
     expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('says the build bridges nowhere rather than claiming an empty history (#1265)', async () => {
+    // A cohort with no bridge-capable network — what a testnet build actually has.
+    // The list looked at no chain, so "no transfers yet" would be a claim about the
+    // member's history that nothing here checked.
+    seedBridge({ state: BRIDGE_STATE.IN_FLIGHT })
+    mockRoster.current = []
+    render(<BridgeStatusList />)
+
+    expect(
+      await screen.findByText(/No network is set up for bridging in this build/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/No cross-network transfers yet/)).toBeNull()
+    expect(screen.queryByRole('listitem')).toBeNull()
+    expect(mockReconcile.current).not.toHaveBeenCalled()
   })
 
   it('shows nothing for a disconnected wallet and asks the network for nothing', async () => {

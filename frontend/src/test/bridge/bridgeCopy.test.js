@@ -17,6 +17,7 @@ import {
   bridgeUnavailableCopy,
   noBridgeDestinationCopy,
 } from '../../lib/bridge/bridgeCopy'
+import { NETWORKS, cohortChainIds, isInCohort, listSupportedChainIds } from '../../config/networks'
 
 describe('BRIDGE_DISCLOSURE (FR-014)', () => {
   it('names the settling third party and says delivery depends on it', () => {
@@ -104,12 +105,22 @@ describe('BRIDGE_STATE_COPY (FR-009/FR-011)', () => {
 })
 
 describe('honest unavailable copy (FR-006/FR-006c/FR-051)', () => {
-  it('lists the networks where bridging is actually configured', () => {
-    const names = bridgeNetworks().map((n) => n.name)
-    expect(names).toContain('Polygon')
-    expect(names).toContain('Ethereum')
-    expect(names).not.toContain('Ethereum Classic')
-    expect(names).not.toContain('Mordor')
+  it('lists the networks where bridging is configured AND this build may read', () => {
+    // Configured is a config fact: the Across SpokePool networks, never ETC/Mordor.
+    const configured = listSupportedChainIds().filter((id) => NETWORKS[id].capabilities?.bridge)
+    expect(configured).toContain(137)
+    expect(configured).toContain(1)
+    expect(configured).not.toContain(61)
+    expect(configured).not.toContain(63)
+
+    // The roster is that narrowed to the cohort (#1265): it names networks to the
+    // member AND is the read roster for in-flight transfers, and constitution III
+    // forbids either crossing the testnet/mainnet boundary. Across ships only on
+    // mainnets and this is a testnet build, so the honest roster here is empty.
+    expect(bridgeNetworks().map((n) => n.chainId)).toEqual(
+      cohortChainIds().filter((id) => NETWORKS[id].capabilities?.bridge),
+    )
+    for (const net of bridgeNetworks()) expect(isInCohort(net.chainId)).toBe(true)
   })
 
   it('returns null on a network where bridging is available', () => {
@@ -119,7 +130,12 @@ describe('honest unavailable copy (FR-006/FR-006c/FR-051)', () => {
   it('says so plainly on ETC/Mordor and points at where it works', () => {
     const copy = bridgeUnavailableCopy(63)
     expect(copy).toMatch(/not available/i)
-    expect(copy).toMatch(/Polygon/)
+    // Where it works is the cohort roster: named when this build has one to name,
+    // and plainly "not set up in this build yet" when it does not — never a
+    // network the build could not use if the member went there (#1265).
+    expect(copy).toMatch(
+      isInCohort(137) ? /Polygon/ : /No network is set up for bridging in this build yet/i,
+    )
   })
 
   it('answers Bitcoin from its string id without touching the EVM registry (spec 061)', () => {
@@ -136,6 +152,13 @@ describe('honest unavailable copy (FR-006/FR-006c/FR-051)', () => {
   it('an empty destination list explains itself and names what would change it (FR-065)', () => {
     const copy = noBridgeDestinationCopy('USDC')
     expect(copy).toContain('USDC')
-    expect(copy).toMatch(/pick a different asset/i)
+    // Same two honest branches as the roster above (#1265): name the remedy where
+    // there are networks to bridge between, and say why there is none where there
+    // are not — never a dead sentence either way.
+    expect(copy).toMatch(
+      bridgeNetworks().length > 0
+        ? /pick a different asset/i
+        : /no network is set up for bridging in this build yet/i,
+    )
   })
 })

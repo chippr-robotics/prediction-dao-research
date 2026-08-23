@@ -297,9 +297,19 @@ where FairWins has shipped nothing. So `tradingLiquidityNetworks()` in
 Both lists are derived, never asserted, so they stay true as deployments land — and an empty list
 produces honest "not set up in this build yet" copy rather than a false roster.
 
+**2a. The cohort bounds every member-facing roster** (issue #1265). All four — `tradingLiquidityNetworks()`,
+`bridgeLiquidityNetworks()` in both `liquidityCopy.js` and `acrossLpPositions.js`, and `bridgeNetworks()`
+in `lib/bridge/bridgeCopy.js` — enumerate **`cohortChainIds()`, never `listSupportedChainIds()`**, and so
+does `useLiquidityCatalog` in `SupplyView.jsx`, which is the one that actually opens connections. Reads
+never cross the testnet/mainnet boundary (constitution III), and naming a network a build cannot supply to
+is a promise it cannot keep. Since the spec-067 routers are mainnet-only, a **testnet-cohort build lists no
+pools and no bridge networks** and says so in its own words; `BridgeStatusList` renders "no network is set
+up for bridging in this build" there rather than "no transfers yet", which would be a claim about the
+member's history that nothing looked for.
+
 The admin roster is the deliberate exception: `adminNetworks(capability)` lists every capable network
-whether or not a router is deployed there, because the undeployed ones are the ones an operator most
-needs to see.
+whether or not a router is deployed there — and, unlike the four above, is **not** cohort-bounded, because
+the undeployed ones are the ones an operator most needs to see (see the comment on the function).
 
 **3. The quoting gateway.** A bridge price is **not derivable client-side** — it needs Across's
 relayer-fee oracle — so quoting goes through the relay-gateway proxy

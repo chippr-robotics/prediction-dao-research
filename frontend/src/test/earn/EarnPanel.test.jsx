@@ -48,7 +48,7 @@ vi.mock('../../components/earn/SupplyView', () => ({
 }))
 
 import EarnPanel from '../../components/earn/EarnPanel'
-import { NETWORKS } from '../../config/networks'
+import { NETWORKS, cohortChainIds, isInCohort, listSupportedChainIds } from '../../config/networks'
 import { getContractAddressForChain } from '../../config/contracts'
 import * as earnCopy from '../../lib/earn/earnCopy'
 import {
@@ -73,6 +73,18 @@ import {
   poolRiskSummary,
   tradingLiquidityNetworks,
 } from '../../lib/liquidity/liquidityCopy'
+
+/**
+ * The bridge half of the availability sentence, in EITHER of its two honest forms.
+ *
+ * Since #1265 the roster behind it is cohort-bounded: a mainnet build names Ethereum
+ * (the HubPool is an L1 contract, research R8), while a testnet build — which this
+ * test build is (VITE_NETWORK_ID=63) — has no bridge pool it may read and says so.
+ * Both are true of their build; what these tests hold is that the sentence is there
+ * and is never a silent blank.
+ */
+const BRIDGE_AVAILABILITY =
+  /Bridge pools are available on .+ only|No network is set up for bridge pools in this build yet/i
 
 const USDC_VAULT = {
   address: '0x00000000000000000000000000000000000000a1',
@@ -368,11 +380,20 @@ describe('liquidityCopy — the platform fee (FR-028/FR-029/FR-030)', () => {
 
 describe('liquidityCopy — availability is asymmetric (research R8, FR-025)', () => {
   it('offers bridge pools on Ethereum ONLY — the HubPool is an L1 contract', () => {
-    expect(bridgeLiquidityNetworks().map((n) => n.chainId)).toEqual([1])
-    // Ethereum is also the only network configured with a HubPool address, so
-    // this cannot drift into "bridge pools everywhere" by a config edit
-    // elsewhere: it is derived from that address, not asserted.
+    // The CONFIG fact, which holds in every build: exactly one network carries a
+    // HubPool, and it is Ethereum. Derived from the address, not asserted, so
+    // this cannot drift into "bridge pools everywhere" by a config edit.
+    const configured = listSupportedChainIds().filter((id) => NETWORKS[id].bridge?.hubPool)
+    expect(configured).toEqual([1])
     expect(NETWORKS[137].bridge?.hubPool ?? null).toBeNull()
+
+    // The ROSTER the copy names is cohort-bounded (#1265), so it is that fact
+    // narrowed to the chains this build may read. Ethereum is a mainnet and this
+    // is a testnet build, so the honest answer here is "none".
+    expect(bridgeLiquidityNetworks().map((n) => n.chainId)).toEqual(
+      cohortChainIds().filter((id) => NETWORKS[id].bridge?.hubPool),
+    )
+    expect(bridgeLiquidityNetworks().map((n) => n.chainId)).not.toContain(1)
   })
 
   it('names a trading network only where the router is deployed, never on protocol addresses alone', () => {
@@ -390,7 +411,7 @@ describe('liquidityCopy — availability is asymmetric (research R8, FR-025)', (
 
   it('states the asymmetry in the copy rather than implying both kinds are everywhere', () => {
     const copy = liquidityAvailabilityCopy()
-    expect(copy).toMatch(/Bridge pools are available on Ethereum only/i)
+    expect(copy).toMatch(BRIDGE_AVAILABILITY)
     // Trading availability tracks deployment: a roster while routers exist, an
     // honest "not set up yet" while none do — never a network that has none.
     const trading = tradingLiquidityNetworks()
@@ -401,7 +422,7 @@ describe('liquidityCopy — availability is asymmetric (research R8, FR-025)', (
     }
     // The empty-list branch is honest too, never a silent blank.
     expect(NO_POOLS_COPY).toMatch(/no pools to supply right now/i)
-    expect(NO_POOLS_COPY).toMatch(/Bridge pools are available on Ethereum only/i)
+    expect(NO_POOLS_COPY).toMatch(BRIDGE_AVAILABILITY)
   })
 
   it('explains a network with no pools without telling the member to switch first', () => {
@@ -409,15 +430,20 @@ describe('liquidityCopy — availability is asymmetric (research R8, FR-025)', (
     expect(copy).toMatch(/no pools on Ethereum Classic Mordor/i)
     expect(copy).toMatch(/do not have to switch networks/i)
     expect(copy).toMatch(/switches over only when you confirm/i)
-    // Ethereum always has pools to offer — its bridge pool needs no FairWins
-    // deployment at all, so there is nothing to explain away there.
-    expect(liquidityUnavailableCopy(1)).toBeNull()
+    // Ethereum's bridge pool needs no FairWins deployment at all — but since
+    // #1265 the answer is cohort-bounded, so a build that may not read Ethereum
+    // says "no pools there" rather than pointing at pools it never lists.
+    if (isInCohort(1)) {
+      expect(liquidityUnavailableCopy(1)).toBeNull()
+    } else {
+      expect(liquidityUnavailableCopy(1)).toMatch(/no pools on Ethereum/i)
+    }
   })
 
   it('answers Bitcoin from its string id, without a numeric network lookup (spec 061)', () => {
     const copy = liquidityUnavailableCopy('bitcoin')
     expect(copy).toMatch(/Bitcoin is not part of supplying/i)
-    expect(copy).toMatch(/Bridge pools are available on Ethereum only/i)
+    expect(copy).toMatch(BRIDGE_AVAILABILITY)
   })
 })
 

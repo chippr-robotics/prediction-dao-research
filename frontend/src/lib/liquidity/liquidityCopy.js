@@ -33,7 +33,7 @@
  *   4. A RETIRED POOL STAYS VISIBLE AND WITHDRAWABLE (FR-024). The copy for a
  *      closed pool says "no new deposits", never "gone".
  */
-import { NETWORKS, listSupportedChainIds } from '../../config/networks'
+import { NETWORKS, cohortChainIds } from '../../config/networks'
 import { isBitcoinNetworkId } from '../../config/bitcoinNetworks'
 import { getContractAddressForChain } from '../../config/contracts'
 import { bpsToPercent } from '../fees/feeQuote'
@@ -240,10 +240,15 @@ export function feeCeilingCopy(maxFeeLabel, netLabel) {
 export const BRIDGE_LP_FEE_FREE_NOTE = `Supplying a ${LIQUIDITY_PROTOCOLS.bridge.protocol} bridge pool carries no FairWins fee. The deposit goes straight from your wallet to ${LIQUIDITY_PROTOCOLS.bridge.protocol}, so there is nothing for FairWins to take a fee from and nothing standing between you and your position.`
 
 /**
- * Every supported network where TRADING liquidity is actually offered, mainnets
- * first.
+ * Every network IN THIS BUILD'S COHORT where TRADING liquidity is actually
+ * offered, mainnets first.
  *
- * TWO conditions, both required, and the second is the point: a network needs
+ * The roster is `cohortChainIds()` and never `listSupportedChainIds()` (issue
+ * #1265): this sentence tells a member where they can supply, and naming the
+ * mainnet routers to a member on a testnet build names pools that build cannot
+ * read, let alone supply (constitution III).
+ *
+ * TWO further conditions, both required, and the second is the point: a network needs
  * Uniswap's position manager configured (`capabilities.liquidity`) AND a
  * deployed `LiquidityRouter`, because the supply path runs through the router.
  * Naming a network on the strength of the protocol addresses alone would
@@ -255,7 +260,7 @@ export const BRIDGE_LP_FEE_FREE_NOTE = `Supplying a ${LIQUIDITY_PROTOCOLS.bridge
  * honest "not set up in this build yet" copy rather than a false roster.
  */
 export function tradingLiquidityNetworks() {
-  return listSupportedChainIds()
+  return cohortChainIds()
     .map((id) => NETWORKS[id])
     .filter(
       (net) =>
@@ -266,13 +271,17 @@ export function tradingLiquidityNetworks() {
 }
 
 /**
- * Every supported network where BRIDGE liquidity is configured — the networks
- * carrying an Across HubPool. This is Ethereum only, by Across's design
- * (research R8); the list is derived rather than asserted so it stays true if
- * that ever changes.
+ * Every network IN THIS BUILD'S COHORT where BRIDGE liquidity is configured —
+ * the networks carrying an Across HubPool. On a mainnet build this is Ethereum
+ * only, by Across's design (research R8); the list is derived rather than
+ * asserted so it stays true if that ever changes.
+ *
+ * Cohort-bounded for the same reason as `tradingLiquidityNetworks()` above
+ * (issue #1265). A testnet build therefore names no network here, and the copy
+ * below already has an honest empty branch for that.
  */
 export function bridgeLiquidityNetworks() {
-  return listSupportedChainIds()
+  return cohortChainIds()
     .map((id) => NETWORKS[id])
     .filter((net) => Boolean(net?.bridge?.hubPool))
     .sort((a, b) => Number(a.isTestnet) - Number(b.isTestnet))
@@ -324,8 +333,11 @@ export function liquidityUnavailableCopy(chainId) {
   const net = chainId != null ? NETWORKS[chainId] : null
   // Deployment-aware on both sides: trading needs the router shipped there,
   // bridge needs a HubPool. Either one makes the network a place with pools.
+  // Both go through the rosters above rather than reading config directly, so a
+  // chain outside this build's cohort answers the same way the catalog does —
+  // "no pools here" — instead of claiming pools the build never reads (#1265).
   const hasTrading = tradingLiquidityNetworks().some((n) => n.chainId === net?.chainId)
-  const hasBridge = Boolean(net?.bridge?.hubPool)
+  const hasBridge = bridgeLiquidityNetworks().some((n) => n.chainId === net?.chainId)
   if (hasTrading || hasBridge) return null
   const here = net?.name
     ? `There are no pools on ${net.name}.`

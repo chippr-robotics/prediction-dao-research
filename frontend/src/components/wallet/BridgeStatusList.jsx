@@ -24,6 +24,12 @@
  * Entries live on their ORIGIN chain (one per bridge, FR-035), so the list reads
  * every bridge-capable network rather than the wallet's active one: a member never
  * has to switch networks to see a transfer they started somewhere else (FR-059).
+ *
+ * "Every bridge-capable network" is `bridgeNetworks()`, which since #1265 is bounded
+ * by the build's cohort — constitution III forbids a read crossing the testnet/mainnet
+ * boundary, and this loop is a read. When that roster is EMPTY the list has looked
+ * nowhere, so it says that rather than "no transfers yet": the second is a claim about
+ * the member's history that nothing here checked.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits } from 'ethers'
@@ -194,6 +200,17 @@ export default function BridgeStatusList({ autoRefresh = true, refreshKey = 0 })
   }, [autoRefresh, hasLive, load])
 
   if (status === 'loading') return <p className="bridge-status-state">Loading your transfers…</p>
+
+  // No network to read means no answer about the member's transfers — never an
+  // empty history, which is a different (and unearned) claim.
+  if (chainIds.length === 0) {
+    return (
+      <p className="bridge-status-state">
+        No network is set up for bridging in this build, so there are no cross-network transfers to
+        show here.
+      </p>
+    )
+  }
 
   if (entries.length === 0) {
     return (
