@@ -659,7 +659,9 @@ describe('MyMarketsModal', () => {
 
       // The detail view, not the empty state — and it carries the reclaim.
       await waitFor(() => {
-        expect(screen.getByText('Reached From The Feed')).toBeInTheDocument()
+        // The title renders in both the list row and the opened detail — either proves the
+        // by-id route surfaced the expired offer, so tolerate more than one match.
+        expect(screen.getAllByText('Reached From The Feed').length).toBeGreaterThan(0)
       })
       expect(screen.queryByText(/No Active Positions/i)).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /claim refund/i })).toBeInTheDocument()

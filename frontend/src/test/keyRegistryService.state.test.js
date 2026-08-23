@@ -21,7 +21,11 @@ vi.mock('../config/contracts', () => ({
 
 vi.mock('ethers', async (orig) => {
   const actual = await orig()
-  const FakeCtor = vi.fn(() => ({ getPublicKey }))
+  // Must be constructible: the service does `new ethers.Contract(...)`, and an
+  // arrow-function mock implementation cannot be `new`-ed.
+  const FakeCtor = vi.fn(function FakeContract() {
+    return { getPublicKey }
+  })
   return { ...actual, Contract: FakeCtor, ethers: { ...actual.ethers, Contract: FakeCtor } }
 })
 
