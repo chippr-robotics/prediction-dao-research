@@ -139,14 +139,24 @@ device is exactly the kind of thing they may need to look up later.
 | `ASSISTANT_ENABLED` | `false` | Off ⇒ `503 assistant_unconfigured`. |
 | `ANTHROPIC_API_KEY` | — | **Secret.** Missing ⇒ `503 assistant_unconfigured`. |
 | `ASSISTANT_MODEL` | `claude-sonnet-5` | Model id. |
-| `ASSISTANT_MAX_TOKENS` | `1024` | Response ceiling. |
+| `ASSISTANT_MAX_TOKENS` | `1024` | Output ceiling per turn. **Hard-capped at 4096 in code**; boot fails above it. |
+| `ASSISTANT_QUOTA_PER_ACCOUNT` / `_GLOBAL` | `20` / `60` | Model **calls** per window — a tighter class than the module's reads. |
+| `ASSISTANT_TOKEN_BUDGET_PER_ACCOUNT` / `_GLOBAL` / `_WINDOW_MS` | `200000` / `2000000` / `3600000` | Model **tokens** per window. The ceiling on money. |
 
 Request `{ messages: [{ role: 'user' | 'assistant', content }], surface? }` — at most 20 messages,
 each at most 4000 characters, else `400 bad_request`. Response
 `{ reply, model, usage: { inputTokens, outputTokens } }`. Upstream failure ⇒ `503
-assistant_unavailable`. The proxy uses `fetch` with an `AbortController` timeout and a quota
-tighter than the read endpoints', because a chat turn costs real money per request where a read
-does not.
+assistant_unavailable`. The proxy uses `fetch` with an `AbortController` timeout.
+
+**Three ceilings sit in front of the provider, and only one of them is about money.** The module's
+general quota and the assistant's own tighter request class both count REQUESTS; the token budget
+counts TOKENS, which is what is actually billed — two turns inside one window can differ by orders
+of magnitude in cost, so a request count was never a spend ceiling. A turn RESERVES its worst case
+(estimated input + `ASSISTANT_MAX_TOKENS`) before the call and SETTLES down to the measured usage
+afterwards, so turns already in flight cannot overshoot between them. An exhausted budget answers
+**`429 assistant_budget_exhausted`** with `Retry-After` — a distinct code from `quota_exceeded`, and
+**never** a shortened reply: trimming `max_tokens` to whatever headroom remained would deliver a
+truncated answer that reads as the assistant's own judgement about how much to say.
 
 `ASSISTANT_ENABLED` is a **sub-config of the Member API module** — the assistant cannot be reached
 while `MEMBER_API_ENABLED` is false, and the Member API killswitch takes the assistant with it.
@@ -161,6 +171,8 @@ while `MEMBER_API_ENABLED` is false, and the Member API killswitch takes the ass
 - **The assistant never signs and never submits.** No signing code path exists in
   `lib/assistant/`; the disclosure on every reply is the member-facing statement of that fact.
 - **Unreachable is never answered.** No fabricated reply, ever.
+- **An exhausted budget is refused, never truncated.** And an unknown cost is never a zero cost: a
+  turn the provider reported no counts for keeps its full reservation.
 - **Message content is never logged, stored server-side, or placed in an audit field or URL.**
 - **Membership `unreadable` renders nothing**, never a denial.
 - **Replies are polite, never assertive.**

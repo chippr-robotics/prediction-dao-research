@@ -33,6 +33,51 @@ export const MAX_MESSAGE_CHARS = 4000
 const MAX_SURFACE_CHARS = 120
 
 /**
+ * The hard ceiling on `ASSISTANT_MAX_TOKENS`, enforced at BOOT.
+ *
+ * A per-turn output ceiling is the only thing that bounds what a single request can cost, so it
+ * must not itself be unbounded configuration: `ASSISTANT_MAX_TOKENS=1000000` would be a typo that
+ * multiplies the bill by a thousand and reads, in an env file, exactly like the correct value. This
+ * is a constant rather than another variable for the same reason — a cap an operator can raise is
+ * not a cap. It is sized well above any answer this assistant should give (its whole job is short,
+ * concrete replies) and well below anything that could be expensive on its own.
+ */
+export const MAX_TOKENS_CEILING = 4096
+
+/**
+ * Worst-case tokens one turn can cost, for the pre-flight budget reservation.
+ *
+ * An ESTIMATE, and only ever used as one: it decides how much headroom to hold while the call is in
+ * flight, and is replaced by the provider's measured counts the moment they arrive. Input is
+ * approximated at the conventional ~4 characters per token (English prose; other scripts run
+ * denser, which is why this is a reservation and not an accounting figure), and output is charged
+ * at the FULL ceiling, because that is genuinely the most the provider can return.
+ *
+ * @param {{messages: Array<{role: string, content: string}>, surface: string|null, maxTokens: number}} turn
+ */
+export function estimateTurnTokens({ messages, surface = null, maxTokens }) {
+  const promptChars = buildSystemPrompt({ surface }).length
+  const messageChars = messages.reduce((acc, m) => acc + m.content.length, 0)
+  // ~4 chars/token, plus a few tokens of per-message envelope the wire format adds.
+  const inputTokens = Math.ceil((promptChars + messageChars) / 4) + messages.length * 4
+  return inputTokens + Math.max(0, Number(maxTokens) || 0)
+}
+
+/**
+ * The largest reservation `estimateTurnTokens` can ever produce for a request `parseChatRequest`
+ * would admit — the caps above are what make that a finite number.
+ *
+ * Boot uses it to refuse a token budget that is smaller than one maximal turn. Without that check
+ * the budget would be a size limit in disguise: a well-formed request could be refused for being
+ * long rather than for the budget being spent, which is a confusing answer to give a member and an
+ * impossible one to act on from the outside.
+ */
+export function maxTurnTokens(maxTokens) {
+  const worstMessages = Array.from({ length: MAX_MESSAGES }, () => ({ role: 'user', content: 'x'.repeat(MAX_MESSAGE_CHARS) }))
+  return estimateTurnTokens({ messages: worstMessages, surface: 'x'.repeat(MAX_SURFACE_CHARS), maxTokens })
+}
+
+/**
  * The server-side system prompt.
  *
  * Written as a description of FairWins plus a short list of things the assistant must not do. The

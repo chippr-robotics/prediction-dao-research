@@ -86,6 +86,11 @@ export const ERROR_CODES = Object.freeze({
   screening_unavailable: { status: 503, summary: 'Sanctions screening could not be performed. Fail-closed — retry.' },
   insufficient_scope: { status: 403, summary: 'The token is valid but does not carry the scope this endpoint requires.' },
   quota_exceeded: { status: 429, summary: 'Per-account or global request quota exceeded. Retry-After is set.' },
+  assistant_budget_exhausted: {
+    status: 429,
+    summary:
+      'The model TOKEN budget for this account, or for this gateway, is spent for the current window. Distinct from quota_exceeded, which counts requests: this counts what was actually billed. Retry-After names the wait.',
+  },
   assistant_unconfigured: { status: 503, summary: 'The assistant is not enabled, or its model credential is unset.' },
   assistant_unavailable: { status: 503, summary: 'The model provider could not be reached, or refused the request.' },
   upstream_unavailable: { status: 503, summary: 'A read this endpoint depends on is temporarily unavailable.' },

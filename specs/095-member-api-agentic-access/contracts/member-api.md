@@ -39,7 +39,7 @@ Request pipeline, in this order:
 | 8 | Membership on the reference chain (cached ≈60 s) | `403 membership_required` / **`503 membership_unreadable`** |
 | 9 | Sanctions screen of the token account (fail closed) | `403 sanctioned_signer` / `503 screening_unavailable` |
 | 10 | Scope check | `403 insufficient_scope` |
-| 11 | Quota (per account, then global) | `429 quota_exceeded` + `Retry-After` |
+| 11 | Quota (per account, then global) — and, on the assistant, its own tighter class and its token budget | `429 quota_exceeded` · `429 assistant_budget_exhausted`, both with `Retry-After` |
 
 > **Stages 6 and 8 have a retryable outcome on purpose.** A contract account has no public key, so an
 > ECDSA recovery that does not match the claimed account is *exactly* what a legitimate smart-account
@@ -81,7 +81,8 @@ with a stack.
 | 403 | `membership_required` | definitively no active paid membership on the reference chain |
 | 403 | `sanctioned_signer` | the screening source returned a positive match |
 | 403 | `insufficient_scope` | the token does not carry the scope this operation needs |
-| 429 | `quota_exceeded` | per-account or global allowance exhausted; `Retry-After` is set |
+| 429 | `quota_exceeded` | per-account or global REQUEST allowance exhausted; `Retry-After` is set |
+| 429 | `assistant_budget_exhausted` | the assistant's per-account or gateway-wide **token** budget is spent for the window; `Retry-After` is set. Distinct from `quota_exceeded` because it counts what was billed rather than how often you asked — and it is never served as a shortened reply |
 | 503 | `auth_unverifiable` | the ERC-1271 leg could not run (chain read failed). **Retry.** |
 | 503 | `membership_unreadable` | the reference-chain membership read failed. **Retry.** |
 | 503 | `screening_unavailable` | the sanctions source could not answer (fail closed) |
@@ -111,8 +112,18 @@ allow-list untouched, and the `X-Origin-Auth` edge lock unchanged.
   pinned for a minute.
 - Quotas use the gateway's existing sliding-window helper, keyed on the **verified token account**
   (lowercased) and then globally. Deliberately **not** the caller IP: `trust proxy` is unset and nginx
-  fronts the container, so an IP key would pool every member into one bucket. Assistant turns are
-  counted in the same allowance as reads.
+  fronts the container, so an IP key would pool every member into one bucket.
+- **There are four windows, and the separation is the control.** The two routes that carry no bearer
+  token can only key on `ip:<req.ip>` — which, `trust proxy` being unset, is one key for every
+  anonymous caller. So they draw from a window of their own (`MEMBER_API_PUBLIC_QUOTA`), never the
+  members'; sharing an instance also shared its **global** counter, and a flood of unauthenticated
+  requests answered `429 quota_exceeded` to every authenticated member on every route of the module.
+  `POST /keys/revoke` then draws from a window of its own again (`MEMBER_API_REVOKE_QUOTA`): a member
+  withdraws a key exactly when it is loose, so its budget must be unspendable by anything else. It is
+  **budgeted, not exempt** — the handler does an ECDSA recovery and possibly an ERC-1271 chain call
+  per request, so an unmetered version would be its own amplifier. A `0` on either fails the boot.
+- Assistant turns are counted in a **tighter class of their own**, and are additionally bounded by a
+  **token budget** rather than a request count (see the assistant section).
 - The audit line for any member-API event carries the account, the key id, the scope used, the outcome
   and counts. It **never** carries a token, a signature, a grant, or assistant message content. The
   audit logger's forbidden-key set is a backstop, not a licence to pass one.
@@ -407,7 +418,9 @@ uncredentialed ⇒ `503 assistant_unconfigured`.
 | Bounds | ≤ 20 messages, each ≤ 4 000 characters; over either ⇒ `400 bad_request` |
 | Roles | `user` \| `assistant` only |
 | Upstream | the model provider's messages API, via bounded `fetch` + `AbortController`; failure or timeout ⇒ `503 assistant_unavailable` |
-| Quota | the module's per-account and global allowance, same as the reads. A turn costs an upstream model call, so a separate, tighter assistant allowance is a reasonable follow-up — but it is not shipped, and this document does not claim one |
+| Quota | a separate, tighter assistant class (`ASSISTANT_QUOTA_PER_ACCOUNT` / `_GLOBAL`, defaults 20/60 per window) **in addition to** the module's general allowance — a read and a model call are not the same permission |
+| Spend | a per-account and gateway-wide **token** budget (`ASSISTANT_TOKEN_BUDGET_*`), because a request count bounds traffic and not money. A turn reserves its worst case (estimated input + `ASSISTANT_MAX_TOKENS`) before the upstream call and settles to the measured usage afterwards, so turns already in flight cannot overshoot. Exhausted ⇒ `429 assistant_budget_exhausted`. A turn the provider reported no counts for keeps its full reservation — an unknown cost is never a zero cost |
+| Per-turn ceiling | `ASSISTANT_MAX_TOKENS`, **hard-capped at 4096 in code**; a higher value fails the boot by name. It is the only bound on what one request can cost, so it is not left to an env file |
 | **Logging** | **message content is never logged, never audited, never cached.** The audit line carries the account, message **count** and outcome only |
 
 The system prompt is **server-side** and describes the platform's surfaces plus the standing safety

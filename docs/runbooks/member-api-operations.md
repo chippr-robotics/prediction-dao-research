@@ -70,6 +70,10 @@ Set the module's environment on the gateway and restart the unit.
 | `MEMBER_API_KILLSWITCH` | `false` | leave `false` | Module-scoped stop. See 3.4. |
 | `MEMBER_API_MAX_TTL_DAYS` | `90` | leave, or lower | Ceiling on a grant's lifetime. Lowering it invalidates longer grants **immediately**. |
 | `MEMBER_API_SUBGRAPH_<chainId>` | unset | a subgraph URL per enabled chain | Unset is honest: that chain reports `not-configured`. |
+| `MEMBER_API_QUOTA_PER_ACCOUNT` | `120` | leave | Requests/min for one authenticated account, keyed by the account behind a verified signature. |
+| `MEMBER_API_QUOTA_GLOBAL` | `600` | leave | Requests/min across all authenticated callers. |
+| `MEMBER_API_PUBLIC_QUOTA` | `240` | leave | Requests/min for the **unauthenticated** routes, in a window of their own. `0` fails the boot. See 3.1.1. |
+| `MEMBER_API_REVOKE_QUOTA` | `60` | leave | Requests/min for `POST /v1/member/keys/revoke` **alone**. `0` fails the boot. See 3.1.1. |
 
 Do this in order — and note the pinned image comes FIRST, because the live pin may predate the
 module entirely (the compose file's own perps history is the cautionary tale: a flag with no code
@@ -118,6 +122,39 @@ grant's own `issuedAt`/`expiresAt`, so dropping 90 → 30 rejects every outstand
 the next call with `401 token_ttl_exceeded`. That is a legitimate blunt control in an incident
 (3.6), and a surprise outage if you do it casually.
 
+#### 3.1.1 Why there are four request quotas and not one
+
+`/v1/member/*` is **not** behind `express-rate-limit` — that middleware sits on `/healthz`,
+`/status` and `POST /v1/intents`. The module's whole limiter is the in-process sliding window in
+`src/policy/quotas.js`, and it runs as **four separate instances** because they make four different
+promises:
+
+| Instance | Keyed by | Covers |
+|---|---|---|
+| `MEMBER_API_QUOTA_*` | the account recovered from the token signature | every authenticated route |
+| `MEMBER_API_PUBLIC_QUOTA` | `ip:<req.ip>` | `GET /v1/member/openapi.json`, and the x402 `402` challenge |
+| `MEMBER_API_REVOKE_QUOTA` | `ip:<req.ip>` | `POST /v1/member/keys/revoke`, and nothing else |
+| `ASSISTANT_QUOTA_*` | the account | `POST /v1/member/assistant/chat` (see 3.2) |
+
+The separation is the control, and merging any two of them re-creates a real denial of service:
+
+- **`trust proxy` is deliberately unset** on this gateway, and nginx fronts the container, so
+  `req.ip` is the proxy for every caller. Every unauthenticated request is therefore ONE key as far
+  as any counter can tell. **Do not "fix" that by setting `trust proxy`** — it would re-key every
+  IP-scoped quota across this estate, not just this module.
+- While that one anonymous key drew on the authenticated instance it also drew on its **global**
+  counter: roughly 600 unauthenticated requests a minute answered `429 quota_exceeded` to every
+  member, on every route of the module — **including key revocation.**
+- Revocation therefore has a window of its own again. A member reaches for it exactly when their
+  key is loose, which is also when whoever holds that key may be hammering the gateway. It is
+  **budgeted, not exempt**: the handler does an ECDSA recovery and, for a smart account, an
+  ERC-1271 chain call per request, so an unmetered version would be an amplifier pointed at our own
+  RPC. What matters is that nothing else can spend from it.
+
+A `0` on either new variable **fails the boot by name** rather than silently refusing every request
+on that route. If you need to stop the module, use the killswitch (3.4) — that answers an honest
+`503`, where an unreachable quota would answer a `429` nobody can clear.
+
 ### 3.2 Enable the assistant
 
 The assistant is a **sub-config of the Member API module**. It cannot answer while
@@ -128,7 +165,38 @@ The assistant is a **sub-config of the Member API module**. It cannot answer whi
 | `ASSISTANT_ENABLED` | `false` | Off ⇒ `503 assistant_unconfigured`. |
 | `ANTHROPIC_API_KEY` | — | **SECRET.** Missing ⇒ `503 assistant_unconfigured`. |
 | `ASSISTANT_MODEL` | `claude-sonnet-5` | Public config. |
-| `ASSISTANT_MAX_TOKENS` | `1024` | Public config. |
+| `ASSISTANT_MAX_TOKENS` | `1024` | Output ceiling per turn. **Hard-capped at 4096 in code** — a higher value fails the boot. |
+| `ASSISTANT_QUOTA_PER_ACCOUNT` | `20` | Model **calls**/min per account. Tighter than the module's `120` reads on purpose. |
+| `ASSISTANT_QUOTA_GLOBAL` | `60` | Model calls/min across the gateway. |
+| `ASSISTANT_TOKEN_BUDGET_PER_ACCOUNT` | `200000` | Model **tokens** per account per window. The ceiling on money. |
+| `ASSISTANT_TOKEN_BUDGET_GLOBAL` | `2000000` | Model tokens per window across the gateway. |
+| `ASSISTANT_TOKEN_BUDGET_WINDOW_MS` | `3600000` | The token-budget window (1 h). Separate from the request-quota window. |
+
+#### The spend ceilings, and why a request count is not one
+
+Two turns inside the same minute can differ by orders of magnitude in what they cost, so a request
+quota bounds **traffic**, never **money**. Read these three facts before changing any number above:
+
+1. **The token budget is the actual ceiling.** A turn reserves its worst case
+   (estimated input + `ASSISTANT_MAX_TOKENS`) before the provider is called, and settles the
+   reservation down to the measured usage when the answer arrives — so turns already in flight
+   cannot overshoot the budget between them. Exhausted answers **`429 assistant_budget_exhausted`**
+   with `Retry-After`: a distinct code from `quota_exceeded`, because an agent should back off on a
+   different timescale. It is **never** served as a shortened reply.
+2. **An unknown cost is never a zero cost.** A provider answer carrying no usage counts keeps its
+   full reservation, and a turn that failed after the request was sent is not credited back —
+   otherwise a retry loop against a failing provider would be free, which is precisely the spend
+   these controls exist to bound.
+3. **`ASSISTANT_MAX_TOKENS` is capped in code, not in the env file.** `ASSISTANT_MAX_TOKENS=1000000`
+   is a typo that reads exactly like the correct value and multiplies the cost of every turn; boot
+   refuses anything above 4096 by name. Boot also refuses a per-account budget below one maximal
+   turn (it would be a size limit wearing a budget's name — a member would be refused for asking a
+   long question rather than for spending their budget) and a gateway budget below a member's.
+
+**Sizing them.** The defaults hold one member to ~200k tokens/hour and the gateway to ~2M — roughly
+$3/hr and $30/hr respectively at Sonnet-5 rates if every token were output, and well under that in
+practice. Raise them only with a figure in mind; they are the difference between a bad hour and a
+bad invoice. Before these existed, the only control over model spend was `ASSISTANT_ENABLED=false`.
 
 **Deliver `ANTHROPIC_API_KEY` through Secret Manager and `fetch-secrets.sh`. Never put it in
 `docker-compose.yml`, a build arg, a Terraform variable, or a `VITE_` variable.**
@@ -229,7 +297,8 @@ Two switches exist. Choose by blast radius.
 |---|---|---|
 | `MEMBER_API_KILLSWITCH=true` | This module answers `503 member_api_killed`. Everything else on the gateway keeps working. | Abuse, quota exhaustion, or a defect confined to this module. |
 | The gateway-wide killswitch | Every module answers `503 killswitch_active`. | A gateway-wide incident. Do not reach for this to stop the Member API. |
-| `ASSISTANT_ENABLED=false` | The assistant answers `503 assistant_unconfigured`; reads keep working. | Model-provider incident, runaway spend, or bad model behaviour. |
+| `ASSISTANT_ENABLED=false` | The assistant answers `503 assistant_unconfigured`; reads keep working. | Model-provider incident or bad model behaviour. **For runaway spend, reach for the budget first** — it is the narrower control. |
+| Lower `ASSISTANT_TOKEN_BUDGET_*` | Members who have already spent the new figure answer `429 assistant_budget_exhausted`; everyone else is unaffected, and the assistant stays up. | Runaway model spend. Narrower than the kill above — prefer it. |
 | `X402_KILLSWITCH=true` | The offer is withdrawn: priced routes refuse exactly as unpriced ones do, and no payment is taken or settled. Member-authenticated traffic is untouched. | Anything wrong with the paid rail. |
 | `X402_ENABLED=false` | The paid rail ceases to exist; the member API is spec 095 exactly. | A deliberate withdrawal of the offering, not an incident stop. |
 
@@ -277,9 +346,12 @@ Therefore:
 | Widespread `503 membership_unreadable` | Same RPC failure on the membership read | Same. A tier that cannot be read is not tier 0. |
 | Widespread `403 sanctioned_signer` | Screening source misconfigured or answering wrongly | Screening fails closed by design. Investigate the source; do not bypass. |
 | Sustained `429` from one account | One member's agent is hot-looping | Confirm from quota counters; contact the member. Kill the module (3.4) only if the gateway is degraded. |
+| `429 quota_exceeded` on **every** member at once | Something is flooding the module | Check whether it is authenticated. Unauthenticated traffic draws on its own window (3.1.1) and **cannot** cause this — if members are being refused, the flood is holding valid tokens. Revocation keeps working throughout by design; confirm it does. |
+| `429 quota_exceeded` on `/openapi.json` while members are fine | The public window is doing its job | Not an outage. Raise `MEMBER_API_PUBLIC_QUOTA` only if a legitimate client needs it — the document is cached, so a client re-fetching it in a loop is the more likely cause. |
+| `429 assistant_budget_exhausted` | The **token** budget is spent for that account, or for the gateway | Distinct from `quota_exceeded`: this counts what was billed, not requests. The reason names which ceiling bit. Raise `ASSISTANT_TOKEN_BUDGET_*` only with a cost figure in mind (3.2); the assistant is working as designed. |
 | Assistant returns `503 assistant_unavailable` | Model provider unreachable, timing out, or refusing the key | Check the provider's status; verify the key reached the container (4.2). The SPA shows an honest unreachable state meanwhile. |
 | Assistant returns `503 assistant_unconfigured` after a rotation | New secret version added but the unit was not restarted | Restart the unit. Secrets are read at boot. |
-| Model spend spiking | Abuse or a client retry loop | Set `ASSISTANT_ENABLED=false`, restart, then investigate. Reads stay up. |
+| Model spend spiking | Abuse or a client retry loop | The token budget bounds it already (3.2). To tighten fast, lower `ASSISTANT_TOKEN_BUDGET_PER_ACCOUNT`/`_GLOBAL` and restart — heavy accounts refuse, everyone else keeps working. `ASSISTANT_ENABLED=false` is the blunt fallback. |
 | A revoked key works again | The gateway restarted and forgot the in-process set | Expected. Re-submit the revocation (3.5). |
 | A chain reports `not-configured` in `/wagers` | `MEMBER_API_SUBGRAPH_<chainId>` unset | This is honest, not an outage. Set the URL only if that chain should be readable. |
 | The MCP service is unreachable | Cloud Run revision failing, or `FAIRWINS_API_URL` wrong | Check `GET /healthz` on the service, then its `FAIRWINS_API_URL`. It holds no secret — never look for one. |
@@ -429,7 +501,17 @@ that would say "we never offered this" about a surface that is simply down.
 
 **The assistant answers slowly, then fails.** The proxy uses an `AbortController` timeout; a
 timeout surfaces as `503 assistant_unavailable`. Check provider latency before changing
-`ASSISTANT_MAX_TOKENS`.
+`ASSISTANT_MAX_TOKENS` — and note a failed turn keeps its budget reservation on purpose (3.2), so a
+provider outage does consume a member's budget. That is the correct trade: the alternative makes a
+retry loop against a failing provider free.
+
+**The gateway will not boot after touching a quota or the assistant.** Read the error — every one of
+these validations names the variable and its value. `MEMBER_API_PUBLIC_QUOTA=0` and
+`MEMBER_API_REVOKE_QUOTA=0` are refused (they would deny every unauthenticated request, and every
+key revocation, with a `429` nobody can clear); `ASSISTANT_MAX_TOKENS` above 4096 is refused; a token
+budget below one maximal turn, or a gateway budget below a member's, are refused. None of it is
+evaluated while the module (or the assistant) is switched off, so an unconfigured optional block can
+never take the gateway down.
 
 **You cannot find an API-key table, dump, or backup.** There is none. Issuance is a member
 signature; the gateway holds nothing. If a procedure seems to require reading a member's key, the

@@ -33,7 +33,7 @@ import { x402Status } from '../x402/paywall.js'
 import { ERROR_CODES, ROUTES, SCOPES, routeOf } from './contract.js'
 import { verifyRevocation } from './auth.js'
 import { buildIntent } from './intents.js'
-import { parseChatRequest } from './assistant.js'
+import { estimateTurnTokens, parseChatRequest } from './assistant.js'
 import { buildOpenApiDocument } from './openapi.js'
 
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/
@@ -48,7 +48,11 @@ const MAX_PAGE = 200
  *   wagerReader: {read: Function},
  *   assistant: {chat: Function, configured: boolean},
  *   providers: Record<number, object>,
- *   quotas: {hit: Function},
+ *   quotas: {hit: Function},              // authenticated traffic, keyed by the recovered account
+ *   publicQuotas: {hit: Function},        // unauthenticated traffic — its OWN window (see guardPublic)
+ *   revokeQuotas: {hit: Function},        // POST /keys/revoke alone — its OWN window again
+ *   assistantQuotas: {hit: Function},     // model CALLS, a tighter class than the general reads
+ *   assistantBudget: {reserve: Function}, // model TOKENS — the ceiling on money rather than traffic
  *   killSwitch: {isActive: () => boolean},
  *   paywall: {offers: Function, settleOrChallenge: Function},   // spec 096; see guard() below
  *   feeRates?: object|null,
@@ -68,6 +72,10 @@ export function createMemberApiRouter(config, {
   assistant,
   providers,
   quotas,
+  publicQuotas,
+  revokeQuotas,
+  assistantQuotas,
+  assistantBudget,
   killSwitch,
   paywall,
   feeRates = null,
@@ -76,6 +84,23 @@ export function createMemberApiRouter(config, {
 }) {
   const memberApi = config.memberApi
   const router = express.Router()
+
+  // The separate windows are not optional plumbing — a missing one would silently reunite the
+  // buckets this module exists to keep apart (and a missing budget would remove the only ceiling on
+  // model spend), so it fails the BOOT rather than a member's request. Same reasoning as the
+  // paywall check below.
+  for (const [name, dep] of [
+    ['publicQuotas', publicQuotas],
+    ['revokeQuotas', revokeQuotas],
+    ['assistantQuotas', assistantQuotas],
+  ]) {
+    if (!dep || typeof dep.hit !== 'function') {
+      throw new Error(`[relay-gateway] member API requires a \`${name}\` quota instance of its own (see src/policy/quotas.js)`)
+    }
+  }
+  if (!assistantBudget || typeof assistantBudget.reserve !== 'function') {
+    throw new Error('[relay-gateway] member API requires an `assistantBudget` (see createTokenBudget in src/policy/quotas.js)')
+  }
 
   // The paid rail's seam is required even when x402 is switched off — off means `offers()` answers
   // false, which is a decision this module must be able to ASK for. A missing dep would surface as a
@@ -112,13 +137,23 @@ export function createMemberApiRouter(config, {
   }
 
   /**
-   * Unauthenticated guard, for the routes that carry no bearer token. Quotas here are keyed per
-   * caller IP — the only key available before a signature is verified — with the caveat that
-   * `req.ip` is the proxy on the VM deployment, so the GLOBAL window is the real bound.
+   * Unauthenticated guard, for the two routes that carry no bearer token.
+   *
+   * THE BUCKET IS AN ARGUMENT, AND THAT IS THE WHOLE FIX. Quotas here can only key on caller IP —
+   * there is no signature to recover an identity from yet — and `req.ip` is the nginx proxy on the
+   * VM deployment, because `trust proxy` is deliberately unset (setting it would re-key every
+   * IP-scoped quota across this estate, which is a far larger change than this problem warrants).
+   * So every anonymous caller shares one key, and that key must therefore draw from a window that
+   * is ITS OWN. It previously drew from the same instance as the members' — which meant the global
+   * counter was shared, and roughly 600 unauthenticated requests a minute would answer 429
+   * `quota_exceeded` to every authenticated member on every route of this module.
+   *
+   * @param {import('express').Request} req
+   * @param {{hit: Function}} bucket the window this route draws from — never the authenticated one
    */
-  function guardPublic(req) {
+  function guardPublic(req, bucket) {
     requireLive()
-    const q = quotas.hit(`ip:${req.ip ?? 'unknown'}`)
+    const q = bucket.hit(`ip:${req.ip ?? 'unknown'}`)
     if (!q.allowed) {
       throw new GatewayError(429, 'quota_exceeded', `${q.scope} member API quota exceeded`, { retryAfterSec: q.retryAfterSec })
     }
@@ -239,7 +274,7 @@ export function createMemberApiRouter(config, {
   // 503 rather than a bare 404.
   mount('openapi', (req, res) => {
     try {
-      guardPublic(req)
+      guardPublic(req, publicQuotas)
       res.json(openApi())
     } catch (err) {
       handleError(res, err)
@@ -272,9 +307,20 @@ export function createMemberApiRouter(config, {
   // got out, so demanding it would make the endpoint useless exactly when it is needed. A valid
   // ApiKeyRevocation signature by the named account is the whole authorisation, and the worst a
   // forged attempt can do is fail verification.
+  //
+  // AND IT DRAWS FROM A WINDOW OF ITS OWN, which nothing else can spend. This is the endpoint a
+  // member reaches for while their key is loose — which is also, in the case that matters, exactly
+  // when this module is being flooded. Sharing a budget with the OpenAPI document would mean an
+  // attacker who leaked a token could then deny its withdrawal with unauthenticated GETs.
+  //
+  // A BUDGET, NOT AN EXEMPTION. Removing the limit here would trade one denial for another: this
+  // handler does an ECDSA recovery and, for a contract account, an ERC-1271 chain call on every
+  // request, so an unmetered version is an amplifier pointed at our own RPC. What matters is not
+  // that revocation is unlimited but that its budget is UNSHARED — no volume of other traffic, on
+  // this module or anywhere else on the gateway, can consume it.
   mount('revoke', async (req, res) => {
     try {
-      guardPublic(req)
+      guardPublic(req, revokeQuotas)
       const provider = providers?.[auth.referenceChainId] ?? null
       const { account, keyId, revokedAt } = await verifyRevocation({
         provider,
@@ -428,11 +474,80 @@ export function createMemberApiRouter(config, {
   })
 
   // ---- POST /v1/member/assistant/chat ----------------------------------------------------------
+  // THE ONLY ROUTE ON THIS MODULE THAT SPENDS MONEY PER REQUEST, and therefore the only one with a
+  // ceiling denominated in something other than requests. Three controls sit in front of the
+  // provider, in ascending cost of being wrong:
+  //   1. the module's general quota (inside `guard`) — traffic;
+  //   2. `assistantQuotas` — a TIGHTER request class, because 120 reads/min and 120 model calls/min
+  //      are not the same permission even though they were once the same number;
+  //   3. `assistantBudget` — TOKENS, which is the thing actually billed. A request count is a poor
+  //      proxy for spend: two turns inside one window can differ by orders of magnitude.
+  // Before this existed the counts below were logged and nothing read them, so the only ceiling was
+  // `ASSISTANT_ENABLED=false` — a full kill as the first available response to overspend.
   mount('assistantChat', async (req, res) => {
     try {
       const token = await guard(req, res, SCOPES.assistantChat, 'assistantChat')
       const { messages, surface } = parseChatRequest(req.body ?? {})
+      // Scoped to the try on purpose: a turn that throws is deliberately NOT settled, so there is no
+      // handle for a catch block to reach for.
+      let reservation = null
+
+      // Keyed by the account on either rail: a member's token account, or (spec 096) the payer a
+      // settled payment names. Neither may be an unattributed caller — this costs real money.
+      const q = assistantQuotas.hit(token.account)
+      if (!q.allowed) {
+        throw new GatewayError(429, 'quota_exceeded', `${q.scope} assistant quota exceeded; retry shortly`, {
+          retryAfterSec: q.retryAfterSec,
+        })
+      }
+
+      // The budget is reserved only once we know a call is genuinely about to be made. An assistant
+      // that is switched off or has no credential costs nothing, and must not consume a member's
+      // budget to tell them so.
+      if (assistant.configured) {
+        const worstCase = estimateTurnTokens({ messages, surface, maxTokens: memberApi.assistant.maxTokens })
+        const r = assistantBudget.reserve(token.account, worstCase)
+        if (!r.allowed) {
+          // REFUSED, NAMED, AND NEVER SHORTENED. The tempting failure here is to trim `max_tokens`
+          // to whatever headroom is left and answer anyway — which delivers a truncated reply that
+          // reads as the assistant's own judgement about how much to say. An exhausted budget is an
+          // operational fact and is reported as one, with its own code so an agent can tell it from
+          // an ordinary rate limit and back off on the right timescale.
+          audit({
+            account: token.account,
+            keyId: token.keyId,
+            action: 'member_api_assistant_chat',
+            messageCount: messages.length,
+            budgetScope: r.scope,
+            spentTokens: r.spentTokens,
+            budgetTokens: r.budgetTokens,
+            outcome: 'budget_exhausted',
+          })
+          throw new GatewayError(
+            429,
+            'assistant_budget_exhausted',
+            r.scope === 'account'
+              ? 'the assistant token budget for this account is spent for now; it refills as the window rolls forward'
+              : 'the gateway’s assistant token budget is spent for now; try again shortly',
+            { retryAfterSec: r.retryAfterSec }
+          )
+        }
+        reservation = r
+      }
+
       const result = await assistant.chat({ messages, surface })
+
+      // Settle the reservation down to what was actually billed. Absent counts stay ABSENT — the
+      // reservation stands rather than collapsing to zero, because "the provider told us nothing"
+      // is not "the provider charged us nothing". A turn that THREW is likewise never settled: the
+      // request had already been sent, so crediting it back would make a retry loop against a
+      // failing provider free, which is exactly the spend this control exists to bound.
+      const spent =
+        result.usage.inputTokens == null && result.usage.outputTokens == null
+          ? null
+          : (result.usage.inputTokens ?? 0) + (result.usage.outputTokens ?? 0)
+      reservation?.settle(spent)
+
       // COUNTS ONLY. Not one character of the conversation reaches the log — on this path or any
       // other. Adding a content key to audit/log.js's FORBIDDEN_KEYS would not substitute for that.
       audit({
