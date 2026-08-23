@@ -89,10 +89,13 @@ describe('Wallet Connection', () => {
   // ---------------------------------------------------------------------------
   // WAL-03: Display wallet balances — verify USDC shown in dropdown
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): asserts `.account-details` is visible, but WalletButton renders it
-  // behind `{isOpen && ...}` — the balances only exist once the dropdown is opened.
-  // Decide whether the balance belongs on the collapsed button before asserting it.
-  it.skip('[WAL-03] Display wallet balances', () => {
+  /*
+   * Un-skipped (#1019). The recorded reason described the app correctly — WalletButton renders
+   * `.account-details` behind `{isOpen && ...}` — but not this test, which has always opened the
+   * dropdown before asserting. Whether the balance ALSO belongs on the collapsed button is a
+   * design question and stays open; it is not one this test was ever blocked on.
+   */
+  it('[WAL-03] Display wallet balances', () => {
     cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0] })
     cy.visit('/fairwins')
     cy.get('body').should('be.visible')
