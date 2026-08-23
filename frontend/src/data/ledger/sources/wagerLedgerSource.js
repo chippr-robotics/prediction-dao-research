@@ -96,6 +96,9 @@ async function loadAllWagers(repository, account) {
 export function createWagerLedgerSource(deps = {}) {
   return {
     class: LEDGER_CLASS.WAGER,
+    // Crosses the network (subgraph/RPC), so a rejection here IS evidence the
+    // chain could not be read (#1280).
+    backing: 'network',
     async list({ account, chainId, provider }) {
       // A chain with no escrow deployed has no FairWins wagers — that is
       // NOT-DEPLOYED, which is a read of nothing, not a failed read (#1280).

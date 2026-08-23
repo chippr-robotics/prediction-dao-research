@@ -94,6 +94,70 @@ describe('ledgerRepository.listEntries', () => {
     expect(readState).toBe('read')
   })
 
+  // The shape of the SHIPPED wiring: six of the nine default sources read the
+  // client record store and cannot fail because a network is down. Counting
+  // rejections across all of them made `unreadable` unreachable in production —
+  // the outage in #1280 would still have produced a confident empty ledger.
+  it('client-store sources answering does NOT mask a total network outage', async () => {
+    const repo = createLedgerRepository({
+      sources: [
+        // network-backed: the whole reason the ledger can speak about a chain
+        { class: 'wager', backing: 'network', list: async () => { throw new Error('rpc 503') } },
+        { class: 'pool', backing: 'network', list: async () => { throw new Error('subgraph refused') } },
+        { class: 'membership', backing: 'network', list: async () => { throw new Error('rpc 503') } },
+        // client-store: localStorage, fulfils regardless of any network
+        { class: 'transfer', backing: 'client', list: async () => [] },
+        { class: 'earn', backing: 'client', list: async () => [] },
+        { class: 'miniapp', backing: 'client', list: async () => [] },
+      ],
+      enrich: passThroughEnrich,
+    })
+    const { entries, readState, staleClasses } = await repo.listEntries(CTX)
+    expect(entries).toEqual([])
+    expect(readState).toBe('unreadable')
+    expect(staleClasses).toEqual(['wager', 'pool', 'membership'])
+  })
+
+  it('records that DID arrive are kept and shown, never discarded as unreadable', async () => {
+    const repo = createLedgerRepository({
+      sources: [
+        { class: 'wager', backing: 'network', list: async () => { throw new Error('rpc 503') } },
+        { ...source('transfer', [preItem({ class: 'transfer', kind: 'send' })]), backing: 'client' },
+      ],
+      enrich: passThroughEnrich,
+    })
+    const { entries, readState, staleClasses } = await repo.listEntries(CTX)
+    // The member's own stored record is data, not noise: `unreadable` is
+    // reserved for an entry list that carries no information at all, because
+    // the estate merge drops an unreachable chain's entries entirely.
+    expect(entries).toHaveLength(1)
+    expect(readState).toBe('read')
+    expect(staleClasses).toEqual(['wager'])
+  })
+
+  it('a source that is NOT deployed on the chain has read nothing, not failed', async () => {
+    const repo = createLedgerRepository({
+      // What Ethereum looks like: no FairWins escrow, so the network sources
+      // return [] rather than rejecting. An empty result there is the truth.
+      sources: [
+        { class: 'wager', backing: 'network', list: async () => [] },
+        { class: 'transfer', backing: 'client', list: async () => [] },
+      ],
+      enrich: passThroughEnrich,
+    })
+    const { readState, staleClasses } = await repo.listEntries(CTX)
+    expect(readState).toBe('read')
+    expect(staleClasses).toEqual([])
+  })
+
+  it('an unclassified source counts as network-backed (the conservative reading)', async () => {
+    const repo = createLedgerRepository({
+      sources: [{ class: 'wager', list: async () => { throw new Error('rpc 503') } }],
+      enrich: passThroughEnrich,
+    })
+    expect((await repo.listEntries(CTX)).readState).toBe('unreadable')
+  })
+
   it('dedups the same underlying event across sources (oc beats dv)', async () => {
     const dedupKey = 'wager:7:deposit'
     const repo = createLedgerRepository({

@@ -156,20 +156,40 @@ wires the default repository and providers). The full contract is
   stale", and a broken subgraph is not "Polygon unreachable".
 - **Empty ≠ failed.** A chain that read fine and found nothing is `read` with `entryCount: 0`;
   gate "no activity" language on state, never on count.
-- **A chain whose sources ALL failed is `unreachable`, not an empty read (#1280).** The
-  repository degrades per source rather than throwing, so a total outage used to arrive at the
+- **A chain whose NETWORK-backed sources all failed is `unreachable`, not an empty read (#1280).**
+  The repository degrades per source rather than throwing, so a total outage used to arrive at the
   merge as an ordinary empty list — indistinguishable from a member with no history, which meant
   `allUnreachable` (and its honest disclosure) could never fire. `listEntries` now returns a
-  three-state `readState` (`read` / `unreadable`) and the merge maps `unreadable` to
-  `unreachable`. A source failing because its contract is **not deployed** on that chain is not a
-  failed read — `wagerLedgerSource` checks the escrow address first, or every un-deployed chain
-  would report the wager class stale forever.
-- **Freshness is a claim about what was READ.** `useAccountStats` only stamps
+  `readState` (`read` / `unreadable`) and the merge maps `unreadable` to `unreachable`.
+  **Reachability is counted over network-backed sources only.** Six of the nine default sources
+  (`transfer`, `earn`, `staking`, `bridge`, `liquidity`, `miniapp`) read the client record store
+  and fulfil whether or not any network is up; counting rejections across all nine looked right
+  and was useless, because `failedSources === sources.length` could never be true on the shipped
+  wiring. Sources declare `backing: 'network' | 'client'` (omitted ⇒ `network`, the conservative
+  reading) and only the network-backed ones can testify that a chain went unread. `unreadable`
+  additionally requires that **nothing at all was collected** — records that did arrive are the
+  member's own data and are shown with their failed classes disclosed, never discarded, because
+  the merge drops an unreachable chain's entries entirely.
+- **Not-deployed is a read of nothing, not a failed read.** A source returning `[]` because its
+  contract does not exist on that chain has fulfilled — `wagerLedgerSource` checks the escrow
+  address first, or every un-deployed chain would report the wager class stale forever. The
+  consequence is worth stating plainly: on a mainnet build only Polygon carries FairWins
+  contracts, so under a total RPC outage Polygon goes `unreachable` while Ethereum/Optimism/
+  Base/Arbitrum stay `read` with zero entries — which is true, there is nothing on them to read.
+  `allUnreachable` (FR-009, "None of your networks could be read") therefore fires only where
+  every cohort chain has something to read, e.g. a single-chain testnet cohort. The mainnet
+  outage is disclosed by the **partial** path instead: the unreadable chain is named in
+  `partialChains`, and `MyAccountView` refuses to call the empty feed "No activity yet".
+- **Freshness is a claim about what was READ.** `useAccountStats` stamps
   `{ lastUpdated: now, status: 'fresh' }` on the ledger-derived sections (summary/series/activity)
-  when the whole estate answered; with a chain or a class unread they stay `stale` on their
-  previous `lastUpdated`. "Updated 50s ago" beside a panel that just disclosed a failed read is
-  the same fabrication as an empty history. The wallet-balance section is unaffected — it reads
-  the connected wallet on its active chain, not the estate.
+  only when the whole estate answered; with a chain or a class unread they get
+  `{ lastUpdated: now, status: 'partial' }` and the indicator reads "Partly updated Ns ago — some
+  sources unread". "Updated 50s ago" beside a panel that just disclosed a failed read is the same
+  fabrication as an empty history — but so is `stale`/"showing last known" over entries that were
+  in fact just fetched, and over a first load with no last-known data at all. `partial` is a
+  fourth status for that reason, and it is not sticky: the next complete read is `fresh` again.
+  The wallet-balance section is unaffected — it reads the connected wallet on its active chain,
+  not the estate.
 - Dedup is by `entryId` (identity embeds chainId), which also collapses reference-chain sources
   (membership) answering from several scopes.
 - Wager lookups downstream are keyed `(chainId, wagerId)` — wager #12 exists independently on

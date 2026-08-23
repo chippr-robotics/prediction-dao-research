@@ -260,16 +260,18 @@ describe('MyAccountView — unified account experience (spec 074)', () => {
       isEmpty: true,
       partialChains: ['Ethereum'],
       freshness: {
-        summary: { lastUpdated: Date.now(), status: 'stale' },
-        activity: { lastUpdated: Date.now(), status: 'stale' },
+        summary: { lastUpdated: Date.now(), status: 'partial' },
+        activity: { lastUpdated: Date.now(), status: 'partial' },
       },
     }))
     renderView('/wallet?tab=account&view=activity')
     expect(screen.queryByText(/no activity yet/i)).not.toBeInTheDocument()
     expect(screen.getByText(/some of your activity could not be read/i)).toBeInTheDocument()
-    expect(screen.getByText(/could not be read: ethereum/i)).toBeInTheDocument()
-    // …and the freshness line does not claim a recent update for it.
-    expect(screen.getByText(/stale — showing last known/i)).toBeInTheDocument()
+    // A network name is marked as one — never run into the same comma list as
+    // a class label like "wager on Polygon".
+    expect(screen.getByText(/could not be read: ethereum \(entire network\)/i)).toBeInTheDocument()
+    // …and the freshness line does not claim a complete update for it.
+    expect(screen.getByText(/partly updated .* some sources unread/i)).toBeInTheDocument()
     expect(screen.queryByText(/^Updated /)).not.toBeInTheDocument()
   })
 

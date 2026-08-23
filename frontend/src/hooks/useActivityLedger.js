@@ -70,9 +70,10 @@ export function useActivityLedger({ filter, period, pollMs = POLL_MS } = {}) {
 
   return {
     entries: state.entries,
-    // Three-state read (#1280): `unreadable` means every source failed, so the
-    // empty entry list above is silence, not an empty history. Consumers must
-    // never render it as "nothing here yet". `null` = not read yet.
+    // The read verdict (#1280): `unreadable` means every network-backed source
+    // failed and nothing was collected, so the empty entry list above is
+    // silence, not an empty history. Consumers must never render it as
+    // "nothing here yet". `null` = not read yet.
     readState: state.readState ?? null,
     staleClasses: state.staleClasses,
     prunedBefore: state.prunedBefore,

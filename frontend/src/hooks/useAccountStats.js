@@ -255,19 +255,26 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE, accountAd
       const fresh = { lastUpdated: now, status: 'fresh' }
       // #1280: freshness is a claim about what was READ, not about when the
       // load finished. A partially-unread estate — a chain that did not answer,
-      // or a class that could not be refreshed — leaves the ledger-derived
-      // sections on last-known data, so they stay `stale` and keep their
-      // previous `lastUpdated` rather than asserting "Updated 0s ago" beside a
-      // panel that just disclosed a failed read. The balances tile reads the
-      // connected wallet on its active chain, so it is unaffected by the
-      // estate's history reads.
+      // or a class that could not be refreshed — must not be labelled "Updated
+      // 0s ago" beside a panel that just disclosed a failed read.
+      //
+      // It is `partial`, NOT `stale`: something WAS read just now, and the
+      // entries beside the line are that read. Calling it stale asserts the
+      // opposite — "showing last known" over data fetched seconds ago, and on
+      // a first load over last-known data that does not exist at all. It would
+      // also be sticky: one class unreadable on one chain would mean these
+      // sections could never carry a timestamp again. So keep the timestamp,
+      // and let the status carry the incompleteness. The balances tile reads
+      // the connected wallet on its active chain, so the estate's history
+      // reads do not speak for it.
       const ledgerIncomplete = staleLabels.length > 0 || partialIds.length > 0
-      setFreshness((f) => ({
-        summary: ledgerIncomplete ? { ...f.summary, status: 'stale' } : fresh,
-        series: ledgerIncomplete ? { ...f.series, status: 'stale' } : fresh,
+      const partial = { lastUpdated: now, status: 'partial' }
+      setFreshness({
+        summary: ledgerIncomplete ? partial : fresh,
+        series: ledgerIncomplete ? partial : fresh,
         balances: fresh,
-        activity: ledgerIncomplete ? { ...f.activity, status: 'stale' } : fresh,
-      }))
+        activity: ledgerIncomplete ? partial : fresh,
+      })
     } catch (err) {
       if (reqId !== reqIdRef.current) return
       setError(err?.message || 'Failed to load account stats')

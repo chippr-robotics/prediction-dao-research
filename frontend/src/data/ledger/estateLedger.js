@@ -16,8 +16,9 @@
  *      are reference-chain sources answering from several scopes);
  *   G6 repository ordering over the merged stream;
  *   G7 empty-but-read is `read` with entryCount 0 — genuinely empty, no warning;
- *   G8 empty-but-UNREAD is `unreachable` — a chain whose sources all failed
- *      returns an empty list too, and the two must never render alike (#1280).
+ *   G8 empty-but-UNREAD is `unreachable` — a chain whose network-backed
+ *      sources all failed returns an empty list too, and the two must never
+ *      render alike (#1280).
  *
  * Pure factory: `index.js` wires the default repository + provider resolution
  * (avoiding an import cycle), tests inject everything.
@@ -48,10 +49,13 @@ export function createEstateLedger({ listEntries, readProviderFor, isInCohort, c
         try {
           const res = await listEntries({ account: q.account, chainId, provider })
           if (res.readState === 'unreadable') {
-            // G8 (#1280): every source on this chain failed. The repository
-            // degrades per source rather than throwing, so the failure arrives
-            // as an empty list — which is byte-identical to a chain with no
-            // history. Only one of those is a fact, so this is `unreachable`.
+            // G8 (#1280): nothing that had to cross the network came back, and
+            // nothing at all was collected. The repository degrades per source
+            // rather than throwing, so the failure arrives as an empty list —
+            // byte-identical to a chain with no history. Only one of those is a
+            // fact, so this is `unreachable`. Dropping the (empty) entries here
+            // is safe precisely because the repository reserves `unreadable`
+            // for the case where it collected nothing to drop.
             return { chainId, state: 'unreachable', reason: 'no source on this network could be read' }
           }
           return {

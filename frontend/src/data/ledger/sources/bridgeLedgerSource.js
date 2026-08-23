@@ -364,6 +364,9 @@ export function createBridgeLedgerSource(deps = {}) {
   const readClientRecords = deps.listClientRecords || listClientRecords
   return {
     class: LEDGER_CLASS.BRIDGE,
+    // Reads the local record store only — it cannot fail because a network
+    // is down, so it never testifies that a chain went unread (#1280).
+    backing: 'client',
     async list({ account, chainId }) {
       const origin = evmChainId(chainId)
       return readClientRecords(account, chainId)

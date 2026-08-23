@@ -240,7 +240,7 @@ describe('useAccountStats — freshness never asserts a read that did not happen
     expect(result.current.error).toBe(null)
   })
 
-  it('an unreachable chain leaves the ledger sections stale, not "just updated"', async () => {
+  it('an unreachable chain marks the ledger sections partial, not "just updated"', async () => {
     listEntriesAcrossEstate.mockResolvedValueOnce({
       ...emptyEstate(),
       entries: [],
@@ -252,13 +252,16 @@ describe('useAccountStats — freshness never asserts a read that did not happen
     })
     const { result } = renderHook(() => useAccountStats())
     await waitFor(() => expect(result.current.partialChains).toEqual(['Ethereum']))
-    expect(result.current.freshness.activity.status).toBe('stale')
-    expect(result.current.freshness.summary.status).toBe('stale')
-    // Never stamped with "now" — there is no fresh read to timestamp.
-    expect(result.current.freshness.activity.lastUpdated).toBe(null)
+    expect(result.current.freshness.activity.status).toBe('partial')
+    expect(result.current.freshness.summary.status).toBe('partial')
+    // `partial`, not `fresh`: the indicator must not claim a complete update.
+    expect(result.current.freshness.activity.status).not.toBe('fresh')
+    // …and not `stale` either: a read DID happen, so the timestamp is real and
+    // "showing last known" would be untrue (there is no last-known here).
+    expect(result.current.freshness.activity.lastUpdated).toBeGreaterThan(0)
   })
 
-  it('a class that could not be refreshed leaves the ledger sections stale too', async () => {
+  it('a class that could not be refreshed marks the ledger sections partial too', async () => {
     listEntriesAcrossEstate.mockResolvedValueOnce({
       ...emptyEstate(),
       entries: [],
@@ -268,17 +271,13 @@ describe('useAccountStats — freshness never asserts a read that did not happen
     await waitFor(() =>
       expect(result.current.staleClasses).toEqual(['wager on Polygon', 'transfer on Polygon']),
     )
-    expect(result.current.freshness.activity.status).toBe('stale')
+    expect(result.current.freshness.activity.status).toBe('partial')
     // The wallet-balance tile reads the connected wallet on its active chain;
     // the estate's history reads do not speak for it.
     expect(result.current.freshness.balances.status).toBe('fresh')
   })
 
-  it('keeps a previous lastUpdated instead of bumping it on a partial refresh', async () => {
-    const { result } = renderHook(() => useAccountStats())
-    await waitFor(() => expect(result.current.freshness.activity.status).toBe('fresh'))
-    const firstUpdated = result.current.freshness.activity.lastUpdated
-
+  it('a partial read never sticks: the next complete one is fresh again', async () => {
     listEntriesAcrossEstate.mockResolvedValueOnce({
       ...emptyEstate(),
       chainStates: [
@@ -287,10 +286,13 @@ describe('useAccountStats — freshness never asserts a read that did not happen
       ],
       partialChains: [1],
     })
+    const { result } = renderHook(() => useAccountStats())
+    await waitFor(() => expect(result.current.freshness.activity.status).toBe('partial'))
+
     await act(async () => {
       await result.current.refresh()
     })
-    expect(result.current.freshness.activity.status).toBe('stale')
-    expect(result.current.freshness.activity.lastUpdated).toBe(firstUpdated)
+    await waitFor(() => expect(result.current.freshness.activity.status).toBe('fresh'))
+    expect(result.current.partialChains).toEqual([])
   })
 })
