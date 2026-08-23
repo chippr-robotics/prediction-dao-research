@@ -119,8 +119,32 @@ describe('Accessibility', () => {
   // ---------------------------------------------------------------------------
   // A11Y-04: Modal accessibility (backdrop, Escape, focus trap)
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): modal control is covered at click time; needs the current dialog layout/focus contract.
-  it.skip('[A11Y-04] Modal accessibility (backdrop, Escape, focus trap)', () => {
+  /*
+   * Un-skipped (#1019). The recorded reason — "modal control is covered at click time" — was
+   * right about the symptom and pointed at the wrong control: the dialog opens fine and Escape
+   * closes it. What failed was the BACKDROP CLICK, and only because of where it aimed.
+   *
+   * `.click('topLeft')` on a backdrop that spans the viewport means (0, 0), and the nav drawer's
+   * 64px fixed gutter (z-index 1401) sits exactly there:
+   *
+   *   `<div class="friend-markets-modal-backdrop" …>` is being covered by another element:
+   *   `<div class="app-nav-drawer-header">…`
+   *
+   * That is the app behaving correctly — a fixed gutter overlays the backdrop's top-left corner —
+   * so the fix belongs in the test's aim, not in either component.
+   *
+   * TOP-CENTRE is the point, and it is the only one that works at BOTH viewport profiles.
+   * Measured with elementFromPoint, modal open:
+   *
+   *            (2, 2)          (100, 100)      (w/2, 8)
+   *   1280x720 drawer header   backdrop        backdrop
+   *   390x844  backdrop        .fm-brand       backdrop
+   *
+   * The modal content starts at y=48 at both widths, so the strip above it is backdrop either
+   * way. Corners are worse than they look: the right edge reports null, and bottom-left is the
+   * section icon nav.
+   */
+  it('[A11Y-04] Modal accessibility (backdrop, Escape, focus trap)', () => {
     connectAndVisit()
 
     // Open the create wager modal via quick action.
@@ -146,8 +170,8 @@ describe('Accessibility', () => {
     cy.get('.quick-action-card').contains('Friends Decide (1v1)').click()
     cy.get('[role="dialog"]', { timeout: 5000 }).should('be.visible')
 
-    // Click the backdrop (outside the modal content).
-    cy.get('.friend-markets-modal-backdrop').click('topLeft')
+    // Click the backdrop above the modal content — see the note above for why not a corner.
+    cy.get('.friend-markets-modal-backdrop').click('top')
     cy.get('.friend-markets-modal-backdrop', { timeout: 5000 })
       .should('not.exist')
   })
