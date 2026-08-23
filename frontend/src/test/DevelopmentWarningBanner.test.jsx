@@ -96,7 +96,9 @@ describe('DevelopmentWarningBanner reserved offset', () => {
     stubRectHeight(60)
     render(<DevelopmentWarningBanner />)
 
-    expect(observers[0].targets).toEqual([screen.getByTestId('dev-warning-banner')])
+    expect(observers[0].targets).toHaveLength(1)
+    // Reference check, not deep equality: this must be the banner node itself.
+    expect(observers[0].targets[0]).toBe(screen.getByTestId('dev-warning-banner'))
   })
 
   it('rounds a fractional height up — a sub-pixel shortfall is a sub-pixel overlap', () => {

@@ -1,7 +1,9 @@
 .sidebar-nav {
   position: fixed;
   left: 0;
-  top: 0;
+  /* Below the development banner (issue #1248): the banner paints above this rail
+     and wraps at narrow widths, so a fixed `0` puts the first nav items under it. */
+  top: var(--dev-banner-height, 0px);
   bottom: 0;
   width: 70px; /* Default to collapsed (icon-only) */
   background: var(--bg-light);

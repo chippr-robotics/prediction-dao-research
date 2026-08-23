@@ -25,12 +25,17 @@ function observedHeight(element, entry) {
  * Dismissible warning banner displayed at the top of the site
  * to inform users that the site is under active development.
  *
- * The banner is `position: fixed`, so everything beneath it (the header, and the controls the
- * header carries) is pushed down by the `--dev-banner-height` custom property it publishes on
- * <html>. That offset is MEASURED, never assumed: this copy wraps to one line on a desktop and to
- * roughly three at 390px, so any constant is wrong at some width and the banner then covers the
- * controls underneath it (issue #1248). Reserve what the element actually renders and the offset
- * is correct at every width, in every font size, in every language.
+ * The banner is `position: fixed`, so it occupies no flow space of its own. It publishes its
+ * height on <html> as the `--dev-banner-height` custom property, and two kinds of consumer read
+ * it: the app shell reserves it as `padding-top` (App.css), and every other fixed or sticky
+ * surface offsets itself by it — the header (Header.css), the nav drawer (AppNavDrawer.css) and
+ * the network-error banner (App.css).
+ *
+ * That height is MEASURED, never assumed: this copy fits one line on a desktop and wraps to
+ * roughly three at 390px, so any constant is wrong at some width, and the banner then covers the
+ * controls underneath it (issue #1248 — it hid the wallet-connect button outright). Publish what
+ * the element actually renders and the reservation is correct at every width, in every font size,
+ * in every language.
  */
 function DevelopmentWarningBanner() {
   // Initialize state from localStorage to avoid effect
