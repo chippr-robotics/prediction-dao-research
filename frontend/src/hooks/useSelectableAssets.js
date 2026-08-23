@@ -6,7 +6,7 @@ import { useBitcoinWallet } from './useBitcoinWallet'
 import usePortfolio from './usePortfolio'
 import { useAccountAssets } from './useAccountAssets'
 import { getBitcoinNetwork } from '../config/bitcoinNetworks'
-import { NETWORKS } from '../config/networks'
+import { NETWORKS, isInCohort } from '../config/networks'
 import { getPortfolioRegistry, getPortfolioChainIds } from '../config/assetTaxonomy'
 import { filterAssetsForActivity, defaultAssetKey } from '../lib/assets/assetActivity'
 
@@ -131,7 +131,18 @@ export function useSelectableAssets({ activity, actingAddress = null, catalog = 
     // A held option already in the map wins (its real balance is preserved); a
     // catalog-only asset lands at balance 0 (honest — you hold none yet).
     if (catalog) {
-      const catalogChainIds = new Set(getPortfolioChainIds())
+      // Bounded by the BUILD'S COHORT, like every other roster (#1265, constitution III).
+      //
+      // `getPortfolioChainIds()` defaults to mainnets only. On a mainnet build that IS the
+      // cohort and this list is byte-identical to before. On a TESTNET build it was the
+      // exact inversion: the catalog offered assets on the six mainnets the build must not
+      // read, and hid every testnet it may — so a testnet member picking a Receive asset,
+      // a Supply asset, or a bridge DESTINATION was choosing from the wrong cohort
+      // entirely. Asking for the testnets and then filtering by cohort says what is meant;
+      // `includeTestnets: true` alone would return both halves.
+      const catalogChainIds = new Set(
+        getPortfolioChainIds({ includeTestnets: true }).filter((id) => isInCohort(id)),
+      )
       if (Number.isFinite(connectedChainId)) catalogChainIds.add(connectedChainId)
       for (const cid of catalogChainIds) {
         const net = NETWORKS[cid]
