@@ -24,6 +24,7 @@ import supplyViewSource from '../../components/earn/SupplyView.jsx?raw'
 import liquidityCopySource from '../../lib/liquidity/liquidityCopy.js?raw'
 import acrossLpSource from '../../lib/liquidity/acrossLpPositions.js?raw'
 import bridgeCopySource from '../../lib/bridge/bridgeCopy.js?raw'
+import selectableAssetsSource from '../../hooks/useSelectableAssets.js?raw'
 import {
   NETWORKS,
   MAINNET_CHAIN_ID,
@@ -32,6 +33,7 @@ import {
   listSupportedChainIds,
 } from '../../config/networks'
 import { getLiquidityRouterAddress } from '../../lib/liquidity/liquidityRouter'
+import { getPortfolioChainIds } from '../../config/assetTaxonomy'
 import {
   bridgeLiquidityNetworks as bridgeLiquidityCopyNetworks,
   tradingLiquidityNetworks,
@@ -208,5 +210,65 @@ describe('the enumeration never goes back to listSupportedChainIds (#1265)', () 
       /listSupportedChainIds/,
     )
     for (const [, source] of SOURCES) expect(codeOf(source).length).toBeGreaterThan(200)
+  })
+})
+
+
+// ── The asset CATALOG, which is the roster the three pick-an-asset surfaces read ──────
+
+/**
+ * `useSelectableAssets({ catalog: true })` backs Receive, Supply and Bridge's destination
+ * list. It enumerated `getPortfolioChainIds()`, whose default is MAINNETS ONLY — right for
+ * a mainnet build and the exact inversion of the rule on a testnet one: it offered assets
+ * on the six chains the build must not read and hid every chain it may.
+ *
+ * That stayed invisible while `bridgeNetworks()` also spanned both cohorts, because the two
+ * wrong lists agreed. Bounding the roster (#1265) and leaving this one alone is what took
+ * the full E2E tier's bridge destination selector to empty: the only in-cohort network with
+ * a bridge config was the origin itself, so `BL-03` — Across records the MEMBER as depositor
+ * — could not run at all.
+ *
+ * The behavioural assertion is the one that matters; the source assertion exists because
+ * the behavioural half would keep passing on a mainnet build, where the cohort and the
+ * default happen to be the same list.
+ */
+describe('the asset catalog is bounded by the cohort too (#1265)', () => {
+  const catalogChainIds = getPortfolioChainIds({ includeTestnets: true }).filter((id) =>
+    isInCohort(id),
+  )
+
+  it('names only chains this build may read', () => {
+    expect(catalogChainIds.length).toBeGreaterThan(0)
+    for (const id of catalogChainIds) expect(isInCohort(id)).toBe(true)
+    expect(catalogChainIds).not.toContain(MAINNET_CHAIN_ID)
+  })
+
+  it('offers a bridge DESTINATION, not just the origin', () => {
+    // The property BL-03 actually needs: at least two in-cohort networks carry a bridge
+    // config, so there is somewhere to bridge TO. One is a roster, not a route.
+    //
+    // Bridge configs on testnets are DEV-only seams (`VITE_E2E_AMOY_LOCAL`), so in this
+    // build they resolve to null and the count is 0 — which is the honest answer for a
+    // shipped testnet build and is asserted as such. What must hold either way is that the
+    // catalog does not exclude the chains that would carry them.
+    const bridgeable = catalogChainIds.filter((id) => NETWORKS[id]?.capabilities?.bridge)
+    expect(bridgeable.length).toBe(0)
+    for (const net of bridgeNetworks()) expect(catalogChainIds).toContain(net.chainId)
+  })
+
+  it('a mainnet build is unaffected — the cohort IS the old default there', () => {
+    // Proven over the real network table rather than asserted about this build: filtering
+    // every non-sandbox chain down to the mainnets reproduces `getPortfolioChainIds()`'s
+    // default exactly, so this change is a no-op wherever the product ships today.
+    const mainnetsOnly = getPortfolioChainIds({ includeTestnets: true }).filter(
+      (id) => !NETWORKS[id].isTestnet,
+    )
+    expect(new Set(mainnetsOnly)).toEqual(new Set(getPortfolioChainIds()))
+  })
+
+  it('the hook enumerates the cohort rather than the default', () => {
+    const code = codeOf(selectableAssetsSource)
+    expect(code).toMatch(/isInCohort/)
+    expect(code).toMatch(/includeTestnets: true/)
   })
 })
