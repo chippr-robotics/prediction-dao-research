@@ -8,6 +8,14 @@ zone       = "us-central1-a"
 
 artifact_registry_repository = "cloud-run-source-deploy"
 
+# spec 095 MCP server. FALSE, and stated rather than left to the variable's default so that turning
+# it on is a one-line diff a reviewer cannot miss. It stays false until
+# `.../cloud-run-source-deploy/fairwins-mcp-server/fairwins-mcp-server:latest` exists — no pipeline
+# publishes it, and apply on merge is unattended, so a true here would try to create a Cloud Run
+# service from an image that is not there. See main.tf's module comment and
+# docs/runbooks/member-api-operations.md §3.8.
+manage_mcp_server = false
+
 # The gateway keeps its existing account, which holds zero project-level roles beyond telemetry.
 gateway_service_account_email = "fairwins-relay-engine@chippr-bots-site-wp.iam.gserviceaccount.com"
 

@@ -21,6 +21,24 @@ variable "artifact_registry_repository" {
   default     = "cloud-run-source-deploy"
 }
 
+variable "manage_mcp_server" {
+  description = <<-EOT
+    Whether Terraform declares the spec-095 MCP server Cloud Run service.
+
+    DEFAULT FALSE, and the default is load-bearing rather than cautious. `infra-apply.yml` applies
+    on push to main with no human in the loop, and no pipeline in this repository publishes the
+    `fairwins-mcp-server` image — so with this true, a promotion would attempt a Cloud Run create
+    against an image that does not exist, fail, and (fail-fast + never-retry, FR-035) stop the
+    estate's apply until somebody intervenes.
+
+    Set it true only AFTER the image is published and verified present. Doing so is its own PR with
+    its own reviewed plan — which is the point: review approves diffs, so the create must appear in
+    one. See docs/runbooks/member-api-operations.md §3.8.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "gateway_service_account_email" {
   description = "Existing service account the gateway node keeps. It holds zero project-level roles beyond telemetry, which is a property worth preserving."
   type        = string

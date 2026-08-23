@@ -116,14 +116,16 @@
 
 # `module.mcp_server` (spec 095) has NO import block, and that absence is deliberate rather than an
 # omission: `fairwins-mcp-server` has never been deployed by hand, so there is nothing to adopt. The
-# first apply CREATES it, and its correctness condition is the ordinary one — the plan that follows
-# reports no changes. An import block for a resource that does not exist fails the plan outright.
+# apply that first sets `manage_mcp_server = true` CREATES it, and its correctness condition is the
+# ordinary one — the plan that follows reports no changes. An import block for a resource that does
+# not exist fails the plan outright, which is the second reason there is none here: the module is
+# gated off, so `module.mcp_server[0]` does not exist to import INTO either.
 #
 # If the service is ever deployed out of band before that apply, adopt it here instead of letting
-# Terraform create a second one:
+# Terraform create a second one. Note the index — the module carries `count`:
 #
 # import {
-#   to = module.mcp_server.google_cloud_run_v2_service.this
+#   to = module.mcp_server[0].google_cloud_run_v2_service.this
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/services/fairwins-mcp-server"
 # }
 
