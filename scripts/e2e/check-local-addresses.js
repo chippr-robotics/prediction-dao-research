@@ -176,13 +176,27 @@ function parseContractsBlock(source, blockName) {
  * in this file: a second copy of that mapping could disagree with the one the app resolves, and
  * this gate would then check a block the app never reads.
  */
-function resolveBlockName(source, chainId) {
+function resolveBlockName(source, chainId, { e2e = false } = {}) {
   const body = objectLiteralBody(source, "NETWORK_CONTRACTS");
   if (body === null) return null;
 
-  const lineRe = /^\s*(\d+)\s*:\s*([A-Za-z_$][\w$]*)\s*,?/;
+  /*
+   * An entry is either a plain identifier or a TERNARY, and 80002 is the ternary:
+   *
+   *   80002: E2E_AMOY_LOCAL ? HARDHAT_CONTRACTS : AMOY_CONTRACTS
+   *
+   * because the E2E tier boots its local node AS chain 80002 and impersonates Amoy. Reading the
+   * identifier straight after the colon picks up `E2E_AMOY_LOCAL` — the CONDITION, which is not a
+   * contracts block at all — and the gate then aborts with "no E2E_AMOY_LOCAL block", on every
+   * single e2e setup. So a ternary is resolved to a BRANCH: the consequent under `--e2e` (the
+   * local impersonation, which is exactly what setup:e2e just deployed), the alternate otherwise.
+   */
+  const ternaryRe = /^\s*(\d+)\s*:\s*[A-Za-z_$][\w$]*\s*\?\s*([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)\s*,?/;
+  const plainRe = /^\s*(\d+)\s*:\s*([A-Za-z_$][\w$]*)\s*,?/;
   for (const line of body.split("\n")) {
-    const m = lineRe.exec(line);
+    const t = ternaryRe.exec(line);
+    if (t && Number(t[1]) === Number(chainId)) return e2e ? t[2] : t[3];
+    const m = plainRe.exec(line);
     if (m && Number(m[1]) === Number(chainId)) return m[2];
   }
   return null;
@@ -441,11 +455,12 @@ function isFailing(result, swap) {
 // ── CLI ────────────────────────────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const out = { network: "localhost", chainId: 1337, json: false };
+  const out = { network: "localhost", chainId: 1337, json: false, e2e: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--network") out.network = argv[++i];
     else if (a === "--chainId") out.chainId = Number(argv[++i]);
+    else if (a === "--e2e") out.e2e = true;
     else if (a === "--deployment") out.deployment = argv[++i];
     else if (a === "--contractsFile") out.contractsFile = argv[++i];
     else if (a === "--json") out.json = true;
@@ -480,7 +495,7 @@ function main(argv, env = process.env) {
   const source = fs.readFileSync(contractsFile, "utf8");
 
   const chainId = Number(record.chainId) || args.chainId;
-  const blockName = resolveBlockName(source, chainId);
+  const blockName = resolveBlockName(source, chainId, { e2e: args.e2e });
   if (!blockName) {
     console.error(
       `\nE2E address gate: NETWORK_CONTRACTS in ${path.relative(ROOT, contractsFile)} maps no block ` +
