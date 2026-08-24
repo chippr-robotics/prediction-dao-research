@@ -202,10 +202,10 @@
 # into two addresses. Decide first whether the estate should have one policy or two; splitting it is
 # a real alerting change and belongs in its own PR, not smuggled into an adoption.
 #
-# import {
-#   to = module.spa[0].google_cloud_run_v2_service.this
-#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research"
-# }
+import {
+  to = module.spa[0].google_cloud_run_v2_service.this
+  id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research"
+}
 #
 # import {
 #   to = module.monitoring[0].google_monitoring_notification_channel.email["cody.w.burns@gmail.com"]

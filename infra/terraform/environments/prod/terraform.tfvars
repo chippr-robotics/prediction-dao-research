@@ -149,11 +149,13 @@ vm_alert_policies = {
 # imports.tf.
 manage_edge = false
 
-# Both surfaces are LIVE and UNADOPTED, so Terraform currently describes them without owning them.
-# Left true, the SPA plans as a create against a service that already serves production (apply fails
-# ALREADY_EXISTS mid-graph), and monitoring plans twelve creates that would SUCCEED and duplicate
-# every alert policy. Flip each one only in the PR that imports it to a zero-diff plan.
-manage_spa        = false
+# The SPA is ADOPTED — imported by the block in imports.tf, never created. The plan must read
+# "will be imported" and never "must be replaced": this service carries production traffic.
+manage_spa = true
+
+# Monitoring is still UNADOPTED and stays gated. All twelve resources exist live and Cloud
+# Monitoring accepts duplicates, so an apply here SUCCEEDS and leaves two of every alert policy —
+# paging twice while the policy that actually fires stays unmanaged. Adopted in its own PR.
 manage_monitoring = false
 
 # cloudflare_zone_id         = "..."
