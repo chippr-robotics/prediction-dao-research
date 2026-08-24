@@ -707,3 +707,42 @@ For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
 at specs/094-e2e-coverage-expansion/plan.md
 <!-- SPECKIT END -->
+- **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
+  platform is administered FROM is a production surface — it can read a funded deploy key that also
+  holds admin authority on live contracts. `scripts/secrets/registry.js` is the SINGLE source of
+  truth for what is a secret, which container holds it, and which least-privilege **profile**
+  includes it; `npm run sec -- --profile <p> -- <cmd>` delivers a profile into a child's environment
+  and nothing else. Six rules:
+  (1) **`hardhat.config.js` is deliberately untouched** — it resolves accounts *synchronously* at
+  load, so fetching inside it would pay a network round-trip on every `compile` and `test`, neither
+  of which needs a secret. Delivery is from OUTSIDE, by wrapper. The floppy keystore flow is
+  unchanged and remains preferred for admin keys.
+  (2) **The fetcher shells out to `gcloud`, and must not gain an npm dependency** — adding one
+  re-resolves the root lockfile and drops the platform rolldown binary (npm/cli#4828), breaking
+  every Vite build including the mini-app release path. The VM reads secrets the same way
+  (`infra/vm/common/fetch-secrets.sh`): one mechanism, one set of failure modes.
+  (3) **KEY and PASSWORD material never falls back to `process.env` on a public network**, whatever
+  flags are passed — a token falling back degrades a feature, a key falling back signs a real
+  transaction with whatever was exported in the shell. Any fallback that does happen is announced;
+  a silent one is indistinguishable from a working vault.
+  (4) **Never write a payload to disk, argv, or a log.** Migration verifies a byte-exact readback
+  BEFORE pruning the local copy and refuses to prune if anything failed. Never round-trip a payload
+  through `$( )` — it strips trailing newlines, and a changed trailing byte is a different
+  credential.
+  (5) **`VITE_` variables cannot be secured by moving them** — they compile into the client bundle
+  and are public once shipped. `check:env-hygiene` reports them as a NOTE, not a failure: the fix is
+  a scoped, publicly-safe credential, not a hiding place.
+  (6) **The workstation identity is declared Terraform** (`chippr-tf-modules//modules/ops-workstation`,
+  SHA-pinned): **no service-account key file, ever** — operators impersonate, so revocation is one
+  list entry and every access is attributed to a named human. `serviceAccountTokenCreator` is granted
+  on the ACCOUNT, never the project (which would grant impersonation of every SA in a shared project,
+  including the one holding `signerVerifier` on the hot gas keys). Adding a secret means editing the
+  registry AND both tfvars lists — `npm run test:secrets` fails on drift, because a missing grant
+  surfaces later as `PERMISSION_DENIED`, which reads exactly like a broken login.
+  Local Prometheus/Grafana (`infra/observability/`) is a READ-ONLY viewing surface bound to loopback
+  — **not** the paging system (Cloud Monitoring pages, and it runs when this machine does not).
+  Probes assert on CONTENT: a plain 200 from the bundler proves nothing (the origin-lock nginx serves
+  its own 200 that never reaches alto — the check that stayed green through the 2026-07-12 stall) and
+  the gateway returns `"status":"ok"` unconditionally. See
+  `docs/developer-guide/workstation-secrets.md` + `docs/runbooks/workstation-operations.md` +
+  `infra/observability/README.md` + `specs/097-workstation-secrets-observability/`.

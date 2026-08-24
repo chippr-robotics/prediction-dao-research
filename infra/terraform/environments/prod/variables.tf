@@ -120,3 +120,17 @@ variable "billing_export_dataset" {
   type        = string
   default     = null
 }
+
+# ── operator workstation (spec 097) ───────────────────────────────────────────────────────────
+
+variable "workstation_operators" {
+  description = "IAM principals permitted to impersonate the operator workstation account. Each entry is a named human who can then read every secret in workstation_secret_ids, so this list is the access-review artifact — keep it short and remove leavers."
+  type        = list(string)
+  default     = []
+}
+
+variable "workstation_secret_ids" {
+  description = "Secret ids the operator workstation may read. Mirrors scripts/secrets/registry.js; parity is enforced by scripts/secrets/__tests__/terraform-parity.test.js rather than by discipline."
+  type        = list(string)
+  default     = []
+}
