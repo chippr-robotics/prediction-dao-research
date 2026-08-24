@@ -244,7 +244,7 @@ resource "google_kms_crypto_key" "signing" {
 module "spa" {
   count = var.manage_spa ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=ce0ed292fd45d577b5f066a1990b611bebc795a3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=be57345a1fd915b359d9ba30139a6272b80d5214"
 
   project_id = var.project_id
   region     = var.region
@@ -331,7 +331,7 @@ module "spa" {
 module "mcp_server" {
   count = var.manage_mcp_server ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=ce0ed292fd45d577b5f066a1990b611bebc795a3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=be57345a1fd915b359d9ba30139a6272b80d5214"
 
   project_id = var.project_id
   region     = var.region
