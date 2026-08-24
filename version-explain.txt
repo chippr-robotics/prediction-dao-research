@@ -1,34 +1,9 @@
-previous: v1.10.1
-commits:  29
-  [unclassified] Merge pull request #1219 from chippr-robotics/staging
-  [unclassified] Merge pull request #1218 from chippr-robotics/claude/issue-cleanup-release-nugenr
-  [docs -> patch] correct the spec-067 router deployment status in the agent guide
-  [unclassified] Merge pull request #1215 from chippr-robotics/claude/passkey-wallets-prediction-bets-da9ojl
-  [unclassified] Merge pull request #1217 from chippr-robotics/claude/finops-alert-datasource
-  [fix -> patch] fold in the billing-export classification, with its premise corrected
-  [fix -> patch] the alert rules were all firing on a healthy estate
-  [fix -> patch] address review — pin passkey approvals to Polygon, un-stale the session credential
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/passkey-wallets-prediction-bets-da9ojl
-  [fix -> patch] stamp the reading and its last-good cache from ONE clock read
-  [feat -> minor] enable passkey smart accounts to trade on Predict via the CLOB's ERC-1271 rail
-  [unclassified] Merge pull request #1214 from chippr-robotics/claude/admin-screens-mini-apps-9c67yi
-  [feat -> minor] bound catalog sections as horizontal rails with a full-list modal
-  [unclassified] Merge pull request #1213 from chippr-robotics/claude/admin-screens-mini-apps-9c67yi
-  [feat -> minor] surface admin mini-apps in the Apps store with Quick Access pinning
-  [unclassified] Merge pull request #1212 from chippr-robotics/claude/admin-screens-mini-apps-9c67yi
-  [unclassified] docs+polish(093): screenshots, form styles, guides, parity audit
-  [feat -> minor] decompose AdminPanel into role-gated admin mini-apps
-  [unclassified] tasks(093): dependency-ordered task breakdown for admin mini-apps
-  [unclassified] plan(093): design admin mini-apps decomposition
-  [spec -> patch] admin mini-apps — granular operations control
-  [unclassified] Merge pull request #1211 from chippr-robotics/claude/finops-credential-runbook
-  [unclassified] Merge pull request #1208 from chippr-robotics/claude/finops-backmerge-approval
-  [unclassified] Merge pull request #1209 from chippr-robotics/release/v1.10.1-changelog
-  [docs -> patch] credential rotation and the connected-systems inventory
-  [unclassified] Merge pull request #1210 from chippr-robotics/claude/finops-billing-export-latency
-  [fix -> patch] a freshly enabled billing export is not-configured, not broken
-  [skipped] chore(release): v1.10.1 [skip release]
-  [fix -> patch] the auto back-merge PR could not satisfy its own required checks
-bump:     minor
+previous: v1.11.0
+commits:  4
+  [unclassified] Merge pull request #1323 from chippr-robotics/hotfix/networks-e2e-cohort-seams
+  [test -> patch] carry the E2E cohort seams in networks.js to main
+  [unclassified] Merge pull request #1221 from chippr-robotics/release/v1.11.0-changelog
+  [skipped] chore(release): v1.11.0 [skip release]
+bump:     patch
 reason:   computed
-next:     v1.11.0
+next:     v1.11.1
