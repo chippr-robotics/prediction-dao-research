@@ -32,6 +32,19 @@
  * Bitcoin is out of scope (FR-006) and says so — its network ids are STRINGS and are kept
  * away from every chain-keyed call by `isEvmOption`.
  *
+ * ── ONE ROSTER (issue #1265) ─────────────────────────────────────────────────────────
+ * The asset selector draws on the CATALOG (`useSelectableAssets({catalog:true})`), which is
+ * mainnets-always plus a member opt-in and knows nothing about the build's cohort. This form
+ * narrows it to `bridgeNetworks()` — the same cohort-bounded roster the availability copy and
+ * `BridgeStatusList` read — because those three must describe ONE build. Before #1265 they did
+ * not have to: the roster spanned both cohorts, so it was never empty. Bounding only the copy
+ * would have let a testnet build quote, sign and record a mainnet bridge and then state
+ * underneath that no network here bridges at all — a transfer the member had just made,
+ * denied by the surface that made it (FR-053). Networks dropped by this narrowing are NAMED
+ * with their real reason below (FR-006c); a silent omission is the failure that requirement
+ * exists to prevent.
+ * ─────────────────────────────────────────────────────────────────────────────────────
+ *
  * ── SCREENING AND THE RESTRICTED ACCOUNT (FR-032/FR-033, T116/T154) ──────────────────
  * The acting wallet is screened through `useAddressScreening` — the platform's one
  * screening path — against the SOURCE network (its own read provider, because the wallet
@@ -202,24 +215,36 @@ export default function BridgeView({ onRecorded } = {}) {
   // client-side (research R10) — so the honest degradation is to say so, not to guess.
   const gatewayReady = bridgeGatewayUrl() !== ''
 
+  // The networks this form may bridge from or to — cohort-bounded (#1265), see the header.
+  const bridgeRoster = useMemo(() => bridgeNetworks(), [])
+  const bridgeChainIds = useMemo(
+    () => new Set(bridgeRoster.map((net) => Number(net.chainId))),
+    [bridgeRoster],
+  )
   const bridgeOptions = useMemo(
-    () => options.filter((o) => isEvmOption(o) && Boolean(NETWORKS[o.chainId]?.capabilities?.bridge)),
-    [options],
+    () => options.filter((o) => isEvmOption(o) && bridgeChainIds.has(Number(o.chainId))),
+    [options, bridgeChainIds],
   )
   // FR-066 — Bitcoin is excluded WITH a reason shown below, never silently dropped.
   const hasNonEvmOption = useMemo(() => options.some((o) => !isEvmOption(o)), [options])
-  // FR-006c — the same rule for EVM networks the settlement protocol does not reach
-  // (Ethereum Classic, Mordor). An asset vanishing from the list with no explanation is the
-  // silent-omission failure the requirement exists to prevent, so name the networks.
-  const withheldNetworkNames = useMemo(() => {
-    const names = new Set()
+  // FR-006c — the same rule for EVM networks this form will not bridge. An asset vanishing
+  // from the list with no explanation is the silent-omission failure the requirement exists
+  // to prevent, so name the networks — and give each its OWN reason, because the two are not
+  // the same fact: the settlement protocol is not deployed on Ethereum Classic or Mordor at
+  // all, whereas a network in the other cohort is one this BUILD does not reach (#1265).
+  const withheld = useMemo(() => {
+    const undeployed = new Set()
+    const otherCohort = new Set()
     for (const o of options) {
       if (!isEvmOption(o)) continue
-      if (NETWORKS[o.chainId]?.capabilities?.bridge) continue
-      names.add(NETWORKS[o.chainId]?.name || o.networkName || `chain ${o.chainId}`)
+      const id = Number(o.chainId)
+      if (bridgeChainIds.has(id)) continue
+      const name = NETWORKS[id]?.name || o.networkName || `chain ${id}`
+      if (NETWORKS[id]?.capabilities?.bridge) otherCohort.add(name)
+      else undeployed.add(name)
     }
-    return [...names]
-  }, [options])
+    return { undeployed: [...undeployed], otherCohort: [...otherCohort] }
+  }, [options, bridgeChainIds])
 
   // You can only send what you have: unheld catalog rows belong in the DESTINATION list,
   // not the source one. A null balance is "not loaded yet", which is not the same as zero.
@@ -658,7 +683,7 @@ export default function BridgeView({ onRecorded } = {}) {
     )
   }
 
-  const bridgeNetworkNames = bridgeNetworks().map((n) => n.name).join(', ')
+  const bridgeNetworkNames = bridgeRoster.map((n) => n.name).join(', ')
   // `chainId` is undefined until the wallet resolves. Number(undefined) is NaN and NaN !== x is
   // always true, which made the surface assert "your wallet is on another network" about a wallet
   // it had no reading for — an unknown presented as a known.
@@ -698,11 +723,18 @@ export default function BridgeView({ onRecorded } = {}) {
           {BRIDGE_UNAVAILABLE.bitcoin}
         </p>
       )}
-      {withheldNetworkNames.length > 0 && (
+      {withheld.undeployed.length > 0 && (
         <p className="bridge-note" role="note">
           {/* Short, but still said: FR-066 is about a member not silently missing an asset they
               hold, and one clause carries that as well as three did. */}
-          {`Assets on ${withheldNetworkNames.join(', ')} are not listed — the bridge protocol is not deployed there.`}
+          {`Assets on ${withheld.undeployed.join(', ')} are not listed — the bridge protocol is not deployed there.`}
+        </p>
+      )}
+      {withheld.otherCohort.length > 0 && (
+        <p className="bridge-note" role="note">
+          {/* A different fact from the line above, so it gets its own sentence: the protocol IS
+              deployed on these networks, this build simply does not reach them (#1265). */}
+          {`Assets on ${withheld.otherCohort.join(', ')} are not listed — this build does not bridge on those networks.`}
         </p>
       )}
 

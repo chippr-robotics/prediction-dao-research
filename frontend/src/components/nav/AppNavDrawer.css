@@ -21,7 +21,12 @@
 
 .app-nav-drawer {
   position: fixed;
-  top: 0;
+  /* Start below the development banner (issue #1248). The banner paints above this
+     drawer (z-index 9999 vs 1401), so at 390px — where its copy wraps to ~3 lines —
+     it would otherwise cover the drawer header: the "Menu" title, the ✕ close
+     button, and the top of the filter field. `0px` when the banner is dismissed or
+     absent, so production layout is unchanged. */
+  top: var(--dev-banner-height, 0px);
   left: 0;
   bottom: 0;
   z-index: 1401;

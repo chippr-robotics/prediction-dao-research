@@ -15,7 +15,10 @@
  *   G5 dedup by entryId (identity embeds chainId, so the only real duplicates
  *      are reference-chain sources answering from several scopes);
  *   G6 repository ordering over the merged stream;
- *   G7 empty-but-read is `read` with entryCount 0 — genuinely empty, no warning.
+ *   G7 empty-but-read is `read` with entryCount 0 — genuinely empty, no warning;
+ *   G8 empty-but-UNREAD is `unreachable` — a chain whose network-backed
+ *      sources all failed returns an empty list too, and the two must never
+ *      render alike (#1280).
  *
  * Pure factory: `index.js` wires the default repository + provider resolution
  * (avoiding an import cycle), tests inject everything.
@@ -24,7 +27,7 @@ import { compareEntries } from './ledgerRepository'
 
 /**
  * @param {object} deps
- * @param {(q:{account:string,chainId:number,provider:any}) => Promise<{entries:Array,staleClasses:string[],prunedBefore:number|null}>} deps.listEntries
+ * @param {(q:{account:string,chainId:number,provider:any}) => Promise<{entries:Array,readState?:'read'|'unreadable',staleClasses:string[],prunedBefore:number|null}>} deps.listEntries
  * @param {(chainId:number, walletChainId?:number, walletProvider?:any) => any} deps.readProviderFor - null ⇒ no connection
  * @param {(chainId:number) => boolean} deps.isInCohort
  * @param {() => number[]} [deps.cohortChainIds] - default chain set when the caller passes none
@@ -45,15 +48,14 @@ export function createEstateLedger({ listEntries, readProviderFor, isInCohort, c
         }
         try {
           const res = await listEntries({ account: q.account, chainId, provider })
-          /*
-           * `listEntries` does not throw when a chain's sources fail — it gathers them with
-           * `allSettled` so one bad source degrades to stale rather than taking the ledger down.
-           * A chain whose sources ALL failed therefore arrives here looking exactly like a chain
-           * with no history: an empty array. Reporting that as `read` is what made the
-           * every-chain-unreachable disclosure unreachable in practice (#1280) — the panel said
-           * "No activity yet" about networks it had not managed to read.
-           */
           if (res.readState === 'unreadable') {
+            // G8 (#1280): nothing that had to cross the network came back, and
+            // nothing at all was collected. The repository degrades per source
+            // rather than throwing, so the failure arrives as an empty list —
+            // byte-identical to a chain with no history. Only one of those is a
+            // fact, so this is `unreachable`. Dropping the (empty) entries here
+            // is safe precisely because the repository reserves `unreadable`
+            // for the case where it collected nothing to drop.
             return { chainId, state: 'unreachable', reason: 'no source on this network could be read' }
           }
           return {

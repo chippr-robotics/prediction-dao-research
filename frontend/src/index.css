@@ -151,3 +151,55 @@ button:focus-visible {
 button:has(> svg:only-child) {
   padding: 0;
 }
+
+/* DISABLED CONTROLS (issue #1260).
+ *
+ * This does not paint anything. It re-points the button FILL/LABEL SET on the
+ * disabled element, and every control that fills itself from one of these
+ * tokens resolves that fill to the neutral instead — including the rules swept
+ * in this change and any written later.
+ *
+ * Doing it with custom properties rather than a `background` declaration is
+ * deliberate: a custom property set ON the element beats the value it would
+ * otherwise inherit from :root regardless of what specificity the component's
+ * own rule has. This selector is (0,1,1), so a `background: var(--disabled-bg)`
+ * here would beat `.pt-btn-primary` (0,1,0) and lose to `.earn-btn.primary`
+ * (0,2,0) — it would grey out some primary buttons and not others, which is
+ * worse than not applying at all.
+ *
+ * WHY --gradient-primary-button IS RE-POINTED HERE AND NOT LEFT TO :root.
+ * A custom property's computed value is its specified value with var() ALREADY
+ * SUBSTITUTED, resolved on the element the declaration applies to. The gradient
+ * is declared at :root, so its stops resolve there, against the ENABLED button
+ * tokens, and a descendant inherits that finished string. Re-pointing
+ * --primary-button on this <button> cannot reach back into it. Without the
+ * fourth line below, every gradient-filled primary control kept its teal while
+ * its label went grey — a 1.06:1 label in dark, and a regression from 4.74:1 in
+ * light, which is strictly worse than the bug this change set out to fix. It is
+ * restated as a flat two-stop gradient rather than a bare colour so that a rule
+ * reaching it through `background-image` still gets a valid <image>.
+ *
+ * THE FILL AND THE LABEL MOVE TOGETHER OR NOT AT ALL. --primary-button-text may
+ * only be used by a rule that also fills from one of the three fill tokens
+ * re-pointed here; a status-coloured control keeps its own fill when disabled
+ * and so uses --status-fill-text, which is deliberately absent from this rule.
+ * disabledControlState.test.js enforces that pairing across the tree.
+ *
+ * A control that fills from none of these reads none of them and is untouched,
+ * so this cannot grey out a secondary or ghost button.
+ *
+ * `aria-disabled` is included because a busy control keeps focus by staying
+ * enabled and saying so, and it should look unavailable while it is. The
+ * selector stays on <button> on purpose: --primary-button-hover is also the
+ * colour of a hovered LINK (`a:hover` in this file), so remapping it on anchors
+ * would repaint disabled links in the disabled FILL colour — a near-invisible
+ * grey on the page — rather than greying a fill.
+ */
+button:disabled,
+button[disabled],
+button[aria-disabled='true'] {
+  --primary-button: var(--disabled-bg);
+  --primary-button-hover: var(--disabled-bg);
+  --primary-button-text: var(--disabled-text);
+  --gradient-primary-button: linear-gradient(135deg, var(--disabled-bg) 0%, var(--disabled-bg) 100%);
+}

@@ -18,7 +18,7 @@
  * `BRIDGE_STATE` in `data/ledger/sources/bridgeLedgerSource.js` by value, so
  * this module stays dependency-light (config only).
  */
-import { NETWORKS, listSupportedChainIds } from '../../config/networks'
+import { NETWORKS, cohortChainIds } from '../../config/networks'
 import { isBitcoinNetworkId } from '../../config/bitcoinNetworks'
 
 /** The third party that settles every bridge in v1 (FR-014). */
@@ -129,12 +129,20 @@ export function bridgeStateCopy(state) {
 export const BRIDGE_NEEDS_ATTENTION_RECOURSE = `This transfer is past its expected arrival time. It has not been lost and FairWins does not hold it: open the sending transaction below to confirm it left, and check the ${BRIDGE_SETTLEMENT.protocol} explorer for where it is. Transfers that cannot be delivered are returned automatically to the wallet they came from.`
 
 /**
- * Every supported network where bridging is configured, mainnets first —
- * mirrors `getStakingNetworks()`. Used by the honest unavailable copy and by
- * tests; empty when nothing is configured, which is itself honest.
+ * Every network IN THIS BUILD'S COHORT where bridging is configured, mainnets
+ * first — mirrors `getStakingNetworks()`. Used by the honest unavailable copy,
+ * by `BridgeStatusList`'s read roster, and by tests; empty when nothing is
+ * configured, which is itself honest.
+ *
+ * `cohortChainIds()` and never `listSupportedChainIds()` (issue #1265): this
+ * list both names networks to the member and decides which chains are READ for
+ * in-flight transfers, and constitution III forbids either crossing the
+ * testnet/mainnet boundary. Across ships only on mainnets, so a testnet build
+ * gets an empty roster and the "no network is set up for bridging in this build
+ * yet" branch below — which is the truth for that build.
  */
 export function bridgeNetworks() {
-  return listSupportedChainIds()
+  return cohortChainIds()
     .map((id) => NETWORKS[id])
     .filter((net) => net?.capabilities?.bridge)
     .sort((a, b) => Number(a.isTestnet) - Number(b.isTestnet))
@@ -184,7 +192,10 @@ export const BRIDGE_UNAVAILABLE = Object.freeze({
 export function bridgeUnavailableCopy(chainId) {
   if (isBitcoinNetworkId(chainId)) return BRIDGE_UNAVAILABLE.bitcoin
   const net = chainId != null ? NETWORKS[chainId] : null
-  if (net?.capabilities?.bridge) return null
+  // Membership of the ROSTER, not the raw capability flag (#1265). The roster is what the
+  // Bridge form offers and what `BridgeStatusList` reads, so answering "bridging is
+  // available here" (null) about a network outside it would contradict both.
+  if (net && bridgeNetworks().some((n) => n.chainId === net.chainId)) return null
   const where = bridgeNetworkList()
   const here = net?.name ? `Bridging is not available on ${net.name}.` : 'Bridging is not available on this network.'
   return where

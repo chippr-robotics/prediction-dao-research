@@ -13,6 +13,7 @@ import {
 } from '../utils/ipfsService'
 import { getFeeOverrides } from '../utils/feeOverrides'
 import { getCurrentDocument } from '../utils/legalDocs'
+import { revertReasonFrom, screenedActorMessage } from '../lib/wagers/sanctionsRevert'
 
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
@@ -463,8 +464,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           onProgress({ step: 'create', message: 'Validating transaction...' })
           await registry[createMethod].staticCall(...createArgs)
         } catch (simError) {
-          const reason = simError.reason || simError.shortMessage || simError.message || ''
-          throw new Error(translateRevert(reason), { cause: simError })
+          throw new Error(translateRevert(revertReasonFrom(simError)), { cause: simError })
         }
 
         onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
@@ -522,7 +522,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           onProgress({ step: 'create', message: 'Validating transaction...' })
           await registry[createMethod].staticCall(...createArgs, { from: userAddress })
         } catch (simError) {
-          throw new Error(translateRevert(simError.reason || simError.shortMessage || simError.message || ''), { cause: simError })
+          throw new Error(translateRevert(revertReasonFrom(simError)), { cause: simError })
         }
         calls.push({
           target: wagerRegistryAddress,
@@ -629,6 +629,18 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }
 
+/**
+ * What a screened member is told on the create path. `_createWager` screens the CREATOR only
+ * (contracts/wagers/WagerRegistryCore.sol) — the acting member — so "your account" is unambiguous
+ * here in a way it is not on the accept paths, which screen both parties.
+ *
+ * The outcome clause deliberately does NOT say "nothing was submitted on-chain": the guard screens
+ * `_createWager` only, so on the self-submit leg the stake-token approval and the stale-wager cleanup
+ * (`batchExpireOpen`) are real transactions already sent, confirmed and PAID FOR by the time this
+ * simulation reverts. "The wager was not created" is the strongest claim true on every leg.
+ */
+export const SCREENED_ADDRESS_MESSAGE = screenedActorMessage('the wager was not created')
+
 export function translateRevert(reason) {
   if (!reason) return 'Unknown contract error.'
   if (reason.includes('insufficient allowance') || reason.includes('exceeds allowance')) {
@@ -637,6 +649,9 @@ export function translateRevert(reason) {
   if (reason.includes('insufficient balance') || reason.includes('exceeds balance')) {
     return 'Insufficient token balance to cover your stake.'
   }
+  // Compliance screening (spec 007 FR-054) — the first Check in `_createWager`. Name it: the
+  // member is otherwise told only that the transaction will fail. See SCREENED_ADDRESS_MESSAGE.
+  if (reason.includes('SanctionedAddress')) return SCREENED_ADDRESS_MESSAGE
   if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
   if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WMATIC.'

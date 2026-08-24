@@ -85,8 +85,8 @@
 .network-switch-btn {
   font-size: 13px;
   font-weight: 600;
-  color: white;
-  background: var(--brand-primary, var(--color-primary));
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: 6px;
   padding: 8px 16px;

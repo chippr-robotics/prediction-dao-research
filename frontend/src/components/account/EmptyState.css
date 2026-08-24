@@ -34,8 +34,8 @@
   padding: 8px 16px;
   border: none;
   border-radius: var(--radius-md, 8px);
-  background: var(--brand-primary);
-  color: #fff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   font-weight: 600;
   cursor: pointer;
 }

@@ -38,6 +38,65 @@ const PASSKEY_WRITE_METHODS = new Set([
   'eth_signTypedData_v4',
 ])
 
+/**
+ * The chain a passkey session reports when nothing else names one (issue #1286).
+ *
+ * NOT `config.chains[0].id`. That list is ordered Polygon-first in `wagmi.js` so 137 is
+ * wagmi's default chain, and using it here made EVERY passkey session claim 137 whatever
+ * the build was for. A classic wallet is unaffected because an injected connector reports
+ * its own chain; a passkey account has no wallet to ask, so the connector is the only thing
+ * that can answer — and it was answering with a constant.
+ *
+ * On a mainnet build 137 was accidentally right, which is why it went unnoticed. On a
+ * testnet-cohort build it is a read across the testnet/mainnet boundary that constitution
+ * III forbids outright, and it reached members as a false statement: the wager create path
+ * looked up the opponent's X25519 key in the WRONG chain's KeyRegistry, found nothing, and
+ * told the member their opponent had not registered a key.
+ *
+ * `getCurrentChainId()` is the build's own home network (`VITE_NETWORK_ID`, else
+ * `PRIMARY_CHAIN_ID`) and the same value `buildIsTestnet()` derives the cohort from — so this
+ * stays truthful per build without a second literal `137` to drift, exactly as
+ * `membershipChainId()` avoids one.
+ *
+ * Falls back to wagmi's default only when the build chain is not registered in `chains`:
+ * wagmi refuses to store an unconfigured chain id, so reporting one would leave the session
+ * claiming a chain the config cannot represent. That fallback is the exact state this function
+ * exists to prevent, and only a broken build can reach it (a non-numeric `VITE_NETWORK_ID` parses
+ * to `NaN`; every id in `NETWORKS` is registered in `wagmi.js#chains`), so it says so loudly
+ * rather than silently putting a testnet build back on Polygon.
+ */
+function buildDefaultChainId(config) {
+  const target = getCurrentChainId()
+  if (config.chains?.some((c) => c.id === target)) return target
+  const fallback = config.chains?.[0]?.id
+  console.error(
+    `[passkey] Build chain ${target} is not a configured wagmi chain — passkey sessions will ` +
+      `report ${fallback} instead, which may cross the testnet/mainnet cohort boundary. ` +
+      'Check VITE_NETWORK_ID (issue #1286).'
+  )
+  return fallback
+}
+
+/**
+ * The chain THIS session reports — and the reason a session carries `chainChosen` (issue #1286).
+ *
+ * Only `switchChain` sets that flag, so it marks a chain the MEMBER named. Everything else is a
+ * chain we derived, and a derived chain must re-derive on every load rather than freeze into the
+ * session: the session has no expiry BY DESIGN (clarification Q4), so a stored default outlives
+ * the build that minted it forever. Two cases make that concrete — a member who signed in before
+ * this fix has `{"chainId":137}` on disk from the old `config.chains[0].id` default and would keep
+ * reading mainnet on a testnet build (`WalletContext`'s auto-switch will not correct it either,
+ * because 137 is a *supported* id), and a staging build repointed to another testnet would never
+ * reach anyone already signed in.
+ *
+ * A chosen chain is honoured verbatim, including across the cohort: the Testnet/Mainnet toggle
+ * deliberately crosses the pair, so clamping a member's own switch would snap them back.
+ */
+function sessionChainId(session, config) {
+  if (session?.chainChosen && session.chainId != null) return session.chainId
+  return buildDefaultChainId(config)
+}
+
 export function readSession(storage = globalThis.localStorage) {
   try {
     return JSON.parse(storage.getItem(SESSION_KEY) || 'null')
@@ -63,55 +122,29 @@ export function passkeyConnector(options = {}) {
   /*
    * THE EIP-1193 FACADE, AND WHY IT MAY NEVER BE NULL AGAIN.
    *
-   * wagmi's `reconnect` skips any connector whose provider is falsy, before it ever asks whether
+   * wagmi's `reconnect` skips any connector whose provider is falsy, BEFORE it ever asks whether
    * the connector is authorized:
    *
    *     const provider = await connector.getProvider().catch(() => undefined)
    *     if (!provider) continue
    *
-   * This returned `null`, so wagmi silently skipped the passkey connector on every reconnect and
-   * every passkey member was signed out by a page reload — with a complete session and credential
-   * record sitting in storage, and FR-003's "silent restore, no ceremony on reload" never once
-   * happening in a browser. Nothing reported it: wagmi swallows reconnect failures, the connector's
-   * own unit tests exercise `connect({ isReconnecting: true })` directly (which works), and the
-   * one account-native test that always ran checks session persistence at the localStorage
-   * boundary rather than the restore.
+   * `getProvider` used to answer `deps.provider ?? null`, so with no provider injected wagmi
+   * silently skipped the passkey connector on every reconnect and every passkey member was signed
+   * out by a page reload — with a complete session and credential record sitting in storage, and
+   * FR-003's "silent restore, no ceremony on reload" never once happening in a browser. Nothing
+   * reported it: wagmi swallows reconnect failures, and the connector's own unit tests exercise
+   * `connect({ isReconnecting: true })` directly, which works.
    *
-   * Built ONCE per connector instance, because wagmi also dedupes by reference
-   * (`providers.some((x) => x === provider)`) — a fresh object per call would make two connectors
-   * look distinct even when they are not, and defeats the identity check.
+   * Built ONCE per connector instance, because wagmi also dedupes providers by reference
+   * (`providers.some((x) => x === provider)`) — a fresh object per call makes two connectors look
+   * distinct when they are not.
    *
    * Reads proxy the configured transport. Writes are refused here BY DESIGN: this connector holds
    * no key, and a passkey transaction is a UserOp assembled by the submission router.
+   *
+   * The chain it reports comes from `sessionChainId`, not a stored value taken on trust, so the
+   * facade and `getChainId()` cannot disagree about which chain the session is on (#1286).
    */
-  /*
-   * The chain a passkey session is on when nothing has said otherwise (#1286).
-   *
-   * NOT `config.chains[0]`. That is Polygon by construction — wagmi.js orders the list so mainnet
-   * is wagmi's default "no wallet connected" chain — so every passkey session reported 137 whatever
-   * the build was for. On a mainnet build that is right by accident; on a testnet-cohort build the
-   * app then took chain-scoped reads against MAINNET while the member sat on the testnet, which is
-   * the cohort-crossing read constitution III forbids.
-   *
-   * What it cost in practice: `useChainId()` fed the wrong chain to the KeyRegistry lookup on the
-   * create path, the opponent's key came back empty, and the form told the member
-   * "your opponent has not registered their encryption key" — a definite claim about someone else,
-   * produced by reading the wrong chain. Encryption is mandatory there, so passkey members could
-   * not create a wager at all off Polygon. (Measured against a local 80002 chain that held a valid
-   * 32-byte key for that exact opponent; a classic session on the identical state created it.)
-   *
-   * `getCurrentChainId()` is the app's own answer to "which network is this build for" — env
-   * `VITE_NETWORK_ID`, else the primary. On a mainnet build it still yields Polygon, so that path
-   * is byte-for-byte unchanged.
-   *
-   * Guarded on registration: a chain wagmi does not know cannot serve `config.getClient`, so an
-   * unregistered id falls back rather than trading a wrong-chain read for a broken client.
-   */
-  const defaultChainId = () => {
-    const current = getCurrentChainId()
-    return config.chains.some((c) => c.id === current) ? current : config.chains[0]?.id
-  }
-
   const provider = deps.provider ?? {
     async request({ method, params } = {}) {
       if (PASSKEY_WRITE_METHODS.has(method)) {
@@ -121,7 +154,7 @@ export function passkeyConnector(options = {}) {
         )
       }
       const session = readSession(deps.storage)
-      const chainId = session?.chainId ?? defaultChainId()
+      const chainId = sessionChainId(session, config)
       if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
         return session ? [getAddress(session.address)] : []
       }
@@ -143,7 +176,7 @@ export function passkeyConnector(options = {}) {
     },
 
     async connect({ chainId, isReconnecting, credentialId, discoverable, mode: requestedMode } = {}) {
-      const targetChain = chainId ?? defaultChainId()
+      const targetChain = chainId ?? buildDefaultChainId(config)
       // NO network gate here, deliberately. Signing in is a WebAuthn ceremony plus a local address
       // derivation — it needs no bundler, no EntryPoint and no RPC. Gating it on submission support
       // locked members out: selecting a network without a bundler persisted in the session, and on
@@ -164,7 +197,15 @@ export function passkeyConnector(options = {}) {
           writeSession(null, deps.storage)
           throw new Error('Passkey session is unusable on this browser — sign in again.')
         }
-        return { accounts: [getAddress(session.address)], chainId: session.chainId ?? targetChain }
+        // Re-resolve rather than trust the stored id: only a member's own switch survives a
+        // reload (see sessionChainId). Heal the row too, so nothing downstream can read a
+        // stale chain straight out of storage.
+        const chosen = chainId != null || session.chainChosen === true
+        const restored = chainId ?? sessionChainId(session, config)
+        if (session.chainId !== restored || Boolean(session.chainChosen) !== chosen) {
+          writeSession({ ...session, chainId: restored, ...(chosen && { chainChosen: true }) }, deps.storage)
+        }
+        return { accounts: [getAddress(session.address)], chainId: restored }
       }
 
       let credential
@@ -230,6 +271,10 @@ export function passkeyConnector(options = {}) {
       const session = {
         address,
         chainId: targetChain,
+        // Marked only when the CALLER named the chain. Without the flag this row is a
+        // derived default that re-resolves on the next load — which is what keeps the
+        // build, not a months-old snapshot, deciding the chain (issue #1286).
+        ...(chainId != null && { chainChosen: true }),
         credentialId: credential.credentialId,
         loginMethod: 'passkey',
         // No expiry field BY DESIGN — persists until explicit sign-out (clarification Q4).
@@ -249,8 +294,9 @@ export function passkeyConnector(options = {}) {
     },
 
     async getChainId() {
-      const session = readSession(deps.storage)
-      return session?.chainId ?? defaultChainId()
+      // A chain the member SWITCHED to is honoured verbatim; a chain we derived is derived
+      // again, so it tracks the build instead of the day the session was created.
+      return sessionChainId(readSession(deps.storage), config)
     },
 
     async isAuthorized() {
@@ -263,7 +309,10 @@ export function passkeyConnector(options = {}) {
       // of the lockout — it made an unsupported chain a one-way door. The write path discloses the
       // limitation honestly at the point of action instead.
       const session = readSession(deps.storage)
-      if (session) writeSession({ ...session, chainId }, deps.storage)
+      // `chainChosen` is written HERE and nowhere else: this is the one path where a member
+      // actually names a chain, and the flag is what makes their choice outrank the build
+      // default on every later load (issue #1286).
+      if (session) writeSession({ ...session, chainId, chainChosen: true }, deps.storage)
       const chain = config.chains.find((c) => c.id === chainId)
       config.emitter.emit('change', { chainId })
       return chain

@@ -546,9 +546,180 @@ describe('MyMarketsModal', () => {
       expect(screen.getByText(/No Active Positions/i)).toBeInTheDocument()
     })
 
-    // The "Expired" status filter was removed (spec 040 US6): expired offers stay
-    // hidden from the default view and are no longer selectable via the dropdown,
-    // so the former filter-to-Expired-then-Clear flow no longer applies here.
+    // The standalone "Expired" status filter stays removed (spec 040 US6), but an
+    // expired offer must still be REACHABLE: it is only expired in this UI — on
+    // chain it is still Open with the creator's stake escrowed, and "Reclaim &
+    // Clear" is how the creator asks for that stake back. Removing the option
+    // without a replacement left that row in no view at all (#1297).
+    it('reaches a creator expired offer under the Pending Acceptance filter, with Reclaim & Clear', async () => {
+      const user = userEvent.setup()
+      const myExpiredOffer = {
+        id: '101',
+        description: 'Nobody Took This',
+        creator: '0x1234567890123456789012345678901234567890', // the connected account
+        participants: [],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        marketType: 'friend'
+      }
+
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[myExpiredOffer]} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+      })
+      await user.click(screen.getByRole('tab', { name: /created/i }))
+
+      // Default 'all' status filter still keeps expired offers out of the way.
+      expect(screen.queryByText('Nobody Took This')).not.toBeInTheDocument()
+
+      // ...and selecting "Pending Acceptance" brings it back, because that is
+      // what it still is on chain.
+      const statusSelect = screen.getByText('Status:').nextElementSibling
+      await act(async () => {
+        await user.selectOptions(statusSelect, 'pending_acceptance')
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Nobody Took This')).toBeInTheDocument()
+      })
+      expect(screen.getByRole('button', { name: 'Reclaim & Clear' })).toBeInTheDocument()
+    })
+
+    // Bulk "Clear all expired" only hides rows — it never reclaims — and
+    // dismissal is one-way here, so it must never offer to sweep away the
+    // creator's own escrowed offer along with its Reclaim & Clear (#1297).
+    it('does not offer bulk clear-all over the member own expired offers', async () => {
+      const user = userEvent.setup()
+      const myExpiredOffer = {
+        id: '102',
+        description: 'Mine, Expired',
+        creator: '0x1234567890123456789012345678901234567890',
+        participants: [],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        marketType: 'friend'
+      }
+
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[myExpiredOffer]} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+      })
+      await user.click(screen.getByRole('tab', { name: /created/i }))
+
+      const statusSelect = screen.getByText('Status:').nextElementSibling
+      await act(async () => {
+        await user.selectOptions(statusSelect, 'pending_acceptance')
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Mine, Expired')).toBeInTheDocument()
+      })
+      expect(screen.queryByRole('button', { name: /clear all expired/i })).not.toBeInTheDocument()
+    })
+
+    // The route a member actually takes: the activity feed's "reclaim your
+    // stake" entry opens this modal with the wager id, which resets the status
+    // filter to "all" — the one view that hides expired offers. A wager asked
+    // for BY ID has to survive that filter, or the feed lands the creator on an
+    // empty list (#1297).
+    it('opens an expired offer asked for by id, even under the default filter', async () => {
+      const myExpiredOffer = {
+        id: '103',
+        description: 'Reached From The Feed',
+        creator: '0x1234567890123456789012345678901234567890',
+        participants: [],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        marketType: 'friend'
+      }
+
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal
+            isOpen={true}
+            onClose={mockOnClose}
+            friendMarkets={[myExpiredOffer]}
+            initialSelectedMarketId="103"
+          />
+        )
+      })
+
+      // The detail view, not the empty state — and it carries the reclaim.
+      // Query the heading specifically: the detail view renders the title twice
+      // (the <h3> and the description block), so a bare getByText is ambiguous.
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: 'Reached From The Feed' })
+        ).toBeInTheDocument()
+      })
+      expect(screen.queryByText(/No Active Positions/i)).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /claim refund/i })).toBeInTheDocument()
+    })
+
+    // "Reclaim & Clear" moves money before it hides the row, and dismissal is
+    // one-way here. If the reclaim cannot even be attempted, the row must stay
+    // put and say why — a dismissal would look identical to a refund that
+    // worked and take the only route to the stake with it (#1297).
+    it('does not dismiss the creator row when the reclaim cannot be submitted', async () => {
+      const user = userEvent.setup()
+      const dismissMarket = vi.fn()
+      useWeb3.mockReturnValue({
+        signer: null,
+        isCorrectNetwork: true,
+        switchNetwork: vi.fn()
+      })
+      const myExpiredOffer = {
+        id: '104',
+        description: 'No Signer Here',
+        creator: '0x1234567890123456789012345678901234567890',
+        participants: [],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        marketType: 'friend'
+      }
+
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[myExpiredOffer]} />,
+          { friendMarketsContext: { ...defaultFriendMarketsContext, dismissMarket } }
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+      })
+      await user.click(screen.getByRole('tab', { name: /created/i }))
+
+      const statusSelect = screen.getByText('Status:').nextElementSibling
+      await act(async () => {
+        await user.selectOptions(statusSelect, 'pending_acceptance')
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('No Signer Here')).toBeInTheDocument()
+      })
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: 'Reclaim & Clear' }))
+      })
+
+      expect(dismissMarket).not.toHaveBeenCalled()
+      expect(await screen.findByRole('alert')).toHaveTextContent(/connect your wallet/i)
+      expect(screen.getByText('No Signer Here')).toBeInTheDocument()
+    })
 
   })
 

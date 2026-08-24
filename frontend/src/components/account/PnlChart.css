@@ -43,8 +43,8 @@
 }
 
 .account-range-btn.active {
-  background: var(--brand-primary);
-  color: #fff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .account-range-btn:focus-visible {

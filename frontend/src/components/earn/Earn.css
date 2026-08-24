@@ -291,9 +291,9 @@
 }
 
 .earn-btn.primary {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-  color: #fff;
+  background: var(--primary-button);
+  border-color: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .earn-btn.secondary {

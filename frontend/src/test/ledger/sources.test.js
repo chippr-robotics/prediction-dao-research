@@ -7,6 +7,10 @@ import { createTransferLedgerSource, transferRecordToEntry } from '../../data/le
 import { createEarnLedgerSource, captureEarnAction } from '../../data/ledger/sources/earnLedgerSource'
 import { createPoolLedgerSource } from '../../data/ledger/sources/poolLedgerSource'
 import { createMembershipLedgerSource } from '../../data/ledger/sources/membershipLedgerSource'
+import { createStakingLedgerSource } from '../../data/ledger/sources/stakingLedgerSource'
+import { createBridgeLedgerSource } from '../../data/ledger/sources/bridgeLedgerSource'
+import { createLiquidityLedgerSource } from '../../data/ledger/sources/liquidityLedgerSource'
+import { createMiniAppLedgerSource } from '../../data/ledger/sources/miniAppSource'
 import { __clearClientLedger } from '../../data/ledger/ledgerClientStore'
 
 const ACCOUNT = '0xabc0000000000000000000000000000000000001'
@@ -243,5 +247,37 @@ describe('membershipLedgerSource', () => {
     expect(purchase.direction).toBe('out')
     const redeem = entries.find((e) => e.kind === 'voucher_redeem')
     expect(redeem.direction).toBe('none')
+  })
+})
+
+/**
+ * Issue #1280 — `backing` is what makes the repository's `unreadable` verdict
+ * mean anything. It is declared per source, so it can silently drift; this
+ * asserts the DEFAULT wiring's split rather than a hand-built seam. A new
+ * source arriving without a backing counts as network-backed, which is the
+ * safe direction (it can only make the ledger more cautious, never less).
+ */
+describe('ledger sources declare what they had to reach (#1280)', () => {
+  it('network-backed sources are the ones that cross an RPC or subgraph', () => {
+    expect(createWagerLedgerSource().backing).toBe('network')
+    expect(createPoolLedgerSource().backing).toBe('network')
+    expect(createMembershipLedgerSource().backing).toBe('network')
+  })
+
+  it('client-store sources never testify that a chain went unread', async () => {
+    const [transfer, earn, staking, bridge, liquidity, miniapp] = [
+      createTransferLedgerSource(),
+      createEarnLedgerSource(),
+      createStakingLedgerSource(),
+      createBridgeLedgerSource(),
+      createLiquidityLedgerSource(),
+      createMiniAppLedgerSource(),
+    ]
+    for (const src of [transfer, earn, staking, bridge, liquidity, miniapp]) {
+      expect(src.backing).toBe('client')
+      // …and the claim is true: with no network at all they still FULFIL,
+      // which is exactly why their answering proves nothing about the chain.
+      await expect(src.list({ ...CTX, provider: null })).resolves.toBeInstanceOf(Array)
+    }
   })
 })

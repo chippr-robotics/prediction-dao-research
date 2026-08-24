@@ -11,6 +11,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 vi.mock('../../../config/networks', () => ({
+  // The build's home network — connectors/passkey resolves its default session chain from
+  // this rather than wagmi's Polygon-first chain list (issue #1286).
+  getCurrentChainId: vi.fn(() => 80002),
   getNetwork: vi.fn(() => ({
     chainId: 80002,
     rpcUrl: 'https://rpc.example',

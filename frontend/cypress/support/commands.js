@@ -351,6 +351,21 @@ Cypress.Commands.add('switchAccount', (accountIndex) => {
     if (!win.ethereum || typeof win.ethereum.__cySetAccount !== 'function') {
       throw new Error('switchAccount: cy.mockWeb3Provider() must run before the visit')
     }
+    /*
+     * Drop the wager cache BEFORE the switch (#1250). The `friendMarkets:<chainId>` key is
+     * per CHAIN, not per account, and this command deliberately does not reload — left in
+     * place, the previous account's key would satisfy `cy.settledWagerPanel()` the instant
+     * it is called, while the new account's scan is still running. The address change
+     * re-runs FriendMarketsContext's effect, so the key is rewritten exactly when THIS
+     * account's fetch completes — which is also what the app would show after a reload.
+     */
+    try {
+      Object.keys(win.localStorage)
+        .filter((k) => k === 'friendMarkets' || k.startsWith('friendMarkets:'))
+        .forEach((k) => win.localStorage.removeItem(k))
+    } catch {
+      // Storage unavailable in this realm; settledWagerPanel falls back to its timeout.
+    }
     win.ethereum.__cySetAccount(account)
   })
 
@@ -683,6 +698,47 @@ Cypress.Commands.add('openMyWagers', (tab = 'participating') => {
     cy.contains('button, [role="tab"]', new RegExp(tab, 'i'))
       .click({ force: true })
   }
+})
+
+/**
+ * Yield the My Wagers list panel only after the wager fetch has actually finished (#1250).
+ *
+ * `cy.get('.mm-panel')` waits for the PANEL, not its CONTENT: MyMarketsModal clears its own
+ * `loading` flag in the same tick it empties `markets`, while the rows come from
+ * `useFriendMarkets()` — a chain scan the modal neither waits on nor renders a pending state
+ * for. The panel therefore appears at once saying "No Active Positions" and fills in seconds
+ * later, so a `$panel.find(...)` snapshot taken in between reads nothing and both limbs of a
+ * conditional no-op. The empty state is NOT terminal, so waiting for "a row OR the empty
+ * state" would settle instantly and prove nothing.
+ *
+ * The one completion edge the app exposes is FriendMarketsContext writing its result —
+ * including an empty one — to `friendMarkets:<chainId>` in localStorage. That is an edge and
+ * not a coincidence because the key is absent when the wait starts: the money-path specs
+ * `cy.clearLocalStorage()` in `beforeEach`, and `cy.switchAccount()` drops the key as it
+ * changes account (the cache is per CHAIN and would otherwise carry the previous account's
+ * list). Callers settle BEFORE the read that decides anything, never inside a chosen branch.
+ *
+ * PREFER NOT SNAPSHOTTING AT ALL: where the spec has just arranged the thing it acts on,
+ * assert the control retryably — cy.get(PANEL).find(CONTROL, { timeout }).should(...) — so an
+ * absent precondition fails there, saying which one. This command is for genuine probes.
+ */
+const WAGER_PANEL_SELECTOR = '.mm-panel, [role="tabpanel"]'
+
+Cypress.Commands.add('settledWagerPanel', () => {
+  cy.get(WAGER_PANEL_SELECTOR, { timeout: 10000 }).should('exist')
+
+  // The key is written verbatim in both this command and `switchAccount`, which clears it,
+  // so the two halves of the wait can be read — and guarded — without chasing a constant.
+  cy.window({ log: false })
+    .its('localStorage', { timeout: 30000 })
+    .should((storage) => {
+      const done = Object.keys(storage).some(
+        (k) => k === 'friendMarkets' || k.startsWith('friendMarkets:'),
+      )
+      expect(done, 'wager fetch completed (friendMarkets cache written)').to.be.true
+    })
+
+  return cy.get(WAGER_PANEL_SELECTOR, { timeout: 10000 })
 })
 
 /**

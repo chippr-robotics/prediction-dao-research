@@ -209,8 +209,8 @@
 }
 
 .hw-scheme-toggle__option[aria-checked='true'] {
-  background: var(--primary-color);
-  color: #fff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 /* --- account picker rows --- */

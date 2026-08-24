@@ -29,6 +29,7 @@ import {
 } from '../../lib/callsigns'
 import { CALLSIGN_REGISTRY_ABI } from '../../abis/callsignRegistry'
 import { getContractAddressForChain } from '../../config/contracts'
+import { extractRevert } from '../../lib/chain/revertError'
 
 // Registration commit -> reveal min age. The contract enforces the real value against block time; this
 // is only the client-side countdown (kept in sync with the on-chain minimum, ~60s). A premature reveal
@@ -115,29 +116,6 @@ function formatDate(seconds) {
   } catch {
     return ''
   }
-}
-
-// Pull a decoded custom error ({name, args}) out of an ethers v6 error, whether it
-// arrived pre-decoded on `.revert` or as raw selector data nested in the RPC payload.
-function extractRevert(err, iface) {
-  if (err?.revert?.name) return { name: err.revert.name, args: err.revert.args }
-  const candidates = [
-    err?.data,
-    err?.info?.error?.data,
-    err?.error?.data,
-    err?.error?.error?.data,
-  ]
-  for (const data of candidates) {
-    if (typeof data === 'string' && data.startsWith('0x') && data.length >= 10) {
-      try {
-        const parsed = iface.parseError(data)
-        if (parsed) return { name: parsed.name, args: parsed.args }
-      } catch {
-        /* not one of our errors — keep looking */
-      }
-    }
-  }
-  return null
 }
 
 function describeError(err, iface) {

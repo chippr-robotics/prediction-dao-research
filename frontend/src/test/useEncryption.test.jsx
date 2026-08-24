@@ -20,6 +20,8 @@ import {
   publicKeyFromSignature,
   getRecipients
 } from '../utils/crypto/envelopeEncryption.js'
+// Mocked below — imported so the #1286 block can drive each of the three lookup states.
+import { lookupPublicKeyState } from '../utils/keyRegistryService.js'
 
 const ACCOUNT = '0x1111111111111111111111111111111111111111'
 const OPPONENT = '0x2222222222222222222222222222222222222222'
@@ -45,6 +47,9 @@ vi.mock('../hooks/useWalletManagement', () => ({
 // Avoid real on-chain key registration during initializeKeys().
 vi.mock('../utils/keyRegistryService.js', () => ({
   lookupPublicKey: vi.fn(async () => null),
+  // Three-state lookup (issue #1286): the hook must be able to tell "no key" from "no answer".
+  KEY_LOOKUP: { READ: 'read', NOT_REGISTERED: 'not-registered', UNREADABLE: 'unreadable' },
+  lookupPublicKeyState: vi.fn(async () => ({ state: 'not-registered' })),
   hasRegisteredKey: vi.fn(async () => false),
   ensureKeyRegistered: vi.fn(async () => false),
   clearKeyCache: vi.fn()
@@ -180,5 +185,36 @@ describe('useEncryption — decrypt flow (My Wagers decrypt bug)', () => {
     // Keys derive from the cached signature — viewing is click → see.
     expect(signMessage).not.toHaveBeenCalled()
     expect(decrypted).toMatchObject(metadata)
+  })
+})
+
+/**
+ * Issue #1286 (part 2) — the create path's refusal text is a definite claim about ANOTHER
+ * member ("your opponent has not registered their encryption key"). It may only follow a
+ * definite negative: an unreadable registry throws instead, so the caller reports our failure
+ * as ours.
+ */
+describe('useEncryption — lookupOpponentKey never turns a failed read into a verdict', () => {
+  beforeEach(() => {
+    lookupPublicKeyState.mockReset()
+  })
+
+  it('returns null when the registry ANSWERED and holds no key', async () => {
+    lookupPublicKeyState.mockResolvedValue({ state: 'not-registered' })
+    const { result } = renderHook(() => useEncryption())
+    await expect(result.current.lookupOpponentKey(OPPONENT)).resolves.toBeNull()
+  })
+
+  it('returns the key when the registry has one', async () => {
+    const key = new Uint8Array(32).fill(7)
+    lookupPublicKeyState.mockResolvedValue({ state: 'read', publicKey: key })
+    const { result } = renderHook(() => useEncryption())
+    await expect(result.current.lookupOpponentKey(OPPONENT)).resolves.toBe(key)
+  })
+
+  it('THROWS when the registry could not be read, so no caller can say "not registered"', async () => {
+    lookupPublicKeyState.mockResolvedValue({ state: 'unreadable', reason: 'timeout' })
+    const { result } = renderHook(() => useEncryption())
+    await expect(result.current.lookupOpponentKey(OPPONENT)).rejects.toThrow(/could not read/i)
   })
 })

@@ -549,7 +549,19 @@ artifacts live under `specs/<feature>/`.
   off-brand. 091 also added tier metals (gold = Amber, so the estate keeps one yellow) and
   `--gradient-brand`; **a gradient built from two different semantic tokens is a bug** — a
   `--brand-primary → --success-color` button says something untrue about what it does, which is
-  exactly what the 091 screenshot round caught. FOUR guards now gate CI in
+  exactly what the 091 screenshot round caught. (6) **A brand fill NEVER states its own label
+  colour** (issue #1260): fill from `--primary-button` and label with `--primary-button-text`, a
+  matched pair that INVERTS on dark (Teal 300 fill, Gunmetal label) because `color: #fff` on
+  `--brand-primary` measures 2.16:1 there. A disabled control changes HUE — `index.css` re-points
+  the whole fill/label set (`--primary-button`, `--primary-button-hover`, `--primary-button-text`
+  **and `--gradient-primary-button`**) at the disabled neutrals on any disabled button — because
+  `opacity: .55` over a pale teal is not a state a member can read. **THE FILL AND THE LABEL MOVE
+  TOGETHER OR NOT AT ALL**: half of each puts `--disabled-text` on a full-strength brand fill at
+  1.27:1 (light) / 1.06:1 (dark), *worse* than the bug being fixed, so a status-coloured control —
+  which keeps its fill when disabled — labels with `--status-fill-text` instead. The gradient must
+  be re-pointed rather than left to re-resolve: a custom property's `var()` stops are substituted
+  where it is DECLARED (`:root`), and descendants inherit the finished string — which is also why
+  the `--text-on-brand`/`--color-on-primary` aliases never follow the remap. SIX guards now gate CI in
   `frontend/src/test/brand/`. See `docs/developer-guide/brand-tokens.md` +
   `specs/090-chippr-brand-alignment/` + `specs/091-neutral-token-consolidation/`.
 - **FinOps (spec 089): the CATALOGUE is the source of truth, and a zero is never an absence.**

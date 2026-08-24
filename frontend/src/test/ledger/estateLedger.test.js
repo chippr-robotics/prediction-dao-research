@@ -116,6 +116,38 @@ describe('listEntriesAcrossEstate — contract guarantees', () => {
     expect(res.partialChains).toEqual([])
   })
 
+  it('G8: a chain whose sources ALL failed is unreachable, never an empty read (#1280)', async () => {
+    // The repository degrades per source rather than throwing, so a total
+    // outage arrives here as `readState: 'unreadable'` with an empty list.
+    const seam = makeSeam({
+      1: { entries: [entry(1, 'a', 100)], readState: 'read' },
+      137: { entries: [], readState: 'unreadable', staleClasses: ['wager', 'transfer'] },
+    })
+    const res = await seam.listEntriesAcrossEstate({ account: ACCOUNT, chainIds: [1, 137] })
+    expect(res.chainStates.find((s) => s.chainId === 137)).toMatchObject({
+      state: 'unreachable',
+      reason: expect.stringMatching(/no source on this network could be read/i),
+      entryCount: 0,
+    })
+    expect(res.partialChains).toEqual([137])
+    // The unreadable chain contributes no staleness — it contributed nothing.
+    expect(res.staleByChain.has(137)).toBe(false)
+    // The chain that answered is unaffected.
+    expect(res.entries).toHaveLength(1)
+    expect(res.chainStates.find((s) => s.chainId === 1).state).toBe('read')
+  })
+
+  it('G8: EVERY chain unreadable ⇒ every chain state is unreachable (the FR-009 shape)', async () => {
+    const seam = makeSeam({
+      1: { entries: [], readState: 'unreadable', staleClasses: ['wager'] },
+      137: { entries: [], readState: 'unreadable', staleClasses: ['wager'] },
+    })
+    const res = await seam.listEntriesAcrossEstate({ account: ACCOUNT, chainIds: [1, 137] })
+    expect(res.entries).toEqual([])
+    expect(res.chainStates.every((s) => s.state === 'unreachable')).toBe(true)
+    expect(res.partialChains).toEqual([1, 137])
+  })
+
   it('carries per-chain staleness and pruning through without collapsing them into chain state', async () => {
     const seam = makeSeam({
       1: { entries: [], staleClasses: ['earn'], prunedBefore: 1700000000000 },

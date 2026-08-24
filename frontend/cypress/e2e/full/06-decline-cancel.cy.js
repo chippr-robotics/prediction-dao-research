@@ -157,9 +157,29 @@ describe('Decline and Cancel Wagers', () => {
     // Open My Wagers → Created tab
     cy.openMyWagers('created')
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
+    /*
+     * This test CREATED the wager above, so the row is a precondition, not a probe: assert it
+     * retryably and fail HERE if it never lists, rather than no-oping through a one-shot
+     * snapshot (#1250). That part was right; the WINDOW was too short, and on a fresh chain
+     * this failed against a list that does arrive.
+     *
+     * Measured on a clean local node: the cache key `friendMarkets:80002` is ALREADY written
+     * (~6.4 KB) by the time this line runs — the page's first scan completed back at
+     * `connectAndVisit(0)`, before the wager existed. So the row needs the NEXT scan, and it
+     * lands at roughly 30s. The old 20s window closed first.
+     *
+     * `cy.settledWagerPanel()` deliberately NOT used here, though this is exactly the shape it
+     * was written for: it waits for that key to exist, and here it already does, so it settles
+     * instantly on a list that predates the creation and proves nothing. Its own docstring
+     * names the precondition it needs — the key absent when the wait starts, via
+     * `clearLocalStorage` or `switchAccount` — and this test meets neither. A retryable
+     * assertion with a window that actually covers a cold scan is the honest wait, and it
+     * still fails here, naming this precondition, if the row never lists at all.
+     */
+    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+      .find('.mm-table-row', { timeout: 60000 })
+      .should('have.length.greaterThan', 0)
+      .then((rows) => {
         // Click on the first wager to view details
         cy.wrap(rows.first()).click()
 
@@ -190,10 +210,7 @@ describe('Decline and Cancel Wagers', () => {
             })
           }
         })
-      } else {
-        cy.get('.mm-empty-state').should('exist')
-      }
-    })
+      })
   })
 
   // ---------------------------------------------------------------------------
@@ -260,8 +277,10 @@ describe('Decline and Cancel Wagers', () => {
 
     cy.openMyWagers('created')
 
-    // Look for an active wager
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
+    // Look for an active wager. This is a genuine probe (the test did not arrange an
+    // ACCEPTED wager), so settle the fetch first — a bare panel snapshot reads the
+    // in-flight empty state as "no active wagers" (#1250).
+    cy.settledWagerPanel().then(($panel) => {
       /*
        * Open the row that is actually ACTIVE.
        *

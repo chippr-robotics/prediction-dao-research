@@ -17,8 +17,8 @@
 
 /* Primary Button */
 .button-primary {
-  background: var(--gradient-brand);
-  color: white;
+  background: var(--gradient-primary-button);
+  color: var(--primary-button-text);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -39,8 +39,8 @@
 }
 
 .button-secondary:hover:not(:disabled) {
-  background: var(--brand-primary);
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   transform: translateY(-2px);
 }
 
