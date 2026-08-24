@@ -100,46 +100,57 @@ billing_export_dataset = "billing_export"
 notification_emails = ["cody.w.burns@gmail.com"]
 
 # VM health policies, carried over from ops/monitoring/apply.sh with thresholds unchanged.
-vm_alert_policies = {
-  vm-cpu-high = {
-    display_name   = "FairWins VM CPU high"
-    condition_name = "CPU utilization above 90% for 5 minutes"
-    filter         = "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\""
-    threshold      = 0.9
-  }
-  vm-memory-high = {
-    display_name   = "FairWins VM memory high"
-    condition_name = "Memory utilization above 90% for 5 minutes"
-    filter         = "metric.type=\"agent.googleapis.com/memory/percent_used\" AND resource.type=\"gce_instance\" AND metric.label.state=\"used\""
-    threshold      = 90
-  }
-  vm-disk-filling = {
-    display_name   = "FairWins VM disk filling"
-    condition_name = "Disk utilization above 85%"
-    filter         = "metric.type=\"agent.googleapis.com/disk/percent_used\" AND resource.type=\"gce_instance\" AND metric.label.state=\"used\""
-    threshold      = 85
-  }
-  vm-instance-down = {
-    display_name      = "FairWins VM instance down"
-    condition_name    = "Instance uptime signal absent"
-    filter            = "metric.type=\"compute.googleapis.com/instance/uptime\" AND resource.type=\"gce_instance\""
-    comparison        = "COMPARISON_LT"
-    threshold         = 1
-    duration_seconds  = 300
-    alignment_seconds = 300
-    aligner           = "ALIGN_COUNT"
-  }
-  vm-agent-not-reporting = {
-    display_name      = "FairWins VM Ops Agent not reporting"
-    condition_name    = "No agent metrics for 10 minutes"
-    filter            = "metric.type=\"agent.googleapis.com/agent/uptime\" AND resource.type=\"gce_instance\""
-    comparison        = "COMPARISON_LT"
-    threshold         = 1
-    duration_seconds  = 600
-    alignment_seconds = 600
-    aligner           = "ALIGN_COUNT"
-  }
-}
+# EMPTY, deliberately — the five live VM policies are NOT adopted (see the module block in main.tf).
+# The module cannot describe them: "VM not reporting" and "Ops Agent not reporting" use
+# conditionAbsent where it emits a conditionThreshold, and the CPU policy runs 0.7 over 900s with
+# REDUCE_MEAN against 0.9 and defaults here. Importing them would rewrite live alerting while
+# reporting an adoption, so they stay live and unmanaged, exactly as they are today.
+#
+# The intended design is kept below verbatim. It becomes real in the follow-up that teaches the
+# module conditionAbsent and per-condition aggregation — at which point these values must ALSO be
+# reconciled against the live policies before anything is imported.
+vm_alert_policies = {}
+
+# vm_alert_policies = {
+#   vm-cpu-high = {
+#     display_name   = "FairWins VM CPU high"
+#     condition_name = "CPU utilization above 90% for 5 minutes"
+#     filter         = "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\""
+#     threshold      = 0.9
+#   }
+#   vm-memory-high = {
+#     display_name   = "FairWins VM memory high"
+#     condition_name = "Memory utilization above 90% for 5 minutes"
+#     filter         = "metric.type=\"agent.googleapis.com/memory/percent_used\" AND resource.type=\"gce_instance\" AND metric.label.state=\"used\""
+#     threshold      = 90
+#   }
+#   vm-disk-filling = {
+#     display_name   = "FairWins VM disk filling"
+#     condition_name = "Disk utilization above 85%"
+#     filter         = "metric.type=\"agent.googleapis.com/disk/percent_used\" AND resource.type=\"gce_instance\" AND metric.label.state=\"used\""
+#     threshold      = 85
+#   }
+#   vm-instance-down = {
+#     display_name      = "FairWins VM instance down"
+#     condition_name    = "Instance uptime signal absent"
+#     filter            = "metric.type=\"compute.googleapis.com/instance/uptime\" AND resource.type=\"gce_instance\""
+#     comparison        = "COMPARISON_LT"
+#     threshold         = 1
+#     duration_seconds  = 300
+#     alignment_seconds = 300
+#     aligner           = "ALIGN_COUNT"
+#   }
+#   vm-agent-not-reporting = {
+#     display_name      = "FairWins VM Ops Agent not reporting"
+#     condition_name    = "No agent metrics for 10 minutes"
+#     filter            = "metric.type=\"agent.googleapis.com/agent/uptime\" AND resource.type=\"gce_instance\""
+#     comparison        = "COMPARISON_LT"
+#     threshold         = 1
+#     duration_seconds  = 600
+#     alignment_seconds = 600
+#     aligner           = "ALIGN_COUNT"
+#   }
+# }
 
 # ── edge ──────────────────────────────────────────────────────────────────────────────────────
 #
@@ -154,10 +165,11 @@ manage_edge = false
 # `env` is a map, which cannot hold a duplicate key. See imports.tf for the full finding.
 manage_spa = false
 
-# Monitoring is still UNADOPTED and stays gated. All twelve resources exist live and Cloud
-# Monitoring accepts duplicates, so an apply here SUCCEEDS and leaves two of every alert policy —
-# paging twice while the policy that actually fires stays unmanaged. Adopted in its own PR.
-manage_monitoring = false
+# Monitoring is PARTIALLY adopted: the notification channel and the two uptime checks are imported
+# and get per-check uptime alerts. The five VM policies and the probe policy are deliberately NOT
+# adopted — see the module block, they use condition types this module cannot express. They stay
+# live and unmanaged until the module can describe them.
+manage_monitoring = true
 
 # cloudflare_zone_id         = "..."
 # geo_gate_allowed_countries = [...]   # a legal control (spec 007) — see infra/cloudflare/waf-geo.md

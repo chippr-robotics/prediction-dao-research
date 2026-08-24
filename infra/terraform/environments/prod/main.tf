@@ -421,35 +421,66 @@ module "monitoring" {
 
   uptime_targets = [
     {
+      # Names, method and timeout are READ OFF THE LIVE CHECK. `display_name` is the live
+      # `fairwins-bundler-origin`, not a prettier one — an import that renames is a change.
       name         = "bundler"
-      display_name = "FairWins bundler origin"
+      display_name = "fairwins-bundler-origin"
       host         = module.network.static_ips["fairwins-bundler-ip"]
       path         = "/__probe/health"
 
       # A plain 200 proves NOTHING: the origin-lock nginx's own /healthz is a static `return 200`
       # that never touches alto — exactly the check that stayed green through the 2026-07-12 outage.
       # 0x5FF137D4 is the EntryPoint v0.6 address prefix in an eth_supportedEntryPoints response.
-      content_match  = "0x5FF137D4"
-      request_method = "POST"
-      body           = base64encode("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_supportedEntryPoints\",\"params\":[]}")
+      #
+      # The live check is a GET whose BODY is asserted by content_match — `/__probe/health` performs
+      # the JSON-RPC call on the VM and returns the result. This declared a POST carrying a
+      # JSON-RPC body straight at that path, which is a different probe design that has never run:
+      # adopting it would have rewritten a working check into an untested one, under the heading of
+      # an import. If the POST design is wanted, it is its own change with its own verification.
+      content_match   = "0x5FF137D4"
+      timeout_seconds = 30
 
       # The origin serves a Cloudflare Origin CA certificate, deliberately not publicly trusted.
       validate_ssl = false
     },
     {
       name         = "gateway"
-      display_name = "FairWins gateway origin"
+      display_name = "fairwins-gateway-origin"
       host         = module.network.static_ips["fairwins-gateway-ip"]
       path         = "/__probe/health"
 
       # Must NOT be "status":"ok" — the server returns that unconditionally even when every chain
       # is down.
-      content_match = "\"rpc\":\"up\""
-      validate_ssl  = false
+      content_match   = "\"rpc\":\"up\""
+      timeout_seconds = 30
+      validate_ssl    = false
     },
   ]
 
+  # EMPTIED AT terraform.tfvars, and that is the scope boundary of this PR. The variable is still
+  # passed because tflint rejects a declared-and-unused one; the emptiness is the VALUE, not a
+  # literal here, so the intended design stays visible beside it.
+  #
+  # The five live VM policies cannot be described by this module, so passing them would not adopt
+  # them — it would rewrite them:
+  #
+  #   VM not reporting / Ops Agent not reporting   live use conditionAbsent; the module emits a
+  #                                                conditionThreshold. Different condition TYPE,
+  #                                                not a different threshold.
+  #   VM CPU sustained high                        live 0.7 over 900s with REDUCE_MEAN and an
+  #                                                instance_name filter clause; declared 0.9 with
+  #                                                module defaults and no reducer.
+  #   VM memory above 85%                          live 85 over 600s; declared 90.
+  #
+  # Leaving them out means they stay live and unmanaged, exactly as they are today. That is honest;
+  # importing them under a declaration that says something else is not. `var.vm_alert_policies` is
+  # kept in terraform.tfvars as the intended design for the follow-up that teaches the module
+  # conditionAbsent and per-condition aggregation.
   vm_alert_policies = var.vm_alert_policies
+
+  # Same reasoning: the live probe policy fires at > 2 over 300s with ALIGN_SUM, and adopting it
+  # here would restate it from module defaults. Left unmanaged with the VM policies.
+  probe_metric_enabled = false
 }
 
 # ── operator workstation (spec 097) ───────────────────────────────────────────────────────────
