@@ -13,7 +13,7 @@ output "node_service_accounts" {
 
 output "spa_service_uri" {
   description = "Default run.app URI for the SPA. The origin lock 403s direct requests to it — the app must use the Cloudflare-fronted host."
-  value       = module.spa.service_uri
+  value       = one(module.spa[*].service_uri)
 }
 
 output "mcp_server_service_uri" {
@@ -23,5 +23,5 @@ output "mcp_server_service_uri" {
 
 output "uptime_check_ids" {
   description = "Uptime check ids, for cross-referencing alert policies."
-  value       = module.monitoring.uptime_check_ids
+  value       = one(module.monitoring[*].uptime_check_ids)
 }

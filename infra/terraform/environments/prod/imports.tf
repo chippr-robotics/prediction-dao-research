@@ -181,3 +181,73 @@
 #   to = module.edge[0].cloudflare_ruleset.origin_lock[0]
 #   id = "<zone_id>/<ruleset_id>"
 # }
+
+# ── Phase F: monitoring and the SPA — LIVE, DECLARED, NOT ADOPTED ─────────────────────────────────
+#
+# Both surfaces are gated OFF (`manage_spa`, `manage_monitoring`) because declaring them without
+# adopting them is worse than not declaring them at all, in two different ways:
+#
+#   - the SPA fails LOUDLY. `prediction-dao-research` serves production; a create returns
+#     ALREADY_EXISTS and aborts the apply part-way through a graph that also touches the network.
+#   - monitoring fails QUIETLY. Cloud Monitoring accepts duplicates, so the apply SUCCEEDS and the
+#     estate ends up with two of every alert policy — paging twice, while the policy that actually
+#     fires is still the unmanaged one. This is the more dangerous of the two.
+#
+# The ids below were read from the live project on 2026-08-24 and are ready to use. Uncomment ONE
+# group, bring it to a zero-diff plan, flip its `manage_*` flag in the same PR, then start the next.
+#
+# ⚠ ONE MAPPING DOES NOT EXIST YET. The module declares an uptime alert PER NODE —
+# `uptime["gateway"]` and `uptime["bundler"]` — but the estate has a SINGLE combined policy,
+# "FairWins: origin uptime check failing" (7610110331374984120). One live policy cannot be imported
+# into two addresses. Decide first whether the estate should have one policy or two; splitting it is
+# a real alerting change and belongs in its own PR, not smuggled into an adoption.
+#
+# import {
+#   to = module.spa[0].google_cloud_run_v2_service.this
+#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_notification_channel.email["cody.w.burns@gmail.com"]
+#   id = "projects/chippr-bots-site-wp/notificationChannels/2280034247916649810"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_uptime_check_config.this["gateway"]
+#   id = "projects/chippr-bots-site-wp/uptimeCheckConfigs/fairwins-gateway-origin-K8nmzOn_h10"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_uptime_check_config.this["bundler"]
+#   id = "projects/chippr-bots-site-wp/uptimeCheckConfigs/fairwins-bundler-origin-xhuYsm1BGYE"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_alert_policy.vm["vm-memory-high"]
+#   id = "projects/chippr-bots-site-wp/alertPolicies/14357975034822966786"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_alert_policy.vm["vm-disk-filling"]
+#   id = "projects/chippr-bots-site-wp/alertPolicies/14540079270659295497"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_alert_policy.vm["vm-agent-not-reporting"]
+#   id = "projects/chippr-bots-site-wp/alertPolicies/7049084972209223880"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_alert_policy.vm["vm-instance-down"]
+#   id = "projects/chippr-bots-site-wp/alertPolicies/7127003534497995938"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_alert_policy.vm["vm-cpu-high"]
+#   id = "projects/chippr-bots-site-wp/alertPolicies/7127003534497996286"
+# }
+#
+# import {
+#   to = module.monitoring[0].google_monitoring_alert_policy.probe_failing[0]
+#   id = "projects/chippr-bots-site-wp/alertPolicies/15034287693947745231"
+# }

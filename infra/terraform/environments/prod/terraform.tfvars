@@ -149,6 +149,13 @@ vm_alert_policies = {
 # imports.tf.
 manage_edge = false
 
+# Both surfaces are LIVE and UNADOPTED, so Terraform currently describes them without owning them.
+# Left true, the SPA plans as a create against a service that already serves production (apply fails
+# ALREADY_EXISTS mid-graph), and monitoring plans twelve creates that would SUCCEED and duplicate
+# every alert policy. Flip each one only in the PR that imports it to a zero-diff plan.
+manage_spa        = false
+manage_monitoring = false
+
 # cloudflare_zone_id         = "..."
 # geo_gate_allowed_countries = [...]   # a legal control (spec 007) — see infra/cloudflare/waf-geo.md
 

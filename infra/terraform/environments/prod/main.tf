@@ -35,13 +35,19 @@ locals {
 # ── network ───────────────────────────────────────────────────────────────────────────────────
 
 module "network" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
 
   project_id   = var.project_id
   region       = var.region
   network_name = "fairwins-infra"
   subnet_name  = "fairwins-infra-usc1"
   subnet_cidr  = "10.10.0.0/24"
+
+  # `network_description` is deliberately LEFT UNSET. It is FORCE-NEW on google_compute_network and
+  # GCP cannot set one on an existing network, so giving the live VPC a description is not an edit —
+  # it is a replacement, and replacing the VPC takes the subnet and every attached instance with it.
+  # The module hardcoded this string until chippr-tf-modules 33a6cc3; at the previous pin the prod
+  # plan read "must be replaced" for both the VPC and the subnet, from a comment field.
 
   # The live rules are `fairwins-allow-*`, NOT `fairwins-infra-allow-*`. Stated explicitly because a
   # derived name would not match what exists, and on import that reads as "create a new rule and
@@ -66,7 +72,7 @@ module "network" {
  * account and sign with the paymaster HSM key. This grant is strictly smaller.
  */
 module "bundler" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
 
   project_id        = var.project_id
   region            = var.region
@@ -109,7 +115,7 @@ module "bundler" {
  * repository-scoped and its secret access is per-secret.
  */
 module "gateway" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
 
   project_id        = var.project_id
   region            = var.region
@@ -236,7 +242,9 @@ resource "google_kms_crypto_key" "signing" {
 # no in-band detection. Guardrail G-11 rejects any attempt to add it back.
 
 module "spa" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  count = var.manage_spa ? 1 : 0
+
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
 
   project_id = var.project_id
   region     = var.region
@@ -309,7 +317,7 @@ module "spa" {
 module "mcp_server" {
   count = var.manage_mcp_server ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
 
   project_id = var.project_id
   region     = var.region
@@ -359,7 +367,7 @@ data "google_secret_manager_secret_version" "origin_lock" {
 
 module "edge" {
   count  = var.manage_edge ? 1 : 0
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
 
   zone_id = var.cloudflare_zone_id
 
@@ -390,7 +398,9 @@ module "edge" {
 # ── monitoring ────────────────────────────────────────────────────────────────────────────────
 
 module "monitoring" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  count = var.manage_monitoring ? 1 : 0
+
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
 
   project_id          = var.project_id
   notification_emails = var.notification_emails
@@ -442,22 +452,13 @@ module "monitoring" {
 # ADOPTION NOTE: these resources already EXIST in prod state, applied from an unmerged branch.
 # Declaring them here is what stopped `terraform plan` proposing to destroy twelve
 # prevent_destroy secret containers on every run. See specs/097-workstation-secrets-observability/.
-# ⚠ PINNED TO AN OLDER MODULE REF THAN EVERYTHING ELSE, DELIBERATELY.
-#
-# `modules/ops-workstation` exists at 205b2e42 and was REMOVED by 70498e2a — almost certainly
-# tidied away as unused, because the branch that consumed it never merged while the estate it
-# manages was already applied to production. Pinning this one module forward would fail
-# `terraform init` with "Failed to expand subdir globs", which is Terraform saying the subdirectory
-# is not in the fetched repo.
-#
-# Every OTHER module here stays at 70498e2a. Terraform pins per module source, so the mismatch is
-# expressible and is the honest description of the modules repo as it stands.
-#
-# TO RETIRE THIS NOTE: restore modules/ops-workstation in chippr-robotics/chippr-tf-modules at a
-# current commit, then move this ref forward with the others. Until then, do not "fix" the
-# inconsistency by bumping this line — that breaks init.
+# The module ref is unified with every other module in this file at d70fb6f. An earlier revision
+# pinned this one module back to 205b2e42, because `modules/ops-workstation` was absent at the ref
+# the rest used and `terraform init` fails with "Failed to expand subdir globs" when a pinned
+# subdirectory is not in the fetched repo. That split is resolved: d70fb6f carries the module and is
+# byte-identical to 205b2e42 for it, so there is no longer a reason for this line to differ.
 module "workstation" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
 
   project_id                   = var.project_id
   service_account_id           = "fairwins-ops"
