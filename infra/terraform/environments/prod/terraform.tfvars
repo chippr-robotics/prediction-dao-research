@@ -160,10 +160,9 @@ vm_alert_policies = {}
 # imports.tf.
 manage_edge = false
 
-# Both surfaces are LIVE and UNADOPTED, so Terraform currently describes them without owning them.
-# Left true, the SPA plans as a create against a service that already serves production (apply fails
-# ALREADY_EXISTS mid-graph), and monitoring plans twelve creates that would SUCCEED and duplicate
-# every alert policy. Flip each one only in the PR that imports it to a zero-diff plan.
+# STILL FALSE. Adoption was attempted and is BLOCKED — not by risk appetite, but because the live
+# service cannot be represented: it defines VITE_NETWORK_ID TWICE (63 and 80002) and the module's
+# `env` is a map, which cannot hold a duplicate key. See imports.tf for the full finding.
 manage_spa = false
 
 # Monitoring is PARTIALLY adopted: the notification channel and the two uptime checks are imported

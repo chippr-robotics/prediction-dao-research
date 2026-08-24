@@ -34,8 +34,14 @@ module "staging_mainnet" {
   # Required by the provider, then ignored — Cloud Build owns the artifact.
   image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/prediction-dao-research/staging:latest"
 
-  min_instances         = 0
-  max_instances         = var.staging_max_instances
+  min_instances = 0
+  max_instances = var.staging_max_instances
+
+  # Read off the LIVE service, not chosen here: gcloud turned startup CPU boost on at deploy time.
+  # The module could not express it until chippr-tf-modules ce0ed29, and a module that cannot
+  # express a setting does not preserve it on import — it resets it to the provider default.
+  # Stating it is what makes this an adoption rather than a quiet reconfiguration.
+  startup_cpu_boost     = true
   cpu                   = "1"
   memory                = "512Mi"
   cpu_idle              = true
@@ -55,8 +61,14 @@ module "staging_testnet" {
 
   image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/prediction-dao-research/staging-testnet:latest"
 
-  min_instances         = 0
-  max_instances         = var.staging_max_instances
+  min_instances = 0
+  max_instances = var.staging_max_instances
+
+  # Read off the LIVE service, not chosen here: gcloud turned startup CPU boost on at deploy time.
+  # The module could not express it until chippr-tf-modules ce0ed29, and a module that cannot
+  # express a setting does not preserve it on import — it resets it to the provider default.
+  # Stating it is what makes this an adoption rather than a quiet reconfiguration.
+  startup_cpu_boost     = true
   cpu                   = "1"
   memory                = "512Mi"
   cpu_idle              = true

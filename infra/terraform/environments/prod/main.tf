@@ -253,11 +253,25 @@ module "spa" {
   # Required by the provider, then ignored. The pipeline publishes :latest alongside the SHA tag.
   image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/prediction-dao-research/prediction-dao-research:latest"
 
+  # Every value below is READ OFF THE LIVE SERVICE, not chosen. An import is a claim that the
+  # declaration already describes what is running, and three of these were wrong:
+  #
+  #   max_instances          declared 100, live 20
+  #   execution_environment  not expressible, live gen1  -> would have become gen2
+  #   startup_cpu_boost      not expressible, live on    -> would have been turned off
+  #
+  # The last two produced NO diff, because the module had no variable for them until
+  # chippr-tf-modules ce0ed29 — a setting a module cannot express is not preserved on import, it is
+  # reset to the provider default. This service carries production traffic; gen1 -> gen2 and losing
+  # startup CPU boost are real changes to how it runs, and neither would have been visible in the
+  # plan that made them.
   min_instances         = 0
-  max_instances         = 100
+  max_instances         = 20
   cpu                   = "1"
   memory                = "512Mi"
   cpu_idle              = true
+  execution_environment = "EXECUTION_ENVIRONMENT_GEN1"
+  startup_cpu_boost     = true
   allow_unauthenticated = true
 
   secret_env = var.spa_secret_env
