@@ -442,8 +442,22 @@ module "monitoring" {
 # ADOPTION NOTE: these resources already EXIST in prod state, applied from an unmerged branch.
 # Declaring them here is what stopped `terraform plan` proposing to destroy twelve
 # prevent_destroy secret containers on every run. See specs/097-workstation-secrets-observability/.
+# ⚠ PINNED TO AN OLDER MODULE REF THAN EVERYTHING ELSE, DELIBERATELY.
+#
+# `modules/ops-workstation` exists at 205b2e42 and was REMOVED by 70498e2a — almost certainly
+# tidied away as unused, because the branch that consumed it never merged while the estate it
+# manages was already applied to production. Pinning this one module forward would fail
+# `terraform init` with "Failed to expand subdir globs", which is Terraform saying the subdirectory
+# is not in the fetched repo.
+#
+# Every OTHER module here stays at 70498e2a. Terraform pins per module source, so the mismatch is
+# expressible and is the honest description of the modules repo as it stands.
+#
+# TO RETIRE THIS NOTE: restore modules/ops-workstation in chippr-robotics/chippr-tf-modules at a
+# current commit, then move this ref forward with the others. Until then, do not "fix" the
+# inconsistency by bumping this line — that breaks init.
 module "workstation" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=205b2e42953af0cbc2960dda79b0d9a9034a5d9a"
 
   project_id                   = var.project_id
   service_account_id           = "fairwins-ops"
