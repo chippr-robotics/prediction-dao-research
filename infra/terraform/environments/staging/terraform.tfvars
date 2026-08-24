@@ -14,3 +14,6 @@ staging_max_instances = 10
 # pipeline publishes it, and apply on merge is unattended. See
 # docs/runbooks/member-api-operations.md §3.8.
 manage_mcp_server = false
+
+# Live, unadopted, and (until this commit) declared under the wrong names — see variables.tf.
+manage_staging_services = false
