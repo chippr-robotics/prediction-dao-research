@@ -15,5 +15,8 @@ staging_max_instances = 10
 # docs/runbooks/member-api-operations.md §3.8.
 manage_mcp_server = false
 
-# Live, unadopted, and (until this commit) declared under the wrong names — see variables.tf.
-manage_staging_services = false
+# ADOPTED. Both services are imported by the blocks in imports.tf rather than created — the plan
+# must read "will be imported" for each and never "must be replaced". The names here are the LIVE
+# service names; they were `staging` / `staging-testnet` until the fix that preceded this, which is
+# why adoption had to wait for a corrected declaration rather than just a flipped flag.
+manage_staging_services = true
