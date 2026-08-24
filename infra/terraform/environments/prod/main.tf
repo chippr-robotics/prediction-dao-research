@@ -443,7 +443,9 @@ module "monitoring" {
     },
   ]
 
-  # DELIBERATELY EMPTY, and this is the scope boundary of this PR.
+  # EMPTIED AT terraform.tfvars, and that is the scope boundary of this PR. The variable is still
+  # passed because tflint rejects a declared-and-unused one; the emptiness is the VALUE, not a
+  # literal here, so the intended design stays visible beside it.
   #
   # The five live VM policies cannot be described by this module, so passing them would not adopt
   # them — it would rewrite them:
@@ -460,7 +462,7 @@ module "monitoring" {
   # importing them under a declaration that says something else is not. `var.vm_alert_policies` is
   # kept in terraform.tfvars as the intended design for the follow-up that teaches the module
   # conditionAbsent and per-condition aggregation.
-  vm_alert_policies = {}
+  vm_alert_policies = var.vm_alert_policies
 
   # Same reasoning: the live probe policy fires at > 2 over 300s with ALIGN_SUM, and adopting it
   # here would restate it from module defaults. Left unmanaged with the VM policies.
