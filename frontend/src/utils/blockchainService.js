@@ -989,8 +989,16 @@ export async function hasRoleOnChain(userAddress, roleName, chainId, { detailed 
   // Everyone else keeps the plain boolean this has always returned, so no existing caller
   // changes behaviour. An estate-wide sweep NEEDS the distinction: counting an unreachable
   // chain as "role not held" is how an operator gets locked out of the console by an RPC blip.
-  const held = (value) => (detailed ? { held: value, readable: true, reason: null } : value)
-  const unread = (reason) => (detailed ? { held: false, readable: false, reason } : false)
+  //
+  // THREE outcomes, not two (spec 071's read / not-deployed / unreadable). `absent` is the third:
+  // there is no contract on this chain that could hold this role, so the answer is a DEPLOYMENT
+  // fact settled from the address book without touching the network. Collapsing it into `held`
+  // told the sweep that a chain had answered when nothing had been asked of it — see
+  // `classifyEstateProbes`, which is what that mattered to.
+  const held = (value) => (detailed ? { held: value, readable: true, deployed: true, reason: null } : value)
+  const absent = () => (detailed ? { held: false, readable: true, deployed: false, reason: null } : false)
+  const unread = (reason) =>
+    (detailed ? { held: false, readable: false, deployed: true, reason } : false)
 
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
@@ -1000,7 +1008,7 @@ export async function hasRoleOnChain(userAddress, roleName, chainId, { detailed 
   const roleHash = getRoleHash(roleName)
   if (!roleHash) {
     console.warn(`Unknown role: ${roleName}`)
-    return held(false)
+    return absent()
   }
 
   const provider = getProvider(chainId)
@@ -1023,7 +1031,7 @@ export async function hasRoleOnChain(userAddress, roleName, chainId, { detailed 
   if (roleName === 'WAGER_PARTICIPANT' || roleName === 'Wager Participant') {
     const refChain = membershipChainId()
     const mmAddress = getContractAddressForChain('membershipManager', refChain)
-    if (!mmAddress) return held(false)
+    if (!mmAddress) return absent()
     try {
       const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, getProvider(refChain))
       return held(Boolean(await mm.hasActiveRole(userAddress, roleHash)))
@@ -1092,7 +1100,10 @@ export async function hasRoleOnChain(userAddress, roleName, chainId, { detailed 
     }
   }
   // No candidate contract on this chain is a DEFINITE "no role here" — there is nothing to hold
-  // a role on. A candidate that would not answer is a different thing, tracked below.
+  // a role on. But it is settled from the address book, not from the chain, so it reports
+  // `deployed: false`: a sweep must not count it as the chain having answered. A candidate that
+  // would not answer is a different thing again, tracked below.
+  if (candidates.length === 0) return absent()
   let anyFailed = null
   for (const addr of candidates) {
     try {

@@ -21,6 +21,33 @@ import {IAcrossSpokePool} from "../interfaces/external/IAcrossSpokePool.sol";
  *         that pulled nothing would leave the router holding the net and mask the invariant.
  */
 contract MockAcrossSpokePool is IAcrossSpokePool {
+    /**
+     * @notice Across V3's own deposit log, emitted verbatim so a client can read a deposit back
+     *         out of the receipt the way it does on a real network.
+     * @dev The app treats a submission it cannot find a deposit reference for as UNCONFIRMED
+     *      rather than sent (BridgeView) — correctly, since an unlogged deposit is a transaction
+     *      that has not demonstrably landed. Without this event the e2e bridge flow could only
+     *      ever reach that degraded state, and would have encoded a gap in this mock as the
+     *      member's expected experience. The signature matches the fragment the SPA parses
+     *      (frontend/src/lib/bridge/bridgeStatus.js); the widened post-rename `FundsDeposited`
+     *      is deliberately not emitted — one vocabulary is what a real SpokePool emits too.
+     */
+    event V3FundsDeposited(
+        address inputToken,
+        address outputToken,
+        uint256 inputAmount,
+        uint256 outputAmount,
+        uint256 indexed destinationChainId,
+        uint32 indexed depositId,
+        uint32 quoteTimestamp,
+        uint32 fillDeadline,
+        uint32 exclusivityDeadline,
+        address indexed depositor,
+        address recipient,
+        address exclusiveRelayer,
+        bytes message
+    );
+
     address public lastDepositor;
     address public lastRecipient;
     address public lastInputToken;
@@ -65,6 +92,22 @@ contract MockAcrossSpokePool is IAcrossSpokePool {
         lastValue = msg.value;
         lastMessage = message;
         depositCount += 1;
+
+        emit V3FundsDeposited(
+            inputToken,
+            outputToken,
+            inputAmount,
+            outputAmount,
+            destinationChainId,
+            uint32(depositCount),
+            quoteTimestamp,
+            fillDeadline,
+            exclusivityDeadline,
+            depositor,
+            recipient,
+            exclusiveRelayer,
+            message
+        );
 
         if (msg.value == 0) {
             // ERC-20 route: consume exactly the approval the router granted.

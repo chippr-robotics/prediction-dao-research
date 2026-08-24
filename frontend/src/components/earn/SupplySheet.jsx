@@ -72,7 +72,7 @@
  *   onClose / onActionComplete
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits, parseUnits } from 'ethers'
 import UniversalAssetSelect from '../ui/UniversalAssetSelect'
 import InfoTip from '../ui/InfoTip'
@@ -174,17 +174,19 @@ function poolLegKeys(pool) {
   return keys
 }
 
+/** True when `pool` holds exactly these two legs, in either order. */
+function poolHoldsPair(pool, aKey, bKey) {
+  if (!pool || !aKey || !bKey || aKey === bKey) return false
+  if (Number(pool.kind) !== POOL_KIND.TRADING_LP) return false
+  const k0 = legKey(pool.chainId, pool.token0)
+  const k1 = legKey(pool.chainId, pool.token1)
+  return (k0 === aKey && k1 === bKey) || (k0 === bKey && k1 === aKey)
+}
+
 /** The enabled trading pool pairing these two leg keys, or null when none is curated. */
 function findPairPool(pools, aKey, bKey) {
   if (!aKey || !bKey || aKey === bKey) return null
-  return (
-    (pools || []).find((p) => {
-      if (Number(p.kind) !== POOL_KIND.TRADING_LP || !p.enabled) return false
-      const k0 = legKey(p.chainId, p.token0)
-      const k1 = legKey(p.chainId, p.token1)
-      return (k0 === aKey && k1 === bKey) || (k0 === bKey && k1 === aKey)
-    }) || null
-  )
+  return (pools || []).find((p) => p.enabled && poolHoldsPair(p, aKey, bKey)) || null
 }
 
 export default function SupplySheet({
@@ -322,17 +324,25 @@ export default function SupplySheet({
     })
   }, [pin, pairPredicate, assetOptions])
 
-  // The pool actually being supplied: for a trading pool the member's chosen pair resolves it
-  // (they may have picked a different curated pool than the card they opened); for a bridge
-  // pool there is one asset and nothing to resolve.
+  /*
+   * The pool actually being supplied: for a trading pool the member's chosen pair resolves it
+   * (they may have picked a different curated pool than the card they opened); for a bridge
+   * pool there is one asset and nothing to resolve.
+   *
+   * THE POOL THE MEMBER OPENED WINS while the pair on screen is still its pair. Uniswap curates
+   * the same pair at SEVERAL fee tiers — USDC/WETH exists at 0.05% and 0.30% — and `findPairPool`
+   * returns the first match, which is not necessarily the pool whose fee tier, size and
+   * disclosure this sheet is showing. Without this line, opening the 0.30% row and pressing
+   * Supply deposited into the 0.05% pool: every figure on the confirm step described one pool
+   * and the signature went to another. The fallback below still covers the case this resolution
+   * exists for — the member CHANGED the pair, so the opened pool is no longer what they mean.
+   */
   const pool = useMemo(() => {
     if (!isTrading) return initialPool
-    const resolved = findPairPool(
-      pools,
-      firstAsset ? optionKeyToLeg.get(firstAsset.key) : null,
-      secondAsset ? optionKeyToLeg.get(secondAsset.key) : null,
-    )
-    return resolved || initialPool
+    const aKey = firstAsset ? optionKeyToLeg.get(firstAsset.key) : null
+    const bKey = secondAsset ? optionKeyToLeg.get(secondAsset.key) : null
+    if (poolHoldsPair(initialPool, aKey, bKey)) return initialPool
+    return findPairPool(pools, aKey, bKey) || initialPool
   }, [isTrading, initialPool, pools, firstAsset, secondAsset, optionKeyToLeg])
 
   const chainId = pool?.chainId
@@ -355,13 +365,26 @@ export default function SupplySheet({
   const routerPaused = pool?.unavailableReason === 'paused'
   const risk = poolRiskSummary(pool?.kind)
 
-  const position = useMemo(
-    () => (positions || []).find((p) => p?.poolId && pool?.poolId && p.poolId === pool.poolId) || null,
-    [positions, pool],
+  const stillHolds = useCallback(
+    (p) => Boolean(p) && (isTrading ? (p.liquidity ?? 0n) > 0n : (p.lpBalance ?? 0n) > 0n),
+    [isTrading],
   )
-  const hasPosition = Boolean(
-    position && (isTrading ? (position.liquidity ?? 0n) > 0n : (position.lpBalance ?? 0n) > 0n),
-  )
+
+  /**
+   * The member's position in this pool.
+   *
+   * A LIVE one wins over a spent one. A member can hold several positions in the same pool —
+   * supplying twice mints a second NFT — and a position withdrawn to zero is kept rather than
+   * deleted, because their history is theirs. Taking the plain first match meant one emptied
+   * position hid every live one behind it, and the sheet told a member with money in the pool
+   * that they had nothing to withdraw. FR-021/FR-024 make the exit the one thing that is
+   * always available; a first-match lookup was quietly making it conditional on ordering.
+   */
+  const position = useMemo(() => {
+    const inPool = (positions || []).filter((p) => p?.poolId && pool?.poolId && p.poolId === pool.poolId)
+    return inPool.find(stillHolds) || inPool[0] || null
+  }, [positions, pool, stillHolds])
+  const hasPosition = stillHolds(position)
 
   // ── The live platform fee (FR-026/FR-027/FR-028/FR-029) ────────────────────────────────
   // Fetched ONLY for a trading pool: a bridge pool has no fee to read, and reading one would

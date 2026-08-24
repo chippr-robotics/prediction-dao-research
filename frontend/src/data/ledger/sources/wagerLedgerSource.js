@@ -14,6 +14,7 @@
  */
 import { createReportDataSource } from '../../reports/reportDataSource'
 import { getDefaultWagerRepository } from '../../wagers/WagerRepository'
+import { getContractAddressForChain } from '../../../config/contracts'
 import { deriveTransfersFromWagers } from '../../../lib/account/deriveTransfers'
 import { hydrateWagerTimestamps } from '../timestamps'
 import { subgraphEntryId, derivedWagerEntryId, wagerDedupKey } from '../identity'
@@ -95,7 +96,22 @@ async function loadAllWagers(repository, account) {
 export function createWagerLedgerSource(deps = {}) {
   return {
     class: LEDGER_CLASS.WAGER,
+    // Crosses the network (subgraph/RPC), so a rejection here IS evidence the
+    // chain could not be read (#1280).
+    backing: 'network',
     async list({ account, chainId, provider }) {
+      // A chain with no escrow deployed has no FairWins wagers — that is
+      // NOT-DEPLOYED, which is a read of nothing, not a failed read (#1280).
+      // Without this, RegistrySource throws `wagerRegistry not deployed` on
+      // every such chain, the class is reported stale forever, and the
+      // ledger's new unreadable state would rest on a failure that is not one.
+      // Mirrors the same check in useAccountStats#loadWagersAcrossEstate.
+      const escrowConfigured = Boolean(
+        getContractAddressForChain('wagerRegistry', chainId) ||
+        getContractAddressForChain('friendGroupMarketFactory', chainId),
+      )
+      if (!escrowConfigured) return []
+
       const listTransfers =
         deps.listTransfers ||
         ((q) => createReportDataSource({ chainId, provider }).listTransfers(q))

@@ -103,8 +103,10 @@ export function sourcePanel({ source, gridPos }) {
       options: {
         mode: 'markdown',
         content:
-          `**Not yet live.** This source is declared but not implemented, so it reports no value and is ` +
-          `excluded from every total.\n\n${source.meaning}`,
+          `**Not yet live.** This source is declared, and produces no value on any current deployment, so it ` +
+          `is excluded from every total. That covers two different situations — a path that does not exist ` +
+          `anywhere, and one that is built but switched off — and the text below says which this is.` +
+          `\n\n${source.meaning}`,
       },
     })
   }

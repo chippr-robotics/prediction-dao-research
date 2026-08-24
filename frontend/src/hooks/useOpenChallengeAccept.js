@@ -8,6 +8,7 @@ import { fetchEncryptedEnvelope, parseEncryptedIpfsReference } from '../utils/ip
 import { deriveFromCode, signOpenAccept } from '../utils/claimCode/deriveFromCode.js'
 import { isValidCode } from '../utils/claimCode/wordlist.js'
 import { decryptEnvelopeCode, isCodeEnvelope } from '../utils/crypto/envelopeEncryption.js'
+import { revertReasonFrom, sanctionedAddressFrom, screenedPartyMessage } from '../lib/wagers/sanctionsRevert.js'
 
 const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE'))
 const MEMBERSHIP_ABI = ['function hasActiveRole(address user, bytes32 role) view returns (bool)']
@@ -62,7 +63,7 @@ export function useOpenChallengeAccept() {
       try {
         await registry.acceptOpenWager.staticCall(wagerId, claimCodeSig)
       } catch (sim) {
-        throw new Error(translateAcceptRevert(sim.reason || sim.shortMessage || sim.message || ''), { cause: sim })
+        throw new Error(translateAcceptRevert(revertReasonFrom(sim), { error: sim, account: actor }), { cause: sim })
       }
 
       onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })
@@ -235,14 +236,14 @@ export function useOpenChallengeAccept() {
       try {
         await registry.acceptOpenWager.staticCall(wagerId, signature, { from: actor })
       } catch (sim) {
-        const raw = sim.reason || sim.shortMessage || sim.message || ''
+        const raw = revertReasonFrom(sim)
         // A not-yet-granted allowance is expected here: the approve above is batched with the
         // accept and runs first, so the isolated pre-flight would spuriously revert on it and
         // deadlock a fresh passkey taker. Only that case is swallowed; every real revert
         // (expired, wrong signature, membership, …) is still surfaced.
         const isAllowanceRevert = /(exceeds|insufficient) allowance/i.test(raw)
         if (!(isAllowanceRevert && allowance < stake)) {
-          throw new Error(translateAcceptRevert(raw), { cause: sim })
+          throw new Error(translateAcceptRevert(raw, { error: sim, account: actor }), { cause: sim })
         }
       }
       onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })
@@ -266,9 +267,26 @@ export function useOpenChallengeAccept() {
   return { lookup, discover, accept, busy, error }
 }
 
-/** Map known contract reverts to friendly messages for the take flow. */
-export function translateAcceptRevert(reason) {
+/**
+ * Map known contract reverts to friendly messages for the take flow.
+ *
+ * `context.error` is the original ethers error and `context.account` the acting taker: the accept
+ * guard screens BOTH parties (`_screen(taker); _screen(creator);` in WagerRegistryCore.sol), so the
+ * screened address is decoded from the revert data rather than assumed to be the member's own.
+ */
+export function translateAcceptRevert(reason, { error = null, account = null } = {}) {
   const r = String(reason)
+  // Compliance screening (spec 007 FR-054). ISanctionsGuard's errors are not in the registry ABI the
+  // frontend ships, so without revertReasonFrom naming it from the selector this arrives as the raw
+  // "execution reverted (unknown custom error)" #1292 reports.
+  if (r.includes('SanctionedAddress')) {
+    return screenedPartyMessage({
+      // Stops at "not accepted": the stake approval above is already sent and paid for by now.
+      outcome: 'the challenge was not accepted',
+      sanctioned: sanctionedAddressFrom(error),
+      account,
+    })
+  }
   if (r.includes('NotOpenChallenge')) return 'This challenge is no longer open — someone may have already taken it.'
   if (r.includes('BadClaimSignature')) return 'That code does not authorize this account to accept.'
   if (r.includes('AcceptExpired')) return 'This challenge has expired and can no longer be accepted.'

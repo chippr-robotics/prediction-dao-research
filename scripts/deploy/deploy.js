@@ -550,6 +550,50 @@ async function main() {
   console.log(`  USDC                   ${usdc}`);
   console.log(`  WMATIC/WETC            ${wmatic || "(none — stablecoin-only allowlist)"}`);
 
+  // -------- WagerRegistryIntents (specs 035 + 036) --------
+  // The registry is TWO facets behind ONE proxy: WagerRegistry delegatecalls unknown selectors to
+  // this extension because the main implementation sits against the 24 KB code limit. Everything
+  // that lives here — every `…WithSig` / `…WithAuthorization` twin, `batchExpireOpen`, and the
+  // `autoResolveFrom*` family — reverts `UnknownFunction()` until the proxy is pointed at it.
+  //
+  // This wiring previously existed ONLY in scripts/deploy/upgrade-gasless-intents.js, which is a
+  // migration for chains that already had a pre-035 registry. A brand-new chain never runs it, so
+  // every deployment from this script shipped with no gasless rail and no auto-resolution, and
+  // nothing said so: the record looked complete because `wagerRegistryIntents` was simply absent
+  // rather than flagged (issue #1227).
+  //
+  // DEPLOYED LAST, DELIBERATELY. Every deploy consumes a nonce, and `tokenFactory` above is a
+  // plain (nonce-derived) proxy deploy — inserting this earlier would move its address on every
+  // future deployment. The CREATE2 deploys are salt-derived and would not care; that one would.
+  console.log("\nDeploying WagerRegistryIntents (registry extension facet)...");
+  const intentsDeploy = await deployDeterministic(
+    "WagerRegistryIntents",
+    [],
+    generateSalt(SALT_PREFIXES.V2 + "WagerRegistryIntents"),
+    deployer
+  );
+  deployments.wagerRegistryIntents = intentsDeploy.address;
+
+  const currentExtension = await wagerRegistry.intentExtension();
+  if (currentExtension.toLowerCase() !== intentsDeploy.address.toLowerCase()) {
+    console.log("Pointing the proxy fallback at the facet (setIntentExtension)...");
+    const extTx = await wagerRegistry.connect(deployer).setIntentExtension(intentsDeploy.address);
+    await extTx.wait();
+  }
+
+  // FAIL LOUDLY rather than shipping a half-wired registry. An unset extension is invisible from
+  // the deployment record and only shows up when a member hits a gasless path and gets a revert
+  // with no arguments, so the absence has to be caught here.
+  const wiredExtension = await wagerRegistry.intentExtension();
+  if (!wiredExtension || wiredExtension === ethers.ZeroAddress) {
+    throw new Error(
+      "WagerRegistry.intentExtension() is unset after deployment — the …WithSig twins, " +
+      "batchExpireOpen and autoResolveFrom* would all revert UnknownFunction(). Refusing to " +
+      "record this deployment as complete."
+    );
+  }
+  console.log(`  ✓ Intent extension wired: ${wiredExtension}`);
+
   // Persist the EXACT constructor args used for each contract so verify.js can
   // reproduce them without recomputing from env/constants (which could drift
   // between this deploy and a later standalone `verify.js` run). These are read
@@ -561,6 +605,7 @@ async function main() {
     membershipVoucher: [deployer.address, mgrDeploy.address],
     voucherBatchMinter: [voucherDeploy.address],
     wagerRegistryImpl: [],
+    wagerRegistryIntents: [],
     sanctionsGuard: [deployer.address, sanctionsOracleAddr],
     keyRegistry: [],
     // spec 028: UUPS factory impl verified with empty args; clone templates have no constructor args.
@@ -596,6 +641,7 @@ async function main() {
       voucherBatchMinter: batchMinterDeploy.address, // immutable batch/gift helper (spec 026)
       wagerRegistry: regDeploy.address, // ERC1967 proxy (stable address)
       wagerRegistryImpl: regProxy.implementation, // current implementation (changes on upgrade)
+      wagerRegistryIntents: intentsDeploy.address, // extension facet the proxy delegates to (specs 035/036)
       keyRegistry: keyDeploy.address,
       sanctionsGuard: guardDeploy.address,
       // spec 028 — token issuance: factory proxy (stable) + impl (changes on upgrade) + immutable templates.

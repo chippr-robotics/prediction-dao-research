@@ -17,9 +17,7 @@ const UNREG = '0x976EA74026E726554dB657fA54763abd0C3a0aa9'  // #6 — stays unre
 function connectAs(account) {
   cy.mockWeb3Provider({ account })
   cy.visit('/fairwins')
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+  cy.connectWallet()
 }
 
 describe('Encryption Key Registration (On-Chain)', () => {
@@ -37,8 +35,20 @@ describe('Encryption Key Registration (On-Chain)', () => {
   it('[ENC-03] registration status is reported correctly', () => {
     // A never-registered account reports "Not registered" on the Security tab.
     connectAs(UNREG)
-    cy.visit('/wallet')
-    cy.contains('button', /security/i, { timeout: 10000 }).click()
+    /*
+     * Deep-link by TAB ID and open the accordion — the same two traps
+     * cy.registerEncryptionKeyViaUI already documents.
+     *
+     * This clicked a button matching /security/i, which has matched nothing since spec 062
+     * renamed the section to "Recovery" while keeping the tab id `security`. The status text
+     * then lives inside the `encryption-key` AccordionSection, which renders COLLAPSED, so it
+     * is in the DOM but not visible and `should('be.visible')` fails on a correct app.
+     */
+    cy.visit('/wallet?tab=security')
+    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.get('#encryption-key-header', { timeout: 10000 }).then(($h) => {
+      if ($h.attr('aria-expanded') !== 'true') cy.wrap($h).click()
+    })
     cy.contains(/not registered/i, { timeout: 10000 }).should('be.visible')
     cy.hasRegisteredKey(UNREG).should('eq', false)
   })

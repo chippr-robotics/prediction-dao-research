@@ -915,10 +915,10 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--primary-button-hover) 100%);
+  background: var(--gradient-primary-button);
   border: none;
   border-radius: 8px;
-  color: white;
+  color: var(--primary-button-text);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -1612,9 +1612,9 @@
 }
 
 .fm-odds-presets button.active {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-  color: white;
+  background: var(--primary-button);
+  border-color: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .fm-odds-presets button:disabled {

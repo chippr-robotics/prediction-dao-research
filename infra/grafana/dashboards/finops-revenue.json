@@ -943,7 +943,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Not yet live.** This source is declared but not implemented, so it reports no value and is excluded from every total.\n\nPLANNED, NOT LIVE. contracts/apps/MiniAppRegistry.sol has no fee, price or payable function as of spec 089, so there is no licensing revenue to read. Shown as not-yet-live and excluded from every total."
+        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nPLANNED, NOT LIVE. contracts/apps/MiniAppRegistry.sol has no fee, price or payable function as of spec 089, so there is no licensing revenue to read. Shown as not-yet-live and excluded from every total."
       }
     },
     {
@@ -962,7 +962,26 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Not yet live.** This source is declared but not implemented, so it reports no value and is excluded from every total.\n\nPLANNED, NOT LIVE. WagerRegistry escrows stakes and takes no platform cut, so wagers currently generate volume but no direct revenue. Shown as not-yet-live and excluded from every total."
+        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nPLANNED, NOT LIVE. WagerRegistry escrows stakes and takes no platform cut, so wagers currently generate volume but no direct revenue. Shown as not-yet-live and excluded from every total."
+      }
+    },
+    {
+      "id": 20,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "type": "text",
+      "title": "Member API — x402 agent payments — NOT YET LIVE",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 73
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nBUILT, NOT OFFERED. The x402 paid rail (spec 096) lets an agent holding no membership pay per request: it signs an EIP-3009 USDC authorization to the platform treasury (X402_PAY_TO) and the gateway settles it — $0.01 a read, $0.05 a typed-data build, $0.10 an assistant message. Unambiguously revenue, and it routes around the FeeRouter entirely, which is why the coverage gate could not see it until C2 learned to look for configured platform payees. It is enabled on NO deployment: X402_ENABLED and X402_PAY_TO are commented out, the treasury has no default on purpose, and the pinned gateway image predates the module. So no payment has ever been possible and there is no value to read — not a $0, which would claim the rail was offered and ignored. Promoting this to `live` needs a collector that can tell x402 settlements apart from every other USDC arrival at the same treasury; the gate now forces that work to happen BEFORE the first payment, not after."
       }
     }
   ]

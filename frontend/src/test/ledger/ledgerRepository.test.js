@@ -59,9 +59,103 @@ describe('ledgerRepository.listEntries', () => {
       ],
       enrich: passThroughEnrich,
     })
-    const { entries, staleClasses } = await repo.listEntries(CTX)
+    const { entries, staleClasses, readState } = await repo.listEntries(CTX)
     expect(entries).toHaveLength(1)
     expect(staleClasses).toEqual(['earn'])
+    // One source answered, so the read happened — just not completely.
+    expect(readState).toBe('read')
+  })
+
+  // Issue #1280 — the empty list a total failure returns is byte-identical to
+  // the empty list of an account with no history. `readState` is what keeps
+  // them apart, so the caller never renders a failed read as an empty record.
+  it('reports readState "unreadable" when EVERY source failed', async () => {
+    const repo = createLedgerRepository({
+      sources: [
+        { class: 'wager', list: async () => { throw new Error('rpc 503') } },
+        { class: 'transfer', list: async () => { throw new Error('rpc 503') } },
+      ],
+      enrich: passThroughEnrich,
+    })
+    const { entries, staleClasses, readState } = await repo.listEntries(CTX)
+    expect(entries).toEqual([])
+    expect(staleClasses).toEqual(['wager', 'transfer'])
+    expect(readState).toBe('unreadable')
+  })
+
+  it('an account with genuinely no history is readState "read", not unreadable', async () => {
+    const repo = createLedgerRepository({
+      sources: [source('wager', []), source('transfer', [])],
+      enrich: passThroughEnrich,
+    })
+    const { entries, staleClasses, readState } = await repo.listEntries(CTX)
+    expect(entries).toEqual([])
+    expect(staleClasses).toEqual([])
+    expect(readState).toBe('read')
+  })
+
+  // The shape of the SHIPPED wiring: six of the nine default sources read the
+  // client record store and cannot fail because a network is down. Counting
+  // rejections across all of them made `unreadable` unreachable in production —
+  // the outage in #1280 would still have produced a confident empty ledger.
+  it('client-store sources answering does NOT mask a total network outage', async () => {
+    const repo = createLedgerRepository({
+      sources: [
+        // network-backed: the whole reason the ledger can speak about a chain
+        { class: 'wager', backing: 'network', list: async () => { throw new Error('rpc 503') } },
+        { class: 'pool', backing: 'network', list: async () => { throw new Error('subgraph refused') } },
+        { class: 'membership', backing: 'network', list: async () => { throw new Error('rpc 503') } },
+        // client-store: localStorage, fulfils regardless of any network
+        { class: 'transfer', backing: 'client', list: async () => [] },
+        { class: 'earn', backing: 'client', list: async () => [] },
+        { class: 'miniapp', backing: 'client', list: async () => [] },
+      ],
+      enrich: passThroughEnrich,
+    })
+    const { entries, readState, staleClasses } = await repo.listEntries(CTX)
+    expect(entries).toEqual([])
+    expect(readState).toBe('unreadable')
+    expect(staleClasses).toEqual(['wager', 'pool', 'membership'])
+  })
+
+  it('records that DID arrive are kept and shown, never discarded as unreadable', async () => {
+    const repo = createLedgerRepository({
+      sources: [
+        { class: 'wager', backing: 'network', list: async () => { throw new Error('rpc 503') } },
+        { ...source('transfer', [preItem({ class: 'transfer', kind: 'send' })]), backing: 'client' },
+      ],
+      enrich: passThroughEnrich,
+    })
+    const { entries, readState, staleClasses } = await repo.listEntries(CTX)
+    // The member's own stored record is data, not noise: `unreadable` is
+    // reserved for an entry list that carries no information at all, because
+    // the estate merge drops an unreachable chain's entries entirely.
+    expect(entries).toHaveLength(1)
+    expect(readState).toBe('read')
+    expect(staleClasses).toEqual(['wager'])
+  })
+
+  it('a source that is NOT deployed on the chain has read nothing, not failed', async () => {
+    const repo = createLedgerRepository({
+      // What Ethereum looks like: no FairWins escrow, so the network sources
+      // return [] rather than rejecting. An empty result there is the truth.
+      sources: [
+        { class: 'wager', backing: 'network', list: async () => [] },
+        { class: 'transfer', backing: 'client', list: async () => [] },
+      ],
+      enrich: passThroughEnrich,
+    })
+    const { readState, staleClasses } = await repo.listEntries(CTX)
+    expect(readState).toBe('read')
+    expect(staleClasses).toEqual([])
+  })
+
+  it('an unclassified source counts as network-backed (the conservative reading)', async () => {
+    const repo = createLedgerRepository({
+      sources: [{ class: 'wager', list: async () => { throw new Error('rpc 503') } }],
+      enrich: passThroughEnrich,
+    })
+    expect((await repo.listEntries(CTX)).readState).toBe('unreadable')
   })
 
   it('dedups the same underlying event across sources (oc beats dv)', async () => {
@@ -157,5 +251,49 @@ describe('ledgerRepository.listEntries', () => {
     })
     const { prunedBefore } = await repo.listEntries(CTX)
     expect(prunedBefore).toBe(12345)
+  })
+})
+
+/*
+ * Spec 051 / #1280 — read vs unreadable.
+ *
+ * `listEntries` gathers sources with `allSettled` so one bad source degrades to stale instead of
+ * poisoning the ledger. The cost of that, until this was added, is that a chain whose sources ALL
+ * failed returned exactly what a chain with no history returns — an empty array — and every caller
+ * downstream rendered "no activity" about networks it had never managed to read.
+ */
+describe('ledgerRepository.listEntries — read vs unreadable', () => {
+  const dead = (cls) => ({ class: cls, list: async () => { throw new Error('rpc down') } })
+
+  it('a chain with sources that all answered is "read", even with nothing to show', async () => {
+    const repo = createLedgerRepository({ sources: [source('wager', []), source('pool', [])], enrich: passThroughEnrich })
+    const res = await repo.listEntries(CTX)
+    expect(res.readState).toBe('read')
+    expect(res.entries).toHaveLength(0)
+    expect(res.staleClasses).toHaveLength(0)
+  })
+
+  it('a PARTIAL failure stays "read" — some of it is known, and staleClasses names the rest', async () => {
+    const repo = createLedgerRepository({
+      sources: [source('wager', [preItem()]), dead('pool')],
+      enrich: passThroughEnrich,
+    })
+    const res = await repo.listEntries(CTX)
+    expect(res.readState).toBe('read')
+    expect(res.entries).toHaveLength(1)
+    expect(res.staleClasses).toEqual(['pool'])
+  })
+
+  it('a TOTAL failure is "unreadable" — an empty array here states nothing', async () => {
+    const repo = createLedgerRepository({ sources: [dead('wager'), dead('pool')], enrich: passThroughEnrich })
+    const res = await repo.listEntries(CTX)
+    expect(res.readState).toBe('unreadable')
+    expect(res.entries).toHaveLength(0)
+  })
+
+  it('NO sources configured is "read" — nothing failed, there was simply nothing to ask', async () => {
+    const repo = createLedgerRepository({ sources: [], enrich: passThroughEnrich })
+    const res = await repo.listEntries(CTX)
+    expect(res.readState).toBe('read')
   })
 })

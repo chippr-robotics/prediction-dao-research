@@ -16,9 +16,25 @@ variable "artifact_registry_repository" {
 }
 
 variable "staging_max_instances" {
-  description = "Scaling ceiling for both staging services. Lower than production on purpose — staging is a mirror, not a load test."
+  description = "Scaling ceiling for the two staging SPA services. Lower than production on purpose — staging is a mirror, not a load test. The MCP server states its own ceiling, mirroring prod."
   type        = number
   default     = 10
+}
+
+variable "manage_mcp_server" {
+  description = <<-EOT
+    Whether Terraform declares the spec-095 staging MCP server Cloud Run service.
+
+    DEFAULT FALSE for the same reason as prod: `infra-apply.yml` applies on push to main with no
+    human in the loop, and no pipeline publishes the `fairwins-mcp-server-staging` image, so a
+    create here would fail against an image that does not exist. The apply matrix is fail-fast and
+    is never retried unattended (FR-035).
+
+    Flip it only after the image is published and verified present, in its own reviewed PR.
+    See docs/runbooks/member-api-operations.md §3.8.
+  EOT
+  type        = bool
+  default     = false
 }
 
 variable "staging_secret_env" {
@@ -37,4 +53,21 @@ variable "staging_testnet_secret_env" {
     version = string
   }))
   default = {}
+}
+
+variable "manage_staging_services" {
+  description = <<-EOT
+    Whether Terraform declares the two staging SPA Cloud Run services.
+
+    DEFAULT FALSE. Both services are LIVE and NOT in state, and until this commit the declaration
+    named them `staging` / `staging-testnet` while the live services are
+    `prediction-dao-research-staging` / `-staging-testnet`. Because the module passes `name` through
+    verbatim, that plan was not adopting anything — it was proposing two ADDITIONAL public services,
+    and unlike a name collision it would have applied cleanly and left them running.
+
+    The names are corrected and imports.tf now carries the real ids. Adopt by uncommenting that
+    group, bringing it to a zero-diff plan, and flipping this in the same PR.
+  EOT
+  type        = bool
+  default     = false
 }

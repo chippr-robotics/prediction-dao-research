@@ -13,6 +13,7 @@ import {
 } from '../utils/ipfsService'
 import { getFeeOverrides } from '../utils/feeOverrides'
 import { getCurrentDocument } from '../utils/legalDocs'
+import { revertReasonFrom, screenedActorMessage } from '../lib/wagers/sanctionsRevert'
 
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
@@ -202,8 +203,22 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       const stakeAmountRaw = data.data.stakeAmount || '10'
       const stakeWei = ethers.parseUnits(String(stakeAmountRaw), tokenDecimals)
       const isOffer = data.marketType === 'offer'
-      const oddsMultiplier = parseInt(data.data.oddsMultiplier, 10) || 100
-      const offerResolutionType = parseInt(data.data.resolutionType, 10) || ResolutionType.Creator
+      // Same NaN-only-fallback fix as resolutionType below, and for a similar reason: `|| 100`
+      // silently turns a missing/unparseable value into 100% odds, which computes a zero
+      // majorityStakeWei and throws "Offer odds (100%) would result in zero or negative majority
+      // stake" — the fallback should be the declared default (200%), not an arbitrary 100.
+      const rawOddsMultiplier = parseInt(data.data.oddsMultiplier, 10)
+      const oddsMultiplier = Number.isNaN(rawOddsMultiplier) ? WAGER_DEFAULTS.ODDS_MULTIPLIER : rawOddsMultiplier
+      /*
+       * NOT `|| ResolutionType.Creator`: Either is 0, and `0 || x` is `x` in JS — that fallback
+       * silently turned every "Either of Us" selection into "Creator Only" the instant the
+       * resolution-type field held a real, valid 0. Caught by 07-manual-resolution's RES-02
+       * (#1231): a UI-created Either-Party wager reverted NotAuthorized when the opponent, who
+       * is supposed to be able to resolve it too, tried to. Preserve a genuine 0; fall back only
+       * when the field is actually missing/unparseable (NaN).
+       */
+      const rawOfferResolutionType = parseInt(data.data.resolutionType, 10)
+      const offerResolutionType = Number.isNaN(rawOfferResolutionType) ? ResolutionType.Creator : rawOfferResolutionType
 
       let creatorStakeWei = stakeWei
       let opponentStakeWei = stakeWei
@@ -293,7 +308,10 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
 
       // Resolution
-      const resolutionType = parseInt(data.data.resolutionType, 10) || ResolutionType.Creator
+      // NOT `|| ResolutionType.Creator` — see the note beside offerResolutionType above; Either
+      // is 0, and `0 || x` discards it.
+      const rawResolutionType = parseInt(data.data.resolutionType, 10)
+      const resolutionType = Number.isNaN(rawResolutionType) ? ResolutionType.Creator : rawResolutionType
       // The form field is `oracleConditionId` (future-proof: same slot serves Polymarket
       // and the upcoming ChainlinkDataFeed / ChainlinkFunctions / UMA adapters). The
       // contract param is still named `polymarketConditionId` for legacy reasons; we
@@ -446,8 +464,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           onProgress({ step: 'create', message: 'Validating transaction...' })
           await registry[createMethod].staticCall(...createArgs)
         } catch (simError) {
-          const reason = simError.reason || simError.shortMessage || simError.message || ''
-          throw new Error(translateRevert(reason), { cause: simError })
+          throw new Error(translateRevert(revertReasonFrom(simError)), { cause: simError })
         }
 
         onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
@@ -505,7 +522,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           onProgress({ step: 'create', message: 'Validating transaction...' })
           await registry[createMethod].staticCall(...createArgs, { from: userAddress })
         } catch (simError) {
-          throw new Error(translateRevert(simError.reason || simError.shortMessage || simError.message || ''), { cause: simError })
+          throw new Error(translateRevert(revertReasonFrom(simError)), { cause: simError })
         }
         calls.push({
           target: wagerRegistryAddress,
@@ -612,6 +629,18 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }
 
+/**
+ * What a screened member is told on the create path. `_createWager` screens the CREATOR only
+ * (contracts/wagers/WagerRegistryCore.sol) — the acting member — so "your account" is unambiguous
+ * here in a way it is not on the accept paths, which screen both parties.
+ *
+ * The outcome clause deliberately does NOT say "nothing was submitted on-chain": the guard screens
+ * `_createWager` only, so on the self-submit leg the stake-token approval and the stale-wager cleanup
+ * (`batchExpireOpen`) are real transactions already sent, confirmed and PAID FOR by the time this
+ * simulation reverts. "The wager was not created" is the strongest claim true on every leg.
+ */
+export const SCREENED_ADDRESS_MESSAGE = screenedActorMessage('the wager was not created')
+
 export function translateRevert(reason) {
   if (!reason) return 'Unknown contract error.'
   if (reason.includes('insufficient allowance') || reason.includes('exceeds allowance')) {
@@ -620,6 +649,9 @@ export function translateRevert(reason) {
   if (reason.includes('insufficient balance') || reason.includes('exceeds balance')) {
     return 'Insufficient token balance to cover your stake.'
   }
+  // Compliance screening (spec 007 FR-054) — the first Check in `_createWager`. Name it: the
+  // member is otherwise told only that the transaction will fail. See SCREENED_ADDRESS_MESSAGE.
+  if (reason.includes('SanctionedAddress')) return SCREENED_ADDRESS_MESSAGE
   if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
   if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WMATIC.'

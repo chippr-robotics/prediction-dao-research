@@ -93,13 +93,32 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "type": "text",
+      "title": "Member assistant — model provider — NOT YET LIVE",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nBUILT, NOT OFFERED. `POST /v1/member/assistant/chat` (spec 095) calls the Anthropic Messages API, which bills per input and output token — a real vendor cost, and the only uncatalogued one. It is enabled on no deployment (ASSISTANT_ENABLED, and MEMBER_API_ENABLED above it, are commented out), so not one token has been billed. `basis` is declared `modelled` NOW, while nothing is at stake, and it is not negotiable later: this exporter holds no Anthropic billing credential, so any dollar figure it ever publishes will be token counts times a rate typed into a config file. Only GCP is `billed` (research R1). The token counts themselves are a fact and belong in vendor usage; the dollars are our arithmetic and must always say so."
+      }
+    },
+    {
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "type": "timeseries",
       "title": "Paymaster — sponsored gas (modelled)",
       "description": "Gas spent sponsoring member UserOps, measured as drawdown of the paymaster EntryPoint deposit. The USD figure is MODELLED: the chain charges POL, and converting needs a price. The POL drawdown itself is exact. When this deposit empties, sponsorship stops and members see failures — which is why its runway, not its balance, is what alerts.",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 9
       },
       "fieldConfig": {
@@ -144,7 +163,7 @@
       ]
     },
     {
-      "id": 4,
+      "id": 5,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -155,8 +174,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 9
+        "x": 0,
+        "y": 17
       },
       "fieldConfig": {
         "defaults": {
@@ -200,7 +219,7 @@
       ]
     },
     {
-      "id": 5,
+      "id": 6,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -211,7 +230,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 17
       },
       "fieldConfig": {
@@ -256,7 +275,7 @@
       ]
     },
     {
-      "id": 6,
+      "id": 7,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -267,8 +286,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 17
+        "x": 0,
+        "y": 25
       },
       "fieldConfig": {
         "defaults": {
@@ -312,7 +331,7 @@
       ]
     },
     {
-      "id": 7,
+      "id": 8,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -323,7 +342,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 25
       },
       "fieldConfig": {
@@ -368,7 +387,7 @@
       ]
     },
     {
-      "id": 8,
+      "id": 9,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -379,8 +398,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 25
+        "x": 0,
+        "y": 33
       },
       "fieldConfig": {
         "defaults": {
@@ -424,7 +443,7 @@
       ]
     },
     {
-      "id": 9,
+      "id": 10,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -435,7 +454,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 33
       },
       "fieldConfig": {
@@ -480,7 +499,7 @@
       ]
     },
     {
-      "id": 10,
+      "id": 11,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -491,8 +510,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 33
+        "x": 0,
+        "y": 41
       },
       "fieldConfig": {
         "defaults": {

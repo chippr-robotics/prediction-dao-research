@@ -15,12 +15,41 @@
 // =============================================================================
 
 const SESSION_KEY = 'fairwins.passkey.session.v1'
+const CREDENTIALS_KEY = 'fairwins.passkey.credentials.v1'
 const ACCOUNT = '0x1111000000000000000000000000000000001111'
+
+/** A book entry the connector considers able to transact (credentialId + a P-256 key). */
+const completeRecord = (credentialId) => [
+  {
+    credentialId,
+    address: ACCOUNT,
+    publicKey: {
+      x: '0x1111111111111111111111111111111111111111111111111111111111111111',
+      y: '0x2222222222222222222222222222222222222222222222222222222222222222',
+    },
+  },
+]
+
+const seed = (win, { session, credentials }) => {
+  win.localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  if (credentials) win.localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(credentials))
+}
 
 describe('Unified login surface (US2)', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * CLOSE THE NETWORK BOUNDARY — required now that the session actually restores.
+     *
+     * A restored session makes the app read: roles across the cohort, balances, prices. Left
+     * open, those hit real public RPC hosts, and their retries outlive the test and kill the
+     * browser connection (a reproducible ECONNRESET). This spec was stable before only because
+     * reconnect never happened, so nothing was ever read.
+     */
+    cy.intercept({ method: 'POST', hostname: /publicnode\.com$|rivet\.link$|etcdesktop\.com$|polygon\.technology$/ }, (req) =>
+      req.reply({ statusCode: 503, body: 'no chain in the no-chain tier' }),
+    )
   })
 
   // PENDING (#1019): asserts the passkey option is absent, but CI renders it — the network passkey config differs from the assumption. Decide the expected capability matrix.
@@ -37,24 +66,37 @@ describe('Unified login surface (US2)', () => {
     cy.contains(/^passkey$/i).should('not.exist')
   })
 
-  // PENDING (#1019): waits for the address text `/0xf39F/i`, which WalletButton renders only inside the opened dropdown (same question as WAL-03).
-  it.skip('[UL-02] classic-wallet flows are untouched by the login manager (SC-004 smoke)', () => {
+  /*
+   * Un-skipped (#1019). There is no question to settle here: WalletButton deliberately renders the
+   * address only inside the opened dropdown, and `cy.assertActiveAccount` is the helper that
+   * exists for exactly that — it opens the dropdown, checks, and closes it again, and it also
+   * handles the fixed-header scroll trap this surface has bitten several specs with.
+   */
+  it('[UL-02] classic-wallet flows are untouched by the login manager (SC-004 smoke)', () => {
     cy.mockWeb3Provider({ account: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' })
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
     cy.selectInjectedConnector()
     // Connected header state renders exactly as the pre-041 suite expects.
-    cy.contains(/0xf39F/i, { timeout: 15000 }).should('exist')
+    cy.assertActiveAccount('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
   })
 
-  it('[UL-03] passkey session persists across reload and clears on sign-out (FR-003)', () => {
-    // Storage-boundary check: a persisted passkey session survives reload…
+  /*
+   * THIS TEST USED TO SEED A SESSION WITH NO CREDENTIAL RECORD and assert it survived a reload.
+   *
+   * It did survive — because nothing ever read it. wagmi skipped the passkey connector on every
+   * reconnect (its `getProvider()` returned null, and reconnect drops a connector without one), so
+   * the session sat in storage untouched and the assertion passed on the strength of the bug. The
+   * moment reconnect actually ran, the connector did the right thing and cleared it, and this
+   * test failed. Both halves of FR-003/FR-005 are now pinned against a reconnect that happens.
+   */
+  it('[UL-03] a complete passkey session survives reload, and sign-out clears it (FR-003)', () => {
     cy.visit('/fairwins', {
       onBeforeLoad(win) {
-        win.localStorage.setItem(
-          SESSION_KEY,
-          JSON.stringify({ address: ACCOUNT, chainId: 80002, credentialId: 'c1', loginMethod: 'passkey' })
-        )
+        seed(win, {
+          session: { address: ACCOUNT, chainId: 80002, credentialId: 'c1', loginMethod: 'passkey' },
+          credentials: completeRecord('c1'),
+        })
       },
     })
     cy.reload()
@@ -66,13 +108,41 @@ describe('Unified login surface (US2)', () => {
     })
   })
 
-  // PENDING (#1019): same address-behind-the-dropdown question as UL-02.
-  it.skip('[UL-04] no cross-account bleed: switching identities resets address-keyed UI state (FR-024)', () => {
+  it('[UL-05] a session this browser cannot sign for is cleared, not restored (spec 045 FR-005)', () => {
+    // Session present, credential book empty: restoring would hand the member an account that
+    // fails on its first action. An honest sign-out is the correct outcome.
+    cy.visit('/fairwins', {
+      onBeforeLoad(win) {
+        seed(win, {
+          session: { address: ACCOUNT, chainId: 80002, credentialId: 'orphan', loginMethod: 'passkey' },
+          credentials: [],
+        })
+      },
+    })
+    cy.get('[aria-label="Connect Wallet"]', { timeout: 20000 }).should('exist')
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(SESSION_KEY), 'unusable session is cleared').to.equal(null)
+    })
+  })
+
+  /*
+   * Un-skipped (#1019), and its assertion strengthened rather than merely unblocked.
+   *
+   * Both of this test's address checks were reading a collapsed header, where NO address renders.
+   * The positive one therefore timed out; the negative one — `cy.contains(passkey address)
+   * .should('not.exist')` — did the opposite and passed unconditionally, because a bleed would
+   * have been just as invisible as no bleed. A test named "no cross-account bleed" that cannot
+   * observe a bleed is worse than no test.
+   *
+   * So the check now opens the dropdown, where the app does render one address, and asserts BOTH
+   * halves against it: the classic account is shown AND the stale passkey account is not.
+   */
+  it('[UL-04] no cross-account bleed: switching identities resets address-keyed UI state (FR-024)', () => {
     cy.mockWeb3Provider({ account: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' })
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
     cy.selectInjectedConnector()
-    cy.contains(/0xf39F/i, { timeout: 15000 }).should('exist')
+    cy.assertActiveAccount('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
     // A stale passkey session from another identity must not leak into view.
     cy.window().then((win) => {
       win.localStorage.setItem(
@@ -81,7 +151,19 @@ describe('Unified login surface (US2)', () => {
       )
     })
     cy.reload()
-    // The wagmi-active classic session wins; the passkey address never renders.
-    cy.contains(new RegExp(ACCOUNT.slice(0, 6), 'i')).should('not.exist')
+    /*
+     * The wagmi-active classic session wins. Asserted where an address actually renders — inside
+     * the open dropdown — so "the passkey address is absent" is a claim about what the app SHOWS,
+     * not about a collapsed button that shows no address either way.
+     */
+    cy.scrollTo('top', { ensureScrollable: false })
+    cy.get('.wallet-account-button', { timeout: 20000 }).should('be.visible').click()
+    cy.get('.account-address-value', { timeout: 10000 })
+      .invoke('text')
+      .should((t) => {
+        const text = t.toLowerCase()
+        expect(text, 'shows the classic account').to.include('0xf39f')
+        expect(text, 'does not show the stale passkey account').to.not.include(ACCOUNT.slice(0, 6).toLowerCase())
+      })
   })
 })

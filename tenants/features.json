@@ -15,6 +15,7 @@
     "clearpath",
     "token-mint",
     "bitcoin",
-    "recovery"
+    "recovery",
+    "assistant"
   ]
 }

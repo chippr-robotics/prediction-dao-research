@@ -341,10 +341,24 @@ export function useClearPath() {
     [chainId, account, host.store]
   )
 
+  /*
+   * The ONE-ARGUMENT form every consumer actually calls.
+   *
+   * `hasRegistryOn` takes `(host, chainId)`, and this was handed out raw — so
+   * `RegisterExternalDao`'s `hasRegistryFor(targetChainId)` passed a NUMBER as the host, read
+   * `undefined.contracts`, and the try/catch turned that into a calm `false`. Every consumer
+   * stubs this prop as `(id) => boolean` in its own tests, so nothing in the package's suite
+   * could see it: the surface reported "this network has no on-chain registry, so the DAO is
+   * tracked on this device" on a chain that HAS one, and then `trackDAO` — which calls
+   * `hasRegistryOn` correctly — sent a registration transaction anyway. Found by
+   * `32-miniapps.cy.js::MA-06`.
+   */
+  const hasRegistryFor = useCallback((targetChainId) => hasRegistryOn(host, targetChainId), [host])
+
   return {
     isSupported,
     hasRegistry,
-    hasRegistryFor: hasRegistryOn,
+    hasRegistryFor,
     hasSanctionsSource,
     registryAddress,
     usdcAddress,

@@ -39,6 +39,12 @@ distinction: granted / "Access Restricted" (a definite no) / "Could Not Verify A
 answered — never dressed as a denial). All data hooks mount *behind* the gate: a denied account
 fetches nothing.
 
+The redirect waits for **`access.settled`**. It acts on the ABSENCE of a role flag, and entry can
+be granted by the curator authority — one contract read — before the role sweep across the cohort
+returns, leaving every flag momentarily false. Without that guard a deep link to an app the
+operator *is* entitled to bounced them to the Control Room; `/admin/incident-response` doing that
+mid-incident is the case that matters. See `chain-estate-reads.md` §3.
+
 UI gating is presentation. The contracts' `onlyRole` checks are the security boundary; a
 hand-typed URL past the matrix reaches nothing (the shell refuses render) and would be refused
 on-chain regardless.
@@ -63,7 +69,13 @@ labelled state while live state keeps rendering.
 ## Write semantics are unchanged
 
 `useAdminTx` is the monolith's `runTx` verbatim (resolves `true`/`false`, never rejects — bulk
-sequences observe the boolean). Scope rules are untouched: `useScopedChain` seeds once and never
+sequences observe the boolean), with one addition: an optional third argument, `{ errorAbi }`.
+When a write fails with raw revert bytes the wallet never decoded, those fragments turn
+"execution reverted (unknown custom error)" into the error's NAME (#1267). It is per **call**, not
+per hook — one `runTx` is shared by apps that write to different contracts (Compliance drives both
+the deny list and the mini-app registry), so the caller that knows which contract it is writing to
+is the one that supplies the fragments. A revert ethers already decoded, or a failure a caller has
+already turned into a sentence, is passed through untouched. Scope rules are untouched: `useScopedChain` seeds once and never
 follows the wallet; `writeGateReason`'s four sentences stand, including "unreadable stays
 permissive" for killswitches; membership writes stay pinned to `membershipChainId()`; incident
 controls act on exactly one named chain, refused at the call site as well as the button, and
@@ -94,7 +106,12 @@ them — **derived client-side, never from the registry**:
 - `test/admin/adminApps.test.js` — matrix totality + per-flag gating (replaces `adminNav.test.js`).
 - `test/admin/ControlRoom.test.jsx` — render-gate ≡ config-gate per single flag (replaces the
   raw-source `adminLeastPrivilege` diff), tile-status honesty.
-- `test/admin/adminRoutes.test.jsx` — unknown-id redirect, `?view=` resolution, denied-at-depth.
+- `test/admin/adminRoutes.test.jsx` — unknown-id redirect, `?view=` resolution, denied-at-depth,
+  and no redirect while the sweep is still running.
+- `test/admin/estateSweepClassification.test.js` — the sweep's read / not-deployed / unreadable
+  classification, including the total-outage case that used to render as a denial.
+- `cypress/e2e/fast/32-admin-console.cy.js` — the three-way entry gate, the three-state estate
+  reads, and Maintenance's permissionless tile, answered at the RPC boundary (#1242).
 - `test/admin/adminEstateGuard.test.js` — recursive scan: no admin file resolves a contract from
   the wallet's chain, no cross-chain sums.
 - `test/admin/adminCharts.test.jsx`, `appDashboards.test.jsx` — three-state honesty + axe.

@@ -7,7 +7,7 @@ self-submit fallback, so the worst failure mode of everything below is "users pa
 
 | Component | Where | Owns |
 |-----------|-------|------|
-| `relay-gateway` | Cloud Run (`services/relay-gateway`) | Policy: signer recovery, intent binding, fail-closed sanctions re-screen, dedup, quotas/spend caps, back-pressure, kill switch, audit log |
+| `relay-gateway` | The `fairwins-gateway` GCE VM (`services/relay-gateway`; formerly Cloud Run — see `infra/vm/README.md`) | Policy: signer recovery, intent binding, fail-closed sanctions re-screen, dedup, quotas/spend caps, back-pressure, kill switch, audit log |
 | `oz-relayer` | Container next to the gateway (`services/oz-relayer`) | Mechanics: per-chain nonce lanes, gas pricing/bumping (legacy type-0 on 61/63), inclusion tracking, RPC failover, the KMS-held gas key |
 | Frontend probe | `frontend/src/lib/relay` | `VITE_RELAYER_URL` + health probe → self-submit routing |
 

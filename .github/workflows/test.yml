@@ -63,6 +63,13 @@ jobs:
       - name: Run market-template tooling tests
         run: npm run test:market-templates
 
+      # The E2E deploy-order gate (issue #1298). It only runs in the full/torture tier, where a
+      # broken gate would be invisible until the next time someone inserts a deploy — so its own
+      # suite runs here, in the tier every push hits. Dependency-free: node:test plus two files
+      # read off disk, no chain, no npm ci.
+      - name: Run E2E address-gate tests
+        run: npm run test:e2e-addresses
+
   # Gate (spec 075, FR-003/FR-015): version skew across manifests and undeclared (phantom)
   # imports. Both invariants were fixed by hand once and had nothing preventing recurrence, which
   # is precisely the failure mode spec 075 exists to remove. Dependency-free, so no npm ci.
@@ -101,6 +108,12 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '22'
+
+      # A gate that silently passes everything is worse than no gate. These drive each C2b rule
+      # against a fixture that MUST be rejected — including the catalogue with the x402 entry
+      # removed, which is the state this gate was green in before the rule existed.
+      - name: Test the coverage gate's own rules
+        run: npm run test:finops-gate
 
       - name: Check FinOps source coverage
         run: npm run check:finops
@@ -386,6 +399,37 @@ jobs:
       - name: Run tests
         run: npm test
 
+  # MCP server tests (specs 095/096). This suite was written and then never run by CI: the only job
+  # touching this service built the image and curled /healthz, which is a liveness check, not a test.
+  # The load-bearing cases here are the transport's — where it binds, whose Origin it serves, and
+  # that `--http` refuses to boot into a shared identity. Every one of those is a decision a passing
+  # container smoke test cannot see.
+  #
+  # NO INSTALL STEP, and that is the point rather than an omission: this service has zero
+  # dependencies and is deliberately NOT a workspace member (spec 075), so there is nothing to
+  # install and `node --test` runs against node built-ins alone. Adding an install here would be the
+  # first step towards giving it the lockfile coupling it exists without.
+  # Gating like every other test job — no continue-on-error (Constitution IV).
+  mcp-server-tests:
+    name: MCP Server Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: services/mcp-server
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Run tests
+        run: node --test test/*.test.js
+
   frontend-tests:
     name: Frontend Unit Tests
     runs-on: ubuntu-latest
@@ -535,8 +579,31 @@ jobs:
       # 2.5 MB of unread bytes on every push is pure quota burn on a private repo.
 
   cypress-fast-e2e:
-    name: Cypress Fast E2E
+    # Spec 094: one leg per viewport profile. Responsive behaviour needs no chain, so this is where
+    # it belongs — admission rule 1 forbids spending on-chain-tier wall clock proving a control is
+    # reachable at 390px. `desktop` is 1280×720, exactly what every existing spec was written
+    # against, so that leg is a no-op change and any diff in it is a real regression.
+    #
+    # SHARDED SIX WAYS PER PROFILE (#1249). This tier had become the merge gate's critical path at
+    # 34:29 of Cypress on the desktop leg, against 09:53–17:09 for the on-chain shards that compile
+    # contracts, boot a chain and send real transactions. The cause was structural, not the work:
+    # that tier was sharded four ways and this one was a single leg. Six is the first count where
+    # BOTH profiles fit the policy's < 6 min budget (predicted 349s desktop / 315s phone); seven and
+    # eight buy little, because the floor is the longest single spec (34-member-surfaces, 192s).
+    #
+    # Runner minutes are ~neutral: 2 legs × ~37 min ≈ 74, against 12 legs × (≈50s setup + ≈6 min)
+    # ≈ 82. This tier installs only frontend deps — no contract compile, no chain — so the per-job
+    # overhead sharding adds is small next to the wall clock it removes.
+    name: Cypress Fast E2E (${{ matrix.viewport }} ${{ matrix.shard }})
     runs-on: ubuntu-latest
+
+    strategy:
+      # Every leg always runs: a phone-only or one-shard failure is information, not a reason to
+      # stop measuring the rest.
+      fail-fast: false
+      matrix:
+        viewport: [desktop, phone]
+        shard: [0, 1, 2, 3, 4, 5]
 
     defaults:
       run:
@@ -563,15 +630,48 @@ jobs:
       # `set -o pipefail` is load-bearing: the command is piped into `tee`, so without it the
       # step's exit status is tee's (always 0) and cypress's failure is discarded exactly as
       # `continue-on-error` used to discard it.
+      # Only the NO-CHAIN tier is doubled. The account-native (passkey) tier rides this job for its
+      # runner, not because it is a viewport question: it drives the WebAuthn harness, its budget is
+      # a single sub-5-minute run, and running it twice would contradict the policy this feature
+      # just wrote down. It goes in the desktop leg — the width every one of its specs was authored
+      # against.
+      # The spec list for this leg. Computed into an env var rather than inlined in the run command
+      # so the job log shows exactly which specs the leg claimed — a shard that silently ran nothing
+      # would otherwise report the same green as one that ran six specs. (Same reasoning, and the
+      # same empty-list guard, as the on-chain tier's shard selection.)
+      - name: Select this leg's specs
+        id: specs
+        working-directory: .
+        run: |
+          SPECS=$(node scripts/e2e/split-fast-tier.js \
+            --profile ${{ matrix.viewport }} --shards 6 --index ${{ matrix.shard }} --csv)
+          if [ -z "$SPECS" ]; then
+            echo "::error::Fast-tier ${{ matrix.viewport }} shard ${{ matrix.shard }} resolved to an empty spec list — refusing to report a pass for running nothing."
+            exit 1
+          fi
+          echo "${{ matrix.viewport }} shard ${{ matrix.shard }} specs: $SPECS"
+          echo "specs=$SPECS" >> $GITHUB_OUTPUT
+
       - name: Run fast E2E tests
+        env:
+          # Read by cypress/support/viewports.js and applied from a global beforeEach, so a spec
+          # written tomorrow is covered at both widths without its author doing anything.
+          CYPRESS_VIEWPORT_PROFILE: ${{ matrix.viewport }}
+          # Account-native tier (#1271). Without this the WebAuthn specs skip themselves, and 16
+          # of the tier's 17 tests were permanently pending while the coverage matrix recorded
+          # them as covered. It needs no bundler — the ceremonies and the local address derivation
+          # run without a chain, which is why the author gated them separately from
+          # PASSKEY_FULL_STACK. Desktop only: the passkey specs ride that leg (see the spec
+          # selection above), so setting it on the phone leg would claim something it never ran.
+          CYPRESS_PASSKEY_ENABLED: ${{ matrix.viewport == 'desktop' && '1' || '' }}
         run: |
           set -o pipefail
-          npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/fast/**/*.cy.js,cypress/e2e/passkey/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
+          npx start-server-and-test dev:fast http://localhost:5173 'cypress run --spec "${{ steps.specs.outputs.specs }}" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
 
       - name: Summarize E2E results
         if: always()
         run: |
-          echo "### Cypress Fast E2E" >> $GITHUB_STEP_SUMMARY
+          echo "### Cypress Fast E2E — ${{ matrix.viewport }} viewport, shard ${{ matrix.shard }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Parse the RUN-TOTAL row of Cypress's own summary table. The previous version preferred
@@ -649,7 +749,9 @@ jobs:
         uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: cypress-fast-screenshots
+          # Sharded (#1249): the name must carry the shard or six legs of the same profile
+          # collide on one artifact name and the upload fails.
+          name: cypress-fast-screenshots-${{ matrix.viewport }}-${{ matrix.shard }}
           path: frontend/cypress/screenshots
           retention-days: 7
 
@@ -660,7 +762,7 @@ jobs:
         # artifact API into rate-limiting.
         if: failure()
         with:
-          name: cypress-fast-videos
+          name: cypress-fast-videos-${{ matrix.viewport }}-${{ matrix.shard }}
           path: frontend/cypress/videos
           retention-days: 7
 
@@ -668,6 +770,242 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: cypress-fast-results
+          name: cypress-fast-results-${{ matrix.viewport }}-${{ matrix.shard }}
           path: frontend/cypress-output.txt
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────────────────────
+  # Cypress Full E2E — the on-chain money paths (#1028).
+  #
+  # This tier is the one that proves the PRODUCT works: create, accept, decline, cancel, resolve,
+  # claim, refund, freeze, pause, expire — every one driven through the real UI against a real
+  # WagerRegistry on a local chain. `fast/**` deliberately never touches a chain, so until this
+  # job existed the merge gate could not tell a working money path from a broken one.
+  #
+  # Why it needs its own job rather than more specs in cypress-fast-e2e: this tier requires a
+  # hardhat node, a full contract deploy and a seed, none of which the fast tier wants to pay for.
+  # Keeping them separate also keeps the failure legible — a red here means the money path broke,
+  # not that a button moved.
+  cypress-full-e2e:
+    # SHARDED, 4 legs, one private chain each (spec 094). Legal only because per-spec chain
+    # isolation (#1222) made specs order-independent — before that, run order decided which specs
+    # passed and splitting the list would have changed results, not just wall clock.
+    #
+    # The split is longest-processing-time-first over measured per-spec seconds
+    # (frontend/cypress/coverage/full-tier-weights.json). Balancing spec COUNT would leave the
+    # critical path barely shorter than the ~30-minute serial run, because the specs are nowhere
+    # near equal.
+    #
+    # 4, not 8: each leg pays a fixed few minutes of install, compile, node start, deploy and seed.
+    # Past 4 that setup dominates and runner minutes grow faster than wall clock falls.
+    #
+    # MEASURED on the first sharded run (Actions 32204349960): legs of 6:37 / 7:51 / 6:29 / 6:09
+    # against a serial total of 1621s (~27 min). That is why this stays on every push — at ~7
+    # minutes a leg it is no longer the thing a branch waits on, which was the concern when the
+    # only number available was the serial one.
+    name: Cypress Full E2E (shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      # One failing shard must not cancel the others: which OTHER money paths also broke is the
+      # first thing anyone reading a red run needs.
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    # Per-LEG bound, down from the serial job's 60. A leg that should take ~10 minutes must not
+    # occupy a runner for an hour before failing; the cap exists to catch a hang, not to
+    # accommodate one.
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
+
+      # RESTORED BEFORE THE INSTALL, deliberately. Cypress's postinstall checks
+      # ~/.cache/Cypress and skips the ~250 MB download when the binary is already there — so a
+      # cache step placed after `npm ci` would restore the cache having just paid the cost it
+      # exists to avoid.
+      - name: Cache Cypress binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: cypress-${{ runner.os }}-
+
+      # ROOT install, unlike cypress-fast-e2e's frontend-only one: this tier drives hardhat
+      # (node, compile, deploy, seed), which lives at the root and is deliberately not a
+      # workspace member.
+      - name: Install dependencies
+        run: npm ci
+
+      # Belt and braces: `npm ci` normally installs the binary via cypress's postinstall, but a
+      # partial cache or a skipped script leaves the package without it, and `cypress run` then
+      # fails deep into the job rather than here.
+      - name: Ensure Cypress binary
+        run: npx cypress install
+
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      # The chain must be ANSWERING before the deploy runs, not merely spawned. Polling
+      # eth_chainId is the only honest readiness signal — a fixed sleep either wastes time or
+      # races, and a race here surfaces as a confusing deploy error rather than "no chain".
+      #
+      # Deliberately NO bare `exit 0` on the success path. test/config/CiGates.test.js rejects one
+      # in any merge-gating step, and it is right to: `exit 0` is the mechanism that lets a step
+      # report success it did not earn, and a reader cannot tell an early return from a swallowed
+      # failure by looking. Recording readiness in a variable and failing on its absence says the
+      # same thing without the pattern — and falls through to failure by default.
+      # AMOY-SHAPED, deliberately (spec 071 collision): membership reads and purchase settlement
+      # are pinned to membershipChainId() — Amoy on a testnet cohort — and that constant is
+      # deliberately not runtime-configurable. A 1337 node therefore cannot host the membership
+      # money path at all (the purchase button is hard-disabled off the membership home). The
+      # node impersonates Amoy instead: local deploys are deterministic by deployer+nonce
+      # (chain-id-independent), so addresses match the committed hardhat set, and the app maps
+      # 80002 to that set through a DEV-only seam (VITE_E2E_AMOY_LOCAL, dead code in any
+      # production bundle).
+      - name: Start local chain
+        run: |
+          HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node > /tmp/hardhat-node.log 2>&1 &
+          ready=""
+          for i in $(seq 1 60); do
+            if curl -s -X POST http://127.0.0.1:8545 \
+                 -H 'content-type: application/json' \
+                 --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+                 | grep -q result; then
+              ready="$i"
+              break
+            fi
+            sleep 1
+          done
+          if [ -z "$ready" ]; then
+            echo "::error::Local chain never answered eth_chainId — see the log below."
+            cat /tmp/hardhat-node.log
+            exit 1
+          fi
+          echo "chain up after ${ready}s"
+
+      # deploy + sync-frontend-contracts + seed. The seed is what makes the specs' preconditions
+      # true (two funded accounts, membership granted, registry approved), so a failure here must
+      # stop the job rather than let 95 specs fail one by one for the same reason.
+      # setup:e2e, not setup:local: same deploy + seed, minus the frontend-contracts sync — the
+      # 80002 mapping comes from the seam above, and the sync would try to rewrite the REAL Amoy
+      # address table with local values.
+      - name: Deploy and seed the local chain
+        run: npm run setup:e2e
+
+      # Constitution IV: this step MUST fail the pipeline on error — no `continue-on-error`.
+      # `set -o pipefail` is load-bearing for the same reason it is in cypress-fast-e2e: the
+      # command is piped into `tee`, so without it the step's status is tee's (always 0).
+      # `dev:e2e`, NOT `dev`. Encryption is mandatory on the create path, and
+      # PINATA_CONFIG.USE_PROXY is false outside a production build — so with no VITE_PINATA_JWT
+      # getPinataAuthHeaders() THROWS and every wager creation dies before it reaches
+      # WagerRegistry. `dev:e2e` supplies a DUMMY value whose only job is to let the request be
+      # issued, so the specs' cy.interceptIpfs() can stub it; no bytes leave the runner. It cannot
+      # leak into a real bundle — pinataSecretGuard() refuses any production build with it set.
+      # The spec list for this leg. Computed once into an env var rather than inline in the run
+      # command so the job log shows exactly which specs the leg claimed — a shard that silently
+      # ran nothing would otherwise report the same green as one that ran four specs.
+      - name: Select this shard's specs
+        id: shard
+        run: |
+          SPECS=$(node scripts/e2e/split-full-tier.js --shards 4 --index ${{ matrix.shard }} --csv)
+          if [ -z "$SPECS" ]; then
+            echo "::error::Shard ${{ matrix.shard }} resolved to an empty spec list — refusing to report a pass for running nothing."
+            exit 1
+          fi
+          echo "shard ${{ matrix.shard }} specs: $SPECS"
+          echo "specs=$SPECS" >> $GITHUB_OUTPUT
+
+      - name: Run full E2E tests
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          CYPRESS_NETWORK_ID=80002 npx start-server-and-test dev:e2e http://localhost:5173 \
+            'cypress run --spec "${{ steps.shard.outputs.specs }}"' 2>&1 | tee cypress-full-output.txt
+
+      - name: Summarize E2E results
+        if: always()
+        working-directory: frontend
+        run: |
+          echo "### Cypress Full E2E — shard ${{ matrix.shard }} (on-chain money paths)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-full-output.txt > cypress-full-plain.txt
+          TOTALS=$(grep -E "(All specs passed!|[0-9]+ of [0-9]+ failed)" cypress-full-plain.txt | tail -1)
+          if [ -n "$TOTALS" ]; then
+            NUMS=$(echo "$TOTALS" | tr -d '│┌┐└┘─' | sed 's/[✔✖]//g' | grep -oE '[0-9]+|-' | tail -5 | tr '\n' ' ')
+            set -- $NUMS
+            z () { [ "${1:-}" = "-" ] || [ -z "${1:-}" ] && echo 0 || echo "$1"; }
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Tests | ${1:-?} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passing | $(z "${2:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failing | $(z "${3:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Pending | $(z "${4:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`$(echo "$TOTALS" | tr -d '│' | xargs)\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Cypress produced no run-total row — see the job log." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      # Same two-part gate as the fast tier, and for the same reasons documented there: the run
+      # step's exit code is authoritative for pass/fail, but it cannot tell us the run never
+      # started. Both matches run on the DE-COLOURED copy — cypress wraps "Run Finished" and the
+      # totals row in escape codes, so grepping the raw file is a check that cannot fire.
+      - name: Check E2E results
+        if: always()
+        working-directory: frontend
+        run: |
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-full-output.txt > cypress-full-plain.txt
+
+          if ! grep -qE "Run Finished" cypress-full-plain.txt; then
+            echo "::error::Cypress never reached 'Run Finished' — the run died before completing. Failing rather than assuming success."
+            exit 1
+          fi
+
+          if grep -qE "[0-9]+ of [0-9]+ failed" cypress-full-plain.txt; then
+            echo "::error::Cypress reported failing specs in the full (on-chain) tier."
+            grep -E "[0-9]+ of [0-9]+ failed" cypress-full-plain.txt
+            exit 1
+          fi
+
+      - name: Upload chain log
+        uses: actions/upload-artifact@v7
+        # The chain log is how you tell a reverted transaction from a UI failure, and it is
+        # only interesting when something broke.
+        if: failure()
+        with:
+          name: cypress-full-chain-log-${{ matrix.shard }}
+          path: /tmp/hardhat-node.log
+          retention-days: 7
+
+      - name: Upload Cypress screenshots
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: cypress-full-screenshots-${{ matrix.shard }}
+          path: frontend/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload Cypress videos
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: cypress-full-videos-${{ matrix.shard }}
+          path: frontend/cypress/videos
+          retention-days: 7
+
+      - name: Upload Cypress output
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cypress-full-results-${{ matrix.shard }}
+          path: frontend/cypress-full-output.txt
           retention-days: 7

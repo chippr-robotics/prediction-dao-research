@@ -34,32 +34,81 @@ describe('Encryption & Key Registration (UI)', () => {
       })
     })
 
-    // PENDING (#1019): cy.then() times out asserting session persistence; needs the key-cache contract re-checked.
-    it.skip('[ENC-04] Key persists within session after derivation', () => {
+    /*
+     * Rewritten (#1019). Un-skipping this as it stood would have restored a green test that
+     * proves nothing about FairWins: it wrote `encryptionKeyDerived` — a key NOTHING in the app
+     * reads — and then asserted sessionStorage still held it after a same-tab visit. That is a
+     * test of the browser's storage semantics.
+     *
+     * The real contract is `useEncryption.js`: a derived signature is cached at
+     * `fairwins_encryption_signature_<account>` in SESSION storage, so it survives navigation
+     * within the tab and cannot outlive the tab.
+     *
+     * It is reachable without a chain, which is why this stays in the no-chain tier: pressing
+     * Register derives client-side (personal_sign, which the mock answers) and caches BEFORE it
+     * attempts the KeyRegistry write. The write then fails here, with no node — deliberately
+     * irrelevant, and the on-chain half is ENC-02/ENC-03's job in full/03-encryption-chain.
+     */
+    it('[ENC-04] Key persists within session after derivation', () => {
+      const ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+      const cacheKey = `fairwins_encryption_signature_${ACCOUNT.toLowerCase()}`
+
+      cy.visit('/wallet?tab=security')
+      cy.get('body', { timeout: 10000 }).should('be.visible')
       cy.connectWallet()
 
-      // Session storage should be available for key caching
+      // ESTABLISH THE PRECONDITION. Without this the later assertion cannot distinguish "the app
+      // cached a signature" from "something had already cached one".
       cy.window().then((win) => {
-        // Simulate key being cached in session storage
-        win.sessionStorage.setItem('encryptionKeyDerived', 'true')
-        expect(win.sessionStorage.getItem('encryptionKeyDerived')).to.equal('true')
+        expect(win.sessionStorage.getItem(cacheKey), 'no cached signature before derivation').to.be.null
       })
 
-      // Navigate away and back
-      cy.visit('/fairwins')
-      cy.get('body', { timeout: 10000 }).should('be.visible')
+      cy.get('#encryption-key-header', { timeout: 10000 }).then(($h) => {
+        if ($h.attr('aria-expanded') !== 'true') cy.wrap($h).click()
+      })
+      cy.contains('button', /register encryption key/i, { timeout: 10000 })
+        .scrollIntoView()
+        .should('be.visible')
+        .click()
 
-      // Session storage persists within the same tab
+      // Derivation is async (signature request, then cache write), so this retries.
+      cy.window({ timeout: 15000 }).should((win) => {
+        const cached = win.sessionStorage.getItem(cacheKey)
+        expect(cached, 'signature cached for the connected account').to.not.be.null
+        expect(JSON.parse(cached), 'cache holds the signature').to.have.property('signature')
+      })
+
+      // Survives navigation within the same tab — the thing this test is named for.
+      cy.visit('/wallet?tab=security')
+      cy.get('body', { timeout: 10000 }).should('be.visible')
+      cy.window({ timeout: 10000 }).should((win) => {
+        expect(win.sessionStorage.getItem(cacheKey), 'still cached after navigating').to.not.be.null
+      })
+
+      // ...and is TAB-scoped by construction. This is the half that makes "cannot outlive the
+      // tab" a fact about the app rather than a hope: a signature written to localStorage would
+      // survive a tab close, and nothing about sessionStorage would have caught that.
       cy.window().then((win) => {
-        expect(win.sessionStorage.getItem('encryptionKeyDerived')).to.equal('true')
+        expect(win.localStorage.getItem(cacheKey), 'never written to localStorage').to.be.null
       })
     })
 
+    /*
+     * Corrected alongside ENC-04 (#1019), and for the same reason. This asserted
+     * `sessionStorage.getItem('encryptionKey')` — a key the app has never written, so it was
+     * `null` no matter what the app did. It reported coverage of the clear-on-new-session
+     * contract while being incapable of observing it.
+     *
+     * Each Cypress test starts a fresh session, so a correctly-named absent key is a real
+     * statement here: whatever ENC-04 derived did not follow the member into a new session.
+     */
     it('[ENC-05] Key cleared on tab close/new session', () => {
-      // Session storage is tab-scoped by design — a fresh visit has no cached key
+      const ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+      const cacheKey = `fairwins_encryption_signature_${ACCOUNT.toLowerCase()}`
+      cy.connectWallet()
       cy.window().then((win) => {
-        const cached = win.sessionStorage.getItem('encryptionKey')
-        expect(cached).to.be.null
+        expect(win.sessionStorage.getItem(cacheKey), 'a new session starts with no cached signature').to.be.null
+        expect(win.localStorage.getItem(cacheKey), 'and nothing durable was left behind').to.be.null
       })
     })
   })

@@ -17,10 +17,21 @@
  *  - stamps degrade FAIL-SAFE: a failed or degraded chunk makes the WHOLE
  *    result degraded (unverified coins are then treated as protected, FR-019).
  *
- * Base URL: the relay-gateway is one host for all proxy modules — resolved
- * from VITE_RELAYER_URL exactly like the collectibles/predict clients
- * (lib/collectibles/gatewayClient.js). The constructor stays injectable
- * (baseUrl + fetchImpl) for tests and non-default wiring.
+ * Base URL: the relay-gateway is one host for all proxy modules, but WHICH
+ * client surfaces a build turns on is per-surface — so Bitcoin reads its own
+ * VITE_BITCOIN_GATEWAY_URL first and falls back to the shared VITE_RELAYER_URL
+ * (issue #1263). A deployment that sets only VITE_RELAYER_URL keeps working
+ * byte-identically; a build that wants a Bitcoin gateway WITHOUT turning on
+ * every other proxy client now has a name for it.
+ *
+ * That switch runs ONE way, deliberately. A blank value falls through, so no
+ * value of VITE_BITCOIN_GATEWAY_URL leaves Bitcoin unconfigured while
+ * VITE_RELAYER_URL is set — turning the Bitcoin client OFF still means leaving
+ * BOTH unset. An explicit disable sentinel would be a new feature, with its own
+ * test, not an implication of this fallback.
+ *
+ * The constructor stays injectable (baseUrl + fetchImpl) for tests and
+ * non-default wiring.
  */
 
 const MAX_ADDRESSES_PER_CALL = 50
@@ -48,9 +59,19 @@ function chunk(list, size) {
   return out
 }
 
-/** The configured gateway base URL, or '' when unset. Read at call time so tests can stub the env. */
+/**
+ * The configured gateway base URL, or '' when unset. Read at call time so tests can stub the env.
+ *
+ * Precedence: VITE_BITCOIN_GATEWAY_URL (this surface only) → VITE_RELAYER_URL (the shared
+ * relay-gateway host). A blank value counts as unset and falls through, so an environment that
+ * only ever set VITE_RELAYER_URL resolves to exactly the URL it always did. Neither set ⇒ '',
+ * which is the honest capability-off signal every method already reports as
+ * `{ ok: false, error: 'unconfigured', disabled: true }` — never an empty portfolio.
+ */
 export function bitcoinGatewayUrl() {
-  return (import.meta.env.VITE_RELAYER_URL || '').trim().replace(/\/$/, '')
+  const specific = (import.meta.env.VITE_BITCOIN_GATEWAY_URL || '').trim()
+  const shared = (import.meta.env.VITE_RELAYER_URL || '').trim()
+  return (specific || shared).replace(/\/$/, '')
 }
 
 /**

@@ -35,9 +35,11 @@ export const FEE_SERVICE_IDS = {
 export const BRIDGE_TRANSFER_CAP_BPS = 250
 export const LIQUIDITY_DEPOSIT_CAP_BPS = 250
 
-// Spec-057 hard caps, re-applied at read time (defense in depth).
-const TAKER_CAP_BPS = 100
-const MAKER_CAP_BPS = 50
+// Spec-057 hard caps, re-applied at read time (defense in depth). Exported alongside the spec-067
+// and spec-082 caps above so a surface that DISCLOSES a rate can disclose its ceiling from the same
+// place the clamp uses — a second literal in a member-facing module would be a hardcoded bps.
+export const TAKER_CAP_BPS = 100
+export const MAKER_CAP_BPS = 50
 
 // Spec-082 cap: Hyperliquid's own 10 bps limit on perps builder fees, re-applied at read time.
 export const PERPS_HL_BUILDER_CAP_BPS = 10

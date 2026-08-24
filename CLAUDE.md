@@ -549,7 +549,19 @@ artifacts live under `specs/<feature>/`.
   off-brand. 091 also added tier metals (gold = Amber, so the estate keeps one yellow) and
   `--gradient-brand`; **a gradient built from two different semantic tokens is a bug** — a
   `--brand-primary → --success-color` button says something untrue about what it does, which is
-  exactly what the 091 screenshot round caught. FOUR guards now gate CI in
+  exactly what the 091 screenshot round caught. (6) **A brand fill NEVER states its own label
+  colour** (issue #1260): fill from `--primary-button` and label with `--primary-button-text`, a
+  matched pair that INVERTS on dark (Teal 300 fill, Gunmetal label) because `color: #fff` on
+  `--brand-primary` measures 2.16:1 there. A disabled control changes HUE — `index.css` re-points
+  the whole fill/label set (`--primary-button`, `--primary-button-hover`, `--primary-button-text`
+  **and `--gradient-primary-button`**) at the disabled neutrals on any disabled button — because
+  `opacity: .55` over a pale teal is not a state a member can read. **THE FILL AND THE LABEL MOVE
+  TOGETHER OR NOT AT ALL**: half of each puts `--disabled-text` on a full-strength brand fill at
+  1.27:1 (light) / 1.06:1 (dark), *worse* than the bug being fixed, so a status-coloured control —
+  which keeps its fill when disabled — labels with `--status-fill-text` instead. The gradient must
+  be re-pointed rather than left to re-resolve: a custom property's `var()` stops are substituted
+  where it is DECLARED (`:root`), and descendants inherit the finished string — which is also why
+  the `--text-on-brand`/`--color-on-primary` aliases never follow the remap. SIX guards now gate CI in
   `frontend/src/test/brand/`. See `docs/developer-guide/brand-tokens.md` +
   `specs/090-chippr-brand-alignment/` + `specs/091-neutral-token-consolidation/`.
 - **FinOps (spec 089): the CATALOGUE is the source of truth, and a zero is never an absence.**
@@ -574,9 +586,26 @@ artifacts live under `specs/<feature>/`.
   (4) **LABELS COME FROM BOUNDED ENUMERATIONS** (`schema.js`) — never a member address, wager id or
   tx hash, which makes series count a function of usage and outgrows the tier in days.
   (5) **`infra/grafana/` IS GENERATED AND COMMITTED** — never hand-edit it (C5 regenerate-and-diff),
-  and a dashboard edited in the Grafana UI is drift that the next provision overwrites. `miniapp
-  licenses` and `wager platform fee` are catalogued `planned`: neither exists on chain, so they show
-  as NOT YET LIVE, declare no metric, and contribute nothing to any total. The exporter is
+  and a dashboard edited in the Grafana UI is drift that the next provision overwrites. Four sources
+  are catalogued `planned` — they show as NOT YET LIVE, declare no metric, and contribute nothing to
+  any total — and they split two ways: `miniapp licenses` / `wager platform fee` exist NOWHERE (no
+  contract has a fee), while `x402-agent-payments` / `assistant-model-api` are **built and offered on
+  no deployment** (specs 096/095, flags commented out in `infra/vm/gateway/docker-compose.yml`).
+  **A gate that cannot see the source is not protection**, and the second group is why: C2's only
+  discovery route was a FeeRouter `keccakId('x.y')` over two files, so the x402 rail — which takes
+  USDC straight to the treasury and registers no `serviceId` — was invisible BY CONSTRUCTION and sat
+  uncatalogued with CI green. **C2b** now also enumerates **configured platform payees** in
+  `services/relay-gateway/src/**` (an env var, READ from the environment, ending `_PAY_TO`/
+  `_TREASURY`/`_REFERRAL_ADDRESS`/`_REF_CODE`/…, plus any payee hardcoded as an address literal) and
+  fails on a namespace no entry claims via `moneyPath: { namespace, payeeEnv, enableEnv }`. It
+  deliberately does NOT match a bare `recipient` (every one in the gateway is the MEMBER's address)
+  and it requires an actual env READ, because matching the name anywhere reported OpenSea's own
+  hardcoded fee address as FairWins revenue. **Enabling a `planned` money path in a committed
+  deployment file is itself a C2b failure** — promotion to `live` with a collector is forced at the
+  moment the rail is switched on, not after. **Cost discovery is NOT automatable** (`fetch(vendor)`
+  looks identical metered or free) and is deliberately left to `basis` + review; do not add a
+  heuristic over outbound calls. `npm run test:finops-gate` drives each rule against a
+  must-fail fixture. The exporter is
   **read-only by construction** (no signer, no write route), binds loopback only, and
   `fetch-secrets.sh` refuses to boot if key material reaches its env. See
   `docs/developer-guide/finops.md` + `docs/runbooks/finops-operations.md` + `specs/089-finops-dashboard/`.
@@ -626,8 +655,123 @@ artifacts live under `specs/<feature>/`.
   re-recording a baseline, i.e. accepting that deployed bytecode or a published package changed.
   See `specs/075-monorepo-workspaces/`.
 
+- **End-to-end coverage has a source of truth, and assertion depth is a separate fact from coverage
+  (spec 094).** `frontend/cypress/coverage/matrix.json` maps EVERY directory under `specs/` — including
+  the ones with no member surface, which carry a reason instead of flows — to its member-facing flows,
+  each with status, **depth**, tier, money-at-risk and a tracking issue;
+  `docs/developer-guide/e2e-coverage-matrix.md` is GENERATED from it (`npm run e2e:matrix`,
+  regenerate-and-diff gated) and a spec directory with no row fails CI. Depth exists because a flow can
+  be `covered` by a test that cannot fail: 33 branches across four money-path specs end in
+  `expect(true).to.be.true` behind a precondition guard, which reports as coverage while proving
+  nothing. Those are annotated `// ASSERTION-DEBT: #1231` and counted by
+  `frontend/src/test/e2e-policy/assertionDepth.test.js`; a NEW unconditional truth fails the build
+  unless it carries `// EITHER-WAY: <reason>`. Two admission rules bind
+  (`docs/developer-guide/e2e-testing-policy.md`): a flow validatable **without a chain must not** live
+  in the on-chain tier, and a flow where a member signs something that **costs them money must** have
+  on-chain coverage. The no-chain tier runs twice — `CYPRESS_VIEWPORT_PROFILE` = `desktop` (1280×720)
+  and `phone` (390×844), applied from a GLOBAL `beforeEach` so a new spec is covered at both widths
+  with no author action. **BOTH tiers are sharded longest-first**, and the packing lives once in
+  `scripts/e2e/lib/tier-split.js`: the on-chain tier is **4 legs with a private chain each**
+  (`split-full-tier.js`), the no-chain tier **6 legs per viewport profile**
+  (`split-fast-tier.js --profile desktop|phone`, where the profile decides whether the `passkey/`
+  specs are in the set — they ride desktop only). Sharding the no-chain tier is #1249: left as one
+  leg it had reached **34:29**, making the tier that starts NO chain the merge gate's critical path,
+  slower than the on-chain shards that compile contracts and send real transactions — a structural
+  fact, not a slow spec. Weights (`full-tier-weights.json`, `fast-tier-weights.json`) are CI-measured
+  and **decay**: `29-protect-custody` had grown to 326s while the splitter still estimated it at the
+  ~110s file mean, so one shard silently carried 3× its assumed load. An unmeasured spec is estimated
+  and ANNOUNCED, never dropped, and `frontend/src/test/e2e-policy/tierSharding.test.js` proves every
+  leg's union is exactly the specs on disk — a spec falling out of every shard fails nothing on its
+  own, because each leg still reports its own green. Accessibility uses `cy.a11yScan` — the
+  **already-installed `axe-core`, injected by the runner, never imported from `frontend/src`** (adding
+  `cypress-axe` would touch the lockfile; see spec 075) — failing on serious/critical, scoped to an
+  open modal's root because the app portals its modals, and every suppression names its issue.
+  Lighthouse measures six routes on **both** profiles; budgets REPORT, but an **unmeasured route
+  fails** (`scripts/e2e/check-lighthouse-coverage.js`) — `lhci` asserts only over URLs it collected, so
+  a route that never loaded otherwise leaves the job green. Uncovered flows are sub-issues of #1228,
+  not lines in a document. See `specs/094-e2e-coverage-expansion/`.
+- **The member API (spec 095) authenticates with member-SIGNED capability tokens, and nothing on it
+  signs or moves value.** A "private API key" is an off-chain EIP-712 `ApiKeyGrant` the member signs
+  in-app (Settings ▸ API access) — the gateway stores nothing to issue one; the struct/domain have
+  ONE source, `@fairwins/intent-types/offchain` (deliberately OUTSIDE `CONTRACT_VERIFIED_TYPES`: the
+  parity gate would demand Solidity that must not exist; `services/relay-gateway/test/memberApiAuth.test.js`
+  is their gate instead). The gateway module (`services/relay-gateway/src/memberApi/`,
+  `MEMBER_API_ENABLED`) is optional and mounts unconditionally (503 `member_api_unconfigured` off);
+  scopes cover reads, typed-data BUILDS and the opt-in assistant — never relay, never custody, and
+  the actor field of every built intent is forced to the token account. Three verdicts are absolute:
+  `auth_unverifiable` and `membership_unreadable` are retryable 503s, NEVER denials (an RPC timeout
+  is not a forged signature; unreadable is not tier 0). Revocation is in-process (`durable: false`
+  on every answer — every surface says so; expiry is the binding limit, TTL-capped at
+  `MEMBER_API_MAX_TTL_DAYS`). The assistant is OPT-IN and default-OFF, memory is device-local and
+  member-clearable (deliberately absent from `syncedObjects.js`), the session token lives in module
+  memory only, and message content never reaches logs or audit fields. The MCP server
+  (`services/mcp-server/`) is DEPENDENCY-FREE and deliberately NOT a workspace member (lockfile
+  hazard, spec 075) — do not add it to `workspaces` or give it dependencies; it consumes the API
+  with the member's own token and cannot sign. Mini-app packages still cannot sign — the api-access
+  console deep-links to the host Settings card for every key ceremony.
+  **Spec 096 adds a SECOND rail on those same operations — x402 pay-per-request
+  (`services/relay-gateway/src/x402/`, `X402_ENABLED`, default off) — and it NEVER applies to a
+  member: the bearer token is checked first, so a valid `fw1` token never reaches the paywall even
+  with an `X-PAYMENT` attached, and `openapi.json`, `/me`, `/membership` and the key routes are never priced.** An
+  unauthenticated call to a priced op answers **402** with an x402-v2 offer (CAIP-2 network, string
+  base-unit amount, the chain's `paymentToken`, and the **TOKEN's** EIP-712 domain in `extra` — from
+  `chains.js#tokenDomain` and `@fairwins/intent-types`, never a local copy); the payer signs
+  **`TransferWithAuthorization`** (not `Receive…`), and the gateway verifies EVERYTHING before it
+  settles — so a refused payment is never submitted and costs nothing, and an engine outage is
+  `503 settlement_unavailable`, never a free serve. Settlement rides the EXISTING engine client (no
+  new key, no custody, no facilitator, no credits/balances, and deliberately no FeeRouter service —
+  this is not a member fee); acceptance is **broadcast, not finality**, on every surface. The payer
+  is sanctions-screened fail-closed and the request is served AS THE PAYER (built intents force the
+  actor to the payer address); prices are env config per op class with **`0` = not offered, never
+  free**; replay protection is in-process and honest about it (the token's own `authorizationState`
+  is the durable guarantee). Contract-account payers are EOA-only refusals whose **reason
+  says so** (a 1271 check would pass here and revert at the token). The MCP server surfaces a 402 whole
+  and forwards `X-PAYMENT` byte-for-byte — it holds no key and **cannot pay**, and a payment is never
+  a tool argument. See `docs/developer-guide/member-api.md` + `docs/developer-guide/mcp-server.md` +
+  `docs/developer-guide/agentic-chat.md` + `docs/developer-guide/agentic-payments.md` +
+  `specs/095-member-api-agentic-access/` + `specs/096-x402-agentic-payments/`.
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/093-admin-mini-apps/plan.md
+at specs/094-e2e-coverage-expansion/plan.md
 <!-- SPECKIT END -->
+- **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
+  platform is administered FROM is a production surface — it can read a funded deploy key that also
+  holds admin authority on live contracts. `scripts/secrets/registry.js` is the SINGLE source of
+  truth for what is a secret, which container holds it, and which least-privilege **profile**
+  includes it; `npm run sec -- --profile <p> -- <cmd>` delivers a profile into a child's environment
+  and nothing else. Six rules:
+  (1) **`hardhat.config.js` is deliberately untouched** — it resolves accounts *synchronously* at
+  load, so fetching inside it would pay a network round-trip on every `compile` and `test`, neither
+  of which needs a secret. Delivery is from OUTSIDE, by wrapper. The floppy keystore flow is
+  unchanged and remains preferred for admin keys.
+  (2) **The fetcher shells out to `gcloud`, and must not gain an npm dependency** — adding one
+  re-resolves the root lockfile and drops the platform rolldown binary (npm/cli#4828), breaking
+  every Vite build including the mini-app release path. The VM reads secrets the same way
+  (`infra/vm/common/fetch-secrets.sh`): one mechanism, one set of failure modes.
+  (3) **KEY and PASSWORD material never falls back to `process.env` on a public network**, whatever
+  flags are passed — a token falling back degrades a feature, a key falling back signs a real
+  transaction with whatever was exported in the shell. Any fallback that does happen is announced;
+  a silent one is indistinguishable from a working vault.
+  (4) **Never write a payload to disk, argv, or a log.** Migration verifies a byte-exact readback
+  BEFORE pruning the local copy and refuses to prune if anything failed. Never round-trip a payload
+  through `$( )` — it strips trailing newlines, and a changed trailing byte is a different
+  credential.
+  (5) **`VITE_` variables cannot be secured by moving them** — they compile into the client bundle
+  and are public once shipped. `check:env-hygiene` reports them as a NOTE, not a failure: the fix is
+  a scoped, publicly-safe credential, not a hiding place.
+  (6) **The workstation identity is declared Terraform** (`chippr-tf-modules//modules/ops-workstation`,
+  SHA-pinned): **no service-account key file, ever** — operators impersonate, so revocation is one
+  list entry and every access is attributed to a named human. `serviceAccountTokenCreator` is granted
+  on the ACCOUNT, never the project (which would grant impersonation of every SA in a shared project,
+  including the one holding `signerVerifier` on the hot gas keys). Adding a secret means editing the
+  registry AND both tfvars lists — `npm run test:secrets` fails on drift, because a missing grant
+  surfaces later as `PERMISSION_DENIED`, which reads exactly like a broken login.
+  Local Prometheus/Grafana (`infra/observability/`) is a READ-ONLY viewing surface bound to loopback
+  — **not** the paging system (Cloud Monitoring pages, and it runs when this machine does not).
+  Probes assert on CONTENT: a plain 200 from the bundler proves nothing (the origin-lock nginx serves
+  its own 200 that never reaches alto — the check that stayed green through the 2026-07-12 stall) and
+  the gateway returns `"status":"ok"` unconditionally. See
+  `docs/developer-guide/workstation-secrets.md` + `docs/runbooks/workstation-operations.md` +
+  `infra/observability/README.md` + `specs/097-workstation-secrets-observability/`.

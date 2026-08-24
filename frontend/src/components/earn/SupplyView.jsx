@@ -19,8 +19,11 @@
  *    never a wall in front of the list.
  *
  * 2. AVAILABILITY IS ASYMMETRIC AND THE COPY SAYS SO. Trading liquidity is on
- *    every supported Uniswap network; bridge liquidity is ETHEREUM ONLY,
- *    because the Across HubPool is an L1 contract by design (research R8).
+ *    every Uniswap network this build may read; bridge liquidity is ETHEREUM
+ *    ONLY, because the Across HubPool is an L1 contract by design (research R8).
+ *    Both rosters are cohort-bounded (#1265; see `useLiquidityCatalog` below), so
+ *    on a testnet build each says "not set up in this build yet" rather than
+ *    naming mainnet pools nobody here can supply.
  *    `liquidityAvailabilityCopy()` states both halves separately so nothing here
  *    implies both kinds exist everywhere.
  *
@@ -66,7 +69,7 @@ import { Contract, formatUnits } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useSelectableAssets } from '../../hooks/useSelectableAssets'
 import { ASSET_ACTIVITIES } from '../../lib/assets/assetActivity'
-import { NETWORKS, listSupportedChainIds } from '../../config/networks'
+import { NETWORKS, cohortChainIds } from '../../config/networks'
 import { makeReadProvider } from '../../utils/rpcProvider'
 import InfoTip from '../ui/InfoTip'
 import AssetLogo from '../wallet/AssetLogo'
@@ -428,13 +431,22 @@ function bridgePosition(pool, lp) {
 }
 
 /**
- * The curated pool list and the member's positions, across EVERY network with a
- * `LiquidityRouter` deployed — never narrowed to the wallet's active chain.
+ * The curated pool list and the member's positions, across every network IN THIS
+ * BUILD'S COHORT with a `LiquidityRouter` deployed — never narrowed to the
+ * wallet's active chain.
+ *
+ * The roster is `cohortChainIds()` and never `listSupportedChainIds()` (issue
+ * #1265): "not gated on the ACTIVE chain" (point 1 in the header) is a different
+ * question from "may read the OTHER cohort", and constitution III forbids the
+ * second. Enumerating every supported chain here had a testnet build opening
+ * connections to the five mainnet routers and listing mainnet pools a member on
+ * that build can never supply.
  *
  * Status is honest-state: 'loading' | 'ready' | 'unavailable'. 'unavailable'
  * means no network could be read at all; a network that individually failed is
  * reported in `networks` so the surface can say which, without withholding the
- * ones that did answer.
+ * ones that did answer. An empty cohort roster is 'ready' with no pools, which
+ * the empty-state copy explains — never an "unavailable" that blames a read.
  */
 function useLiquidityCatalog({ skip = false } = {}) {
   const wallet = useWallet() || {}
@@ -442,7 +454,7 @@ function useLiquidityCatalog({ skip = false } = {}) {
 
   const chainIds = useMemo(
     () =>
-      listSupportedChainIds().filter(
+      cohortChainIds().filter(
         (id) => Number.isFinite(id) && Boolean(getLiquidityRouterAddress(id)),
       ),
     [],

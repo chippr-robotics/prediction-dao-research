@@ -9,14 +9,21 @@
  * ANY divergence in owners, order, threshold, fallback handler or salt produces a DIFFERENT address,
  * so all of those are pinned as constants below — never parameterise them per chain.
  *
- * Owner set is deliberate (see issue #966 discussion):
- *   0x5250…F6e1  hot EOA        — signs on every chain
+ * Owner set (second admin Safe — supersedes the 0x8cc564E3… set):
+ *   0x2623…1C9A  GCP KMS HSM key `admin-signer-polygon` — EC_SIGN_SECP256K1_SHA256, non-exportable
  *   0x1215…8575  Ledger device  — signs on every chain
- *   0x4402…8eC5  passkey account — a CONTRACT, currently deployed on Polygon ONLY. A contract owner
- *                signs via EIP-1271, which requires code on that chain, so off Polygon this owner
- *                cannot approve. With threshold 2 that means the hot EOA and the Ledger are both
- *                required off Polygon — accepted knowingly; deploying passkeys to more chains
- *                restores the spare signer.
+ *   0x48cB…2275  Trezor device  — signs on every chain
+ *
+ * Every owner is now an EOA from the chain's point of view, so all three can sign on ALL chains.
+ * The previous set could not: its third owner was a passkey CONTRACT deployed on Polygon only, and
+ * a contract owner signs via EIP-1271 which requires code on that chain. Off Polygon that left just
+ * two usable signers against a threshold of 2 — meaning the hot EOA was *required* for every
+ * operation, including its own removal. This set has no such single point of failure.
+ *
+ * The first owner is a KMS key rather than a hot EOA deliberately: the private key cannot be
+ * exported, so it cannot end up in a shell history, an .env file or a log. Note it is still only
+ * one of two required signatures — GCP project owners can sign with it, so it is not by itself a
+ * stronger boundary than the Google account. The two hardware devices are what make the set safe.
  *
  * Usage:
  *   npx hardhat run scripts/ops/deploy-admin-safe.js --network <net>            # deploy
@@ -34,9 +41,9 @@ const FALLBACK_HANDLER = "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99";
 
 // ---- PINNED: changing ANY of these changes the resulting address on every chain ----
 const OWNERS = [
-  "0x52502d049571C7893447b86c4d8B38e6184bF6e1", // hot EOA
+  "0x26235546d8c5075D2bfdA4faC3f3F760651b1C9A", // GCP KMS HSM key `admin-signer-polygon` (fairwins-relayer/us-central1)
   "0x1215185387E70a48b07D73AcB67002A073F18575", // Ledger hardware device
-  "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5", // passkey account (Polygon-only today)
+  "0x48cBca63f764615f3f372e62d480a98F56462275", // Trezor hardware device
 ];
 const THRESHOLD = 2;
 const SALT_NONCE = 68n; // spec 068

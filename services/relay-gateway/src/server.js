@@ -13,18 +13,23 @@
  *   GET  /healthz             liveness/readiness               (origin-lock EXEMPT)
  *   GET  /v1/opensea/*        read-only collectibles proxy     (origin-locked; spec 055)
  *   GET  /v1/bridge/*         read-only Across quote/status    (origin-locked; spec 067)
+ *   GET/POST /v1/member/*     member API: capability tokens    (origin-locked; spec 095)
+ *                             …and, on its PRICED ops only, x402 pay-per-request (spec 096):
+ *                             no token => 402 + PaymentRequirements; X-PAYMENT => verify, settle
+ *                             through the SAME engine, then serve. A valid token is never charged.
  */
 import crypto from 'node:crypto'
 import express from 'express'
+import { rateLimit } from 'express-rate-limit'
 import helmet from 'helmet'
 import { loadConfig } from './config/index.js'
-import { buildProviders } from './config/providers.js'
+import { assertChainEndpoints, buildProviders } from './config/providers.js'
 import { createFeeRouterReader } from './fees/onchain.js'
 import { parseIntent, verifyIntent } from './intent/verify.js'
 import { createIntentStore } from './intent/store.js'
 import { createSanctionsScreen } from './policy/sanctions.js'
 import { createDedupStore } from './policy/dedup.js'
-import { createQuotas, createSpendTracker } from './policy/quotas.js'
+import { createQuotas, createSpendTracker, createTokenBudget } from './policy/quotas.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createEngineClient } from './engine/client.js'
@@ -40,6 +45,13 @@ import { createPerpsClients } from './perps/client.js'
 import { createPerpsRouter, perpsStatus } from './perps/routes.js'
 import { createAcrossClient } from './bridge/quotes.js'
 import { createBridgeRouter } from './bridge/routes.js'
+import { createMemberApiRouter, memberApiStatus } from './memberApi/routes.js'
+import { createMemberAuth } from './memberApi/auth.js'
+import { createRevocationStore } from './memberApi/revocation.js'
+import { createMembershipReader } from './memberApi/membership.js'
+import { createWagerReader } from './memberApi/wagers.js'
+import { createAssistantClient } from './memberApi/assistant.js'
+import { createPaywall } from './x402/paywall.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
@@ -110,6 +122,12 @@ async function estimateCostWei(provider, chainCfg, { to, data }, defaultGasLimit
  *   now?: () => number,            // unix seconds
  *   killSwitch?: ReturnType<typeof createKillSwitch>,
  *   auditSink?: (line: string) => void,
+ *   memberApiFetch?: typeof fetch,     // spec 095: subgraph + assistant upstreams
+ *   memberApiRevocations?: object,
+ *   memberApiMembership?: object,
+ *   memberApiWagers?: object,
+ *   memberApiAssistant?: object,
+ *   paywall?: object,                  // spec 096: the x402 paid rail seam
  * }} [deps]
  */
 export function createApp(config, deps = {}) {
@@ -152,6 +170,33 @@ export function createApp(config, deps = {}) {
   app.disable('x-powered-by')
   app.use(helmet())
 
+  // ---- Coarse per-IP route limiters (spec 095 hardening). These sit in FRONT of the fine-grained
+  // quota layer, which stays the real per-member control (it keys on the RECOVERED SIGNER — a fact
+  // an attacker cannot vary for free — where an IP is spoof-cheap and, on the VM deployment, the
+  // nginx proxy's address for every caller). What these buy is an outer bound on the two places
+  // that do real work BEFORE any quota can key: the health snapshot's edge-auth comparison and the
+  // intent pipeline's signature recovery. A limit of 0 disables that limiter (an empty middleware
+  // keeps the registration sites uniform). 429s use the gateway's error body + Retry-After.
+  const makeRouteLimiter = (perMin, scope) =>
+    perMin > 0
+      ? rateLimit({
+          windowMs: 60_000,
+          limit: perMin,
+          standardHeaders: 'draft-7',
+          legacyHeaders: false,
+          // `trust proxy` is deliberately unset (changing it would re-key every IP-scoped quota in
+          // one move — see the bitcoin/bridge/perps modules), and nginx sets X-Forwarded-For on the
+          // VM. Without this, express-rate-limit's startup validation refuses that combination.
+          validate: { xForwardedForHeader: false },
+          handler: (_req, res) =>
+            res
+              .status(429)
+              .json({ error: { code: 'rate_limited', reason: `${scope} rate limit exceeded — retry shortly` } }),
+        })
+      : (_req, _res, next) => next()
+  const healthLimiter = makeRouteLimiter(config.rateLimit.healthPerMin, 'health')
+  const intentsLimiter = makeRouteLimiter(config.rateLimit.intentsPerMin, 'intents')
+
   // ---- CORS: the SPA calls the gateway cross-origin (fairwins.app -> relay.fairwins.app). Echo an
   // allow-listed Origin and answer preflight BEFORE the origin lock — browsers cannot attach
   // X-Origin-Auth (Cloudflare injects it in transit) and preflight OPTIONS carry no credentials.
@@ -161,7 +206,14 @@ export function createApp(config, deps = {}) {
       res.setHeader('Access-Control-Allow-Origin', origin)
       res.setHeader('Vary', 'Origin')
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+      // `Authorization` is here for the spec-095 member API: a browser cannot send a bearer token
+      // at all unless preflight allows the header, and the SPA's own API-access console and
+      // assistant call these routes cross-origin. It changes nothing for the existing modules —
+      // no route added it as a requirement, no credentials mode is enabled, no cookie is ever set,
+      // the origin allow-list is unchanged, and the X-Origin-Auth edge lock still applies to every
+      // client route. Allowing a request header only permits a browser to SEND it; what it
+      // authorises is decided entirely by the member-signed grant it carries.
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
       res.setHeader('Access-Control-Max-Age', '600')
     }
     if (req.method === 'OPTIONS') return res.status(204).end()
@@ -326,13 +378,17 @@ export function createApp(config, deps = {}) {
     // Perps read-proxy visibility (spec 082, FR-014): venue/attribution config state only —
     // no member data, and the live HL builder bps already surfaces via /v1/perps/config.
     const perps = perpsStatus(config, { killSwitch })
-    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps })
+    // Member API visibility (spec 095): module state + which chains can answer a wager read + whether
+    // the assistant has a credential. No member data, no key material, nothing about any token.
+    // `memberApiAssistant` is declared further down; this closure only runs at request time.
+    const memberApi = memberApiStatus(config, { killSwitch, assistantConfigured: memberApiAssistant.configured })
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi })
   }
-  app.get('/healthz', healthHandler)
-  app.get('/status', healthHandler)
+  app.get('/healthz', healthLimiter, healthHandler)
+  app.get('/status', healthLimiter, healthHandler)
 
   // ---- POST /v1/intents --------------------------------------------------------------------
-  app.post('/v1/intents', async (req, res) => {
+  app.post('/v1/intents', intentsLimiter, async (req, res) => {
     let reserved = null // {chainId, marker} released on any post-reservation rejection
     try {
       // Kill switch first: when active the gateway cleanly stops ACCEPTING intents (FR-015).
@@ -749,6 +805,123 @@ export function createApp(config, deps = {}) {
     })
   )
 
+  // ---- GET/POST /v1/member/* (spec 095 member API; origin-locked via middleware) ---------------
+  // Member-signed capability tokens granting custody-free, scoped access to a member's OWN data,
+  // plus unsigned typed-data quotes and a conversational assistant. NOTHING here moves value: the
+  // strongest response is a payload the MEMBER then signs, and relaying a signed intent stays on
+  // the existing public POST /v1/intents, which recovers the signer itself.
+  //
+  // Quotas are keyed by the RECOVERED ACCOUNT rather than caller IP — `trust proxy` is unset and
+  // nginx fronts this container, so an IP key would pool every member into one bucket.
+  //
+  // FOUR INSTANCES, BECAUSE ONE WINDOW CANNOT SERVE FOUR DIFFERENT PROMISES. The unauthenticated
+  // routes can only key on the proxy's IP, so they are ONE caller as far as any counter can tell;
+  // sharing an instance with the members meant they shared the GLOBAL counter too, and a flood of
+  // anonymous GETs would answer 429 to every authenticated member on every route of this module —
+  // including `keys/revoke`, the one endpoint that has to work while a token is loose. So:
+  //   · memberApiQuotas   — authenticated traffic, keyed by the account behind a verified signature
+  //   · memberApiPublic   — every unauthenticated route (and the x402 402-challenge path)
+  //   · memberApiRevoke   — POST /v1/member/keys/revoke and nothing else (see routes.js for why it
+  //                         is budgeted rather than exempted)
+  //   · memberApiAssistantQuotas — model CALLS, tighter than the general read class
+  // and, separately, a TOKEN budget, because a request count is not a spend ceiling.
+  //
+  // Mounting is unconditional so a disabled module answers 503 member_api_unconfigured with a
+  // machine-readable code, never a bare 404 — same reasoning as the bitcoin/bridge/perps proxies.
+  const memberApiQuotas = createQuotas({
+    signerPerWindow: config.memberApi.quotaPerAccount,
+    globalPerWindow: config.memberApi.quotaGlobal,
+    windowMs: config.memberApi.quotaWindowMs,
+    now: nowMs,
+  })
+  // One number configures both bounds: with `trust proxy` unset the per-key and aggregate windows
+  // coincide (every anonymous caller is the same nginx IP), and if an operator ever did trust the
+  // proxy the per-IP key simply becomes the finer of two real bounds.
+  const memberApiPublicQuotas = createQuotas({
+    signerPerWindow: config.memberApi.publicQuota,
+    globalPerWindow: config.memberApi.publicQuota,
+    windowMs: config.memberApi.quotaWindowMs,
+    now: nowMs,
+  })
+  const memberApiRevokeQuotas = createQuotas({
+    signerPerWindow: config.memberApi.revokeQuota,
+    globalPerWindow: config.memberApi.revokeQuota,
+    windowMs: config.memberApi.quotaWindowMs,
+    now: nowMs,
+  })
+  const memberApiAssistantQuotas = createQuotas({
+    signerPerWindow: config.memberApi.assistant.quotaPerAccount,
+    globalPerWindow: config.memberApi.assistant.quotaGlobal,
+    windowMs: config.memberApi.quotaWindowMs,
+    now: nowMs,
+  })
+  // The ceiling on MONEY. Its own window (hourly by default) because spend is judged over a period
+  // a human would recognise, the way the gas spend cap already is.
+  const memberApiAssistantBudget =
+    deps.memberApiAssistantBudget ??
+    createTokenBudget({
+      perAccountPerWindow: config.memberApi.assistant.tokenBudgetPerAccount,
+      globalPerWindow: config.memberApi.assistant.tokenBudgetGlobal,
+      windowMs: config.memberApi.assistant.tokenBudgetWindowMs,
+      now: nowMs,
+    })
+  const memberApiRevocations =
+    deps.memberApiRevocations ??
+    createRevocationStore({
+      maxTtlDays: config.memberApi.maxTtlDays,
+      maxEntries: config.memberApi.revocationMaxEntries,
+      now: nowMs,
+    })
+  const memberApiMembership =
+    deps.memberApiMembership ?? createMembershipReader(config, providers, { now: nowMs })
+  const memberApiWagers =
+    deps.memberApiWagers ??
+    createWagerReader(config, deps.memberApiFetch ? { fetchImpl: deps.memberApiFetch } : {})
+  const memberApiAssistant =
+    deps.memberApiAssistant ??
+    createAssistantClient(config, deps.memberApiFetch ? { fetchImpl: deps.memberApiFetch } : {})
+  app.use(
+    createMemberApiRouter(config, {
+      auth: createMemberAuth(config, {
+        providers,
+        screen,
+        revocations: memberApiRevocations,
+        membership: memberApiMembership,
+        quotas: memberApiQuotas,
+        now,
+      }),
+      revocations: memberApiRevocations,
+      wagerReader: memberApiWagers,
+      assistant: memberApiAssistant,
+      providers,
+      quotas: memberApiQuotas,
+      publicQuotas: memberApiPublicQuotas,
+      revokeQuotas: memberApiRevokeQuotas,
+      assistantQuotas: memberApiAssistantQuotas,
+      assistantBudget: memberApiAssistantBudget,
+      killSwitch,
+      // x402 pay-per-request (spec 096). Reuses THIS gateway's engine client, sanctions screen and
+      // member-API quotas — no second submission rail, no second screen, no key. Disabled by
+      // default, in which case `offers()` is false everywhere and the routes behave exactly as they
+      // did before the module existed.
+      paywall:
+        deps.paywall ??
+        createPaywall(config, {
+          providers,
+          screen,
+          engineClient,
+          quotas: memberApiQuotas,
+          publicQuotas: memberApiPublicQuotas,
+          killSwitch,
+          audit,
+          now,
+        }),
+      feeRates,
+      audit,
+      now,
+    })
+  )
+
   // ---- POST /v1/engine/webhook ----------------------------------------------------------------
   app.post('/v1/engine/webhook', (req, res) => {
     // Engine authenticity: the OZ Relayer signs each webhook as `X-Signature:
@@ -801,6 +974,21 @@ if (isMain) {
   if (!config.webhookSecret) {
     console.warn('[relay-gateway] WARN: WEBHOOK_SHARED_SECRET unset — engine webhooks will be REJECTED')
   }
+
+  // Every configured endpoint must agree about which chain it serves. A mismatch is FATAL: the
+  // providers are built with `staticNetwork`, so nothing downstream would ever notice, and every
+  // sanctions screen, gas estimate and paymaster read would be answered from the wrong chain while
+  // /status reported rpc:"up". An UNREACHABLE endpoint is not a mismatch and does not stop the
+  // boot — see assertChainEndpoints for why those two must stay separate.
+  const endpointCheck = await assertChainEndpoints(config)
+  if (!endpointCheck.ok) {
+    console.error(
+      '[relay-gateway] refusing to start: an RPC endpoint serves a different chain than it is ' +
+        'configured for. Fix RPC_URL_PRIMARY_<chainId> / RPC_URLS_<chainId> for the chains named above.'
+    )
+    process.exit(1)
+  }
+
   const { app, killSwitch } = createApp(config)
   // Runtime kill switch: `kill -USR2 <pid>` toggles accept/refuse (FR-015).
   process.on('SIGUSR2', () => {

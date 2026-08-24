@@ -250,6 +250,44 @@ describe('MyAccountView — unified account experience (spec 074)', () => {
     expect(screen.queryByText(/no activity yet/i)).not.toBeInTheDocument()
   })
 
+  // Issue #1280: the reported screen was "No activity yet" + "Updated 50s ago"
+  // with every RPC answering 503. An empty feed only means "nothing happened"
+  // when everything that feeds it answered.
+  it('never says "No activity yet" when a network went unread (#1280)', () => {
+    useAccountStatsMock.mockImplementation(() => ({
+      ...baseStats(),
+      activity: [],
+      isEmpty: true,
+      partialChains: ['Ethereum'],
+      freshness: {
+        summary: { lastUpdated: Date.now(), status: 'partial' },
+        activity: { lastUpdated: Date.now(), status: 'partial' },
+      },
+    }))
+    renderView('/wallet?tab=account&view=activity')
+    expect(screen.queryByText(/no activity yet/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/some of your activity could not be read/i)).toBeInTheDocument()
+    // A network name is marked as one — never run into the same comma list as
+    // a class label like "wager on Polygon".
+    expect(screen.getByText(/could not be read: ethereum \(entire network\)/i)).toBeInTheDocument()
+    // …and the freshness line does not claim a complete update for it.
+    expect(screen.getByText(/partly updated .* some sources unread/i)).toBeInTheDocument()
+    expect(screen.queryByText(/^Updated /)).not.toBeInTheDocument()
+  })
+
+  it('never says "No activity yet" when an activity class could not be refreshed (#1280)', () => {
+    useAccountStatsMock.mockImplementation(() => ({
+      ...baseStats(),
+      activity: [],
+      isEmpty: true,
+      staleClasses: ['wager on Polygon'],
+    }))
+    renderView('/wallet?tab=account&view=activity')
+    expect(screen.queryByText(/no activity yet/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/wager on polygon/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create a wager/i })).not.toBeInTheDocument()
+  })
+
   it('keeps the honest empty state with the create CTA (V1)', () => {
     useAccountStatsMock.mockImplementation(() => ({
       ...baseStats(),

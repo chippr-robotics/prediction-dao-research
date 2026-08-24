@@ -61,47 +61,87 @@ function bytesToHex(bytes) {
 }
 
 /**
- * Look up a user's registered encryption public key from ZKKeyManager
+ * The three outcomes of a key lookup (issue #1286).
+ *
+ * `not-registered` is a FACT ABOUT ANOTHER MEMBER — the registry answered, and it holds no key
+ * for them. `unreadable` is a fact about US — the read failed, the registry is not configured on
+ * this chain, or it returned something that is not a 32-byte X25519 key, so we cannot say either
+ * way. Collapsing the two into one `null` is how an RPC blip on the wager create path came out as
+ * "your opponent has not registered their encryption key": a definite claim about someone else,
+ * manufactured by our own failure. Same shape as the estate reads (`read` / `not-deployed` /
+ * `unreadable`), and `publicKey` exists only on `read`.
+ */
+export const KEY_LOOKUP = Object.freeze({
+  READ: 'read',
+  NOT_REGISTERED: 'not-registered',
+  UNREADABLE: 'unreadable',
+})
+
+/**
+ * Look up a user's registered encryption public key, distinguishing "no key" from "no answer".
  *
  * @param {string} address - Ethereum address to look up
  * @param {ethers.Provider} provider - RPC provider
- * @returns {Promise<Uint8Array|null>} X25519 public key bytes, or null if not registered
+ * @returns {Promise<{state: string, publicKey?: Uint8Array, reason?: string}>}
  */
-export async function lookupPublicKey(address, provider) {
-  if (!address || !provider) return null
+export async function lookupPublicKeyState(address, provider) {
+  if (!address || !provider) {
+    return { state: KEY_LOOKUP.UNREADABLE, reason: 'No address or provider to read with' }
+  }
 
   const normalized = address.toLowerCase()
 
-  // Check cache
+  // Check cache. Only DEFINITE outcomes are ever cached — a failed read must not turn into a
+  // five-minute claim that the member has no key.
   const cached = keyCache.get(normalized)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.publicKeyBytes
+      ? { state: KEY_LOOKUP.READ, publicKey: cached.publicKeyBytes }
+      : { state: KEY_LOOKUP.NOT_REGISTERED }
   }
 
   try {
     const contract = await getKeyRegistryContract(provider)
     const publicKeyHex = await contract.getPublicKey(address)
 
-    if (!publicKeyHex || publicKeyHex === '') {
-      // No key registered — cache the miss to avoid repeated RPC calls
+    const publicKeyBytes = publicKeyHex ? hexToBytes(publicKeyHex) : new Uint8Array(0)
+
+    if (publicKeyBytes.length === 0) {
+      // The registry answered and holds nothing — a real negative. Cache the miss to avoid
+      // repeated RPC calls.
       keyCache.set(normalized, { publicKeyBytes: null, timestamp: Date.now() })
-      return null
+      return { state: KEY_LOOKUP.NOT_REGISTERED }
     }
 
-    const publicKeyBytes = hexToBytes(publicKeyHex)
-
-    // Validate X25519 key length (32 bytes)
+    // Present but not an X25519 key: the registry gave us bytes we cannot use. That says
+    // nothing about whether the member registered — do NOT report it as "not registered".
     if (publicKeyBytes.length !== 32) {
       console.warn(`[keyRegistry] Unexpected key length for ${address}: ${publicKeyBytes.length} bytes`)
-      return null
+      return { state: KEY_LOOKUP.UNREADABLE, reason: `Registry returned ${publicKeyBytes.length} bytes, expected 32` }
     }
 
     keyCache.set(normalized, { publicKeyBytes, timestamp: Date.now() })
-    return publicKeyBytes
+    return { state: KEY_LOOKUP.READ, publicKey: publicKeyBytes }
   } catch (error) {
     console.error(`[keyRegistry] Failed to lookup key for ${address}:`, error.message)
-    return null
+    return { state: KEY_LOOKUP.UNREADABLE, reason: error.message }
   }
+}
+
+/**
+ * Look up a user's registered encryption public key from ZKKeyManager
+ *
+ * Convenience wrapper over {@link lookupPublicKeyState} for callers that cannot act on the
+ * difference. Anything that reports the result TO A MEMBER must use the state form instead —
+ * `null` here still means "no key OR no answer".
+ *
+ * @param {string} address - Ethereum address to look up
+ * @param {ethers.Provider} provider - RPC provider
+ * @returns {Promise<Uint8Array|null>} X25519 public key bytes, or null if not registered
+ */
+export async function lookupPublicKey(address, provider) {
+  const result = await lookupPublicKeyState(address, provider)
+  return result.state === KEY_LOOKUP.READ ? result.publicKey : null
 }
 
 /**

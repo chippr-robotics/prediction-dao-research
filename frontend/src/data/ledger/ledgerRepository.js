@@ -7,6 +7,13 @@
  * (`staleClasses`) instead of failing the ledger — the UI discloses staleness
  * honestly (constitution III) rather than blanking or fabricating.
  *
+ * The read is two-state (`readState`): `unreadable` when every NETWORK-backed
+ * source failed and nothing at all was collected, `read` otherwise. An
+ * `unreadable` result's empty entry list is NOT an empty history — see #1280.
+ * Sources declare `backing: 'network' | 'client'`; only network-backed ones
+ * can testify that a chain went unread, because a client-store read fulfils
+ * whether or not any network is up.
+ *
  * Failed entries are INCLUDED here; excluding them from financial totals is
  * the summary helpers' job (FR-003), not the repository's.
  */
@@ -101,6 +108,18 @@ export function compareEntries(a, b) {
 }
 
 /**
+ * What a source had to reach to answer. `network` (the default for an
+ * unclassified source — the conservative reading, since a failure there is
+ * evidence a read did not happen) crosses an RPC or subgraph; `client` reads
+ * the local record store and cannot fail because a network is down. Only the
+ * former counts toward the `unreadable` verdict below.
+ * @param {{backing?: 'network'|'client'}} src
+ */
+function sourceBacking(src) {
+  return src?.backing === 'client' ? 'client' : 'network'
+}
+
+/**
  * @param {object} deps
  * @param {Array}  deps.sources - LedgerSource adapters
  * @param {Function} [deps.enrich] - (entries, {chainId}) => enriched entries
@@ -109,7 +128,7 @@ export function compareEntries(a, b) {
 export function createLedgerRepository({ sources = [], enrich = defaultEnrich, getPrunedBefore } = {}) {
   /**
    * @param {object} q - { account, chainId, filter?, period?, provider?, signal? }
-   * @returns {Promise<{entries: Array, staleClasses: string[], prunedBefore: number|null}>}
+   * @returns {Promise<{entries: Array, readState: 'read'|'unreadable', staleClasses: string[], prunedBefore: number|null}>}
    */
   async function listEntries(q) {
     const ctx = { account: String(q.account || '').toLowerCase(), chainId: Number(q.chainId) }
@@ -130,10 +149,43 @@ export function createLedgerRepository({ sources = [], enrich = defaultEnrich, g
     )
 
     const collected = []
+    // Reachability is counted over the NETWORK-backed sources only (#1280).
+    // Counting rejections across all nine default sources looked right and was
+    // useless: six of them read the client store, which cannot fail during an
+    // RPC or subgraph outage, so `failedSources === sources.length` was never
+    // true and the verdict below was dead code on the shipped wiring. What
+    // makes a chain unreadable is that nothing which had to cross the network
+    // came back — a localStorage read fulfilling says nothing about that.
+    let networkSources = 0
+    let networkFailures = 0
     settled.forEach((res, i) => {
+      const isNetworkBacked = sourceBacking(sources[i]) === 'network'
+      if (isNetworkBacked) networkSources++
       if (res.status === 'fulfilled') collected.push(...res.value)
-      else staleClasses.push(sources[i].class)
+      else {
+        if (isNetworkBacked) networkFailures++
+        staleClasses.push(sources[i].class)
+      }
     })
+
+    // The read verdict (constitution III, issue #1280). Per-source degradation
+    // is right, but it has one blind spot: when every network-backed source
+    // fails the caller gets the same empty array a chain with no history
+    // returns, and cannot tell "nothing happened" from "nothing was read". Say
+    // so here, where the distinction is knowable. `unreadable` never means
+    // empty — it means the entry list below carries no information at all,
+    // which is why it also requires that NOTHING was collected: records that
+    // did arrive are the member's own data and are shown (with the failed
+    // classes disclosed as stale), never discarded as an unreachable chain.
+    //
+    // A source that returns [] because its contract is not deployed here has
+    // FULFILLED — a read of nothing is a read. That is why a chain carrying no
+    // FairWins contracts stays `read` with zero entries even mid-outage: there
+    // was nothing on it to fail to read.
+    const readState =
+      networkSources > 0 && networkFailures === networkSources && collected.length === 0
+        ? 'unreadable'
+        : 'read'
 
     // Dedup across sources, then collapse every observation of one bridge into
     // the single movement it is — a bridge spans two networks and two
@@ -145,6 +197,7 @@ export function createLedgerRepository({ sources = [], enrich = defaultEnrich, g
 
     return {
       entries: filtered,
+      readState,
       staleClasses,
       prunedBefore: typeof getPrunedBefore === 'function' ? getPrunedBefore(ctx) ?? null : null }
   }

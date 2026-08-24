@@ -98,6 +98,33 @@ missing — there is simply nothing there.
 
 Render with `ChainStateTable`, which handles all three states and the partial label.
 
+### The role sweep obeys the same three states
+
+The console's entry decision is itself an estate read — `hasRole` per operator role per cohort
+chain — and it is classified by `classifyEstateProbes` (`lib/chains/estateSweep.js`), which fills
+`estateRead = { read, notDeployed, unreadable, swept }`.
+
+The rule that makes it honest: **a chain is classified on the probes that had a contract to
+read.** `hasRoleOnChain(..., { detailed: true })` reports `deployed: false` when no contract on
+that chain could hold the role — Ethereum Classic carries no `WagerRegistry`, so nobody is its
+Account Moderator, and that is settled from the address book without a network call. Those probes
+say nothing about whether the chain answered.
+
+Collapsing them into `read` is a bug with a specific, bad shape. On a mainnet build only Polygon
+carries a contract for *every* operator role; the four spec-067 chains carry the routers and
+nothing else, and ETC carries neither. So a total RPC outage produced `read` = five chains that
+had "answered" from config, `unreadable` = `[137]`, and an entry state of `denied` — the operator
+was shown **"Access Restricted"**, a statement about their permissions, on the strength of zero
+successful reads, at exactly the moment an incident commander needs to get in. `unverified`
+("Could Not Verify Access", with a retry) is the honest screen, and it is only reachable if
+`read` can actually be empty.
+
+`useAdminAccess` also exposes **`settled`** — `swept && curatorAuthority !== null`. Entry can be
+granted by the curator authority (one contract read) before the role sweep returns, and in that
+window every role flag is still false. Anything acting on the ABSENCE of a flag must wait for
+`settled`, or it acts on a fact that is not in yet: `AdminAppShell`'s deep-link redirect did not,
+and bounced an entitled operator following a bookmarked link back to the Control Room.
+
 ## 4. Operator views: scope reads, gate writes
 
 ```js
@@ -156,6 +183,40 @@ wires the default repository and providers). The full contract is
   stale", and a broken subgraph is not "Polygon unreachable".
 - **Empty ≠ failed.** A chain that read fine and found nothing is `read` with `entryCount: 0`;
   gate "no activity" language on state, never on count.
+- **A chain whose NETWORK-backed sources all failed is `unreachable`, not an empty read (#1280).**
+  The repository degrades per source rather than throwing, so a total outage used to arrive at the
+  merge as an ordinary empty list — indistinguishable from a member with no history, which meant
+  `allUnreachable` (and its honest disclosure) could never fire. `listEntries` now returns a
+  `readState` (`read` / `unreadable`) and the merge maps `unreadable` to `unreachable`.
+  **Reachability is counted over network-backed sources only.** Six of the nine default sources
+  (`transfer`, `earn`, `staking`, `bridge`, `liquidity`, `miniapp`) read the client record store
+  and fulfil whether or not any network is up; counting rejections across all nine looked right
+  and was useless, because `failedSources === sources.length` could never be true on the shipped
+  wiring. Sources declare `backing: 'network' | 'client'` (omitted ⇒ `network`, the conservative
+  reading) and only the network-backed ones can testify that a chain went unread. `unreadable`
+  additionally requires that **nothing at all was collected** — records that did arrive are the
+  member's own data and are shown with their failed classes disclosed, never discarded, because
+  the merge drops an unreachable chain's entries entirely.
+- **Not-deployed is a read of nothing, not a failed read.** A source returning `[]` because its
+  contract does not exist on that chain has fulfilled — `wagerLedgerSource` checks the escrow
+  address first, or every un-deployed chain would report the wager class stale forever. The
+  consequence is worth stating plainly: on a mainnet build only Polygon carries FairWins
+  contracts, so under a total RPC outage Polygon goes `unreachable` while Ethereum/Optimism/
+  Base/Arbitrum stay `read` with zero entries — which is true, there is nothing on them to read.
+  `allUnreachable` (FR-009, "None of your networks could be read") therefore fires only where
+  every cohort chain has something to read, e.g. a single-chain testnet cohort. The mainnet
+  outage is disclosed by the **partial** path instead: the unreadable chain is named in
+  `partialChains`, and `MyAccountView` refuses to call the empty feed "No activity yet".
+- **Freshness is a claim about what was READ.** `useAccountStats` stamps
+  `{ lastUpdated: now, status: 'fresh' }` on the ledger-derived sections (summary/series/activity)
+  only when the whole estate answered; with a chain or a class unread they get
+  `{ lastUpdated: now, status: 'partial' }` and the indicator reads "Partly updated Ns ago — some
+  sources unread". "Updated 50s ago" beside a panel that just disclosed a failed read is the same
+  fabrication as an empty history — but so is `stale`/"showing last known" over entries that were
+  in fact just fetched, and over a first load with no last-known data at all. `partial` is a
+  fourth status for that reason, and it is not sticky: the next complete read is `fresh` again.
+  The wallet-balance section is unaffected — it reads the connected wallet on its active chain,
+  not the estate.
 - Dedup is by `entryId` (identity embeds chainId), which also collapses reference-chain sources
   (membership) answering from several scopes.
 - Wager lookups downstream are keyed `(chainId, wagerId)` — wager #12 exists independently on

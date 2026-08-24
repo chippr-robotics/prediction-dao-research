@@ -225,3 +225,74 @@ describe('useAccountStats — estate merge (spec 092)', () => {
     expect(result.current.partialChains).toEqual(['Polygon', 'Ethereum'])
   })
 })
+
+/**
+ * Issue #1280 — freshness is a claim about what was READ, not about when the
+ * load finished. The observed failure was an activity panel reading
+ * "Updated 50s ago" over "No activity yet" while every RPC answered 503.
+ */
+describe('useAccountStats — freshness never asserts a read that did not happen (#1280)', () => {
+  it('marks the ledger-derived sections fresh only when the whole estate answered', async () => {
+    const { result } = renderHook(() => useAccountStats())
+    await waitFor(() => expect(result.current.freshness.activity.status).toBe('fresh'))
+    expect(result.current.freshness.summary.status).toBe('fresh')
+    expect(result.current.freshness.activity.lastUpdated).toBeGreaterThan(0)
+    expect(result.current.error).toBe(null)
+  })
+
+  it('an unreachable chain marks the ledger sections partial, not "just updated"', async () => {
+    listEntriesAcrossEstate.mockResolvedValueOnce({
+      ...emptyEstate(),
+      entries: [],
+      chainStates: [
+        { chainId: 137, state: 'read', entryCount: 0 },
+        { chainId: 1, state: 'unreachable', reason: 'rpc 503', entryCount: 0 },
+      ],
+      partialChains: [1],
+    })
+    const { result } = renderHook(() => useAccountStats())
+    await waitFor(() => expect(result.current.partialChains).toEqual(['Ethereum']))
+    expect(result.current.freshness.activity.status).toBe('partial')
+    expect(result.current.freshness.summary.status).toBe('partial')
+    // `partial`, not `fresh`: the indicator must not claim a complete update.
+    expect(result.current.freshness.activity.status).not.toBe('fresh')
+    // …and not `stale` either: a read DID happen, so the timestamp is real and
+    // "showing last known" would be untrue (there is no last-known here).
+    expect(result.current.freshness.activity.lastUpdated).toBeGreaterThan(0)
+  })
+
+  it('a class that could not be refreshed marks the ledger sections partial too', async () => {
+    listEntriesAcrossEstate.mockResolvedValueOnce({
+      ...emptyEstate(),
+      entries: [],
+      staleByChain: new Map([[137, ['wager', 'transfer']]]),
+    })
+    const { result } = renderHook(() => useAccountStats())
+    await waitFor(() =>
+      expect(result.current.staleClasses).toEqual(['wager on Polygon', 'transfer on Polygon']),
+    )
+    expect(result.current.freshness.activity.status).toBe('partial')
+    // The wallet-balance tile reads the connected wallet on its active chain;
+    // the estate's history reads do not speak for it.
+    expect(result.current.freshness.balances.status).toBe('fresh')
+  })
+
+  it('a partial read never sticks: the next complete one is fresh again', async () => {
+    listEntriesAcrossEstate.mockResolvedValueOnce({
+      ...emptyEstate(),
+      chainStates: [
+        { chainId: 137, state: 'read', entryCount: 0 },
+        { chainId: 1, state: 'unreachable', reason: 'rpc 503', entryCount: 0 },
+      ],
+      partialChains: [1],
+    })
+    const { result } = renderHook(() => useAccountStats())
+    await waitFor(() => expect(result.current.freshness.activity.status).toBe('partial'))
+
+    await act(async () => {
+      await result.current.refresh()
+    })
+    await waitFor(() => expect(result.current.freshness.activity.status).toBe('fresh'))
+    expect(result.current.partialChains).toEqual([])
+  })
+})

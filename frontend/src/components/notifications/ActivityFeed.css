@@ -163,9 +163,9 @@
 }
 
 .activity-feed-filter.active {
-  color: #fff;
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
+  border-color: var(--primary-button);
 }
 
 .activity-feed-filter:focus-visible {

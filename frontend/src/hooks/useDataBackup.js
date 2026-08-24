@@ -74,7 +74,20 @@ export function useDataBackup() {
 
   const [status, setStatus] = useState('idle') // 'idle' | 'backing-up' | 'restoring' | 'error'
   const [lastBackupAt, setLastBackupAt] = useState(null)
-  const [hasRemote, setHasRemote] = useState(false)
+  /*
+   * THREE states, never two (constitution III / the estate rule).
+   *
+   * `readPointer` deliberately separates "" (genuinely no pointer) from `null` (the read could not
+   * be completed), and the restore path below already honours that distinction. This status did
+   * not: `!!null` is `false`, so an unreachable canonical RPC rendered as "None found" — a
+   * definite claim about the member's backup that nothing established. That is worse here than on
+   * most surfaces, because the two remedies diverge: told they have no backup, a member pays gas
+   * to make one they may already have, or concludes there is nothing to restore.
+   *
+   * 'yes' | 'none' | 'unknown'. `hasRemote` stays exported as the positive case only, so every
+   * existing consumer keeps its meaning and none of them can accidentally read 'unknown' as 'none'.
+   */
+  const [remoteState, setRemoteState] = useState('unknown')
 
   const available = isBackupAvailable()
   const onCanonical = Number(chainId) === CANONICAL_CHAIN_ID
@@ -82,13 +95,13 @@ export function useDataBackup() {
 
   // Per-(account) status refresh: local last-backup time + whether an on-chain pointer exists. Honest reads.
   const refreshStatus = useCallback(async () => {
-    if (!account) { setLastBackupAt(null); setHasRemote(false); return }
+    if (!account) { setLastBackupAt(null); setRemoteState('unknown'); return }
     setLastBackupAt(getUserPreference(account, LAST_BACKUP_KEY, null, true))
     try {
       const cid = await readPointer(account)
-      setHasRemote(!!cid)
+      setRemoteState(cid === null ? 'unknown' : cid ? 'yes' : 'none')
     } catch {
-      setHasRemote(false)
+      setRemoteState('unknown')
     }
   }, [account])
 
@@ -99,14 +112,19 @@ export function useDataBackup() {
     let cancelled = false
     ;(async () => {
       if (!account) {
-        if (!cancelled) { setLastBackupAt(null); setHasRemote(false) }
+        if (!cancelled) { setLastBackupAt(null); setRemoteState('unknown') }
         return
       }
-      let remote
-      try { remote = !!(await readPointer(account)) } catch { remote = false }
+      let next
+      try {
+        const cid = await readPointer(account)
+        next = cid === null ? 'unknown' : cid ? 'yes' : 'none'
+      } catch {
+        next = 'unknown'
+      }
       if (!cancelled) {
         setLastBackupAt(getUserPreference(account, LAST_BACKUP_KEY, null, true))
-        setHasRemote(remote)
+        setRemoteState(next)
       }
     })()
     return () => { cancelled = true }
@@ -138,7 +156,7 @@ export function useDataBackup() {
       const now = Date.now()
       saveUserPreference(account, LAST_BACKUP_KEY, now, true)
       setLastBackupAt(now)
-      setHasRemote(true)
+      setRemoteState('yes')
       setStatus('idle')
       showNotification('Your data is backed up.', 'success')
       return true
@@ -207,7 +225,7 @@ export function useDataBackup() {
       await persistPointer('') // clear the pointer
       removeUserPreference(account, LAST_BACKUP_KEY)
       setLastBackupAt(null)
-      setHasRemote(false)
+      setRemoteState('none')
       setStatus('idle')
       showNotification('Your stored backup was removed. Your local data is unchanged.', 'success')
       return true
@@ -226,7 +244,8 @@ export function useDataBackup() {
     canonicalName,
     status,
     lastBackupAt,
-    hasRemote,
+    remoteState,
+    hasRemote: remoteState === 'yes',
     refreshStatus,
     backup,
     restore,

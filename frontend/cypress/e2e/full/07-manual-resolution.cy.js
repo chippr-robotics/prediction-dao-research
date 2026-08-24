@@ -23,11 +23,7 @@ function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
   cy.visitWagers()
 
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-    .click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-    .should('be.visible')
+  cy.connectWallet()
 }
 
 /**
@@ -69,10 +65,14 @@ function createWager(config = {}) {
   }
 
   if (opts.arbitrator) {
-    cy.get('[role="dialog"]').within(() => {
-      cy.get('input[placeholder*="0x"]').last().clear().type(opts.arbitrator)
-    })
-    cy.wait(500)
+    /*
+     * `#fm-arbitrator`, not `input[placeholder*="0x"].last()` — the arbitrator input only
+     * renders once ThirdParty is selected, so before that `.last()` IS the opponent field and
+     * the helper overwrote the opponent with the arbitrator (04's helper documented and fixed
+     * the same trap). Wait for resolution, not a fixed 500ms.
+     */
+    cy.get('#fm-arbitrator', { timeout: 10000 }).clear().type(opts.arbitrator)
+    cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('have.length.greaterThan', 1)
   }
 
   // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
@@ -94,97 +94,139 @@ function createWager(config = {}) {
 function acceptPendingWager() {
   cy.openMyWagers('participating')
 
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-    if (viewBtn.length > 0) {
-      cy.wrap(viewBtn.first()).click({ force: true })
+  /*
+   * WAIT for the accept control; do not snapshot for it.
+   *
+   * `$panel.find(...)` inside .then() reads the DOM once, at whatever instant the panel first
+   * exists. The row renders before its action column does — the accept control is gated on
+   * canAccept, which depends on data that arrives async — so the snapshot saw a row with no
+   * button and reported "no offer is listed" while the screenshot plainly showed one, pending
+   * acceptance with 11h 58m left. That is why this spec's score oscillated between runs with no
+   * code change: pure timing, read as a state.
+   *
+   * A retryable cy.contains fails only if the control never appears, which is the thing worth
+   * failing on. Scoped to the panel so nothing behind the modal can satisfy it.
+   */
+  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).should('exist')
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
+    .click({ force: true })
+  cy.acceptOfferInModal()
 
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-      cy.contains('button', /accept offer/i).click()
-      cy.contains('button', /i understand|confirm|accept/i).click()
+  cy.lastWagerId().then((id) => cy.waitForWagerActive(id))
 
-      cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-        const lower = text.toLowerCase()
-        expect(lower.includes('accepted') || lower.includes('success') || lower.includes('done')).to.be.true
-      })
-
-      // Close acceptance modal
-      cy.contains('button', /done|close/i).click({ force: true })
-    }
-  })
+  cy.dismissAcceptanceModal()
 
   // Close My Wagers modal
   cy.get('.mm-close-btn, button[aria-label="Close modal"]').first().click({ force: true })
 }
 
 /**
- * Open the resolution modal for the first resolvable wager in the Created tab.
+ * Open the resolution modal for the first resolvable wager in the given My Wagers tab
+ * ('created' for the creator, 'participating' for the opponent/arbitrator).
  */
-function openResolutionForFirstWager() {
-  cy.openMyWagers('created')
+function openResolutionFor(tab = 'created') {
+  cy.openMyWagers(tab)
 
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    // Look for Resolve button or click into detail
-    const resolveBtn = $panel.find('.mm-action-resolve, button:contains("Resolve")')
-    if (resolveBtn.length > 0) {
-      cy.wrap(resolveBtn.first()).click({ force: true })
-    } else {
-      // Click into first wager to get detail view with resolve option
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-        cy.get('.mm-detail').then(($detail) => {
-          const resolveDetailBtn = $detail.find('button:contains("Resolve")')
-          if (resolveDetailBtn.length > 0) {
-            cy.wrap(resolveDetailBtn.first()).click()
-          }
-        })
-      }
-    }
+  /*
+   * WAIT for the Resolve control; do not snapshot for it, and do not fall through when it is
+   * missing. The row's action column renders after the row, so the old $panel.find() read
+   * nothing, took the else branch, found no rows either, and returned having done NOTHING —
+   * leaving the caller to fail on "the resolve sub-modal never appeared" (RES-03, RES-10). Both
+   * branches were silent, so the report named a symptom three commands downstream of the cause.
+   *
+   * Retryable, and scoped to the panel so nothing behind the modal can satisfy it.
+   */
+  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).should('exist')
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /^resolve$|resolve wager/i, { timeout: 20000 })
+    .click({ force: true })
+}
+
+/** Thin alias — every existing call site names the tab it means. */
+function openResolutionForFirstWager() {
+  openResolutionFor('created')
+}
+
+/**
+ * Create, accept and resolve a wager ENTIRELY ON CHAIN (chainTx), skipping the UI. Used by tests
+ * that are proving a contract-level guarantee (finality, re-resolution, deadlines) rather than
+ * the resolve UI itself — RES-01 already covers that. Returns the wagerId.
+ */
+function resolvedWagerOnChain(cfg = {}) {
+  const opts = { resolutionType: 0, ...cfg }
+  const winner = opts.winner ?? TEST_ACCOUNTS[0]
+  const resolverIndex = opts.resolverIndex ?? 0
+  return cy.createAndAcceptWager(opts).then((wagerId) => {
+    return cy.task('chainTx', {
+      action: 'declareWinner',
+      args: { wagerId, callerIndex: resolverIndex, winner },
+    }).then((r) => {
+      expect(r.ok, `declareWinner ok (${r.error || ''})`).to.be.true
+      return cy.wrap(wagerId)
+    })
   })
 }
 
 /**
  * Resolve a wager by selecting an outcome in the resolution modal.
  */
-function resolveWithOutcome(outcome = 'Pass') {
-  cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).should('be.visible')
-
-  // Select outcome
-  cy.get('.mm-sub-modal').within(() => {
-    cy.contains(outcome).click()
-  })
-
-  // Submit resolution
-  cy.get('.mm-sub-modal').within(() => {
-    cy.contains('button', /confirm|submit|resolve/i).click()
-  })
-
-  // Wait for TX
-  cy.get('.mm-sub-modal', { timeout: 30000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    const validOutcome = lower.includes('success') ||
-                        lower.includes('proposed') ||
-                        lower.includes('resolved') ||
-                        lower.includes('error') ||
-                        lower.includes('failed')
-    expect(validOutcome).to.be.true
-  })
+/*
+ * The resolve sub-modal labels outcomes by PARTY, not by Pass/Fail: MyMarketsModal builds
+ * "Creator wins — <name>", "Opponent wins — <name>" and "Draw — both parties refunded"
+ * (outcomeLabels/labelFor). The old 'Pass'/'Fail' strings matched nothing, so RES-01/03/10 opened
+ * the modal, found no such option, and timed out one step short of resolving. Map the intent to
+ * the wording the app actually renders, and match a pattern rather than an exact string — the
+ * label carries a resolved name or shortened address after the title.
+ */
+const OUTCOME_PATTERNS = {
+  Pass: /creator wins/i,
+  Fail: /opponent wins/i,
+  Draw: /draw/i,
 }
+
+function resolveWithOutcome(outcome = 'Pass') {
+  cy.resolveWagerInModal(OUTCOME_PATTERNS[outcome] || outcome)
+  cy.lastWagerId().then((id) => cy.waitForWagerResolved(id))
+}
+
+import { resetChainBetweenTests } from '../../support/e2e'
 
 describe('Manual Resolution', () => {
   before(() => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
     // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
     // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
-    cy.ensureWagerCapacity([0, 1])
-    cy.ensureEncryptionKeys([0, 1])
+    /*
+     * Account #2 is included because RES-05 names it as ARBITRATOR, and FriendMarketsModal
+     * refuses to create a third-party wager whose arbitrator has no key in KeyRegistry — the
+     * creator encrypts the private terms to them. With keys for [0, 1] only, RES-05 failed at
+     * "Wager Created" with nothing on screen naming the missing key. (04's helper hit and
+     * documented the same requirement.)
+     */
+    cy.ensureWagerCapacity([0, 1, 2])
+    cy.ensureEncryptionKeys([0, 1, 2])
   })
+
+  /*
+   * EVERY test here advances the chain by 25h+ to get past an end date, and the create form
+   * computes deadlines from BROWSER time — so from the second test on, the registry rejected
+   * the create with BadDeadlines and the failure surfaced as "Wager Created" never appearing,
+   * nowhere near its cause. Reset the chain between tests. Declared after the fixture hook
+   * above so the restore point sits after the encryption keys, not before them.
+   */
+  resetChainBetweenTests()
 
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. This spec was
+     * misclassified in the first interceptIpfs rollout: the sweep grepped for the SHARED create
+     * helpers, and this file's local `createWager` matched nothing, so 07 was tagged "never
+     * creates" while every one of its eight scenarios starts by creating. Without the stub the
+     * mandatory encrypted-metadata upload dies before the contract is reached, and all eight
+     * failed at "Wager Created" — cause 1 surviving in exactly one spec.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------
@@ -210,14 +252,7 @@ describe('Manual Resolution', () => {
 
     openResolutionForFirstWager()
 
-    cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-      if ($modal.length > 0) {
-        resolveWithOutcome('Pass')
-      } else {
-        // Resolution modal might not open if no resolvable wagers
-        expect(true).to.be.true
-      }
-    })
+    resolveWithOutcome('Pass')
   })
 
   // ---------------------------------------------------------------------------
@@ -235,24 +270,25 @@ describe('Manual Resolution', () => {
 
     cy.advanceTime(25 * 60 * 60)
 
-    // Opponent stays and resolves from participating tab
-    cy.openMyWagers('participating')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-
-        // Opponent should be able to resolve with Either Party type
-        cy.get('.mm-detail').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          // Verify wager details are visible
-          expect(lower.includes('res-02') || lower.includes('wager') || lower.includes('active')).to.be.true
-        })
-      } else {
-        expect(true).to.be.true
-      }
+    /*
+     * Resolve as the opponent via chainTx rather than the participating-tab UI. Measured: the
+     * opponent's own view of a wager they just accepted reads back "Pending Acceptance" from
+     * this list for a while after the real acceptance (a stale read behind the list's own
+     * refresh, not a bug this spec exists to chase) — the created-tab creator's view has no such
+     * lag, which is why RES-01/03 resolve reliably through the UI and this doesn't. Either Party
+     * lets the opponent resolve; that authorization is a chain fact and this proves it as one.
+     */
+    cy.lastWagerId().then((id) => {
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId: id, callerIndex: 1, winner: TEST_ACCOUNTS[1] },
+      }).then((r) => {
+        expect(r.ok, `the opponent resolves under Either Party (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        expect(i.status, 'wager is Resolved').to.equal(3)
+        expect(i.winner, 'the opponent, who resolved, is the declared winner').to.equal(TEST_ACCOUNTS[1])
+      })
     })
   })
 
@@ -275,13 +311,13 @@ describe('Manual Resolution', () => {
     cy.switchAccount(0)
 
     openResolutionForFirstWager()
+    resolveWithOutcome('Pass')
 
-    cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-      if ($modal.length > 0) {
-        resolveWithOutcome('Pass')
-      } else {
-        expect(true).to.be.true
-      }
+    cy.lastWagerId().then((id) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        expect(i.winner, 'the creator, the only authorized resolver, is the declared winner')
+          .to.equal(TEST_ACCOUNTS[0])
+      })
     })
   })
 
@@ -300,23 +336,27 @@ describe('Manual Resolution', () => {
 
     cy.advanceTime(25 * 60 * 60)
 
-    // Opponent stays to resolve
-    cy.openMyWagers('participating')
+    // The chain is the authority: the creator is NOT authorized for Opponent Only, checked
+    // before anyone has resolved yet (so this is genuinely testing authorization, not finality).
+    cy.lastWagerId().then((id) => {
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId: id, callerIndex: 0, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'the creator is not authorized to resolve an Opponent Only wager').to.equal(false)
+      })
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-
-        // Opponent should see resolution-related UI for Opponent Only type
-        cy.get('.mm-detail').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          expect(lower.includes('res-04') || lower.includes('wager') || lower.length > 0).to.be.true
-        })
-      } else {
-        expect(true).to.be.true
-      }
+      // Opponent resolves via chainTx — see RES-02 for why not the participating-tab UI.
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId: id, callerIndex: 1, winner: TEST_ACCOUNTS[1] },
+      }).then((r) => {
+        expect(r.ok, `the opponent, the only authorized resolver, resolves (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        expect(i.winner, 'the opponent, the only authorized resolver, is the declared winner')
+          .to.equal(TEST_ACCOUNTS[1])
+      })
     })
   })
 
@@ -354,31 +394,32 @@ describe('Manual Resolution', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // RES-06: Finalize after challenge period
+  // RES-06: Resolution is final the instant declareWinner lands.
+  //
+  // The original name — "finalizes after challenge period" — guessed at a dispute window that
+  // does not exist: WagerRegistryCore._declareWinner flips status straight to Resolved with no
+  // separate finalize step and no delay (contrast CLM-05/09's "claim window", same premise, same
+  // fix). What is real and worth proving: the moment declareWinner lands, the wager is BOTH
+  // Resolved on chain AND listed as resolved in the member's History — no separate step, no wait.
   // ---------------------------------------------------------------------------
-  it('[RES-06] Resolution finalizes after challenge period', () => {
+  it('[RES-06] Resolution is final the instant declareWinner lands — no separate finalize step', () => {
     connectAndVisit(0)
+    createWager({ description: 'RES-06: immediate finality', resolutionType: 0 })
 
-    // Check if any resolved wagers exist in history
+    cy.switchAccount(1)
+    acceptPendingWager()
+    cy.advanceTime(25 * 60 * 60)
+    cy.switchAccount(0)
+
+    openResolutionForFirstWager()
+    resolveWithOutcome('Pass')
+    // resolveWithOutcome already polls wagerInfo until status === Resolved (3) — the chain fact.
+
+    // And it shows up as resolved in History immediately, with no extra wait beyond that.
     cy.openMyWagers('history')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      if (lower.includes('resolved') || lower.includes('history')) {
-        // History tab has resolved wagers — verify the status is terminal
-        cy.get('.mm-panel').then(($panel) => {
-          const resolvedBadge = $panel.find('.status-resolved, :contains("Resolved")')
-          if (resolvedBadge.length > 0) {
-            expect(resolvedBadge.length).to.be.greaterThan(0)
-          } else {
-            expect(true).to.be.true
-          }
-        })
-      } else {
-        // No history — this is fine for a fresh Hardhat node
-        expect(true).to.be.true
-      }
-    })
+    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+      .find('.status-resolved, :contains("Resolved")', { timeout: 10000 })
+      .should('have.length.greaterThan', 0)
   })
 
   // ---------------------------------------------------------------------------
@@ -399,27 +440,24 @@ describe('Manual Resolution', () => {
 
     cy.openMyWagers('created')
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+      .find('.mm-table-row', { timeout: 20000 })
+      .should('have.length.greaterThan', 0)
 
-        // Should show countdown instead of Resolve button
-        cy.get('.mm-detail').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const hasCountdown = lower.includes('resolution available in') ||
-                              lower.includes('countdown') ||
-                              lower.includes('remaining') ||
-                              lower.includes('h ') ||
-                              lower.includes('d ')
-          const hasResolveBtn = lower.includes('resolve market')
-          // Before end date: countdown visible, OR resolve button absent
-          expect(hasCountdown || !hasResolveBtn).to.be.true
-        })
-      } else {
-        expect(true).to.be.true
-      }
+    cy.get('.mm-panel, [role="tabpanel"]').find('.mm-table-row').first().click()
+    cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+
+    // Should show countdown instead of Resolve button
+    cy.get('.mm-detail').invoke('text').then((text) => {
+      const lower = text.toLowerCase()
+      const hasCountdown = lower.includes('resolution available in') ||
+                          lower.includes('countdown') ||
+                          lower.includes('remaining') ||
+                          lower.includes('h ') ||
+                          lower.includes('d ')
+      const hasResolveBtn = lower.includes('resolve market')
+      // Before end date: countdown visible, OR resolve button absent
+      expect(hasCountdown || !hasResolveBtn, 'no resolve control offered before the end date').to.be.true
     })
   })
 
@@ -438,46 +476,44 @@ describe('Manual Resolution', () => {
 
     cy.advanceTime(25 * 60 * 60)
 
-    // Opponent tries to resolve — should not see Resolve button for Creator Only
-    cy.openMyWagers('participating')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-
-        // Opponent should NOT see a Resolve button for Creator Only resolution
-        cy.get('.mm-detail').then(($detail) => {
-          const resolveBtn = $detail.find('button:contains("Resolve Market")')
-          // Opponent view (non-creator tab) should not show resolution button
-          expect(resolveBtn.length).to.equal(0)
-        })
-      } else {
-        expect(true).to.be.true
-      }
+    // The chain is the authority: the opponent is not authorized to resolve a Creator Only wager.
+    cy.lastWagerId().then((id) => {
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId: id, callerIndex: 1, winner: TEST_ACCOUNTS[1] },
+      }).then((r) => {
+        expect(r.ok, 'the opponent cannot resolve a Creator Only wager').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        expect(i.status, 'wager stays Active — unresolved').to.equal(2)
+      })
     })
   })
 
   // ---------------------------------------------------------------------------
-  // RES-09: Resolve after challenge window
+  // RES-09: A resolved wager stays resolved indefinitely — no challenge window ever reopens it.
+  //
+  // Same corrected premise as RES-06: there is no dispute/challenge window in
+  // WagerRegistryCore. What is real: once Resolved, a wager's status, winner and paid flag
+  // never change on their own, however much time passes, and a stale re-resolve attempt is
+  // still refused long after the fact.
   // ---------------------------------------------------------------------------
-  it('[RES-09] Resolution is final after challenge window passes', () => {
-    connectAndVisit(0)
+  it('[RES-09] A resolved wager stays resolved, however long afterward it is checked', () => {
+    const winner = TEST_ACCOUNTS[0]
 
-    // Advance past challenge window (24 hours after resolution)
-    cy.advanceTime(48 * 60 * 60)
+    resolvedWagerOnChain({ winner }).then((wagerId) => {
+      cy.advanceTime(60 * 24 * 60 * 60) // 60 days — long past any plausible "challenge window"
 
-    cy.openMyWagers('history')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      // After challenge window, resolved wagers should be in history
-      const validState = lower.includes('resolved') ||
-                        lower.includes('history') ||
-                        lower.includes('no wager') ||
-                        lower.includes('empty')
-      expect(validState).to.be.true
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'still Resolved').to.equal(3)
+        expect(i.winner, 'winner is unchanged').to.equal(winner)
+      })
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 0, winner: TEST_ACCOUNTS[1] },
+      }).then((r) => {
+        expect(r.ok, 'a stale re-resolve attempt is still refused').to.equal(false)
+      })
     })
   })
 
@@ -485,59 +521,64 @@ describe('Manual Resolution', () => {
   // RES-10: Resolve with invalid outcome reverts
   // ---------------------------------------------------------------------------
   it('[RES-10] Resolve must select a valid outcome', () => {
+    /*
+     * ESTABLISH THE PRECONDITION. This test used to connect and hope a resolvable wager was
+     * lying around from an earlier test — and its `else { expect(true).to.be.true }` meant that
+     * when none was, it PASSED without testing anything. Per-test chain isolation removed the
+     * leftovers and turned that silent pass into an honest failure, so the wager is created here.
+     */
     connectAndVisit(0)
+    createWager({ description: 'RES-10: Outcome selection is required', resolutionType: 0 })
+
+    cy.switchAccount(1)
+    acceptPendingWager()
+    cy.advanceTime(25 * 60 * 60)
+    cy.switchAccount(0)
 
     openResolutionForFirstWager()
 
-    cy.get('.mm-sub-modal, .mm-sub-modal-backdrop', { timeout: 5000 }).then(($modal) => {
-      if ($modal.length > 0) {
-        // Try to submit without selecting an outcome
-        cy.get('.mm-sub-modal').within(() => {
-          cy.contains('button', /confirm|submit|resolve/i).click()
-        })
+    /*
+     * The app does not let you submit an unresolved choice and then complain — "Continue" is
+     * DISABLED until an outcome is selected (MyMarketsModal: `disabled={!selectedOutcome || …}`).
+     * Assert the guard that exists rather than scanning for error copy that never appears.
+     */
+    cy.get('.mm-sub-modal', { timeout: 15000 }).should('be.visible')
+    cy.get('.mm-sub-modal').contains('button', /^continue$/i).should('be.disabled')
 
-        // Should show error about missing outcome selection
-        cy.get('.mm-sub-modal').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const hasError = lower.includes('select') ||
-                          lower.includes('outcome') ||
-                          lower.includes('required') ||
-                          lower.includes('error')
-          expect(hasError).to.be.true
-        })
-      } else {
-        // No resolvable wagers
-        expect(true).to.be.true
-      }
-    })
+    // Choosing an outcome is what unlocks it.
+    cy.get('.mm-sub-modal').contains(/creator wins/i).click()
+    cy.get('.mm-sub-modal').contains('button', /^continue$/i).should('not.be.disabled')
   })
 
   // ---------------------------------------------------------------------------
   // RES-11: Resolve already-resolved wager
   // ---------------------------------------------------------------------------
   it('[RES-11] Cannot resolve an already-resolved wager', () => {
-    connectAndVisit(0)
+    resolvedWagerOnChain({ winner: TEST_ACCOUNTS[0] }).then((wagerId) => {
+      // The chain is the authority: a second declareWinner on a Resolved wager is refused
+      // (NotActive), even naming a different winner.
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 0, winner: TEST_ACCOUNTS[1] },
+      }).then((r) => {
+        expect(r.ok, 're-resolving an already-resolved wager is refused').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.winner, 'the original winner is unchanged').to.equal(TEST_ACCOUNTS[0])
+      })
 
-    cy.openMyWagers('history')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const resolvedRows = $panel.find('.status-resolved, :contains("Resolved")')
-      if (resolvedRows.length > 0) {
-        // Click into a resolved wager
-        const rows = $panel.find('.mm-table-row')
-        if (rows.length > 0) {
-          cy.wrap(rows.first()).click()
-          cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-
-          // Should NOT have resolve button
-          cy.get('.mm-detail').then(($detail) => {
-            const resolveBtn = $detail.find('button:contains("Resolve")')
-            expect(resolveBtn.length).to.equal(0)
-          })
-        }
-      } else {
-        expect(true).to.be.true
-      }
+      // And the UI does not offer the control on a resolved wager either.
+      connectAndVisit(0)
+      cy.openMyWagers('history')
+      cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+        .find('.mm-table-row', { timeout: 20000 })
+        .should('have.length.greaterThan', 0)
+      cy.get('.mm-panel, [role="tabpanel"]').find('.mm-table-row').first().click()
+      cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+      cy.get('.mm-detail').then(($detail) => {
+        const resolveBtn = $detail.find('button:contains("Resolve")')
+        expect(resolveBtn.length, 'no Resolve control on an already-resolved wager').to.equal(0)
+      })
     })
   })
 
@@ -545,27 +586,30 @@ describe('Manual Resolution', () => {
   // RES-12: NotActive revert when resolving pending wager
   // ---------------------------------------------------------------------------
   it('[RES-12] NotActive revert when wager is still pending acceptance', () => {
-    connectAndVisit(0)
+    // Created but not accepted — Open, not Active. Established here, not assumed left over.
+    cy.createAndAcceptWager({ description: 'RES-12: pending acceptance', accept: false }).then((wagerId) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is Open, not yet Active').to.equal(1)
+      })
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 0, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'resolving a pending (Open) wager is refused').to.equal(false)
+      })
 
-    cy.openMyWagers('created')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const pendingBadges = $panel.find('.status-pending-acceptance, :contains("Pending"), :contains("Under Consideration")')
-      if (pendingBadges.length > 0) {
-        // Pending wager should not show resolve button
-        const rows = $panel.find('.mm-table-row')
-        if (rows.length > 0) {
-          cy.wrap(rows.first()).click()
-          cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-
-          cy.get('.mm-detail').then(($detail) => {
-            const resolveBtn = $detail.find('button:contains("Resolve Market")')
-            expect(resolveBtn.length).to.equal(0)
-          })
-        }
-      } else {
-        expect(true).to.be.true
-      }
+      // And the UI does not show a resolve control on it either.
+      connectAndVisit(0)
+      cy.openMyWagers('created')
+      cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+        .find('.mm-table-row', { timeout: 20000 })
+        .should('have.length.greaterThan', 0)
+      cy.get('.mm-panel, [role="tabpanel"]').find('.mm-table-row').first().click()
+      cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+      cy.get('.mm-detail').then(($detail) => {
+        const resolveBtn = $detail.find('button:contains("Resolve Market")')
+        expect(resolveBtn.length, 'no Resolve control on a pending wager').to.equal(0)
+      })
     })
   })
 
@@ -576,9 +620,7 @@ describe('Manual Resolution', () => {
     cy.mockWeb3Provider({ account: TEST_ACCOUNTS[4] }) // Bystander
     cy.visitWagers()
 
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
+    cy.connectWallet()
 
     cy.openMyWagers('created')
 
@@ -593,34 +635,285 @@ describe('Manual Resolution', () => {
   // RES-14: Resolve deadline enforcement
   // ---------------------------------------------------------------------------
   it('[RES-14] Cannot resolve after resolve deadline passes', () => {
-    connectAndVisit(0)
+    // Active (accepted), with a resolveDeadline this test controls directly rather than hoping
+    // the default window has or hasn't elapsed by the time 30 days pass. resolveDeadline must be
+    // strictly after acceptDeadline (BadDeadlines otherwise), hence the shorter acceptIn.
+    cy.createAndAcceptWager({
+      description: 'RES-14: resolve deadline', acceptIn: 300, resolveIn: 3600,
+    }).then((wagerId) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is Active').to.equal(2)
+      })
 
-    // Advance far past the resolve deadline (MAX_RESOLVE_WINDOW)
-    cy.advanceTime(30 * 24 * 60 * 60) // 30 days
+      cy.advanceTime(30 * 24 * 60 * 60) // 30 days — well past resolveDeadline
 
-    cy.openMyWagers('created')
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 0, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'resolving after the resolve deadline is refused').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager stays Active — it was never resolved').to.equal(2)
+      })
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-
-        // After resolve deadline, the wager may be refundable or timed out
-        cy.get('.mm-detail').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const validState = lower.includes('ended') ||
-                            lower.includes('expired') ||
-                            lower.includes('timed out') ||
-                            lower.includes('refund') ||
-                            lower.includes('resolve') ||
-                            lower.includes('pending')
-          expect(validState).to.be.true
-        })
-      } else {
-        // No wagers left after time advancement
-        expect(true).to.be.true
-      }
+      // Past its deadline, the wager is refundable instead — the door the app actually offers.
+      cy.task('chainTx', { action: 'claimRefund', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, `refund is available once resolution is no longer possible (${r.error || ''})`).to.be.true
+      })
     })
   })
+
+  // ---------------------------------------------------------------------------
+  // RES-15 / RES-16 — DRAWS (spec 004). Both stakes go back, and one side alone
+  // can never make that happen.
+  // ---------------------------------------------------------------------------
+
+  it('[RES-15] An arbitrator declares a draw and BOTH stakes are returned', () => {
+    /*
+     * `Status.Draw` is not "resolved with no winner" — it is a refund of both sides, and the only
+     * assertion that proves it is the money. A status flag can be set by code that never moved a
+     * token; `_settleDraw` transfers each stake back to the account that put it up, so the test
+     * reads balances before and after and requires each side to be made whole.
+     *
+     * ThirdParty is the arbitrator path: their single call settles immediately, with no consent
+     * from either participant. That is the whole point of naming an arbitrator, and it is also
+     * why the participant path below must behave completely differently.
+     */
+    const STAKE = 2n * 10n ** 18n
+    cy.createAndAcceptWager({
+      description: 'RES-15: arbitrated draw',
+      resolutionType: 3, // ThirdParty
+      arbitrator: TEST_ACCOUNTS[2],
+      stake: String(STAKE),
+    }).then((wagerId) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is Active before the draw').to.equal(2)
+      })
+
+      // Balances with both stakes escrowed — the baseline the refund is measured against.
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).as('creatorBefore')
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).as('opponentBefore')
+
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 2 } }).then((r) => {
+        expect(r.ok, `the arbitrator can declare a draw (${r.error || ''})`).to.equal(true)
+      })
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'the wager settled as a Draw').to.equal(6)
+      })
+
+      // THE ASSERTION THIS TEST EXISTS FOR: each side got its own stake back, exactly.
+      cy.get('@creatorBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the creator was refunded their stake').to.equal(STAKE)
+        })
+      })
+      cy.get('@opponentBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the opponent was refunded their stake').to.equal(STAKE)
+        })
+      })
+
+      // Settled means settled: a second declaration finds nothing Active to draw.
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 2 } }).then((r) => {
+        expect(r.ok, 'a settled wager cannot be drawn again').to.equal(false)
+      })
+    })
+  })
+
+  it('[RES-16] One participant alone cannot force a draw — it takes both, and consent can be revoked', () => {
+    /*
+     * THE RULE WITH TEETH.
+     *
+     * On participant-resolved wagers a draw is MUTUAL: `_declareDraw` records one consent bit and
+     * settles only at `_CONSENT_BOTH`. If a single declaration settled, either party could void a
+     * wager they were losing at no cost — which is not a draw, it is a unilateral exit from a bet
+     * whose outcome had stopped being convenient.
+     *
+     * So the load-bearing assertion here is a NEGATIVE one: after the creator declares, the wager
+     * is still Active and nobody has been paid.
+     */
+    const STAKE = 2n * 10n ** 18n
+    cy.createAndAcceptWager({
+      description: 'RES-16: mutual draw consent',
+      resolutionType: 0, // Either — a participant-resolved type
+      stake: String(STAKE),
+    }).then((wagerId) => {
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).as('creatorBefore')
+
+      // One side proposes. Accepted as a PROPOSAL — and nothing else moves.
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'the creator may propose a draw').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'one consent is NOT a draw — the wager is still Active').to.equal(2)
+      })
+      cy.get('@creatorBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((after) => {
+          expect(BigInt(after.balance), 'no stake moved on a one-sided proposal').to.equal(BigInt(before.balance))
+        })
+      })
+
+      /*
+       * And the proposal is withdrawable. A member who offered a draw and then changed their mind
+       * must be able to take it back while the wager is still live — otherwise the offer is a
+       * one-way door that the other side can walk through at any later moment of their choosing.
+       */
+      cy.task('chainTx', { action: 'revokeDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'a draw proposal can be revoked while the wager is Active').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, 'the opponent may now propose').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(
+          i.status,
+          'the revoked consent did not count — one live proposal is still not a draw',
+        ).to.equal(2)
+      })
+
+      // Both sides agreeing IS a draw, and the money follows.
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).as('opponentBefore')
+      cy.task('chainTx', { action: 'declareDraw', args: { wagerId, callerIndex: 0 } }).then((r) => {
+        expect(r.ok, 'the creator declares again, completing mutual consent').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'both sides agreeing settles the wager as a Draw').to.equal(6)
+      })
+      cy.get('@opponentBefore').then((before) => {
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).then((after) => {
+          expect(BigInt(after.balance) - BigInt(before.balance), 'the opponent was refunded their stake').to.equal(STAKE)
+        })
+      })
+    })
+  })
+
+
+  // ---------------------------------------------------------------------------
+  // RES-17 / RES-18 / RES-19 — RELAYED INTENTS (spec 035). Someone else pays the
+  // gas; nobody else gains the authority.
+  // ---------------------------------------------------------------------------
+
+  it('[RES-17] A relayer submits the member\'s signed intent — the member acts, the relayer pays', () => {
+    /*
+     * The whole promise of the intent rail in one assertion pair.
+     *
+     * `declareWinnerWithSig` is a PUBLIC function: anyone may call it. What makes that safe is
+     * that the acting identity is not `msg.sender` but the address recovered from the signature,
+     * and every authorisation check runs against THAT. So a relayer can pay the gas for a member
+     * who has none, without acquiring any of the member's rights.
+     *
+     * The test proves both halves at once: the resolution succeeds when submitted by an account
+     * that has no authority over the wager, and the outcome is the one the MEMBER signed.
+     */
+    cy.createAndAcceptWager({
+      description: 'RES-17: relayed resolution',
+      resolutionType: 1, // Creator-only — so the relayer plainly cannot resolve it themselves
+    }).then((wagerId) => {
+      /*
+       * Positive control first. Account #3 is the relayer, and on a Creator-only wager it has no
+       * standing at all — if this direct call were to succeed, the test below would prove nothing
+       * about signatures.
+       */
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 3, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'the relayer has no authority of its own over this wager').to.equal(false)
+      })
+
+      // The same account submits the same outcome, now carrying the creator's signature.
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3 },
+      }).then((r) => {
+        expect(r.ok, `the relayer may submit an intent the creator signed (${r.error || ''})`).to.equal(true)
+      })
+
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'the wager resolved').to.equal(3)
+        expect(i.winner, 'the outcome is the one the MEMBER signed').to.equal(TEST_ACCOUNTS[0])
+      })
+    })
+  })
+
+  it('[RES-18] A relayed intent cannot be replayed, and cannot be re-pointed at another signer', () => {
+    /*
+     * Two ways a public, signature-carrying entrypoint goes wrong, and the guards for each.
+     *
+     * REPLAY: the intent is visible on chain the moment it is submitted. Without a spent-nonce
+     * check, anyone could resubmit it — harmless on a settled wager, not harmless on a repeatable
+     * action, and the guard belongs to the rail rather than to each action.
+     *
+     * SUBSTITUTION: `signer` is passed as a plain argument alongside the signature. If it were
+     * trusted rather than verified against the recovered address, a relayer could name any member
+     * as the actor and act as them. The digest binds the signer, so a mismatched pair must fail.
+     */
+    cy.createAndAcceptWager({ description: 'RES-18: replay + substitution', resolutionType: 1 }).then((wagerId) => {
+      const NONCE = '0x' + '11'.repeat(32)
+
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3, nonce: NONCE },
+      }).then((r) => {
+        expect(r.ok, 'the first submission lands').to.equal(true)
+      })
+
+      // Replay of the identical intent, by the same relayer.
+      cy.task('chainTx', {
+        action: 'declareWinnerWithSig',
+        args: { wagerId, winner: TEST_ACCOUNTS[0], signerIndex: 0, relayerIndex: 3, nonce: NONCE },
+      }).then((r) => {
+        expect(r.ok, 'the same intent cannot be submitted twice').to.equal(false)
+      })
+
+      // Substitution: a signature made by #1, presented as though #0 had signed it.
+      cy.createAndAcceptWager({ description: 'RES-18b: substitution', resolutionType: 1 }).then((otherId) => {
+        cy.task('chainTx', {
+          action: 'declareWinnerWithSig',
+          args: {
+            wagerId: otherId,
+            winner: TEST_ACCOUNTS[1],
+            signerIndex: 1,
+            relayerIndex: 3,
+            signerAddressOverride: TEST_ACCOUNTS[0],
+          },
+        }).then((r) => {
+          expect(
+            r.ok,
+            'naming a different signer than the one who signed does not make them the actor',
+          ).to.equal(false)
+        })
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: otherId } }).then((i) => {
+          expect(i.status, 'the wager was not resolved by the substitution attempt').to.equal(2)
+        })
+      })
+    })
+  })
+
+  it('[RES-19] The self-submit fallback reaches the same outcome without any relayer', () => {
+    /*
+     * THE NEVER-STRANDED RULE (spec 036). The relayer is OPTIONAL infrastructure: when it is
+     * unavailable the member submits the same action themselves and pays their own gas.
+     *
+     * A test cannot take down a relayer that this tier never runs, and asserting on a stubbed
+     * gateway would only prove the stub was called. What IS on chain, and what the rule actually
+     * depends on, is that the direct entrypoint remains open and produces the identical result —
+     * so a member with gas is never blocked by infrastructure being down.
+     */
+    cy.createAndAcceptWager({ description: 'RES-19: self-submit fallback', resolutionType: 1 }).then((wagerId) => {
+      cy.task('chainTx', {
+        action: 'declareWinner',
+        args: { wagerId, callerIndex: 0, winner: TEST_ACCOUNTS[0] },
+      }).then((r) => {
+        expect(r.ok, 'the member can always submit for themselves — no relayer required').to.equal(true)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'self-submission resolves the wager').to.equal(3)
+        expect(i.winner, 'and reaches the same outcome the relayed path would have').to.equal(TEST_ACCOUNTS[0])
+      })
+    })
+  })
+
 })

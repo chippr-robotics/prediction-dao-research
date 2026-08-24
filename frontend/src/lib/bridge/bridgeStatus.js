@@ -48,6 +48,7 @@ import { queueBridgeNotification } from './bridgeActivityBuffer'
 import { NETWORKS } from '../../config/networks'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import { makeReadProvider } from '../../utils/rpcProvider'
+import { scanLogRange } from '../chain/logScan'
 
 const FETCH_TIMEOUT_MS = 10_000
 
@@ -275,10 +276,31 @@ const APPROX_BLOCK_SECONDS = Object.freeze({ 1: 12, 10: 2, 137: 2, 8453: 2, 4216
 const DEFAULT_BLOCK_SECONDS = 12
 /** How far back a destination scan looks — generously past any route's expected fill window. */
 export const FILL_LOOKBACK_SECONDS = 6 * 60 * 60
-/** Hard ceiling so a fast chain cannot produce an absurd range that every RPC will refuse. */
+/**
+ * Ceiling on the SIZE OF THE SWEEP, which since the scan was chunked means a ceiling on the number
+ * of REQUESTS it may cost: 120,000 blocks is 12 chunks of `LOG_SCAN_CHUNK`, three waves.
+ *
+ * It used to be documented as "a range that every RPC will refuse", and that was wrong in both
+ * directions. It never fired — it sits 12x above the 10,000-block cap QuickNode and most public
+ * endpoints actually enforce — while every range that WAS refused (Polygon/Optimism/Base at 10,800,
+ * Arbitrum at 86,400) passed under it untouched. A cap set above every real cap protects nothing.
+ *
+ * It is deliberately NOT lowered toward 10,000 now that the sweep is chunked. `FILL_LOOKBACK_SECONDS`
+ * states a window in TIME; clamping the block count to one chunk would quietly redefine six hours as
+ * roughly forty minutes on Arbitrum, and a fill found outside the window reads as no fill at all —
+ * which the machine then ages into `needs_attention`. Truncating a real delivery to save eight
+ * requests is the wrong trade. Today the ceiling binds nothing (Arbitrum's 86,400 is the widest real
+ * value); it exists for a future chain faster than 0.25s/block, or a longer lookback.
+ */
 const MAX_LOOKBACK_BLOCKS = 120_000
 
-function lookbackBlocksFor(chainId) {
+/**
+ * How many blocks back a destination fill scan reaches on a given chain.
+ *
+ * Exported for tests: this arithmetic is what decided the width of the request that four chains'
+ * RPCs were rejecting, so it is worth pinning per chain rather than inferring from a mock.
+ */
+export function fillLookbackBlocksFor(chainId) {
   const seconds = APPROX_BLOCK_SECONDS[chainId] ?? DEFAULT_BLOCK_SECONDS
   return Math.min(MAX_LOOKBACK_BLOCKS, Math.ceil(FILL_LOOKBACK_SECONDS / seconds))
 }
@@ -345,29 +367,44 @@ async function readOriginEvidence({ provider, srcTxHash, depositId }) {
  * refuses the range, a decode failure — because "no fill found" is not evidence of non-delivery and
  * must never be reported as one.
  *
+ * THE SWEEP IS CHUNKED, and that is load-bearing rather than tidy. Asking for the whole lookback in
+ * ONE `eth_getLogs` meant asking for 10,800 blocks on Polygon, Optimism and Base and 86,400 on
+ * Arbitrum, against endpoints that cap a single request at 10,000 — verified live against the
+ * Polygon SpokePool, where 10,000 answered with 347 logs and 10,001 answered
+ * `-32614 eth_getLogs is limited to a 10,000 range`. Only Ethereum's 1,800 fit. The `catch` below
+ * meant this degraded honestly (a refused range returns null, which the machine reads as "no new
+ * information", so no member was ever falsely told a transfer had not arrived) — but the fill hash,
+ * the entire output of this function, was unreachable on four of the five bridging chains. Honest
+ * and useless is still useless. `scanLogRange` issues the window as inclusive ranges no wider than
+ * `LOG_SCAN_CHUNK`, and re-derives it on every call rather than caching — see its own note on why a
+ * never-rewinding watermark is the wrong shape for evidence that money moved.
+ *
  * @returns {Promise<string|null>} the fill transaction hash
  */
 async function readDestinationFill({ provider, destinationChainId, originChainId, depositId, spokePool, fromBlock, lookbackBlocks }) {
   const address = spokePool || spokePoolAddress(destinationChainId)
   if (!provider || !address || depositId == null) return null
 
-  let from = fromBlock
-  if (from == null) {
-    try {
-      const head = await provider.getBlockNumber()
-      const span = lookbackBlocks ?? lookbackBlocksFor(destinationChainId)
-      from = Math.max(0, Number(head) - span)
-    } catch {
-      return null
-    }
+  // The head is needed even when the caller pins `fromBlock`: a chunked sweep has to know where the
+  // range ENDS, and `toBlock: 'latest'` is precisely the open end that cannot be divided.
+  let head
+  try {
+    head = Number(await provider.getBlockNumber())
+  } catch {
+    return null
   }
+  if (!Number.isFinite(head)) return null
+
+  const span = lookbackBlocks ?? fillLookbackBlocksFor(destinationChainId)
+  const from = fromBlock == null ? Math.max(0, head - span) : Number(fromBlock)
 
   let logs
   try {
-    logs = await provider.getLogs({
+    logs = await scanLogRange({
+      provider,
       address,
       fromBlock: from,
-      toBlock: 'latest',
+      toBlock: head,
       // [any fill event, this origin chain, this deposit]. `uint32` and `uint256` pad to the same
       // 32-byte topic for any value a deposit id can take, so one topic serves both vocabularies.
       topics: [topicsFor(FILL_EVENT_NAMES), toBeHex(BigInt(originChainId), 32), toBeHex(BigInt(depositId), 32)],

@@ -63,7 +63,15 @@ export async function discoverCrossChain({
         pendingSats: full.pendingSats,
         spendableSats: full.spendableSats,
         byType: full.byType,
-        status: full.stale || disc.stale ? 'partial' : 'complete',
+        /*
+         * PARTIAL means "some of it was read". A scan that came back stale with NOTHING read has
+         * told us nothing at all, and reporting that as a partial result of zero is a fabricated
+         * zero on the one surface where it is most expensive: a member deciding whether an old
+         * wallet still holds money reads "No funds found" as "it is empty", and stops looking.
+         */
+        status: (full.stale || disc.stale)
+          ? (full.confirmedSats > 0 || full.pendingSats > 0 ? 'partial' : 'unreachable')
+          : 'complete',
       }
     } catch {
       results.bitcoin = { accountId: derived.bitcoin.accountId, confirmedSats: 0, spendableSats: 0, byType: {}, status: 'unreachable' }

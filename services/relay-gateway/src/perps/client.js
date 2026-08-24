@@ -11,6 +11,8 @@
  * (research D2). Member addresses appear only in position queries and never leave the gateway
  * logs' standard request path.
  */
+import { stripTrailingSlashes } from '../strings.js'
+
 
 /** Venue unreachable / persistent 5xx / upstream 429 — routes degrade that venue, never the rest. */
 export class PerpsUpstreamError extends Error {
@@ -36,7 +38,7 @@ export class PerpsRequestError extends Error {
  * @param {{baseUrl: string, timeoutMs?: number, retries?: number, fetchImpl?: typeof fetch}} opts
  */
 export function createVenueClient({ baseUrl, timeoutMs = 8000, retries = 1, fetchImpl = fetch }) {
-  const base = baseUrl.replace(/\/+$/, '')
+  const base = stripTrailingSlashes(baseUrl)
 
   async function request(path, init) {
     let lastErr

@@ -203,8 +203,8 @@
 }
 
 .connect-wallet-btn {
-  background: var(--brand-primary);
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .connect-wallet-btn:hover {

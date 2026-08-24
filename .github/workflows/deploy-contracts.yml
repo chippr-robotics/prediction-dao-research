@@ -1,15 +1,16 @@
 name: Deploy DAO Contracts
 
+# MANUAL ONLY. The `push:` trigger was removed deliberately — do not restore it.
+#
+# It fired on push to `main` for `contracts/**`, `hardhat.config.js`, the deploy script and this
+# file. That meant a deploy happened on INTENT TO MERGE, not intent to deploy: any PR touching
+# hardhat.config.js — a comment, an RPC default — sent a real transaction to a real chain. During
+# the 2026-08-22 admin-key rotation this workflow was one merge away from firing with a key that
+# was being retired, purely because the branch corrected a stale comment.
+#
+# A deploy is a deliberate act. `workflow_dispatch` is the whole of the trigger set, on purpose.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'contracts/**'
-      - 'scripts/deploy/archive/deploy-deterministic.js'
-      - 'hardhat.config.js'
-      - '.github/workflows/deploy-contracts.yml'
 
 permissions:
   contents: read
@@ -48,8 +49,24 @@ jobs:
         run: |
           if [ -z "$PRIVATE_KEY" ]; then
             echo "❌ ERROR: PRIVATE_KEY secret not configured"
-            echo "Please add your private key to GitHub repository secrets"
-            echo "Settings → Secrets and variables → Actions → New repository secret"
+            echo ""
+            echo "Before adding one, be sure it is the RIGHT kind of key."
+            echo ""
+            echo "The deploy key is a DEPLOYMENT VEHICLE: it pays gas and calls CREATE2. Contract"
+            echo "addresses are deterministic and independent of who sends the transaction, so a"
+            echo "compromised deploy key can waste gas and deploy junk — it cannot touch a deployed"
+            echo "contract. Admin authority lives in the multisig Safe"
+            echo "(deployments/admin-safe.json), NOT in this key."
+            echo ""
+            echo "Do NOT put an admin key here. The previous deploy EOA held DEFAULT_ADMIN/UPGRADER"
+            echo "on ~260 (contract, role) pairs when it leaked; see"
+            echo "docs/runbooks/key-compromise-recovery.md."
+            echo ""
+            echo "Preferred direction is GCP KMS rather than a raw key in a CI secret — the private"
+            echo "key is then non-exportable and cannot end up in a log or a shell history."
+            echo "scripts/ops/lib/kmsSigner.js already signs transactions with a KMS key; what is"
+            echo "still missing is a hardhat provider wrapper (hardhat's accounts: array takes raw"
+            echo "keys only) and Workload Identity Federation for this workflow."
             exit 1
           fi
 

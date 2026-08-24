@@ -153,8 +153,8 @@
   padding: 10px 22px;
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
-  background: var(--brand-primary);
+  color: var(--primary-button-text);
+  background: var(--primary-button);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;

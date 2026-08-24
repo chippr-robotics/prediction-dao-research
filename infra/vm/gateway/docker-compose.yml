@@ -26,17 +26,22 @@ services:
   # ---- namespace owner: the policy gateway (the only public surface) ----
   gateway:
     container_name: fairwins-gateway-gateway
-    # perps-083 (staging efcfef33, PRs #1150 + #1153): the first image carrying the perps read proxy
-    # — and, because predict-058 predates them, also the first carrying spec 060's FeeRouter reader
-    # and spec 076's build identity. Verified before push: /status returns the `perps`, `fees` and
-    # `build` blocks that the live predict-058 does not. Digest sha256:c34df81637673702bbb91cd32a95…
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:perps-083
+    # agentic-096 (staging 7d5f2c10): the first image carrying spec 095's member API and spec 096's
+    # x402 rail, plus the spec-089 FinOps catalogue work and the member-API quota/spend bounds from
+    # #1311. Verified before push: /status returns a `memberApi` block (with x402 nested inside it)
+    # that the live perps-083 does not. Digest sha256:c57e88ae0960519ef461a7316f782281e0f1bcccc499a…
+    #
+    # The module is PRESENT but OFF: every spec-095/096 switch below stays commented, so this image
+    # behaves exactly as perps-083 did until someone turns one on deliberately. Shipping the code
+    # and flipping the switch are different decisions, and X402_PAY_TO has no safe default to
+    # guess — it is where agent payments LAND.
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:agentic-096
     restart: unless-stopped
     pull_policy: missing
     ports:
       - "127.0.0.1:8788:8788"
     env_file:
-      - /run/fairwins/gateway.env   # 8 gateway secrets. MUST NOT contain GCP_PRIVATE_KEY.
+      - /run/fairwins/gateway.env   # gateway credentials only. MUST NOT contain GCP_PRIVATE_KEY.
     environment:
       PORT: "8788"
       ENABLED_CHAIN_IDS: "63,137"
@@ -47,13 +52,43 @@ services:
       RPC_URLS_63: "https://rpc.mordor.etccooperative.org,https://geth-mordor.etc-network.info"
       ENGINE_RELAYER_ID_137: "polygon-137"
       GAS_WALLET_137: "0x3BB28b184b8a748dE22aBD076634F85adADA82db"
-      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.llamarpc.com"
+      # PUBLIC FAILOVER ONLY. The primary is the keyed QuickNode archive endpoint, delivered as
+      # RPC_URL_PRIMARY_137 in gateway.env and PREPENDED to this list by config/index.js — it is a
+      # URL with the token in its path and must never be written here, where it would be in git.
+      #
+      # polygon.llamarpc.com was REMOVED, not replaced in place: measured 2026-08-23 it does not
+      # resolve at all (`fetch failed`), so this had been a one-entry list wearing a failover's
+      # clothes since some unknown date. polygon-rpc.com is NOT the replacement either — it now
+      # answers 401 without a key. polygon.drpc.org was probed at the same time: HTTP 200,
+      # chainId 137.
+      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"
       PAYMASTER_ADDRESS_137: "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105"
       PM_SIGNER_KMS_KEY: "projects/chippr-bots-site-wp/locations/us-central1/keyRings/fairwins-relayer/cryptoKeys/paymaster-signer-polygon/cryptoKeyVersions/1"
       OPENSEA_REFERRAL_ADDRESS: ""
       POLYMARKET_BUILDER_CODE: "0x6e0316783960e149b53466f0f2c5fdbaf5ce11ba15669491de980f6dedc493a3"
       POLYMARKET_BUILDER_TAKER_FEE_BPS: "50"
       POLYMARKET_BUILDER_MAKER_FEE_BPS: "0"
+      # ---- Member API + assistant (spec 095) and x402 agentic payments (spec 096) ----
+      # COMMENTED UNTIL THE IMAGE PIN ADVANCES: the pinned image above predates the memberApi
+      # module, and this file's own perps history shows what a flag with no code behind it looks
+      # like. Enable procedure (image build → push → repin → uncomment → converge) is
+      # docs/runbooks/member-api-operations.md §3.1 "Enable the Member API". The reference-chain
+      # pin is LOAD-BEARING: ENABLED_CHAIN_IDS starts with 63, and the default reference chain is
+      # the FIRST enabled chain with a recorded membershipManager — Mordor also has one, so leaving
+      # this unset silently pins membership + ERC-1271 auth to testnet on a mainnet-serving gateway.
+      # The 137 subgraph is pinned to a version, never /version/latest (networks.js precedent);
+      # Mordor deliberately has no MEMBER_API_SUBGRAPH_63 — no subgraph exists there, and
+      # `not-configured` is the honest answer. ANTHROPIC_API_KEY arrives via fetch-secrets
+      # (optional): absent ⇒ the assistant route answers 503 assistant_unconfigured, nothing else
+      # degrades. x402 (spec 096) additionally needs X402_PAY_TO — the treasury that RECEIVES agent
+      # payments; it has no default on purpose and enabling it is a funds decision, not a flag flip.
+      # MEMBER_API_ENABLED: "true"
+      # MEMBER_API_REFERENCE_CHAIN_ID: "137"
+      # MEMBER_API_SUBGRAPH_137: "https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.3.0"
+      # ASSISTANT_ENABLED: "true"
+      # X402_ENABLED: "true"
+      # X402_CHAIN_ID: "137"
+      # X402_PAY_TO: "<treasury address — REQUIRED, no default>"
       # ---- Perps read proxy (specs 082 + 083) ----
       # READ-ONLY BY CONSTRUCTION: this module has no write route at all. It proxies three PUBLIC
       # venue APIs (Gains, GMX, Hyperliquid) for market data and a member's own positions, and holds
@@ -113,6 +148,14 @@ services:
     volumes:
       # config.json is delivered read-only from the repo checkout on the VM. Its localhost:8788
       # webhook URL is correct here — do NOT template it.
+      #
+      # ⚠ THE ENGINE HAS ITS OWN `rpc_urls`, and they are NOT this file's RPC_URLS_137. The engine
+      # is the WRITE path — it broadcasts every relayed transaction — and it reads that list from
+      # config.json, which is a plain file in git. It therefore stays on PUBLIC endpoints: the keyed
+      # QuickNode URL carries its token in the path, and putting it here would commit a credential.
+      # Its dead polygon.llamarpc.com entry was replaced 2026-08-23 (see the note on RPC_URLS_137
+      # above); giving the write path the keyed endpoint needs a templated config rendered at boot
+      # from Secret Manager, which is a separate change.
       - /opt/fairwins/repo/services/oz-relayer/deploy/production/config.json:/app/config/config.json:ro
     cpus: 0.35
     mem_limit: 320m
@@ -142,7 +185,11 @@ services:
       # The build's cohort. Reads never cross the testnet/mainnet boundary (constitution III).
       FINOPS_COHORT_CHAIN_IDS: "63,137"
       RPC_URLS_63: "https://rpc.mordor.etccooperative.org,https://geth-mordor.etc-network.info"
-      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.llamarpc.com"
+      # Same shape as the gateway above: public failover here, keyed primary from finops.env as
+      # RPC_URL_PRIMARY_137. The exporter reads treasury, gas-wallet and paymaster balances, so an
+      # endpoint that cannot serve them makes those sources `unreadable` — an honest state, but one
+      # a working archive endpoint simply avoids.
+      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"
       # Contracts it READS. Same addresses the gateway uses; nothing new is trusted.
       PAYMASTER_ADDRESS_137: "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105"
       GAS_WALLET_63: "0xf505d95F62bEE94437C112d3D64ee7Df0Fa973aC"
