@@ -25,10 +25,34 @@ services:
     ports:
       - "127.0.0.1:8080:8080"     # host nginx -> nginx sidecar (which proxies to :3000 in-namespace)
     env_file:
-      - /run/fairwins/alto.env    # ALTO_EXECUTOR_PRIVATE_KEYS + ALTO_UTILITY_PRIVATE_KEY ONLY
+      # ALTO_EXECUTOR_PRIVATE_KEYS + ALTO_UTILITY_PRIVATE_KEY + ALTO_RPC_URL.
+      - /run/fairwins/alto.env
     environment:
       ALTO_ENTRYPOINTS: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"   # EntryPoint v0.6
-      ALTO_RPC_URL: "https://rpc-mainnet.matic.quiknode.pro"
+      # ⚠ ALTO_RPC_URL IS DELIBERATELY ABSENT FROM THIS BLOCK. It arrives in alto.env from
+      # QUICKNODE_POLYGON_API (fetch-secrets.sh), because the keyed QuickNode URL carries its token
+      # in the path and cannot be written into a file in git.
+      #
+      # docker-compose `environment:` OVERRIDES `env_file:`. Re-adding ALTO_RPC_URL here — even
+      # "temporarily", even to the old public value — silently takes the bundler back off the keyed
+      # endpoint, and it keeps passing its healthcheck the whole time, because eth_supportedEntryPoints
+      # answers fine on an endpoint that cannot serve the archive eth_getLogs the receipt path needs.
+      # That is exactly the 2026-07-12 failure: ops mined, confirmations never surfaced.
+      #
+      # It is fetched as REQUIRED: alto takes one endpoint, has no failover and no default, so an
+      # unavailable secret must abort the boot with a diagnosis rather than crash-loop without one.
+      #
+      # ⚠ 50 req/s, SHARED. The endpoint's rate limit is per ENDPOINT, not per consumer, and three
+      # processes now sit behind it: alto (here), the gateway and the FinOps exporter. alto is both
+      # the heaviest — a continuous block-poll plus receipt polling, independent of UserOp volume —
+      # and the only one with NOTHING behind it: the other two list public endpoints as failover, so
+      # a 429 storm costs them latency and costs alto its whole service.
+      #
+      # No client-side limiter is added here, deliberately. alto v1.2.7 exposes no request-rate
+      # knob, so limiting would mean a proxy in front of it — new machinery, on the write path, to
+      # solve a problem not yet observed. The instrument already exists instead: the FinOps exporter
+      # reads QuickNode credit usage (collectors/quicknode.js). Watch that series after this change;
+      # build a limiter if it shows a ceiling being approached, not before.
       ALTO_SAFE_MODE: "false"
       ALTO_PORT: "3000"
       ALTO_API_VERSION: "v1,v2"

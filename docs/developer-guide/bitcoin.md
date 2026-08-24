@@ -54,6 +54,35 @@ Normative contracts live in `specs/061-bitcoin-transactions/contracts/`:
   final; balance-source failure renders stale/failed (`failedAssets`), never
   zero; testnet4 and mainnet never mix (paired with the app's toggle).
 
+## Configuration
+
+The gateway has two halves, and they are named separately on purpose.
+
+| Var | Side | Notes |
+|---|---|---|
+| `VITE_BITCOIN_GATEWAY_URL` | frontend (build-time) | base URL the SPA's Bitcoin client calls. Preferred over `VITE_RELAYER_URL`; unset ⇒ falls back to it |
+| `VITE_RELAYER_URL` | frontend (build-time) | the shared relay-gateway host, used by Bitcoin only when no Bitcoin-specific URL is set |
+| `BTC_*` | relay-gateway | the module's own switches and upstreams — `BTC_ENABLED`, `BTC_ESPLORA_URL`, `BTC_STAMPS_URL`, `BTC_KILLSWITCH`, … (table in the runbook) |
+
+Resolution lives in exactly one place, `bitcoinGatewayUrl()` in
+`lib/bitcoin/gatewayClient.js`: `VITE_BITCOIN_GATEWAY_URL` → `VITE_RELAYER_URL`
+→ `''`. A blank value counts as unset and falls through, so **an environment
+that sets only `VITE_RELAYER_URL` is unchanged** — this name exists so a build
+can point the Bitcoin client at a gateway without dragging Predict, Perps,
+Collect, Solana RPC, the intent relayer and the bridge quote proxy with it
+(issue #1263).
+
+The switch runs one way on purpose: since blank falls through, no value of
+`VITE_BITCOIN_GATEWAY_URL` disables Bitcoin while `VITE_RELAYER_URL` is set. A
+build that wants the Bitcoin client dark leaves **both** unset. With neither set
+the client resolves `''` and every method reports
+`{ ok: false, error: 'unconfigured', disabled: true }`; surfaces say "gateway
+unavailable" rather than rendering an empty wallet.
+
+Setting the URL only says *where* to ask. The module still has to be on at the
+other end: `BTC_ENABLED=false` (or `BTC_KILLSWITCH=true`) answers 503 and the
+surfaces degrade the same honest way.
+
 ## Portfolio integration
 
 `getBitcoinPortfolioAsset(networkId)` (assetTaxonomy) yields the native-BTC

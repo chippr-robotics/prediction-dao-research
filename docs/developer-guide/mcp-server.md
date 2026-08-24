@@ -82,6 +82,28 @@ Two transports:
   makes one hosted instance usable by more than one member without the instance holding anyone's
   credential. A per-request `X-PAYMENT` header rides the same way — see below.
 
+The HTTP transport binds **loopback** and validates **`Origin`**, and refuses one configuration
+outright. Each of the three is load-bearing:
+
+- **`--host` defaults to `127.0.0.1`** (`0.0.0.0` in the container image and on Cloud Run, where
+  `K_SERVICE` is set and the platform routes in from outside the network namespace). `listen(port)`
+  with no host binds every interface, which put a member's tools on the office network the moment
+  somebody added `--http` to try something out.
+- **A present, non-allow-listed `Origin` is refused with 403 `origin_not_allowed`; an ABSENT one is
+  served.** Withholding CORS was never a defence: CORS decides whether a browser lets a page *read*
+  a response, not whether the request is sent or executed, and a `text/plain` POST is CORS-safelisted
+  — no preflight, straight through. Measured before the check existed: `Origin: https://evil.example`
+  with `Content-Type: text/plain` got a 200 and a full tools listing. Loopback origins are always
+  served (a rebinding attacker's page keeps *its* origin, so this costs nothing and keeps the MCP
+  Inspector working); extra origins come from `--allowed-origin` / `FAIRWINS_MCP_ALLOWED_ORIGINS`,
+  and there is no wildcard. `Origin: null` — a sandboxed iframe, a `file://` page — is a *present*
+  origin and is refused.
+- **`--http` with `FAIRWINS_API_TOKEN` set refuses to boot** unless `--allow-shared-token` is passed.
+  The env token is a fallback for requests with no `Authorization` header; over stdio the caller
+  population is one by construction, over HTTP it is everything that can open a socket, and the
+  fallback promotes all of them to that one member. Both Cloud Run services are
+  `allow_unauthenticated = true` and correspondingly set no token.
+
 ## Payments: it carries them, it never makes them (spec 096)
 
 The gateway may price an operation and accept a [pay-per-request payment](agentic-payments.md) from a
@@ -161,7 +183,8 @@ act — there is nothing here to act with.
 | Variable | Required | Purpose |
 |---|---|---|
 | `FAIRWINS_API_URL` | to serve | Gateway base URL, e.g. `https://relay.fairwins.app`. Unset ⇒ tools return honest errors. |
-| `FAIRWINS_API_TOKEN` | no | The member's own `fw1.…` token. **Secret.** In HTTP mode a request header overrides it. |
+| `FAIRWINS_API_TOKEN` | no | The member's own `fw1.…` token. **Secret.** In HTTP mode a request header overrides it — and `--http` refuses to boot while it is set unless `--allow-shared-token` says the shared identity is intended. |
+| `FAIRWINS_MCP_ALLOWED_ORIGINS` | no | Comma-separated browser origins the HTTP transport will serve, in addition to loopback. Same effect as repeating `--allowed-origin`. |
 
 There is deliberately **no variable for a payment**: a payment is single-use and per-request, and one
 replayable out of configuration would be a standing withdrawal. It travels as an `X-PAYMENT` request
@@ -177,6 +200,14 @@ Client configuration examples (Claude Desktop / Claude Code JSON) live in
 Terraform as a Cloud Run service (`fairwins-mcp-server`, and `-staging`) with **no secret
 environment and no dedicated service account** — the service holds nothing, because the
 authorisation arrives on each request. Scale-to-zero, single container.
+
+**Not deployed yet, and deliberately gated so a merge cannot deploy it.** No pipeline builds or
+pushes this image — CI builds it to boot it and never pushes — so both Terraform modules sit behind
+`manage_mcp_server`, default **false**. Terraform applies unattended on merge to `main`, and a Cloud
+Run create against an absent image would fail and stop the estate's apply. Publishing the image and
+flipping the flag is [runbook §3.8](../runbooks/member-api-operations.md). Until then the hosted
+mode is unavailable and members run the server locally over **stdio**, which is the configuration
+`services/mcp-server/README.md` documents.
 
 ## Invariants
 

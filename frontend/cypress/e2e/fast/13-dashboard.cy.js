@@ -46,27 +46,61 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-01: Quick action cards visible
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): 9 quick-action cards render, the test asserts 6 — decide the intended grouping first.
-  it.skip('[DSH-01] Quick action cards visible, grouped by intent (create / track / QR)', () => {
+  /*
+   * Rewritten (#1019). The pending note said "9 render, the test asserts 6 — decide the intended
+   * grouping first", but there is no grouping decision to make: Dashboard.jsx declares TEN quick
+   * actions and filters exactly one of them, `oracle-open-challenge`, on
+   * `capabilities.polymarketSidebets` — a chain without an on-chain oracle does not get the Open
+   * Oracle Challenge card (the plain Open Challenge stays). Nine is that rule's answer on this
+   * tier, not a mystery.
+   *
+   * So this asserts the RULE and the cards' IDENTITY, never a count and never a position. The old
+   * body did both — `should('have.length', 6)` and `.eq(0..5)` against titles — which is why
+   * adding a tile broke it and why it would have kept breaking on every reorder. A count is also a
+   * weak assertion in its own right: six of the wrong cards would have satisfied it.
+   *
+   * Membership is checked BOTH ways. Each expected card must be there exactly once, and no tile
+   * may render that is not a known quick action — that second half is what a count was really
+   * reaching for, and it names the stranger instead of just disagreeing about a number.
+   */
+  it('[DSH-01] Quick action cards visible, grouped by intent (create / track / QR)', () => {
     connectAndVisitDashboard()
 
-    // The quick-actions-grid holds the six action tiles, ordered by their
-    // intent group: three "Create a wager" tiles, then "Track & share"
-    // (My Wagers, Scan QR, Share Account).
+    // Present on every chain.
+    const ALWAYS_PRESENT = [
+      'Friends Decide (1v1)',
+      'Oracle Settles (1v1)',
+      'Make an Offer',
+      'Open Challenge',
+      'Group Pool',
+      'Enter Words',
+      'My Wagers',
+      'Scan QR Code',
+      'Share Account',
+    ]
+    // Rendered only where the chain advertises an on-chain oracle (Dashboard.jsx
+    // `visibleCreateActions`). Allowed, not required — this tier has no oracle.
+    const CAPABILITY_GATED = 'Open Oracle Challenge'
+
     cy.get('.quick-actions-grid', { timeout: 10000 }).should('be.visible')
-    cy.get('.quick-action-card').should('have.length', 6)
 
-    // Verify each action card title in group order.
-    cy.get('.quick-action-card').eq(0).should('contain.text', 'Friends Decide (1v1)')
-    cy.get('.quick-action-card').eq(1).should('contain.text', 'Oracle Settles (1v1)')
-    cy.get('.quick-action-card').eq(2).should('contain.text', 'Make an Offer')
-    cy.get('.quick-action-card').eq(3).should('contain.text', 'My Wagers')
-    cy.get('.quick-action-card').eq(4).should('contain.text', 'Scan QR Code')
-    cy.get('.quick-action-card').eq(5).should('contain.text', 'Share Account')
+    ALWAYS_PRESENT.forEach((title) => {
+      cy.get('.quick-action-card')
+        .filter(`:contains("${title}")`)
+        .should('have.length', 1)
+    })
 
-    // The two intent groups are labeled.
-    cy.get('.qa-group-eyebrow').should('contain.text', 'Start a wager')
-    cy.get('.qa-group-eyebrow').should('contain.text', 'Track & share')
+    cy.get('.quick-action-card').then(($cards) => {
+      const known = new Set([...ALWAYS_PRESENT, CAPABILITY_GATED])
+      const rendered = [...$cards].map((el) => el.querySelector('h4')?.textContent?.trim())
+      const strangers = rendered.filter((t) => !known.has(t))
+      expect(strangers, 'every rendered tile is a known quick action').to.deep.equal([])
+    })
+
+    // The two intent groups are labelled. A group header only renders when it still has a card
+    // under it, so these also prove neither group was emptied by the capability filter.
+    cy.contains('.qa-group-eyebrow', 'Start a wager').should('exist')
+    cy.contains('.qa-group-eyebrow', 'Track & share').should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -90,8 +124,21 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-03: My Wagers — Created tab
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): tab is a <span> without aria-selected; decide the tab role/a11y contract, then assert it.
-  it.skip('[DSH-03] My Wagers Created tab', () => {
+  /*
+   * Un-skipped (#1019). The recorded reason — "tab is a <span> without aria-selected" — described
+   * what the ASSERTION resolved to, not what the app renders. MyMarketsModal's tabs are buttons
+   * carrying `role="tab"` and `aria-selected`; the a11y contract is already there and needed no
+   * deciding.
+   *
+   * What went wrong is a Cypress shape: `cy.get('[role="tab"]').contains('Created')` returns the
+   * DEEPEST element containing the text, which is the inner `<span>Created</span>` — so the
+   * assertion looked for aria-selected on a span that will never have it. The selector-first form,
+   * `cy.contains('[role="tab"]', 'Created')`, yields the element matching the SELECTOR.
+   *
+   * The test was already using the correct form one line above, for the click. Only the assertion
+   * used the other one, which is why the tab genuinely switched and the check still failed.
+   */
+  it('[DSH-03] My Wagers Created tab', () => {
     connectAndVisitDashboard()
 
     cy.get('.quick-action-card').contains('My Wagers').click()
@@ -99,8 +146,12 @@ describe('Dashboard', () => {
 
     // Switch to Created tab.
     cy.contains('[role="tab"]', 'Created').click()
-    cy.get('[role="tab"]').contains('Created')
+    cy.contains('[role="tab"]', 'Created')
       .should('have.attr', 'aria-selected', 'true')
+    // Both sides. "Created is selected" alone would still pass if every tab claimed selection,
+    // which is a real way for a tablist to be wrong and the reason the marker existed.
+    cy.contains('[role="tab"]', 'Participating')
+      .should('have.attr', 'aria-selected', 'false')
 
     // The Created tabpanel should be visible.
     cy.get('[role="tabpanel"], .mm-panel').should('be.visible')
@@ -109,8 +160,8 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-04: My Wagers — History tab
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): same tab-role question as DSH-03.
-  it.skip('[DSH-04] My Wagers History tab', () => {
+  // Same Cypress shape as DSH-03 — see the note there.
+  it('[DSH-04] My Wagers History tab', () => {
     connectAndVisitDashboard()
 
     cy.get('.quick-action-card').contains('My Wagers').click()
@@ -118,8 +169,11 @@ describe('Dashboard', () => {
 
     // Switch to History tab.
     cy.contains('[role="tab"]', 'History').click()
-    cy.get('[role="tab"]').contains('History')
+    cy.contains('[role="tab"]', 'History')
       .should('have.attr', 'aria-selected', 'true')
+    // Both sides — see DSH-03.
+    cy.contains('[role="tab"]', 'Created')
+      .should('have.attr', 'aria-selected', 'false')
 
     cy.get('[role="tabpanel"], .mm-panel').should('be.visible')
   })
@@ -407,8 +461,15 @@ describe('Dashboard', () => {
     cy.get('[role="dialog"], .my-markets-modal', { timeout: 5000 }).should('be.visible')
   }
 
-  /** Build a synthetic friend-market record for an opponent-side expired offer. */
-  function expiredOfferAsOpponent(id = 'exp-1') {
+  /**
+   * Build a synthetic friend-market record for an opponent-side expired offer.
+   *
+   * The description is per-test on purpose: a row renders the wager's
+   * description plus "Wager ID #<id>", so with one shared literal a
+   * `cy.contains('.mm-table-row', 'DSH-15')` matches nothing — the case id
+   * appears nowhere in the row.
+   */
+  function expiredOfferAsOpponent(id = 'exp-1', description = 'DSH-14 Expired Friend Offer') {
     return {
       id,
       uniqueId: `0xMOCK-${id}`,
@@ -416,7 +477,7 @@ describe('Dashboard', () => {
       creator: '0x00000000000000000000000000000000000000aa', // not the test account
       opponent: TEST_ACCOUNT,
       participants: ['0x00000000000000000000000000000000000000aa', TEST_ACCOUNT],
-      description: 'DSH-14 Expired Friend Offer',
+      description,
       status: 'pending_acceptance',
       acceptanceDeadline: Date.now() - 60 * 60 * 1000,
       endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -434,12 +495,14 @@ describe('Dashboard', () => {
     cy.contains('.mm-table-row', 'DSH-14 Expired Friend Offer').should('not.exist')
   })
 
-  // PENDING (#1019): status <select> has no matching <option>; the filter vocabulary changed.
-  it.skip('[DSH-15] Expired filter surfaces expired offers with "Expired" time-left and a Clear button', () => {
-    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-15')])
+  // The standalone "Expired" option is gone (spec 040 US6); an expired offer is
+  // still Open on chain, so "Pending Acceptance" is the filter that surfaces it
+  // and the route to its Clear / Reclaim & Clear action (#1297).
+  it('[DSH-15] Pending Acceptance filter surfaces expired offers with "Expired" time-left and a Clear button', () => {
+    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-15', 'DSH-15 Expired Friend Offer')])
 
-    cy.get('.mm-filter-bar .mm-filter-select').last().select('expired')
-    cy.get('.mm-filter-bar .mm-filter-select').last().should('have.value', 'expired')
+    cy.get('.mm-filter-bar .mm-filter-select').last().select('pending_acceptance')
+    cy.get('.mm-filter-bar .mm-filter-select').last().should('have.value', 'pending_acceptance')
 
     cy.contains('.mm-table-row', 'DSH-15', { timeout: 5000 }).should('be.visible')
       .within(() => {
@@ -451,11 +514,13 @@ describe('Dashboard', () => {
       })
   })
 
-  // PENDING (#1019): same changed filter vocabulary as DSH-15.
-  it.skip('[DSH-16] Clear button dismisses an expired offer and persists to localStorage', () => {
-    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-16')])
+  // Same filter as DSH-15. The offer here was created by someone else, so the
+  // member has nothing escrowed and Clear really is just "hide it" — the
+  // creator's variant reclaims the stake first and is covered in the unit suite.
+  it('[DSH-16] Clear button dismisses an expired offer and persists to localStorage', () => {
+    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-16', 'DSH-16 Expired Friend Offer')])
 
-    cy.get('.mm-filter-bar .mm-filter-select').last().select('expired')
+    cy.get('.mm-filter-bar .mm-filter-select').last().select('pending_acceptance')
     cy.contains('.mm-table-row', 'DSH-16').should('be.visible').within(() => {
       cy.contains('button', /^Clear$/).click({ force: true })
     })

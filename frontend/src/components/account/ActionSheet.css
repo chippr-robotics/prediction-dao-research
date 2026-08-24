@@ -202,14 +202,14 @@
 }
 
 .action-sheet .btn-primary {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-  color: #fff;
+  background: var(--primary-button);
+  border-color: var(--primary-button);
+  color: var(--primary-button-text);
 }
 
 .action-sheet .btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--brand-primary) 88%, #000);
-  border-color: color-mix(in srgb, var(--brand-primary) 88%, #000);
+  background: var(--primary-button-hover);
+  border-color: var(--primary-button-hover);
 }
 
 .action-sheet .btn-danger {

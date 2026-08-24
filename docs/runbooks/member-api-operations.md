@@ -4,7 +4,8 @@
 
 Operate the member-facing HTTP API on the relay gateway (`services/relay-gateway/src/memberApi/`),
 the agentic assistant proxy inside it, and the `fairwins-mcp-server` Cloud Run service that
-consumes it.
+consumes it — **which is not deployed**: its Terraform is gated off behind `manage_mcp_server`
+because nothing publishes its image, and 3.8 is how that changes.
 
 Hold four facts before touching anything:
 
@@ -331,6 +332,85 @@ Run this after every change. The point is not that the endpoints answer — it i
 12. **The receipt says broadcast.** Confirm no surface — header, docs, or MCP tool result — describes
     a settlement as confirmed or final.
 
+### 3.8 Publish and enable the MCP server
+
+**The MCP server is NOT deployed, and Terraform is gated off so that a merge cannot deploy it.**
+`manage_mcp_server = false` in both `infra/terraform/environments/prod/terraform.tfvars` and
+`.../staging/terraform.tfvars`; while it is false the `module "mcp_server"` / `"mcp_server_staging"`
+blocks declare nothing at all.
+
+The gate exists because of a gap, not a preference: **no pipeline builds or pushes this image.**
+`cloudbuild.yaml` builds the SPA, `cloudbuild.staging.yaml` builds the two staging SPA cohorts, and
+`.github/workflows/container-build.yml`'s `mcp-image` job builds `services/mcp-server` only to boot
+it and speak one `initialize` handshake — under a local `fairwins-mcp-server:ci` tag it never
+pushes. There is no `fairwins-mcp-server/*` package in `cloud-run-source-deploy`. Meanwhile
+`infra-apply.yml` applies on push to `main` **with no human in the loop**, its matrix is
+`fail-fast: true` (prod failing means staging never applies), and a failed apply is never retried
+unattended (FR-035). Ungated, one promotion would try to create a Cloud Run service from an image
+that does not exist and wedge the estate's apply path behind a person.
+
+Publishing the image is necessary but **not sufficient on its own**: the image build and the infra
+apply would both hang off the same push to `main`, concurrently, with no ordering between them. The
+flag is what makes the create happen at a moment somebody chose.
+
+Do it in this order. Steps 1–2 need someone with **write access to Artifact Registry**; step 3 is an
+ordinary PR.
+
+1. **Build and push the image.** Standalone build context — `services/mcp-server`, not the repo
+   root (the service has no dependencies and no workspace package; a root context would re-admit
+   the failure mode the spec-075 images guard against).
+
+   ```bash
+   git checkout <the merged commit>          # never a dirty tree
+   REPO=us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/fairwins-mcp-server
+
+   docker build -f services/mcp-server/Dockerfile -t "$REPO/fairwins-mcp-server:<sha>" services/mcp-server
+   docker tag "$REPO/fairwins-mcp-server:<sha>" "$REPO/fairwins-mcp-server:latest"
+
+   # Boot it before pushing, exactly as CI does — a container that answers /healthz but not
+   # `initialize` is broken in the only way a client can see.
+   docker run -d --name mcp -p 8790:8790 -e FAIRWINS_API_URL=https://gateway.invalid "$REPO/fairwins-mcp-server:<sha>"
+   curl -fsS http://127.0.0.1:8790/healthz
+   curl -fsS -H 'content-type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ops","version":"0"}}}' \
+     http://127.0.0.1:8790/mcp | grep -q '"name":"fairwins-mcp"'
+   docker rm -f mcp
+
+   docker push --all-tags "$REPO/fairwins-mcp-server"
+   ```
+
+   For staging, repeat with the `fairwins-mcp-server-staging` name in the same
+   `fairwins-mcp-server/` path — the two Terraform modules name different packages.
+
+2. **Confirm it is really there.** Do not take the push's word for it; the tag Terraform names is
+   `:latest`, and a partial push is exactly the state that produces a create failure later:
+
+   ```bash
+   gcloud artifacts docker images list \
+     us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy \
+     --include-tags --format='value(package,tags)' | grep fairwins-mcp-server
+   ```
+
+   Both `fairwins-mcp-server` and `fairwins-mcp-server-staging` must appear, each carrying `latest`.
+
+3. **Flip the flag, as its own PR.** Set `manage_mcp_server = true` in the environment(s) whose
+   image you verified — prod and staging are separate flags and may be flipped separately. Read the
+   Infra Plan output on that PR: it must report exactly one Cloud Run service and one
+   `run.invoker`/`allUsers` member being CREATED, and nothing else. Merge it alone, not stacked
+   behind other infra work.
+
+4. **Verify** with 4.6. The URI is the `mcp_server_service_uri` output; while the flag is false that
+   output is **null**, which means "not declared" — a different fact from a declared service that is
+   unreachable.
+
+**If you ever deploy the service by hand first**, adopt it with the commented `import` block in
+`imports.tf` rather than letting Terraform create a second one. Note the block is indexed
+(`module.mcp_server[0]`) because the module carries `count`.
+
+**A standing pipeline is the better end state** and is deliberately not improvised here: adding a
+build-and-push step is a change to what production ships, and belongs in a spec-095 follow-up with
+its own review — not folded into the change that closed the unattended-apply hazard.
+
 ---
 
 ## 4. Code Examples
@@ -391,6 +471,11 @@ curl -s -H "Authorization: Bearer $TOKEN" "$BASE/v1/member/wagers?chainId=137" \
 ```
 
 ### 4.6 Check the MCP service
+
+**Not deployed yet.** Terraform's `manage_mcp_server` is false in both environments and no pipeline
+publishes the image, so there is no `fairwins-mcp-server` service and the `mcp_server_service_uri`
+output is null. §3.8 is how that changes. Until then the server runs locally over stdio, which is
+what `docs/developer-guide/mcp-server.md` documents for a member.
 
 ```bash
 curl -s https://fairwins-mcp-server-<hash>-uc.a.run.app/healthz

@@ -889,6 +889,30 @@ const NETWORKS = {
     dex: null,
     contracts: {},
     polymarket: null,
+    /*
+     * DEV-ONLY, and a DESTINATION only (spec 067 + issue #1265).
+     *
+     * A shipped build resolves this to null: Across has no production deployment we
+     * curate here, so Bridge self-discloses off on Sepolia exactly as it does today.
+     *
+     * The local impersonation exists because #1265 made `bridgeNetworks()` cohort-bounded,
+     * which is right — a testnet build must never be offered a mainnet destination — but
+     * left the full E2E tier with a roster of exactly ONE network (Amoy, via the seam
+     * below at 80002). A bridge needs somewhere to go: with one network in the roster the
+     * destination selector is correctly empty, no quote is ever requested, and BL-03 —
+     * the assertion that Across records the MEMBER as depositor, which is why
+     * `IBridgeRouter` has no rescue function — cannot run at all.
+     *
+     * So Sepolia is the second in-cohort network the local tier bridges TO. It shares
+     * Amoy's mock SpokePool address deliberately: a DESTINATION's spoke pool is never
+     * called — `depositV3` is sent to the ORIGIN chain's pool, and the destination chain
+     * reaches this build only as route metadata the mock records verbatim. Nothing is
+     * read on Sepolia by these flows. Giving it a distinct fake address would imply a
+     * second deployed contract that does not exist.
+     */
+    bridge: E2E_AMOY_LOCAL
+      ? bridgeConfig('0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00')
+      : null,
     // Passkey smart accounts (spec 041) — Sepolia carries EntryPoint v0.6, the
     // Arachnid CREATE2 proxy, and a P-256 precompile, which makes it the
     // free-to-fund rehearsal network for the Ethereum-family rollout.

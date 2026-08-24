@@ -174,8 +174,8 @@
 }
 
 .notif-pref-seg.selected {
-  background: var(--brand-primary);
-  color: #fff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   font-weight: 600;
 }
 

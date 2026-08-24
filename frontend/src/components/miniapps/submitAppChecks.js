@@ -5,6 +5,7 @@
  */
 import { isValidCid } from '../../constants/ipfs'
 import { TIER_NAMES } from '../../hooks/useRoleDetails'
+import { extractRevert } from '../../lib/chain/revertError'
 import { networkName } from '../../lib/chains/estate'
 import {
   ZERO_MANIFEST_HASH,
@@ -283,28 +284,6 @@ export async function precheckManifest({
 // ---------------------------------------------------------------------------
 // Contract error decoding.
 // ---------------------------------------------------------------------------
-
-/**
- * Pull a decoded custom error out of an ethers v6 failure, whether it arrived pre-decoded on `.revert`
- * or as raw selector bytes nested in an RPC payload. (Same shape as `CallsignPanel#extractRevert`;
- * a passkey UserOp failure nests the revert data one level deeper than a signer transaction does.)
- */
-function extractRevert(error, iface) {
-  if (error?.revert?.name) return { name: error.revert.name, args: error.revert.args }
-  if (error?.errorName) return { name: error.errorName, args: error.errorArgs }
-  const candidates = [error?.data, error?.info?.error?.data, error?.error?.data, error?.error?.error?.data]
-  for (const data of candidates) {
-    if (typeof data === 'string' && data.startsWith('0x') && data.length >= 10) {
-      try {
-        const parsed = iface.parseError(data)
-        if (parsed) return { name: parsed.name, args: parsed.args }
-      } catch {
-        /* not one of ours — keep looking */
-      }
-    }
-  }
-  return null
-}
 
 /**
  * Turn a failed submission into guidance a developer can act on.

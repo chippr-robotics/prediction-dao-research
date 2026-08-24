@@ -5,11 +5,13 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { currentChainId } = vi.hoisted(() => ({ currentChainId: vi.fn(() => 80002) }))
+// The build's home network (`VITE_NETWORK_ID`, else `PRIMARY_CHAIN_ID`). Mutable so a test can
+// stand up a testnet-cohort build and a mainnet one without rebuilding the module graph.
+// `vi.hoisted` because the mock factory below is hoisted above every declaration in this file.
+const build = vi.hoisted(() => ({ chainId: 80002 }))
+
 vi.mock('../../config/networks', () => ({
-  // The build's own network — what `VITE_NETWORK_ID` resolves to. The connector uses it as the
-  // chain a session defaults to (#1286); it must NOT fall back to wagmi's first chain.
-  getCurrentChainId: currentChainId,
+  getCurrentChainId: vi.fn(() => build.chainId),
   getNetwork: vi.fn((chainId) =>
     chainId === 80002
       ? {
@@ -36,6 +38,12 @@ import { passkeyConnector, readSession, writeSession, PASSKEY_CONNECTOR_ID } fro
 import { ChainNotSupportedError } from '../../lib/passkey/smartAccount'
 import { rememberCredential, knownCredentials, isTransactComplete } from '../../lib/passkey/credentials'
 import { computeAccountAddress, publicKeyToOwnerBytes } from '../../lib/passkey/smartAccount'
+/*
+ * `@noble/curves/nist.js`, not `p256.js`. The dependabot bump to @noble/curves 2.x (#1157)
+ * removed the per-curve subpath, so `p256.js` is not in the package's exports map any more and the
+ * whole FILE fails to load — 0 tests run, which reads as a suite failure rather than a resolution
+ * one. Every other passkey test in the tree was already migrated; this branch predates the bump.
+ */
 import { p256 } from '@noble/curves/nist.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 
@@ -67,7 +75,10 @@ function rememberCompleteRecord(credentialId = 'cred-1') {
   rememberCredential({ credentialId, publicKey: PUBLIC_KEY, prfCapable: true, address: ACCOUNT })
 }
 
-beforeEach(() => localStorage.clear())
+beforeEach(() => {
+  localStorage.clear()
+  build.chainId = 80002
+})
 
 describe('connect', () => {
   it('sign-up: creates a credential, derives the counterfactual address, persists the session', async () => {
@@ -199,49 +210,6 @@ describe('connect', () => {
     expect(deps.getAssertion).not.toHaveBeenCalled()
   })
 
-  /*
-   * THE REGRESSION THAT COST EVERY PASSKEY MEMBER THEIR SESSION ON RELOAD.
-   *
-   * wagmi's `reconnect` filters connectors before it asks whether they are authorized:
-   *
-   *     const provider = await connector.getProvider().catch(() => undefined)
-   *     if (!provider) continue
-   *
-   * `getProvider()` returned null, so the passkey connector was skipped every time and the
-   * reconnect below — which has always passed — was never reached in a real browser. The unit
-   * test proving the restore works is exactly what made the breakage invisible, so this asserts
-   * the precondition wagmi actually applies.
-   */
-  it('exposes a provider at all, because wagmi skips connectors without one', async () => {
-    const { connector } = makeConnector()
-    const provider = await connector.getProvider()
-    expect(provider, 'a null provider makes reconnect unreachable').toBeTruthy()
-  })
-
-  it('keeps provider identity stable — wagmi dedupes providers by reference', async () => {
-    const { connector } = makeConnector()
-    expect(await connector.getProvider()).toBe(await connector.getProvider())
-  })
-
-  it('refuses to sign from the facade: this connector holds no key', async () => {
-    const { connector } = makeConnector()
-    const provider = await connector.getProvider()
-    await expect(provider.request({ method: 'eth_sendTransaction', params: [{}] })).rejects.toThrow(
-      /submission router/,
-    )
-    await expect(provider.request({ method: 'personal_sign', params: [] })).rejects.toThrow(
-      /submission router/,
-    )
-  })
-
-  it('answers eth_accounts from the session, so the facade agrees with the connector', async () => {
-    rememberCompleteRecord()
-    writeSession({ address: ACCOUNT, chainId: 80002, credentialId: 'cred-1', loginMethod: 'passkey' })
-    const { connector } = makeConnector()
-    const provider = await connector.getProvider()
-    expect(await provider.request({ method: 'eth_accounts' })).toEqual(await connector.getAccounts())
-  })
-
   it('reconnect with no stored session fails (no silent account invention)', async () => {
     const { connector } = makeConnector()
     await expect(connector.connect({ chainId: 80002, isReconnecting: true })).rejects.toThrow(/No passkey session/)
@@ -300,6 +268,159 @@ describe('session lifecycle', () => {
 })
 
 /**
+ * Issue #1286 — the chain a passkey session reports.
+ *
+ * `chains` here is ordered Polygon-FIRST on purpose: that is `src/wagmi.js`'s real order, and
+ * `config.chains[0].id` was the old fallback. A passkey account has no wallet to ask its chain,
+ * so the connector is the only thing that can answer — and it answered 137 whatever the build
+ * was for. On a testnet build every chain-scoped read taken under that session went to mainnet;
+ * the wager create path read the wrong KeyRegistry, found nothing, and told the member their
+ * opponent had not registered an encryption key.
+ */
+describe('the provider facade wagmi actually consults', () => {
+  /*
+   * THE REGRESSION THAT COST EVERY PASSKEY MEMBER THEIR SESSION ON RELOAD.
+   *
+   * wagmi's `reconnect` filters connectors BEFORE it asks whether they are authorized:
+   *
+   *     const provider = await connector.getProvider().catch(() => undefined)
+   *     if (!provider) continue
+   *
+   * `getProvider()` returned null, so the passkey connector was skipped every time and the
+   * session-restore tests — which have always passed — were never reached in a real browser. The
+   * unit test proving the restore works is exactly what made the breakage invisible, so these
+   * assert the precondition wagmi actually applies.
+   *
+   * Carried over from staging when the two branches' passkey suites were merged: they cover the
+   * connector's contract with wagmi rather than either branch's chain derivation, so they belong
+   * with whichever implementation wins.
+   */
+  it('exposes a provider at all, because wagmi skips connectors without one', async () => {
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    expect(provider, 'a null provider makes reconnect unreachable').toBeTruthy()
+  })
+
+  it('keeps provider identity stable — wagmi dedupes providers by reference', async () => {
+    const { connector } = makeConnector()
+    expect(await connector.getProvider()).toBe(await connector.getProvider())
+  })
+
+  it('refuses to sign from the facade: this connector holds no key', async () => {
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    await expect(provider.request({ method: 'eth_sendTransaction', params: [{}] })).rejects.toThrow(
+      /submission router/,
+    )
+    await expect(provider.request({ method: 'personal_sign', params: [] })).rejects.toThrow(
+      /submission router/,
+    )
+  })
+
+  it('answers eth_accounts from the session, so the facade agrees with the connector', async () => {
+    rememberCompleteRecord()
+    writeSession({ address: ACCOUNT, chainId: 80002, credentialId: 'cred-1', loginMethod: 'passkey' })
+    const { connector } = makeConnector()
+    const provider = await connector.getProvider()
+    expect(await provider.request({ method: 'eth_accounts' })).toEqual(await connector.getAccounts())
+  })
+})
+
+describe('the chain a session reports (issue #1286)', () => {
+  const POLYGON_FIRST = [{ id: 137 }, { id: 80002 }, { id: 63 }]
+
+  it('a testnet-cohort build reports the TESTNET chain, not wagmi default Polygon', async () => {
+    build.chainId = 80002
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    const out = await connector.connect()
+    expect(out.chainId).toBe(80002)
+    expect(readSession().chainId).toBe(80002)
+    expect(await connector.getChainId()).toBe(80002)
+  })
+
+  it('reports the build chain before any session exists (nothing to read yet)', async () => {
+    build.chainId = 80002
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect(readSession()).toBeNull()
+    expect(await connector.getChainId()).toBe(80002)
+  })
+
+  it('a mainnet build still reports 137 (the case that was accidentally right)', async () => {
+    build.chainId = 137
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect((await connector.connect()).chainId).toBe(137)
+  })
+
+  it('an explicitly requested chain still wins over the build default', async () => {
+    build.chainId = 80002
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect((await connector.connect({ chainId: 63 })).chainId).toBe(63)
+  })
+
+  it('falls back to wagmi’s default when the build chain is not a configured chain — LOUDLY', async () => {
+    // wagmi refuses to store an unconfigured chain id, so reporting one would leave the
+    // session claiming a chain the config cannot represent. But this fallback is the very
+    // state the fix exists to prevent (a non-numeric VITE_NETWORK_ID parses to NaN and lands
+    // a testnet build back on Polygon), so it must never happen silently.
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    build.chainId = 999999
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect((await connector.connect()).chainId).toBe(137)
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('999999'))
+    err.mockRestore()
+  })
+
+  it('honours a chain the member SWITCHED to, across reloads and the cohort', async () => {
+    // The Testnet/Mainnet toggle deliberately crosses the pair, so a member's own switch
+    // outranks the build default forever — clamping it here would snap them back.
+    build.chainId = 80002
+    rememberCompleteRecord()
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    await connector.connect()
+    await connector.switchChain({ chainId: 137 })
+    expect(readSession().chainChosen).toBe(true)
+    expect(await connector.getChainId()).toBe(137)
+    expect((await connector.connect({ isReconnecting: true })).chainId).toBe(137)
+  })
+
+  it('re-derives a session written BEFORE this fix instead of trusting its stored 137', async () => {
+    // The population that produced the issue: sessions the old default stamped with 137, on a
+    // testnet build. The session has no expiry by design, and 137 is a *supported* id so
+    // WalletContext's auto-switch leaves it alone — nothing else would ever correct it. A
+    // stored chain with no `chainChosen` is ours, not the member's, so it resolves again.
+    build.chainId = 80002
+    rememberCompleteRecord()
+    writeSession({ address: ACCOUNT, chainId: 137, credentialId: 'cred-1', loginMethod: 'passkey' })
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    expect(await connector.getChainId()).toBe(80002)
+    expect((await connector.connect({ isReconnecting: true })).chainId).toBe(80002)
+    // …and the stale row is healed, so nothing downstream can read 137 out of storage.
+    expect(readSession().chainId).toBe(80002)
+    expect(readSession().chainChosen).toBeUndefined()
+  })
+
+  it('re-derives when the BUILD moves under an existing session (staging repointed)', async () => {
+    build.chainId = 80002
+    rememberCompleteRecord()
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    await connector.connect()
+    expect(readSession().chainChosen).toBeUndefined() // nobody chose it — we derived it
+
+    build.chainId = 63 // same build, repointed to Mordor
+    const { connector: next } = makeConnector({ chains: POLYGON_FIRST })
+    expect(await next.getChainId()).toBe(63)
+  })
+
+  it('remembers an explicitly requested chain as a choice', async () => {
+    build.chainId = 80002
+    const { connector } = makeConnector({ chains: POLYGON_FIRST })
+    await connector.connect({ chainId: 63 })
+    expect(readSession().chainChosen).toBe(true)
+    expect(await connector.getChainId()).toBe(63)
+  })
+})
+
+/**
  * Cross-device sign-in: the passkey was created on another device (phone) and is synced here, so
  * the ceremony succeeds but this browser has never recorded the account. Previously this failed
  * with "This passkey is not yet linked to an account on this browser."
@@ -321,7 +442,7 @@ describe('cross-device sign-in (fresh browser, synced passkey)', () => {
     const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
     // prehash:false — an authenticator signs the DIGEST, and @noble/curves v2 prehashes by default.
     const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false, prehash: false })
-    // @noble/curves v2 returns compact BYTES here; v1 returned a Signature instance.
+    // v2 returns compact BYTES here; v1 returned a Signature instance.
     const sigObj = sig instanceof Uint8Array ? p256.Signature.fromBytes(sig) : sig
     const der = sigObj.toDERRawBytes ? sigObj.toDERRawBytes() : sigObj.toBytes('der')
     return { credentialId: 'cred-phone', authenticatorData, clientDataJSON, signature: new Uint8Array(der) }
@@ -381,9 +502,8 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
   const makeAssertion = (priv, challenge) => {
     const authenticatorData = concat(sha256(enc('fairwins.app')), new Uint8Array([0x05]), new Uint8Array([0, 0, 0, 1]))
     const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
-    // prehash:false — an authenticator signs the DIGEST, and @noble/curves v2 prehashes by default.
+    // See the note above: v2 prehashes by default and returns compact bytes.
     const sig = p256.sign(sha256(concat(authenticatorData, sha256(clientDataJSON))), priv, { lowS: false, prehash: false })
-    // @noble/curves v2 returns compact BYTES here; v1 returned a Signature instance.
     const sigObj = sig instanceof Uint8Array ? p256.Signature.fromBytes(sig) : sig
     return {
       credentialId: 'cred-phone',
@@ -423,50 +543,5 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
     })
     const out = await connector.connect({ chainId: 80002, mode: 'sign-in' })
     expect(out.accounts).toHaveLength(1)
-  })
-})
-
-/*
- * #1286 — which chain a passkey session is on when nothing has said otherwise.
- *
- * `config.chains[0]` is Polygon by construction (wagmi.js orders the list so mainnet is wagmi's
- * default "no wallet connected" chain), so using it here made EVERY passkey session report 137
- * whatever the build was for. On a mainnet build that is right by accident; on a testnet build the
- * app then took chain-scoped reads against mainnet while the member sat on the testnet.
- *
- * It is not a cosmetic mislabel. `WalletContext` derives its read provider from `getNetwork(chainId)`
- * and PREFERS the RPC provider for passkey sessions, so a wrong chain id hands every read a
- * provider pointed at the wrong network. Measured: the create path's KeyRegistry lookup went to
- * Polygon for an 80002 member, came back empty, and the form told them their opponent had not
- * registered an encryption key.
- */
-describe('#1286 — the chain a session defaults to', () => {
-  it('reports the BUILD network, not wagmi first chain, when no session says otherwise', async () => {
-    currentChainId.mockReturnValue(80002)
-    // Ordered as production orders them: Polygon first.
-    const { connector } = makeConnector({ chains: [{ id: 137 }, { id: 80002 }] })
-    expect(await connector.getChainId()).toBe(80002)
-  })
-
-  it('a stored session still wins — switching chains is remembered', async () => {
-    currentChainId.mockReturnValue(80002)
-    const { connector } = makeConnector({ chains: [{ id: 137 }, { id: 80002 }] })
-    writeSession({ address: ACCOUNT, credentialId: 'cred-1', loginMethod: 'passkey', chainId: 137 })
-    expect(await connector.getChainId()).toBe(137)
-  })
-
-  it('connect() without an explicit chain targets the build network', async () => {
-    currentChainId.mockReturnValue(80002)
-    const { connector } = makeConnector({ chains: [{ id: 137 }, { id: 80002 }] })
-    const out = await connector.connect()
-    expect(out.chainId).toBe(80002)
-  })
-
-  it('falls back to wagmi first chain when the build network is not registered', async () => {
-    // A chain wagmi does not know cannot serve `config.getClient`, so an unregistered id would
-    // trade a wrong-chain read for a broken client. Falling back is the lesser failure.
-    currentChainId.mockReturnValue(999999)
-    const { connector } = makeConnector({ chains: [{ id: 137 }, { id: 80002 }] })
-    expect(await connector.getChainId()).toBe(137)
   })
 })

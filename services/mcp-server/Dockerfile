@@ -38,4 +38,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # No literal port: `--http` alone reads $PORT (Cloud Run injects it) and falls back to 8790,
 # which ENV PORT above pins for local runs so the EXPOSE/HEALTHCHECK behavior is identical.
-CMD ["node", "src/server.js", "--http"]
+#
+# `--host 0.0.0.0` IS EXPLICIT HERE ON PURPOSE. The server defaults to 127.0.0.1 (a laptop running
+# `--http` should not put a member's tools on every interface), and a container that inherited that
+# default would be unreachable through `-p 8790:8790` while its HEALTHCHECK — which curls loopback
+# from INSIDE the namespace — went on reporting healthy. Binding every interface is right here
+# because the network namespace is the boundary, not the bind address: what is exposed is decided by
+# the operator's `-p` / the Cloud Run ingress. Saying it in the CMD rather than leaning on the
+# K_SERVICE fallback puts that decision where somebody reading this file can see it.
+CMD ["node", "src/server.js", "--http", "--host", "0.0.0.0"]

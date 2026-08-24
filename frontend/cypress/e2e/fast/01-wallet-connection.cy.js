@@ -89,10 +89,13 @@ describe('Wallet Connection', () => {
   // ---------------------------------------------------------------------------
   // WAL-03: Display wallet balances — verify USDC shown in dropdown
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): asserts `.account-details` is visible, but WalletButton renders it
-  // behind `{isOpen && ...}` — the balances only exist once the dropdown is opened.
-  // Decide whether the balance belongs on the collapsed button before asserting it.
-  it.skip('[WAL-03] Display wallet balances', () => {
+  /*
+   * Un-skipped (#1019). The recorded reason described the app correctly — WalletButton renders
+   * `.account-details` behind `{isOpen && ...}` — but not this test, which has always opened the
+   * dropdown before asserting. Whether the balance ALSO belongs on the collapsed button is a
+   * design question and stays open; it is not one this test was ever blocked on.
+   */
+  it('[WAL-03] Display wallet balances', () => {
     cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0] })
     cy.visit('/fairwins')
     cy.get('body').should('be.visible')
@@ -118,8 +121,13 @@ describe('Wallet Connection', () => {
   // ---------------------------------------------------------------------------
   // WAL-04: Disconnect wallet — verify returns to connect view
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): expects the connect button back after disconnect; the mock has no disconnect path yet.
-  it.skip('[WAL-04] Disconnect wallet', () => {
+  /*
+   * Not pending any more. The reason recorded here — "the mock has no disconnect path" — did not
+   * survive measurement: disconnect is an APP action (WalletButton -> disconnectWallet -> wagmi),
+   * and a real wallet is not told about it either, so there is nothing for the mock to model.
+   * Run as written, the connect button comes back.
+   */
+  it('[WAL-04] Disconnect wallet', () => {
     cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0] })
     cy.visit('/fairwins')
     cy.get('body').should('be.visible')
@@ -139,45 +147,79 @@ describe('Wallet Connection', () => {
       .should('be.visible')
       .click()
 
-    // After disconnect the connect button should reappear.
+    /*
+     * SCROLL BACK TO THE TOP FIRST. Reaching the Disconnect button scrolled the page — it sits at
+     * the bottom of a long dropdown — and the wallet control lives in a position:fixed header, so
+     * Cypress reports it "overflowed by other elements" rather than absent. Same trap, and the
+     * same remedy, as cy.assertActiveAccount.
+     */
+    cy.scrollTo('top', { ensureScrollable: false })
+
+    // After disconnect the connect button should reappear, and the connected affordance must be
+    // GONE — not merely joined by a connect button somewhere else on the page.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .should('be.visible')
+    cy.get('.wallet-account-button').should('not.exist')
   })
 
   // ---------------------------------------------------------------------------
-  // WAL-05: Auto-reconnect disabled — refresh page, verify must reconnect
+  // WAL-05: A connected session survives a reload; a DISCONNECTED one must too
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): asserts auto-reconnect is off, but the EIP-6963 mock now makes wagmi attempt one.
-  it.skip('[WAL-05] Auto-reconnect disabled', () => {
+  /*
+   * Rewritten (#1019). The old test asserted "auto-reconnect disabled" and was skipped because
+   * "the EIP-6963 mock now makes wagmi attempt one". Measured, the app's intent is the opposite
+   * of what the test claimed: wagmi.js configures `injected({ shimDisconnect: true })`, which
+   * exists precisely so a stored session DOES restore on reload and an explicit disconnect does
+   * NOT. So the contract has two halves, and this asserts both — the second half is the one that
+   * was broken (a member who signed out was silently signed back in by the sibling EIP-6963
+   * connector, whose own shim flag had never been set).
+   */
+  it('[WAL-05] A reload restores a session, but never resurrects a disconnected one', () => {
     cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0] })
     cy.visit('/fairwins')
     cy.get('body').should('be.visible')
 
-    // The page should show the connect button on first load (no auto-connect).
-    // The mock provider injects window.ethereum but doesn't trigger auto-connect
-    // through wagmi, so the connect button should be visible.
+    // Nothing is connected before the member asks for it: the mock reports an empty
+    // eth_accounts until eth_requestAccounts, exactly as an unauthorised wallet does.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .should('be.visible')
-
-    // Connect, then reload and verify we need to reconnect.
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]').click()
+      .click()
     cy.selectInjectedConnector()
-    cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-      .should('be.visible')
+    cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
 
-    // Reload the page (re-inject mock provider).
-    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0] })
+    // Half one — the session restores. No second mockWeb3Provider call: the same closure state
+    // carries across the load, which is what a wallet that still trusts the site looks like.
     cy.reload()
-    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.get('.wallet-account-button', { timeout: 20000 })
+      .should('be.visible')
+    cy.get('.wallet-connect-button').should('not.exist')
 
-    // After reload, verify the connect button is shown OR the app requires
-    // explicit reconnection. With wagmi + mock, either the connect button is
-    // visible or the Welcome View is shown (no wallet connected).
-    cy.get('body').then(($body) => {
-      const hasConnectBtn = $body.find('.wallet-connect-button, button[aria-label="Connect Wallet"]').length > 0
-      const hasWelcomeView = $body.find('.welcome-view, .welcome-hero').length > 0
-      expect(hasConnectBtn || hasWelcomeView).to.be.true
-    })
+    // Half two — an explicit disconnect survives a reload.
+    cy.get('.wallet-account-button').click()
+    cy.contains('button', /disconnect/i, { timeout: 5000 }).should('be.visible').click()
+    // Reaching Disconnect scrolled the page away from the fixed header (see WAL-04).
+    cy.scrollTo('top', { ensureScrollable: false })
+    cy.get('.wallet-connect-button', { timeout: 10000 }).should('be.visible')
+
+    cy.reload()
+    /*
+     * The app OPENS THE CONNECT DIALOG here, and that is corroboration rather than an obstacle:
+     * AutoConnectPrompt only fires for a disconnected visitor, so the prompt appearing already
+     * says the reload did not restore the session. It has to be closed before asserting on the
+     * header, though — its backdrop covers the fixed control, which is what failed this test on
+     * the phone profile while it passed on desktop. `cy.visit` closes it automatically;
+     * `cy.reload` is not `cy.visit` and never did.
+     */
+    cy.dismissAutoConnectPrompt()
+    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 20000 })
+      .should('be.visible')
+    /*
+     * The load-bearing assertion. The wallet still answers eth_accounts with the account — a real
+     * MetaMask does too, because the member revoked the SITE's session, not the wallet's memory —
+     * so nothing here is proven by the provider being quiet. It is proven by the app declining to
+     * act on an answer it was told to ignore.
+     */
+    cy.get('.wallet-account-button').should('not.exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -206,47 +248,47 @@ describe('Wallet Connection', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // WAL-07: Reject wallet connection — verify error/pending state clears
+  // WAL-07: The member declines the wallet's connect prompt
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): reject-connection path needs the mock to reject eth_requestAccounts.
-  it.skip('[WAL-07] Reject wallet connection', () => {
-    // Inject a provider that rejects the connection request.
-    cy.on('window:before:load', (win) => {
-      win.ethereum = {
-        isMetaMask: true,
-        selectedAddress: null,
-        networkVersion: '1337',
-        chainId: '0x539',
-        request: ({ method }) => {
-          if (method === 'eth_requestAccounts' || method === 'eth_accounts') {
-            return Promise.reject(new Error('User rejected the request'))
-          }
-          if (method === 'eth_chainId') return Promise.resolve('0x539')
-          if (method === 'net_version') return Promise.resolve('1337')
-          return Promise.resolve(null)
-        },
-        enable: () => Promise.reject(new Error('User rejected')),
-        on: () => {},
-        removeListener: () => {},
-        removeAllListeners: () => {},
-      }
-    })
-
+  /*
+   * Rewritten (#1019). The pending reason was right that the mock could not reject, but the old
+   * body could not have worked even with one: it built its OWN window.ethereum in a
+   * `window:before:load` handler queued after cy.mockWeb3Provider's, so the two raced for the
+   * same window — and its provider announced nothing over EIP-6963, which is the only way wagmi
+   * discovers a wallet here. The connect modal therefore had no connector to decline with.
+   *
+   * `rejectConnect` puts the refusal on the wallet this mock already announces, which is where a
+   * refusal lives.
+   */
+  it('[WAL-07] Reject wallet connection', () => {
+    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0], rejectConnect: true })
     cy.visit('/fairwins')
     cy.get('body').should('be.visible')
 
-    // Open connector dropdown.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .should('be.visible')
       .click()
-
-    // Try to connect — it will be rejected.
     cy.selectInjectedConnector()
 
-    // The connect button should remain visible (connection failed).
-    // The pending state should eventually clear.
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
+    /*
+     * The app must SAY something. WalletContext.connectWallet turns EIP-1193 4001 into
+     * "Please approve the connection request" and ConnectModal renders it in
+     * `.connect-modal__error[role="alert"]`; asserting the element alone would pass on an empty
+     * one, so assert the copy the member actually reads.
+     */
+    cy.get('.connect-modal__error', { timeout: 10000 })
       .should('be.visible')
+      .invoke('text')
+      .should('match', /approve the connection request/i)
+
+    // And the pending state must CLEAR — a spinner that never stops is the failure this test is
+    // named for. Every connector option is re-enabled once `pendingId` goes back to null.
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 10000 })
+      .first()
+      .should('not.be.disabled')
+
+    // Nothing was granted: no account affordance anywhere.
+    cy.get('.wallet-account-button').should('not.exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -408,33 +450,43 @@ describe('Wallet Connection', () => {
   // ---------------------------------------------------------------------------
   // WAL-11: Switch account mid-session — verify address updates
   // ---------------------------------------------------------------------------
-  // PENDING (#1019): account switching needs the mock to emit accountsChanged.
-  it.skip('[WAL-11] Switch account mid-session', () => {
+  /*
+   * Rewritten (#1019). The pending reason — "needs the mock to emit accountsChanged" — went stale
+   * when `__cySetAccount` was written: it mutates the live provider and fires the event, which is
+   * what a member switching accounts in MetaMask does. What was left was a body that could not
+   * fail (`accountBtn.length > 0 || connectBtn.length > 0` is true of every rendered page,
+   * including one that dropped the connection entirely).
+   *
+   * cy.switchAccount already asserts the app FOLLOWED the switch, via cy.assertActiveAccount.
+   * What is added here is the other half: the previous account is gone, not merely joined.
+   */
+  it('[WAL-11] Switch account mid-session', () => {
     cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0] })
     cy.visit('/fairwins')
     cy.get('body').should('be.visible')
 
-    // Connect with account #0.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
     cy.selectInjectedConnector()
-    cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-      .should('be.visible')
+    cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
 
-    // Switch to account #1 via the custom command.
+    // Establish the starting point rather than assuming it — otherwise a switch that never
+    // happened is indistinguishable from one that did.
+    cy.assertActiveAccount(TEST_ACCOUNTS[0])
+
+    // Emits accountsChanged on the live provider; asserts the app followed.
     cy.switchAccount(1)
 
-    // After reload, verify the page loaded. The address should update
-    // (either reflected in the wallet dropdown or on the dashboard subtitle).
-    cy.get('body', { timeout: 10000 }).should('be.visible')
-
-    // The app may require re-connection after switchAccount (which reloads).
-    // Verify the page is in a valid state — either showing account #1 address
-    // or showing the connect button (for re-connection).
-    cy.get('body').then(($body) => {
-      const accountBtn = $body.find('.wallet-account-button, button[aria-label="Wallet Account"]')
-      const connectBtn = $body.find('.wallet-connect-button, button[aria-label="Connect Wallet"]')
-      expect(accountBtn.length > 0 || connectBtn.length > 0).to.be.true
-    })
+    // The displayed address is now #1's AND is no longer #0's. Both halves matter: the dropdown
+    // renders one address, so an app that ignored the event would still satisfy a bare "contains
+    // an address" check.
+    cy.get('.wallet-account-button').click()
+    cy.get('.account-address-value', { timeout: 10000 })
+      .invoke('text')
+      .should((t) => {
+        const text = t.toLowerCase()
+        expect(text, 'shows the switched-to account').to.include(TEST_ACCOUNTS[1].slice(0, 6).toLowerCase())
+        expect(text, 'no longer shows the account switched away from').to.not.include(TEST_ACCOUNTS[0].slice(0, 6).toLowerCase())
+      })
   })
 })

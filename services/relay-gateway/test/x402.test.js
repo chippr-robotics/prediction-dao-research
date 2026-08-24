@@ -408,6 +408,33 @@ describe('payment verification', () => {
     expect(engine.submissions).toHaveLength(0)
   })
 
+  it('refuses an overpaying authorization the payer cannot cover — the paywall bypass', async () => {
+    // The bypass this guards: sign a huge `value` while holding only the price. Step 3 passes
+    // (value >= amount), and a balance check against the PRICE passes too — so verification
+    // succeeded, the engine broadcast, the answer was SERVED, and the token then reverted for
+    // insufficient balance. Free answer, and FairWins paid gas for a reverting transaction.
+    // Repeatable at the per-account quota with fresh nonces. The balance must be checked against
+    // what was SIGNED, because that is what settle.js transfers.
+    const { res, engine } = await refuse(
+      { value: PRICE_READ * 1_000_000n },
+      { providerOpts: { balance: PRICE_READ } } // exactly the price — enough to pass the old check
+    )
+    expect(res.body.error).toBe('payment_insufficient_balance')
+    expect(engine.submissions).toHaveLength(0)
+  })
+
+  it('reports the SETTLED value in the receipt, not the quoted price', async () => {
+    // An agent may authorize more than the offer. settle.js moves `authorization.value`, so a
+    // receipt naming `requirement.amount` would understate what actually left the payer's wallet.
+    const overpay = PRICE_READ * 3n
+    const { app, config, engine } = build({ providerOpts: { balance: overpay * 2n } })
+    const { header } = await payment(config, { value: overpay })
+    const res = await get(app, '/v1/member/fees').set('X-PAYMENT', header)
+    expect(res.status).toBe(200)
+    expect(decodeReceipt(res).amount).toBe(String(overpay))
+    expect(engine.submissions).toHaveLength(1)
+  })
+
   it('answers 503 — never a free serve — when the balance cannot be read at all', async () => {
     const { res, engine } = await refuse({}, { providerOpts: { balanceError: true } })
     expect(res.status).toBe(503)

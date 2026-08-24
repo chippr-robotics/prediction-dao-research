@@ -79,6 +79,29 @@ function mergeTopics(topicSets) {
   return [topic0.length === 1 ? topic0[0] : topic0, ...tail]
 }
 
+/**
+ * Split `[from..to]` into INCLUSIVE ranges no wider than `LOG_SCAN_CHUNK` blocks.
+ *
+ * The one definition of "how wide is a chunk" in this app. Note the arithmetic: a request for
+ * `fromBlock..fromBlock + LOG_SCAN_CHUNK - 1` spans exactly `LOG_SCAN_CHUNK` blocks because both
+ * ends are inclusive — the off-by-one that turns a 10,000-block cap into a 10,001-block request is
+ * the whole failure mode this module exists to prevent, so it is written down once and only once.
+ *
+ * @param {number} from - first block, inclusive
+ * @param {number} to - last block, inclusive
+ * @param {number} [limit] - stop after this many chunks (a budget); omit for the whole range
+ */
+function planChunks(from, to, limit = Infinity) {
+  const chunks = []
+  let cursor = from
+  while (cursor <= to && chunks.length < limit) {
+    const end = Math.min(cursor + LOG_SCAN_CHUNK - 1, to)
+    chunks.push({ from: cursor, to: end })
+    cursor = end + 1
+  }
+  return chunks
+}
+
 /** One range, with a narrower retry before giving up. Throws when even the narrow pass fails. */
 async function getLogsRange(provider, base, from, to) {
   try {
@@ -171,14 +194,9 @@ export async function scanLogs({ contract, filters, fromBlock, chainId, toBlock,
 
   while (cursor <= head && spent < maxChunks) {
     // One wave of concurrent chunks, still inside the budget.
-    const wave = []
-    for (let i = 0; i < CONCURRENCY && cursor <= head && spent < maxChunks; i += 1) {
-      const from = cursor
-      const to = Math.min(from + LOG_SCAN_CHUNK - 1, head)
-      wave.push({ from, to })
-      cursor = to + 1
-      spent += 1
-    }
+    const wave = planChunks(cursor, head, Math.min(CONCURRENCY, maxChunks - spent))
+    cursor = wave[wave.length - 1].to + 1
+    spent += wave.length
     // A throw here abandons the wave WITHOUT advancing the cursor past it: the caller sees the
     // failure, and the next attempt re-scans from the last block actually accounted for.
     const results = await Promise.all(wave.map((w) => getLogsRange(provider, base, w.from, w.to)))
@@ -191,6 +209,56 @@ export async function scanLogs({ contract, filters, fromBlock, chainId, toBlock,
   }
 
   return answer()
+}
+
+/**
+ * One bounded, chunked sweep of a fixed block range. Raw logs, no cache, no cursor, no decoding.
+ *
+ * `scanLogs` above is built for HISTORY: a fixed `fromBlock` (a deploy block) that never moves, so
+ * a session cache and a resumable watermark are pure wins. This is the other shape — a SLIDING
+ * window anchored to the head ("the last six hours"), read by a caller that must be able to derive
+ * its answer afresh every time:
+ *
+ *   - the anchor moves with every call, so `scanLogs`' key (which contains `fromBlock`) would
+ *     fragment into a new cache entry per poll: never a hit, and an unbounded Map;
+ *   - a watermark that never rewinds is exactly wrong for a reorg-sensitive read. `scanLogs` may
+ *     keep serving a log the chain has dropped, which for a caller that turns one log into "your
+ *     money arrived" is the single worst answer available. Re-deriving costs requests; it cannot
+ *     be stale.
+ *
+ * What IS shared with `scanLogs` — and the reason this lives here rather than in the caller — is
+ * the policy: `planChunks` for the width, `getLogsRange` for the narrow retry, `CONCURRENCY` for
+ * the request rate. Those must never diverge between the two shapes.
+ *
+ * Throws when a range cannot be read even at the narrow width, for the same reason `scanLogs` does:
+ * a silently skipped range is indistinguishable from "nothing happened there". Callers that must
+ * degrade honestly catch it and report "no new information" — never a negative result.
+ *
+ * @param {object} args
+ * @param {object} args.provider - anything with `getLogs`
+ * @param {string} args.address - the contract to read
+ * @param {Array} args.topics - an `eth_getLogs` topics array (topic0 may itself be an OR-set)
+ * @param {number} args.fromBlock - first block, inclusive
+ * @param {number} args.toBlock - last block, inclusive. A NUMBER, never `'latest'`: a range with an
+ *   open end cannot be chunked, which is how an over-cap request gets issued in the first place.
+ * @returns {Promise<object[]>} every raw log in the range, in no particular order
+ */
+export async function scanLogRange({ provider, address, topics, fromBlock, toBlock }) {
+  if (!provider?.getLogs) throw new Error('logScan: no provider')
+  const from = Number(fromBlock)
+  const to = Number(toBlock)
+  if (!Number.isFinite(from) || !Number.isFinite(to)) throw new Error('logScan: scanLogRange needs numeric block bounds')
+  if (to < from) return []
+
+  const base = { address, topics }
+  const chunks = planChunks(from, to)
+  const out = []
+  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+    const wave = chunks.slice(i, i + CONCURRENCY)
+    const results = await Promise.all(wave.map((w) => getLogsRange(provider, base, w.from, w.to)))
+    out.push(...results.flat())
+  }
+  return out
 }
 
 export default scanLogs

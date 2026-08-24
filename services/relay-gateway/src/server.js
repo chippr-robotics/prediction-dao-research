@@ -23,7 +23,7 @@ import express from 'express'
 import { rateLimit } from 'express-rate-limit'
 import helmet from 'helmet'
 import { loadConfig } from './config/index.js'
-import { buildProviders } from './config/providers.js'
+import { assertChainEndpoints, buildProviders } from './config/providers.js'
 import { createFeeRouterReader } from './fees/onchain.js'
 import { parseIntent, verifyIntent } from './intent/verify.js'
 import { createIntentStore } from './intent/store.js'
@@ -928,6 +928,21 @@ if (isMain) {
   if (!config.webhookSecret) {
     console.warn('[relay-gateway] WARN: WEBHOOK_SHARED_SECRET unset — engine webhooks will be REJECTED')
   }
+
+  // Every configured endpoint must agree about which chain it serves. A mismatch is FATAL: the
+  // providers are built with `staticNetwork`, so nothing downstream would ever notice, and every
+  // sanctions screen, gas estimate and paymaster read would be answered from the wrong chain while
+  // /status reported rpc:"up". An UNREACHABLE endpoint is not a mismatch and does not stop the
+  // boot — see assertChainEndpoints for why those two must stay separate.
+  const endpointCheck = await assertChainEndpoints(config)
+  if (!endpointCheck.ok) {
+    console.error(
+      '[relay-gateway] refusing to start: an RPC endpoint serves a different chain than it is ' +
+        'configured for. Fix RPC_URL_PRIMARY_<chainId> / RPC_URLS_<chainId> for the chains named above.'
+    )
+    process.exit(1)
+  }
+
   const { app, killSwitch } = createApp(config)
   // Runtime kill switch: `kill -USR2 <pid>` toggles accept/refuse (FR-015).
   process.on('SIGUSR2', () => {

@@ -48,6 +48,17 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
    */
 
   /*
+   * `rejectConnect: true` models the member pressing Cancel on the wallet's connect prompt:
+   * `eth_requestAccounts` rejects with EIP-1193 4001 and the wallet grants nothing.
+   *
+   * It has to live HERE rather than in a spec's own `window:before:load`, which is what WAL-07
+   * used to do. That handler assigned its own `win.ethereum` wholesale, so it raced this mock's
+   * handler for the same window — and, more decisively, it announced nothing over EIP-6963, so
+   * wagmi never discovered it and the connect modal offered no connector to decline with. A
+   * refusal is a property of the wallet this mock already announces, not of a second wallet.
+   */
+
+  /*
    * This call's wallet state. ONE object per mockWeb3Provider() CALL, closed over by the
    * handler below — so it SURVIVES page loads (that persistence is load-bearing: connect once,
    * and every later cy.visit auto-restores the session because `authorized` is still true).
@@ -58,6 +69,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
     activeChainId: Number(networkId),
     authorized: options.preAuthorized === true,
     rejectChainSwitch: options.rejectChainSwitch === true,
+    rejectConnect: options.rejectConnect === true,
     /*
      * `eth_getBalance` answers a FIXED 100 ETH by default, which is fine while a spec only needs
      * the connected account to look funded. It is a fabrication the moment a spec reads the
@@ -149,6 +161,14 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         return new Promise((resolve, reject) => {
           switch (method) {
             case 'eth_requestAccounts':
+              if (S().rejectConnect) {
+                // The member pressed Cancel in the wallet. EIP-1193 4001, and NOTHING is
+                // granted — `authorized` stays false, so a later eth_accounts is still empty.
+                const rejected = new Error('User rejected the request.')
+                rejected.code = 4001
+                reject(rejected)
+                break
+              }
               // The user pressing Connect. Grants access for the rest of this page load.
               S().authorized = true
               resolve([S().activeAccount])
@@ -330,6 +350,21 @@ Cypress.Commands.add('switchAccount', (accountIndex) => {
   cy.window().then((win) => {
     if (!win.ethereum || typeof win.ethereum.__cySetAccount !== 'function') {
       throw new Error('switchAccount: cy.mockWeb3Provider() must run before the visit')
+    }
+    /*
+     * Drop the wager cache BEFORE the switch (#1250). The `friendMarkets:<chainId>` key is
+     * per CHAIN, not per account, and this command deliberately does not reload — left in
+     * place, the previous account's key would satisfy `cy.settledWagerPanel()` the instant
+     * it is called, while the new account's scan is still running. The address change
+     * re-runs FriendMarketsContext's effect, so the key is rewritten exactly when THIS
+     * account's fetch completes — which is also what the app would show after a reload.
+     */
+    try {
+      Object.keys(win.localStorage)
+        .filter((k) => k === 'friendMarkets' || k.startsWith('friendMarkets:'))
+        .forEach((k) => win.localStorage.removeItem(k))
+    } catch {
+      // Storage unavailable in this realm; settledWagerPanel falls back to its timeout.
     }
     win.ethereum.__cySetAccount(account)
   })
@@ -663,6 +698,47 @@ Cypress.Commands.add('openMyWagers', (tab = 'participating') => {
     cy.contains('button, [role="tab"]', new RegExp(tab, 'i'))
       .click({ force: true })
   }
+})
+
+/**
+ * Yield the My Wagers list panel only after the wager fetch has actually finished (#1250).
+ *
+ * `cy.get('.mm-panel')` waits for the PANEL, not its CONTENT: MyMarketsModal clears its own
+ * `loading` flag in the same tick it empties `markets`, while the rows come from
+ * `useFriendMarkets()` — a chain scan the modal neither waits on nor renders a pending state
+ * for. The panel therefore appears at once saying "No Active Positions" and fills in seconds
+ * later, so a `$panel.find(...)` snapshot taken in between reads nothing and both limbs of a
+ * conditional no-op. The empty state is NOT terminal, so waiting for "a row OR the empty
+ * state" would settle instantly and prove nothing.
+ *
+ * The one completion edge the app exposes is FriendMarketsContext writing its result —
+ * including an empty one — to `friendMarkets:<chainId>` in localStorage. That is an edge and
+ * not a coincidence because the key is absent when the wait starts: the money-path specs
+ * `cy.clearLocalStorage()` in `beforeEach`, and `cy.switchAccount()` drops the key as it
+ * changes account (the cache is per CHAIN and would otherwise carry the previous account's
+ * list). Callers settle BEFORE the read that decides anything, never inside a chosen branch.
+ *
+ * PREFER NOT SNAPSHOTTING AT ALL: where the spec has just arranged the thing it acts on,
+ * assert the control retryably — cy.get(PANEL).find(CONTROL, { timeout }).should(...) — so an
+ * absent precondition fails there, saying which one. This command is for genuine probes.
+ */
+const WAGER_PANEL_SELECTOR = '.mm-panel, [role="tabpanel"]'
+
+Cypress.Commands.add('settledWagerPanel', () => {
+  cy.get(WAGER_PANEL_SELECTOR, { timeout: 10000 }).should('exist')
+
+  // The key is written verbatim in both this command and `switchAccount`, which clears it,
+  // so the two halves of the wait can be read — and guarded — without chasing a constant.
+  cy.window({ log: false })
+    .its('localStorage', { timeout: 30000 })
+    .should((storage) => {
+      const done = Object.keys(storage).some(
+        (k) => k === 'friendMarkets' || k.startsWith('friendMarkets:'),
+      )
+      expect(done, 'wager fetch completed (friendMarkets cache written)').to.be.true
+    })
+
+  return cy.get(WAGER_PANEL_SELECTOR, { timeout: 10000 })
 })
 
 /**
@@ -1430,7 +1506,23 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
      * Escape is used rather than clicking the backdrop: the backdrop is the element under test in
      * some specs, and ConnectModal binds Escape to the same `close` handler.
      */
-    if (autoDismissConnectModal) {
+    if (autoDismissConnectModal) dismissAutoConnectPrompt()
+    return win
+  })
+})
+
+/*
+ * Close the auto-opened connect dialog, if one appeared.
+ *
+ * Extracted from the `visit` override so it can be reached from a RELOAD too. `cy.reload()` is not
+ * `cy.visit()` and never ran this, so a spec that reloaded into a disconnected state got the
+ * prompt back with nothing to close it — and the backdrop then covered the very control the spec
+ * was asserting on. That is how WAL-05 failed on the phone profile while passing on desktop.
+ *
+ * Exposed as `cy.dismissAutoConnectPrompt()` for those cases. The `visit` override's behaviour and
+ * timing are unchanged: it calls exactly this, exactly where it used to.
+ */
+function dismissAutoConnectPrompt() {
       /*
        * The prompt opens ASYNCHRONOUSLY — AutoConnectPrompt waits for `connectionStatus` to settle,
        * and WalletContext waits for wallet detection before that. An immediate DOM check races it,
@@ -1477,10 +1569,9 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
           )
         }),
       )
-    }
-    return win
-  })
-})
+}
+
+Cypress.Commands.add('dismissAutoConnectPrompt', dismissAutoConnectPrompt)
 
 
 /**

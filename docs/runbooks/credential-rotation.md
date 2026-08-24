@@ -3,10 +3,24 @@
 Every credential the FairWins estate holds, what breaks when it is wrong, and how to rotate it
 without an outage.
 
-> **Measured, not asserted — 2026-08-16.** The inventory below was read from the live project with
+> **Measured, not asserted — 2026-08-23.** The inventory below was read from the live project with
 > `gcloud secrets list` and cross-referenced against the code that actually consumes each one
-> (`infra/vm/common/fetch-secrets.sh`, `infra/vm/*/docker-compose.yml`, `scripts/secrets/registry.js`).
+> (`infra/vm/common/fetch-secrets.sh`, `infra/vm/*/docker-compose.yml`,
+> `infra/terraform/environments/prod/terraform.tfvars`).
 > Re-run the commands in [Keeping this current](#keeping-this-current) after any change.
+>
+> **Correction, and then its retraction (2026-08-23).** An earlier revision of this page reported
+> that `npm run sec` and `scripts/secrets/registry.js` did not exist. That was true when written —
+> and the reason was not a fictitious runbook. Spec 097's tooling had been **applied to production
+> but never merged**, so this page was describing an estate that really existed while the code that
+> managed it did not. Landing spec 097 made the original references true again, and they are restored
+> below.
+>
+> Both halves are kept deliberately. `scripts/secrets/registry.js` is now the inventory of record —
+> `scripts/secrets/__tests__/terraform-parity.test.js` fails if it drifts from the Terraform grant
+> list, which is the property that makes it trustworthy. The raw `gcloud` commands stay as the
+> fallback for a machine that has not run the workstation setup, since a runbook step that cannot
+> run is worse than an absent one.
 
 > **⚠️ The GCP project is SHARED.** `chippr-bots-site-wp` holds 73 secrets, and **only about half
 > are FairWins'**. The rest belong to unrelated Chippr workloads (Clerk, Neo4j, OpenAI, GraphRAG,
@@ -62,6 +76,7 @@ gasless relay path — the never-stranded rule.
 | `relay-engine-gcp-private-key` | engine only | required | on exposure | KMS signing fails on **both** hot gas keys. Never let the public-facing gateway container see this. |
 | `OPENSEA_API_KEY` | gateway | optional | on exposure | Collect degrades to 503; SPA hides the tab. |
 | `POLYMARKET_API_KEY` / `_SECRET` / `_PASSPHRASE` / `_ADDRESS` | gateway, finops | optional | on exposure | Predict feed degrades to 503. |
+| `QUICKNODE_POLYGON_API` | gateway, finops (as `RPC_URL_PRIMARY_137`) | optional | on exposure | Chain 137 reads fall back to the public endpoints in `RPC_URLS_137` — slower, no archive depth, still serving. Also read by the **bundler**, where it is required (below). |
 
 ### Runtime — bundler VM
 
@@ -69,6 +84,29 @@ gasless relay path — the never-stranded rule.
 |---|---|---|---|
 | `alto-executor-key-137` | alto (executor **and** utility key) | required | **Hot key holding real POL.** Rotating means funding a new EOA and draining the old one — not a config change. See `docs/runbooks/relayer-operations.md`. |
 | `origin-lock-secret` | bundler nginx | optional (fail-open) | Fail-open by design: an unavailable secret disables enforcement rather than 403-bricking the bundler. |
+| `QUICKNODE_POLYGON_API` | alto (as `ALTO_RPC_URL`) | **required** | alto takes ONE endpoint, with no failover and no default. Unavailable ⇒ boot aborts with a diagnosis, rather than a crash-loop with an opaque upstream error. **Rotate the bundler and the gateway together** — same secret, two nodes, and the bundler is the one that stops serving. |
+
+> **⚠️ There are THREE unrelated QuickNode credential families in this project. Do not confuse them.**
+>
+> | Secret | What it is | Read by |
+> |---|---|---|
+> | `QUICKNODE_POLYGON_API` / `_WSS`, `QUICKNODE_AMOY_API` / `_WSS` | **RPC endpoint URLs**, token in the path | gateway + finops + alto (Polygon HTTP only — see below) |
+> | `finops-quicknode-key` | the **Admin API** key, for reading credit usage | FinOps exporter |
+> | `fairwins-quicknode-polygon-url` / `-token` | workstation archive RPC, operator only | never on a VM |
+>
+> **One endpoint, one token, chain by hostname infix.** `<name>.matic.quiknode.pro` is Polygon and
+> `<name>.matic-amoy.quiknode.pro` is Amoy, on the SAME credential — so a mis-set variable answers
+> **HTTP 200 with the wrong chain's state**, not a 401. The gateway asserts `eth_chainId` against
+> every configured endpoint at boot and refuses to start on a mismatch; nothing else in the estate
+> would notice, because the providers are built with `staticNetwork`.
+>
+> **`QUICKNODE_POLYGON_WSS`, `QUICKNODE_AMOY_API` and `QUICKNODE_AMOY_WSS` are declared but
+> deliberately UNREAD.** Nothing opens a WebSocket RPC, and there is no Amoy-cohort node. They are
+> under Terraform management with **empty IAM policies on purpose** — a recorded decision rather
+> than an orphan. Wiring one means an emit line in `fetch-secrets.sh` *and* an entry in
+> `gateway_secret_ids`; without the accessor binding the fetch fails on one journal line.
+>
+> **The whole endpoint is capped at 50 req/s, shared** by the gateway, the exporter and alto.
 
 ### FinOps (spec 089)
 
@@ -92,7 +130,15 @@ state, never a fabricated zero.
 
 ### Workstation — operator only, never on a VM
 
-Read through `npm run sec <profile>`; see `scripts/secrets/registry.js`, which is the inventory.
+There is **no inventory script and no profile loader** — read these one at a time, on demand:
+
+```bash
+gcloud secrets versions access latest --secret=<secret-name> --project=chippr-bots-site-wp
+```
+
+Never export them into a shell that then runs a build: `.env` is gitignored but a printed value is
+in your scrollback and your shell history. The table below IS the inventory; keep it current with
+the `gcloud secrets list` command under [Keeping this current](#keeping-this-current).
 
 | Secret | Purpose |
 |---|---|
@@ -113,7 +159,7 @@ Read through `npm run sec <profile>`; see `scripts/secrets/registry.js`, which i
 | **Cloudflare** (zone `fairwins.app`) | DNS, TLS, WAF geo gate (HTTP 451 — a legal control), origin-lock transform rule | `origin-lock-secret` (shared header), `finops-cloudflare-token` (analytics read) | Geo gate is compliance-critical. Origin lock rotation must be simultaneous both sides. |
 | **Grafana Cloud** (`chippr.grafana.net`, Prom instance `3500268`) | Alloy pushes; we never expose an endpoint | `glc_` (write) + `glsa_` (provision) | Wrong token type ⇒ silent 401, no data, dashboards look empty. |
 | **GCP BigQuery** billing export | Exporter queries `billing_export.gcp_billing_export_v1_*` | Workload identity — the gateway node's SA, **no stored token** | Newly enabled exports take **hours** to produce a first table and never backfill. |
-| **QuickNode** | Exporter reads credit usage; SPA/relayer read RPC | `finops-quicknode-key`, `fairwins-quicknode-polygon-*` | Reports credits, never dollars — cost is `modelled`. |
+| **QuickNode** | Exporter reads credit usage; gateway/exporter/alto read chain 137 over the keyed endpoint | `finops-quicknode-key` (admin API), `QUICKNODE_POLYGON_API` (RPC), `fairwins-quicknode-polygon-*` (workstation) | Reports credits, never dollars — cost is `modelled`. **50 req/s hard cap shared across all three consumers**; the bundler is the one with no failover behind it. |
 | **Polymarket CLOB** | Gateway proxies public reads; members sign their own orders | 4 `POLYMARKET_API_*` | Predict degrades to 503; SPA hides the tab. |
 | **OpenSea** | Gateway proxies collectible reads | `OPENSEA_API_KEY` | Collect degrades to 503. |
 | **The Graph** | Subgraph queries/deploys | `fairwins-graph-*` | Wager history degrades to direct chain reads. |
@@ -189,8 +235,13 @@ grep -E '^\s+emit ' infra/vm/common/fetch-secrets.sh \
 # Who can read a given secret
 gcloud secrets get-iam-policy <secret-name> --project=chippr-bots-site-wp
 
-# Workstation inventory
-node -e "console.log(Object.keys(require('./scripts/secrets/registry.js')))"
+# Which secrets are DECLARED in Terraform (containers + who may read them)
+grep -A40 'managed_secret_ids' infra/terraform/environments/prod/terraform.tfvars
+grep -A20 'gateway_secret_ids'  infra/terraform/environments/prod/terraform.tfvars
+
+# A secret in `gcloud secrets list` but in NEITHER of the above is either another workload's or an
+# orphan — hand-created, unread, and with no recorded owner. QUICKNODE_* were exactly that until
+# 2026-08-23.
 ```
 
 See also: `docs/runbooks/finops-operations.md`, `docs/runbooks/relayer-operations.md`,

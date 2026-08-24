@@ -696,7 +696,12 @@ returns an outcome and never throws. The gate on the approve button:
 Verification state is keyed by **manifest hash**, not record id, so a replaced package silently
 invalidates a stale verification. `StaleProposal` is a first-class outcome: decoded, shown as a
 readable sentence, and it clears the verification, the acknowledgement and any confirmation before
-forcing a refresh. Every successful decision writes a ledger entry keyed on the tx hash and
+forcing a refresh. It is decoded from **whichever shape the failure arrives in**
+(`lib/chain/revertError.js`): ethers populates `error.revert` only where it held the ABI at the
+point the call failed — a `staticCall` — while the write path through an injected wallet forwards
+the same revert as raw selector bytes on `error.data`. Reading `.revert` alone therefore lost this
+explanation on the exact path a curator uses, leaving them "execution reverted (unknown custom
+error)" — a message with no reason to re-review (#1267). Every successful decision writes a ledger entry keyed on the tx hash and
 attributed to `app-<chainId>-<id>` — the immutable id, never the display name.
 
 ### 4. Launchable

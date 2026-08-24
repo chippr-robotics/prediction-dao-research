@@ -26,11 +26,11 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 98 |
+| Spec directories | 99 |
 | With a member-facing flow | 80 |
 | Member-facing flows | 137 |
-| 🟢 covered | 126 |
-| 🟡 partial | 2 |
+| 🟢 covered | 127 |
+| 🟡 partial | 1 |
 | 🔴 absent | 3 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -321,7 +321,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-42 flows — 🟢 39 · 🟡 2 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
+42 flows — 🟢 40 · 🟡 1 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -368,7 +368,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟡 partial | flow | `no-chain` | `35-navigation-and-lookup.cy.js` (BK-01, BK-02) | the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for — admission rule 2 puts that half in the on-chain tier |
+| `backup.encrypted-sync-roundtrip` | Back up local data encrypted and restore it on another device | 🟢 covered | settled | `on-chain` | `35-navigation-and-lookup.cy.js` (BK-01, BK-02); `37-backup-roundtrip.cy.js` (BKC-01, BKC-02) |  |
 
 ### `037-unified-pool-challenge-lookup` — Unified pool and challenge lookup
 
@@ -685,6 +685,7 @@ Listed so the gate can tell "correctly omitted" from "forgotten".
 | `091-neutral-token-consolidation` — Neutral token consolidation | Design tokens; gated by noHardcodedColors and noUndefinedTokens. |
 | `094-e2e-coverage-expansion` — E2E coverage expansion | This feature: the matrix, the tiering policy and the suite's own gates. Its subject is the coverage of every other row. |
 | `096-x402-agentic-payments` — x402 pay-per-request access to the member API | An agent-facing HTTP rail with no member surface: an unauthenticated caller is answered 402 with a price, pays with an X-PAYMENT header, and is served as the payer. No component, route or member journey changes, and a member holding a capability token never enters the path. Its gate is the gateway vitest suite (services/relay-gateway/test/x402.test.js) plus the spec-095 suites passing unchanged with the rail enabled, and node:test coverage of the MCP server's 402 surfacing and payment passthrough. |
+| `097-workstation-secrets-observability` — Workstation secrets and local observability | Operator tooling with no member surface: credentials move off a local .env into Secret Manager and are delivered per least-privilege profile by a wrapper, and the Prometheus and Grafana stack is a read-only viewing surface bound to loopback. Nothing here is reachable from the app, and the workstation identity is declared Terraform with no service-account key file. Gated by the scripts/secrets vitest suites (including the registry/tfvars parity test, which fails on drift because a missing grant surfaces later as PERMISSION_DENIED), check:env-hygiene, and the Terraform plan. |
 
 ## Covered but not proven
 

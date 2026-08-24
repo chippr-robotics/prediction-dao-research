@@ -706,16 +706,17 @@
         {
           "id": "backup.encrypted-sync-roundtrip",
           "name": "Back up local data encrypted and restore it on another device",
-          "status": "partial",
-          "tier": "no-chain",
-          "depth": "flow",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "access",
           "tests": [
             "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-01",
-            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-02"
+            "frontend/cypress/e2e/fast/35-navigation-and-lookup.cy.js::BK-02",
+            "frontend/cypress/e2e/full/37-backup-roundtrip.cy.js::BKC-01",
+            "frontend/cypress/e2e/full/37-backup-roundtrip.cy.js::BKC-02"
           ],
-          "issue": "#1228",
-          "missing": "the pointer read is driven through all three of its states and no secret material is ever rendered; the ENCRYPT/RESTORE round-trip itself is not driven end to end here because recording the pointer is an on-chain transaction the member pays gas for \u2014 admission rule 2 puts that half in the on-chain tier"
+          "note": "The no-chain half pins the honest-state rules (no secret material rendered; an unsettled pointer read is never reported as \"no backup\"). The on-chain half is the round trip itself: recording the pointer is a transaction the member pays gas for, so admission rule 2 puts it there \u2014 BKC-01 reads the pointer back from chain and checks it names the blob that was pinned (and that the pinned bytes are ciphertext), BKC-02 wipes the device and restores from that pointer."
         }
       ]
     },
@@ -2400,6 +2401,13 @@
       "title": "x402 pay-per-request access to the member API",
       "memberFacing": false,
       "reason": "An agent-facing HTTP rail with no member surface: an unauthenticated caller is answered 402 with a price, pays with an X-PAYMENT header, and is served as the payer. No component, route or member journey changes, and a member holding a capability token never enters the path. Its gate is the gateway vitest suite (services/relay-gateway/test/x402.test.js) plus the spec-095 suites passing unchanged with the rail enabled, and node:test coverage of the MCP server's 402 surfacing and payment passthrough.",
+      "flows": []
+    },
+    {
+      "id": "097-workstation-secrets-observability",
+      "title": "Workstation secrets and local observability",
+      "memberFacing": false,
+      "reason": "Operator tooling with no member surface: credentials move off a local .env into Secret Manager and are delivered per least-privilege profile by a wrapper, and the Prometheus and Grafana stack is a read-only viewing surface bound to loopback. Nothing here is reachable from the app, and the workstation identity is declared Terraform with no service-account key file. Gated by the scripts/secrets vitest suites (including the registry/tfvars parity test, which fails on drift because a missing grant surfaces later as PERMISSION_DENIED), check:env-hygiene, and the Terraform plan.",
       "flows": []
     }
   ]

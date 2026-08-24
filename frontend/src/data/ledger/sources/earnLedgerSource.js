@@ -60,6 +60,9 @@ export function createEarnLedgerSource(deps = {}) {
   const readClientRecords = deps.listClientRecords || listClientRecords
   return {
     class: LEDGER_CLASS.EARN,
+    // Reads the local record store only — it cannot fail because a network
+    // is down, so it never testifies that a chain went unread (#1280).
+    backing: 'client',
     async list({ account, chainId }) {
       return readClientRecords(account, chainId).filter((r) => r.class === LEDGER_CLASS.EARN)
     },

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { translateRevert, ResolutionType, ORACLE_RESOLUTION_TYPES } from '../hooks/useFriendMarketCreation'
+import {
+  translateRevert,
+  ResolutionType,
+  ORACLE_RESOLUTION_TYPES,
+} from '../hooks/useFriendMarketCreation'
 
 // Light unit tests for the hook surface that's deterministic + pure:
 //  - `translateRevert(reason)` maps contract revert reasons to user-friendly strings.
@@ -51,6 +55,16 @@ describe('useFriendMarketCreation: translateRevert', () => {
       .toMatch(/approval has not been confirmed/i)
     expect(translateRevert('execution reverted: ERC20: transfer amount exceeds balance'))
       .toMatch(/insufficient token balance/i)
+  })
+
+  it('names sanctions screening instead of falling through to the raw reason (#1292)', () => {
+    // What the message may and may not CLAIM (fail-closed screening, already-paid-for approvals) is
+    // pinned once, for all four screened entrypoints, in `test/wagers/sanctionsRevert.test.js`.
+    const message = translateRevert('execution reverted: SanctionedAddress')
+    expect(message).toMatch(/sanctions screening/i)
+    expect(message).toMatch(/wager was not created/i)
+    // The screened member must not be shown the raw fallback.
+    expect(message).not.toMatch(/transaction will fail/i)
   })
 
   it('maps EitherRequiresEqualStakes to equal-stakes guidance', () => {

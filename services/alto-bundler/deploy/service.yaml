@@ -1,3 +1,14 @@
+# ⚠ DECOMMISSIONED, AND IT MUST STAY THAT WAY (spec 087 guardrail G-11).
+#
+# `fairwins-alto-bundler` was deleted from Cloud Run when the bundler moved to GCE; verified absent
+# from `gcloud run services list` 2026-08-23. It is deliberately NOT declared in Terraform, and
+# `npm run check:iac` rejects any attempt to add it back — a second bundler against the VM
+# bundler's EOA means colliding nonces and stuck bundles, with both instances reporting healthy and
+# no in-band detection.
+#
+# This file is the reconciliation record, kept in step with infra/vm/bundler/docker-compose.yml so
+# it stays a truthful description. Do NOT `gcloud run services replace` it.
+#
 # Cloud Run multi-container service: origin-lock nginx ingress + alto ERC-4337 bundler sidecar.
 # Spec 041 SC-009 / spec 036 FR-029: put the bundler behind the same origin lock as the SPA + gateway.
 #
@@ -73,16 +84,21 @@ spec:
           env:
             - name: ALTO_ENTRYPOINTS
               value: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"   # EntryPoint v0.6
+            # Switched off publicnode 2026-07-12: its free tier began 403-ing archive requests
+            # ("Archive requests require a personal token"), which broke ERC-4337 receipt
+            # resolution (eth_getLogs for UserOperationEvent) — ops mined but confirmations never
+            # surfaced, and the receipt-poll 403 flood degraded the send path (bundles stopped
+            # broadcasting; executor nonce froze). The stopgap was QuickNode's TOKENLESS shared
+            # endpoint (https://rpc-mainnet.matic.quiknode.pro), which serves archive getLogs as a
+            # courtesy with no quota we control.
+            #
+            # 2026-08-23: moved to the KEYED endpoint. Its token is in the URL path, so the value
+            # is a secret reference rather than a literal — the same thing the VM does by reading
+            # QUICKNODE_POLYGON_API into alto.env. alto takes ONE endpoint and has no failover, so
+            # if the secret cannot be read the container must not start.
             - name: ALTO_RPC_URL
-              # Switched off publicnode 2026-07-12: its free tier began 403-ing archive requests
-              # ("Archive requests require a personal token"), which broke ERC-4337 receipt
-              # resolution (eth_getLogs for UserOperationEvent) — ops mined but confirmations never
-              # surfaced, and the receipt-poll 403 flood degraded the send path (bundles stopped
-              # broadcasting; executor nonce froze). QuickNode's public Polygon endpoint serves
-              # archive getLogs without a token. Applied live via `gcloud run services update
-              # --container=alto --update-env-vars` (revision 00072). If broadcasts still stall on a
-              # gas spike, add an alto gas-price multiplier / move to a keyed archive RPC.
-              value: "https://rpc-mainnet.matic.quiknode.pro"
+              valueFrom:
+                secretKeyRef: { name: QUICKNODE_POLYGON_API, key: latest }
             - name: ALTO_SAFE_MODE
               value: "false"
             - name: ALTO_PORT

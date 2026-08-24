@@ -58,7 +58,7 @@
  * `PoolListing.poolAddress` read off the router. Nothing here hardcodes one.
  */
 import { Contract, Interface } from 'ethers'
-import { NETWORKS, listSupportedChainIds } from '../../config/networks'
+import { NETWORKS, cohortChainIds } from '../../config/networks'
 import { isBitcoinNetworkId } from '../../config/bitcoinNetworks'
 import { assertEvmChainId } from '../bridge/bridgeRouter'
 
@@ -132,12 +132,19 @@ const asBigInt = (v) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Every supported network carrying an Across HubPool. Derived from config so the answer
- * stays true if that ever stops being exactly one network; never a hardcoded chain id.
+ * Every network IN THIS BUILD'S COHORT carrying an Across HubPool. Derived from config so
+ * the answer stays true if that ever stops being exactly one network; never a hardcoded
+ * chain id.
+ *
+ * `cohortChainIds()` and never `listSupportedChainIds()` (issue #1265): this roster is what
+ * the availability copy names, and constitution III forbids a testnet build describing —
+ * or reading — the mainnet HubPool. A testnet build therefore gets an empty list, which the
+ * callers below already render as "not set up in this build yet".
+ *
  * @returns {Array<{chainId: number, name: string, hubPool: string}>}
  */
 export function bridgeLiquidityNetworks() {
-  return listSupportedChainIds()
+  return cohortChainIds()
     .map((id) => NETWORKS[id])
     .filter((net) => ADDRESS_RE.test(String(net?.bridge?.hubPool ?? '')))
     .map((net) => ({ chainId: net.chainId, name: net.name, hubPool: net.bridge.hubPool }))

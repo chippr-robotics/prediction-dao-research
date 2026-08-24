@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useGaslessWrite } from '../../lib/relay/useGaslessWrite'
+import { sanctionedAddressFrom, screenedPartyMessage } from '../../lib/wagers/sanctionsRevert'
 import { useEncryption } from '../../hooks/useEncryption'
 import { fetchEncryptedEnvelope } from '../../utils/ipfsService'
 import {
@@ -439,8 +440,7 @@ function MarketAcceptanceModal({
       console.error('Error accepting offer:', err)
 
       // v2 WagerRegistry custom-error string matches (selectors omitted — ethers v6
-      // already surfaces the named error in err.shortMessage / err.reason)
-      const errorSelectors = {}
+      // already surfaces the named error in err.shortMessage / err.reason).
       const knownRevertReasons = {
         'NotOpen': 'Wager is not open. It may have already been accepted or cancelled.',
         'NotOpponent': 'You are not the named opponent for this wager.',
@@ -451,31 +451,35 @@ function MarketAcceptanceModal({
 
       let errorMessage = err.reason || err.message || 'Failed to accept offer'
 
-      // Check for known revert reason strings (from staticCall or revert data)
-      for (const [pattern, friendlyMessage] of Object.entries(knownRevertReasons)) {
-        if (errorMessage.includes(pattern)) {
-          errorMessage = friendlyMessage
-          break
-        }
-      }
-
-      // Try to decode error data if available
-      if (err.data) {
-        const selector = typeof err.data === 'string' ? err.data.slice(0, 10) : null
-        if (selector && errorSelectors[selector]) {
-          errorMessage = errorSelectors[selector]
-        }
-      }
-
-      // Check for common error patterns in the message
-      if (errorMessage.includes('missing revert data') || errorMessage.includes('unknown custom error')) {
-        const txData = err.transaction?.data || err.info?.error?.data
-        if (txData) {
-          const selector = typeof txData === 'string' ? txData.slice(0, 10) : null
-          if (selector && errorSelectors[selector]) {
-            errorMessage = errorSelectors[selector]
+      // The sanctions guard is the one revert ethers cannot name: ISanctionsGuard's errors are NOT in
+      // the registry ABI the frontend ships (they bubble up *through* the registry call), so a screened
+      // member saw "unknown custom error" and fell through to "check your balance and allowance" —
+      // two things that are both fine (#1292). Recognize it from the selector, ahead of the message
+      // patterns below, and decode WHICH party it stopped on rather than assuming: `_runAcceptGuard`
+      // screens BOTH (`_screen(taker); _screen(creator);` in WagerRegistryCore.sol), so a creator
+      // listed after their wager was created reverts every accept with the CREATOR's address, and
+      // blaming the acceptor's own clean account would be a false compliance accusation.
+      const screenedAddress = sanctionedAddressFrom(err)
+      if (screenedAddress || errorMessage.includes('SanctionedAddress')) {
+        errorMessage = screenedPartyMessage({
+          // Stops at "not accepted": a stake approval may already have been sent and paid for.
+          outcome: 'the wager was not accepted',
+          sanctioned: screenedAddress,
+          // Acting as a vault, the screened taker is the Safe, not this address — say nothing about
+          // whose account it was rather than comparing against the wrong one.
+          account: operatingAsVault ? null : account,
+        })
+      } else {
+        // Check for known revert reason strings (from staticCall or revert data)
+        for (const [pattern, friendlyMessage] of Object.entries(knownRevertReasons)) {
+          if (errorMessage.includes(pattern)) {
+            errorMessage = friendlyMessage
+            break
           }
-        } else {
+        }
+
+        // Check for common error patterns in the message
+        if (errorMessage.includes('missing revert data') || errorMessage.includes('unknown custom error')) {
           errorMessage = 'Transaction failed. Please check your balance and allowance, then try again.'
         }
       }

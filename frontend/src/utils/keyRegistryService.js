@@ -17,37 +17,6 @@ const keyCache = new Map()
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 /**
- * The registry is not deployed/configured on this chain. An ABSENCE of a registry, which is a
- * different fact from "this member has no key" and different again from "we could not look".
- */
-export class KeyRegistryNotConfiguredError extends Error {
-  constructor(chainId) {
-    super(`KeyRegistry contract address not configured${chainId != null ? ` for chain ${chainId}` : ''}`)
-    this.name = 'KeyRegistryNotConfiguredError'
-    this.chainId = chainId ?? null
-  }
-}
-
-/**
- * The lookup could not be completed — RPC refused, timed out, or the answer would not decode.
- *
- * This exists so a failed READ can never be reported as a fact about another member (#1286).
- * `lookupPublicKey` used to return `null` for this case, exactly as it does for "no key
- * registered", and the create path turned that into "Your opponent has not registered their
- * encryption key yet" — a definite statement about someone else, derived from our own failure to
- * look. Same three-state rule the estate reads follow: read / not-deployed / unreadable, and a
- * value only on `read`.
- */
-export class KeyLookupUnavailableError extends Error {
-  constructor(address, cause) {
-    super('Could not check whether that account has registered an encryption key — the network could not be reached. Please try again.')
-    this.name = 'KeyLookupUnavailableError'
-    this.address = address
-    this.cause = cause
-  }
-}
-
-/**
  * Get a read-only KeyRegistry contract instance.
  * Falls back to legacy `zkKeyManager` config field for Mordor deployments.
  */
@@ -56,16 +25,14 @@ async function getKeyRegistryContract(provider) {
   // one network never reads another's registry. Fall back to the build-time
   // chain only when the provider can't report its network.
   let address
-  let resolvedChainId = null
   try {
     const cid = Number((await provider.getNetwork()).chainId)
-    resolvedChainId = cid
     address = getContractAddressForChain('keyRegistry', cid) || getContractAddressForChain('zkKeyManager', cid)
   } catch {
     address = getContractAddress('keyRegistry') || getContractAddress('zkKeyManager')
   }
   if (!address) {
-    throw new KeyRegistryNotConfiguredError(resolvedChainId)
+    throw new Error('KeyRegistry contract address not configured')
   }
   return new ethers.Contract(address, KEY_REGISTRY_ABI, provider)
 }
@@ -94,57 +61,87 @@ function bytesToHex(bytes) {
 }
 
 /**
- * Look up a user's registered encryption public key from ZKKeyManager
+ * The three outcomes of a key lookup (issue #1286).
+ *
+ * `not-registered` is a FACT ABOUT ANOTHER MEMBER — the registry answered, and it holds no key
+ * for them. `unreadable` is a fact about US — the read failed, the registry is not configured on
+ * this chain, or it returned something that is not a 32-byte X25519 key, so we cannot say either
+ * way. Collapsing the two into one `null` is how an RPC blip on the wager create path came out as
+ * "your opponent has not registered their encryption key": a definite claim about someone else,
+ * manufactured by our own failure. Same shape as the estate reads (`read` / `not-deployed` /
+ * `unreadable`), and `publicKey` exists only on `read`.
+ */
+export const KEY_LOOKUP = Object.freeze({
+  READ: 'read',
+  NOT_REGISTERED: 'not-registered',
+  UNREADABLE: 'unreadable',
+})
+
+/**
+ * Look up a user's registered encryption public key, distinguishing "no key" from "no answer".
  *
  * @param {string} address - Ethereum address to look up
  * @param {ethers.Provider} provider - RPC provider
- * @returns {Promise<Uint8Array|null>} X25519 public key bytes, or null if not registered
+ * @returns {Promise<{state: string, publicKey?: Uint8Array, reason?: string}>}
  */
-export async function lookupPublicKey(address, provider) {
-  if (!address || !provider) return null
+export async function lookupPublicKeyState(address, provider) {
+  if (!address || !provider) {
+    return { state: KEY_LOOKUP.UNREADABLE, reason: 'No address or provider to read with' }
+  }
 
   const normalized = address.toLowerCase()
 
-  // Check cache
+  // Check cache. Only DEFINITE outcomes are ever cached — a failed read must not turn into a
+  // five-minute claim that the member has no key.
   const cached = keyCache.get(normalized)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.publicKeyBytes
+      ? { state: KEY_LOOKUP.READ, publicKey: cached.publicKeyBytes }
+      : { state: KEY_LOOKUP.NOT_REGISTERED }
   }
 
   try {
     const contract = await getKeyRegistryContract(provider)
     const publicKeyHex = await contract.getPublicKey(address)
 
-    /*
-     * `0x` IS the absence. ethers returns `'0x'` for an unset `bytes`, never `''`, so the old
-     * `=== ''` check never matched and a genuinely unregistered account fell through to the
-     * length guard below — reported as an "Unexpected key length: 0 bytes" warning, as though the
-     * registry had answered with something malformed. It had answered correctly: nothing.
-     */
-    if (!publicKeyHex || publicKeyHex === '' || publicKeyHex === '0x') {
-      // No key registered — cache the miss to avoid repeated RPC calls
+    const publicKeyBytes = publicKeyHex ? hexToBytes(publicKeyHex) : new Uint8Array(0)
+
+    if (publicKeyBytes.length === 0) {
+      // The registry answered and holds nothing — a real negative. Cache the miss to avoid
+      // repeated RPC calls.
       keyCache.set(normalized, { publicKeyBytes: null, timestamp: Date.now() })
-      return null
+      return { state: KEY_LOOKUP.NOT_REGISTERED }
     }
 
-    const publicKeyBytes = hexToBytes(publicKeyHex)
-
-    // Validate X25519 key length (32 bytes). A non-empty value of the wrong size is a registry
-    // answering with something we cannot encrypt to — not an absence, so it is not cached as one.
+    // Present but not an X25519 key: the registry gave us bytes we cannot use. That says
+    // nothing about whether the member registered — do NOT report it as "not registered".
     if (publicKeyBytes.length !== 32) {
       console.warn(`[keyRegistry] Unexpected key length for ${address}: ${publicKeyBytes.length} bytes`)
-      return null
+      return { state: KEY_LOOKUP.UNREADABLE, reason: `Registry returned ${publicKeyBytes.length} bytes, expected 32` }
     }
 
     keyCache.set(normalized, { publicKeyBytes, timestamp: Date.now() })
-    return publicKeyBytes
+    return { state: KEY_LOOKUP.READ, publicKey: publicKeyBytes }
   } catch (error) {
-    // A registry that is not deployed here is an ABSENCE — there is nothing to read, and callers
-    // have always treated that as "no key". A failed read is not: see KeyLookupUnavailableError.
-    if (error instanceof KeyRegistryNotConfiguredError) return null
     console.error(`[keyRegistry] Failed to lookup key for ${address}:`, error.message)
-    throw new KeyLookupUnavailableError(address, error)
+    return { state: KEY_LOOKUP.UNREADABLE, reason: error.message }
   }
+}
+
+/**
+ * Look up a user's registered encryption public key from ZKKeyManager
+ *
+ * Convenience wrapper over {@link lookupPublicKeyState} for callers that cannot act on the
+ * difference. Anything that reports the result TO A MEMBER must use the state form instead —
+ * `null` here still means "no key OR no answer".
+ *
+ * @param {string} address - Ethereum address to look up
+ * @param {ethers.Provider} provider - RPC provider
+ * @returns {Promise<Uint8Array|null>} X25519 public key bytes, or null if not registered
+ */
+export async function lookupPublicKey(address, provider) {
+  const result = await lookupPublicKeyState(address, provider)
+  return result.state === KEY_LOOKUP.READ ? result.publicKey : null
 }
 
 /**
@@ -155,15 +152,6 @@ export async function lookupPublicKey(address, provider) {
  * @returns {Promise<boolean>}
  */
 export async function hasRegisteredKey(address, provider) {
-  /*
-   * Deliberately LENIENT where `lookupPublicKey` is strict, because the consequence differs.
-   *
-   * Every caller of this asks about the MEMBER'S OWN key, to decide whether to offer registration.
-   * A failed read answering `false` costs a redundant registration prompt; answering with a throw
-   * would break the purchase and setup flows on a transient RPC blip. `lookupPublicKey` asks about
-   * SOMEONE ELSE, and a wrong answer there is published to the member as a fact about that person
-   * (#1286) — which is why only that one refuses to guess.
-   */
   if (!address || !provider) return false
 
   try {

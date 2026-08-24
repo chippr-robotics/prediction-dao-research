@@ -126,9 +126,28 @@ describe('Activity across chains, and honest capability gating (specs 092 / 051 
        */
       expect(text, 'the failure is disclosed').to.match(/could not be read|None of your networks/i)
       expect(text, 'and an absence is not asserted in its place').to.not.match(/No activity yet/i)
-      // The disclosure NAMES what is missing. "Something went wrong" leaves the member unable to
-      // tell whether the gap is their whole history or one corner of it.
-      expect(text, 'the unread classes are named').to.match(/wager|transfer|earn|pool|membership/i)
+      /*
+       * The disclosure NAMES what is missing. "Something went wrong" leaves the member unable to
+       * tell whether the gap is their whole history or one corner of it.
+       *
+       * It names it at whichever granularity is TRUE, and the two forms are not interchangeable.
+       * `listEntries` calls a chain unreadable only when every NETWORK-backed source on it failed
+       * (#1280 — a localStorage source fulfilling says nothing about an RPC outage, so counting
+       * all nine sources made that verdict dead code). A chain in that state is listed once as
+       * "<Network> (entire network)" and its per-class failures are deliberately NOT repeated
+       * after it: "Polygon (entire network), wager on Polygon, pool on Polygon" states the same
+       * fact three times and reads as though the classes were a second, smaller problem. When
+       * only SOME classes failed the chain is still read, and those are named as
+       * "<class> on <Network>" instead.
+       *
+       * Under a total refusal — every RPC and every subgraph — the whole-network form is the one
+       * that holds, and it is the stronger claim: it says every class went unread without having
+       * to enumerate them. So this accepts either shape and rejects an unnamed disclosure, which
+       * is the thing #1280 was actually about.
+       */
+      expect(text, 'the unread source is named').to.match(
+        /\(entire network\)|(?:wager|transfer|earn|pool|membership) on \S/i,
+      )
     })
   })
 

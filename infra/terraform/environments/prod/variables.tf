@@ -21,6 +21,24 @@ variable "artifact_registry_repository" {
   default     = "cloud-run-source-deploy"
 }
 
+variable "manage_mcp_server" {
+  description = <<-EOT
+    Whether Terraform declares the spec-095 MCP server Cloud Run service.
+
+    DEFAULT FALSE, and the default is load-bearing rather than cautious. `infra-apply.yml` applies
+    on push to main with no human in the loop, and no pipeline in this repository publishes the
+    `fairwins-mcp-server` image — so with this true, a promotion would attempt a Cloud Run create
+    against an image that does not exist, fail, and (fail-fast + never-retry, FR-035) stop the
+    estate's apply until somebody intervenes.
+
+    Set it true only AFTER the image is published and verified present. Doing so is its own PR with
+    its own reviewed plan — which is the point: review approves diffs, so the create must appear in
+    one. See docs/runbooks/member-api-operations.md §3.8.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "gateway_service_account_email" {
   description = "Existing service account the gateway node keeps. It holds zero project-level roles beyond telemetry, which is a property worth preserving."
   type        = string
@@ -119,4 +137,52 @@ variable "billing_export_dataset" {
   description = "BigQuery dataset holding the GCP billing export, read by the FinOps exporter. Null to grant no BigQuery data access."
   type        = string
   default     = null
+}
+
+# ── operator workstation (spec 097) ───────────────────────────────────────────────────────────
+
+variable "workstation_operators" {
+  description = "IAM principals permitted to impersonate the operator workstation account. Each entry is a named human who can then read every secret in workstation_secret_ids, so this list is the access-review artifact — keep it short and remove leavers."
+  type        = list(string)
+  default     = []
+}
+
+variable "workstation_secret_ids" {
+  description = "Secret ids the operator workstation may read. Mirrors scripts/secrets/registry.js; parity is enforced by scripts/secrets/__tests__/terraform-parity.test.js rather than by discipline."
+  type        = list(string)
+  default     = []
+}
+
+variable "manage_spa" {
+  description = <<-EOT
+    Whether Terraform declares the production SPA Cloud Run service (`prediction-dao-research`).
+
+    DEFAULT FALSE because the service is LIVE and NOT in state. With this true the plan reads
+    "will be created" for a service that already serves production traffic: the apply fails on
+    ALREADY_EXISTS, but only after Terraform has begun working a graph that includes the network.
+    A failed apply half-way through the estate is worse than one that never started.
+
+    Adoption is by import, not by create — uncomment the `module.spa` group in imports.tf, bring the
+    declaration to a ZERO-DIFF plan, and flip this in the same PR. Expect real reconciliation:
+    Terraform owns Cloud Run SHAPE while Cloud Build owns the IMAGE (spec 087 rule 4), so the
+    ignore_changes set must be right before this is trusted.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "manage_monitoring" {
+  description = <<-EOT
+    Whether Terraform declares the uptime checks, alert policies and notification channel.
+
+    DEFAULT FALSE for the same reason as `manage_spa`, with a different failure mode: all twelve
+    resources EXIST live and unadopted, and Monitoring does not refuse a duplicate. An apply would
+    therefore SUCCEED and leave two of every alert policy — double paging, while the policies that
+    actually fire stay unmanaged. A create that succeeds wrongly is harder to notice than one that
+    fails, which is why this is gated rather than left to a careful reviewer.
+
+    Adopt by importing each policy, uptime check and channel by id, then flip this.
+  EOT
+  type        = bool
+  default     = false
 }

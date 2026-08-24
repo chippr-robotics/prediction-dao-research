@@ -22,6 +22,32 @@ hides/degrades every Bitcoin surface honestly.
 Boot fails loudly on malformed URLs or nonsensical clamps when
 `BTC_ENABLED=true` — a bad deploy dies visibly, not silently.
 
+## Config (SPA build — where the client points)
+
+| Var | Default | Notes |
+|---|---|---|
+| `VITE_BITCOIN_GATEWAY_URL` | unset | base URL the SPA's Bitcoin client calls; wins over `VITE_RELAYER_URL` |
+| `VITE_RELAYER_URL` | unset | shared relay-gateway host; used by Bitcoin only as the fallback |
+
+Build-time only (Vite inlines them), so changing either needs a rebuild, not a
+restart. Precedence is `VITE_BITCOIN_GATEWAY_URL` → `VITE_RELAYER_URL` → unset;
+a blank value counts as unset, so **a deployment that sets only
+`VITE_RELAYER_URL` is unaffected by this variable existing** (issue #1263). Set
+the Bitcoin-specific name when a build should reach the Bitcoin proxy without
+also turning on the other gateway-backed clients (Predict, Perps, Collect,
+Solana RPC, intent relay, bridge quotes).
+
+**It does not run the other way.** Because blank falls through, there is no
+value of `VITE_BITCOIN_GATEWAY_URL` that leaves Bitcoin unconfigured while
+`VITE_RELAYER_URL` is set. To build with the Bitcoin client dark — which is
+what a "gateway unavailable" e2e row needs — leave **both** names unset.
+
+With neither set the client is unconfigured and every Bitcoin surface says so;
+it never renders a zero balance. Note this is a client-side switch only:
+pointing a build at a gateway whose `BTC_ENABLED` is `false` still gets 503
+`bitcoin_disabled`, and turning the client off does not stop the gateway
+serving anyone else.
+
 ## Playbooks
 
 **Kill Bitcoin now** (incident): set `BTC_KILLSWITCH=true` and restart (or the

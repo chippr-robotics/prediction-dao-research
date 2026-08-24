@@ -27,7 +27,10 @@ export const CHAIN_DEFS = {
     paymentSupported: true,
     noBatch: false,
     tokenDomain: { name: 'USD Coin', version: '2' },
-    defaultRpcUrls: ['https://polygon-rpc.com', 'https://polygon-bor-rpc.publicnode.com'],
+    // polygon-rpc.com was the first entry until 2026-08-23, when it was measured answering HTTP
+    // 401 without a key — a default that fails closed for anyone who has not set
+    // RPC_URLS_137. Production always sets it; this is the path a dev or a fresh deploy takes.
+    defaultRpcUrls: ['https://polygon-bor-rpc.publicnode.com', 'https://polygon.drpc.org'],
     // Fallbacks only — used when a live fee read fails; the engine owns real pricing.
     gasPriceFallbackWei: 50_000_000_000n, // 50 gwei
   },

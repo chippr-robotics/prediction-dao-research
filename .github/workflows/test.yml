@@ -63,6 +63,13 @@ jobs:
       - name: Run market-template tooling tests
         run: npm run test:market-templates
 
+      # The E2E deploy-order gate (issue #1298). It only runs in the full/torture tier, where a
+      # broken gate would be invisible until the next time someone inserts a deploy — so its own
+      # suite runs here, in the tier every push hits. Dependency-free: node:test plus two files
+      # read off disk, no chain, no npm ci.
+      - name: Run E2E address-gate tests
+        run: npm run test:e2e-addresses
+
   # Gate (spec 075, FR-003/FR-015): version skew across manifests and undeclared (phantom)
   # imports. Both invariants were fixed by hand once and had nothing preventing recurrence, which
   # is precisely the failure mode spec 075 exists to remove. Dependency-free, so no npm ci.
@@ -385,6 +392,37 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  # MCP server tests (specs 095/096). This suite was written and then never run by CI: the only job
+  # touching this service built the image and curled /healthz, which is a liveness check, not a test.
+  # The load-bearing cases here are the transport's — where it binds, whose Origin it serves, and
+  # that `--http` refuses to boot into a shared identity. Every one of those is a decision a passing
+  # container smoke test cannot see.
+  #
+  # NO INSTALL STEP, and that is the point rather than an omission: this service has zero
+  # dependencies and is deliberately NOT a workspace member (spec 075), so there is nothing to
+  # install and `node --test` runs against node built-ins alone. Adding an install here would be the
+  # first step towards giving it the lockfile coupling it exists without.
+  # Gating like every other test job — no continue-on-error (Constitution IV).
+  mcp-server-tests:
+    name: MCP Server Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: services/mcp-server
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Run tests
+        run: node --test test/*.test.js
 
   frontend-tests:
     name: Frontend Unit Tests
