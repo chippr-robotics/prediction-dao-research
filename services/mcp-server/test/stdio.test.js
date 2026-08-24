@@ -76,7 +76,15 @@ test('blank lines are ignored and stdin ending resolves the transport', async ()
 })
 
 test('parseArgs defaults to stdio and reads --http in both spellings', () => {
-  assert.deepEqual(parseArgs([]), { mode: 'stdio', port: 8790, help: false, version: false })
+  assert.deepEqual(parseArgs([]), {
+    mode: 'stdio',
+    port: 8790,
+    host: null,
+    allowedOrigins: [],
+    allowSharedToken: false,
+    help: false,
+    version: false,
+  })
   assert.equal(parseArgs(['--http']).mode, 'http')
   assert.equal(parseArgs(['--http']).port, 8790)
   assert.equal(parseArgs(['--http', '9001']).port, 9001)
