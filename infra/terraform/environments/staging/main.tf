@@ -22,7 +22,7 @@
 module "staging_mainnet" {
   count = var.manage_staging_services ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=ce0ed292fd45d577b5f066a1990b611bebc795a3"
 
   project_id = var.project_id
   region     = var.region
@@ -34,8 +34,14 @@ module "staging_mainnet" {
   # Required by the provider, then ignored — Cloud Build owns the artifact.
   image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/prediction-dao-research/staging:latest"
 
-  min_instances         = 0
-  max_instances         = var.staging_max_instances
+  min_instances = 0
+  max_instances = var.staging_max_instances
+
+  # Read off the LIVE service, not chosen here: gcloud turned startup CPU boost on at deploy time.
+  # The module could not express it until chippr-tf-modules ce0ed29, and a module that cannot
+  # express a setting does not preserve it on import — it resets it to the provider default.
+  # Stating it is what makes this an adoption rather than a quiet reconfiguration.
+  startup_cpu_boost     = true
   cpu                   = "1"
   memory                = "512Mi"
   cpu_idle              = true
@@ -47,7 +53,7 @@ module "staging_mainnet" {
 module "staging_testnet" {
   count = var.manage_staging_services ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=ce0ed292fd45d577b5f066a1990b611bebc795a3"
 
   project_id = var.project_id
   region     = var.region
@@ -55,8 +61,14 @@ module "staging_testnet" {
 
   image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/prediction-dao-research/staging-testnet:latest"
 
-  min_instances         = 0
-  max_instances         = var.staging_max_instances
+  min_instances = 0
+  max_instances = var.staging_max_instances
+
+  # Read off the LIVE service, not chosen here: gcloud turned startup CPU boost on at deploy time.
+  # The module could not express it until chippr-tf-modules ce0ed29, and a module that cannot
+  # express a setting does not preserve it on import — it resets it to the provider default.
+  # Stating it is what makes this an adoption rather than a quiet reconfiguration.
+  startup_cpu_boost     = true
   cpu                   = "1"
   memory                = "512Mi"
   cpu_idle              = true
@@ -92,7 +104,7 @@ module "staging_testnet" {
 module "mcp_server_staging" {
   count = var.manage_mcp_server ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=ce0ed292fd45d577b5f066a1990b611bebc795a3"
 
   project_id = var.project_id
   region     = var.region

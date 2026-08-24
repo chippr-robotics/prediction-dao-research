@@ -6,7 +6,10 @@ region     = "us-central1"
 artifact_registry_repository = "cloud-run-source-deploy"
 
 # Lower than production on purpose: staging is a promotion mirror, not a load test.
-staging_max_instances = 10
+# 3, because that is what the live services run. This read 10; raising an instance ceiling is a
+# real change to cost and blast radius, and it must not ride in on an import that claims to bring a
+# service under management unchanged.
+staging_max_instances = 3
 
 # spec 095 MCP server. FALSE, and stated rather than left to the variable's default so that turning
 # it on is a one-line diff a reviewer cannot miss. It stays false until
