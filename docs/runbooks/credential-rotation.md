@@ -9,12 +9,18 @@ without an outage.
 > `infra/terraform/environments/prod/terraform.tfvars`).
 > Re-run the commands in [Keeping this current](#keeping-this-current) after any change.
 >
-> **Correction (2026-08-23).** Earlier revisions of this page cited `npm run sec` and
-> `scripts/secrets/registry.js` as the workstation inventory. **Neither exists in this repository** —
-> there is no `sec` script in `package.json` and no `scripts/secrets/` directory. The workstation
-> secrets listed below are real and readable with `gcloud`; only the tooling was fictitious, and a
-> runbook step that cannot run is worse than an absent one, because it is followed first and
-> disbelieved second.
+> **Correction, and then its retraction (2026-08-23).** An earlier revision of this page reported
+> that `npm run sec` and `scripts/secrets/registry.js` did not exist. That was true when written —
+> and the reason was not a fictitious runbook. Spec 097's tooling had been **applied to production
+> but never merged**, so this page was describing an estate that really existed while the code that
+> managed it did not. Landing spec 097 made the original references true again, and they are restored
+> below.
+>
+> Both halves are kept deliberately. `scripts/secrets/registry.js` is now the inventory of record —
+> `scripts/secrets/__tests__/terraform-parity.test.js` fails if it drifts from the Terraform grant
+> list, which is the property that makes it trustworthy. The raw `gcloud` commands stay as the
+> fallback for a machine that has not run the workstation setup, since a runbook step that cannot
+> run is worse than an absent one.
 
 > **⚠️ The GCP project is SHARED.** `chippr-bots-site-wp` holds 73 secrets, and **only about half
 > are FairWins'**. The rest belong to unrelated Chippr workloads (Clerk, Neo4j, OpenAI, GraphRAG,

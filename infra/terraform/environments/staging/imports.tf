@@ -7,13 +7,13 @@
  */
 
 # import {
-#   to = module.staging_mainnet.google_cloud_run_v2_service.this
-#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/staging"
+#   to = module.staging_mainnet[0].google_cloud_run_v2_service.this
+#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research-staging"
 # }
 #
 # import {
-#   to = module.staging_testnet.google_cloud_run_v2_service.this
-#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/staging-testnet"
+#   to = module.staging_testnet[0].google_cloud_run_v2_service.this
+#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research-staging-testnet"
 # }
 
 # `module.mcp_server_staging` (spec 095) is deliberately absent here: the service is new, created by

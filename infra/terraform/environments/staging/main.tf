@@ -20,11 +20,16 @@
  */
 
 module "staging_mainnet" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  count = var.manage_staging_services ? 1 : 0
+
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id = var.project_id
   region     = var.region
-  name       = "staging"
+  # The LIVE service is `prediction-dao-research-staging`. This read `"staging"`, and the module
+  # passes `name` through verbatim — so the plan was not adopting the staging service, it was
+  # proposing a SECOND, public, unmanaged one beside it. That apply would have SUCCEEDED.
+  name = "prediction-dao-research-staging"
 
   # Required by the provider, then ignored — Cloud Build owns the artifact.
   image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/prediction-dao-research/staging:latest"
@@ -40,11 +45,13 @@ module "staging_mainnet" {
 }
 
 module "staging_testnet" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  count = var.manage_staging_services ? 1 : 0
+
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id = var.project_id
   region     = var.region
-  name       = "staging-testnet"
+  name       = "prediction-dao-research-staging-testnet"
 
   image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/prediction-dao-research/staging-testnet:latest"
 
@@ -85,7 +92,7 @@ module "staging_testnet" {
 module "mcp_server_staging" {
   count = var.manage_mcp_server ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id = var.project_id
   region     = var.region

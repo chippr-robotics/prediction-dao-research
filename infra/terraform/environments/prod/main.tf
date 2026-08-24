@@ -35,13 +35,19 @@ locals {
 # ── network ───────────────────────────────────────────────────────────────────────────────────
 
 module "network" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id   = var.project_id
   region       = var.region
   network_name = "fairwins-infra"
   subnet_name  = "fairwins-infra-usc1"
   subnet_cidr  = "10.10.0.0/24"
+
+  # `network_description` is deliberately LEFT UNSET. It is FORCE-NEW on google_compute_network and
+  # GCP cannot set one on an existing network, so giving the live VPC a description is not an edit —
+  # it is a replacement, and replacing the VPC takes the subnet and every attached instance with it.
+  # The module hardcoded this string until chippr-tf-modules 33a6cc3; at the previous pin the prod
+  # plan read "must be replaced" for both the VPC and the subnet, from a comment field.
 
   # The live rules are `fairwins-allow-*`, NOT `fairwins-infra-allow-*`. Stated explicitly because a
   # derived name would not match what exists, and on import that reads as "create a new rule and
@@ -66,7 +72,7 @@ module "network" {
  * account and sign with the paymaster HSM key. This grant is strictly smaller.
  */
 module "bundler" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id        = var.project_id
   region            = var.region
@@ -109,7 +115,7 @@ module "bundler" {
  * repository-scoped and its secret access is per-secret.
  */
 module "gateway" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id        = var.project_id
   region            = var.region
@@ -236,7 +242,9 @@ resource "google_kms_crypto_key" "signing" {
 # no in-band detection. Guardrail G-11 rejects any attempt to add it back.
 
 module "spa" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  count = var.manage_spa ? 1 : 0
+
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id = var.project_id
   region     = var.region
@@ -309,7 +317,7 @@ module "spa" {
 module "mcp_server" {
   count = var.manage_mcp_server ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id = var.project_id
   region     = var.region
@@ -359,7 +367,7 @@ data "google_secret_manager_secret_version" "origin_lock" {
 
 module "edge" {
   count  = var.manage_edge ? 1 : 0
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   zone_id = var.cloudflare_zone_id
 
@@ -390,7 +398,9 @@ module "edge" {
 # ── monitoring ────────────────────────────────────────────────────────────────────────────────
 
 module "monitoring" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
+  count = var.manage_monitoring ? 1 : 0
+
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id          = var.project_id
   notification_emails = var.notification_emails
@@ -426,4 +436,44 @@ module "monitoring" {
   ]
 
   vm_alert_policies = var.vm_alert_policies
+}
+
+# ── operator workstation (spec 097) ───────────────────────────────────────────────────────────
+#
+# The self-hosted administration machine. It is not provisioned here — it is physical hardware —
+# but the identity it acts as and everything it can reach IS declared, which is what makes it a
+# reviewable surface rather than an undescribed box holding a funded deploy key.
+#
+# The secret id list is NOT hand-maintained: it mirrors `scripts/secrets/registry.js`, and
+# `scripts/secrets/__tests__/terraform-parity.test.js` fails if the two drift. Without that, an
+# operator adds a secret to the registry, the grant silently never appears, and the failure surfaces
+# as PERMISSION_DENIED at use time — which reads exactly like a broken login.
+#
+# ADOPTION NOTE: these resources already EXIST in prod state, applied from an unmerged branch.
+# Declaring them here is what stopped `terraform plan` proposing to destroy twelve
+# prevent_destroy secret containers on every run. See specs/097-workstation-secrets-observability/.
+# The module ref is unified with every other module in this file at d70fb6f. An earlier revision
+# pinned this one module back to 205b2e42, because `modules/ops-workstation` was absent at the ref
+# the rest used and `terraform init` fails with "Failed to expand subdir globs" when a pinned
+# subdirectory is not in the fetched repo. That split is resolved: d70fb6f carries the module and is
+# byte-identical to 205b2e42 for it, so there is no longer a reason for this line to differ.
+module "workstation" {
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
+
+  project_id                   = var.project_id
+  service_account_id           = "fairwins-ops"
+  service_account_display_name = "FairWins operator workstation"
+
+  operator_principals     = var.workstation_operators
+  secret_accessor_secrets = var.workstation_secret_ids
+
+  # READ-ONLY telemetry only. This is what lets the locally-run Prometheus and Grafana stack
+  # (infra/observability) scrape Cloud Monitoring and read logs while holding no write path of any
+  # kind into the estate. Anything mutating belongs to the CI apply identity, not to a workstation.
+  project_roles = [
+    "roles/monitoring.viewer",
+    "roles/logging.viewer",
+  ]
+
+  depends_on = [google_secret_manager_secret.managed]
 }

@@ -54,3 +54,20 @@ variable "staging_testnet_secret_env" {
   }))
   default = {}
 }
+
+variable "manage_staging_services" {
+  description = <<-EOT
+    Whether Terraform declares the two staging SPA Cloud Run services.
+
+    DEFAULT FALSE. Both services are LIVE and NOT in state, and until this commit the declaration
+    named them `staging` / `staging-testnet` while the live services are
+    `prediction-dao-research-staging` / `-staging-testnet`. Because the module passes `name` through
+    verbatim, that plan was not adopting anything — it was proposing two ADDITIONAL public services,
+    and unlike a name collision it would have applied cleanly and left them running.
+
+    The names are corrected and imports.tf now carries the real ids. Adopt by uncommenting that
+    group, bringing it to a zero-diff plan, and flipping this in the same PR.
+  EOT
+  type        = bool
+  default     = false
+}

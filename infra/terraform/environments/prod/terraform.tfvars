@@ -75,6 +75,22 @@ managed_secret_ids = [
   "QUICKNODE_POLYGON_WSS",
   "QUICKNODE_AMOY_API",
   "QUICKNODE_AMOY_WSS",
+
+
+  # Workstation secrets (spec 097). Mirrors scripts/secrets/registry.js — the parity test keeps
+  # these in step; do not edit one list without the other.
+  "fairwins-creator-key",
+  "fairwins-deployer-key",
+  "fairwins-etherscan-api-key",
+  "fairwins-floppy-keystore-password",
+  "fairwins-floppy-mordor-password",
+  "fairwins-floppy-nazgul-prime-password",
+  "fairwins-graph-api-key",
+  "fairwins-graph-deploy-key",
+  "fairwins-pinata-jwt",
+  "fairwins-quicknode-polygon-token",
+  "fairwins-quicknode-polygon-url",
+  "fairwins-seed-player-keys",
 ]
 
 # The billing export the FinOps exporter reads. It is the ONLY source of `billed` (as opposed to
@@ -133,6 +149,13 @@ vm_alert_policies = {
 # imports.tf.
 manage_edge = false
 
+# Both surfaces are LIVE and UNADOPTED, so Terraform currently describes them without owning them.
+# Left true, the SPA plans as a create against a service that already serves production (apply fails
+# ALREADY_EXISTS mid-graph), and monitoring plans twelve creates that would SUCCEED and duplicate
+# every alert policy. Flip each one only in the PR that imports it to a zero-diff plan.
+manage_spa        = false
+manage_monitoring = false
+
 # cloudflare_zone_id         = "..."
 # geo_gate_allowed_countries = [...]   # a legal control (spec 007) — see infra/cloudflare/waf-geo.md
 
@@ -142,3 +165,24 @@ manage_edge = false
 # their IAM bindings; key VERSIONS are never managed, because a destroyed version is unrecoverable.
 # kms_key_ring    = "..."
 # kms_crypto_keys = [...]
+
+# ── operator workstation (spec 097) ───────────────────────────────────────────────────────────
+#
+# Everyone listed here can read every secret below by impersonating fairwins-ops@. That is the
+# whole access-review question in one place: this list times that list.
+workstation_operators = ["user:cody.w.burns@gmail.com"]
+
+workstation_secret_ids = [
+  "fairwins-creator-key",
+  "fairwins-deployer-key",
+  "fairwins-etherscan-api-key",
+  "fairwins-floppy-keystore-password",
+  "fairwins-floppy-mordor-password",
+  "fairwins-floppy-nazgul-prime-password",
+  "fairwins-graph-api-key",
+  "fairwins-graph-deploy-key",
+  "fairwins-pinata-jwt",
+  "fairwins-quicknode-polygon-token",
+  "fairwins-quicknode-polygon-url",
+  "fairwins-seed-player-keys",
+]
