@@ -88,6 +88,39 @@ updates:
       # update, not just major.
       - dependency-name: solc
 
+      # HELD AT 5.4.0 BECAUSE OZ 5.5+ CANNOT COMPILE FOR PRE-CANCUN CHAINS.
+      #
+      # OZ 5.5 spread the Cancun-only `mcopy` opcode from 2 files to 7 — adding utils/Memory.sol,
+      # utils/RLP.sol, utils/structs/Accumulators.sol, utils/cryptography/SignatureChecker.sol and,
+      # decisively, utils/Arrays.sol (0 -> 9 uses). Arrays.sol is NOT avoidable: EnumerableSet
+      # imports it, and this repo imports AccessControlEnumerableUpgradeable and ERC721Enumerable,
+      # so it is always in the compile graph. Every contract here compiles with
+      # `evmVersion: "paris"` (hardhat.config.js, both compiler entries) so bytecode deploys on
+      # pre-Cancun ETC (61) and Mordor (63). Measured on 5.6.1: `DeclarationError: Function "mcopy"
+      # not found` at Arrays.sol:402/432/462/492/540/574. Not a warning — the project does not build.
+      #
+      # This is the same failure that already blocks GovernorUpgradeable on Mordor via Bytes.sol
+      # (spec 030 shipped an external-DAO connector because of it). 5.5+ widens it from one
+      # governance module to a large fraction of the library.
+      #
+      # ANY update, not just major: 5.4.0 -> 5.6.1 is a MINOR bump, so a major-only rule would not
+      # have caught it. Dependabot has offered it repeatedly (#1103, deferred via #1055).
+      #
+      # Two further 5.5 removals are waiting behind this whenever it IS lifted, both compile errors:
+      #   * `ReentrancyGuardUpgradeable` is deleted (9 contracts inherit it). The replacement is the
+      #     plain `ReentrancyGuard`, which is proxy-safe ONLY from 5.5 — it moved to a fixed
+      #     StorageSlot at 0x9b779b17…55f00, byte-identical to the slot the upgradeable variant used.
+      #     Do NOT perform that swap while pinned at 5.4.0: there the plain guard is still a
+      #     sequential `uint256 private _status`, so the swap would inject a storage variable into
+      #     every upgradeable contract and corrupt the layout of every deployed proxy.
+      #   * `__UUPSUpgradeable_init()` is deleted, and UUPSManaged calls it. Harmless to drop (it was
+      #     always a no-op) but it will not compile until removed.
+      #
+      # Lift ONLY when ETC/Mordor support is deliberately dropped, or OZ makes the mcopy paths
+      # conditional on the EVM target. Not before, and not as part of a routine dependency sweep.
+      - dependency-name: "@openzeppelin/contracts"
+      - dependency-name: "@openzeppelin/contracts-upgradeable"
+
   - package-ecosystem: github-actions
     # Open updates against `staging`, not `main` (spec 076, FR-018).
     #
