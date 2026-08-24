@@ -187,6 +187,31 @@
 # Both surfaces are gated OFF (`manage_spa`, `manage_monitoring`) because declaring them without
 # adopting them is worse than not declaring them at all, in two different ways:
 #
+# ⚠ THE SPA IS BLOCKED, AND NOT ON JUDGEMENT. Adoption was attempted (the plan ran) and the live
+# service cannot be REPRESENTED by this module:
+#
+#     VITE_NETWORK_ID = 63        <- Mordor
+#     VITE_NETWORK_ID = 80002     <- Amoy
+#
+# Both, on the same container, on the MAINNET production service. Cloud Run allows a repeated env
+# name; the module takes `env` as a MAP, and a map cannot hold a duplicate key. There is no value
+# to write here that produces the current state, so this is not an adoption that needs more care —
+# it is one that cannot be expressed until the duplicate is removed from the service.
+#
+# The import plan also proposed to DELETE all nine runtime env vars, including the
+# VITE_PINATA_JWT secret reference, because none of them are declared. Changing template env
+# creates a new revision, so that is a live change to production, not a bookkeeping one.
+#
+# Two things must happen before this is retried, and neither is a Terraform change:
+#   1. remove the duplicate VITE_NETWORK_ID and decide which value is correct — a mainnet service
+#      carrying two testnet ids is worth understanding before it is frozen into a declaration;
+#   2. decide what the runtime env SHOULD be. Note VITE_* are BUILD-time and compiled into the
+#      bundle (see CLAUDE.md), so runtime env on the nginx container may be entirely vestigial —
+#      in which case the answer is to remove it, not to declare it.
+#
+# The module block's `max_instances` / `execution_environment` / `startup_cpu_boost` were already
+# corrected to the live values and are left that way: they are right whenever this is retried.
+#
 #   - the SPA fails LOUDLY. `prediction-dao-research` serves production; a create returns
 #     ALREADY_EXISTS and aborts the apply part-way through a graph that also touches the network.
 #   - monitoring fails QUIETLY. Cloud Monitoring accepts duplicates, so the apply SUCCEEDS and the
@@ -202,10 +227,10 @@
 # into two addresses. Decide first whether the estate should have one policy or two; splitting it is
 # a real alerting change and belongs in its own PR, not smuggled into an adoption.
 #
-import {
-  to = module.spa[0].google_cloud_run_v2_service.this
-  id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research"
-}
+# import {
+#   to = module.spa[0].google_cloud_run_v2_service.this
+#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research"
+# }
 #
 # import {
 #   to = module.monitoring[0].google_monitoring_notification_channel.email["cody.w.burns@gmail.com"]

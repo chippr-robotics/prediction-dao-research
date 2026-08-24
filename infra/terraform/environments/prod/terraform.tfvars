@@ -149,9 +149,10 @@ vm_alert_policies = {
 # imports.tf.
 manage_edge = false
 
-# The SPA is ADOPTED — imported by the block in imports.tf, never created. The plan must read
-# "will be imported" and never "must be replaced": this service carries production traffic.
-manage_spa = true
+# STILL FALSE. Adoption was attempted and is BLOCKED — not by risk appetite, but because the live
+# service cannot be represented: it defines VITE_NETWORK_ID TWICE (63 and 80002) and the module's
+# `env` is a map, which cannot hold a duplicate key. See imports.tf for the full finding.
+manage_spa = false
 
 # Monitoring is still UNADOPTED and stays gated. All twelve resources exist live and Cloud
 # Monitoring accepts duplicates, so an apply here SUCCEEDS and leaves two of every alert policy —
