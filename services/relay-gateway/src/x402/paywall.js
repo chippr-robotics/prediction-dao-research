@@ -183,7 +183,7 @@ export function createPaywall(config, { providers, screen, engineClient, quotas,
       op: routeId,
       opClass,
       payer: verified.payer,
-      amount: String(verified.amount),
+      amount: String(verified.value), // what the token actually moved, not the quoted price
       asset: requirement.asset,
       network: verified.network,
       chainId: x402.chainId,
@@ -199,13 +199,13 @@ export function createPaywall(config, { providers, screen, engineClient, quotas,
         transactionId: receipt.transactionId,
         chainId: x402.chainId,
         payer: verified.payer,
-        amount: verified.amount,
+        amount: verified.value,
       })
     )
 
     return {
       payer: verified.payer,
-      settlement: { ...receipt, network: verified.network, amount: String(verified.amount), asset: requirement.asset },
+      settlement: { ...receipt, network: verified.network, amount: String(verified.value), asset: requirement.asset },
     }
   }
 
