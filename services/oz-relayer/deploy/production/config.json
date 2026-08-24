@@ -115,7 +115,7 @@
       "features": [],
       "rpc_urls": [
         "https://polygon-bor-rpc.publicnode.com",
-        "https://polygon.llamarpc.com"
+        "https://polygon.drpc.org"
       ],
       "explorer_urls": ["https://polygonscan.com"],
       "tags": ["mainnet", "fairwins", "eip1559", "eip3009"]

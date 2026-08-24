@@ -36,7 +36,7 @@ services:
     ports:
       - "127.0.0.1:8788:8788"
     env_file:
-      - /run/fairwins/gateway.env   # 8 gateway secrets. MUST NOT contain GCP_PRIVATE_KEY.
+      - /run/fairwins/gateway.env   # gateway credentials only. MUST NOT contain GCP_PRIVATE_KEY.
     environment:
       PORT: "8788"
       ENABLED_CHAIN_IDS: "63,137"
@@ -47,7 +47,16 @@ services:
       RPC_URLS_63: "https://rpc.mordor.etccooperative.org,https://geth-mordor.etc-network.info"
       ENGINE_RELAYER_ID_137: "polygon-137"
       GAS_WALLET_137: "0x3BB28b184b8a748dE22aBD076634F85adADA82db"
-      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.llamarpc.com"
+      # PUBLIC FAILOVER ONLY. The primary is the keyed QuickNode archive endpoint, delivered as
+      # RPC_URL_PRIMARY_137 in gateway.env and PREPENDED to this list by config/index.js — it is a
+      # URL with the token in its path and must never be written here, where it would be in git.
+      #
+      # polygon.llamarpc.com was REMOVED, not replaced in place: measured 2026-08-23 it does not
+      # resolve at all (`fetch failed`), so this had been a one-entry list wearing a failover's
+      # clothes since some unknown date. polygon-rpc.com is NOT the replacement either — it now
+      # answers 401 without a key. polygon.drpc.org was probed at the same time: HTTP 200,
+      # chainId 137.
+      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"
       PAYMASTER_ADDRESS_137: "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105"
       PM_SIGNER_KMS_KEY: "projects/chippr-bots-site-wp/locations/us-central1/keyRings/fairwins-relayer/cryptoKeys/paymaster-signer-polygon/cryptoKeyVersions/1"
       OPENSEA_REFERRAL_ADDRESS: ""
@@ -134,6 +143,14 @@ services:
     volumes:
       # config.json is delivered read-only from the repo checkout on the VM. Its localhost:8788
       # webhook URL is correct here — do NOT template it.
+      #
+      # ⚠ THE ENGINE HAS ITS OWN `rpc_urls`, and they are NOT this file's RPC_URLS_137. The engine
+      # is the WRITE path — it broadcasts every relayed transaction — and it reads that list from
+      # config.json, which is a plain file in git. It therefore stays on PUBLIC endpoints: the keyed
+      # QuickNode URL carries its token in the path, and putting it here would commit a credential.
+      # Its dead polygon.llamarpc.com entry was replaced 2026-08-23 (see the note on RPC_URLS_137
+      # above); giving the write path the keyed endpoint needs a templated config rendered at boot
+      # from Secret Manager, which is a separate change.
       - /opt/fairwins/repo/services/oz-relayer/deploy/production/config.json:/app/config/config.json:ro
     cpus: 0.35
     mem_limit: 320m
@@ -163,7 +180,11 @@ services:
       # The build's cohort. Reads never cross the testnet/mainnet boundary (constitution III).
       FINOPS_COHORT_CHAIN_IDS: "63,137"
       RPC_URLS_63: "https://rpc.mordor.etccooperative.org,https://geth-mordor.etc-network.info"
-      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.llamarpc.com"
+      # Same shape as the gateway above: public failover here, keyed primary from finops.env as
+      # RPC_URL_PRIMARY_137. The exporter reads treasury, gas-wallet and paymaster balances, so an
+      # endpoint that cannot serve them makes those sources `unreadable` — an honest state, but one
+      # a working archive endpoint simply avoids.
+      RPC_URLS_137: "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"
       # Contracts it READS. Same addresses the gateway uses; nothing new is trusted.
       PAYMASTER_ADDRESS_137: "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105"
       GAS_WALLET_63: "0xf505d95F62bEE94437C112d3D64ee7Df0Fa973aC"
