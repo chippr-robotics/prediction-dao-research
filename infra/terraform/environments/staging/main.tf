@@ -22,7 +22,7 @@
 module "staging_mainnet" {
   count = var.manage_staging_services ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=be57345a1fd915b359d9ba30139a6272b80d5214"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=c59ac880f14d1a172b58bd5f43c45bf31922819f"
 
   project_id = var.project_id
   region     = var.region
@@ -53,7 +53,7 @@ module "staging_mainnet" {
 module "staging_testnet" {
   count = var.manage_staging_services ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=be57345a1fd915b359d9ba30139a6272b80d5214"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=c59ac880f14d1a172b58bd5f43c45bf31922819f"
 
   project_id = var.project_id
   region     = var.region
@@ -104,7 +104,7 @@ module "staging_testnet" {
 module "mcp_server_staging" {
   count = var.manage_mcp_server ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=be57345a1fd915b359d9ba30139a6272b80d5214"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=c59ac880f14d1a172b58bd5f43c45bf31922819f"
 
   project_id = var.project_id
   region     = var.region
