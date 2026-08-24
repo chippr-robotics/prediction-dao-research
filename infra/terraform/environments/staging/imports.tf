@@ -6,15 +6,15 @@
  * adoption as the audit record and the state-loss recovery path.
  */
 
-# import {
-#   to = module.staging_mainnet[0].google_cloud_run_v2_service.this
-#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research-staging"
-# }
-#
-# import {
-#   to = module.staging_testnet[0].google_cloud_run_v2_service.this
-#   id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research-staging-testnet"
-# }
+import {
+  to = module.staging_mainnet[0].google_cloud_run_v2_service.this
+  id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research-staging"
+}
+
+import {
+  to = module.staging_testnet[0].google_cloud_run_v2_service.this
+  id = "projects/chippr-bots-site-wp/locations/us-central1/services/prediction-dao-research-staging-testnet"
+}
 
 # `module.mcp_server_staging` (spec 095) is deliberately absent here: the service is new, created by
 # the apply that first sets `manage_mcp_server = true`, with nothing to adopt — and while the module
