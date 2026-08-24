@@ -650,6 +650,17 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
           headers: { 'Retry-After': { schema: { type: 'integer' }, description: 'Seconds to wait before retrying.' } },
           content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorBody' }, example: { error: { code: 'quota_exceeded', reason: 'signer member API quota exceeded; retry shortly' } } } },
         },
+        AssistantTooManyRequests: {
+          ...errorResponse(
+            'Two different ceilings, and an agent should branch on which one it hit. `quota_exceeded` counts ' +
+              'REQUESTS — the assistant has its own, tighter request class than the module\'s reads. ' +
+              '`assistant_budget_exhausted` counts TOKENS, which is what is actually billed; it means the model ' +
+              'budget for this account or for this gateway is spent for the window. Neither ever arrives as a ' +
+              'truncated answer: an exhausted budget refuses the turn outright rather than shortening it.',
+            ['quota_exceeded', 'assistant_budget_exhausted']
+          ),
+          headers: { 'Retry-After': { schema: { type: 'integer' }, description: 'Seconds to wait before retrying.' } },
+        },
         Unavailable: errorResponse(
           'Temporarily unavailable — RETRY. None of these is a rejection: `auth_unverifiable` and ' +
             '`membership_unreadable` in particular mean a fact could not be established, not that it was ' +
@@ -752,7 +763,7 @@ export function buildOpenApiDocument(config, { assistantConfigured = false } = {
         400: errRef('BadRequest'),
         401: errRef('Unauthorized'),
         403: errRef('Forbidden'),
-        429: errRef('TooManyRequests'),
+        429: errRef('AssistantTooManyRequests'),
         503: errRef('AssistantUnavailable'),
       },
     },

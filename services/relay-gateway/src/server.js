@@ -29,7 +29,7 @@ import { parseIntent, verifyIntent } from './intent/verify.js'
 import { createIntentStore } from './intent/store.js'
 import { createSanctionsScreen } from './policy/sanctions.js'
 import { createDedupStore } from './policy/dedup.js'
-import { createQuotas, createSpendTracker } from './policy/quotas.js'
+import { createQuotas, createSpendTracker, createTokenBudget } from './policy/quotas.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createEngineClient } from './engine/client.js'
@@ -812,9 +812,19 @@ export function createApp(config, deps = {}) {
   // the existing public POST /v1/intents, which recovers the signer itself.
   //
   // Quotas are keyed by the RECOVERED ACCOUNT rather than caller IP — `trust proxy` is unset and
-  // nginx fronts this container, so an IP key would pool every member into one bucket. The two
-  // unauthenticated routes (the OpenAPI document and the self-authorizing revocation) fall back to
-  // an `ip:`-prefixed key in the same instance, where the GLOBAL window is the real bound.
+  // nginx fronts this container, so an IP key would pool every member into one bucket.
+  //
+  // FOUR INSTANCES, BECAUSE ONE WINDOW CANNOT SERVE FOUR DIFFERENT PROMISES. The unauthenticated
+  // routes can only key on the proxy's IP, so they are ONE caller as far as any counter can tell;
+  // sharing an instance with the members meant they shared the GLOBAL counter too, and a flood of
+  // anonymous GETs would answer 429 to every authenticated member on every route of this module —
+  // including `keys/revoke`, the one endpoint that has to work while a token is loose. So:
+  //   · memberApiQuotas   — authenticated traffic, keyed by the account behind a verified signature
+  //   · memberApiPublic   — every unauthenticated route (and the x402 402-challenge path)
+  //   · memberApiRevoke   — POST /v1/member/keys/revoke and nothing else (see routes.js for why it
+  //                         is budgeted rather than exempted)
+  //   · memberApiAssistantQuotas — model CALLS, tighter than the general read class
+  // and, separately, a TOKEN budget, because a request count is not a spend ceiling.
   //
   // Mounting is unconditional so a disabled module answers 503 member_api_unconfigured with a
   // machine-readable code, never a bare 404 — same reasoning as the bitcoin/bridge/perps proxies.
@@ -824,6 +834,37 @@ export function createApp(config, deps = {}) {
     windowMs: config.memberApi.quotaWindowMs,
     now: nowMs,
   })
+  // One number configures both bounds: with `trust proxy` unset the per-key and aggregate windows
+  // coincide (every anonymous caller is the same nginx IP), and if an operator ever did trust the
+  // proxy the per-IP key simply becomes the finer of two real bounds.
+  const memberApiPublicQuotas = createQuotas({
+    signerPerWindow: config.memberApi.publicQuota,
+    globalPerWindow: config.memberApi.publicQuota,
+    windowMs: config.memberApi.quotaWindowMs,
+    now: nowMs,
+  })
+  const memberApiRevokeQuotas = createQuotas({
+    signerPerWindow: config.memberApi.revokeQuota,
+    globalPerWindow: config.memberApi.revokeQuota,
+    windowMs: config.memberApi.quotaWindowMs,
+    now: nowMs,
+  })
+  const memberApiAssistantQuotas = createQuotas({
+    signerPerWindow: config.memberApi.assistant.quotaPerAccount,
+    globalPerWindow: config.memberApi.assistant.quotaGlobal,
+    windowMs: config.memberApi.quotaWindowMs,
+    now: nowMs,
+  })
+  // The ceiling on MONEY. Its own window (hourly by default) because spend is judged over a period
+  // a human would recognise, the way the gas spend cap already is.
+  const memberApiAssistantBudget =
+    deps.memberApiAssistantBudget ??
+    createTokenBudget({
+      perAccountPerWindow: config.memberApi.assistant.tokenBudgetPerAccount,
+      globalPerWindow: config.memberApi.assistant.tokenBudgetGlobal,
+      windowMs: config.memberApi.assistant.tokenBudgetWindowMs,
+      now: nowMs,
+    })
   const memberApiRevocations =
     deps.memberApiRevocations ??
     createRevocationStore({
@@ -854,6 +895,10 @@ export function createApp(config, deps = {}) {
       assistant: memberApiAssistant,
       providers,
       quotas: memberApiQuotas,
+      publicQuotas: memberApiPublicQuotas,
+      revokeQuotas: memberApiRevokeQuotas,
+      assistantQuotas: memberApiAssistantQuotas,
+      assistantBudget: memberApiAssistantBudget,
       killSwitch,
       // x402 pay-per-request (spec 096). Reuses THIS gateway's engine client, sanctions screen and
       // member-API quotas — no second submission rail, no second screen, no key. Disabled by
@@ -866,6 +911,7 @@ export function createApp(config, deps = {}) {
           screen,
           engineClient,
           quotas: memberApiQuotas,
+          publicQuotas: memberApiPublicQuotas,
           killSwitch,
           audit,
           now,

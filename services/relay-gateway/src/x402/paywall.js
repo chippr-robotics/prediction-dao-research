@@ -48,16 +48,24 @@ export const PAYMENT_RESPONSE_HEADER = 'X-PAYMENT-RESPONSE'
  *   providers: Record<number, {call: Function}>,
  *   screen: {screen: Function},
  *   engineClient: {submitTransaction: Function},
- *   quotas: {hit: Function},
+ *   quotas: {hit: Function},          // keyed by the SETTLED payer — an identified account
+ *   publicQuotas: {hit: Function},    // the unauthenticated window, for the 402 challenge path
  *   killSwitch: {isActive: () => boolean},
  *   audit?: (fields: object) => void,
  *   now?: () => number,          // unix SECONDS, matching the gateway-wide clock
  *   nonces?: ReturnType<typeof createNonceStore>,
  * }} deps
  */
-export function createPaywall(config, { providers, screen, engineClient, quotas, killSwitch, audit = () => {}, now = () => Math.floor(Date.now() / 1000), nonces } = {}) {
+export function createPaywall(config, { providers, screen, engineClient, quotas, publicQuotas, killSwitch, audit = () => {}, now = () => Math.floor(Date.now() / 1000), nonces } = {}) {
   const x402 = config.x402
   const nonceStore = nonces ?? createNonceStore({ max: x402.nonceMaxEntries })
+
+  // The challenge path draws on the UNAUTHENTICATED window (see settleOrChallenge). A missing
+  // instance would surface as a TypeError inside a request handler and be laundered into a generic
+  // error — and, worse, would leave the challenge unmetered. Fail the boot instead.
+  if (!publicQuotas || typeof publicQuotas.hit !== 'function') {
+    throw new Error('[relay-gateway] the x402 paywall requires a `publicQuotas` instance for its challenge path')
+  }
 
   /** Liveness of the paid rail: config on, module not killed, gateway not killed. */
   function live() {
@@ -110,9 +118,12 @@ export function createPaywall(config, { providers, screen, engineClient, quotas,
     const presented = req.get(PAYMENT_HEADER)
     if (!presented) {
       // No payment yet. Rate-limit the CHALLENGE by caller IP — the only key available before a
-      // signature exists — with the same caveat as the member API's unauthenticated routes: `req.ip`
-      // is the proxy on the VM deployment, so the GLOBAL window is the real bound.
-      const q = quotas.hit(`ip:${req.ip ?? 'unknown'}`)
+      // signature exists — against the UNAUTHENTICATED window, never the members'. `req.ip` is the
+      // proxy on the VM deployment (`trust proxy` is unset), so every anonymous caller shares one
+      // key; drawing that from the same instance members use would let a flood of unpaid challenges
+      // spend the whole module's global counter and 429 every authenticated request. Same fix, same
+      // reason, as the member API's own public routes.
+      const q = publicQuotas.hit(`ip:${req.ip ?? 'unknown'}`)
       if (!q.allowed) {
         throw new GatewayError(429, 'quota_exceeded', `${q.scope} member API quota exceeded`, { retryAfterSec: q.retryAfterSec })
       }

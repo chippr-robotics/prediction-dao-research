@@ -149,6 +149,19 @@ nested shape, `{ "error": { "code": …, "reason": … } }`.
 | 5 | Sanctions screen the account (`policy/sanctions.js`, fail closed) | `403 sanctioned_signer` · `503 screening_unavailable` |
 | 6 | Scope; then per-account and global quota | `403 insufficient_scope` · `429 quota_exceeded` with `Retry-After` |
 
+The quota in step 6 is one of **four separate windows**, and the separation is load-bearing rather
+than tidy. The two unauthenticated routes can only key on `ip:<req.ip>`, and `trust proxy` is
+deliberately unset — so every anonymous caller is one key. While that key drew on the authenticated
+instance it drew on its global counter too, and a flood of unauthenticated GETs answered `429` to
+every member on every route, **including key revocation**. So: authenticated traffic, unauthenticated
+traffic, `POST /keys/revoke` alone, and assistant calls each draw from a window nothing else can
+spend. Revocation is *budgeted, not exempt* — the handler does an ECDSA recovery and possibly an
+ERC-1271 call per request — but no volume of other traffic can starve it.
+
+The assistant additionally carries a **token budget** (`assistant_budget_exhausted`, 429), because a
+request count bounds traffic and not money. See [agentic-chat.md](agentic-chat.md) and
+[Configuration](../reference/configuration.md#member-api-and-assistant-gateway).
+
 `contract.js` is the single declaration of the scope list, the error codes and the route table,
 and `openapi.js` renders the served document from it — so the published contract, the enforced
 scope and the documented error cannot drift apart by anyone editing one and not the others. The
@@ -284,6 +297,12 @@ lock is unchanged.
 - **The actor of a built intent is the token account.** Always. No request field overrides it.
 - **Revocation reports `durable: false`** until it is backed by something that survives a restart.
 - **Every error body is `{ error: { code, reason } }`**, and every `429` carries `Retry-After`.
+- **Key revocation is never starvable.** It draws from a window nothing else can spend, because a
+  member reaches for it exactly when their key is loose.
+- **Model spend has a ceiling denominated in tokens, not requests.** A turn reserves its worst case
+  before the provider is called and settles to the measured usage; an exhausted budget refuses with
+  `429 assistant_budget_exhausted` and is **never** served as a shortened answer. An unknown cost is
+  never a zero cost.
 - **The struct tables have one source**, `@fairwins/intent-types`. A local copy is a defect.
 
 ## Tests
@@ -293,6 +312,10 @@ lock is unchanged.
   ERC-1271 paths including the unverifiable branch, revocation, and the membership three-state.
 - Gateway: `services/relay-gateway/test/memberApi.test.js` — routes, scope matrix, quota headers,
   the module gate and both killswitches, and the served OpenAPI document against `contract.js`.
+- Gateway: `services/relay-gateway/test/memberApiQuotaIsolation.test.js` — that the four windows are
+  genuinely separate, and that revocation survives a flood from either side of the auth boundary.
+- Gateway: `services/relay-gateway/test/memberApiSpend.test.js` — the assistant's token budget, its
+  tighter request class, and the boot-time caps.
 - E2E: `frontend/cypress/e2e/fast/` — key creation and revocation, and honest-unreachable states.
 
 ## Related
