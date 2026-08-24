@@ -10,6 +10,10 @@
  * `reconcileBridges` is stubbed: it is exercised in
  * `lib/bridge/__tests__/bridgeStatus.test.js`, and stubbing it keeps this file about
  * what the member SEES, with no network in the loop.
+ *
+ * Since #1265 the list has TWO rosters — the cohort-bounded one it READS, and that plus the
+ * member's own ledger, which it LISTS. The tests at the end of "ordering, empty state,
+ * polling" are the ones that hold them apart.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
@@ -24,6 +28,20 @@ const mockReconcile = vi.hoisted(() => ({ current: vi.fn(async () => []) }))
 vi.mock('../../lib/bridge/bridgeStatus', async (importOriginal) => {
   const actual = await importOriginal()
   return { ...actual, reconcileBridges: (...args) => mockReconcile.current(...args) }
+})
+
+/**
+ * The roster this list reads is `bridgeNetworks()`, which since #1265 is bounded by the
+ * build's cohort — and Across ships only on mainnets, so it is EMPTY in this (testnet,
+ * VITE_NETWORK_ID=63) test build. These tests are about what a member SEES for transfers
+ * that exist, so the roster is injected as the mainnet pair the fixtures below use. The
+ * empty roster is not swept under that: it has its own tests, and they pin both halves —
+ * a transfer already recorded is still listed, and an empty result says it was looked for.
+ */
+const mockRoster = vi.hoisted(() => ({ current: [] }))
+vi.mock('../../lib/bridge/bridgeCopy', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, bridgeNetworks: () => mockRoster.current }
 })
 
 import BridgeStatusList from '../../components/wallet/BridgeStatusList'
@@ -108,6 +126,10 @@ beforeEach(() => {
   localStorage.clear()
   mockWallet.current = { address: ACCOUNT, chainId: ORIGIN, isConnected: true }
   mockReconcile.current = vi.fn(async () => [])
+  mockRoster.current = [
+    { chainId: ORIGIN, name: 'Polygon' },
+    { chainId: DESTINATION, name: 'Base' },
+  ]
 })
 
 afterEach(() => {
@@ -269,6 +291,44 @@ describe('BridgeStatusList — ordering, empty state, polling', () => {
     render(<BridgeStatusList />)
     expect(await screen.findByText(/No cross-network transfers yet/)).toBeInTheDocument()
     expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  // ── Issue #1265: the read roster narrowed; what is LISTED did not ────────────────────
+  //
+  // FR-053 — the in-flight list renders underneath the form in every case and must never
+  // hide a transfer that is already moving. So the cohort bound applies to what this list
+  // READS over the network, never to what it SHOWS: it lists the member's own ledger too.
+
+  it('still shows a recorded transfer on a network this build does not read (#1265, FR-053)', async () => {
+    seedBridge({ state: BRIDGE_STATE.IN_FLIGHT })
+    mockRoster.current = []
+    render(<BridgeStatusList />)
+
+    // Shown — hiding a transfer already moving is the failure this guards.
+    const item = await screen.findByRole('listitem')
+    expect(within(item).getByText('On the way')).toBeInTheDocument()
+    expect(within(item).getByRole('link', { name: /Sending transaction on Polygon/ })).toBeInTheDocument()
+    // …and never claimed away.
+    expect(screen.queryByText(/No cross-network transfers yet/)).toBeNull()
+    expect(screen.queryByText(/No network is set up for bridging in this build/i)).toBeNull()
+    // Not read: the cohort bound is what it is for. So no "as of" line either — the status
+    // is the last one recorded, and the row says exactly that.
+    expect(mockReconcile.current).not.toHaveBeenCalled()
+    expect(within(item).queryByText(/Status as of/)).toBeNull()
+    expect(within(item).getByText(/does not check that network/i)).toBeInTheDocument()
+  })
+
+  it('says the build bridges nowhere AND that it found nothing recorded (#1265)', async () => {
+    // Nothing configured and nothing in the member's own ledger. Both halves are said,
+    // because "no transfers yet" alone would be a claim about a history this build never
+    // looked for, and the roster half alone would leave the history unanswered.
+    mockRoster.current = []
+    render(<BridgeStatusList />)
+
+    const empty = await screen.findByText(/No network is set up for bridging in this build/i)
+    expect(empty).toHaveTextContent(/no cross-network transfers recorded here/i)
+    expect(screen.queryByRole('listitem')).toBeNull()
+    expect(mockReconcile.current).not.toHaveBeenCalled()
   })
 
   it('shows nothing for a disconnected wallet and asks the network for nothing', async () => {

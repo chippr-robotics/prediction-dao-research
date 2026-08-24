@@ -238,8 +238,8 @@
   padding: 0.55rem 1.4rem;
   font-size: 0.9rem;
   font-weight: 600;
-  background: var(--brand-primary);
-  color: #fff;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   cursor: pointer;
 }
 
@@ -330,9 +330,9 @@
 }
 
 .profile-schedule-day.selected {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-  color: #fff;
+  background: var(--primary-button);
+  border-color: var(--primary-button);
+  color: var(--primary-button-text);
   font-weight: 600;
 }
 

@@ -83,6 +83,7 @@ const OWNED_NAME_PATTERNS = [
   /^alto-executor-key-137$/,
   /^relay-(webhook-secret|engine-api-key)$/,
   /^POLYMARKET_/, // gateway feature credentials, named in their upstream's convention
+  /^QUICKNODE_(POLYGON|AMOY)_(API|WSS)$/, // QuickNode Multi-Chain RPC credentials (one token, chain by hostname infix)
   /^github-actions$/, // the WIF pool
 ];
 

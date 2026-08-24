@@ -66,6 +66,9 @@ export function createTransferLedgerSource(deps = {}) {
 
   return {
     class: LEDGER_CLASS.TRANSFER,
+    // Reads the local record store only — it cannot fail because a network
+    // is down, so it never testifies that a chain went unread (#1280).
+    backing: 'client',
     async list({ account, chainId }) {
       const clientRecords = readClientRecords(account, chainId).filter(
         (r) => r.class === LEDGER_CLASS.TRANSFER,

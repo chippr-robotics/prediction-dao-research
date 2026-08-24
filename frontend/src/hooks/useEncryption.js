@@ -36,7 +36,8 @@ import {
   isEncryptedEnvelope
 } from '../utils/crypto/envelopeEncryption.js'
 import {
-  lookupPublicKey,
+  lookupPublicKeyState,
+  KEY_LOOKUP,
   hasRegisteredKey,
   ensureKeyRegistered,
   registerEncryptionKey,
@@ -575,9 +576,15 @@ export function useEncryption() {
   }, [])
 
   /**
-   * Look up an opponent's encryption public key from the on-chain registry
+   * Look up an opponent's encryption public key from the on-chain registry.
+   *
+   * `null` means the registry ANSWERED and holds no key for them — a caller may say so. A read
+   * that failed THROWS instead (issue #1286): the caller's refusal text is a definite statement
+   * about another member, and an unreachable RPC is not evidence for it.
+   *
    * @param {string} opponentAddress - Ethereum address
    * @returns {Promise<Uint8Array|null>} X25519 public key bytes, or null if not registered
+   * @throws {Error} when the registry could not be read
    */
   const lookupOpponentKey = useCallback(async (opponentAddress) => {
     if (!opponentAddress) return null
@@ -586,7 +593,15 @@ export function useEncryption() {
     if (!readProvider) {
       throw new Error('No provider available')
     }
-    return lookupPublicKey(opponentAddress, readProvider)
+    const result = await lookupPublicKeyState(opponentAddress, readProvider)
+    if (result.state === KEY_LOOKUP.UNREADABLE) {
+      throw new Error(
+        'We could not read the encryption key registry just now, so we cannot tell whether ' +
+          `${opponentAddress} has registered a key. That is our read failing, not their key ` +
+          'missing — please try again in a moment.'
+      )
+    }
+    return result.state === KEY_LOOKUP.READ ? result.publicKey : null
   }, [signer, provider])
 
   /**

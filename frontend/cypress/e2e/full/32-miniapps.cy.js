@@ -253,19 +253,34 @@ describe('Mini-app platform (specs 073 / 077 / 028 / 030)', () => {
         // record already carries one — the verification-failure panel this flow deliberately
         // provoked — so the generic helper reads the wrong element.
         /*
-         * The curator is TOLD, and the approval does not go through.
+         * The curator is TOLD WHAT HAPPENED, and the approval does not go through.
          *
-         * Deliberately not asserting the specific `StaleProposal` wording that
-         * `MiniAppReviewTab#decodeStaleProposal` composes ("the vendor replaced this package since
-         * you opened it…"). That message needs ethers to have decoded the revert into
-         * `error.revert`, and through the injected-wallet path it arrives as raw `error.data`
-         * instead, so what actually renders here is the generic "execution reverted". Whether a
-         * real wallet fares better is not something this harness can settle, so the flow asserts
-         * the refusal it can prove rather than a sentence it cannot. Tracked in #1267.
+         * This asserted only a generic /revert|failed|error/ and carried a comment explaining
+         * why: `decodeStaleProposal` read `error.revert`, which ethers populates only when it held
+         * the ABI where the call failed — true of a `staticCall`, NOT of a write through the
+         * injected wallet, which forwards the node's revert as raw `error.data`. So on the exact
+         * path a curator uses, the named message was lost and "execution reverted" is what
+         * rendered. That was #1267.
+         *
+         * #1267 is fixed: the raw bytes are decoded against the registry's own ABI, so the
+         * sentence a curator can act on is what actually appears. Keeping the generic assertion
+         * would now assert the BUG — and worse, it would keep passing if the decode regressed all
+         * the way back to a bare failure, which is the one outcome this flow exists to rule out.
+         *
+         * `cy.contains`, not `cy.get(...).invoke('text')`: the notification is re-rendered as the
+         * message changes, and a held subject goes stale. That is why this read as `''` rather
+         * than as the wrong sentence — Cypress was re-reading a detached node while the live one
+         * carried this text.
          */
-        cy.get('.notification-message', { timeout: 30000 })
-          .invoke('text')
-          .should('match', /revert|failed|error/i)
+        cy.contains('.notification-message', /vendor replaced this package/i, { timeout: 30000 })
+          .should('be.visible')
+        // Named, not merely announced: WHICH package the registry now holds, and that the
+        // curator's own decision cost nothing. A message that says only "the package changed"
+        // leaves them unable to tell whether they need to undo something.
+        cy.contains('.notification-message', /Nothing was changed/i).should('be.visible')
+        // The toast is transient; the record keeps a durable notice saying the same thing, and
+        // that is what a curator who looked away comes back to.
+        cy.contains(/The record above has been re-read/i, { timeout: 30000 }).should('be.visible')
 
         // The durable proof, from the chain: the swap was never promoted, and the package members
         // are being served is the one approved long before any of this.

@@ -297,9 +297,35 @@ where FairWins has shipped nothing. So `tradingLiquidityNetworks()` in
 Both lists are derived, never asserted, so they stay true as deployments land — and an empty list
 produces honest "not set up in this build yet" copy rather than a false roster.
 
+**2a. The cohort bounds every member-facing roster** (issue #1265). All four — `tradingLiquidityNetworks()`,
+`bridgeLiquidityNetworks()` in both `liquidityCopy.js` and `acrossLpPositions.js`, and `bridgeNetworks()`
+in `lib/bridge/bridgeCopy.js` — enumerate **`cohortChainIds()`, never `listSupportedChainIds()`**, and so
+does `useLiquidityCatalog` in `SupplyView.jsx`, which is the one that actually opens connections. Reads
+never cross the testnet/mainnet boundary (constitution III), and naming a network a build cannot supply to
+is a promise it cannot keep. Since the spec-067 routers are mainnet-only, a **testnet-cohort build lists no
+pools and no bridge networks** and says so in its own words.
+
+**The Bridge FORM is bounded by the same roster, and had to be.** Its asset and destination selectors
+draw on `useSelectableAssets({catalog: true})` → `getPortfolioChainIds()`, which is mainnets-always plus a
+member opt-in and knows nothing about the cohort (that model is deliberate and is **not** folded into the
+cohort rule — it still governs the portfolio elsewhere). Bounding only the copy would have left a testnet
+build able to quote, sign and record a mainnet bridge while stating underneath that no network here
+bridges at all. So `BridgeView` intersects the catalog with `bridgeNetworks()`, and names what that drops
+with the reason that is true of it (FR-006c): *"the bridge protocol is not deployed there"* for ETC and
+Mordor, *"this build does not bridge on those networks"* for the other cohort.
+
+**`BridgeStatusList` then has TWO rosters, and they are not the same list.** What it READS over the
+network is `bridgeNetworks()` — cohort-bounded, because a status poll is a read. What it LISTS is that
+plus every origin chain the member's own ledger has a bridge on (`listBridgeChainIds`, local storage, no
+network). FR-053 says the in-flight list renders underneath the form in every case and must never hide a
+transfer that is already moving, so a record predating the bound — or restored from a backup written by
+another build — still renders, with its last recorded status and a line saying this build did not check
+that network. The "no network is set up for bridging in this build" empty state is reached only when the
+ledger is *also* empty, which makes it a result rather than an assumption.
+
 The admin roster is the deliberate exception: `adminNetworks(capability)` lists every capable network
-whether or not a router is deployed there, because the undeployed ones are the ones an operator most
-needs to see.
+whether or not a router is deployed there — and, unlike the four above, is **not** cohort-bounded, because
+the undeployed ones are the ones an operator most needs to see (see the comment on the function).
 
 **3. The quoting gateway.** A bridge price is **not derivable client-side** — it needs Across's
 relayer-fee oracle — so quoting goes through the relay-gateway proxy

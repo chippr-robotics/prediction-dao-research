@@ -80,6 +80,21 @@ vi.mock('../../utils/rpcProvider', () => ({
   makeReadProvider: () => ({ getTransactionReceipt: (...args) => getTransactionReceipt(...args) }),
 }))
 
+// The bridge roster is cohort-bounded (#1265) and this suite runs in a TESTNET build, where
+// the real roster is empty — every fixture below is a mainnet and would be filtered out of
+// the form, leaving nothing to screen. Declare the roster the fixtures assume; the roster's
+// own cohort bounding is asserted by `test/liquidity/cohortRosters.test.js`.
+vi.mock('../../lib/bridge/bridgeCopy', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    bridgeNetworks: () => [
+      { chainId: 137, name: 'Polygon' },
+      { chainId: 42161, name: 'Arbitrum One' },
+    ],
+  }
+})
+
 const captureBridgeSubmission = vi.fn(() => 'entry-1')
 vi.mock('../../data/ledger/sources/bridgeLedgerSource', async (importOriginal) => ({
   ...(await importOriginal()),

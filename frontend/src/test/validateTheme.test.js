@@ -42,6 +42,10 @@ describe('validateTheme', () => {
             '--text-secondary': '#5A6772',
             '--primary-button': '#36B37E',
             '--primary-button-hover': '#2F9E6E',
+            // The label half of the pair (#1260). `validateTheme` requires it because a
+            // theme defining the fill and not the label ships a 2.16:1 control rather than
+            // an obviously broken one — so a fixture that omits it is asserting the gap.
+            '--primary-button-text': '#FFFFFF',
           }
           return values[varName] || ''
         })

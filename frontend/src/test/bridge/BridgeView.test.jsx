@@ -71,6 +71,18 @@ vi.mock('../../lib/bridge/acrossQuotes', async (importOriginal) => {
   return { ...actual, fetchBridgeQuote: (...args) => fetchBridgeQuote(...args) }
 })
 
+// The cohort-bounded bridge roster (#1265). This suite runs in a TESTNET build
+// (`VITE_NETWORK_ID=63`), where the real roster is empty because Across ships only on
+// mainnets — so every fixture below would be filtered out of the form and the suite would
+// test the empty state 27 times. Declaring the roster the fixtures assume keeps the suite
+// about the bridge form; `test/liquidity/cohortRosters.test.js` is what asserts the real
+// roster is cohort-bounded, and `test/bridge/BridgeStatusList.test.jsx` owns the empty case.
+const mockBridgeRoster = { current: [] }
+vi.mock('../../lib/bridge/bridgeCopy', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, bridgeNetworks: () => mockBridgeRoster.current }
+})
+
 const getTransactionReceipt = vi.fn()
 vi.mock('../../utils/rpcProvider', () => ({
   makeReadProvider: () => ({ getTransactionReceipt: (...args) => getTransactionReceipt(...args) }),
@@ -204,6 +216,11 @@ const optionNetworks = (listbox) =>
 
 beforeEach(() => {
   vi.stubEnv('VITE_RELAYER_URL', GATEWAY)
+  mockBridgeRoster.current = [
+    { chainId: 137, name: 'Polygon' },
+    { chainId: 42161, name: 'Arbitrum One' },
+    { chainId: 8453, name: 'Base' },
+  ]
   walletState.address = '0x1111111111111111111111111111111111111111'
   walletState.chainId = 137
   selectableOptions = [
@@ -511,6 +528,43 @@ describe('BridgeView — honest unavailable states (T083, FR-051/FR-053/FR-054)'
     selectableOptions = [BTC_OPTION]
     render(<BridgeView />)
     expect(await screen.findByText(/do not hold anything on a network this can bridge from/i)).toBeInTheDocument()
+  })
+
+  // ── Issue #1265: one roster across the form, the copy and the list underneath ─────────
+  //
+  // The asset CATALOG is mainnets-always and knows nothing about the build's cohort, so
+  // before this the form would quote, sign and record a mainnet bridge in a testnet build
+  // while the copy and `BridgeStatusList` — now cohort-bounded — stated underneath that no
+  // network here bridges at all. These two pin the form to the same roster they read.
+
+  it('does not offer an asset on a bridgeable network outside this build (#1265)', async () => {
+    mockBridgeRoster.current = [{ chainId: 137, name: 'Polygon' }]
+    const user = userEvent.setup()
+    render(<BridgeView />)
+    await screen.findByText(/Route availability as of/i)
+    const listbox = await openSelect(user, 'Asset to send')
+    const shown = optionNetworks(listbox)
+    expect(shown.some((t) => /Polygon/.test(t))).toBe(true)
+    expect(shown.some((t) => /Arbitrum One|Base/.test(t))).toBe(false)
+    // FR-006c — named, with the reason that is actually true of them. "The bridge protocol
+    // is not deployed there" would be false: it is, this build just does not reach it.
+    expect(
+      screen.getByText(/Arbitrum One, Base are not listed — this build does not bridge on those networks/i),
+    ).toBeInTheDocument()
+  })
+
+  it('offers no source at all when this build bridges nowhere, and says so (#1265)', async () => {
+    mockBridgeRoster.current = []
+    render(<BridgeView />)
+    expect(
+      await screen.findByText(/No network is set up for bridging in this build yet/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Asset to send' })).not.toBeInTheDocument()
+    // …and the fallback is never the OTHER sentence, which would name networks this build
+    // will not bridge from and invite the member to fund one of them.
+    expect(
+      screen.queryByText(/do not hold anything on a network this can bridge from/i),
+    ).not.toBeInTheDocument()
   })
 
   it('reports a failed quote by its real cause and offers a retry when it is transient', async () => {

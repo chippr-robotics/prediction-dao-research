@@ -82,6 +82,8 @@ import {
 } from '../acrossLpPositions'
 // Imported by the TEST only, as the control for the "never resolves a router address" check.
 import { getLiquidityRouterAddress } from '../liquidityRouter'
+// The cohort roster the availability answers are bounded by (#1265).
+import { NETWORKS, cohortChainIds, isInCohort, listSupportedChainIds } from '../../../config/networks'
 
 const HUB_POOL_IFACE = new Interface(HUB_POOL_ABI)
 const ROUTER_IFACE = new Interface(LIQUIDITY_ROUTER_ABI)
@@ -199,19 +201,34 @@ describe('availability is Ethereum only, and says so', () => {
     expect(getHubPoolAddress(8453)).toBeNull()
   })
 
-  it('lists exactly the networks carrying a HubPool, derived from config', () => {
+  it('lists exactly the networks carrying a HubPool that this build may read', () => {
+    // The config fact, which holds in every build: one HubPool, on Ethereum.
+    expect(listSupportedChainIds().filter((id) => NETWORKS[id].bridge?.hubPool)).toEqual([1])
+
+    // The roster narrows that to the cohort (#1265) — constitution III forbids a
+    // testnet build describing, or reading, the mainnet HubPool. This test build
+    // is a testnet one, so the honest answer is an empty list.
     const nets = bridgeLiquidityNetworks()
-    expect(nets.map((n) => n.chainId)).toEqual([1])
-    expect(nets[0].hubPool).toBe(HUB_POOL)
+    expect(nets.map((n) => n.chainId)).toEqual(
+      cohortChainIds().filter((id) => NETWORKS[id].bridge?.hubPool),
+    )
+    for (const net of nets) {
+      expect(isInCohort(net.chainId)).toBe(true)
+      expect(net.hubPool).toBe(NETWORKS[net.chainId].bridge.hubPool)
+    }
+    if (isInCohort(1)) expect(nets.map((n) => n.hubPool)).toContain(HUB_POOL)
   })
 
   it('reports unsupported networks with a REASON naming where it is available', () => {
     const polygon = bridgeLiquiditySupport(137)
     expect(polygon.available).toBe(false)
     expect(polygon.hubPool).toBeNull()
-    // Honest, not silent: it says both where it is not, and where it is.
+    // Honest, not silent: it says where it is not, and either where it IS or —
+    // in a build with no bridge pool to name — that there is none to name.
     expect(polygon.reason).toMatch(/Polygon/)
-    expect(polygon.reason).toMatch(/Ethereum/)
+    expect(polygon.reason).toMatch(
+      isInCohort(1) ? /Ethereum/ : /No network is set up for bridge pools in this build yet/i,
+    )
   })
 
   it('says yes on Ethereum, with the address and no reason', () => {
@@ -227,7 +244,9 @@ describe('availability is Ethereum only, and says so', () => {
     const btc = bridgeLiquiditySupport('bitcoin')
     expect(btc.available).toBe(false)
     expect(btc.reason).toMatch(/Bitcoin/)
-    expect(btc.reason).toMatch(/Ethereum/)
+    expect(btc.reason).toMatch(
+      isInCohort(1) ? /Ethereum/ : /No network is set up for bridge pools in this build yet/i,
+    )
     // The throwing form is the caller-bug boundary guard (spec 061).
     expect(() => getHubPoolAddress('bitcoin')).toThrow(/not an EVM chain/)
   })

@@ -8,6 +8,14 @@ zone       = "us-central1-a"
 
 artifact_registry_repository = "cloud-run-source-deploy"
 
+# spec 095 MCP server. FALSE, and stated rather than left to the variable's default so that turning
+# it on is a one-line diff a reviewer cannot miss. It stays false until
+# `.../cloud-run-source-deploy/fairwins-mcp-server/fairwins-mcp-server:latest` exists — no pipeline
+# publishes it, and apply on merge is unattended, so a true here would try to create a Cloud Run
+# service from an image that is not there. See main.tf's module comment and
+# docs/runbooks/member-api-operations.md §3.8.
+manage_mcp_server = false
+
 # The gateway keeps its existing account, which holds zero project-level roles beyond telemetry.
 gateway_service_account_email = "fairwins-relay-engine@chippr-bots-site-wp.iam.gserviceaccount.com"
 
@@ -26,6 +34,17 @@ gateway_secret_ids = [
   # spec 095. OPTIONAL: absent ⇒ the assistant route answers 503 assistant_unconfigured while the
   # rest of the member API (and the gasless relay path) keeps serving — the never-stranded rule.
   "anthropic-api-key",
+  # The keyed Polygon archive endpoint, delivered as RPC_URL_PRIMARY_137 to BOTH containers on this
+  # node that read chain 137 (the gateway and the FinOps exporter). OPTIONAL: absent ⇒ both fall back
+  # to the public endpoints already listed in RPC_URLS_137, so the gasless relay path keeps serving.
+  #
+  # ONLY the Polygon HTTP credential is granted here, and the other three QuickNode secrets are
+  # deliberately NOT in this list. QUICKNODE_POLYGON_WSS has no consumer (nothing in this estate
+  # opens a WebSocket RPC), and the two AMOY secrets have no reader either — there is no Amoy-cohort
+  # node. Handing a node a credential nothing on it reads is the opposite of least privilege, and
+  # the AMOY pair is the same token behind a `matic-amoy` infix, so a node holding it could be
+  # pointed at the wrong chain by a four-character typo that returns 200 rather than 401.
+  "QUICKNODE_POLYGON_API",
 ]
 
 # Secret CONTAINERS under management. Versions and payloads are never declared (guardrail G-04).
@@ -42,6 +61,21 @@ managed_secret_ids = [
   # spec 095. Container only — the payload (the Anthropic API key for the member assistant) is
   # created out of band (guardrail G-04) and read solely by the gateway container.
   "anthropic-api-key",
+  # QuickNode Multi-Chain RPC. ALL FOUR are declared, but only QUICKNODE_POLYGON_API is granted to
+  # anything (see gateway_secret_ids above and the bundler module in main.tf). Declaring the other
+  # three is not busywork: it puts them under `prevent_destroy`, gives them an import block, and
+  # turns their empty IAM policy from an accident into a recorded decision. They were hand-created
+  # at the console on 2026-08-21 with no Terraform label and no bindings at all.
+  #
+  # ⚠ ONE ENDPOINT, ONE TOKEN, CHAIN CHOSEN BY A HOSTNAME INFIX. `<name>.matic.quiknode.pro` is
+  # Polygon and `<name>.matic-amoy.quiknode.pro` is Amoy, on the SAME credential. A mis-set variable
+  # therefore returns valid data FROM THE WRONG CHAIN instead of a 401 — which is why the gateway
+  # asserts eth_chainId against every configured endpoint at boot and refuses to start on a mismatch.
+  "QUICKNODE_POLYGON_API",
+  "QUICKNODE_POLYGON_WSS",
+  "QUICKNODE_AMOY_API",
+  "QUICKNODE_AMOY_WSS",
+
 
   # Workstation secrets (spec 097). Mirrors scripts/secrets/registry.js — the parity test keeps
   # these in step; do not edit one list without the other.

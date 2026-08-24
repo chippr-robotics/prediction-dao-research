@@ -39,9 +39,19 @@ node src/server.js --http 8790
 | Variable | Required | Meaning |
 | --- | --- | --- |
 | `FAIRWINS_API_URL` | to serve data | Gateway base URL, e.g. `https://relay.fairwins.app`. |
-| `FAIRWINS_API_TOKEN` | for member tools | The member's own API token. Public tools work without it. |
+| `FAIRWINS_API_TOKEN` | for member tools | The member's own API token. Public tools work without it. **In `--http` mode this is a shared identity — see [below](#the-env-token-and---http).** |
 | `FAIRWINS_TIMEOUT_MS` | no | Per-request upstream timeout, default `15000`. |
 | `PORT` | no | Default port for `--http` when none is given on the command line. |
+| `FAIRWINS_MCP_ALLOWED_ORIGINS` | no | Comma-separated browser origins to serve, same effect as `--allowed-origin`. |
+
+Command-line options, all of them `--http`-only (passing one without `--http` is an error rather
+than a silent no-op — the stdio transport has no socket to bind and no origin to check):
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--host <address>` | `127.0.0.1` | Bind address. `0.0.0.0` on Cloud Run (`K_SERVICE` set), where the platform reaches the container from outside its network namespace. |
+| `--allowed-origin <origin>` | — | Also serve browser requests from this exact origin. Repeatable. No wildcard. |
+| `--allow-shared-token` | off | Serve `FAIRWINS_API_TOKEN` to callers who send no `Authorization` header. Without it, `--http` refuses to start when that variable is set. |
 
 There is deliberately **no environment variable for a payment**. A payment is single-use and
 per-request; one that could be replayed out of configuration would be a standing withdrawal. It
@@ -105,10 +115,80 @@ that request, so one process can serve several members without storing any of th
 
 A per-request `X-PAYMENT` header is forwarded the same way — see [Paying per request](#paying-per-request-x402-spec-096).
 
-There is deliberately **no CORS header on any response**. MCP clients are agents, not browsers, so
-CORS buys this endpoint nothing — while `Access-Control-Allow-Origin: *` would let any web page the
-member has open script requests at a server that is holding their capability token. If a browser
-surface ever needs this, it belongs behind an explicit origin allow-list, never a wildcard.
+#### Where it listens
+
+`--http` binds **`127.0.0.1`**. The MCP specification says a local server should, and the reason is
+concrete: this endpoint answers for a member's capability token, and the difference between "a
+process on my laptop" and "a service on the office network" should not be something you get by
+default from a flag you added to try something out.
+
+| How it is run | Binds | Why |
+| --- | --- | --- |
+| `node src/server.js --http 8790` | `127.0.0.1:8790` | The default. Nothing off this machine can reach it. |
+| `node src/server.js --http 8790 --host 0.0.0.0` | `0.0.0.0:8790` | You asked. The boot log says out loud that the port is now reachable and that Origin checking is not authentication. |
+| The container image | `0.0.0.0:$PORT` | The CMD passes `--host 0.0.0.0`, because the network namespace is the boundary — what is exposed is decided by your `-p` or the Cloud Run ingress, not by the bind address. A loopback-bound container would be unreachable through `-p` while its healthcheck, which curls loopback from inside, went on reporting healthy. |
+| Cloud Run | `0.0.0.0:$PORT` | `K_SERVICE` is set. Backstop for a deployment that overrides the CMD; Cloud Run cannot route to a loopback-bound revision. |
+
+#### Which origins it serves
+
+There is deliberately **no CORS header on any response** — MCP clients are agents, not browsers, so
+CORS buys this endpoint nothing, and `Access-Control-Allow-Origin: *` would be scriptable by any
+page the member has open.
+
+**Withholding CORS is not, however, a defence, and the `Origin` header is validated separately.**
+CORS governs whether a browser lets a page *read* a response. It does not govern whether the request
+is sent, and it does not govern whether the server executes it. A POST whose `Content-Type` is one
+of the three CORS-safelisted values — `text/plain` among them — is a *simple request*: no preflight,
+sent straight through. Before this check existed, `POST /mcp` with `Content-Type: text/plain` and
+`Origin: https://evil.example` answered **200** with a full tools listing.
+
+So, as the MCP Streamable HTTP specification requires ("servers MUST validate the `Origin` header on
+all incoming connections", for DNS-rebinding defence):
+
+| Request carries | Result |
+| --- | --- |
+| **No `Origin` header** | **Served.** curl, an agent runtime, an editor. A browser cannot omit one, so absence is evidence of not being the thing this check defends against. |
+| A loopback origin (`http://localhost:*`, `http://127.0.0.0/8:*`, `http://[::1]:*`, https likewise) | Served, always. A rebinding attacker's page keeps *its* origin, so this grants them nothing — what it grants is the MCP Inspector and other local browser-based tooling. |
+| An origin you allow-listed | Served. Exact match; default ports fold, so `https://a.example` and `https://a.example:443` are one entry. |
+| Anything else, including `Origin: null` | **403 `origin_not_allowed`.** `null` is what a sandboxed iframe and a `file://` page send: a present origin that is not on the list, not an absent one. |
+
+The check runs before routing, so `/healthz` and unknown paths are covered too. There is no
+wildcard: `--allowed-origin '*'` is refused at startup rather than accepted and quietly never
+matched.
+
+#### The env token and `--http`
+
+`--http` **refuses to start when `FAIRWINS_API_TOKEN` is set**, unless you pass
+`--allow-shared-token`.
+
+`FAIRWINS_API_TOKEN` is a fallback for requests that arrive with no `Authorization` header. Over
+stdio that is exactly right and is what the variable is for: there is one caller by construction —
+the client that spawned the process — and the token is that member's own, in that member's client
+configuration. Over HTTP the population of callers is "everything that can open a socket to this
+port", and the fallback silently promotes every one of them to that member: their scopes, their
+wagers, their fee data, their quotas, and on a priced gateway their membership standing in place of
+a payment.
+
+It is fatal rather than a warning because a warning in a boot log is not read by the person
+deploying, and it is a flag rather than a ban because a single-member HTTP deployment — one member,
+one server, bound where only they can reach it — is a real thing. The flag makes it a decision
+instead of an accident, and the boot log keeps saying what was accepted.
+
+The usual answer is to leave it unset and have each caller send its own token:
+
+```bash
+# refuses to start
+FAIRWINS_API_TOKEN=fw1.… node src/server.js --http 8790
+
+# serves several members, holds none of their credentials
+FAIRWINS_API_URL=https://relay.fairwins.app node src/server.js --http 8790
+curl -H 'Authorization: Bearer fw1.…' -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' http://127.0.0.1:8790/mcp
+```
+
+The Cloud Run deployment sets no token at all (`infra/terraform/environments/*/main.tf` gives this
+service `env` but no `secret_env`), which is why `allow_unauthenticated = true` there is not a hole:
+the member token is the authorization, and the platform never holds one.
 
 ## Tools
 
@@ -182,6 +262,10 @@ curl -fsS http://127.0.0.1:8790/healthz     # {"status":"ok"}
 The build context is **this directory**, not the repo root, because there is nothing outside it to
 copy: no workspace package, no lockfile, no install stage. `.github/workflows/container-build.yml`
 builds this image and boots it on every change to `services/mcp-server/**`.
+
+The image's CMD is `--http --host 0.0.0.0`. See [Where it listens](#where-it-listens) for why the
+container says that explicitly instead of inheriting the loopback default — and note that the same
+image passes no token, so it is never the shared-identity case.
 
 ## See also
 

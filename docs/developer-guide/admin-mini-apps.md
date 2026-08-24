@@ -69,7 +69,13 @@ labelled state while live state keeps rendering.
 ## Write semantics are unchanged
 
 `useAdminTx` is the monolith's `runTx` verbatim (resolves `true`/`false`, never rejects — bulk
-sequences observe the boolean). Scope rules are untouched: `useScopedChain` seeds once and never
+sequences observe the boolean), with one addition: an optional third argument, `{ errorAbi }`.
+When a write fails with raw revert bytes the wallet never decoded, those fragments turn
+"execution reverted (unknown custom error)" into the error's NAME (#1267). It is per **call**, not
+per hook — one `runTx` is shared by apps that write to different contracts (Compliance drives both
+the deny list and the mini-app registry), so the caller that knows which contract it is writing to
+is the one that supplies the fragments. A revert ethers already decoded, or a failure a caller has
+already turned into a sentence, is passed through untouched. Scope rules are untouched: `useScopedChain` seeds once and never
 follows the wallet; `writeGateReason`'s four sentences stand, including "unreadable stays
 permissive" for killswitches; membership writes stay pinned to `membershipChainId()`; incident
 controls act on exactly one named chain, refused at the call site as well as the button, and

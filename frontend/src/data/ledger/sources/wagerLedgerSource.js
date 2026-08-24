@@ -96,18 +96,16 @@ async function loadAllWagers(repository, account) {
 export function createWagerLedgerSource(deps = {}) {
   return {
     class: LEDGER_CLASS.WAGER,
+    // Crosses the network (subgraph/RPC), so a rejection here IS evidence the
+    // chain could not be read (#1280).
+    backing: 'network',
     async list({ account, chainId, provider }) {
-      /*
-       * NOT DEPLOYED is not the same as COULD NOT BE READ (the estate rule; `loadWagersAcrossEstate`
-       * has always made this distinction and this source did not).
-       *
-       * With no escrow on a chain there is no wager history there to have — it is a knowable,
-       * complete absence. Left to fall through, `RegistrySource` throws "wagerRegistry not deployed
-       * on chain N", the repository catches it as a failed source, and the class is reported stale:
-       * the app then tells the member their wager history on Ethereum could not be read, when what
-       * is true is that FairWins wagers do not exist there. Naming a gap that is not one is the
-       * same error as hiding one that is.
-       */
+      // A chain with no escrow deployed has no FairWins wagers — that is
+      // NOT-DEPLOYED, which is a read of nothing, not a failed read (#1280).
+      // Without this, RegistrySource throws `wagerRegistry not deployed` on
+      // every such chain, the class is reported stale forever, and the
+      // ledger's new unreadable state would rest on a failure that is not one.
+      // Mirrors the same check in useAccountStats#loadWagersAcrossEstate.
       const escrowConfigured = Boolean(
         getContractAddressForChain('wagerRegistry', chainId) ||
         getContractAddressForChain('friendGroupMarketFactory', chainId),

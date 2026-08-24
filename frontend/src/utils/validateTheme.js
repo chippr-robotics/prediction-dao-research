@@ -17,6 +17,12 @@ export function validateTheme() {
     '--text-secondary',
     '--primary-button',
     '--primary-button-hover',
+    // The label half of the pair. It is the one that INVERTS between themes
+    // (white in light, Gunmetal in dark), so a theme that defines the fill and
+    // not the label ships a 2.16:1 control rather than an obviously broken one
+    // (issue #1260). scripts/tenants/validate-tenant-manifest.js requires the
+    // same three per mode; keep the two lists in step.
+    '--primary-button-text',
   ];
   
   const styles = getComputedStyle(document.documentElement);

@@ -9,6 +9,6 @@ output "staging_testnet_service_uri" {
 }
 
 output "staging_mcp_server_service_uri" {
-  description = "Staging MCP server URI. No Cloudflare hostname is declared for it, so this run.app address is what an MCP client is configured with."
-  value       = module.mcp_server_staging.service_uri
+  description = "Staging MCP server URI, or NULL while `manage_mcp_server` is false — null means not declared, which is a different fact from declared-and-unreachable. No Cloudflare hostname is declared for it, so this run.app address is what an MCP client is configured with."
+  value       = one(module.mcp_server_staging[*].service_uri)
 }

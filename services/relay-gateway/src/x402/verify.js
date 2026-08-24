@@ -290,10 +290,24 @@ export async function verifyPayment({
       'the payer’s token balance could not be read, so this payment was NOT settled; nothing was charged — try again'
     )
   }
-  if (BigInt(balance) < amount) {
+  // Check the balance against what the payer SIGNED, not against what we quoted.
+  //
+  // Step 3 only requires `authorization.value >= amount`, and settle.js transfers
+  // `authorization.value` — not `amount`. Checking `amount` here therefore passed an agent who
+  // signed a huge value while holding only the price: verification succeeded, the engine broadcast,
+  // the answer was served, and the token then reverted for insufficient balance. Free answer, and
+  // FairWins paid gas for a reverting transaction. Repeatable at the per-account quota with fresh
+  // nonces, so it was a paywall bypass, not an edge case.
+  if (BigInt(balance) < authorization.value) {
     nonces.release(authorization.nonce)
-    throw refuse('payment_insufficient_balance', `the payer holds less than ${amount} base units of ${requirement.asset}`)
+    throw refuse(
+      'payment_insufficient_balance',
+      `the payer holds less than the authorized ${authorization.value} base units of ${requirement.asset}`
+    )
   }
 
-  return { payer, amount, network: caip2(chainCfg.chainId) }
+  // `amount` is what the offer QUOTED; `value` is what the token will actually move. They differ
+  // whenever an agent authorizes more than the price, so the receipt must report `value` — see
+  // paywall.js, which puts it in the audit line, X-PAYMENT-RESPONSE and the settlement object.
+  return { payer, amount, value: authorization.value, network: caip2(chainCfg.chainId) }
 }

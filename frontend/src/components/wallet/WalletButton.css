@@ -478,9 +478,9 @@
 .my-markets-btn {
   width: 100%;
   justify-content: center;
-  background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--info-color) 100%);
+  background: var(--gradient-primary-button);
   border: none;
-  color: white;
+  color: var(--primary-button-text);
 }
 
 .my-markets-btn:hover {

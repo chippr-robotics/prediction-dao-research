@@ -100,6 +100,44 @@
 #   id = "projects/chippr-bots-site-wp/secrets/alto-executor-key-137"
 # }
 #
+# ── the QuickNode Multi-Chain RPC credentials ─────────────────────────────────────────────────
+#
+# ADOPTED, NEVER RECREATED. All four were hand-created at the console on 2026-08-21 and carry no
+# `goog-terraform-provisioned` label. Verified 2026-08-23 before writing these blocks: each exists,
+# each has exactly one ENABLED version, and each replicates `automatic` — which is what
+# `google_secret_manager_secret.managed` declares, so adoption is a plain import with no diff. A
+# user-managed replication policy would instead have planned a REPLACEMENT, and replacing a secret
+# container destroys every version it holds (which is what `prevent_destroy` is there to refuse).
+#
+# All four are imported even though only QUICKNODE_POLYGON_API is granted to anything. An
+# unmanaged secret is invisible; a managed one with a deliberately empty IAM policy is a recorded
+# decision. See terraform.tfvars for why the other three have no reader.
+
+# import {
+#   to = google_secret_manager_secret.managed["QUICKNODE_POLYGON_API"]
+#   id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_POLYGON_API"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["QUICKNODE_POLYGON_WSS"]
+#   id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_POLYGON_WSS"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["QUICKNODE_AMOY_API"]
+#   id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_AMOY_API"
+# }
+#
+# import {
+#   to = google_secret_manager_secret.managed["QUICKNODE_AMOY_WSS"]
+#   id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_AMOY_WSS"
+# }
+#
+# The accessor bindings are deliberately NOT imported: the four secrets have COMPLETELY EMPTY IAM
+# policies today (`gcloud secrets get-iam-policy` returns an etag and nothing else), so
+# `module.gateway.google_secret_manager_secret_iam_member.node["QUICKNODE_POLYGON_API"]` and its
+# bundler twin are genuine CREATES. Importing a binding that does not exist fails the plan.
+#
 # import {
 #   to = google_artifact_registry_repository.cloud_run_source_deploy
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/repositories/cloud-run-source-deploy"
@@ -116,14 +154,16 @@
 
 # `module.mcp_server` (spec 095) has NO import block, and that absence is deliberate rather than an
 # omission: `fairwins-mcp-server` has never been deployed by hand, so there is nothing to adopt. The
-# first apply CREATES it, and its correctness condition is the ordinary one — the plan that follows
-# reports no changes. An import block for a resource that does not exist fails the plan outright.
+# apply that first sets `manage_mcp_server = true` CREATES it, and its correctness condition is the
+# ordinary one — the plan that follows reports no changes. An import block for a resource that does
+# not exist fails the plan outright, which is the second reason there is none here: the module is
+# gated off, so `module.mcp_server[0]` does not exist to import INTO either.
 #
 # If the service is ever deployed out of band before that apply, adopt it here instead of letting
-# Terraform create a second one:
+# Terraform create a second one. Note the index — the module carries `count`:
 #
 # import {
-#   to = module.mcp_server.google_cloud_run_v2_service.this
+#   to = module.mcp_server[0].google_cloud_run_v2_service.this
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/services/fairwins-mcp-server"
 # }
 
