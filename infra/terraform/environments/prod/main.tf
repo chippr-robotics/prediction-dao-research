@@ -256,6 +256,29 @@ module "spa" {
  * MCP server (spec 095). Speaks the Model Context Protocol over HTTP so an AI agent can reach the
  * member API on a member's behalf.
  *
+ * ⚠ OFF UNTIL THE IMAGE EXISTS. `manage_mcp_server` defaults to false and terraform.tfvars states
+ * it, so this module declares nothing today and a merge to main applies nothing. It is gated
+ * because NOTHING IN THIS REPOSITORY PUBLISHES `fairwins-mcp-server`: cloudbuild.yaml builds the
+ * SPA and only the SPA, and .github/workflows/container-build.yml builds this image for a boot
+ * smoke test under a LOCAL `fairwins-mcp-server:ci` tag it never pushes. There is no such package
+ * in the Artifact Registry repository.
+ *
+ * That matters because infra-apply.yml runs on push to main WITHOUT A HUMAN IN THE LOOP. A Cloud
+ * Run create against an image that does not exist fails; the matrix is `fail-fast: true`, so prod
+ * failing means staging never applies; and FR-035 forbids retrying an apply unattended. Ungated,
+ * one promotion would wedge the estate's entire apply path behind a person.
+ *
+ * A gate is the right shape here rather than merely the cheap one. Publishing the image would not
+ * close this on its own: the image build and this apply are both triggered by the same push to
+ * main, concurrently and with no ordering between them, so the first create could still lose the
+ * race. The flag makes the create happen at a moment somebody chose.
+ *
+ * TO TURN IT ON, in this order — docs/runbooks/member-api-operations.md §3.8:
+ *   1. build and push `<repo>/fairwins-mcp-server/fairwins-mcp-server:latest`
+ *   2. confirm it is really there (`gcloud artifacts docker images list`)
+ *   3. flip `manage_mcp_server = true` in terraform.tfvars as its own PR, and read the plan
+ * Step 3 is a reviewed diff with its own plan, which is the control spec 087 actually relies on.
+ *
  * STATELESS AND SECRETLESS, which is why this block is as short as it is. The service holds no
  * credential of its own: every request carries the MEMBER's own capability token in its
  * `Authorization` header and the service forwards it upstream. Hence:
@@ -281,13 +304,19 @@ module "spa" {
  * block, so the default container port applies and a hardcoded listener would never pass a probe.
  */
 module "mcp_server" {
+  count = var.manage_mcp_server ? 1 : 0
+
   source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=70498e2a2860f2e65cd2ce3919ca85d29678a1e3"
 
   project_id = var.project_id
   region     = var.region
   name       = "fairwins-mcp-server"
 
-  # Required by the provider, then ignored. The pipeline publishes :latest alongside the SHA tag.
+  # Required by the provider, then ignored — the module's `ignore_changes` covers the image, so
+  # after the first create this value never moves the service again (G-07: Terraform owns SHAPE,
+  # the build owns the ARTIFACT). It must nonetheless RESOLVE at create time, and today it does
+  # not. Unlike the SPA above, `:latest` here is an instruction to whoever publishes this image
+  # first — not a description of something a pipeline already does.
   image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/fairwins-mcp-server/fairwins-mcp-server:latest"
 
   # Agent traffic is thin and bursty, and every request is a proxy hop to the member API. A low

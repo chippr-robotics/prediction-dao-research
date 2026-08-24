@@ -178,6 +178,14 @@ Terraform as a Cloud Run service (`fairwins-mcp-server`, and `-staging`) with **
 environment and no dedicated service account** — the service holds nothing, because the
 authorisation arrives on each request. Scale-to-zero, single container.
 
+**Not deployed yet, and deliberately gated so a merge cannot deploy it.** No pipeline builds or
+pushes this image — CI builds it to boot it and never pushes — so both Terraform modules sit behind
+`manage_mcp_server`, default **false**. Terraform applies unattended on merge to `main`, and a Cloud
+Run create against an absent image would fail and stop the estate's apply. Publishing the image and
+flipping the flag is [runbook §3.8](../runbooks/member-api-operations.md). Until then the hosted
+mode is unavailable and members run the server locally over **stdio**, which is the configuration
+`services/mcp-server/README.md` documents.
+
 ## Invariants
 
 - **No dependencies.** `package.json` has no `dependencies` and no `devDependencies` beyond what
