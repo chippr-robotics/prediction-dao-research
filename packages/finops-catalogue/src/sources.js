@@ -15,6 +15,22 @@
  * What does NOT belong here: endpoints, account ids, zone tags, project names, and above all
  * credentials. `credential` names a Secret Manager secret; it never carries one (FR-003). This file
  * is world-readable in the repository.
+ *
+ * ── `moneyPath`: how the gate SEES an entry in the platform ───────────────────────────────────
+ *
+ * An optional field on any source whose money moves through the relay gateway:
+ *
+ *   moneyPath: { namespace, payeeEnv?, enableEnv? }
+ *
+ * `namespace` is the config namespace the coverage gate derives from an env-var prefix
+ * (`X402_PAY_TO` => `x402`). `payeeEnv` names the variable that configures the recipient WE control;
+ * `enableEnv` names the flag that switches the path on in a deployment.
+ *
+ * It exists because the original gate discovered new revenue by exactly one route — a FeeRouter
+ * `serviceId` — and so was structurally blind to a rail that takes money without registering one.
+ * The x402 rail below is exactly that, and it sat uncatalogued with CI green. C2 now also
+ * enumerates configured platform payees in the gateway and fails on any namespace no entry claims,
+ * and refuses to let a `planned` entry stay `planned` once a committed deployment turns its path on.
  */
 
 /** Chain ids, spelled out so a reader does not have to know that 137 is Polygon. */
@@ -141,6 +157,7 @@ const referral = [
     interval: VENDOR,
     credential: null,
     docs: 'finops-operations.md#referral-revenue',
+    moneyPath: { namespace: 'opensea', payeeEnv: 'OPENSEA_REFERRAL_ADDRESS' },
     meaning:
       'Referral share attributable to FairWins-routed OpenSea volume. OPENSEA_REFERRAL_ADDRESS is unset in ' +
       'production, so this reports not-configured rather than zero: no code is registered, so there is nothing to earn.',
@@ -156,6 +173,7 @@ const referral = [
     interval: VENDOR,
     credential: null,
     docs: 'finops-operations.md#referral-revenue',
+    moneyPath: { namespace: 'perps-gains', payeeEnv: 'PERPS_GAINS_REFERRER' },
     meaning:
       'Venue-paid referral share from Gains Network. Gains has not whitelisted a referrer, so link-outs go ' +
       'unattributed and this reports not-configured.',
@@ -171,6 +189,7 @@ const referral = [
     interval: VENDOR,
     credential: null,
     docs: 'finops-operations.md#referral-revenue',
+    moneyPath: { namespace: 'perps-gmx', payeeEnv: 'PERPS_GMX_REF_CODE' },
     meaning:
       'Venue-paid GMX referral share (which also discounts the trader). No ref code is registered, so this ' +
       'reports not-configured.',
@@ -186,6 +205,7 @@ const referral = [
     interval: VENDOR,
     credential: 'polymarket-api-key',
     docs: 'finops-operations.md#referral-revenue',
+    moneyPath: { namespace: 'polymarket', payeeEnv: 'POLYMARKET_BUILDER_CODE' },
     meaning:
       'Weekly rewards from the Polymarket builder-code programme, separate from the per-order builder fee ' +
       'captured by fee-polymarket-taker/maker. The builder code IS registered, so unlike the other referral ' +
@@ -229,6 +249,73 @@ const planned = [
     meaning:
       'PLANNED, NOT LIVE. WagerRegistry escrows stakes and takes no platform cut, so wagers currently generate ' +
       'volume but no direct revenue. Shown as not-yet-live and excluded from every total.',
+  },
+]
+
+/**
+ * BUILT, NOT OFFERED. Two money paths whose code is complete and whose deployment is switched off.
+ *
+ * These are a different thing from the `planned` block above, and the difference is worth stating
+ * because it decides how they are watched. Mini-app licenses and the wager platform fee do not exist
+ * ANYWHERE: no contract has a fee, so nothing could ever be read. These two exist entirely, are
+ * tested, and are one uncommented line in `infra/vm/gateway/docker-compose.yml` away from moving
+ * real money.
+ *
+ * They still carry `status: 'planned'`, because status describes what there is to READ and there is
+ * nothing: no deployment offers either path, so not one payment and not one billed token exists.
+ * Reporting `$0` would say "offered, and nobody used it" — untrue, and it would close a question
+ * that is still open.
+ *
+ * What keeps that from rotting is `moneyPath`. C2 fails the build the moment a committed deployment
+ * sets X402_PAY_TO or ASSISTANT_ENABLED while these entries still claim to be not-yet-live. The
+ * enable step is where a promotion to `live` (with a collector) becomes non-optional — which is the
+ * whole point, because switching on a revenue rail is precisely the moment nobody remembers the
+ * dashboard.
+ */
+const dormant = [
+  {
+    id: 'x402-agent-payments',
+    kind: 'revenue',
+    status: 'planned',
+    label: 'Member API — x402 agent payments',
+    metric: null,
+    collector: 'none',
+    chains: [POLYGON],
+    interval: CHAIN_EVENTS,
+    credential: null,
+    docs: 'finops-operations.md#planned-sources',
+    moneyPath: { namespace: 'x402', payeeEnv: 'X402_PAY_TO', enableEnv: 'X402_ENABLED' },
+    meaning:
+      'BUILT, NOT OFFERED. The x402 paid rail (spec 096) lets an agent holding no membership pay per request: it ' +
+      'signs an EIP-3009 USDC authorization to the platform treasury (X402_PAY_TO) and the gateway settles it — ' +
+      '$0.01 a read, $0.05 a typed-data build, $0.10 an assistant message. Unambiguously revenue, and it routes ' +
+      'around the FeeRouter entirely, which is why the coverage gate could not see it until C2 learned to look for ' +
+      'configured platform payees. It is enabled on NO deployment: X402_ENABLED and X402_PAY_TO are commented out, ' +
+      'the treasury has no default on purpose, and the pinned gateway image predates the module. So no payment has ' +
+      'ever been possible and there is no value to read — not a $0, which would claim the rail was offered and ' +
+      'ignored. Promoting this to `live` needs a collector that can tell x402 settlements apart from every other ' +
+      'USDC arrival at the same treasury; the gate now forces that work to happen BEFORE the first payment, not after.',
+  },
+  {
+    id: 'assistant-model-api',
+    kind: 'cost',
+    status: 'planned',
+    label: 'Member assistant — model provider',
+    metric: null,
+    basis: 'modelled',
+    collector: 'none',
+    interval: VENDOR,
+    credential: 'anthropic-api-key',
+    docs: 'finops-operations.md#planned-sources',
+    moneyPath: { namespace: 'assistant', enableEnv: 'ASSISTANT_ENABLED' },
+    meaning:
+      'BUILT, NOT OFFERED. `POST /v1/member/assistant/chat` (spec 095) calls the Anthropic Messages API, which ' +
+      'bills per input and output token — a real vendor cost, and the only uncatalogued one. It is enabled on no ' +
+      'deployment (ASSISTANT_ENABLED, and MEMBER_API_ENABLED above it, are commented out), so not one token has ' +
+      'been billed. `basis` is declared `modelled` NOW, while nothing is at stake, and it is not negotiable later: ' +
+      'this exporter holds no Anthropic billing credential, so any dollar figure it ever publishes will be token ' +
+      'counts times a rate typed into a config file. Only GCP is `billed` (research R1). The token counts ' +
+      'themselves are a fact and belong in vendor usage; the dollars are our arithmetic and must always say so.',
   },
 ]
 
@@ -388,6 +475,7 @@ export const SOURCES = [
   ...membership,
   ...referral,
   ...planned,
+  ...dormant,
   ...gasPools,
   ...vendors,
 ]

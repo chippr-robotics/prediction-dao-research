@@ -586,9 +586,26 @@ artifacts live under `specs/<feature>/`.
   (4) **LABELS COME FROM BOUNDED ENUMERATIONS** (`schema.js`) — never a member address, wager id or
   tx hash, which makes series count a function of usage and outgrows the tier in days.
   (5) **`infra/grafana/` IS GENERATED AND COMMITTED** — never hand-edit it (C5 regenerate-and-diff),
-  and a dashboard edited in the Grafana UI is drift that the next provision overwrites. `miniapp
-  licenses` and `wager platform fee` are catalogued `planned`: neither exists on chain, so they show
-  as NOT YET LIVE, declare no metric, and contribute nothing to any total. The exporter is
+  and a dashboard edited in the Grafana UI is drift that the next provision overwrites. Four sources
+  are catalogued `planned` — they show as NOT YET LIVE, declare no metric, and contribute nothing to
+  any total — and they split two ways: `miniapp licenses` / `wager platform fee` exist NOWHERE (no
+  contract has a fee), while `x402-agent-payments` / `assistant-model-api` are **built and offered on
+  no deployment** (specs 096/095, flags commented out in `infra/vm/gateway/docker-compose.yml`).
+  **A gate that cannot see the source is not protection**, and the second group is why: C2's only
+  discovery route was a FeeRouter `keccakId('x.y')` over two files, so the x402 rail — which takes
+  USDC straight to the treasury and registers no `serviceId` — was invisible BY CONSTRUCTION and sat
+  uncatalogued with CI green. **C2b** now also enumerates **configured platform payees** in
+  `services/relay-gateway/src/**` (an env var, READ from the environment, ending `_PAY_TO`/
+  `_TREASURY`/`_REFERRAL_ADDRESS`/`_REF_CODE`/…, plus any payee hardcoded as an address literal) and
+  fails on a namespace no entry claims via `moneyPath: { namespace, payeeEnv, enableEnv }`. It
+  deliberately does NOT match a bare `recipient` (every one in the gateway is the MEMBER's address)
+  and it requires an actual env READ, because matching the name anywhere reported OpenSea's own
+  hardcoded fee address as FairWins revenue. **Enabling a `planned` money path in a committed
+  deployment file is itself a C2b failure** — promotion to `live` with a collector is forced at the
+  moment the rail is switched on, not after. **Cost discovery is NOT automatable** (`fetch(vendor)`
+  looks identical metered or free) and is deliberately left to `basis` + review; do not add a
+  heuristic over outbound calls. `npm run test:finops-gate` drives each rule against a
+  must-fail fixture. The exporter is
   **read-only by construction** (no signer, no write route), binds loopback only, and
   `fetch-secrets.sh` refuses to boot if key material reaches its env. See
   `docs/developer-guide/finops.md` + `docs/runbooks/finops-operations.md` + `specs/089-finops-dashboard/`.

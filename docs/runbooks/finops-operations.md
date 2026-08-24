@@ -216,12 +216,38 @@ exist to prevent.
 
 ### planned-sources
 
-`miniapp-licenses` and `wager-platform-fee` are declared but **not live**: `MiniAppRegistry` has no
-fee or `payable` function, and `WagerRegistry` takes no platform cut. They render as *not yet live*,
-contribute nothing to any total, and emit no metric.
+Four sources are declared and **not live**. They render as *not yet live*, contribute nothing to any
+total, and emit no metric — a `planned` source showing `$0` would be indistinguishable from a shipped
+source earning nothing (FR-014). They fall into two groups, and the difference decides how each is
+watched.
 
-When one ships, change its `status` to `live`, give it a `metric` and a collector, and regenerate.
-The gate already knows its name.
+**Does not exist anywhere.** `miniapp-licenses` and `wager-platform-fee`: `MiniAppRegistry` has no
+fee or `payable` function, and `WagerRegistry` takes no platform cut. There is nothing that could
+produce a value, and nothing to watch for.
+
+**Built, but offered on no deployment.** `x402-agent-payments` and `assistant-model-api`: the code is
+complete and tested, and both are one uncommented line in `infra/vm/gateway/docker-compose.yml` away
+from moving real money — x402 takes USDC to the platform treasury per priced request, and the
+assistant calls a metered model API. Because enabling them is a config change rather than a code
+change, each declares a `moneyPath` in the catalogue and **C2b fails the build** the moment a
+committed deployment sets `X402_PAY_TO` or `ASSISTANT_ENABLED`:
+
+```
+[C2b] Source 'x402-agent-payments' is catalogued 'planned' — "nothing to read" — but
+      X402_PAY_TO is configured in infra/vm/gateway/docker-compose.yml:77.
+```
+
+That failure is the intended sequence, not an obstacle to route around: switching on a revenue rail
+is precisely the moment nobody remembers the dashboard.
+
+**Promoting any of the four.** Change `status` to `live`, give it a `metric` and a collector under
+`services/finops-exporter/src/collectors/` that returns `read | not-configured | unreadable`, then
+`npm run finops:generate` and commit. The gate already knows its name.
+
+For `x402-agent-payments` specifically, the collector is the real work and must be designed before
+the rail is enabled: settlements are EIP-3009 USDC transfers into the **same treasury** that receives
+FeeRouter fees and membership withdrawals, so summing arrivals at that address would double-count.
+The distinguishing trace is the token's `AuthorizationUsed` event in the settling transaction.
 
 ## Rotating a credential
 
