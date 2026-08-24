@@ -153,8 +153,13 @@ manage_edge = false
 # Left true, the SPA plans as a create against a service that already serves production (apply fails
 # ALREADY_EXISTS mid-graph), and monitoring plans twelve creates that would SUCCEED and duplicate
 # every alert policy. Flip each one only in the PR that imports it to a zero-diff plan.
-manage_spa        = false
-manage_monitoring = false
+manage_spa = false
+
+# Monitoring is PARTIALLY adopted: the notification channel and the two uptime checks are imported
+# and get per-check uptime alerts. The five VM policies and the probe policy are deliberately NOT
+# adopted — see the module block, they use condition types this module cannot express. They stay
+# live and unmanaged until the module can describe them.
+manage_monitoring = true
 
 # cloudflare_zone_id         = "..."
 # geo_gate_allowed_countries = [...]   # a legal control (spec 007) — see infra/cloudflare/waf-geo.md
