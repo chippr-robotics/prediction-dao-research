@@ -26,11 +26,16 @@ services:
   # ---- namespace owner: the policy gateway (the only public surface) ----
   gateway:
     container_name: fairwins-gateway-gateway
-    # perps-083 (staging efcfef33, PRs #1150 + #1153): the first image carrying the perps read proxy
-    # — and, because predict-058 predates them, also the first carrying spec 060's FeeRouter reader
-    # and spec 076's build identity. Verified before push: /status returns the `perps`, `fees` and
-    # `build` blocks that the live predict-058 does not. Digest sha256:c34df81637673702bbb91cd32a95…
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:perps-083
+    # agentic-096 (staging 7d5f2c10): the first image carrying spec 095's member API and spec 096's
+    # x402 rail, plus the spec-089 FinOps catalogue work and the member-API quota/spend bounds from
+    # #1311. Verified before push: /status returns a `memberApi` block (with x402 nested inside it)
+    # that the live perps-083 does not. Digest sha256:c57e88ae0960519ef461a7316f782281e0f1bcccc499a…
+    #
+    # The module is PRESENT but OFF: every spec-095/096 switch below stays commented, so this image
+    # behaves exactly as perps-083 did until someone turns one on deliberately. Shipping the code
+    # and flipping the switch are different decisions, and X402_PAY_TO has no safe default to
+    # guess — it is where agent payments LAND.
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:agentic-096
     restart: unless-stopped
     pull_policy: missing
     ports:
