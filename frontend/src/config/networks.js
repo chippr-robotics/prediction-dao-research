@@ -75,6 +75,30 @@ const COLLECTIBLES_CHAIN_IDS = new Set([1, 137])
 // Polymarket runs nowhere else. Everywhere else the capability is false and the Predict tab hides
 // entirely (FR-018 soft-fail), mirroring COLLECTIBLES_CHAIN_IDS.
 const PREDICT_CHAIN_IDS = new Set([137])
+
+const earnConfig = () => ({
+  provider: { name: 'Morpho', url: 'https://app.morpho.org' },
+  merklDistributor: MERKL_DISTRIBUTOR,
+  legacyRewardsUrl: 'https://rewards-legacy.morpho.org/',
+})
+
+/*
+ * Full-E2E seam, identical in guard and reasoning to the one in config/contracts.js: the tier's
+ * local hardhat node boots AS chainId 80002 so the local chain is the app's membership home, and
+ * `import.meta.env.DEV &&` makes this whole branch dead code in any production bundle.
+ *
+ * Why Earn needs one. `FeeRouter.depositToVaultWithFee` is the only path that CHARGES a platform
+ * fee on chain, and Earn ▸ Lend is its only member surface — so the spec-060 invariant "a member
+ * is never charged above the rate they were shown" can only be settled from chain state on a
+ * network where Earn exists. Real Amoy has no Morpho and never will; the local impersonation has
+ * a FeeRouter and a MockERC4626Vault (scripts/deploy/deploy-local-earn-vault.js), which is what
+ * this flag describes. Nothing else about the section changes: the vault LIST still comes from
+ * the Morpho API, which the spec stubs, so a build with the flag set and no stub shows the same
+ * honest "unavailable" state it would on any other chain.
+ */
+const E2E_AMOY_LOCAL =
+  Boolean(import.meta.env?.DEV) && import.meta.env?.VITE_E2E_AMOY_LOCAL === '1'
+
 // In-app token swapping (spec 033 / 067 FR-016a). An EXPLICIT allow-list, not
 // `Boolean(this.dex)`.
 //
@@ -94,12 +118,75 @@ const PREDICT_CHAIN_IDS = new Set([137])
 // Membership here is a POLICY gate, not a claim that the network is ready: the
 // capability also requires real `dex` config, because ETC/Mordor/Amoy build
 // theirs from env vars and yield null when unset.
-const SWAP_CHAIN_IDS = new Set([1, 10, 61, 63, 137, 8453, 42161])
+//
+// The 80002 entry is the LOCAL E2E IMPERSONATION ONLY, and is the same seam `earn` and the staking
+// config already use on this network (`E2E_AMOY_LOCAL`, above). It is compile-time — a shipped
+// build has `import.meta.env.DEV` false, the branch is dead code, and real Polygon Amoy stays
+// swap-less exactly as it is today. It exists because admission rule 2 of the e2e policy says a
+// flow in which a member signs something that costs them money must have on-chain coverage, the
+// on-chain tier impersonates Amoy, and a member swapping is spending. Membership of this set is
+// still not sufficient on its own: Amoy's `dex` block is built from VITE_AMOY_UNISWAP_* and stays
+// null unless something supplies them — locally, `scripts/deploy/deploy-local-swap.js`.
+const SWAP_CHAIN_IDS = new Set([1, 10, 61, 63, 137, 8453, 42161, ...(E2E_AMOY_LOCAL ? [80002] : [])])
 
-const earnConfig = () => ({
-  provider: { name: 'Morpho', url: 'https://app.morpho.org' },
-  merklDistributor: MERKL_DISTRIBUTOR,
-  legacyRewardsUrl: 'https://rewards-legacy.morpho.org/',
+/*
+ * Full-E2E staking wiring (specs 065 + 066), behind the same DEV-only seam as `earn` above.
+ *
+ * Real Polygon Amoy has no Lido, no sPOL and no Polygon StakeManager, so a shipped build
+ * resolves `staking` to null here exactly as it always did and the Stake area names the
+ * networks where staking really exists. The local impersonation points at the contracts/mocks
+ * stand-ins that `scripts/deploy/deploy-staking-router.js` deploys on a local node, which is
+ * what lets the stake, unstake and operator-control flows run against a chain.
+ *
+ * NONCE-DERIVED, like the router addresses in contracts.js — they come from the same deploy.
+ *
+ * `aprApi` and `stakingApi` are deliberately NULL. Both are public third-party endpoints whose
+ * only job is decoration; a local run must not depend on them, and both callers already treat
+ * an unreadable source as "no decoration" rather than as an error.
+ */
+const localStakingConfig = () => ({
+  liquid: [
+    {
+      kind: 'lido',
+      provider: { name: 'Lido', url: 'https://stake.lido.fi' },
+      asset: { symbol: 'ETH', decimals: 18 },
+      lstSymbol: 'wstETH',
+      referral: '0x0000000000000000000000000000000000000000',
+      contracts: {
+        steth: '0x82e01223d51Eb87e16A03E24687EDF0F294da6f1',
+        wsteth: '0x2bdCC0de6bE1f7D2ee689a0342D76F52E8EFABa3',
+        withdrawalQueue: '0x0000000000000000000000000000000000000000',
+      },
+      aprApi: null,
+      unbonding: { kind: 'queue', instantExit: false },
+    },
+    {
+      kind: 'spol',
+      provider: { name: 'sPOL (Polygon)', url: 'https://staking.polygon.technology/lst' },
+      asset: { symbol: 'POL', decimals: 18, address: '0x7969c5eD335650692Bc04293B07F5BF2e7A673C0' },
+      lstSymbol: 'sPOL',
+      referral: null,
+      contracts: {
+        token: '0x7bc06c482DEAd17c0e297aFbC32f6e63d3846650',
+        controller: '0xc351628EB244ec633d5f21fBD6621e1a683B1181',
+      },
+      aprApi: null,
+      unbonding: { kind: 'checkpoints', instantExit: true },
+    },
+  ],
+  delegated: {
+    provider: { name: 'Polygon PoS', url: 'https://staking.polygon.technology' },
+    asset: { symbol: 'POL', decimals: 18, address: '0x7969c5eD335650692Bc04293B07F5BF2e7A673C0' },
+    stakeManager: '0xFD471836031dc5108809D173A067e8486B9047A3',
+    stakingApi: null,
+    validators: [
+      {
+        validatorId: 1,
+        name: 'E2E Validator',
+        validatorShare: '0xcbEAF3BDe82155F56486Fb5a1072cb8baAf547cc',
+      },
+    ],
+  },
 })
 
 // Cross-chain bridge + liquidity supply (spec 067).
@@ -186,8 +273,13 @@ const NETWORKS = {
     stablecoin: {
       address: import.meta.env?.VITE_AMOY_USDC || '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
       symbol: 'USDC',
+      // Decimals follow the address override: the full-E2E tier points VITE_AMOY_USDC at the
+      // local 18-dec mock (the node impersonates Amoy — see dev:e2e), and an address override
+      // with the real token's 6 hardcoded beside it makes every amount computation wrong by
+      // 10^12 — stakes become dust that still clears on-chain, which is worse than failing.
+      // Unset, this is exactly the literal 6 it always was.
       name: 'USD Coin',
-      decimals: 6,
+      decimals: Number(import.meta.env?.VITE_AMOY_USDC_DECIMALS) || 6,
       // EIP-712 domain version for the EIP-3009 payment leg (spec 035 FR-020):
       // native Circle USDC signs under version '2' (bridged USDC.e would be '1').
       domainVersion: '2',
@@ -223,6 +315,26 @@ const NETWORKS = {
       name: 'Uniswap',
       url: 'https://app.uniswap.org/swap',
     },
+    // Earn ▸ Lend exists here ONLY in the local full-E2E impersonation (see E2E_AMOY_LOCAL
+    // above) — real Polygon Amoy has no Morpho deployment, and a shipped build resolves this
+    // to null exactly as it always did.
+    earn: E2E_AMOY_LOCAL ? earnConfig() : null,
+    // Same seam, same reason (specs 065 + 066) — see `localStakingConfig` above.
+    staking: E2E_AMOY_LOCAL ? localStakingConfig() : null,
+    /*
+     * Same seam, same reason (spec 067): Across is not deployed on real Polygon Amoy, so a shipped
+     * build resolves this to null and the Bridge surface hides here exactly as it does today. The
+     * local impersonation points at the contracts/mocks SpokePool that
+     * `scripts/deploy/deploy-bridge-liquidity.js` deploys, so the bridge flows can be driven end to
+     * end against a chain.
+     *
+     * NONCE-DERIVED, like the router addresses in contracts.js — it comes from the same targeted
+     * deploy. No HubPool: bridge-liquidity supply is Ethereum-only (the HubPool is an L1 contract),
+     * and pretending otherwise here would offer a supply route that cannot exist.
+     */
+    bridge: E2E_AMOY_LOCAL
+      ? bridgeConfig('0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00')
+      : null,
     // Passkey smart accounts (spec 041) — Amoy is the passkey validation
     // network: RIP-7212 P-256 precompile live, canonical EntryPoint v0.6.
     passkey: passkeyConfig(
@@ -777,6 +889,30 @@ const NETWORKS = {
     dex: null,
     contracts: {},
     polymarket: null,
+    /*
+     * DEV-ONLY, and a DESTINATION only (spec 067 + issue #1265).
+     *
+     * A shipped build resolves this to null: Across has no production deployment we
+     * curate here, so Bridge self-discloses off on Sepolia exactly as it does today.
+     *
+     * The local impersonation exists because #1265 made `bridgeNetworks()` cohort-bounded,
+     * which is right — a testnet build must never be offered a mainnet destination — but
+     * left the full E2E tier with a roster of exactly ONE network (Amoy, via the seam
+     * below at 80002). A bridge needs somewhere to go: with one network in the roster the
+     * destination selector is correctly empty, no quote is ever requested, and BL-03 —
+     * the assertion that Across records the MEMBER as depositor, which is why
+     * `IBridgeRouter` has no rescue function — cannot run at all.
+     *
+     * So Sepolia is the second in-cohort network the local tier bridges TO. It shares
+     * Amoy's mock SpokePool address deliberately: a DESTINATION's spoke pool is never
+     * called — `depositV3` is sent to the ORIGIN chain's pool, and the destination chain
+     * reaches this build only as route metadata the mock records verbatim. Nothing is
+     * read on Sepolia by these flows. Giving it a distinct fake address would imply a
+     * second deployed contract that does not exist.
+     */
+    bridge: E2E_AMOY_LOCAL
+      ? bridgeConfig('0x5eb3Bc0a489C5A8288765d2336659EbCA68FCd00')
+      : null,
     // Passkey smart accounts (spec 041) — Sepolia carries EntryPoint v0.6, the
     // Arachnid CREATE2 proxy, and a P-256 precompile, which makes it the
     // free-to-fund rehearsal network for the Ethereum-family rollout.
@@ -969,8 +1105,27 @@ const MINIAPP_TESTNET_CHAIN_ID = 63
  * Not runtime-configurable, deliberately. The registry is the trust boundary for what code the
  * host executes, so a runtime-swappable registry chain would let a misconfiguration (or a
  * tampered preference) point verification at a chain anyone can write to.
+ *
+ * ── THE ONE EXCEPTION, AND WHY IT DOES NOT WEAKEN THAT ──────────────────────────────────────
+ * `E2E_AMOY_LOCAL` redirects this to the local node, and it is NOT a runtime configuration: it is
+ * `import.meta.env.DEV && VITE_E2E_AMOY_LOCAL === '1'`, so a production build eliminates the
+ * branch entirely and no preference, tampered or otherwise, can reach it. The sentence above is
+ * about a *runtime-swappable* registry chain; this is a compile-time one, and it is the same gate
+ * that already repoints the ENTIRE 80002 address map to `HARDHAT_CONTRACTS` in config/contracts.js
+ * — a strictly larger surface, since that one moves the wager registry and the fee router too.
+ *
+ * It exists because the rules this registry enforces — `launchable` is the serving decision, an
+ * approval is content-committed, screening happens inside `wallet.submit` — are exactly the kind a
+ * refactor inverts silently, and none of them can be settled against a chain the test cannot
+ * write to. Mordor is a public network: a flow test cannot submit a package there, approve it, and
+ * then swap it under the curator. On the local node it can.
+ *
+ * The cohort boundary still holds, and holds MORE tightly than before: 80002 is `isTestnet: true`,
+ * so a testnet build still reads a testnet registry. `src/test/networks.miniapps.test.js` pins the
+ * production answers on both sides so this branch cannot drift into a shipped build.
  */
 export function miniAppChainId() {
+  if (E2E_AMOY_LOCAL) return TESTNET_CHAIN_ID
   return buildIsTestnet() ? MINIAPP_TESTNET_CHAIN_ID : MAINNET_CHAIN_ID
 }
 
