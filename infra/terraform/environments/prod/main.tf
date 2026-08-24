@@ -35,7 +35,7 @@ locals {
 # ── network ───────────────────────────────────────────────────────────────────────────────────
 
 module "network" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/network?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id   = var.project_id
   region       = var.region
@@ -72,7 +72,7 @@ module "network" {
  * account and sign with the paymaster HSM key. This grant is strictly smaller.
  */
 module "bundler" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id        = var.project_id
   region            = var.region
@@ -115,7 +115,7 @@ module "bundler" {
  * repository-scoped and its secret access is per-secret.
  */
 module "gateway" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/edge-node?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id        = var.project_id
   region            = var.region
@@ -244,7 +244,7 @@ resource "google_kms_crypto_key" "signing" {
 module "spa" {
   count = var.manage_spa ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=c59ac880f14d1a172b58bd5f43c45bf31922819f"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id = var.project_id
   region     = var.region
@@ -331,7 +331,7 @@ module "spa" {
 module "mcp_server" {
   count = var.manage_mcp_server ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=c59ac880f14d1a172b58bd5f43c45bf31922819f"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloud-run-service?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id = var.project_id
   region     = var.region
@@ -381,7 +381,7 @@ data "google_secret_manager_secret_version" "origin_lock" {
 
 module "edge" {
   count  = var.manage_edge ? 1 : 0
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/cloudflare-zone?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   zone_id = var.cloudflare_zone_id
 
@@ -414,7 +414,7 @@ module "edge" {
 module "monitoring" {
   count = var.manage_monitoring ? 1 : 0
 
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/monitoring?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id          = var.project_id
   notification_emails = var.notification_emails
@@ -472,7 +472,7 @@ module "monitoring" {
 # subdirectory is not in the fetched repo. That split is resolved: d70fb6f carries the module and is
 # byte-identical to 205b2e42 for it, so there is no longer a reason for this line to differ.
 module "workstation" {
-  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=d70fb6f6bccf24d5303305f442efb1e7300e9a26"
+  source = "git::https://github.com/chippr-robotics/chippr-tf-modules.git//modules/ops-workstation?ref=838c250b6dc8542fd0730b12ec7050462387bc53"
 
   project_id                   = var.project_id
   service_account_id           = "fairwins-ops"
