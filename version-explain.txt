@@ -1,9 +1,303 @@
-previous: v1.11.0
-commits:  4
-  [unclassified] Merge pull request #1323 from chippr-robotics/hotfix/networks-e2e-cohort-seams
-  [test -> patch] carry the E2E cohort seams in networks.js to main
-  [unclassified] Merge pull request #1221 from chippr-robotics/release/v1.11.0-changelog
-  [skipped] chore(release): v1.11.0 [skip release]
-bump:     patch
+previous: v1.11.1
+commits:  298
+  [unclassified] Merge pull request #1322 from chippr-robotics/staging
+  [unclassified] Merge pull request #1326 from chippr-robotics/chore/auto-backmerge-main-into-staging
+  [unclassified] Merge remote-tracking branch 'origin/staging' into backmerge-resolve
+  [unclassified] Merge pull request #1324 from chippr-robotics/release/v1.11.1-changelog
+  [skipped] chore(release): v1.11.1 [skip release]
+  [unclassified] Merge pull request #1321 from chippr-robotics/ops/gateway-image-agentic-096
+  [chore -> patch] repin the gateway to agentic-096
+  [unclassified] Merge pull request #1300 from chippr-robotics/deps/hold-oz-540
+  [unclassified] Merge pull request #1299 from chippr-robotics/ops/admin-safe-rotation
+  [unclassified] Merge pull request #1311 from chippr-robotics/fix/member-api-quota-and-spend
+  [unclassified] Merge pull request #1314 from chippr-robotics/fix/finops-x402-coverage
+  [fix -> patch] declare @google-cloud/kms, which scripts/ops was borrowing
+  [unclassified] Merge remote-tracking branch 'origin/staging' into ops/admin-safe-rotation
+  [unclassified] Merge pull request #1320 from chippr-robotics/infra/adopt-prod-monitoring
+  [unclassified] Merge staging into infra/adopt-prod-monitoring
+  [unclassified] Merge pull request #1319 from chippr-robotics/infra/adopt-prod-spa
+  [unclassified] Merge pull request #1318 from chippr-robotics/infra/adopt-staging-services
+  [unclassified] Merge pull request #1317 from chippr-robotics/feat/097-workstation-secrets
+  [unclassified] infra: restore the provider lockfile
+  [unclassified] infra: restore the provider lockfile
+  [unclassified] infra: restore the provider lockfile
+  [unclassified] infra: restore the provider lockfile
+  [unclassified] infra: repin modules to chippr-tf-modules main
+  [unclassified] infra: repin modules to chippr-tf-modules main
+  [unclassified] infra: repin modules to chippr-tf-modules main
+  [unclassified] infra: repin modules to chippr-tf-modules main
+  [unclassified] infra(prod): declare the workstation outputs that state already holds
+  [unclassified] infra(prod): the SPA cannot be adopted — record why, keep the gate shut
+  [unclassified] infra(staging): repin — Cloud Build's labels live on the template
+  [unclassified] infra(prod): empty vm_alert_policies at the value, not the call site
+  [unclassified] infra: repin cloud-run-service — Cloud Build's labels are its own
+  [unclassified] infra: repin cloud-run-service — Cloud Build's labels are its own
+  [unclassified] infra(prod): adopt monitoring as far as the module can honestly describe it
+  [unclassified] infra(prod): adopt the production SPA, describing it as it actually runs
+  [unclassified] infra(staging): describe the live services before importing them
+  [unclassified] infra(staging): adopt the two staging SPA services
+  [test -> patch] give spec 097 its coverage-matrix row
+  [fix -> patch] staging planned two extra public services, and would have succeeded
+  [fix -> patch] a clean plan was hiding three ways to break production
+  [fix -> patch] pin ops-workstation to the ref where the module still exists
+  [unclassified] Merge remote-tracking branch 'origin/staging' into feat/097-workstation-secrets
+  [chore -> patch] retrigger CI
+  [feat -> minor] land the workstation secrets estate that prod was already running
+  [unclassified] Merge pull request #1315 from chippr-robotics/fix/quicknode-wiring
+  [unclassified] Merge pull request #1313 from chippr-robotics/fix/mcp-http-hardening
+  [unclassified] Merge pull request #1312 from chippr-robotics/fix/bridge-getlogs-chunking
+  [unclassified] Merge pull request #1308 from chippr-robotics/claude/e2e-testing-issues-patches-nfihjs
+  [unclassified] Merge pull request #1316 from chippr-robotics/fix/infra-apply-mcp-gate
+  [unclassified] Merge pull request #1310 from chippr-robotics/fix/x402-balance-check
+  [unclassified] Merge pull request #1309 from chippr-robotics/ops/phase4-deploy-gate
+  [test -> patch] DEC-02's row assertion waits long enough for a cold wager scan
+  [fix -> patch] wire the orphaned QuickNode credentials, and guard the wrong-chain hazard they invite
+  [fix -> patch] a stranger could not have denied key revocation, and nothing bounded model spend
+  [fix -> patch] catalogue x402 + the assistant, and widen C2 past FeeRouter services
+  [fix -> patch] gate the spec-095 MCP Cloud Run modules off, and stop the comment lying
+  [fix -> patch] bind loopback, validate Origin, refuse a shared identity over HTTP
+  [fix -> patch] chunk the destination fill scan — it was dead on four of five chains
+  [fix -> patch] check the balance against the SIGNED value, not the quoted price
+  [test -> patch] the validateTheme fixture defines the label token it now requires
+  [unclassified] Merge remote-tracking branch 'origin/claude/e2e-testing-issues-patches-nfihjs' into claude/e2e-testing-issues-patches-nfihjs
+  [test -> patch] MA-03 asserts the message the curator now actually gets
+  [fix -> patch] make contract deploys manual-only
+  [unclassified] Merge remote follow-ups (#1265 catalog cohort bound, MC-02 test) into 1250/1260 integration
+  [test -> patch] adopt the #1250 settle-wait guard on the post-staging money-path specs
+  [fix -> patch] make the disabled fill and label move together (#1260)
+  [fix -> patch] label brand fills from the audited token pair, not #fff (#1260, #1247)
+  [fix -> patch] the asset catalog is cohort-bounded too, so a testnet build has a bridge destination
+  [test -> patch] MC-02 accepts the disclosure granularity the ledger actually reports
+  [test -> patch] CP-02 matches the honest screening copy, not the retired one
+  [unclassified] Merge remote work (staging sync + gate/CP-02/passkey follow-ups) into local revision integration
+  [fix -> patch] land the address gate green, and diagnose the right mechanism (#1298)
+  [fix -> patch] only dismiss an expired offer once its reclaim is confirmed (#1297)
+  [fix -> patch] say only what the sanctions revert establishes, on all four screened paths (#1292)
+  [fix -> patch] restore the passkey provider facade, and migrate its test to @noble/curves v2
+  [fix -> patch] the address gate could never pass on the tier it guards
+  [test -> patch] CP-02 asserts the screening message now that there is one
+  [unclassified] Merge staging into claude/e2e-testing-issues-patches-nfihjs
+  [test -> patch] label the seeded expired offer with the test's own id (#1297)
+  [fix -> patch] walk every observed revert-data nesting on the wager paths
+  [test -> patch] DSH-03 and DSH-04 run again — the span was the assertion's, not the app's (#1307)
+  [test -> patch] ENC-04 asserts the app's key cache, not the browser's (#1306)
+  [test -> patch] A11Y-04 runs again — the backdrop click was aimed at the nav gutter (#1305)
+  [test -> patch] repair first-run failures surfaced by integration validation
+  [fix -> patch] keep the Bridge form, its copy and its in-flight list on one roster (#1265)
+  [fix -> patch] bound spec-067 Supply and Bridge rosters to the build cohort (#1265)
+  [fix -> patch] clear the development banner on every fixed surface, not just the header (#1248)
+  [fix -> patch] measure the development banner instead of reserving 45px (#1248)
+  [fix -> patch] make the unread-ledger verdict reachable, and never crash on it (#1280)
+  [fix -> patch] never render an unread activity ledger as an empty history (#1280)
+  [docs -> patch] correct the VITE_BITCOIN_GATEWAY_URL guidance to what the code does
+  [fix -> patch] give the Bitcoin gateway its own env var (#1263)
+  [fix -> patch] re-derive an unchosen passkey chain, and stop a failed key read accusing a member (#1286)
+  [fix -> patch] resolve the passkey session chain from the build, not wagmi's default (#1286)
+  [fix -> patch] detect "deployed but unset", and describe the real nonce hazard (#1298)
+  [fix -> patch] fail the e2e setup loudly when a deploy-order shift repoints the app (#1298)
+  [fix -> patch] make the expired-offer reclaim reachable by both routes and safe to fail (#1297)
+  [fix -> patch] restore a reachable route to an expired offer's Reclaim & Clear (#1297)
+  [fix -> patch] tell a screened member only what is true, on both wager paths (#1292)
+  [fix -> patch] name sanctions screening on the wager create path (#1292)
+  [fix -> patch] decode a raw error.data revert so the curator sees StaleProposal (#1267)
+  [test -> patch] WAL-03, UL-02 and UL-04 run again — and UL-04 can now fail (#1304)
+  [test -> patch] HMM-02, HMM-04 and HMM-05 run again — the covered switcher is gone (#1303)
+  [test -> patch] three more pending markers cleared — ONB-01, ONB-02, DSH-01 (#1302)
+  [fix -> patch] a member who disconnects stays disconnected, and four wallet tests that never ran (#1296)
+  [chore -> patch] hold @openzeppelin/contracts at 5.4.0, with the reason
+  [unclassified] Merge pull request #1295 from chippr-robotics/claude/issue-1249-budget
+  [unclassified] Merge pull request #1289 from chippr-robotics/claude/issue-1228-backup-roundtrip
+  [chore -> patch] record the Mordor legacy-contract write-off as a decision
+  [feat -> minor] KMS transaction signer, and a key-compromise runbook
+  [chore -> patch] record the admin Safe on Amoy 80002
+  [chore -> patch] rotate the admin Safe to KMS + Ledger + Trezor
+  [fix -> patch] append the backup-pointer deploy, don't insert it mid-order
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/issue-1249-budget
+  [unclassified] Merge staging into claude/issue-1228-backup-roundtrip
+  [test -> patch] compliance parity for passkey accounts — three tests that had never run (#1293)
+  [unclassified] Merge pull request #1294 from chippr-robotics/claude/openapi-agentic-chat-7cv5re
+  [unclassified] Merge pull request #1291 from chippr-robotics/claude/dependabot-prs-staging-merge-p9a97i
+  [docs -> patch] raise the no-chain budget to 7 minutes, with the reason recorded
+  [feat -> minor] x402 pay-per-request rail for agents, prod-gateway enablement procedure
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/issue-1228-backup-roundtrip
+  [fix -> patch] adapt to @noble/curves v2 — restore cross-device key recovery
+  [chore -> patch] reconcile lockfile and raise the gateway runtime to Node 22
+  [unclassified] Merge remote-tracking branch 'origin/dependabot/npm_and_yarn/staging/google-cloud/kms-6.0.0' into claude/dependabot-prs-staging-merge-p9a97i
+  [unclassified] Merge remote-tracking branch 'origin/dependabot/npm_and_yarn/staging/noble/curves-2.3.0' into claude/dependabot-prs-staging-merge-p9a97i
+  [unclassified] Merge remote-tracking branch 'origin/dependabot/npm_and_yarn/staging/noble/post-quantum-0.7.0' into claude/dependabot-prs-staging-merge-p9a97i
+  [unclassified] Merge remote-tracking branch 'origin/dependabot/npm_and_yarn/staging/scure/btc-signer-2.3.0' into claude/dependabot-prs-staging-merge-p9a97i
+  [unclassified] Merge remote-tracking branch 'origin/dependabot/github_actions/staging/terraform-linters/setup-tflint-6' into claude/dependabot-prs-staging-merge-p9a97i
+  [unclassified] Merge remote-tracking branch 'origin/dependabot/github_actions/staging/google-github-actions/setup-gcloud-3' into claude/dependabot-prs-staging-merge-p9a97i
+  [unclassified] Merge remote-tracking branch 'origin/dependabot/github_actions/staging/actions/setup-node-7' into claude/dependabot-prs-staging-merge-p9a97i
+  [fix -> patch] a passkey session reports the build's chain, not wagmi's first (#1288)
+  [chore -> patch] prod-gateway enablement block (commented until image repin), staging-gateway truth
+  [test -> patch] the encrypted backup round trip, the half that costs gas
+  [chore -> patch] bump @noble/curves from 1.9.7 to 2.3.0
+  [unclassified] Merge pull request #1287 from chippr-robotics/claude/openapi-agentic-chat-7cv5re
+  [fix -> patch] truthful names and linear regexes end the CodeQL alert class
+  [feat -> minor] adopt express-rate-limit as the coarse outer bound on flagged routes
+  [fix -> patch] retire the quadratic trailing-slash trim across all six gateway upstream clients
+  [fix -> patch] unambiguous decimal-amount regex in the keypad e2e helper
+  [fix -> patch] linear-time parsing on attacker-reachable strings, e2e repairs
+  [fix -> patch] drop mcp-server version field (release-computed), clear two eslint errors
+  [fix -> patch] versions track the release, never hand-bumped
+  [unclassified] Merge origin/staging into claude/openapi-agentic-chat-7cv5re
+  [fix -> patch] actor-critic screenshot round — 7 UI fixes, 56 shots landed, harness files untracked
+  [test -> patch] fast-tier e2e for the assistant and API access, coverage matrix row, undelivered-revocation honesty
+  [chore -> patch] lockfile with api-access workspace member, miniapp byte baseline, verification fixes
+  [feat -> minor] member API with signed capability keys, MCP server, api-access mini-app, agentic chat assistant
+  [perf -> patch] shard the no-chain tier six ways per profile, and re-measure both tiers (#1284)
+  [test -> patch] on-chain depth for draws, open challenges, relayed intents and wager notifications (#1283)
+  [chore -> patch] wire api-access mini-app into build/publish/digest chains, add test:mcp script
+  [test -> patch] 15 coverage rows closed, 8 product bugs fixed, 2 permanent skips removed (#1282)
+  [test -> patch] read-only member surfaces — 12 absent rows closed, 2 gaps named rather than faked (#1281)
+  [fix -> patch] passkey reload sign-out and synced-passkey account loss (#1271)
+  [docs -> patch] record the two anti-patterns the account-native tier was built on
+  [feat -> minor] run the account-native tier in CI, and stop the matrix over-claiming
+  [fix -> patch] wagmi never reconnected the passkey connector — every reload signed the member out
+  [fix -> patch] an empty credential book is not proof the member is new
+  [unclassified] wip(1271): make the account-native tier actually run
+  [test -> patch] admin console — three-state estate reads, entry gating, single-chain writes (#1242)
+  [fix -> patch] AD-06 read the chain before the pause had been mined
+  [fix -> patch] match the RPC intercepts on hostname, not a regex built from a string
+  [test -> patch] the estate's three states, the entry gate's three answers, and a single-chain write (#1242)
+  [fix -> patch] a deep link must not be redirected while the sweep is running
+  [fix -> patch] a chain with nothing deployed is not a chain that answered
+  [test -> patch] identity, access and endpoint flows (#1241)
+  [fix -> patch] remove the duplicate callsignRegistry key in HARDHAT_CONTRACTS
+  [fix -> patch] the native sweep's gas reserve must track a RISING fee, not just a falling balance
+  [test -> patch] register a %callsign through commit and reveal (#1241)
+  [test -> patch] a callsign resolves in address entry, and the tenant brand comes from its manifest (#1241)
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/issue-1241-identity
+  [unclassified] Merge pull request #1272 from chippr-robotics/claude/issue-1240-transfers
+  [test -> patch] endpoints, the callsign gate and compliance refusal (#1241)
+  [test -> patch] Verify's three verdicts and the endpoint credential rules (#1241)
+  [test -> patch] the three money flows of #1240 — send, swap, redeem
+  [unclassified] Merge pull request #1269 from chippr-robotics/claude/issue-1238-miniapps
+  [test -> patch] browse the app catalogue, in the tier that flow belongs to (#1238)
+  [test -> patch] ClearPath registers on chain, and demands a switch instead of signing on the wrong one (#1238)
+  [test -> patch] Token Mint deploys through the host, and screening bites inside submit (#1238)
+  [test -> patch] the curator's content-committed approval (#1238)
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/issue-1238-miniapps
+  [unclassified] Merge pull request #1266 from chippr-robotics/claude/issue-1237-earn
+  [test -> patch] launch and serving-decision flows against the local registry (#1238)
+  [test -> patch] put the mini-app registry on the local E2E chain (#1238)
+  [unclassified] Merge staging (#1264) into the earn e2e branch
+  [unclassified] Merge pull request #1264 from chippr-robotics/claude/issue-1236-bridge-liquidity
+  [test -> patch] settle delegated staking and the operator's controls on chain (#1237)
+  [test -> patch] settle the lending vault deposit and withdrawal from chain state (#1237)
+  [test -> patch] settle the two bridge flows from chain state, and close #1236
+  [test -> patch] settle the two supplied-liquidity flows from chain state (#1236)
+  [test -> patch] make the bridge and supply surfaces reachable on the e2e chain
+  [unclassified] Merge pull request #1262 from chippr-robotics/claude/issue-1235-protect-custody
+  [test -> patch] drive vault proposals by their nonce, and make the failure explain itself
+  [fix -> patch] sequence multi-step vault changes on the chain, not the queue
+  [test -> patch] one scenario table for the guard, the client twin and the UI
+  [test -> patch] cover the multi-chain vault list and v1 enforcement
+  [test -> patch] prove first-match-governs and no-match-denies against the chain
+  [test -> patch] drive v2 guard adoption as the vault's own threshold-approved decision
+  [test -> patch] drive create-vault, propose-and-execute and operate-as-vault on chain
+  [test -> patch] stand up the Protect custody estate on the e2e chain
+  [unclassified] Merge pull request #1261 from chippr-robotics/claude/issue-1234-ywyb3v
+  [test -> patch] retier the sweep spec onto the Amoy-shaped chain and record the matrix rows
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/issue-1234-ywyb3v
+  [test -> patch] e2e coverage for legacy account recovery, and two sweep defects it found
+  [unclassified] Merge pull request #1259 from chippr-robotics/claude/issue-1233-cypress-e2e-zussx4
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/issue-1233-cypress-e2e-zussx4
+  [fix -> patch] treat a missing browsers root as 'not here', not as a crash
+  [docs -> patch] correct the open contrast finding's scope and link it to #1260
+  [test -> patch] end-to-end coverage for platform-fee disclosure and the maxFeeBps ceiling (#1233)
+  [chore -> patch] bump @google-cloud/kms from 5.7.0 to 6.0.0
+  [chore -> patch] bump @scure/btc-signer from 2.2.0 to 2.3.0
+  [chore -> patch] bump @noble/post-quantum from 0.6.1 to 0.7.0
+  [chore -> patch] bump google-github-actions/setup-gcloud from 2 to 3
+  [chore -> patch] bump actions/setup-node from 4 to 7
+  [chore -> patch] bump terraform-linters/setup-tflint from 4 to 6
+  [unclassified] Merge pull request #1251 from chippr-robotics/claude/e2e-testing-1232-m3kyha
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/e2e-testing-1232-m3kyha
+  [unclassified] Merge pull request #1252 from chippr-robotics/claude/e2e-testing-implementation-q3lvai
+  [fix -> patch] fall back the offer odds multiplier to the declared default, not 100
+  [test -> patch] add unhappy-path assertions to POOL-01 and POOL-02
+  [test -> patch] rewrite the 39 vacuous branches in the money-path specs (#1231)
+  [fix -> patch] re-sync browser clock to chain after advancing in POOL-03
+  [fix -> patch] stop predicting createPool's now, read the mined block instead
+  [fix -> patch] CI round 2 — auto-close vs explicit close, retry BadDeadlines
+  [fix -> patch] CI failures — stale-checkpoint deadline math and a nonce race
+  [unclassified] fixup(034): rebase pools e2e onto staging's spec-094 harness
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/e2e-testing-1232-m3kyha
+  [test -> patch] full-tier e2e coverage for Wager Pools
+  [unclassified] Merge pull request #1246 from chippr-robotics/claude/issue-1228-e2e-testing-cqx3lj
+  [fix -> patch] the Lighthouse artifact has never uploaded anything
+  [test -> patch] CLM-01 must wait for the list, not snapshot for it
+  [fix -> patch] stop a Lighthouse preset blocking on performance, and record the tier that missed its budget
+  [test -> patch] record the measured shard weights, and keep the on-chain tier on every push
+  [test -> patch] fix the harness bugs its own first CI run exposed
+  [unclassified] merge staging: take its CLM-10 rewrite, and close the hole it exposed
+  [test -> patch] address the review — passkey leg, route drift, anchored regex, sub-pixel bounds
+  [test -> patch] coverage matrix, tiering policy, and the gates that keep them honest (spec 094)
+  [unclassified] Merge pull request #1229 from chippr-robotics/claude/issue-cleanup-release-nugenr
+  [unclassified] Merge pull request #1230 from chippr-robotics/claude/deploy-intents-facet-1227
+  [spec -> patch] e2e coverage expansion — spec, plan, research, tasks
+  [test -> patch] CLM-10 must actually freeze the winner
+  [test -> patch] ORC-03 asserts the tie rule, not the absence of auto-resolution
+  [fix -> patch] wire the WagerRegistryIntents facet on a fresh deployment
+  [fix -> patch] derive the purchase action from the member, not the entry point
+  [unclassified] Merge pull request #1223 from chippr-robotics/claude/e2e-amoy-local-nugenr
+  [unclassified] Merge pull request #1222 from chippr-robotics/claude/e2e-chain-isolation-nugenr
+  [unclassified] Merge pull request #1220 from chippr-robotics/claude/issue-cleanup-release-nugenr
+  [test -> patch] CRE-12 must pick a side, and a refused submit should say so
+  [test -> patch] CRE-12/16 assert the selection, not the pixel
+  [test -> patch] RES-10 establishes its own precondition and asserts the real guard
+  [test -> patch] the resolve flow has three steps, and the tests only clicked one
+  [test -> patch] assert the fact, not the copy — chain state for resolve and reject
+  [test -> patch] stop fighting a modal that closes itself, and wait for the Resolve control
+  [test -> patch] one acceptance helper, and wait for the modal to decide before branching
+  [test -> patch] fix CLM-01's acceptance and E2E-01's tab; name E2E-02's revert
+  [test -> patch] select the outcome by the wording the resolve modal renders
+  [test -> patch] wait for the accept control instead of snapshotting for it
+  [test -> patch] DEC-05 must inspect the wager it claims to be inspecting
+  [test -> patch] close the acceptance modal by its own control
+  [test -> patch] give spec 05 the acceptance-modal helper 07 already earned
+  [test -> patch] name the custom error behind a revert, and judge acceptance on chain
+  [test -> patch] register provider wrappers after the mock, and open the card MEM-06 reads
+  [test -> patch] make the browser clock track the chain clock
+  [test -> patch] reject every spend authorization in MEM-12, not just eth_sendTransaction
+  [test -> patch] fail at the acceptance step instead of three commands later
+  [test -> patch] register opponent encryption keys in the blocked-case specs
+  [test -> patch] assert the decrypt gate in PRV-02, not a placeholder
+  [test -> patch] register the arbitrator's key, and make a failed decrypt say why
+  [test -> patch] drop the second encryption-toggle copy in attemptCreateWager
+  [test -> patch] handle the private-wager decrypt gate, and refresh ADM-01 for spec 093
+  [test -> patch] reset the chain between tests in clock-advancing specs
+  [test -> patch] repair three dead selectors behind the four near-zero specs
+  [test -> patch] scope the confirm-acceptance click to its dialog
+  [test -> patch] scroll the acceptance confirm into view — 07's creates now reach it
+  [test -> patch] 07 and 10 create wagers too — the interceptIpfs sweep missed their local helpers
+  [test -> patch] DEC-01 stops at the proven money path — list staleness is #1019's call
+  [test -> patch] assert the declined offer's absence on a REOPENED list
+  [test -> patch] a declined wager reads back as None — assert the storage release
+  [test -> patch] DEC-01 asserts the decline's OUTCOME, not text on a dialog that closed
+  [test -> patch] mock state lives in the closure; the window holds only a pointer
+  [test -> patch] one mock provider per page — the before-hook's account was winning
+  [test -> patch] the impersonating chain's USDC must be the LOCAL mock, decimals included
+  [test -> patch] assert the Membership tab the app renders, not the one imagined
+  [test -> patch] fix the lint break and the reconnect race behind MEM-06
+  [test -> patch] the E2E dev server is a TESTNET-cohort build
+  [test -> patch] target the Review step's controls, not the panel's visibility
+  [test -> patch] run the local chain AS the membership home (Amoy-shaped node)
+  [test -> patch] rewrite the oracle creates against the flow the product ships
+  [test -> patch] fail checkpoint loudly, cover the arbitrator's key, repair CRE-09, restructure 02
+  [test -> patch] isolate full-tier specs with a chain checkpoint — run order decided who passed
+  [test -> patch] treat an already-connected wallet as valid, not as a failure
+  [chore -> patch] refresh the stale local-chain (1337) contract defaults
+  [test -> patch] scroll to the top before asserting the connected account
+  [docs -> patch] record that the full tier is not hermetic
+  [test -> patch] give the full tier an IPFS boundary — the money path could never run
+  [fix -> patch] drop the bare `exit 0` from the chain-readiness step
+  [chore -> patch] ignore the local-chain deployment record
+  [test -> patch] fix ENC-03's stale Security-tab navigation
+  [ci -> patch] gate the on-chain money paths — add the Cypress Full E2E job
+  [fix -> patch] derive the denied-access role hint instead of restating it
+bump:     minor
 reason:   computed
-next:     v1.11.1
+next:     v1.12.0
