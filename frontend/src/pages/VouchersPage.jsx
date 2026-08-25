@@ -6,6 +6,7 @@ import { useVouchers } from '../hooks/useVouchers'
 import { useTierPrices } from '../hooks/useTierPrices'
 import { TIER_NAMES, TIER_COLORS } from '../hooks/useRoleDetails'
 import { MEMBERSHIP_VOUCHERS_TERMS_PATH } from '../constants/legalLinks'
+import { getCurrentDocument } from '../utils/legalDocs'
 import Button from '../components/ui/Button'
 import AddressInput from '../components/ui/AddressInput'
 import AddressBookButton from '../components/ui/AddressBookButton'
@@ -178,9 +179,14 @@ export default function VouchersPage() {
     setRedeemed(false)
     if (!selectedVoucherId) return
     try {
-      // NOTE: pass the in-force Terms version hash here once wired (spec 007); the contract records whatever
-      // hash is supplied for the redeemer. The checkbox captures explicit consent in the UI.
-      await redeemVoucher(selectedVoucherId, undefined)
+      // Spec 026 FR-013/SC-005: record the redeemer's Terms acceptance on-chain, the same way the
+      // purchase rail does (PremiumPurchaseModal.jsx) — the in-force Terms hash, resolved from the
+      // SAME source (getCurrentDocument('terms')), so redemption and purchase record the identical
+      // accepted-terms artifact. The checkboxes above (MembershipAttestation) already gate this
+      // button on explicit consent; this just plumbs that consent into the recorded hash instead of
+      // discarding it.
+      const acceptedTermsHash = getCurrentDocument('terms')?.hash || null
+      await redeemVoucher(selectedVoucherId, acceptedTermsHash)
       setRedeemed(true)
       refreshVouchers()
     } catch {

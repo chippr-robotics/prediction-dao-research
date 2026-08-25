@@ -84,7 +84,20 @@ function MarketAcceptanceModal({
   const { signer, isCorrectNetwork, switchNetwork, chainId, sendCalls, loginMethod, provider } = useWeb3()
   const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3): accepting a wager while operating as a vault becomes a threshold-gated vault proposal.
-  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
+  // Spec 088 FR-001/FR-002: a recovered (legacy) or hardware acting account accepts AS ITSELF — its
+  // balance is what is checked and ITS signer signs. Before this those kinds fell past the vault
+  // branch into the passkey/gasless legs and silently staked the CONNECTED wallet's money.
+  const {
+    identity: activeIdentity,
+    isVault: operatingAsVault,
+    isLegacy: operatingAsLegacy,
+    isHardware: operatingAsHardware,
+    canActAsVault,
+    submit: submitAsActive,
+  } = useActiveAccount()
+  const actingAsSigner = operatingAsLegacy || operatingAsHardware
+  // The account that will actually be the taker — the switcher's answer, never the session's.
+  const takerAddress = actingAsSigner ? activeIdentity?.address : account
   const {
     decryptMetadata,
     canUserDecrypt,
@@ -384,7 +397,10 @@ function MarketAcceptanceModal({
         return
       }
 
-      const balance = await tokenContract.balanceOf(account)
+      // Spec 088 FR-001 — the stake comes out of the ACTING account, so that is the balance the
+      // check has to be about. Checking the connected wallet's balance would clear an accept the
+      // acting account cannot cover, and reject one it can.
+      const balance = await tokenContract.balanceOf(takerAddress)
       let tokenSymbol = marketData?.stakeTokenSymbol || 'tokens'
       let tokenDecimals = marketData?.stakeTokenDecimals || 18
       try { tokenSymbol = await tokenContract.symbol() } catch { /* fall back to default */ }
@@ -396,6 +412,35 @@ function MarketAcceptanceModal({
           `Have ${ethers.formatUnits(balance, tokenDecimals)}, ` +
           `need ${ethers.formatUnits(stakeAmount, tokenDecimals)}.`
         )
+      }
+
+      // Spec 088 FR-002 — acting as a recovered or hardware account. Same [approve?, acceptWager]
+      // batch as the vault branch, but executed rather than proposed: an EOA cannot batch
+      // atomically, so `submitAsActiveAccount` sends the calls SEQUENTIALLY, each awaited to
+      // inclusion, signed by the acting account's own signer (the unlock / device ceremony runs on
+      // demand). Deliberately NOT the gasless leg below: a relayed intent is signed on the
+      // connected wallet's rail and has no acting-account twin, and self-submit is the
+      // never-stranded fallback those rails already promise.
+      if (actingAsSigner) {
+        const calls = []
+        const allowance = await tokenContract.allowance(takerAddress, contractAddress)
+        if (allowance < stakeAmount) {
+          calls.push({
+            to: stakeTokenAddress,
+            value: 0n,
+            data: tokenContract.interface.encodeFunctionData('approve', [contractAddress, stakeAmount]),
+          })
+        }
+        calls.push({
+          to: contractAddress,
+          value: 0n,
+          data: contract.interface.encodeFunctionData('acceptWager', [marketId]),
+        })
+        const res = await submitAsActive({ batch: calls })
+        if (res?.txHash) setTxHash(res.txHash)
+        setStep('success')
+        if (onAccepted) onAccepted(marketId)
+        return
       }
 
       // Passkey rail (spec 041/050): batch [approve?(exact stake), acceptWager] into ONE sponsored
@@ -466,8 +511,10 @@ function MarketAcceptanceModal({
           outcome: 'the wager was not accepted',
           sanctioned: screenedAddress,
           // Acting as a vault, the screened taker is the Safe, not this address — say nothing about
-          // whose account it was rather than comparing against the wrong one.
-          account: operatingAsVault ? null : account,
+          // whose account it was rather than comparing against the wrong one. Acting as a recovered
+          // or hardware account the taker IS known (spec 088), so name that address, not the
+          // session's.
+          account: operatingAsVault ? null : takerAddress,
         })
       } else {
         // Check for known revert reason strings (from staticCall or revert data)

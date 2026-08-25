@@ -6,6 +6,10 @@
 // host renders the unlock / device-connect dialog right then). A cached signer bound to a network
 // the wallet has since left is DROPPED and re-requested — the fresh ceremony binds to the current
 // chain — instead of failing the send with a "switch back" error.
+//
+// Spec 088 FR-002 (audit) — submit() has NO fall-through for an unhandled acting kind. Any mode
+// that is not 'personal' and has no branch of its own is REFUSED, never sent with the CONNECTED
+// wallet's signer under somebody else's label.
 
 import { useCallback, useContext } from 'react'
 import { useWallet } from './useWalletManagement'
@@ -62,6 +66,16 @@ export function useActiveAccount() {
         }
         if (!acting) acting = await requestActingSigner()
         return submitAsActiveAccount(payload, { mode: 'personal', signer: acting })
+      }
+      // Spec 088 FR-002 — every non-personal kind must be handled ABOVE. A mode with no branch
+      // here (today: 'derived', the cross-chain identity useEffectiveAccount already resolves)
+      // would otherwise fall through to the connected wallet's signer and sign as somebody else
+      // under an acting label — silently, which is the single thing this seam exists to prevent.
+      // Refuse instead, and name the account so the member knows what to do about it.
+      if (active.mode && active.mode !== 'personal') {
+        throw new Error(
+          `This account cannot send transactions here yet, so nothing has been signed. Switch back to acting as yourself to send from your own account.`,
+        )
       }
       return submitAsActiveAccount(payload, { mode: 'personal', signer })
     },

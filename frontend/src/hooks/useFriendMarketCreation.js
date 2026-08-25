@@ -115,7 +115,19 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
   const { signer, sendCalls, loginMethod, provider, address, chainId } = useWeb3()
   const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3): when operating as a vault, wager creation becomes a threshold-gated vault proposal.
-  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
+  // Spec 088 FR-001/FR-002: a recovered (legacy) or hardware acting account creates the wager AS
+  // ITSELF — its address is the creator, its balance is checked, and ITS signer signs, obtained on
+  // demand by the deferred ceremony. Before this, those kinds fell past the vault branch into the
+  // gasless/self-submit legs below and silently created the wager from the CONNECTED wallet.
+  const {
+    identity: activeIdentity,
+    isVault: operatingAsVault,
+    isLegacy: operatingAsLegacy,
+    isHardware: operatingAsHardware,
+    canActAsVault,
+    submit: submitAsActive,
+  } = useActiveAccount()
+  const actingAsSigner = operatingAsLegacy || operatingAsHardware
 
   // Gasless createWager (spec 035/036): relayed where the relayer serves the chain and the stake token
   // supports EIP-3009 (Polygon USDC); transparent self-submit otherwise (Mordor USC → auto self-submit).
@@ -193,7 +205,15 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         throw new Error('A stake token (USDC or WMATIC) is required. Native MATIC is not supported.')
       }
 
-      const userAddress = activeSigner ? await activeSigner.getAddress() : address
+      // Spec 088 FR-001 — the creator is whoever is ACTING. Everything keyed off this address
+      // (the stake balance check, the allowance, the self-wager guard, the simulated `from`, and
+      // the recorded creator) must describe the account the switcher shows, not the wallet that
+      // happens to hold the session.
+      const userAddress = actingAsSigner
+        ? activeIdentity.address
+        : activeSigner
+          ? await activeSigner.getAddress()
+          : address
       const registry = new ethers.Contract(wagerRegistryAddress, WAGER_REGISTRY_ABI, readRunner)
       const stakeToken = new ethers.Contract(stakeTokenAddress, ERC20_ABI, readRunner)
       const tokenDecimals = Number(await stakeToken.decimals())
@@ -505,7 +525,45 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       // UserOp via sendCalls. Mirrors the vault batch above but self-executed (not a Safe proposal).
       // Flows into the shared receipt/WagerCreated parsing below via a txHash-only runResult.
       let runResult
-      if (isPasskey) {
+      if (actingAsSigner) {
+        // Spec 088 FR-002 — acting as a recovered or hardware account. Same [approve?, create]
+        // batch the vault branch builds, but executed rather than proposed: an EOA cannot batch
+        // atomically, so `submitAsActiveAccount` sends them SEQUENTIALLY, each awaited to
+        // inclusion, signed by the acting account's own signer (the unlock / device ceremony runs
+        // on demand). Deliberately NOT the gasless leg below: a relayed intent is signed against
+        // the connected wallet's rail, and there is no acting-account twin of it — self-submit is
+        // the never-stranded fallback the gasless rails already promise.
+        const calls = []
+        const currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
+        if (currentAllowance < creatorStakeWei) {
+          calls.push({
+            to: stakeTokenAddress,
+            value: 0n,
+            data: stakeToken.interface.encodeFunctionData('approve', [wagerRegistryAddress, creatorStakeWei]),
+          })
+        }
+        // Simulate AS the acting account, so a membership/screening refusal is reported before
+        // the member is asked to unlock a key or confirm on a device.
+        try {
+          onProgress({ step: 'create', message: 'Validating transaction...' })
+          await registry[createMethod].staticCall(...createArgs, { from: userAddress })
+        } catch (simError) {
+          throw new Error(translateRevert(revertReasonFrom(simError)), { cause: simError })
+        }
+        calls.push({
+          to: wagerRegistryAddress,
+          value: 0n,
+          data: registry.interface.encodeFunctionData(createMethod, createArgs),
+        })
+        onProgress({
+          step: 'create',
+          message: operatingAsHardware
+            ? 'Confirm on your hardware device…'
+            : 'Confirm with the recovered account…',
+        })
+        const res = await submitAsActive({ batch: calls })
+        runResult = { txHash: res?.txHash ?? null, via: 'acting' }
+      } else if (isPasskey) {
         if (typeof sendCalls !== 'function') {
           throw new Error('This wallet cannot create a wager on the current transaction rail.')
         }
@@ -624,7 +682,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
       throw error
     }
-  }, [signer, isPasskey, sendCalls, provider, address, chainId, onMarketCreated, createWagerTx, operatingAsVault, canActAsVault, submitAsActive])
+  }, [signer, isPasskey, sendCalls, provider, address, chainId, onMarketCreated, createWagerTx, operatingAsVault, canActAsVault, submitAsActive, actingAsSigner, operatingAsHardware, activeIdentity])
 
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }
