@@ -14,6 +14,255 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.12.0 — 2026-08-24
+
+Promoted from: v1.12.0-rc.36
+Previous release: v1.11.1 · Range: `v1.11.1..v1.12.0` (298 commits)
+
+### 🚀 Features
+
+- feat(097): land the workstation secrets estate that prod was already running
+- feat(ops): KMS transaction signer, and a key-compromise runbook
+- feat(096): x402 pay-per-request rail for agents, prod-gateway enablement procedure
+- feat(095): adopt express-rate-limit as the coarse outer bound on flagged routes
+- feat(095): member API with signed capability keys, MCP server, api-access mini-app, agentic chat assistant
+- feat(094/041): run the account-native tier in CI, and stop the matrix over-claiming
+
+### 🐛 Bug Fixes
+
+- fix(deps): declare @google-cloud/kms, which scripts/ops was borrowing
+- fix(infra): staging planned two extra public services, and would have succeeded
+- fix(infra): a clean plan was hiding three ways to break production
+- fix(097): pin ops-workstation to the ref where the module still exists
+- fix(infra): wire the orphaned QuickNode credentials, and guard the wrong-chain hazard they invite
+- fix(095): a stranger could not have denied key revocation, and nothing bounded model spend
+- fix(finops): catalogue x402 + the assistant, and widen C2 past FeeRouter services
+- fix(infra): gate the spec-095 MCP Cloud Run modules off, and stop the comment lying
+- fix(mcp): bind loopback, validate Origin, refuse a shared identity over HTTP
+- fix(bridge): chunk the destination fill scan — it was dead on four of five chains
+- fix(x402): check the balance against the SIGNED value, not the quoted price
+- fix(ci): make contract deploys manual-only
+- fix(a11y): make the disabled fill and label move together (#1260)
+- fix(a11y): label brand fills from the audited token pair, not #fff (#1260, #1247)
+- fix(#1265): the asset catalog is cohort-bounded too, so a testnet build has a bridge destination
+- fix: land the address gate green, and diagnose the right mechanism (#1298)
+- fix: only dismiss an expired offer once its reclaim is confirmed (#1297)
+- fix: say only what the sanctions revert establishes, on all four screened paths (#1292)
+- fix: restore the passkey provider facade, and migrate its test to @noble/curves v2
+- fix(#1298): the address gate could never pass on the tier it guards
+- fix: walk every observed revert-data nesting on the wager paths
+- fix: keep the Bridge form, its copy and its in-flight list on one roster (#1265)
+- fix: bound spec-067 Supply and Bridge rosters to the build cohort (#1265)
+- fix: clear the development banner on every fixed surface, not just the header (#1248)
+- fix: measure the development banner instead of reserving 45px (#1248)
+- fix: make the unread-ledger verdict reachable, and never crash on it (#1280)
+- fix: never render an unread activity ledger as an empty history (#1280)
+- fix: give the Bitcoin gateway its own env var (#1263)
+- fix: re-derive an unchosen passkey chain, and stop a failed key read accusing a member (#1286)
+- fix: resolve the passkey session chain from the build, not wagmi's default (#1286)
+- fix: detect "deployed but unset", and describe the real nonce hazard (#1298)
+- fix: fail the e2e setup loudly when a deploy-order shift repoints the app (#1298)
+- fix: make the expired-offer reclaim reachable by both routes and safe to fail (#1297)
+- fix: restore a reachable route to an expired offer's Reclaim & Clear (#1297)
+- fix: tell a screened member only what is true, on both wager paths (#1292)
+- fix: name sanctions screening on the wager create path (#1292)
+- fix: decode a raw error.data revert so the curator sees StaleProposal (#1267)
+- fix(#1019): a member who disconnects stays disconnected, and four wallet tests that never ran (#1296)
+- fix(#1228): append the backup-pointer deploy, don't insert it mid-order
+- fix(passkey): adapt to @noble/curves v2 — restore cross-device key recovery
+- fix(041): a passkey session reports the build's chain, not wagmi's first (#1288)
+- fix(095): truthful names and linear regexes end the CodeQL alert class
+- fix(095): retire the quadratic trailing-slash trim across all six gateway upstream clients
+- fix(095): unambiguous decimal-amount regex in the keypad e2e helper
+- fix(095): linear-time parsing on attacker-reachable strings, e2e repairs
+- fix(095): drop mcp-server version field (release-computed), clear two eslint errors
+- fix(095): versions track the release, never hand-bumped
+- fix(095): actor-critic screenshot round — 7 UI fixes, 56 shots landed, harness files untracked
+- fix(041/045): passkey reload sign-out and synced-passkey account loss (#1271)
+- fix(041): wagmi never reconnected the passkey connector — every reload signed the member out
+- fix(041/045): an empty credential book is not proof the member is new
+- fix(test): AD-06 read the chain before the pause had been mined
+- fix(test): match the RPC intercepts on hostname, not a regex built from a string
+- fix(093/071): a deep link must not be redirected while the sweep is running
+- fix(071): a chain with nothing deployed is not a chain that answered
+- fix: remove the duplicate callsignRegistry key in HARDHAT_CONTRACTS
+- fix(062): the native sweep's gas reserve must track a RISING fee, not just a falling balance
+- fix(test): sequence multi-step vault changes on the chain, not the queue
+- fix(ui): treat a missing browsers root as 'not here', not as a crash
+- fix(offer): fall back the offer odds multiplier to the declared default, not 100
+- fix(e2e): re-sync browser clock to chain after advancing in POOL-03
+- fix(e2e): stop predicting createPool's now, read the mined block instead
+- fix(034): CI round 2 — auto-close vs explicit close, retry BadDeadlines
+- fix(034): CI failures — stale-checkpoint deadline math and a nonce race
+- fix(ci): the Lighthouse artifact has never uploaded anything
+- fix(e2e): stop a Lighthouse preset blocking on performance, and record the tier that missed its budget
+- fix(deploy): wire the WagerRegistryIntents facet on a fresh deployment
+- fix(membership): derive the purchase action from the member, not the entry point
+- fix(ci): drop the bare `exit 0` from the chain-readiness step
+- fix(admin): derive the denied-access role hint instead of restating it
+
+### ⚡ Performance
+
+- perf(e2e): shard the no-chain tier six ways per profile, and re-measure both tiers (#1284)
+
+### 📚 Documentation
+
+- docs: correct the VITE_BITCOIN_GATEWAY_URL guidance to what the code does
+- docs(094): raise the no-chain budget to 7 minutes, with the reason recorded
+- docs(094): record the two anti-patterns the account-native tier was built on
+- docs(060): correct the open contrast finding's scope and link it to #1260
+- spec(094): e2e coverage expansion — spec, plan, research, tasks
+- docs(e2e): record that the full tier is not hermetic
+
+### 🧪 Tests
+
+- test(094): give spec 097 its coverage-matrix row
+- test(#1250): DEC-02's row assertion waits long enough for a cold wager scan
+- test(#1260): the validateTheme fixture defines the label token it now requires
+- test(#1267): MA-03 asserts the message the curator now actually gets
+- test(e2e): adopt the #1250 settle-wait guard on the post-staging money-path specs
+- test(e2e): MC-02 accepts the disclosure granularity the ledger actually reports
+- test(e2e): CP-02 matches the honest screening copy, not the retired one
+- test(#1292): CP-02 asserts the screening message now that there is one
+- test(e2e): label the seeded expired offer with the test's own id (#1297)
+- test(#1019): DSH-03 and DSH-04 run again — the span was the assertion's, not the app's (#1307)
+- test(#1019): ENC-04 asserts the app's key cache, not the browser's (#1306)
+- test(#1019): A11Y-04 runs again — the backdrop click was aimed at the nav gutter (#1305)
+- test: repair first-run failures surfaced by integration validation
+- test(#1019): WAL-03, UL-02 and UL-04 run again — and UL-04 can now fail (#1304)
+- test(#1019): HMM-02, HMM-04 and HMM-05 run again — the covered switcher is gone (#1303)
+- test(#1019): three more pending markers cleared — ONB-01, ONB-02, DSH-01 (#1302)
+- test(#1228): compliance parity for passkey accounts — three tests that had never run (#1293)
+- test(032): the encrypted backup round trip, the half that costs gas
+- test(095): fast-tier e2e for the assistant and API access, coverage matrix row, undelivered-revocation honesty
+- test(024/035/036/012): on-chain depth for draws, open challenges, relayed intents and wager notifications (#1283)
+- test(#1228): 15 coverage rows closed, 8 product bugs fixed, 2 permanent skips removed (#1282)
+- test(#1245): read-only member surfaces — 12 absent rows closed, 2 gaps named rather than faked (#1281)
+- test(071/093): admin console — three-state estate reads, entry gating, single-chain writes (#1242)
+- test(071/093): the estate's three states, the entry gate's three answers, and a single-chain write (#1242)
+- test(084/069/054/072/007): identity, access and endpoint flows (#1241)
+- test(054): register a %callsign through commit and reveal (#1241)
+- test(054/072): a callsign resolves in address entry, and the tenant brand comes from its manifest (#1241)
+- test(069/054/007): endpoints, the callsign gate and compliance refusal (#1241)
+- test(084/069): Verify's three verdicts and the endpoint credential rules (#1241)
+- test(058/033/026): the three money flows of #1240 — send, swap, redeem
+- test(073/077): browse the app catalogue, in the tier that flow belongs to (#1238)
+- test(030/042): ClearPath registers on chain, and demands a switch instead of signing on the wrong one (#1238)
+- test(028/073): Token Mint deploys through the host, and screening bites inside submit (#1238)
+- test(073): the curator's content-committed approval (#1238)
+- test(073): launch and serving-decision flows against the local registry (#1238)
+- test(073): put the mini-app registry on the local E2E chain (#1238)
+- test(065/066): settle delegated staking and the operator's controls on chain (#1237)
+- test(050-earn): settle the lending vault deposit and withdrawal from chain state (#1237)
+- test(067): settle the two bridge flows from chain state, and close #1236
+- test(067): settle the two supplied-liquidity flows from chain state (#1236)
+- test(067): make the bridge and supply surfaces reachable on the e2e chain
+- test(068): drive vault proposals by their nonce, and make the failure explain itself
+- test(068): one scenario table for the guard, the client twin and the UI
+- test(049,068): cover the multi-chain vault list and v1 enforcement
+- test(068): prove first-match-governs and no-match-denies against the chain
+- test(068): drive v2 guard adoption as the vault's own threshold-approved decision
+- test(043): drive create-vault, propose-and-execute and operate-as-vault on chain
+- test(043,049,068): stand up the Protect custody estate on the e2e chain
+- test(062,063): retier the sweep spec onto the Amoy-shaped chain and record the matrix rows
+- test(062,063): e2e coverage for legacy account recovery, and two sweep defects it found
+- test(060): end-to-end coverage for platform-fee disclosure and the maxFeeBps ceiling (#1233)
+- test(e2e): add unhappy-path assertions to POOL-01 and POOL-02
+- test(e2e): rewrite the 39 vacuous branches in the money-path specs (#1231)
+- test(034): full-tier e2e coverage for Wager Pools
+- test(e2e): CLM-01 must wait for the list, not snapshot for it
+- test(e2e): record the measured shard weights, and keep the on-chain tier on every push
+- test(e2e): fix the harness bugs its own first CI run exposed
+- test(e2e): address the review — passkey leg, route drift, anchored regex, sub-pixel bounds
+- test(e2e): coverage matrix, tiering policy, and the gates that keep them honest (spec 094)
+- test(e2e): CLM-10 must actually freeze the winner
+- test(e2e): ORC-03 asserts the tie rule, not the absence of auto-resolution
+- test(e2e): CRE-12 must pick a side, and a refused submit should say so
+- test(e2e): CRE-12/16 assert the selection, not the pixel
+- test(e2e): RES-10 establishes its own precondition and asserts the real guard
+- test(e2e): the resolve flow has three steps, and the tests only clicked one
+- test(e2e): assert the fact, not the copy — chain state for resolve and reject
+- test(e2e): stop fighting a modal that closes itself, and wait for the Resolve control
+- test(e2e): one acceptance helper, and wait for the modal to decide before branching
+- test(e2e): fix CLM-01's acceptance and E2E-01's tab; name E2E-02's revert
+- test(e2e): select the outcome by the wording the resolve modal renders
+- test(e2e): wait for the accept control instead of snapshotting for it
+- test(e2e): DEC-05 must inspect the wager it claims to be inspecting
+- test(e2e): close the acceptance modal by its own control
+- test(e2e): give spec 05 the acceptance-modal helper 07 already earned
+- test(e2e): name the custom error behind a revert, and judge acceptance on chain
+- test(e2e): register provider wrappers after the mock, and open the card MEM-06 reads
+- test(e2e): make the browser clock track the chain clock
+- test(e2e): reject every spend authorization in MEM-12, not just eth_sendTransaction
+- test(e2e): fail at the acceptance step instead of three commands later
+- test(e2e): register opponent encryption keys in the blocked-case specs
+- test(e2e): assert the decrypt gate in PRV-02, not a placeholder
+- test(e2e): register the arbitrator's key, and make a failed decrypt say why
+- test(e2e): drop the second encryption-toggle copy in attemptCreateWager
+- test(e2e): handle the private-wager decrypt gate, and refresh ADM-01 for spec 093
+- test(e2e): reset the chain between tests in clock-advancing specs
+- test(e2e): repair three dead selectors behind the four near-zero specs
+- test(e2e): scope the confirm-acceptance click to its dialog
+- test(e2e): scroll the acceptance confirm into view — 07's creates now reach it
+- test(e2e): 07 and 10 create wagers too — the interceptIpfs sweep missed their local helpers
+- test(e2e): DEC-01 stops at the proven money path — list staleness is #1019's call
+- test(e2e): assert the declined offer's absence on a REOPENED list
+- test(e2e): a declined wager reads back as None — assert the storage release
+- test(e2e): DEC-01 asserts the decline's OUTCOME, not text on a dialog that closed
+- test(e2e): mock state lives in the closure; the window holds only a pointer
+- test(e2e): one mock provider per page — the before-hook's account was winning
+- test(e2e): the impersonating chain's USDC must be the LOCAL mock, decimals included
+- test(e2e): assert the Membership tab the app renders, not the one imagined
+- test(e2e): fix the lint break and the reconnect race behind MEM-06
+- test(e2e): the E2E dev server is a TESTNET-cohort build
+- test(e2e): target the Review step's controls, not the panel's visibility
+- test(e2e): run the local chain AS the membership home (Amoy-shaped node)
+- test(e2e): rewrite the oracle creates against the flow the product ships
+- test(e2e): fail checkpoint loudly, cover the arbitrator's key, repair CRE-09, restructure 02
+- test(e2e): isolate full-tier specs with a chain checkpoint — run order decided who passed
+- test(e2e): treat an already-connected wallet as valid, not as a failure
+- test(e2e): scroll to the top before asserting the connected account
+- test(e2e): give the full tier an IPFS boundary — the money path could never run
+- test(e2e): fix ENC-03's stale Security-tab navigation
+
+### 🏗️ Infrastructure
+
+- ci(e2e): gate the on-chain money paths — add the Cypress Full E2E job
+
+### 🧹 Maintenance
+
+- chore(ops): repin the gateway to agentic-096
+- chore: retrigger CI
+- chore(deps): hold @openzeppelin/contracts at 5.4.0, with the reason
+- chore(ops): record the Mordor legacy-contract write-off as a decision
+- chore(ops): record the admin Safe on Amoy 80002
+- chore(ops): rotate the admin Safe to KMS + Ledger + Trezor
+- chore(deps): reconcile lockfile and raise the gateway runtime to Node 22
+- chore(096): prod-gateway enablement block (commented until image repin), staging-gateway truth
+- chore(deps): bump @noble/curves from 1.9.7 to 2.3.0
+- chore(095): lockfile with api-access workspace member, miniapp byte baseline, verification fixes
+- chore(095): wire api-access mini-app into build/publish/digest chains, add test:mcp script
+- chore(deps): bump @google-cloud/kms from 5.7.0 to 6.0.0
+- chore(deps): bump @scure/btc-signer from 2.2.0 to 2.3.0
+- chore(deps): bump @noble/post-quantum from 0.6.1 to 0.7.0
+- chore(deps): bump google-github-actions/setup-gcloud from 2 to 3
+- chore(deps): bump actions/setup-node from 4 to 7
+- chore(deps): bump terraform-linters/setup-tflint from 4 to 6
+- chore(config): refresh the stale local-chain (1337) contract defaults
+- chore(git): ignore the local-chain deployment record
+
+### Artifacts
+
+Range: `v1.11.1..v1.12.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | moved | `amoy-chain80002-v2/membershipManagerImpl` → `0xb6499596703cEE6eA4BE5b5F01DEc4d7ccfe10bD`<br>`amoy-chain80002-v2/wagerRegistryImpl` → `0xa2176F5Fea39888cD1697Be4651415490C78905d`<br>`amoy-chain80002-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`arbitrum-chain42161-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`arbitrum-chain42161-v2/bridgeRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`arbitrum-chain42161-v2/liquidityRouterImpl` → `0x7Af46728e7C969b75723398e3F93b565E968A3ba`<br>`arbitrum-chain42161-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`base-chain8453-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`base-chain8453-v2/bridgeRouterImpl` → `0x41ba6bcA216bd6A4c5A0Bf8F9b2d682ec0a879D5`<br>`base-chain8453-v2/liquidityRouterImpl` → `0x7Af46728e7c969b75723398E3f93b565E968A3bA`<br>`base-chain8453-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`etc-chain61-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mainnet-chain1-v2/feeRouterImpl` → `0x5cCd55D62Ce7Df730c39543B332dD8d6054B5d00`<br>`mainnet-chain1-v2/bridgeRouterImpl` → `0xcA277Cc3485Da12771d6171a9D0A894B8DD159f8`<br>`mainnet-chain1-v2/liquidityRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`mainnet-chain1-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mordor-chain63-v2/membershipManagerImpl` → `0x7D38F7Ef26f7E2409d5C04a62c1d9A3Ec002A49e`<br>`mordor-chain63-v2/wagerRegistryImpl` → `0x9FfE701be18Ff033706f2df19cd8730F5CB884B2`<br>`mordor-chain63-v2/tokenFactoryImpl` → `0x135108EB6f81e361b6cF131d2Cb9A01E92Cd8ED9`<br>`mordor-chain63-v2/openERC20Impl` → `0xd8E67C6C058a6D35E69c691B44b8D5f858591971`<br>`mordor-chain63-v2/openERC721Impl` → `0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB`<br>`mordor-chain63-v2/restrictedERC20Impl` → `0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444`<br>`mordor-chain63-v2/openERC20V2Impl` → `0x92169007926fBc8Ac90cdD311dD3C2557158C395`<br>`mordor-chain63-v2/openERC721V2Impl` → `0xEeaBC05214FF0C42cbA42b365aB400b7ca4311cE`<br>`mordor-chain63-v2/restrictedERC20V2Impl` → `0x664d87bed13ea4D50Cd3da8e0aC5A8D70A302A0B`<br>`mordor-chain63-v2/externalDAORegistryImpl` → `0x28270cB71E87D2D6C662e61CFE6eD02d05d43B7A`<br>`mordor-chain63-v2/zkWagerPoolFactoryImpl` → `0xd3e851FDDa9D5796D503daFd34b2403D7336d9fD`<br>`mordor-chain63-v2/poolImpl` → `0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277`<br>`mordor-chain63-v2/wagerPoolFactoryImpl` → `0xfB6F9F7EfD86a220eE1aD7906278247051B25430`<br>`mordor-chain63-v2/feeRouterImpl` → `0x744b8E56d84bb8D7657b2Bb13426cB882c93B7E6`<br>`mordor-chain63-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mordor-chain63-v2/miniAppRegistryImpl` → `0xc8Dd8601b35aDa3AF367C9E41f24Fd0503Ced674`<br>`optimism-chain10-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`optimism-chain10-v2/bridgeRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`optimism-chain10-v2/liquidityRouterImpl` → `0x7Af46728e7C969b75723398e3F93b565E968A3ba`<br>`optimism-chain10-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`polygon-chain137-v2/membershipManagerImpl` → `0x7177470fE3c5D89CEf965A596540E57cE290C939`<br>`polygon-chain137-v2/wagerRegistryImpl` → `0x9c52C1ef4Bbe65CF19a5C26bebD4A22100964898`<br>`polygon-chain137-v2/tokenFactoryImpl` → `0xE819f7b672D81A8b78d40b1C99Fe5d646513D12C`<br>`polygon-chain137-v2/openERC20Impl` → `0xd8E67C6C058a6D35E69c691B44b8D5f858591971`<br>`polygon-chain137-v2/openERC721Impl` → `0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB`<br>`polygon-chain137-v2/restrictedERC20Impl` → `0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444`<br>`polygon-chain137-v2/wagerPoolFactoryImpl` → `0x754d8aa4785Ec4bEE7c921f8d032D5E3a78d9308`<br>`polygon-chain137-v2/poolImpl` → `0xB153e4456FaD1A7E96e35e14094Cf6964348BC40`<br>`polygon-chain137-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`polygon-chain137-v2/callsignRegistryImpl` → `0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49`<br>`polygon-chain137-v2/feeRouterImpl` → `0x40ee755246E60f66E7bA425F99C6d704859d38db`<br>`polygon-chain137-v2/bridgeRouterImpl` → `0x8F7A7e7437733326BD2F8045BFceD9B821aF1De1`<br>`polygon-chain137-v2/liquidityRouterImpl` → `0x33818052Ca8B5b8Bb9777Bf6eBbaFCD8Faae6e65`<br>`polygon-chain137-v2/miniAppRegistryImpl` → `0x41858006aD6dd0788b84F9fb17A28d8167C7b331` |
+| Mini-app packages | moved | `api-access` v1.0.0<br>`clearpath` v1.0.2<br>`token-mint` v1.0.2 |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.11.1 — 2026-08-24
 
 Promoted from: none — released directly from main
