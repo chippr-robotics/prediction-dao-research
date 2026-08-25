@@ -14,6 +14,46 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.13.0 — 2026-08-25
+
+Promoted from: v1.13.0-rc.2
+Previous release: v1.12.0 · Range: `v1.12.0..v1.13.0` (25 commits)
+
+### 🚀 Features
+
+- feat(frontend): acting-account routing for wager refund/resolve; Earn refuses acting accounts
+- feat(frontend): record redemption terms, verify admin write authority, route acting accounts
+
+### 🐛 Bug Fixes
+
+- fix: repair lockfile from the earlier full re-resolve
+- fix: stub the real WalletConnect connector under Cypress
+- fix(e2e): compare BigInt accrued fees as booleans in ADM-05
+- fix(admin): name the actual signing chain in the role header; fix multi-match test query
+- fix(membership): expired-renewal purchase-mode fallback refinements
+
+### 🧪 Tests
+
+- test(e2e): cover admin membership/role writes and voucher purchase on-chain
+
+### 🧹 Maintenance
+
+- chore(deps): bump @google-cloud/bigquery from 7.9.4 to 9.0.2
+- chore(deps): bump @solana-program/system from 0.13.0 to 0.14.0
+- chore(deps-dev): bump @chainlink/contracts in the solidity-sources group
+
+### Artifacts
+
+Range: `v1.12.0..v1.13.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.12.0 — 2026-08-24
 
 Promoted from: v1.12.0-rc.36
