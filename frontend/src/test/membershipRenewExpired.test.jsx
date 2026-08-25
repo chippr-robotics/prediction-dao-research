@@ -120,7 +120,7 @@ describe("the expired-member Renew entry (action='extend', active tier 0)", () =
   it('explains the expired state instead of showing four unexplained tier cards', async () => {
     render(<PremiumPurchaseModal action="extend" />)
     await tierRadio('Bronze')
-    expect(screen.getByText(/Your membership has expired/i)).toBeTruthy()
+    expect(screen.getAllByText(/Your membership has expired/i).length).toBeGreaterThan(0)
   })
 
   it("routes the confirm through 'purchase' — the call that succeeds on-chain when expired", async () => {

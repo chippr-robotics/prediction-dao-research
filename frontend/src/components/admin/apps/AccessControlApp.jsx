@@ -230,7 +230,17 @@ export default function AccessControlApp() {
           notDeployedLabel="no wager registry"
         />
         <div className="admin-card">
-          <h3>Grant / Revoke Admin Roles on {networkName(roleChainId)}</h3>
+          {/* The header names the chain the SELECTED role's transaction actually
+              signs on — for ROLE_MANAGER that is the membership reference chain,
+              whatever network the view is scoped to. */}
+          <h3>Grant / Revoke Admin Roles on {networkName(selectedWriteChainId)}</h3>
+          {Number(selectedWriteChainId) !== Number(roleChainId) && (
+            <p className="card-info">
+              This view is scoped to {networkName(roleChainId)}, but Role Manager&apos;s home
+              contract is the MembershipManager on {networkName(selectedWriteChainId)} — the grant
+              signs there, and a grant there is the only one membership ever reads.
+            </p>
+          )}
           {!onSelectedWriteChain && (
             <p className="card-info warning-text" role="status">
               {adminRoleForm.role === 'ROLE_MANAGER' ? (
