@@ -68,7 +68,18 @@ function MyMarketsModal({
   const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3, FR-022c): a vault-won payout claim is a threshold-gated vault transaction (the registry
   // binds the claimer to the winner). Refunds stay single-owner and need no change.
-  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
+  // Spec 088 FR-002: a recovered (legacy) or hardware acting account claims with ITS OWN signer. The
+  // registry pays the winner it recorded, so claiming with the connected wallet while the switcher
+  // shows another account did not merely mis-attribute the signature — it reverted NotWinner, and
+  // the member was told the wager was not theirs.
+  const {
+    isVault: operatingAsVault,
+    isLegacy: operatingAsLegacy,
+    isHardware: operatingAsHardware,
+    canActAsVault,
+    submit: submitAsActive,
+  } = useActiveAccount()
+  const actingAsSigner = operatingAsLegacy || operatingAsHardware
 
   // Wager activity watcher (spec 012). Optional: the modal must keep working
   // when rendered outside WagerActivityProvider (legacy trees, tests).
@@ -801,6 +812,20 @@ function MyMarketsModal({
         fireToast('Vault claim proposed — awaiting co-owner approval')
         return
       }
+      // Spec 088 FR-002 — acting as a recovered or hardware account: the SAME single call, signed
+      // by that account's signer through the active-account seam (the unlock / device ceremony
+      // runs on demand). Deliberately not the gasless leg: a relayed intent is signed on the
+      // connected wallet's rail and has no acting-account twin, and self-submit is the
+      // never-stranded fallback that rail already promises.
+      if (actingAsSigner) {
+        const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
+        const data = new ethers.Interface(WAGER_REGISTRY_ABI).encodeFunctionData('claimPayout', [wagerId])
+        const res = await submitAsActive({ to: registryAddr, value: 0n, data })
+        markWagerRead?.(id)
+        fireToast(res?.txHash ? 'Winnings claimed 🎉' : 'Claim submitted — confirming…')
+        await refreshFriendMarkets?.()
+        return
+      }
       const result = isPasskey
         ? await sendRegistryCall(sendCalls, chainId, 'claimPayout', [wagerId])
         : await claimPayoutTx.run(wagerId)
@@ -829,7 +854,7 @@ function MyMarketsModal({
     } finally {
       setClaimingId(null)
     }
-  }, [signer, isPasskey, sendCalls, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimPayoutTx, operatingAsVault, canActAsVault, submitAsActive, chainId])
+  }, [signer, isPasskey, sendCalls, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimPayoutTx, operatingAsVault, canActAsVault, submitAsActive, actingAsSigner, chainId])
 
   // Participant reclaims their stake on a wager that ran past its resolution
   // window without a winner being declared (the "refundable" state). Mirrors
@@ -872,6 +897,30 @@ function MyMarketsModal({
 
     try {
       const wagerId = market.wagerId ?? market.id
+      // Spec 088 FR-002 — claimRefund pays whoever the registry recorded (creator/opponent), same
+      // as claimPayout: acting as a vault → threshold-gated proposal calling claimRefund FROM the Safe.
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to reclaim as the vault.")
+        const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
+        const data = new ethers.Interface(WAGER_REGISTRY_ABI).encodeFunctionData('claimRefund', [wagerId])
+        await submitAsActive({ to: registryAddr, value: 0n, data })
+        markWagerRead?.(id)
+        fireToast('Vault refund proposed — awaiting co-owner approval')
+        return
+      }
+      // Spec 088 FR-002 — acting as a recovered or hardware account: the SAME single call, signed
+      // by that account's own signer through the active-account seam, never the connected wallet's.
+      // Deliberately not the gasless leg below: a relayed intent has no acting-account twin, and
+      // self-submit is the never-stranded fallback that rail already promises.
+      if (actingAsSigner) {
+        const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
+        const data = new ethers.Interface(WAGER_REGISTRY_ABI).encodeFunctionData('claimRefund', [wagerId])
+        const res = await submitAsActive({ to: registryAddr, value: 0n, data })
+        markWagerRead?.(id)
+        fireToast(res?.txHash ? 'Refund claimed' : 'Refund submitted — confirming…')
+        await refreshFriendMarkets?.()
+        return
+      }
       const result = isPasskey
         ? await sendRegistryCall(sendCalls, chainId, 'claimRefund', [wagerId])
         : await claimRefundRowTx.run(wagerId)
@@ -892,13 +941,13 @@ function MyMarketsModal({
       } else if (lower.includes('notrefundable') || lower.includes('not refundable')) {
         message = 'Not refundable yet — the resolution window may still be open. Try resolving instead.'
       } else {
-        message = 'Failed to claim refund. Please try again.'
+        message = err?.message || 'Failed to claim refund. Please try again.'
       }
       setRefundError({ id, message })
     } finally {
       setRefundingId(null)
     }
-  }, [signer, isPasskey, sendCalls, chainId, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimRefundRowTx])
+  }, [signer, isPasskey, sendCalls, chainId, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimRefundRowTx, operatingAsVault, canActAsVault, submitAsActive, actingAsSigner])
 
   // "Reclaim & Clear" on an expired offer. For the CREATOR this is a money move
   // first and a dismissal second: the offer is still Open on chain with their
@@ -1544,6 +1593,19 @@ function MarketDetailView({
   // (Polygon mainnet vs Amoy testnet) instead of a hardcoded testnet URL.
   const { chainId, sendCalls, loginMethod } = useWeb3()
   const isPasskey = loginMethod === 'passkey'
+  // Spec 088 FR-002 — this detail view's own claimRefund/cancelOpen buttons need the same
+  // acting-account routing the list row got: never sign with the connected wallet while the
+  // switcher shows another account. cancelOpen (Withdraw Offer) stays personal-only below —
+  // it always self-attributes correctly to whoever is submitting it as the offer's creator, and
+  // the detail view has no reachable non-personal path onto that button today.
+  const {
+    isVault: operatingAsVault,
+    isLegacy: operatingAsLegacy,
+    isHardware: operatingAsHardware,
+    canActAsVault,
+    submit: submitAsActive,
+  } = useActiveAccount()
+  const actingAsSigner = operatingAsLegacy || operatingAsHardware
 
   const [withdrawing, setWithdrawing] = useState(false)
   const [withdrawError, setWithdrawError] = useState(null)
@@ -1664,6 +1726,31 @@ function MarketDetailView({
 
     try {
       const wagerId = market.wagerId ?? market.id
+      // Spec 088 FR-002 — acting as a vault → threshold-gated claimRefund proposal FROM the Safe.
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to reclaim as the vault.")
+        const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
+        const data = new ethers.Interface(WAGER_REGISTRY_ABI).encodeFunctionData('claimRefund', [wagerId])
+        await submitAsActive({ to: registryAddr, value: 0n, data })
+        setRefundSuccess(true)
+        onRefunded?.(market)
+        return
+      }
+      // Spec 088 FR-002 — acting as a recovered or hardware account: same single call, signed by
+      // that account's own signer through the active-account seam, never the connected wallet's.
+      if (actingAsSigner) {
+        const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
+        const data = new ethers.Interface(WAGER_REGISTRY_ABI).encodeFunctionData('claimRefund', [wagerId])
+        const res = await submitAsActive({ to: registryAddr, value: 0n, data })
+        if (res?.txHash) {
+          setRefundTxHash(res.txHash)
+          setRefundSuccess(true)
+          onRefunded?.(market)
+        } else {
+          setRefundError('Still processing — check back in a moment.')
+        }
+        return
+      }
       const result = isPasskey
         ? await sendRegistryCall(sendCalls, chainId, 'claimRefund', [wagerId])
         : await claimRefundTx.run(wagerId)
@@ -2094,6 +2181,20 @@ function ResolutionModal({
   // Chain-aware explorer link for the payout receipt (avoids a hardcoded testnet host).
   const { chainId, sendCalls, loginMethod, provider } = useWeb3()
   const isPasskey = loginMethod === 'passkey'
+  // Spec 088 FR-002 — resolving (declareDraw/declareWinner) checks `actor` against the wager's
+  // creator/opponent/arbitrator on-chain, so signing with the CONNECTED wallet while the switcher
+  // shows another account does not merely misattribute the signature — it reverts NotAuthorized.
+  // Route exactly like claimPayout: a single call, proposed for a vault, self-submitted for a
+  // recovered/hardware acting signer. The gasless/self-submit legs below stay personal-only — a
+  // relayed intent has no acting-account twin, and self-submit is the never-stranded fallback.
+  const {
+    isVault: operatingAsVault,
+    isLegacy: operatingAsLegacy,
+    isHardware: operatingAsHardware,
+    canActAsVault,
+    submit: submitAsActive,
+  } = useActiveAccount()
+  const actingAsSigner = operatingAsLegacy || operatingAsHardware
 
   // Canonical outcome keys preserve the on-chain mapping:
   //   outcomes[0] => creator wins, outcomes[1] => opponent wins.
@@ -2247,6 +2348,26 @@ function ResolutionModal({
       // first call only proposes (awaiting the counterparty); the second settles.
       // The self-submit closure inspects the WagerDrawn event to set drawSettled.
       if (isDrawSelected) {
+        // Spec 088 FR-002 — acting as a vault → threshold-gated declareDraw proposal FROM the
+        // Safe. Whether it merely proposes or settles is a fact of the on-chain consent state
+        // this signature cannot see ahead of co-owner approval, so drawSettled is left false.
+        if (operatingAsVault) {
+          if (!canActAsVault) throw new Error("Switch to the vault's network to resolve as the vault.")
+          const data = registry.interface.encodeFunctionData('declareDraw', [market.id])
+          const res = await submitAsActive({ to: registryAddress, value: 0n, data })
+          if (res?.safeTxHash) setTxHash(res.safeTxHash)
+          setStep('success')
+          return
+        }
+        // Spec 088 FR-002 — acting as a recovered or hardware account: the SAME single call,
+        // signed by that account's own signer, never the connected wallet's.
+        if (actingAsSigner) {
+          const data = registry.interface.encodeFunctionData('declareDraw', [market.id])
+          const res = await submitAsActive({ to: registryAddress, value: 0n, data })
+          if (res?.txHash) setTxHash(res.txHash)
+          setStep('success')
+          return
+        }
         const result = isPasskey
           ? await sendRegistryCall(sendCalls, chainId, 'declareDraw', [market.id])
           : await declareDrawTx.run(market.id)
@@ -2268,6 +2389,27 @@ function ResolutionModal({
         selectedOutcome,
         notes: resolutionNotes,
       })
+
+      // Spec 088 FR-002 — acting as a vault → threshold-gated declareWinner proposal FROM the Safe.
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to resolve as the vault.")
+        const data = registry.interface.encodeFunctionData('declareWinner', [market.id, winner])
+        const res = await submitAsActive({ to: registryAddress, value: 0n, data })
+        if (res?.safeTxHash) setTxHash(res.safeTxHash)
+        setStep('success')
+        return
+      }
+      // Spec 088 FR-002 — acting as a recovered or hardware account: the SAME single call, signed
+      // by that account's own signer, never the connected wallet's. Deliberately not the gasless
+      // leg below: a relayed intent has no acting-account twin, and self-submit is the
+      // never-stranded fallback that rail already promises.
+      if (actingAsSigner) {
+        const data = registry.interface.encodeFunctionData('declareWinner', [market.id, winner])
+        const res = await submitAsActive({ to: registryAddress, value: 0n, data })
+        if (res?.txHash) setTxHash(res.txHash)
+        setStep('success')
+        return
+      }
 
       const result = isPasskey
         ? await sendRegistryCall(sendCalls, chainId, 'declareWinner', [market.id, winner])
