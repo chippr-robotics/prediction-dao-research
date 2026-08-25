@@ -1,4 +1,4 @@
-import { http, createConfig } from 'wagmi'
+import { createConfig, createConnector, http } from 'wagmi'
 import { fallback } from 'viem'
 import { arbitrum, base, mainnet, optimism, sepolia } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
@@ -167,6 +167,58 @@ const resolveAppUrl = () => {
 const appUrl = resolveAppUrl()
 
 /**
+ * WalletConnect stand-in for Cypress runs ONLY (`window.Cypress`, never true outside a
+ * Cypress-driven browser — production and manual `npm run dev` always get the real connector).
+ *
+ * wagmi calls `connector.setup()` for every registered connector as soon as `config` is
+ * constructed below (`@wagmi/core#createConfig`), not lazily on first use. The real
+ * `walletConnect()`'s `setup()` eagerly builds a full `@walletconnect/ethereum-provider`
+ * `EthereumProvider` — real SignClient/Core bootstrap (crypto key generation, storage, a relay
+ * handshake) — on every single page load, whether or not anyone ever picks WalletConnect. That
+ * cost is real regardless of network reachability (confirmed empirically: blocking WalletConnect's
+ * hosts via Cypress's `blockHosts` did not shorten it), and it was invisible before
+ * @walletconnect/ethereum-provider was an installed dependency, since `getProvider()` failed fast
+ * on the unresolved import. Once it resolved, that background bootstrap work competes for the
+ * event loop against tests that assert on-screen timing (SC-005's sign-in budget, WAL-05's reload
+ * budget), tipping already-tight windows into intermittent CI failures.
+ *
+ * No spec ever exercises a real WalletConnect connection — the only assertion touching this
+ * connector (WAL-02) checks that the option is *listed*, never that it *connects* — so a stub
+ * that reports the same id/name/type and never does real work is a safe swap for test runs.
+ */
+function isCypressRun() {
+  return typeof window !== 'undefined' && Boolean(window.Cypress)
+}
+
+function inertWalletConnectStub() {
+  return createConnector(() => ({
+    id: 'walletConnect',
+    name: 'WalletConnect',
+    type: walletConnect.type,
+    async setup() {},
+    async connect() {
+      throw new Error('WalletConnect is stubbed out under Cypress — no spec connects through it.')
+    },
+    async disconnect() {},
+    async getAccounts() {
+      return []
+    },
+    async getChainId() {
+      return networkId
+    },
+    async isAuthorized() {
+      return false
+    },
+    async getProvider() {
+      return null
+    },
+    onAccountsChanged() {},
+    onChainChanged() {},
+    onDisconnect() {},
+  }))
+}
+
+/**
  * Transport for one chain, honouring the member's own endpoint (spec 069).
  *
  * Precedence per chain: the member's endpoint (+ their failover, + the build default behind
@@ -231,17 +283,20 @@ export const config = createConfig({
     injected({
       shimDisconnect: true,
     }),
-    // WalletConnect is always available for hardware wallet and mobile wallet support
-    walletConnect({
-      projectId: walletConnectProjectId,
-      metadata: {
-        name: tenantBrand().displayName,
-        description: tenantBrand().tagline || tenantBrand().displayName,
-        url: appUrl,
-        icons: [`${appUrl}${tenantBrand().logoMark}`]
-      },
-      showQrModal: true,
-    }),
+    // WalletConnect is always available for hardware wallet and mobile wallet support.
+    // Cypress gets the inert stub above — see its comment for why.
+    isCypressRun()
+      ? inertWalletConnectStub()
+      : walletConnect({
+          projectId: walletConnectProjectId,
+          metadata: {
+            name: tenantBrand().displayName,
+            description: tenantBrand().tagline || tenantBrand().displayName,
+            url: appUrl,
+            icons: [`${appUrl}${tenantBrand().logoMark}`]
+          },
+          showQrModal: true,
+        }),
     // Passkey smart accounts (spec 041) — first-class connector beside the
     // classic wallets; capability-gated per network (FR-001/FR-004).
     passkeyConnector(),
