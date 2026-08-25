@@ -162,7 +162,9 @@ describe('Admin Panel', () => {
 
       adminState().then((before) => {
         expect(before.ok, before.error).to.equal(true)
-        expect(BigInt(before.accruedFees), 'the purchase accrued withdrawable fees').to.be.greaterThan(0n)
+        // Compared as a boolean: this Chai's `greaterThan` takes numbers/dates only, and
+        // these are BigInts (`.to.equal` handles BigInt; `.greaterThan` throws on it).
+        expect(BigInt(before.accruedFees) > 0n, 'the purchase accrued withdrawable fees').to.equal(true)
 
         cy.task('chainTx', {
           action: 'tokenBalance',
@@ -195,7 +197,7 @@ describe('Admin Panel', () => {
            * manager's accrued figure lost, and it was not nothing.
            */
           adminState().should((after) => {
-            expect(BigInt(before.accruedFees) - BigInt(after.accruedFees), 'accrued fell').to.be.greaterThan(0n)
+            expect(BigInt(before.accruedFees) - BigInt(after.accruedFees) > 0n, 'accrued fell').to.equal(true)
           })
           adminState().then((after) => {
             const withdrawn = BigInt(before.accruedFees) - BigInt(after.accruedFees)
