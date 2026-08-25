@@ -161,5 +161,6 @@ describe('an unreadable tier is still not treated as expired (FR-004/FR-005)', (
     })
     // Unknown is not "no membership": no expired copy, no purchase-mode tier grid.
     expect(screen.queryByText(/Your membership has expired/i)).toBeNull()
+    expect(document.querySelector('input[type="radio"]')).toBeNull()
   })
 })

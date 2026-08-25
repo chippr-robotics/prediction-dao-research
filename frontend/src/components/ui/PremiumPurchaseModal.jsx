@@ -212,13 +212,17 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
 
   const availableTiers = useMemo(() => {
     return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => {
-      // Same-tier entries (extend/manage) offer the current tier and up — but only while a
-      // current tier exists. At tier 0 (expired renewal) fall through to the purchase filter,
-      // which offers every tier; never return an empty list to a member who can legally buy.
-      if (allowsSameTier && userCurrentTier > 0) return tier.id >= userCurrentTier
+      if (allowsSameTier) {
+        // Offer the current tier and up — but only while a current tier exists. At an ACTUALLY
+        // READ tier 0 (expired renewal) fall back to the full purchase offering; never return
+        // an empty list to a member who can legally buy. An UNREADABLE tier is not tier 0
+        // (FR-004): keep the pre-existing empty offering so only the retry card renders.
+        if (userCurrentTier > 0) return tier.id >= userCurrentTier
+        return tierReadable && tier.id > 0
+      }
       return tier.id > userCurrentTier
     })
-  }, [userCurrentTier, allowsSameTier])
+  }, [userCurrentTier, allowsSameTier, tierReadable])
 
   const selectedTierInfo = MEMBERSHIP_TIERS[selectedTier]
 
