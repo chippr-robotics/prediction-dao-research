@@ -630,6 +630,18 @@
           "tests": [
             "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::VC-01"
           ]
+        },
+        {
+          "id": "membership.buy-voucher",
+          "name": "Buy a voucher at the tier price, paid in USDC",
+          "status": "covered",
+          "tier": "on-chain",
+          "proposedTier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::VC-02"
+          ]
         }
       ]
     },
@@ -1879,6 +1891,54 @@
           "risk": "access",
           "tests": [
             "frontend/cypress/e2e/full/35-admin-single-chain-write.cy.js::AD-06"
+          ]
+        },
+        {
+          "id": "admin.grant-revoke-membership",
+          "name": "An operator grants a membership tier to a user address and revokes it, judged on-chain",
+          "status": "covered",
+          "tier": "on-chain",
+          "proposedTier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-03"
+          ]
+        },
+        {
+          "id": "admin.configure-tier",
+          "name": "An operator changes a tier price and the chain reports the price every future purchase is quoted",
+          "status": "covered",
+          "tier": "on-chain",
+          "proposedTier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-04"
+          ]
+        },
+        {
+          "id": "admin.treasury-withdrawal",
+          "name": "An operator withdraws accrued fees and the named recipient's balance moves by exactly that amount",
+          "status": "covered",
+          "tier": "on-chain",
+          "proposedTier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/15-admin-panel.cy.js::ADM-05"
+          ]
+        },
+        {
+          "id": "admin.grant-revoke-operator-role",
+          "name": "An operator grants an admin role to an address, the contract confirms it, and a revoke removes it",
+          "status": "covered",
+          "tier": "on-chain",
+          "proposedTier": "on-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/full/35-admin-single-chain-write.cy.js::AD-07"
           ]
         }
       ]

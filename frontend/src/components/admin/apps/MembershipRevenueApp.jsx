@@ -42,6 +42,17 @@ const APP = adminAppById('membership-revenue')
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
 const USDC_DECIMALS = 6
 const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE'))
+// The MembershipManager is role-keyed, and pools (spec 034) gate on their own
+// role: WagerPoolFactory's checkCanCreate(account, POOL_PARTICIPANT_ROLE) is
+// NOT satisfied by a Wager Participant membership. Each form therefore carries
+// a role selector, defaulting to Wager Participant so existing behaviour (and
+// anything driving these forms without touching the selector) is unchanged.
+const POOL_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes('POOL_PARTICIPANT_ROLE'))
+const MEMBERSHIP_ROLES = {
+  WAGER_PARTICIPANT: { hash: WAGER_PARTICIPANT_ROLE, label: 'Wager Participant' },
+  POOL_PARTICIPANT: { hash: POOL_PARTICIPANT_ROLE, label: 'Pool Participant' },
+}
+const membershipRole = (key) => MEMBERSHIP_ROLES[key] || MEMBERSHIP_ROLES.WAGER_PARTICIPANT
 
 const MEMBERSHIP_ADMIN_ABI = [
   'function setTier(bytes32 role, uint8 tier, uint128 priceUSDC, uint32 durationDays, (uint32 monthlyMarketCreation,uint32 maxConcurrentMarkets) limits, bool active)',
@@ -111,11 +122,11 @@ export default function MembershipRevenueApp() {
 
   // ── Forms (state shapes carried over from the monolith) ──
   const [tierForm, setTierForm] = useState({
-    tier: 1, price: '2', durationDays: 30, monthly: 15, concurrent: 5, active: true,
+    role: 'WAGER_PARTICIPANT', tier: 1, price: '2', durationDays: 30, monthly: 15, concurrent: 5, active: true,
   })
-  const [grantForm, setGrantForm] = useState({ address: '', tier: 1, durationDays: 30 })
+  const [grantForm, setGrantForm] = useState({ address: '', role: 'WAGER_PARTICIPANT', tier: 1, durationDays: 30 })
   const grantEns = useEnsResolution(grantForm.address || '')
-  const [revokeForm, setRevokeForm] = useState({ address: '' })
+  const [revokeForm, setRevokeForm] = useState({ address: '', role: 'WAGER_PARTICIPANT' })
   const revokeEns = useEnsResolution(revokeForm.address || '')
 
   // A withdrawal targets ONE chain. Defaults to the wallet's chain when that
@@ -144,14 +155,14 @@ export default function MembershipRevenueApp() {
     const priceUSDC = ethers.parseUnits(String(tierForm.price), USDC_DECIMALS)
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).setTier(
-        WAGER_PARTICIPANT_ROLE,
+        membershipRole(tierForm.role).hash,
         tierForm.tier,
         priceUSDC,
         tierForm.durationDays,
         { monthlyMarketCreation: tierForm.monthly, maxConcurrentMarkets: tierForm.concurrent },
         tierForm.active,
       ),
-      `Tier ${TIER_NAMES[tierForm.tier]} configured at $${tierForm.price} USDC on ${networkName(membershipAdminChainId)}`,
+      `${membershipRole(tierForm.role).label} tier ${TIER_NAMES[tierForm.tier]} configured at $${tierForm.price} USDC on ${networkName(membershipAdminChainId)}`,
     )
   }
 
@@ -161,9 +172,9 @@ export default function MembershipRevenueApp() {
     if (!requireMembershipChain()) return false
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).grantMembership(
-        target, WAGER_PARTICIPANT_ROLE, grantForm.tier, grantForm.durationDays,
+        target, membershipRole(grantForm.role).hash, grantForm.tier, grantForm.durationDays,
       ),
-      `Granted ${TIER_NAMES[grantForm.tier]} membership to ${shortAddr(target)} on ${networkName(membershipAdminChainId)}`,
+      `Granted ${TIER_NAMES[grantForm.tier]} ${membershipRole(grantForm.role).label} membership to ${shortAddr(target)} on ${networkName(membershipAdminChainId)}`,
     )
   }
 
@@ -173,9 +184,9 @@ export default function MembershipRevenueApp() {
     if (!requireMembershipChain()) return false
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).revokeMembership(
-        target, WAGER_PARTICIPANT_ROLE,
+        target, membershipRole(revokeForm.role).hash,
       ),
-      `Revoked membership for ${shortAddr(target)} on ${networkName(membershipAdminChainId)}`,
+      `Revoked ${membershipRole(revokeForm.role).label} membership for ${shortAddr(target)} on ${networkName(membershipAdminChainId)}`,
     )
   }
 
@@ -257,10 +268,18 @@ export default function MembershipRevenueApp() {
       return (
         <div className="admin-tab-content" role="tabpanel">
           <div className="admin-card">
-            <h3>Configure Tier: Wager Participant on {networkName(membershipAdminChainId)}</h3>
+            <h3>Configure Tier: {membershipRole(tierForm.role).label} on {networkName(membershipAdminChainId)}</h3>
             {membershipChainWarning}
             <p>Set price (USDC), duration, monthly cap, and concurrent cap for each tier. 0 = unlimited.</p>
             <div className="admin-form">
+              <label>
+                Membership role
+                <select value={tierForm.role} onChange={(e) => setTierForm({ ...tierForm, role: e.target.value })}>
+                  {Object.entries(MEMBERSHIP_ROLES).map(([key, r]) => (
+                    <option key={key} value={key}>{r.label}</option>
+                  ))}
+                </select>
+              </label>
               <label>
                 Tier
                 <select value={tierForm.tier} onChange={(e) => setTierForm({ ...tierForm, tier: Number(e.target.value) })}>
@@ -307,8 +326,20 @@ export default function MembershipRevenueApp() {
           <div className="admin-card">
             <h3>Grant Membership on {networkName(membershipAdminChainId)}</h3>
             {membershipChainWarning}
-            <p>Grant a Wager Participant membership directly, bypassing the purchase flow. Use for support, gifts, or dispute resolution.</p>
+            <p>
+              Grant a {membershipRole(grantForm.role).label} membership directly, bypassing the
+              purchase flow. Use for support, gifts, or dispute resolution. Wager and pool
+              memberships are separate roles — one does not satisfy the other.
+            </p>
             <div className="admin-form">
+              <label>
+                Membership role
+                <select value={grantForm.role} onChange={(e) => setGrantForm({ ...grantForm, role: e.target.value })}>
+                  {Object.entries(MEMBERSHIP_ROLES).map(([key, r]) => (
+                    <option key={key} value={key}>{r.label}</option>
+                  ))}
+                </select>
+              </label>
               <label>
                 Recipient (address or ENS)
                 <input type="text" value={grantForm.address}
@@ -338,8 +369,16 @@ export default function MembershipRevenueApp() {
 
           <div className="admin-card">
             <h3>Revoke Membership</h3>
-            <p>Sets the user&apos;s Wager Participant tier back to <code>None</code>. Does not refund any USDC.</p>
+            <p>Sets the user&apos;s {membershipRole(revokeForm.role).label} tier back to <code>None</code>. Does not refund any USDC.</p>
             <div className="admin-form">
+              <label>
+                Membership role
+                <select value={revokeForm.role} onChange={(e) => setRevokeForm({ ...revokeForm, role: e.target.value })}>
+                  {Object.entries(MEMBERSHIP_ROLES).map(([key, r]) => (
+                    <option key={key} value={key}>{r.label}</option>
+                  ))}
+                </select>
+              </label>
               <label>
                 Account
                 <input type="text" value={revokeForm.address}

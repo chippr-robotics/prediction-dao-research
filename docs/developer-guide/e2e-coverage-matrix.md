@@ -28,8 +28,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 99 |
 | With a member-facing flow | 80 |
-| Member-facing flows | 137 |
-| 🟢 covered | 127 |
+| Member-facing flows | 142 |
+| 🟢 covered | 132 |
 | 🟡 partial | 1 |
 | 🔴 absent | 3 |
 | ⚪ out of scope | 6 |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-51 flows — 🟢 43 · 🟡 0 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
+54 flows — 🟢 46 · 🟡 0 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -81,6 +81,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `membership.redeem-voucher` | Redeem a voucher for membership without paying | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-01) |  |
+| `membership.buy-voucher` | Buy a voucher at the tier price, paid in USDC | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-02) |  |
 
 ### `028-token-mint` — Token Mint mini-app
 
@@ -238,6 +239,13 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `custody.safe-receiver` | A vault receives assets that require a callback | ⚪ out-of-scope | none | — (proposed: on-chain) | — | Spec 070 is paused with open issues and nothing is shipped; there is no surface to drive. |
 
+### `071-multi-chain-admin-console` — Multi-chain admin console
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `admin.configure-tier` | An operator changes a tier price and the chain reports the price every future purchase is quoted | 🟢 covered | settled | `on-chain` | `15-admin-panel.cy.js` (ADM-04) |  |
+| `admin.treasury-withdrawal` | An operator withdraws accrued fees and the named recipient's balance moves by exactly that amount | 🟢 covered | settled | `on-chain` | `15-admin-panel.cy.js` (ADM-05) |  |
+
 ### `073-miniapp-platform` — Mini-app platform
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
@@ -321,7 +329,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-42 flows — 🟢 40 · 🟡 1 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
+44 flows — 🟢 42 · 🟡 1 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -433,6 +441,8 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `admin.estate-reads-three-state` | An operator reads the estate and sees not-deployed and unreadable distinguished from zero | 🟢 covered | settled | `no-chain` | `32-admin-console.cy.js` (AD-04) |  |
 | `admin.single-chain-write` | An operator writes to one named chain with authority read from that chain | 🟢 covered | settled | `on-chain` | `35-admin-single-chain-write.cy.js` (AD-06) |  |
+| `admin.grant-revoke-membership` | An operator grants a membership tier to a user address and revokes it, judged on-chain | 🟢 covered | settled | `on-chain` | `15-admin-panel.cy.js` (ADM-03) |  |
+| `admin.grant-revoke-operator-role` | An operator grants an admin role to an address, the contract confirms it, and a revoke removes it | 🟢 covered | settled | `on-chain` | `35-admin-single-chain-write.cy.js` (AD-07) |  |
 
 ### `072-white-label-tenants` — White-label tenants
 
