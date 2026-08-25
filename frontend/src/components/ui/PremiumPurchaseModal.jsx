@@ -195,12 +195,34 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
   const isManageFlow = entryMode === 'manage'
   const allowsSameTier = isExtendFlow || isManageFlow
 
+  /*
+   * EXPIRED RENEWAL — an 'extend' entry whose ACTIVE tier reads 0.
+   *
+   * `getActiveTier` returns 0 for an EXPIRED membership, so the member the Renew CTA exists
+   * for (RoleDetailsCard shows it off the raw stored tier, which persists past expiry) arrived
+   * here with `userCurrentTier === 0`. The same-tier filter below then offered NOTHING: no tier
+   * cards, no explanatory card, Continue disabled — a dead-end for exactly the member who most
+   * needs to pay us. On-chain nothing blocks them: `purchaseTier` reverts AlreadyActive only
+   * while UNexpired, so an expired member can buy any tier fresh (and `effectiveAction` already
+   * resolves tier-0 to 'purchase'). Fall back to the purchase-mode offering and say why.
+   * ('manage' can't reach tier 0 — it is only ever derived from `userCurrentTier > 0` — but is
+   * included so a future explicit caller gets the same fallback rather than the dead-end.)
+   */
+  const isExpiredRenewal = allowsSameTier && tierReadable && !isLoadingTier && userCurrentTier === 0
+
   const availableTiers = useMemo(() => {
     return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => {
-      if (allowsSameTier) return tier.id >= userCurrentTier && userCurrentTier > 0
+      if (allowsSameTier) {
+        // Offer the current tier and up — but only while a current tier exists. At an ACTUALLY
+        // READ tier 0 (expired renewal) fall back to the full purchase offering; never return
+        // an empty list to a member who can legally buy. An UNREADABLE tier is not tier 0
+        // (FR-004): keep the pre-existing empty offering so only the retry card renders.
+        if (userCurrentTier > 0) return tier.id >= userCurrentTier
+        return tierReadable && tier.id > 0
+      }
       return tier.id > userCurrentTier
     })
-  }, [userCurrentTier, allowsSameTier])
+  }, [userCurrentTier, allowsSameTier, tierReadable])
 
   const selectedTierInfo = MEMBERSHIP_TIERS[selectedTier]
 
@@ -216,6 +238,12 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
    * Safe to read `userCurrentTier` here: handleSubmit refuses outright while `tierReadable` is
    * false (FR-005), so this only ever decides on a tier that was actually read. The fallback
    * matters anyway for the disabled-button render path.
+   *
+   * An EXPIRED member (active tier 0, whatever tier is still stored) resolves to 'purchase' on
+   * every selection, deliberately: `purchaseTier` succeeds once expired (AlreadyActive guards
+   * only an UNexpired membership) and charges exactly the full tier price shown above, while
+   * `upgradeTier` reverts NoActiveMembership on expired and `extendMembership` needs the stored
+   * tier this modal never read. Do not route tier-0 through 'extend' or 'upgrade'.
    */
   const effectiveAction = useMemo(() => {
     if (!tierReadable) return action || 'purchase'
@@ -451,7 +479,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
               {isUpgradeFlow
                 ? 'Upgrade Membership'
                 : isExtendFlow
-                  ? 'Extend Membership'
+                  ? (isExpiredRenewal ? 'Renew Membership' : 'Extend Membership')
                   : isManageFlow
                     ? 'Renew or Upgrade Membership'
                     : 'Get Wager Access'}
@@ -460,7 +488,9 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
               {isUpgradeFlow
                 ? 'Move to a higher tier for more monthly and concurrent wagers.'
                 : isExtendFlow
-                  ? 'Add another 30 days at your current tier.'
+                  ? (isExpiredRenewal
+                      ? 'Your membership has expired — choose a tier to renew for another 30 days.'
+                      : 'Add another 30 days at your current tier.')
                   : isManageFlow
                     ? 'Add another 30 days at your current tier, or move up to a higher one.'
                     : 'Purchase the Wager Participant role to create and accept peer-to-peer wagers.'}
@@ -560,6 +590,22 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
                       <button type="button" className="ppm-btn-secondary" onClick={() => setTierRetry((n) => n + 1)}>
                         Retry
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Expired renewal: the active tier reads 0, so no "Current Membership" card can
+                    render — without this the member saw four unexplained tier cards under a
+                    "Renew" title. Say what happened and what picking a tier does. */}
+                {isExpiredRenewal && (
+                  <div className="ppm-info-card ppm-renewal-info" role="status">
+                    <span className="ppm-info-icon" aria-hidden="true">ℹ️</span>
+                    <div>
+                      <strong>Your membership has expired</strong>
+                      <p>
+                        Choose any tier to renew — your previous tier or a different one. The new
+                        30 days start when the purchase confirms.
+                      </p>
                     </div>
                   </div>
                 )}

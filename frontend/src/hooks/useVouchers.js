@@ -9,6 +9,20 @@ import { ERC20_ABI } from '../abis/ERC20'
 import { useGaslessWrite } from '../lib/relay/useGaslessWrite'
 
 /**
+ * Normalize a Terms hash into the 0x-prefixed bytes32 hex the contract expects. The source of
+ * truth (`frontend/src/utils/legalDocs.js#getCurrentDocument('terms').hash` — the same one the
+ * purchase rail reads, see `PremiumPurchaseModal.jsx`) returns a bare 64-char lowercase hex
+ * digest with no `0x` prefix; `MembershipManager.redeemVoucher`/`redeemVoucherWithSig` take
+ * `bytes32`. Falls back to the zero hash (the contract's `_recordTerms` no-ops on it) when no
+ * in-force hash was resolved, matching `blockchainService.js`'s normalization for purchases.
+ * Exported for tests (spec 026 FR-013/SC-005).
+ */
+export function normalizeTermsHash(termsHash) {
+  if (typeof termsHash !== 'string' || !termsHash) return ethers.ZeroHash
+  return termsHash.startsWith('0x') ? termsHash : `0x${termsHash}`
+}
+
+/**
  * useVouchers — buy and redeem membership voucher NFTs (spec 026).
  *
  * Two acquisition rails converge on the same soulbound membership: this hook drives the *voucher* rail.
@@ -53,10 +67,10 @@ export function useVouchers() {
   // MembershipManager.redeemVoucher call (never-stranded). Signer-attributed (no payment) — the
   // redeemer is the connected wallet, auto-filled by signIntent, so it's omitted from params.
   const voucherTx = useGaslessWrite('redeemVoucher', {
-    params: (tokenId, termsHash) => ({ voucherId: tokenId, acceptedTermsHash: termsHash || ethers.ZeroHash }),
+    params: (tokenId, termsHash) => ({ voucherId: tokenId, acceptedTermsHash: normalizeTermsHash(termsHash) }),
     selfSubmit: async (tokenId, termsHash) => {
       const manager = new ethers.Contract(managerAddress, MEMBERSHIP_MANAGER_ABI, signer)
-      const tx = await manager.redeemVoucher(tokenId, termsHash || ethers.ZeroHash)
+      const tx = await manager.redeemVoucher(tokenId, normalizeTermsHash(termsHash))
       setLastTxHash(tx.hash)
       return tx.wait()
     },
@@ -217,7 +231,14 @@ export function useVouchers() {
     [isPasskey, sendCalls, signer, account, voucherAvailable, voucherAddress]
   )
 
-  /** Redeem voucher `tokenId` into a soulbound membership for the connected wallet. `termsHash` may be 0x0. */
+  /**
+   * Redeem voucher `tokenId` into a soulbound membership for the connected wallet. `termsHash` is
+   * the caller-resolved in-force Terms version hash (spec 026 FR-013/SC-005 — see
+   * `VouchersPage.jsx#onRedeem`, sourced the same way the purchase rail is:
+   * `getCurrentDocument('terms').hash`); it's normalized to 0x-bytes32 (or the zero hash, a
+   * contract-side no-op) here so every rail records the same accepted-terms artifact the purchase
+   * rail does.
+   */
   const redeemVoucher = useCallback(
     async (tokenId, termsHash) => {
       if (!isPasskey && !signer) throw new Error('Connect a wallet to redeem.')
@@ -230,7 +251,7 @@ export function useVouchers() {
           // Passkey rail: redeemVoucher as one sponsored UserOp (the 035 relay/intent path is
           // signer-only). The redeemer is the smart account — the connected passkey session.
           const iface = new ethers.Interface(MEMBERSHIP_MANAGER_ABI)
-          const data = iface.encodeFunctionData('redeemVoucher', [tokenId, termsHash || ethers.ZeroHash])
+          const data = iface.encodeFunctionData('redeemVoucher', [tokenId, normalizeTermsHash(termsHash)])
           const res = await sendCalls([{ target: managerAddress, data, value: 0n }])
           const txHash = res?.txHash ?? res?.userOpHash ?? null
           setLastTxHash(txHash)

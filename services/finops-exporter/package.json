@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@fairwins/finops-catalogue": "*",
-    "@google-cloud/bigquery": "^7.9.0",
+    "@google-cloud/bigquery": "^9.0.2",
     "ethers": "^6.17.0",
     "express": "^5.2.1"
   },
