@@ -8,6 +8,7 @@ pattern but returns canonical LedgerEntry pre-items instead of notifications.
 /**
  * @typedef {object} LedgerSource
  * @property {string} class                    // 'wager' | 'transfer' | 'earn' | 'pool' | 'membership'
+ * @property {'network'|'client'} [backing]    // what it had to reach; default 'network'
  * @property {(ctx: SourceContext) => Promise<LedgerEntryPreItem[]>} list
  * @property {(listener: () => void) => (() => void)} [subscribe]  // optional change signal (e.g. transferStore events)
  */
@@ -27,6 +28,15 @@ pattern but returns canonical LedgerEntry pre-items instead of notifications.
    never throws for empty history (returns `[]`). Network errors reject; the
    repository degrades per-source and reports which classes are stale rather
    than failing the whole ledger (honest-state principle).
+1b. **`backing` says what a rejection proves** (issue #1280). A `network`
+   source (subgraph/RPC) rejecting is evidence the chain could not be read; a
+   `client` source reads the local record store and fulfils whether or not any
+   network is up, so it can never testify to that. The repository counts only
+   network-backed sources when deciding `readState: 'unreadable'` — counting
+   all of them made the verdict unreachable, because six of the nine default
+   sources are client-store reads. Omitting the field means `network`, the
+   conservative reading. A source returning `[]` because its contract is not
+   deployed on the chain has FULFILLED: a read of nothing is a read.
 2. **Pre-item shape**: everything in `data-model.md` LedgerEntry except
    enrichment fields (`tokenSymbol/tokenDecimals/valueUsd/valuationStatus`),
    which the repository adds via the shared enrichment pipeline. `entryId`
@@ -44,6 +54,9 @@ pattern but returns canonical LedgerEntry pre-items instead of notifications.
 ```
 listEntries({ account, chainId, filter?, period?, signal? })
   → { entries: LedgerEntry[],          // deduped, enriched, sorted desc by (timestamp ?? recordedAt)
+      readState: 'read'|'unreadable',  // 'unreadable' ⇒ every network-backed source failed AND
+                                       //   nothing was collected: the empty list carries no
+                                       //   information and is NOT an empty history (#1280)
       staleClasses: string[],          // sources that errored; UI must disclose
       prunedBefore: number | null }    // FR-013 disclosure marker
 ```

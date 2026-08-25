@@ -35,6 +35,22 @@ export function loadConfig(env = process.env) {
     if (m) rpcUrls[Number(m[1])] = list(env[key])
   }
 
+  // RPC_URL_PRIMARY_<chainId> is a credential-bearing endpoint delivered from Secret Manager by
+  // fetch-secrets.sh, so it cannot be written into the compose file the way RPC_URLS_<chainId> is.
+  // It is PREPENDED rather than substituted: the public endpoints stay behind it as failover, so a
+  // keyed endpoint rate-limiting turns an on-chain source slow, not `unreadable`.
+  //
+  // De-duplicated, because the same URL twice is one endpoint, and buildProviders would otherwise
+  // wrap it in a FallbackProvider that fails over from a host to itself.
+  for (const key of Object.keys(env)) {
+    const m = /^RPC_URL_PRIMARY_(\d+)$/.exec(key)
+    if (!m) continue
+    const url = String(env[key] ?? '').trim()
+    if (!url) continue
+    const chainId = Number(m[1])
+    rpcUrls[chainId] = [url, ...(rpcUrls[chainId] ?? []).filter((u) => u !== url)]
+  }
+
   return {
     port: num(env.PORT, 9464),
     // Loopback only. The exporter has no member-facing surface and must not be publicly reachable

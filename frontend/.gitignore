@@ -29,6 +29,11 @@ dist-ssr
 coverage
 .nyc_output
 *.lcov
+# spec 094: the E2E COVERAGE MATRIX is first-party source, not a generated report — the bare
+# `coverage` rule above would silently ignore it, and a matrix nobody committed is worse than none
+# (same exemption shape as scripts/coverage in the root .gitignore).
+!cypress/coverage/
+!cypress/coverage/**
 
 # Lighthouse CI
 .lighthouseci

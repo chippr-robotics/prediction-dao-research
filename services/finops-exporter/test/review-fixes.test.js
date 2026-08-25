@@ -270,3 +270,40 @@ describe('the GCP fallback does not refresh the success timestamp', () => {
     expect((await collect({ id: 'gcp' })).state).toBe('unreadable')
   })
 })
+
+describe('the credentialed RPC primary', () => {
+  // The exporter reads treasury, gas-wallet and paymaster balances over these endpoints. A keyed
+  // archive endpoint cannot live in the compose file (its token is in the URL path), so it arrives
+  // as RPC_URL_PRIMARY_<chainId> from Secret Manager and is prepended to the public list.
+  const PUBLIC_A = 'https://public-a.example.invalid'
+  const PUBLIC_B = 'https://public-b.example.invalid'
+  const KEYED = 'https://keyed.matic.quiknode.pro/token-shaped-path'
+
+  it('is prepended, leaving the public endpoints behind it as failover', () => {
+    const config = cfg({ RPC_URLS_137: `${PUBLIC_A},${PUBLIC_B}`, RPC_URL_PRIMARY_137: KEYED })
+    // Substituting instead of prepending would make one credential's rate limit the difference
+    // between every on-chain source being `read` and every one being `unreadable`.
+    expect(config.rpcUrls[137]).toEqual([KEYED, PUBLIC_A, PUBLIC_B])
+  })
+
+  it('changes nothing when it is absent — it is fetched OPTIONAL on purpose', () => {
+    expect(cfg({ RPC_URLS_137: PUBLIC_A }).rpcUrls[137]).toEqual([PUBLIC_A])
+  })
+
+  it('never lists one endpoint twice', () => {
+    // buildProviders wraps a multi-URL list in a FallbackProvider; a duplicate would have it fail
+    // over from a host to itself and report two independent endpoints where there is one.
+    const config = cfg({ RPC_URLS_137: `${KEYED},${PUBLIC_A}`, RPC_URL_PRIMARY_137: KEYED })
+    expect(config.rpcUrls[137]).toEqual([KEYED, PUBLIC_A])
+  })
+
+  it('works for a chain with no RPC_URLS_ list at all', () => {
+    expect(cfg({ RPC_URL_PRIMARY_137: KEYED }).rpcUrls[137]).toEqual([KEYED])
+  })
+
+  it('does not leak across chains', () => {
+    const config = cfg({ RPC_URLS_137: PUBLIC_A, RPC_URLS_63: PUBLIC_B, RPC_URL_PRIMARY_137: KEYED })
+    expect(config.rpcUrls[137]).toEqual([KEYED, PUBLIC_A])
+    expect(config.rpcUrls[63]).toEqual([PUBLIC_B])
+  })
+})

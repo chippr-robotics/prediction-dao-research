@@ -70,6 +70,20 @@ import {
 import { bridgeDest } from '../../lib/assets/networkPin'
 import { partialWithdrawalCopy } from '../../lib/liquidity/liquidityCopy'
 
+/**
+ * The bridge half of the availability sentence, in EITHER of its two honest
+ * forms.
+ *
+ * Since #1265 the roster behind that sentence is cohort-bounded: a mainnet build
+ * names Ethereum (the HubPool is an L1 contract), and a testnet build — which is
+ * what this test build is (VITE_NETWORK_ID=63) — has no bridge pool to name and
+ * says so instead. Both are the truth for their build, and what these tests are
+ * actually about is that the sentence is stated ONCE and stays reachable, not
+ * which networks it happens to name here.
+ */
+const BRIDGE_AVAILABILITY =
+  /Bridge pools are available on .+ only|No network is set up for bridge pools in this build yet/i
+
 const USDC = { address: '0x00000000000000000000000000000000000000c1', symbol: 'USDC', decimals: 6 }
 const WETH = { address: '0x00000000000000000000000000000000000000e1', symbol: 'WETH', decimals: 18 }
 
@@ -277,7 +291,7 @@ describe('SupplyView — the curated list (FR-015)', () => {
     render(<SupplyView catalog={catalog()} />)
     // Once, not twice: the copy states both halves separately and never implies
     // that both kinds of pool exist everywhere.
-    const stated = screen.getAllByText(/Bridge pools are available on Ethereum only/i)
+    const stated = screen.getAllByText(BRIDGE_AVAILABILITY)
     expect(stated).toHaveLength(1)
     expect(stated[0]).toHaveTextContent(/trading pools/i)
   })
@@ -291,7 +305,7 @@ describe('SupplyView — the curated list (FR-015)', () => {
     const details = summary.closest('details')
     expect(details).toBeTruthy()
     expect(details.open).toBe(false)
-    expect(details).toHaveTextContent(/Bridge pools are available on Ethereum only/i)
+    expect(details).toHaveTextContent(BRIDGE_AVAILABILITY)
   })
 })
 
@@ -520,7 +534,7 @@ describe('SupplyView — empty states (FR-025)', () => {
     render(<SupplyView catalog={catalog({ pools: [] })} />)
 
     expect(screen.getByText(/There are no pools to supply right now/i)).toBeInTheDocument()
-    expect(screen.getAllByText(/Bridge pools are available on Ethereum only/i).length)
+    expect(screen.getAllByText(BRIDGE_AVAILABILITY).length)
       .toBeGreaterThan(0)
     // No mock rows and no dead controls.
     expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
@@ -535,7 +549,7 @@ describe('SupplyView — empty states (FR-025)', () => {
     expect(screen.getByText(/No pool takes DAI right now/i)).toBeInTheDocument()
     // Same reason: this sentence already carries the availability copy.
     expect(screen.queryByText('Where pools are available')).not.toBeInTheDocument()
-    expect(screen.getAllByText(/Bridge pools are available on Ethereum only/i)).toHaveLength(1)
+    expect(screen.getAllByText(BRIDGE_AVAILABILITY)).toHaveLength(1)
   })
 
   it('offers a retry, not a blank page, when nothing could be read at all', () => {

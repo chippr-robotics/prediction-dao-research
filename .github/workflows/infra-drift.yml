@@ -51,7 +51,7 @@ jobs:
           # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -60,7 +60,7 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.TF_PLAN_SERVICE_ACCOUNT }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
 
       # Cloudflare's ranges refresh through a data source on every plan. Google's prober addresses
       # have no data source, so a committed list is the only option — and a committed list nobody
@@ -94,7 +94,7 @@ jobs:
           # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 

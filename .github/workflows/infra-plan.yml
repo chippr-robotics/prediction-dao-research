@@ -46,7 +46,7 @@ jobs:
           # Nothing here pushes, so the persisted credential buys nothing and costs correctness.
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -217,7 +217,7 @@ jobs:
             echo "::endgroup::"
           done
 
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: latest
 

@@ -162,42 +162,83 @@ jobs:
           echo "Checking index.html:"
           head -20 dist/index.html
 
-      - name: Run Lighthouse CI
-        run: lhci autorun
+      # Spec 094: BOTH profiles, over one shared route list (frontend/lighthouse-routes.json) so
+      # desktop and mobile cannot drift apart. lhci takes a single `settings.preset` per run, which
+      # is why this is two configs rather than one.
+      #
+      # Neither run blocks on a budget — a Lighthouse score on a shared runner moves several points
+      # between runs, and a gate that mostly reports the runner is one people learn to re-run.
+      # `continue-on-error` is deliberately NOT used: the assertions are `warn`-level in the config
+      # itself, so lhci exits 0 on a budget miss but still fails on a run that could not execute.
+      # `lhci collect` always writes its lhr-*.json into `.lighthouseci/`, so the two profiles are
+      # separated by moving each run's reports into a profile directory before the next run starts.
+      # Doing it in shell rather than trusting a flag keeps the layout something a reader can verify
+      # from the job log — and it is the layout the coverage check below reads.
+      - name: Run Lighthouse CI (desktop)
+        run: |
+          lhci autorun --config=lighthouserc.desktop.json
+          mkdir -p .lighthouseci/desktop
+          mv .lighthouseci/lhr-*.json .lighthouseci/desktop/
         env:
           LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
           LHCI_BUILD_CONTEXT__COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
+
+      - name: Run Lighthouse CI (mobile)
+        run: |
+          lhci autorun --config=lighthouserc.mobile.json
+          mkdir -p .lighthouseci/mobile
+          mv .lighthouseci/lhr-*.json .lighthouseci/mobile/
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
+          LHCI_BUILD_CONTEXT__COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
+
+      # The half that DOES block (FR-026). `lhci assert` only evaluates URLs it collected, so a
+      # route that failed to load contributes nothing and leaves the job green — an unmeasured
+      # route reported as a pass is the same defect as a green gate over a crashed run.
+      - name: Every budgeted route was measured on both profiles
+        run: node scripts/e2e/check-lighthouse-coverage.js
+        working-directory: .
 
       - name: Summarize Lighthouse results
         if: always()
         run: |
           echo "### Lighthouse Scores" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          # Parse the latest Lighthouse JSON report
-          REPORT=$(find .lighthouseci -name "lhr-*.json" -type f | head -1 2>/dev/null || echo "")
-          if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
-            node -e "
-              const lhr = require('./$REPORT');
-              const cats = lhr.categories || {};
-              console.log('| Category | Score |');
-              console.log('|----------|-------|');
-              for (const [key, cat] of Object.entries(cats)) {
-                const score = Math.round((cat.score || 0) * 100);
-                const icon = score >= 90 ? '🟢' : score >= 50 ? '🟠' : '🔴';
-                console.log('| ' + cat.title + ' | ' + icon + ' ' + score + ' |');
-              }
-            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Could not parse Lighthouse report" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Lighthouse report not available" >> $GITHUB_STEP_SUMMARY
-          fi
+          # One row per route per profile. The previous version summarised the FIRST report it
+          # found and presented it as "the" score — with six routes and two profiles that is one
+          # twelfth of the measurement, reported as all of it.
+          for PROFILE in desktop mobile; do
+            echo "**${PROFILE}**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Route | Perf | A11y | Best practices | SEO |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
+            for REPORT in $(find ".lighthouseci/$PROFILE" -name "lhr-*.json" -type f 2>/dev/null | sort); do
+              node -e "
+                const lhr = require('./$REPORT');
+                const c = lhr.categories || {};
+                const pct = (k) => c[k] ? Math.round(c[k].score * 100) : '—';
+                const url = (lhr.requestedUrl || '').replace('http://localhost:4173', '') || '/';
+                console.log('| ' + url + ' | ' + pct('performance') + ' | ' + pct('accessibility') +
+                            ' | ' + pct('best-practices') + ' | ' + pct('seo') + ' |');
+              " >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "Budgets report rather than block; an unmeasured route fails the job." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+      # `include-hidden-files` is REQUIRED here and its absence was silent: `.lighthouseci` is a
+      # dot-directory, upload-artifact@v7 excludes hidden paths by default, and the step logged
+      # "No files were found with the provided path" as a WARNING while the job stayed green — so
+      # this artifact has been uploading nothing. The reports are the evidence behind "budgets
+      # report rather than block"; discarding them left the step summary as the only record.
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v7
         if: always()
         with:
           name: lighthouse-results
           path: frontend/.lighthouseci/
+          include-hidden-files: true
           retention-days: 7
 
   axe-audit:

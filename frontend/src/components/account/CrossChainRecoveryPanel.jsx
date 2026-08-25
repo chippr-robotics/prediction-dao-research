@@ -40,6 +40,13 @@ export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
   }, [entry, passphrase, runDiscovery, deps.unlock])
 
   const fundedSolana = useMemo(() => (results?.solana || []).filter((s) => s.status === 'found'), [results])
+  /*
+   * Every Solana candidate we asked about came back unreadable, so nothing is known. "No funds
+   * found" here would be a fabricated zero — see the Bitcoin row above and
+   * `crossChainDiscovery.js` for the same distinction on that leg.
+   */
+  const solanaProbes = results?.solana || []
+  const solanaUnreadable = solanaProbes.length > 0 && solanaProbes.every((s) => s.status === 'unreachable')
   const btc = results?.bitcoin || null
   const btcSpendable = btc?.spendableSats || 0
   const btcConfirmed = btc?.confirmedSats || 0
@@ -123,7 +130,9 @@ export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
           <div className="lkr-asset-row">
             <span className="lkr-asset-row__chain">Solana</span>
             {fundedSolana.length === 0 ? (
-              <span className="lkr-asset-row__muted">No funds found</span>
+              <span className="lkr-asset-row__muted">
+                {solanaUnreadable ? 'Couldn’t check — try again' : 'No funds found'}
+              </span>
             ) : (
               <ul className="lkr-asset-list">
                 {fundedSolana.map((s) => (

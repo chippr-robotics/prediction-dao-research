@@ -110,7 +110,7 @@
   cursor: not-allowed;
 }
 
-.wc-action-primary { color: #fff; background: var(--brand-secondary); }
+.wc-action-primary { color: var(--primary-button-text); background: var(--primary-button); }
 .wc-action-primary:hover:not(:disabled) { filter: brightness(1.08); }
 
 .wc-action-success { color: #fff; background: var(--success-color); }

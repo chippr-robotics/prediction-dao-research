@@ -36,7 +36,7 @@
  * per device, after which the key is cached locally like any other credential record.
  */
 
-import { p256 } from '@noble/curves/p256.js'
+import { p256 } from '@noble/curves/nist.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 
 import { getAssertion } from './credentials'
@@ -123,6 +123,11 @@ const toHexXY = (point) => {
 export function recoverCandidateKeys({ authenticatorData, clientDataJSON, signature }) {
   const hash = webauthnSignedHash({ authenticatorData, clientDataJSON })
   const { r, s } = derToRS(signature)
+  // @noble/curves v2 takes the signature as BYTES; passing the {r,s} object throws. That throw
+  // would land in the catch below — which exists for invalid recovery bits — leaving `found`
+  // empty and turning "this key signed it" into "no candidate", silently. Encode once, up front.
+  const sigInstance = new p256.Signature(r, s)
+  const sigBytes = sigInstance.toBytes ? sigInstance.toBytes('compact') : sigInstance.toCompactRawBytes()
   const found = new Set()
   for (const bit of [0, 1, 2, 3]) {
     try {
@@ -130,7 +135,11 @@ export function recoverCandidateKeys({ authenticatorData, clientDataJSON, signat
       const bytes = point.toBytes ? point.toBytes(false) : point.toRawBytes(false)
       // lowS:false — authenticators are not required to emit low-S, and rejecting high-S here
       // would silently drop the true key for those devices.
-      if (p256.verify({ r, s }, hash, bytes, { lowS: false })) found.add(toHexXY(point))
+      // prehash:false — `hash` IS the digest the authenticator signed
+      // (sha256(authenticatorData || sha256(clientDataJSON))). @noble/curves v2 prehashes by
+      // DEFAULT, where v1 did not; leaving it on would hash the digest a second time and every
+      // candidate would fail to verify, emptying the set exactly like the {r,s} throw above.
+      if (p256.verify(sigBytes, hash, bytes, { lowS: false, prehash: false })) found.add(toHexXY(point))
     } catch {
       // Not every recovery bit yields a valid point; that is expected.
     }

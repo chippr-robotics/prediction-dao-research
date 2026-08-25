@@ -91,9 +91,13 @@ function TierLimits({ tierName, chainLimits }) {
  * @param {object}   props
  * @param {boolean}  props.isOpen
  * @param {function} props.onClose
- * @param {string}   [props.action]  - 'purchase' (default), 'upgrade', or 'extend'
+ * @param {string}   [props.action]  - 'purchase', 'upgrade' or 'extend'. OMIT IT to have the
+ *   modal decide from the member's own membership: an entry point that serves both new and
+ *   existing members (the Membership tab's "Renew / Upgrade") cannot know which it is, and
+ *   guessing 'purchase' is what made #1226 — purchaseTier reverts AlreadyActive() for anyone
+ *   who already holds a membership, which is precisely who that control is shown to.
  */
-function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
+function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
   const { grantRole, loadRoles } = useRoles()
   const {
     account, isConnected, isCorrectNetwork, switchNetwork, chainId,
@@ -105,8 +109,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const flow = usePurchaseFlow()
   const navigate = useNavigate()
 
-  const isUpgradeFlow = action === 'upgrade'
-  const isExtendFlow = action === 'extend'
 
   // The voucher rail (spec 026) is a parallel way to get the same membership:
   // buy a transferable voucher to gift/resell, or redeem one you hold. It lives
@@ -179,14 +181,49 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     return () => { cancelled = true }
   }, [account, chainId, tierRetry])
 
+  /*
+   * ENTRY MODE — what this modal is for, from the caller or from the member.
+   *
+   * WalletButton opens it with an explicit 'upgrade' / 'extend' and those are honoured. The
+   * Membership tab's combined "Renew / Upgrade" passes nothing, because it serves whichever
+   * the member turns out to need; for an existing member that is 'manage', which offers their
+   * current tier (renew) alongside the higher ones (upgrade), matching what the button says.
+   */
+  const entryMode = action || (tierReadable && userCurrentTier > 0 ? 'manage' : 'purchase')
+  const isUpgradeFlow = entryMode === 'upgrade'
+  const isExtendFlow = entryMode === 'extend'
+  const isManageFlow = entryMode === 'manage'
+  const allowsSameTier = isExtendFlow || isManageFlow
+
   const availableTiers = useMemo(() => {
     return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => {
-      if (isExtendFlow) return tier.id >= userCurrentTier && userCurrentTier > 0
+      if (allowsSameTier) return tier.id >= userCurrentTier && userCurrentTier > 0
       return tier.id > userCurrentTier
     })
-  }, [userCurrentTier, isExtendFlow])
+  }, [userCurrentTier, allowsSameTier])
 
   const selectedTierInfo = MEMBERSHIP_TIERS[selectedTier]
+
+  /*
+   * WHICH CONTRACT CALL — decided by the member's CURRENT tier against the one they picked,
+   * never by how the modal was opened (#1226).
+   *
+   * MembershipManager refuses purchaseTier for anyone already active (AlreadyActive, L279), so
+   * an entry point that opened in 'purchase' mode sent an existing member down a path that
+   * could only revert — after their USDC approval had already landed. upgradeTier and
+   * extendTier exist for exactly these two cases.
+   *
+   * Safe to read `userCurrentTier` here: handleSubmit refuses outright while `tierReadable` is
+   * false (FR-005), so this only ever decides on a tier that was actually read. The fallback
+   * matters anyway for the disabled-button render path.
+   */
+  const effectiveAction = useMemo(() => {
+    if (!tierReadable) return action || 'purchase'
+    if (userCurrentTier <= 0) return 'purchase'
+    if (selectedTierInfo && selectedTierInfo.id > userCurrentTier) return 'upgrade'
+    return 'extend'
+  }, [action, tierReadable, userCurrentTier, selectedTierInfo])
+
   const selectedPrice = getPrice(ROLE_KEY, selectedTier)
   const chainLimits = getLimits(ROLE_KEY, selectedTier)
 
@@ -194,7 +231,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     const next = {}
     if (step === 0) {
       if (!selectedTierInfo) next.tier = 'Select a tier to continue'
-      else if (!isExtendFlow && selectedTierInfo.id <= userCurrentTier) {
+      else if (!allowsSameTier && selectedTierInfo.id <= userCurrentTier) {
         next.tier = 'Select a tier higher than your current one'
       }
     }
@@ -203,7 +240,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     }
     setErrors(next)
     return Object.keys(next).length === 0
-  }, [selectedTierInfo, userCurrentTier, isExtendFlow, acknowledged])
+  }, [selectedTierInfo, userCurrentTier, allowsSameTier, acknowledged])
 
   const handleNext = useCallback(() => {
     if (validateStep(currentStep)) setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1))
@@ -287,7 +324,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
         // RPC provider; the batch carries the exact price the contract pulls.
         const batchPurchase = async () => {
           const { calls } = await buildMembershipPurchaseCalls(
-            provider, account, ROLE_KEY, tierValue, action, acceptedTermsHash,
+            provider, account, ROLE_KEY, tierValue, effectiveAction, acceptedTermsHash,
           )
           const res = await sendCalls(calls)
           return { hash: res?.txHash, txHash: res?.txHash, route: res?.route }
@@ -316,7 +353,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
           roleName: ROLE_KEY,
           priceUSD: selectedPrice,
           tier: tierValue,
-          action,
+          action: effectiveAction,
           termsHash: acceptedTermsHash,
           batchPurchase,
           ensureInitialized,
@@ -340,7 +377,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
         roleName: ROLE_KEY,
         priceUSD: selectedPrice,
         tier: tierValue,
-        action,
+        action: effectiveAction,
         termsHash: acceptedTermsHash,
         ensureInitialized,
         onPaid,
@@ -411,14 +448,22 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
         <header className="ppm-header">
           <div className="ppm-header-content">
             <h2 id="ppm-title">
-              {isUpgradeFlow ? 'Upgrade Membership' : isExtendFlow ? 'Extend Membership' : 'Get Wager Access'}
+              {isUpgradeFlow
+                ? 'Upgrade Membership'
+                : isExtendFlow
+                  ? 'Extend Membership'
+                  : isManageFlow
+                    ? 'Renew or Upgrade Membership'
+                    : 'Get Wager Access'}
             </h2>
             <p className="ppm-subtitle">
               {isUpgradeFlow
                 ? 'Move to a higher tier for more monthly and concurrent wagers.'
                 : isExtendFlow
                   ? 'Add another 30 days at your current tier.'
-                  : 'Purchase the Wager Participant role to create and accept peer-to-peer wagers.'}
+                  : isManageFlow
+                    ? 'Add another 30 days at your current tier, or move up to a higher one.'
+                    : 'Purchase the Wager Participant role to create and accept peer-to-peer wagers.'}
             </p>
           </div>
           <button
@@ -532,13 +577,13 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                         >
                           {Object.values(MEMBERSHIP_TIERS)[userCurrentTier - 1]?.name}
                         </span>
-                        {isExtendFlow ? '. You can extend at the same tier or upgrade.' : '. You can only upgrade to a higher tier.'}
+                        {allowsSameTier ? '. You can extend at the same tier or upgrade.' : '. You can only upgrade to a higher tier.'}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {!isLoadingTier && userCurrentTier >= 4 && !isExtendFlow && (
+                {!isLoadingTier && userCurrentTier >= 4 && !allowsSameTier && (
                   <div className="ppm-warning-card">
                     <span className="ppm-warning-icon" aria-hidden="true">🎉</span>
                     <div className="ppm-warning-content">

@@ -77,6 +77,14 @@ export const networkName = estateNetworkName
  * specs/071-multi-chain-admin-console/research.md (R10) for why that is being tracked as an
  * open question rather than settled silently in this change.
  *
+ * #1265 moved the four MEMBER-facing spec-067 rosters onto `cohortChainIds()` and revisited this
+ * one deliberately. It stays as it is, and the two are not the same question: those rosters
+ * decide what a MEMBER is shown and which routers get read on their behalf, while this one is an
+ * operator's deployment map, read behind an admin gate through the `requireCohort: false` provider
+ * below. Cohort-bounding it would blank both tabs in a testnet build — the operator would lose the
+ * view precisely where a deployment is missing. If that ever changes, the roster must stay
+ * capability-derived (undeployed networks included), or the tabs stop showing what needs doing.
+ *
  * @param {'bridge'|'liquidity'} capability
  */
 export function adminNetworks(capability) {

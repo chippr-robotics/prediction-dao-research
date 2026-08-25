@@ -15,7 +15,7 @@ const POLL_MS = 60_000
 
 export function useActivityLedger({ filter, period, pollMs = POLL_MS } = {}) {
   const { address, chainId, isConnected, provider } = useWallet() || {}
-  const [state, setState] = useState({ entries: [], staleClasses: [], prunedBefore: null })
+  const [state, setState] = useState({ entries: [], readState: null, staleClasses: [], prunedBefore: null })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const reqIdRef = useRef(0)
@@ -28,7 +28,7 @@ export function useActivityLedger({ filter, period, pollMs = POLL_MS } = {}) {
 
   const load = useCallback(async () => {
     if (!isConnected || !address || chainId == null) {
-      setState({ entries: [], staleClasses: [], prunedBefore: null })
+      setState({ entries: [], readState: null, staleClasses: [], prunedBefore: null })
       setIsLoading(false)
       return
     }
@@ -70,6 +70,11 @@ export function useActivityLedger({ filter, period, pollMs = POLL_MS } = {}) {
 
   return {
     entries: state.entries,
+    // The read verdict (#1280): `unreadable` means every network-backed source
+    // failed and nothing was collected, so the empty entry list above is
+    // silence, not an empty history. Consumers must never render it as
+    // "nothing here yet". `null` = not read yet.
+    readState: state.readState ?? null,
     staleClasses: state.staleClasses,
     prunedBefore: state.prunedBefore,
     isLoading,

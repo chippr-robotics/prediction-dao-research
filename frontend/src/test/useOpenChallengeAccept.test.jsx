@@ -59,10 +59,16 @@ vi.mock('ethers', async () => {
         state.acceptArgs = a
         return Promise.resolve({ wait: () => Promise.resolve({ status: 1, hash: '0xtxhash' }) })
       }
-      acceptOpenWager.staticCall = () =>
-        state.staticCallReject
-          ? Promise.reject(Object.assign(new Error(state.staticCallReject), { reason: state.staticCallReject }))
-          : Promise.resolve()
+      acceptOpenWager.staticCall = () => {
+        const spec = state.staticCallReject
+        if (!spec) return Promise.resolve()
+        // A string is a plain revert reason. An object is a raw ethers error shape — used for the
+        // custom errors the shipped ABI cannot decode, where all the information is in `data`.
+        if (typeof spec === 'string') return Promise.reject(Object.assign(new Error(spec), { reason: spec }))
+        return Promise.reject(
+          Object.assign(new Error(spec.message || 'execution reverted (unknown custom error)'), spec),
+        )
+      }
       return {
         interface: { encodeFunctionData: vi.fn(() => '0xacceptcalldata') },
         openWagerIdForClaim: () => state.throwLookup
@@ -100,6 +106,7 @@ vi.mock('ethers', async () => {
 })
 
 import { useOpenChallengeAccept } from '../hooks/useOpenChallengeAccept'
+import { SANCTIONED_ADDRESS_SELECTOR } from '../lib/wagers/sanctionsRevert'
 
 describe('useOpenChallengeAccept.accept (funding flow)', () => {
   beforeEach(() => {
@@ -207,6 +214,41 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
     })
     expect(err?.message).toMatch(/expired/i)
     expect(calls).toEqual([])
+    expect(wallet.sendCalls).not.toHaveBeenCalled()
+  })
+
+  // #1292 — ISanctionsGuard's errors are not in the registry ABI the frontend ships, so a screened
+  // taker's pre-flight arrives as a bare "unknown custom error" with the answer only in `data`.
+  const encodeSanctioned = (address) => `${SANCTIONED_ADDRESS_SELECTOR}${address.slice(2).padStart(64, '0')}`
+
+  it('names sanctions screening — not the raw custom error — when the TAKER is the screened party', async () => {
+    wallet.loginMethod = 'passkey'
+    state.staticCallReject = { data: encodeSanctioned(ACCOUNT) }
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    let err
+    await act(async () => {
+      try { await result.current.accept('river tiger kite zoo', 4n) } catch (e) { err = e }
+    })
+    expect(err?.message).toMatch(/sanctions screening/i)
+    expect(err?.message).toMatch(/your account/i)
+    expect(err?.message).not.toMatch(/unknown custom error/i)
+    expect(wallet.sendCalls).not.toHaveBeenCalled()
+  })
+
+  it('blames the CREATOR, not the taker, when the guard named the creator', async () => {
+    // `_runAcceptGuard` screens both parties, so a creator listed after their challenge was posted
+    // reverts every accept — with the CREATOR's address. Telling the taker their own clean account
+    // was stopped would be a false compliance accusation.
+    wallet.loginMethod = 'passkey'
+    const CREATOR = '0x4444444444444444444444444444444444444444'
+    state.staticCallReject = { data: encodeSanctioned(CREATOR) }
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    let err
+    await act(async () => {
+      try { await result.current.accept('river tiger kite zoo', 4n) } catch (e) { err = e }
+    })
+    expect(err?.message).toMatch(/other party's account/i)
+    expect(err?.message).not.toMatch(/your account/i)
     expect(wallet.sendCalls).not.toHaveBeenCalled()
   })
 })

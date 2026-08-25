@@ -59,6 +59,9 @@ const hasRegisteredKey = vi.fn(async () => false)
 const registerEncryptionKey = vi.fn(async () => ({ hash: '0x1', status: 'success' }))
 vi.mock('../utils/keyRegistryService.js', () => ({
   lookupPublicKey: vi.fn(async () => null),
+  // Three-state lookup (issue #1286): the hook must be able to tell "no key" from "no answer".
+  KEY_LOOKUP: { READ: 'read', NOT_REGISTERED: 'not-registered', UNREADABLE: 'unreadable' },
+  lookupPublicKeyState: vi.fn(async () => ({ state: 'not-registered' })),
   hasRegisteredKey: (...a) => hasRegisteredKey(...a),
   ensureKeyRegistered: vi.fn(async () => false),
   registerEncryptionKey: (...a) => registerEncryptionKey(...a),

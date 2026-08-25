@@ -27,7 +27,7 @@
 .backup-btn:hover:not(:disabled) { border-color: var(--brand-primary); }
 .backup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .backup-btn:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 1px; }
-.backup-btn-primary { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
+.backup-btn-primary { background: var(--primary-button); border-color: var(--primary-button); color: var(--primary-button-text); }
 .backup-btn-danger { color: var(--semantic-loss); border-color: var(--semantic-loss); background: transparent; }
 
 .backup-cost { color: var(--text-muted, var(--text-secondary)); font-size: 0.78rem; margin: 0.3rem 0 0; }

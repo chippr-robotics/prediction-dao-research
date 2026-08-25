@@ -33,6 +33,93 @@ const PROVIDERS = {
   stakeManager: process.env.POLYGON_STAKE_MANAGER || "0x5e3Ef299fDDf15eAa0432E6e66473ace8c13D908",
 };
 
+const LOCAL_NETWORKS = new Set(["hardhat", "localhost"]);
+
+async function hasCode(address) {
+  if (!address || !ethers.isAddress(address)) return false;
+  return (await ethers.provider.getCode(address)) !== "0x";
+}
+
+/**
+ * Local-only stand-ins so `npx hardhat node` + this script gives a working local wiring in one
+ * command — the same shape `deploy-bridge-liquidity.js` uses for Across/Uniswap. Mocks are confined
+ * to contracts/mocks and can never reach a real network: this runs only when the network is
+ * hardhat/localhost AND nothing is configured or overridden.
+ *
+ * A re-run against the same local node REUSES the doubles already in the record. Deploying fresh
+ * ones would rewrite the record's provider addresses to contracts the already-deployed router does
+ * not point at — and the router's addresses are what the member app reads back through
+ * `readStakingRouterConfig`, so the drift would show up as options quietly disappearing.
+ *
+ * The DELEGATED validator is deployed here too, even though delegation never routes through the
+ * router: the router's allowlist is what decides whether the app OFFERS a validator at all
+ * (`overlayRouterConfig` drops any that is not listed), so a local chain needs one that exists.
+ */
+async function deployLocalStakingDoubles(record) {
+  const mocks = record.mocks || (record.mocks = {});
+  const reusable =
+    (await hasCode(mocks.mockLidoStETH)) &&
+    (await hasCode(mocks.mockWstETH)) &&
+    (await hasCode(mocks.mockSpolController)) &&
+    (await hasCode(mocks.mockValidatorShare));
+  if (reusable) {
+    console.log("\n⚠️  LOCAL DEV ONLY — reusing the recorded contracts/mocks stand-ins (still live).");
+    return {
+      steth: mocks.mockLidoStETH,
+      wsteth: mocks.mockWstETH,
+      spolController: mocks.mockSpolController,
+      spolToken: mocks.mockSpolToken,
+      polToken: mocks.mockPolToken,
+      stakeManager: mocks.mockPolygonStakeManager,
+      validatorShare: mocks.mockValidatorShare,
+    };
+  }
+
+  console.log("\n⚠️  LOCAL DEV ONLY — no Lido/sPOL/Polygon deployment on this chain.");
+  console.log("   Deploying contracts/mocks stand-ins so the local staking flow works. These are");
+  console.log("   test doubles, NOT protocol addresses; never reuse this record on a real network.");
+
+  const deploy = async (name, args = []) => {
+    const c = await (await ethers.getContractFactory(name)).deploy(...args);
+    await c.waitForDeployment();
+    return c.getAddress();
+  };
+
+  const steth = await deploy("MockLidoStETH");
+  const wsteth = await deploy("MockWstETH", [steth]);
+  const polToken = await deploy("MintableToken", ["Polygon Ecosystem Token", "POL"]);
+  const spolToken = await deploy("MintableToken", ["Staked POL", "sPOL"]);
+  const spolController = await deploy("MockSpolController", [polToken, spolToken]);
+  // 1 checkpoint, so an unbonding period is one `advanceEpoch(1)` rather than a wait nobody can
+  // sit through in a test. The real delay is ~80 checkpoints; what is under test is the RULE
+  // ("not claimable until the delay has passed"), not its duration.
+  const stakeManager = await deploy("MockPolygonStakeManager", [polToken, 1]);
+  const validatorShare = await deploy("MockValidatorShare", [polToken, stakeManager]);
+
+  mocks.mockLidoStETH = steth;
+  mocks.mockWstETH = wsteth;
+  mocks.mockPolToken = polToken;
+  mocks.mockSpolToken = spolToken;
+  mocks.mockSpolController = spolController;
+  mocks.mockPolygonStakeManager = stakeManager;
+  mocks.mockValidatorShare = validatorShare;
+  record.stakingLocalMocks = true;
+
+  for (const [label, address] of Object.entries({
+    MockLidoStETH: steth,
+    MockWstETH: wsteth,
+    "MintableToken (POL)": polToken,
+    "MintableToken (sPOL)": spolToken,
+    MockSpolController: spolController,
+    MockPolygonStakeManager: stakeManager,
+    MockValidatorShare: validatorShare,
+  })) {
+    console.log(`  ✓ ${label}: ${address}`);
+  }
+
+  return { steth, wsteth, spolController, spolToken, polToken, stakeManager, validatorShare };
+}
+
 async function main() {
   const network = await ethers.provider.getNetwork();
   const networkName = hre.network.name;
@@ -69,6 +156,25 @@ async function main() {
     return;
   }
 
+  // On a local node the mainnet L1 addresses carry no bytecode, so the router would be pointed at
+  // nothing and every staking read would come back empty. Stand-ins are deployed instead —
+  // local-only, and only when nothing was overridden.
+  let providers = { ...PROVIDERS };
+  let localValidatorShare = null;
+  if (LOCAL_NETWORKS.has(networkName) && !(await hasCode(providers.steth))) {
+    const doubles = await deployLocalStakingDoubles(record);
+    providers = {
+      steth: doubles.steth,
+      wsteth: doubles.wsteth,
+      spolController: doubles.spolController,
+      spolToken: doubles.spolToken,
+      polToken: doubles.polToken,
+      stakeManager: doubles.stakeManager,
+    };
+    localValidatorShare = doubles.validatorShare;
+    saveDeployment(filename, record);
+  }
+
   // Admin (config + guardian) starts as the deployer; hand off to the multisig below (FR-018).
   console.log("\nDeploying StakingRouter behind a UUPS proxy...");
   const proxy = await deployProxy({
@@ -76,12 +182,12 @@ async function main() {
     initArgs: [
       deployer.address,
       feeRouter,
-      PROVIDERS.steth,
-      PROVIDERS.wsteth,
-      PROVIDERS.spolController,
-      PROVIDERS.spolToken,
-      PROVIDERS.polToken,
-      PROVIDERS.stakeManager,
+      providers.steth,
+      providers.wsteth,
+      providers.spolController,
+      providers.spolToken,
+      providers.polToken,
+      providers.stakeManager,
     ],
   });
 
@@ -112,6 +218,17 @@ async function main() {
       }
       await (await router.registerService(id, svc.capBps, svc.kind)).wait();
       console.log(`  ✓ registered ${svc.label} (cap ${svc.capBps} bps, ConfigOnly)`);
+    }
+  }
+
+  // The allowlist is the boundary the member app reads: `overlayRouterConfig` drops any curated
+  // validator the router does not list, so a locally-deployed validator that is never added here
+  // would be deployed and invisible.
+  if (localValidatorShare) {
+    const stakingRouter = await ethers.getContractAt("StakingRouter", contracts.stakingRouter);
+    if (!(await stakingRouter.isValidator(localValidatorShare))) {
+      await (await stakingRouter.addValidator(localValidatorShare)).wait();
+      console.log(`  ✓ allowlisted the local MockValidatorShare: ${localValidatorShare}`);
     }
   }
 

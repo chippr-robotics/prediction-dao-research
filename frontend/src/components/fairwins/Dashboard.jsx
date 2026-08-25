@@ -84,10 +84,12 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     `${actionNeededCount} wager${actionNeededCount === 1 ? '' : 's'} ` +
     `need${actionNeededCount === 1 ? 's' : ''} action`
 
-  // The six actions split into two intents the user actually has: starting a
-  // wager (three settlement styles) vs. tracking/handing one off. Grouping +
+  // The actions split into two intents the user actually has: starting a wager
+  // (several settlement styles) vs. tracking/handing one off. Grouping +
   // labels/tags/icons make that split legible — all tiles share the site-green
-  // brand accent (no per-tile colors).
+  // brand accent (no per-tile colors). Deliberately not stating a count here:
+  // this said "six" while ten were declared, and one of those is filtered by
+  // chain capability, so the number on screen is a function of the network.
   const createActions = [
     {
       id: 'create-1v1-friends',

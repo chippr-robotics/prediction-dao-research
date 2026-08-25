@@ -112,5 +112,13 @@
   "gaslessIntentsUpgradedAt": "2026-07-05T17:35:37.300Z",
   "tier2PoolIntentsUpgradedAt": "2026-07-06T04:32:38.208Z",
   "feeRouterDeployedAt": "2026-07-27T01:12:47.440Z",
-  "miniAppRegistryDeployedAt": "2026-08-01T16:48:44.235Z"
+  "miniAppRegistryDeployedAt": "2026-08-01T16:48:44.235Z",
+  "legacyContractsWriteOff": {
+    "decidedOn": "2026-08-22",
+    "decision": "NOT MIGRATED \u2014 deliberately abandoned, not overlooked.",
+    "context": "During the 0x52502d04\u2026F6e1 key-compromise recovery, a chain-wide RoleGranted/OwnershipTransferred scan of Mordor found 23 contracts holding live authority that are absent from this deployment record: superseded WagerRegistry and MembershipManager iterations, the contracts-archive v1 RBAC estate (RoleManager, MembershipPaymentManager instances, FriendGroupMarketFactory), and several token clones. Together they carry roughly 60 sole-held roles and 62 Ownable owners still held by the compromised EOA.",
+    "rationale": "They are abandoned testnet iterations holding testnet play money. Migrating them would cost ~120 transactions to secure nothing. The 10 RECORDED Mordor contracts were migrated in full to the admin Safe 0xcf76db7aa9Fb1BFe08E010468F3344bB45830447.",
+    "consequence": "Anyone finding the compromised key with authority on an unrecorded Mordor contract should treat that as expected. Do NOT deploy anything new that depends on these, and do not read their state as trustworthy.",
+    "seeAlso": "docs/runbooks/key-compromise-recovery.md"
+  }
 }

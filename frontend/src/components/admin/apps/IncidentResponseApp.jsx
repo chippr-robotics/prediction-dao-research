@@ -19,7 +19,7 @@ import { ethers } from 'ethers'
 import AdminAppShell from '../AdminAppShell'
 import ServiceHealthCard from '../ServiceHealthCard'
 import AdminStatTile from '../charts/AdminStatTile'
-import { NetworkScopeCard } from '../scopeControls'
+import { NetworkScopeCard, WriteScopeNotice } from '../scopeControls'
 import { useScopedChain } from '../scopeGate'
 import { adminAppById } from '../adminApps'
 import { useAdminAccess } from '../useAdminAccess'
@@ -204,6 +204,19 @@ export default function IncidentResponseApp() {
             notDeployedLabel="no wager registry"
           />
 
+          {/*
+            FR-018: a wrong-network write is refused in WORDS, before signing. The buttons below
+            disable themselves off the scoped chain, and a dead control with no explanation is
+            indistinguishable from a bug — least of all here, where the operator is mid-incident
+            and the thing that will not press is the killswitch.
+          */}
+          <WriteScopeNotice
+            scopeChainId={incidentChainId}
+            walletChainId={chainId}
+            signer={signer}
+            canWrite
+          />
+
           <div className="admin-card">
             <h3>Emergency Pause on {networkName(incidentChainId)}</h3>
             <p>
@@ -259,6 +272,13 @@ export default function IncidentResponseApp() {
             onRefresh={pauseEstate.refresh}
             lastReadAt={pauseEstate.readAt}
             notDeployedLabel="no wager registry"
+          />
+
+          <WriteScopeNotice
+            scopeChainId={incidentChainId}
+            walletChainId={chainId}
+            signer={signer}
+            canWrite
           />
 
           <div className="admin-card">

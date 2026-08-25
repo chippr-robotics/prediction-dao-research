@@ -67,9 +67,23 @@ export class BridgeQuoteUnavailable extends Error {
   }
 }
 
-/** The configured gateway base URL, or '' when unset. Read at call time so tests can stub the env. */
+/**
+ * The configured gateway base URL for BRIDGE quotes, or '' when unset. Read at call time so tests
+ * can stub the env.
+ *
+ * `VITE_BRIDGE_GATEWAY_URL` names this surface's gateway on its own, falling back to the shared
+ * `VITE_RELAYER_URL` so a normal deployment still configures everything with one value. The
+ * separate name exists because the shared one is a single switch over surfaces that are not
+ * related: the same variable also decides whether the Bitcoin gateway (spec 061) counts as
+ * configured, so turning the bridge on turned Bitcoin on with it. That collision is a real one —
+ * a build that proxies Across has not thereby gained a Bitcoin gateway, and saying it has makes
+ * the Bitcoin surface claim a capability it does not have. Giving Bitcoin its own name is issue
+ * #1263; the rest of the shared consumers (Predict, Perps, Collect, Solana RPC, intent relay) have
+ * the same latent collision and are noted there.
+ */
 export function bridgeGatewayUrl() {
-  return (import.meta.env.VITE_RELAYER_URL || '').trim().replace(/\/$/, '')
+  const configured = import.meta.env.VITE_BRIDGE_GATEWAY_URL || import.meta.env.VITE_RELAYER_URL || ''
+  return configured.trim().replace(/\/$/, '')
 }
 
 /**

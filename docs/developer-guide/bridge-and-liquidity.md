@@ -297,13 +297,40 @@ where FairWins has shipped nothing. So `tradingLiquidityNetworks()` in
 Both lists are derived, never asserted, so they stay true as deployments land — and an empty list
 produces honest "not set up in this build yet" copy rather than a false roster.
 
+**2a. The cohort bounds every member-facing roster** (issue #1265). All four — `tradingLiquidityNetworks()`,
+`bridgeLiquidityNetworks()` in both `liquidityCopy.js` and `acrossLpPositions.js`, and `bridgeNetworks()`
+in `lib/bridge/bridgeCopy.js` — enumerate **`cohortChainIds()`, never `listSupportedChainIds()`**, and so
+does `useLiquidityCatalog` in `SupplyView.jsx`, which is the one that actually opens connections. Reads
+never cross the testnet/mainnet boundary (constitution III), and naming a network a build cannot supply to
+is a promise it cannot keep. Since the spec-067 routers are mainnet-only, a **testnet-cohort build lists no
+pools and no bridge networks** and says so in its own words.
+
+**The Bridge FORM is bounded by the same roster, and had to be.** Its asset and destination selectors
+draw on `useSelectableAssets({catalog: true})` → `getPortfolioChainIds()`, which is mainnets-always plus a
+member opt-in and knows nothing about the cohort (that model is deliberate and is **not** folded into the
+cohort rule — it still governs the portfolio elsewhere). Bounding only the copy would have left a testnet
+build able to quote, sign and record a mainnet bridge while stating underneath that no network here
+bridges at all. So `BridgeView` intersects the catalog with `bridgeNetworks()`, and names what that drops
+with the reason that is true of it (FR-006c): *"the bridge protocol is not deployed there"* for ETC and
+Mordor, *"this build does not bridge on those networks"* for the other cohort.
+
+**`BridgeStatusList` then has TWO rosters, and they are not the same list.** What it READS over the
+network is `bridgeNetworks()` — cohort-bounded, because a status poll is a read. What it LISTS is that
+plus every origin chain the member's own ledger has a bridge on (`listBridgeChainIds`, local storage, no
+network). FR-053 says the in-flight list renders underneath the form in every case and must never hide a
+transfer that is already moving, so a record predating the bound — or restored from a backup written by
+another build — still renders, with its last recorded status and a line saying this build did not check
+that network. The "no network is set up for bridging in this build" empty state is reached only when the
+ledger is *also* empty, which makes it a result rather than an assumption.
+
 The admin roster is the deliberate exception: `adminNetworks(capability)` lists every capable network
-whether or not a router is deployed there, because the undeployed ones are the ones an operator most
-needs to see.
+whether or not a router is deployed there — and, unlike the four above, is **not** cohort-bounded, because
+the undeployed ones are the ones an operator most needs to see (see the comment on the function).
 
 **3. The quoting gateway.** A bridge price is **not derivable client-side** — it needs Across's
 relayer-fee oracle — so quoting goes through the relay-gateway proxy
-(`services/relay-gateway/src/bridge/`, base URL `VITE_RELAYER_URL`, module env `BRIDGE_ENABLED`,
+(`services/relay-gateway/src/bridge/`, base URL `VITE_BRIDGE_GATEWAY_URL` — falling back to
+`VITE_RELAYER_URL`, which is the same gateway and stays the deployed default — module env `BRIDGE_ENABLED`,
 `BRIDGE_CHAIN_IDS`, `BRIDGE_KILLSWITCH`, quota and TTL vars). The module is optional infrastructure
 and off unless enabled; when off it answers **503 `bridge_disabled`** rather than 404, so the client
 can tell "an operator turned it off" from "this gateway is too old". Supply needs no gateway at all —
@@ -495,3 +522,35 @@ Tests:
 - Frontend — `frontend/src/lib/bridge/__tests__/`, `frontend/src/lib/liquidity/__tests__/`,
   `frontend/src/lib/assets/__tests__/networkPin.test.js`, and the admin suites under
   `frontend/src/test/admin/` (least-privilege, network scoping, pause-never-traps).
+- End to end — `frontend/cypress/e2e/full/30-bridge-liquidity.cy.js` (on-chain tier, spec 094
+  matrix rows `bridge.*` / `liquidity.*`). See below for what it settles and why it needs a chain.
+
+### The end-to-end flows, and why they are on-chain
+
+Invariants 1–3 above are all statements about **who ends up holding the money**, and none of them is
+a rendering fact. A component test can assert what the app *intends* to send; only a chain can answer
+who owns the position NFT and whose address Across wrote down — and both `recipient: address(this)`
+and `depositor: address(this)` are perfectly ordinary-looking lines to write. So the four flows drive
+the real surfaces and then read the answer off the chain:
+
+| Flow | Settles |
+|---|---|
+| `BL-01` supply | The position NFT's owner is the member, the router's balance of both legs is zero |
+| `BL-02` pause | A withdrawal completes **while the router is paused**, and the tokens arrive |
+| `BL-03` bridge | `MockAcrossSpokePool.lastDepositor()` is the member, and exactly one deposit landed |
+| `BL-04` ceiling | The rate is raised **after** the member read it: the transfer is refused, not repriced, and nothing reaches Across. Then at rate 0 there is no fee line at all (FR-029) |
+
+Two seams make this possible and neither ships:
+
+- `VITE_E2E_AMOY_LOCAL=1` (DEV-only, `config/networks.js` + `config/contracts.js`) resolves both
+  routers, the SpokePool and the Supply surface on the chain-80002-shaped local node. Real Amoy has
+  neither protocol; a production bundle drops the branch entirely.
+- The **quote endpoint is stubbed** and only that. A bridge price is not derivable client-side, so
+  there is nothing on a local node to quote against — but the stub answers arithmetic the protocol
+  itself enforces (`net - totalRelayFee == outputAmount`), because a quote that does not reconcile
+  makes the app drop its itemization and hide the very lines `BL-04` reads.
+
+`contracts/mocks/MockAcrossSpokePool.sol` and `contracts/mocks/MockPositionManager.sol` model the
+parts these flows read back: the recorded `depositor`, the `V3FundsDeposited` log the SPA parses a
+submission out of, and the member-called exit legs (`decreaseLiquidity` / `collect`) that make "a
+pause cannot trap a position" a testable claim rather than a design intention.

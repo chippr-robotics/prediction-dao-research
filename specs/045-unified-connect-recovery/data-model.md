@@ -32,7 +32,14 @@ Existing entity, hardened. One entry per passkey known to this browser.
 
 ## PasskeySession (localStorage `fairwins.passkey.session.v1`)
 
-Existing entity. `{ address, chainId, credentialId, loginMethod: 'passkey' }`.
+Existing entity. `{ address, chainId, chainChosen?, credentialId, loginMethod: 'passkey' }`.
+
+**`chainChosen` (issue #1286)**: written by `switchChain` and nowhere else, so it marks a
+chain the MEMBER named. Without it, `chainId` is a default the connector derived from the
+build (`getCurrentChainId()`) and is re-derived on every load — the session has no expiry, so
+a derived chain would otherwise outlive the build that produced it (every pre-fix session
+carries `chainId: 137` from wagmi's Polygon-first chain list). A chosen chain is honoured
+verbatim, including across the testnet/mainnet pair the toggle deliberately crosses.
 
 **New invariant**: a session is only restored (connector `isReconnecting`)
 when a transact-complete CredentialRecord exists for `session.credentialId`;

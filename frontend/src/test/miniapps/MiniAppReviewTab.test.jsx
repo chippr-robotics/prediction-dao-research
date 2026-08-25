@@ -91,7 +91,9 @@ vi.mock('../../data/ledger/sources/miniAppSource', () => ({
   captureMiniAppLog: vi.fn(() => 'entry-id'),
 }))
 
-import { AppCategory, AppStatus } from '../../abis/miniAppRegistry'
+import { ethers } from 'ethers'
+
+import { AppCategory, AppStatus, MINI_APP_REGISTRY_ABI } from '../../abis/miniAppRegistry'
 import { captureMiniAppLog } from '../../data/ledger/sources/miniAppSource'
 import { VERIFICATION_FAILURE } from '../../lib/miniapps/loader'
 import { CURATOR_AUTHORITY, UNVERIFIED_REASON } from '../../lib/miniapps/registryAuthority'
@@ -107,6 +109,15 @@ const ZERO_HASH = `0x${'0'.repeat(64)}`
 const APPROVED_HASH = `0x${'aa'.repeat(32)}`
 const PROPOSED_HASH = `0x${'bb'.repeat(32)}`
 const SWAPPED_HASH = `0x${'cc'.repeat(32)}`
+
+/**
+ * The bytes an injected EIP-1193 wallet forwards for `StaleProposal(expected, actual)` — the
+ * registry's own encoding, not a hand-written fixture, so the test cannot drift from the ABI.
+ */
+const STALE_REVERT_DATA = new ethers.Interface(MINI_APP_REGISTRY_ABI).encodeErrorResult('StaleProposal', [
+  PROPOSED_HASH,
+  SWAPPED_HASH,
+])
 
 function tuple({ cid = '', manifestHash = ZERO_HASH, version = 0 } = {}) {
   return Object.freeze({ cid, manifestHash, version, present: cid !== '' && manifestHash !== ZERO_HASH })
@@ -632,8 +643,58 @@ describe('StaleProposal means the vendor changed the package (FR-004a)', () => {
     expect(within(card).getByText(/Verify the package before approving it/i)).toBeInTheDocument()
   })
 
+  it('reads the substitution off a raw `error.data` the wallet never decoded (#1267)', async () => {
+    // The shape the WRITE path actually produces. ethers only lifts a revert onto `.revert` when
+    // it held the ABI where the call failed — true of a `staticCall`, not of a transaction sent
+    // through an injected wallet, which forwards the node's `{code, message, data}` verbatim. The
+    // curator consequently got "execution reverted (unknown custom error)" for an error this very
+    // ABI names, which is the one message that tells them to re-review rather than retry.
+    state.throwOn.approveApp = Object.assign(new Error('execution reverted (unknown custom error)'), {
+      code: 'CALL_EXCEPTION',
+      shortMessage: 'execution reverted (unknown custom error)',
+      data: STALE_REVERT_DATA,
+    })
+
+    const user = userEvent.setup()
+    renderTab()
+    let card = await recordCard('Token Mint')
+    await user.click(within(card).getByRole('button', { name: /Verify proposed package/ }))
+    await waitFor(() => expect(within(card).getByText(/Package verified\./)).toBeInTheDocument())
+    await user.click(within(card).getByRole('button', { name: /^Approve v2/ }))
+
+    await waitFor(() => expect(screen.getByText(/The vendor replaced this package\./)).toBeInTheDocument())
+    card = await recordCard('Token Mint')
+    const notice = within(card).getByText(/The vendor replaced this package\./).closest('[role="alert"]')
+    expect(notice.textContent).toContain('The decision was refused on-chain and nothing changed')
+    // Both hashes came out of the raw bytes, so the notice names WHICH package is there now and
+    // which one the curator reviewed — the part a generic "execution reverted" cannot carry.
+    expect(within(notice).getByTitle(SWAPPED_HASH)).toBeInTheDocument()
+    expect(within(notice).getByTitle(PROPOSED_HASH)).toBeInTheDocument()
+    // …and the verification of the old bytes is gone, exactly as on the pre-decoded path.
+    expect(within(card).queryByText(/Package verified\./)).toBeNull()
+  })
+
   it('does not mistake an ordinary revert for a package substitution', async () => {
     state.throwOn.approveApp = new Error('insufficient funds for intrinsic transaction cost')
+    const user = userEvent.setup()
+    renderTab()
+    const card = await recordCard('Token Mint')
+    await user.click(within(card).getByRole('button', { name: /Verify proposed package/ }))
+    await waitFor(() => expect(within(card).getByText(/Package verified\./)).toBeInTheDocument())
+    await user.click(within(card).getByRole('button', { name: /^Approve v2/ }))
+
+    await waitFor(() => expect(state.calls).toHaveLength(1))
+    expect(screen.queryByText(/The vendor replaced this package\./)).toBeNull()
+  })
+
+  it('does not mistake raw revert bytes from another ABI for a package substitution', async () => {
+    // Decoding raw data widens what the tab will read; it must not widen what the tab will
+    // CLAIM. A selector this ABI does not carry is not a stale proposal, and saying it is would
+    // send a curator to re-review a package the vendor never touched.
+    state.throwOn.approveApp = Object.assign(new Error('execution reverted (unknown custom error)'), {
+      code: 'CALL_EXCEPTION',
+      data: '0xdeadbeef',
+    })
     const user = userEvent.setup()
     renderTab()
     const card = await recordCard('Token Mint')

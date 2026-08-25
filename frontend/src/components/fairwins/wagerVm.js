@@ -134,11 +134,17 @@ export function buildWagerVm(market, ctx) {
     actions.push({ key: 'resolve', label: 'Resolve', variant: 'primary', onClick: () => onResolve(market), title: 'Resolve wager' })
   }
   if (showClearBtn) {
+    // For the creator this button claims the refund before it dismisses, so it
+    // reports through the same per-row refund state as the "Refund" button —
+    // a reclaim that failed has to say so, or it is indistinguishable from one
+    // that worked and the row is gone either way (#1297).
     actions.push({
       key: 'clear',
-      label: isCreator ? 'Reclaim & Clear' : 'Clear',
+      label: !isCreator ? 'Clear' : refundingId === idStr ? 'Reclaiming…' : 'Reclaim & Clear',
       variant: 'ghost',
       onClick: () => onClearExpired(market),
+      disabled: isCreator && refundingId === idStr,
+      error: isCreator && refundError?.id === idStr ? refundError.message : null,
       title: isCreator ? 'Reclaim stake and clear' : 'Clear from list',
     })
   }

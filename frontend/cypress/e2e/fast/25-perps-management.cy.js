@@ -9,11 +9,19 @@
 // through `import.meta.env`, i.e. they are BUILD properties — a single dev server
 // resolves exactly one of these worlds, so they can never all run in one pass.
 //
-//   1. DEFAULT — no gateway, flag off. Runs in CI, and is the state most people
-//      see. The contract is honest ABSENCE: no management control exists, no
-//      sheet can be opened, and a saved deep link lands on Swap rather than on a
-//      dead control.
+//   1. DEFAULT — flag off. Runs in CI, and is the state most people see. The
+//      contract is honest ABSENCE OF MANAGEMENT: no management control exists,
+//      no sheet can be opened, and a saved deep link lands somewhere useful
+//      rather than on a dead control.
 //        npm run test:e2e:fast
+//
+//      NOTE: world 1 used to also mean "no gateway", because the tier's dev
+//      server left `VITE_RELAYER_URL` unset. It no longer does — `dev:fast`
+//      points it at a port nothing serves, so Predict, Collect and the perps
+//      READ view are reachable at all (they all gate on that one variable).
+//      The Perps TAB therefore exists here, which is correct and is 24-perps'
+//      question, not this file's. What this file is about is spec 083's kill
+//      switch, and that is still off.
 //
 //   2. GATEWAY STUBBED, FLAG OFF — the regression that would otherwise go
 //      unnoticed: with the kill switch off the Perps view must render exactly as
@@ -433,26 +441,40 @@ describe('Perps position management (spec 083)', () => {
       cy.visit('/wallet?tab=trade')
       cy.get('.trade-panel', { timeout: 15000 }).should('exist')
 
-      // Not "disabled" — absent. A control that cannot work is worse than no control.
-      cy.contains('button', /^Perps$/).should('not.exist')
-      cy.get('.perps-view').should('not.exist')
+      /*
+       * Not "disabled" — absent. A control that cannot work is worse than no control.
+       *
+       * The MANAGEMENT controls are what the kill switch governs, and every one of them must be
+       * missing. The Perps tab itself is a different question (does a gateway exist at all), it
+       * is answered by 24-perps, and asserting it here would make this file fail whenever the
+       * tier's dev server changes its gateway configuration — which is exactly what happened.
+       */
       cy.get('.perps-position-manage').should('not.exist')
       cy.get('.perps-open-btn').should('not.exist')
       cy.get('.perps-orders-recover').should('not.exist')
+      cy.get('.perps-position-sheet').should('not.exist')
+      cy.get('.perps-open-sheet').should('not.exist')
       assertNoExecutionClaim()
     })
 
-    it('[PERPS-M-02] a perps deep link lands on Swap and opens no sheet', () => {
-      // A saved link from a build that HAD the surface must land somewhere useful (FR-013), and it
-      // must not leave a half-built management sheet behind it.
+    it('[PERPS-M-02] a perps deep link opens no management sheet', () => {
+      /*
+       * A saved link from a build that HAD the management surface must land somewhere useful
+       * (FR-013) and must not leave a half-built management sheet behind it.
+       *
+       * Where it lands now depends on whether a gateway is configured, and that is 24-perps'
+       * subject — PERPS-01 there covers the unreachable-gateway landing. What this asserts is the
+       * part the kill switch owns: whatever the link resolves to, nothing on it is a management
+       * control waiting to be pressed.
+       */
       cy.visit('/wallet?tab=trade&view=perps&venue=gains')
-      cy.get('.trade-panel', { timeout: 15000 }).should('exist')
+      cy.get('.trade-panel, .perps-view', { timeout: 15000 }).should('exist')
 
       cy.get('.perps-position-sheet').should('not.exist')
       cy.get('.perps-open-sheet').should('not.exist')
       cy.get('.asset-sheet-backdrop').should('not.exist')
-      // Nothing on the page is waiting for a member to press it.
-      cy.get('[class*="perps-"]').should('not.exist')
+      cy.get('.perps-open-btn').should('not.exist')
+      cy.get('.perps-position-manage').should('not.exist')
       assertNoExecutionClaim()
     })
   })

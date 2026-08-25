@@ -9,7 +9,7 @@
  * member could be told to fund and could never spend from.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { p256 } from '@noble/curves/p256.js'
+import { p256 } from '@noble/curves/nist.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 
 import {
@@ -35,8 +35,11 @@ function makeAssertion(priv, challenge, { credentialId = 'cred-x' } = {}) {
   const authenticatorData = concat(sha256(enc('fairwins.app')), new Uint8Array([0x05]), new Uint8Array([0, 0, 0, 7]))
   const clientDataJSON = enc(JSON.stringify({ type: 'webauthn.get', challenge, origin: 'https://fairwins.app' }))
   const hash = sha256(concat(authenticatorData, sha256(clientDataJSON)))
-  const sig = p256.sign(hash, priv, { lowS: false })
-  const der = sig.toDERRawBytes ? sig.toDERRawBytes() : sig.toBytes('der')
+  // prehash:false — an authenticator signs the DIGEST, and @noble/curves v2 prehashes by default.
+  const sig = p256.sign(hash, priv, { lowS: false, prehash: false })
+  // @noble/curves v2 returns compact BYTES here; v1 returned a Signature instance.
+  const sigObj = sig instanceof Uint8Array ? p256.Signature.fromBytes(sig) : sig
+  const der = sigObj.toDERRawBytes ? sigObj.toDERRawBytes() : sigObj.toBytes('der')
   return { credentialId, authenticatorData, clientDataJSON, signature: new Uint8Array(der) }
 }
 

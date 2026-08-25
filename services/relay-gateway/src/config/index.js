@@ -12,6 +12,10 @@
  *                              contracts only (no wagerRegistry), so enabling it fails the
  *                              startup check by design until the full target set is pinned)
  *   RPC_URLS_<chainId>         comma list, failover order (default: built-in public pair, FR-007)
+ *   RPC_URL_PRIMARY_<chainId>  ONE endpoint, PREPENDED to RPC_URLS_<chainId>. It exists so a
+ *                              credential-bearing URL can be delivered from Secret Manager while
+ *                              the public failover list stays readable in the compose file. Unset
+ *                              => RPC_URLS_<chainId> is used exactly as written
  *   ORIGIN_AUTH_SECRET         origin-lock shared secret (X-Origin-Auth). Unset => lock DISABLED
  *                              (dev only; production must set it — research.md §4 / SC-016)
  *   WEBHOOK_SHARED_SECRET      engine webhook shared secret. Unset => webhook rejects everything (fail closed)
@@ -21,6 +25,8 @@
  *   KILL_SWITCH                'true' => boot with the kill switch active (FR-015)
  *   SIGNER_QUOTA_PER_MIN       per-signer intents/min (default 12)
  *   GLOBAL_QUOTA_PER_MIN       global intents/min (default 120)
+ *   RATE_LIMIT_HEALTH_PER_MIN  outer per-IP limiter on /healthz + /status (default 600; 0 = off)
+ *   RATE_LIMIT_INTENTS_PER_MIN outer per-IP limiter on POST /v1/intents (default 300; 0 = off)
  *   MAX_QUEUE_DEPTH            bounded in-flight queue (default 100) — back-pressure past this (FR-009)
  *   GAS_SPEND_CAP_WEI_<id>     per-chain per-window gas spend cap (default 0.5 native / hour, FR-014)
  *   SPEND_WINDOW_MS            spend-cap window (default 3600000)
@@ -110,6 +116,79 @@
  *   PERPS_HL_BUILDER_ADDRESS   PUBLIC attribution: FairWins Hyperliquid builder wallet
  *   PERPS_HL_BUILDER_FEE_BPS   HL builder fee FALLBACK bps (live source: FeeRouter
  *                              perps.hyperliquid.builder). Boot fails above the 10 bps HL perps cap.
+ *   MEMBER_API_ENABLED         'true' enables the /v1/member/* member API (spec 095; default false).
+ *                              Disabled => every route answers 503 member_api_unconfigured, including
+ *                              the OpenAPI document, so a client can tell "turned off" from "too old"
+ *   MEMBER_API_KILLSWITCH      'true' => all /v1/member/* routes answer 503 member_api_killed (ops kill)
+ *   MEMBER_API_MAX_TTL_DAYS    longest lifetime a member-signed key may claim (default 90). A grant
+ *                              asking for more is refused with 401 token_ttl_exceeded. This is the
+ *                              REAL bound on a leaked key: revocations are in-process (Phase 1) and do
+ *                              not survive a restart, and every revocation answer says `durable:false`
+ *   MEMBER_API_REFERENCE_CHAIN_ID  chain membership + ERC-1271 signature checks are read on. Defaults
+ *                              to the first enabled chain with a membershipManager recorded. Membership
+ *                              has ONE home per cohort — reading the caller's chain would let a testnet
+ *                              answer stand in for a mainnet fact
+ *   MEMBER_API_MEMBERSHIP_CACHE_MS  per-account membership cache (default 60000). Successes only —
+ *                              caching a failure would turn one bad moment into a minute of them
+ *   MEMBER_API_CLOCK_SKEW_SEC  tolerance for a client clock ahead of ours (default 300)
+ *   MEMBER_API_REVOCATION_MAX  revocation records held in memory (default 50000)
+ *   MEMBER_API_SUBGRAPH_<chainId>  wager indexer (The Graph) endpoint per chain. UNSET => that chain
+ *                              answers `not-configured` — which is NOT an empty wager list; the
+ *                              question was never asked
+ *   MEMBER_API_TIMEOUT_MS      upstream (subgraph) request timeout (default 5000)
+ *   MEMBER_API_QUOTA_PER_ACCOUNT / _GLOBAL / _WINDOW_MS   read quotas keyed by the RECOVERED account
+ *                              (defaults 120/600/60000) — not by IP, which is the proxy in production
+ *   MEMBER_API_PUBLIC_QUOTA    requests/window for the UNAUTHENTICATED routes, in a window of their
+ *                              own (default 240). Separate from the authenticated global on purpose:
+ *                              `trust proxy` is unset, so anonymous callers all key to the nginx IP,
+ *                              and sharing one global let a flood of them lock every member out
+ *   MEMBER_API_REVOKE_QUOTA    requests/window for POST /v1/member/keys/revoke ALONE (default 60).
+ *                              An emergency control with a budget nothing else can spend — a member
+ *                              withdraws a leaked key exactly when this module may be under load
+ *   ASSISTANT_ENABLED          'true' enables POST /v1/member/assistant/chat (default false)
+ *   ANTHROPIC_API_KEY          SECRET. Model-provider credential for the assistant. Unset => that one
+ *                              route answers 503 assistant_unconfigured; nothing else is affected
+ *   ASSISTANT_BASE_URL         model provider base (default https://api.anthropic.com)
+ *   ASSISTANT_MODEL            model id (default claude-sonnet-5)
+ *   ASSISTANT_MAX_TOKENS       per-turn output ceiling (default 1024). HARD-CAPPED at 4096 in code —
+ *                              boot fails above it. This is the only bound on what one request can
+ *                              cost, so it is not something an env file may raise without limit
+ *   ASSISTANT_TIMEOUT_MS       upstream request timeout (default 30000)
+ *   ASSISTANT_QUOTA_PER_ACCOUNT / _GLOBAL   model calls/window, in a class of their own, tighter than
+ *                              the module's general read quota (defaults 20/60). A read and a model
+ *                              call are not the same permission, so they are not the same budget
+ *   ASSISTANT_TOKEN_BUDGET_PER_ACCOUNT / _GLOBAL / _WINDOW_MS   the ceiling on MONEY rather than
+ *                              traffic (defaults 200000 / 2000000 tokens per 3600000 ms). Request
+ *                              counts are a poor proxy for spend; these count the thing that is
+ *                              billed. A turn RESERVES its worst case up front and settles down to
+ *                              the measured usage, so requests already in flight cannot overshoot.
+ *                              Exhausted => 429 assistant_budget_exhausted, never a truncated reply
+ *                              and never a 500. Boot refuses a per-account budget below one turn
+ *   X402_ENABLED               'true' enables the x402 pay-per-request rail on the member API's PRICED
+ *                              operations (spec 096; default false). Disabled => byte-identical
+ *                              behaviour to a pre-096 gateway: an unauthenticated priced request
+ *                              answers 401 exactly as before, and nothing ever answers 402
+ *   X402_KILLSWITCH            'true' => the paid rail stops being OFFERED (ops kill). Member bearer
+ *                              requests are unaffected — they were never charged in the first place
+ *   X402_CHAIN_ID              chain payments are signed on and settled on. MUST be an enabled chain
+ *                              that supports EIP-3009 (a recorded paymentToken + a token EIP-712
+ *                              domain) — boot fails otherwise, because a rail that can never settle
+ *                              must not advertise a price. Defaults to the first enabled such chain
+ *   X402_PAY_TO                the platform treasury every payment is made to. REQUIRED when enabled,
+ *                              with NO DEFAULT ON PURPOSE: a defaulted treasury address would send
+ *                              agents' money somewhere nobody chose
+ *   X402_SETTLE_BUFFER_SECONDS how much validity an authorization must have LEFT to be accepted
+ *                              (default 60). One that expires mid-settlement would be accepted here
+ *                              and refused by the token — refusing it now costs the payer nothing
+ *   X402_MAX_TIMEOUT_SECONDS   `maxTimeoutSeconds` published in the 402 offer (default 300)
+ *   X402_PRICE_READ            price of a priced READ op, in USDC base units (default 10000 = $0.01)
+ *   X402_PRICE_BUILD           price of a typed-data BUILD (default 50000 = $0.05)
+ *   X402_PRICE_ASSISTANT       price of one assistant message (default 100000 = $0.10)
+ *                              EACH PRICE AT 0 MEANS "NOT OFFERED", never "free": that op class is
+ *                              simply absent from the paid rail and answers 401 as it does today
+ *   X402_NONCE_MAX             bound on the in-process replay set (default 50000). Phase 1: the
+ *                              TOKEN's own authorization state is the real uniqueness guarantee — a
+ *                              replay reverts on chain — so this only saves the gas of finding out
  *   FEE_ROUTER_ADDRESS         FeeRouter proxy (spec 060) serving the LIVE polymarket.taker/.maker bps.
  *                              Defaults to the deployment record's feeRouter for FEE_ROUTER_CHAIN_ID;
  *                              a set value that CONTRADICTS the record fails boot loudly. Unset and not
@@ -124,6 +203,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CHAIN_DEFS } from './chains.js'
 import { actionsForContract } from '../intent/intentTypes.js'
+import { MAX_TOKENS_CEILING, maxTurnTokens } from '../memberApi/assistant.js'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/
@@ -256,10 +336,22 @@ export function loadConfig(env = process.env, opts = {}) {
       targetsByKey.wagerPoolFactory = c.wagerPoolFactory
     }
 
-    const rpcUrls = opt(env, `RPC_URLS_${chainId}`, def.defaultRpcUrls.join(','))
+    const listedRpcUrls = opt(env, `RPC_URLS_${chainId}`, def.defaultRpcUrls.join(','))
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean)
+
+    // A credential-bearing primary, delivered by fetch-secrets.sh rather than written into the
+    // compose file. Prepending it (instead of replacing the list) is what keeps FR-007 true: the
+    // public endpoints stay behind it as failover, so a keyed endpoint rate-limiting or expiring
+    // degrades to a slower route rather than taking the chain down.
+    //
+    // De-duplicated, because the same URL appearing twice is not two independent endpoints — it is
+    // one endpoint that would be retried against itself and would make the `< 2` warning below lie.
+    const primaryRpcUrl = opt(env, `RPC_URL_PRIMARY_${chainId}`, null)
+    const rpcUrls = primaryRpcUrl
+      ? [primaryRpcUrl, ...listedRpcUrls.filter((u) => u !== primaryRpcUrl)]
+      : listedRpcUrls
     if (rpcUrls.length === 0) throw new Error(`[relay-gateway] RPC_URLS_${chainId} must list at least one endpoint`)
     if (rpcUrls.length < 2) {
       // FR-007 wants >=2 independent endpoints; tolerate 1 for local dev but say so loudly.
@@ -335,6 +427,18 @@ export function loadConfig(env = process.env, opts = {}) {
       signerPerWindow: int(env, 'SIGNER_QUOTA_PER_MIN', 12),
       globalPerWindow: int(env, 'GLOBAL_QUOTA_PER_MIN', 120),
       windowMs: int(env, 'QUOTA_WINDOW_MS', 60_000),
+    },
+    // Coarse per-IP route limiters (express-rate-limit) in FRONT of the fine-grained quotas above.
+    // The quotas remain the real per-member control (they key on the RECOVERED SIGNER, which an
+    // attacker cannot vary for free); these middlewares are an outer DoS bound on the routes that
+    // do work before any quota can key — the health snapshot's edge-auth comparison and the intent
+    // pipeline's signature recovery. NOTE the production caveat from the module docs: `trust proxy`
+    // is deliberately unset and nginx fronts the VM container, so `req.ip` is the proxy there and
+    // each limiter is effectively an AGGREGATE ceiling — defaults are sized for that, and set to 0
+    // to disable a limiter entirely.
+    rateLimit: {
+      healthPerMin: int(env, 'RATE_LIMIT_HEALTH_PER_MIN', 600),
+      intentsPerMin: int(env, 'RATE_LIMIT_INTENTS_PER_MIN', 300),
     },
     // Sponsored-paymaster (spec 050): sponsorship signer + per-op ceilings + burst quotas. The
     // killswitch and sanctions screen are shared with the intent path; these are the paymaster-only
@@ -630,6 +734,285 @@ export function loadConfig(env = process.env, opts = {}) {
         quotaGlobal: int(env, 'PERPS_QUOTA_GLOBAL', 300),
         quotaWindowMs: int(env, 'PERPS_QUOTA_WINDOW_MS', 60_000),
         killSwitch: opt(env, 'PERPS_KILLSWITCH', 'false').toLowerCase() === 'true',
+      }
+    })(),
+    // Member API (spec 095): member-signed capability tokens granting custody-free, scoped access to
+    // a member's OWN data plus unsigned typed-data quotes. Optional like the bitcoin/bridge/perps
+    // proxies — disabled means every /v1/member/* route (including the OpenAPI document) answers
+    // 503 member_api_unconfigured, and boot is unaffected. Fail-loud validation applies only when
+    // the module is ENABLED, same philosophy as the blocks above.
+    //
+    // THE GATEWAY STORES NOTHING TO ISSUE A KEY. A key is an EIP-712 grant the MEMBER signs; this
+    // process verifies the signature on every request and keeps no copy. That is why there is no
+    // key-store config here — and why MEMBER_API_MAX_TTL_DAYS matters: the grant's own expiry is
+    // the real bound on a leaked token, since revocations are in-process (Phase 1) and every
+    // revocation response says `durable: false` rather than implying otherwise.
+    memberApi: (() => {
+      const enabled = opt(env, 'MEMBER_API_ENABLED', 'false').toLowerCase() === 'true'
+      const maxTtlDays = int(env, 'MEMBER_API_MAX_TTL_DAYS', 90)
+
+      // Membership has ONE home per environment cohort, so signature fallback (ERC-1271) and the
+      // tier read both happen on ONE named chain. Default: the first enabled chain that records a
+      // membershipManager — FR-025 requires every enabled chain to have one, so this is simply the
+      // first enabled chain unless an operator names another.
+      const defaultReference = enabledChainIds.find((id) => Boolean(chains[id]?.targetsByKey?.membershipManager))
+      const referenceChainId = int(env, 'MEMBER_API_REFERENCE_CHAIN_ID', defaultReference ?? enabledChainIds[0])
+
+      // Per-chain wager indexers. An UNSET chain resolves `not-configured`, which is a different
+      // fact from an empty wager list — the question was never asked (never `[]`).
+      const subgraphUrls = {}
+      for (const chainId of enabledChainIds) {
+        const url = opt(env, `MEMBER_API_SUBGRAPH_${chainId}`, null)
+        if (url) subgraphUrls[chainId] = url
+      }
+
+      const assistantEnabled = opt(env, 'ASSISTANT_ENABLED', 'false').toLowerCase() === 'true'
+      const assistantBaseUrl = opt(env, 'ASSISTANT_BASE_URL', 'https://api.anthropic.com')
+      const assistantMaxTokens = int(env, 'ASSISTANT_MAX_TOKENS', 1024)
+      // Model spend. The per-turn output ceiling is capped by MAX_TOKENS_CEILING (imported rather
+      // than restated — a duplicated ceiling is two ceilings that agree today), and the rest of this
+      // block bounds what SPEND may accumulate. The request quotas above bound TRAFFIC; only these
+      // bound MONEY, because two turns inside one window can differ by orders of magnitude in cost.
+      const assistantQuotaPerAccount = int(env, 'ASSISTANT_QUOTA_PER_ACCOUNT', 20)
+      const assistantQuotaGlobal = int(env, 'ASSISTANT_QUOTA_GLOBAL', 60)
+      const assistantTokenBudgetPerAccount = int(env, 'ASSISTANT_TOKEN_BUDGET_PER_ACCOUNT', 200_000)
+      const assistantTokenBudgetGlobal = int(env, 'ASSISTANT_TOKEN_BUDGET_GLOBAL', 2_000_000)
+      const assistantTokenBudgetWindowMs = int(env, 'ASSISTANT_TOKEN_BUDGET_WINDOW_MS', 3_600_000)
+
+      // Unauthenticated member-API traffic gets its OWN windows, never the members' shared one:
+      // `trust proxy` is unset by design, so every anonymous caller keys to the same nginx IP, and
+      // pooling that bucket with the authenticated global let one flood lock every member out of
+      // the whole module. Revocation then gets a window of its own again — see below.
+      const publicQuota = int(env, 'MEMBER_API_PUBLIC_QUOTA', 240)
+      const revokeQuota = int(env, 'MEMBER_API_REVOKE_QUOTA', 60)
+
+      if (enabled) {
+        if (maxTtlDays < 1) {
+          throw new Error(`[relay-gateway] MEMBER_API_MAX_TTL_DAYS=${maxTtlDays} must be >= 1 day`)
+        }
+        // A zero here is not "unlimited" and not "off" — createQuotas would refuse EVERY request,
+        // and for the revocation window that means a member cannot withdraw a leaked key. Refuse
+        // the value rather than booting into that.
+        if (publicQuota < 1) {
+          throw new Error(
+            `[relay-gateway] MEMBER_API_PUBLIC_QUOTA=${publicQuota} must be >= 1; 0 would refuse every ` +
+              'unauthenticated request, including the OpenAPI document a client needs before it can mint a key'
+          )
+        }
+        if (revokeQuota < 1) {
+          throw new Error(
+            `[relay-gateway] MEMBER_API_REVOKE_QUOTA=${revokeQuota} must be >= 1; 0 would refuse every key ` +
+              'revocation, which is the one member action that must work during a token compromise'
+          )
+        }
+        // A reference chain that is not enabled, or has no membershipManager, means EVERY request
+        // would 503 membership_unreadable — a module that cannot authenticate anyone must not boot
+        // pretending it can.
+        if (!chains[referenceChainId]?.targetsByKey?.membershipManager) {
+          throw new Error(
+            `[relay-gateway] MEMBER_API_REFERENCE_CHAIN_ID=${referenceChainId} is not an enabled chain with a recorded ` +
+              `membershipManager (enabled: ${enabledChainIds.join(', ')}). Refusing to start: no member could be authenticated.`
+          )
+        }
+        for (const [chainId, url] of Object.entries(subgraphUrls)) {
+          let ok = false
+          try {
+            ok = ['http:', 'https:'].includes(new URL(url).protocol)
+          } catch {
+            ok = false
+          }
+          if (!ok) throw new Error(`[relay-gateway] MEMBER_API_SUBGRAPH_${chainId}=${url} is not a valid http(s) URL`)
+        }
+        if (assistantEnabled) {
+          let ok = false
+          try {
+            ok = ['http:', 'https:'].includes(new URL(assistantBaseUrl).protocol)
+          } catch {
+            ok = false
+          }
+          if (!ok) throw new Error(`[relay-gateway] ASSISTANT_BASE_URL=${assistantBaseUrl} is not a valid http(s) URL`)
+          if (assistantMaxTokens < 1 || assistantMaxTokens > MAX_TOKENS_CEILING) {
+            throw new Error(
+              `[relay-gateway] ASSISTANT_MAX_TOKENS=${assistantMaxTokens} must be between 1 and ` +
+                `${MAX_TOKENS_CEILING}. This is the per-turn output ceiling — the only bound on what a ` +
+                'SINGLE request can cost — so it is capped in code rather than left to the env file.'
+            )
+          }
+          if (assistantQuotaPerAccount < 1 || assistantQuotaGlobal < 1) {
+            throw new Error(
+              `[relay-gateway] ASSISTANT_QUOTA_PER_ACCOUNT=${assistantQuotaPerAccount} and ` +
+                `ASSISTANT_QUOTA_GLOBAL=${assistantQuotaGlobal} must each be >= 1; use ASSISTANT_ENABLED=false ` +
+                'to switch the assistant off, which is an honest 503 rather than a 429 nobody can clear'
+            )
+          }
+          if (assistantTokenBudgetWindowMs < 1000) {
+            throw new Error(`[relay-gateway] ASSISTANT_TOKEN_BUDGET_WINDOW_MS=${assistantTokenBudgetWindowMs} must be >= 1000`)
+          }
+          // A budget below ONE MAXIMAL TURN is a size limit wearing a budget's name: a well-formed
+          // request would be refused for being long rather than for the budget being spent, which
+          // is a confusing thing to tell a member and an impossible one to act on. `maxTurnTokens`
+          // derives the bound from the request caps parseChatRequest already enforces, so the two
+          // cannot drift apart.
+          const oneTurn = maxTurnTokens(assistantMaxTokens)
+          if (assistantTokenBudgetPerAccount < oneTurn) {
+            throw new Error(
+              `[relay-gateway] ASSISTANT_TOKEN_BUDGET_PER_ACCOUNT=${assistantTokenBudgetPerAccount} is below ` +
+                `${oneTurn}, the most one admissible turn can reserve at ASSISTANT_MAX_TOKENS=${assistantMaxTokens}. ` +
+                'A member could then be refused for asking a long question rather than for spending their budget. ' +
+                'Raise the budget or lower the per-turn ceiling.'
+            )
+          }
+          if (assistantTokenBudgetGlobal < assistantTokenBudgetPerAccount) {
+            throw new Error(
+              `[relay-gateway] ASSISTANT_TOKEN_BUDGET_GLOBAL=${assistantTokenBudgetGlobal} is below ` +
+                `ASSISTANT_TOKEN_BUDGET_PER_ACCOUNT=${assistantTokenBudgetPerAccount}; the gateway-wide ceiling ` +
+                'would bite before any member reached their own, which is not what either number claims to mean'
+            )
+          }
+          // A missing ANTHROPIC_API_KEY is deliberately NOT a boot failure: it is an optional
+          // feature credential, so that one route fails closed with 503 assistant_unconfigured
+          // exactly like the OpenSea/Polymarket keys — losing the assistant must never take down
+          // the gateway (fetch-secrets.sh invariant 5).
+        }
+      }
+
+      return {
+        enabled,
+        killSwitch: opt(env, 'MEMBER_API_KILLSWITCH', 'false').toLowerCase() === 'true',
+        maxTtlDays,
+        referenceChainId,
+        subgraphUrls,
+        membershipCacheTtlMs: int(env, 'MEMBER_API_MEMBERSHIP_CACHE_MS', 60_000),
+        clockSkewSec: int(env, 'MEMBER_API_CLOCK_SKEW_SEC', 300),
+        revocationMaxEntries: int(env, 'MEMBER_API_REVOCATION_MAX', 50_000),
+        timeoutMs: int(env, 'MEMBER_API_TIMEOUT_MS', 5000),
+        // Keyed by the RECOVERED account, not by caller IP: `trust proxy` is unset and nginx fronts
+        // the container, so an IP key would pool every member into one bucket. Reads are cheap and
+        // an agent polls, so the per-account allowance is more generous than the intent quota.
+        quotaPerAccount: int(env, 'MEMBER_API_QUOTA_PER_ACCOUNT', 120),
+        quotaGlobal: int(env, 'MEMBER_API_QUOTA_GLOBAL', 600),
+        quotaWindowMs: int(env, 'MEMBER_API_QUOTA_WINDOW_MS', 60_000),
+        // Its OWN window, not a slice of the authenticated one. Because `trust proxy` is unset the
+        // per-key and aggregate bounds coincide on the VM (every anonymous caller is the nginx IP),
+        // so one number configures both — and if an operator ever did trust the proxy, the per-IP
+        // key would simply become the finer of two real bounds rather than needing a new variable.
+        publicQuota,
+        // Revocation's own window again, one level down. `keys/revoke` is the emergency control: a
+        // member reaches for it exactly when their token is loose, which is also exactly when
+        // something may be hammering this module. It is BUDGETED rather than EXEMPTED because the
+        // endpoint does an ECDSA recovery and possibly an ERC-1271 chain call per request, so an
+        // unlimited one is its own amplifier — but nothing else may spend from this window, so no
+        // volume of other traffic can starve it.
+        revokeQuota,
+        assistant: {
+          enabled: assistantEnabled,
+          // SECRET. Never logged, never echoed, never part of any response.
+          apiKey: opt(env, 'ANTHROPIC_API_KEY', null),
+          baseUrl: assistantBaseUrl,
+          model: opt(env, 'ASSISTANT_MODEL', 'claude-sonnet-5'),
+          maxTokens: assistantMaxTokens,
+          timeoutMs: int(env, 'ASSISTANT_TIMEOUT_MS', 30_000),
+          // A tighter request class than the module's general read quota: an assistant turn costs
+          // real money, so 120 reads/min and 120 model calls/min are not the same permission.
+          quotaPerAccount: assistantQuotaPerAccount,
+          quotaGlobal: assistantQuotaGlobal,
+          // The ceiling on MONEY rather than traffic. Hourly by default, matching SPEND_WINDOW_MS's
+          // philosophy for the gas cap: spend is judged over a period a human would recognise.
+          tokenBudgetPerAccount: assistantTokenBudgetPerAccount,
+          tokenBudgetGlobal: assistantTokenBudgetGlobal,
+          tokenBudgetWindowMs: assistantTokenBudgetWindowMs,
+        },
+      }
+    })(),
+    // x402 agentic payments (spec 096): a pay-per-request rail on the member API's PRICED
+    // operations, for an agent that holds no member key. Optional exactly like the blocks above —
+    // disabled (the default) means no route ever answers 402 and an unauthenticated priced request
+    // gets the same 401 it got before this module existed.
+    //
+    // THE PAID RAIL SUBSTITUTES MEMBERSHIP FOR ONE OPERATION, and never applies to a member whose
+    // bearer token works: routes.js checks the token FIRST. Payment is an EIP-3009
+    // `TransferWithAuthorization` the PAYER signs on the chain's own USDC to X402_PAY_TO; this
+    // gateway verifies it and hands the settlement to the SAME engine the intent rail uses. No key
+    // is held here, and nothing is signed server-side — as everywhere else in this service.
+    //
+    // Fail-loud validation applies ONLY when the module is ENABLED, same philosophy as the
+    // bitcoin/bridge/perps/memberApi blocks — with one addition that matters more than the others:
+    // X402_PAY_TO has no default, because a defaulted treasury is money sent somewhere nobody chose.
+    x402: (() => {
+      const enabled = opt(env, 'X402_ENABLED', 'false').toLowerCase() === 'true'
+
+      // EIP-3009 is the whole settlement mechanism, so the only candidate chains are the ones this
+      // gateway already knows carry an EIP-3009 token (`paymentSupported` + a recorded paymentToken).
+      // On 61/63 the live token is permit-only and there is nothing to settle with.
+      const defaultChain = enabledChainIds.find((id) => chains[id]?.paymentSupported && chains[id]?.paymentToken)
+      const chainId = int(env, 'X402_CHAIN_ID', defaultChain ?? enabledChainIds[0])
+      const payTo = opt(env, 'X402_PAY_TO', null)
+      const prices = {
+        read: int(env, 'X402_PRICE_READ', 10_000),
+        build: int(env, 'X402_PRICE_BUILD', 50_000),
+        assistant: int(env, 'X402_PRICE_ASSISTANT', 100_000),
+      }
+      const settleBufferSeconds = int(env, 'X402_SETTLE_BUFFER_SECONDS', 60)
+      const maxTimeoutSeconds = int(env, 'X402_MAX_TIMEOUT_SECONDS', 300)
+
+      if (enabled) {
+        const chain = chains[chainId]
+        if (!chain) {
+          throw new Error(
+            `[relay-gateway] X402_CHAIN_ID=${chainId} is not an enabled chain (enabled: ${enabledChainIds.join(', ')}). ` +
+              'Refusing to start: the paid rail would advertise a price it could never settle.'
+          )
+        }
+        if (!chain.paymentSupported || !ADDRESS_RE.test(chain.paymentToken || '')) {
+          throw new Error(
+            `[relay-gateway] X402_CHAIN_ID=${chainId} has no EIP-3009 payment token recorded, so an x402 payment ` +
+              'could never be settled there. Refusing to start.'
+          )
+        }
+        if (!chain.tokenDomain?.name || !chain.tokenDomain?.version) {
+          throw new Error(
+            `[relay-gateway] chain ${chainId} has no payment-token EIP-712 domain, so a payment signature could ` +
+              'never be verified. Refusing to start.'
+          )
+        }
+        if (!chain.engineRelayerId) {
+          throw new Error(`[relay-gateway] chain ${chainId} has no engine relayer id; x402 settlement has no lane`)
+        }
+        // REQUIRED, and validated. There is deliberately no fallback: an unset treasury must stop
+        // the boot, never quietly resolve to an address an operator did not choose.
+        if (!payTo) {
+          throw new Error(
+            '[relay-gateway] X402_ENABLED=true requires X402_PAY_TO (the treasury every payment is made to). ' +
+              'It has no default on purpose — refusing to start.'
+          )
+        }
+        if (!ADDRESS_RE.test(payTo)) throw new Error(`[relay-gateway] X402_PAY_TO=${payTo} is not an address`)
+        if (Object.values(prices).every((p) => p <= 0)) {
+          throw new Error(
+            '[relay-gateway] X402_ENABLED=true but every X402_PRICE_* is 0, so no operation is offered over the ' +
+              'paid rail. Refusing to start: the module would be on and do nothing.'
+          )
+        }
+        if (settleBufferSeconds < 1) {
+          throw new Error(`[relay-gateway] X402_SETTLE_BUFFER_SECONDS=${settleBufferSeconds} must be >= 1`)
+        }
+        if (maxTimeoutSeconds < settleBufferSeconds) {
+          throw new Error(
+            `[relay-gateway] X402_MAX_TIMEOUT_SECONDS=${maxTimeoutSeconds} is below X402_SETTLE_BUFFER_SECONDS=` +
+              `${settleBufferSeconds}; the offer would promise less time than settlement demands`
+          )
+        }
+      }
+
+      return {
+        enabled,
+        killSwitch: opt(env, 'X402_KILLSWITCH', 'false').toLowerCase() === 'true',
+        chainId,
+        payTo,
+        prices,
+        settleBufferSeconds,
+        maxTimeoutSeconds,
+        nonceMaxEntries: int(env, 'X402_NONCE_MAX', 50_000),
       }
     })(),
     // FeeRouter (spec 060): the on-chain source of truth for the Polymarket builder bps. The env

@@ -437,7 +437,7 @@ button.trade-rate .trade-summary-val {
   width: 100%;
   margin-top: 0.85rem;
   padding: 0.95rem;
-  background: var(--trade-accent);
+  background: var(--primary-button);
   color: var(--primary-button-text);
   border: none;
   border-radius: 12px;

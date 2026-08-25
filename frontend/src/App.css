@@ -11,6 +11,22 @@ body {
   max-width: 100vw;
 }
 
+/* Development banner reservation (issue #1248).
+   The banner is out of flow, and the in-app header below it is `position: sticky`
+   (Header.css) — for a sticky box `top` only OFFSETS the paint position, it does not
+   reserve anything, so the header alone clearing the banner would leave the banner
+   covering the first rows of page content. Padding the shell gives the banner a real
+   flow slot: the header's resting position becomes the same offset it sticks at, and
+   nothing is hidden underneath. Resolves to `0px` when the banner is dismissed or absent
+   — the same computed padding the global reset already gives this element — so the
+   production layout is unchanged.
+   Known gap: the marketing route (`.landing-page`) is outside this shell and still only
+   offsets its header. It carries no fixed controls (its header is rendered with
+   `hideWalletButton`), so the overlap there is decorative rather than a blocked control. */
+.app-shell {
+  padding-top: var(--dev-banner-height, 0px);
+}
+
 /* Type-role utilities — Chippr Brand Guidelines v1.0 slide 13 (spec 090).
    The heading roles are applied to h1–h4 in index.css; these cover the roles
    that are not heading elements, so a surface can ask for a role instead of
@@ -892,7 +908,9 @@ svg {
 /* Network error banner */
 .network-error-banner {
   position: fixed;
-  top: 0;
+  /* Below the development banner (issue #1248) — it paints above this one and
+     wraps to ~3 lines at 390px, which would cover the "Switch Network" button. */
+  top: var(--dev-banner-height, 0px);
   left: 0;
   right: 0;
   background: var(--danger-color);

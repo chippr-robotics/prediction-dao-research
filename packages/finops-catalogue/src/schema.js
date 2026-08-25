@@ -89,8 +89,30 @@ export function validateSource(src, index) {
   if (src.kind === 'cost' && src.status === 'live' && !BASES.includes(src.basis)) {
     bad(`a live cost source MUST declare 'basis' as ${BASES.join(' or ')}. Research R1: presenting a figure we computed ourselves as if it were an invoice is the specific dishonesty this field exists to prevent.`)
   }
+  // A `planned` cost may declare a basis and should: it pre-commits, while nobody is under pressure
+  // to publish a number, to whether the eventual figure is an invoice or our own arithmetic. What it
+  // may never do is declare one that is not a basis at all.
+  if (src.basis != null && !BASES.includes(src.basis)) {
+    bad(`'basis' must be ${BASES.join(' or ')}, got ${JSON.stringify(src.basis)}`)
+  }
   if (src.kind === 'revenue' && src.basis != null) {
     bad(`'basis' is a cost-source field only`)
+  }
+
+  // The gate's join key back to the platform (FR-019). See moneyPath's comment in sources.js.
+  if (src.moneyPath != null) {
+    const mp = src.moneyPath
+    if (typeof mp !== 'object' || Array.isArray(mp)) bad(`'moneyPath' must be an object`)
+    else {
+      if (typeof mp.namespace !== 'string' || !ID_RE.test(mp.namespace)) {
+        bad(`'moneyPath.namespace' must be kebab-case: it is derived from an env-var prefix by the coverage gate (X402_PAY_TO => 'x402'), and a mismatch means the gate cannot join this entry to the code that earns it.`)
+      }
+      for (const field of ['payeeEnv', 'enableEnv']) {
+        if (mp[field] != null && !/^[A-Z][A-Z0-9_]*$/.test(mp[field])) {
+          bad(`'moneyPath.${field}' must be an ENVIRONMENT VARIABLE NAME (upper snake case), never a value`)
+        }
+      }
+    }
   }
 
   if (src.chains != null) {

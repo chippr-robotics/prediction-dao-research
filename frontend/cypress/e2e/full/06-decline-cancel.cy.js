@@ -22,11 +22,7 @@ function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
   cy.visitWagers()
 
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-    .click()
-  cy.selectInjectedConnector()
-  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
-    .should('be.visible')
+  cy.connectWallet()
 }
 
 /**
@@ -81,6 +77,12 @@ describe('Decline and Cancel Wagers', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    /*
+     * STUB THE PINNING SERVICE — see frontend/package.json `dev:e2e`. Both exits from a pending
+     * wager need one CREATED first, and a create that cannot pin its encrypted metadata throws
+     * before it reaches WagerRegistry.
+     */
+    cy.interceptIpfs()
   })
 
   // ---------------------------------------------------------------------------
@@ -91,38 +93,57 @@ describe('Decline and Cancel Wagers', () => {
     connectAndVisit(0)
     createWagerForTest('DEC-01: Opponent will decline this')
 
-    // Switch to opponent
-    cy.switchAccount(1)
+    cy.lastWagerId().then((wagerId) => {
+      // Pin the precondition: the wager this test just created is Open (1).
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } })
+        .its('status').should('eq', 1)
 
-    cy.openMyWagers('participating')
+      // Switch to opponent
+      cy.switchAccount(1)
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-      if (viewBtn.length > 0) {
-        cy.wrap(viewBtn.first()).click({ force: true })
+      cy.openMyWagers('participating')
 
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
+      // The offer MUST be here — this test just created it addressed to #1.
+      // (The old guard's else-branch swallowed "offer missing" as a pass.)
+      cy.contains('button', /view offer/i, { timeout: 15000 }).click({ force: true })
+      cy.get('.ma-modal, [role="dialog"]', { timeout: 10000 }).should('be.visible')
 
-        // Click Decline Offer
-        cy.contains('button', /decline/i).click()
+      cy.contains('button', /decline/i).click()
+      cy.contains('button', /confirm decline/i).click()
 
-        // Confirm decline
-        cy.contains('button', /confirm decline/i).click()
-
-        // Wait for TX
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const validOutcome = lower.includes('declined') ||
-                              lower.includes('returned') ||
-                              lower.includes('success') ||
-                              lower.includes('removed') ||
-                              lower.includes('error')
-          expect(validOutcome).to.be.true
+      /*
+       * The acceptance modal CLOSES on a successful decline, so asserting its
+       * text re-matched whichever dialog remained (MyMarketsModal) — a surface
+       * that never says "declined", which made this test fail against a
+       * correct app. Assert the OUTCOME instead — and the outcome is not a
+       * Cancelled status: WagerRegistryCore RELEASES a declined/cancelled Open
+       * wager's storage for reuse (the gas-refund pattern), so the record
+       * reads back as None (0). The Open(1)→None(0) transition, pinned by the
+       * precondition check above, IS the on-chain proof the decline landed
+       * and the escrow was released.
+       */
+      const pollCleared = (n) =>
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((info) => {
+          if (info.ok && Number(info.status) === 0) return cy.wrap(info.status)
+          if (n <= 0) throw new Error(`wager ${wagerId} was never released; last status ${info.status}`)
+          cy.wait(1000)
+          return pollCleared(n - 1)
         })
-      } else {
-        // No pending offers visible
-        cy.get('.mm-empty-state, .mm-panel').should('exist')
-      }
+      pollCleared(30)
+
+      /*
+       * DELIBERATELY NOT ASSERTED: the list dropping the declined offer.
+       *
+       * Measured (2026-08-18): the "View Offer" row survives the decline —
+       * on the stale open list AND after closing and reopening MyMarkets —
+       * because the list's data outlives the modal and refreshes on a slower
+       * cadence than any reasonable test timeout. Whether a declined wager
+       * should stop being actionable promptly is a PRODUCT question, filed on
+       * #1019; encoding either answer here would invent the decision. What
+       * this test proves is the money path: the decline transacted and the
+       * escrow was released (the Open→None poll above). A member tapping the
+       * stale row gets the contract's refusal, not a double-decline.
+       */
     })
   })
 
@@ -136,9 +157,29 @@ describe('Decline and Cancel Wagers', () => {
     // Open My Wagers → Created tab
     cy.openMyWagers('created')
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
+    /*
+     * This test CREATED the wager above, so the row is a precondition, not a probe: assert it
+     * retryably and fail HERE if it never lists, rather than no-oping through a one-shot
+     * snapshot (#1250). That part was right; the WINDOW was too short, and on a fresh chain
+     * this failed against a list that does arrive.
+     *
+     * Measured on a clean local node: the cache key `friendMarkets:80002` is ALREADY written
+     * (~6.4 KB) by the time this line runs — the page's first scan completed back at
+     * `connectAndVisit(0)`, before the wager existed. So the row needs the NEXT scan, and it
+     * lands at roughly 30s. The old 20s window closed first.
+     *
+     * `cy.settledWagerPanel()` deliberately NOT used here, though this is exactly the shape it
+     * was written for: it waits for that key to exist, and here it already does, so it settles
+     * instantly on a list that predates the creation and proves nothing. Its own docstring
+     * names the precondition it needs — the key absent when the wait starts, via
+     * `clearLocalStorage` or `switchAccount` — and this test meets neither. A retryable
+     * assertion with a window that actually covers a cold scan is the honest wait, and it
+     * still fails here, naming this precondition, if the row never lists at all.
+     */
+    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
+      .find('.mm-table-row', { timeout: 60000 })
+      .should('have.length.greaterThan', 0)
+      .then((rows) => {
         // Click on the first wager to view details
         cy.wrap(rows.first()).click()
 
@@ -169,10 +210,7 @@ describe('Decline and Cancel Wagers', () => {
             })
           }
         })
-      } else {
-        cy.get('.mm-empty-state').should('exist')
-      }
-    })
+      })
   })
 
   // ---------------------------------------------------------------------------
@@ -208,35 +246,25 @@ describe('Decline and Cancel Wagers', () => {
     connectAndVisit(0)
     createWagerForTest('DEC-04: Non-creator cancel test')
 
-    // Switch to opponent
-    cy.switchAccount(1)
+    cy.lastWagerId().then((wagerId) => {
+      // The chain is the authority here: only the creator may cancelOpen (NotCreator otherwise).
+      cy.task('chainTx', { action: 'cancelOpen', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, 'a non-creator cannot cancel the wager').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is untouched — still Open').to.equal(1)
+      })
 
-    cy.openMyWagers('participating')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
-
-        cy.get('.mm-detail, .ma-modal', { timeout: 5000 }).then(($view) => {
-          // Opponent should NOT see "Withdraw Offer" button
-          const withdrawBtn = $view.find('button:contains("Withdraw")')
-          expect(withdrawBtn.length).to.equal(0)
-        })
-      } else {
-        // If opponent sees View Offer instead, that's also correct
-        const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-        if (viewBtn.length > 0) {
-          cy.wrap(viewBtn.first()).click({ force: true })
-          cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).then(($modal) => {
-            // Should not have a cancel/withdraw option, only accept/decline
-            const withdrawBtn = $modal.find('button:contains("Withdraw"), button:contains("Cancel Wager")')
-            expect(withdrawBtn.length).to.equal(0)
-          })
-        } else {
-          expect(true).to.be.true
-        }
-      }
+      // And the UI does not offer the control to the opponent either.
+      cy.switchAccount(1)
+      cy.openMyWagers('participating')
+      cy.contains('.mm-panel button, [role="tabpanel"] button', /view offer/i, { timeout: 20000 })
+        .click({ force: true })
+      cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
+      cy.get('.ma-modal').then(($modal) => {
+        const withdrawBtn = $modal.find('button:contains("Withdraw"), button:contains("Cancel Wager")')
+        expect(withdrawBtn.length, 'no cancel control offered to the opponent').to.equal(0)
+      })
     })
   })
 
@@ -249,25 +277,32 @@ describe('Decline and Cancel Wagers', () => {
 
     cy.openMyWagers('created')
 
-    // Look for an active wager
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const activeBadge = $panel.find('.status-active, :contains("Active")')
-      if (activeBadge.length > 0) {
-        // Click on the active wager
-        const rows = $panel.find('.mm-table-row')
-        if (rows.length > 0) {
-          cy.wrap(rows.first()).click()
+    // Look for an active wager. This is a genuine probe (the test did not arrange an
+    // ACCEPTED wager), so settle the fetch first — a bare panel snapshot reads the
+    // in-flight empty state as "no active wagers" (#1250).
+    cy.settledWagerPanel().then(($panel) => {
+      /*
+       * Open the row that is actually ACTIVE.
+       *
+       * This used to ask whether an Active badge existed ANYWHERE in the panel and then open
+       * `rows.first()` — a different wager whenever the newest row was not the active one. A
+       * pending offer legitimately carries a Cancel button, so the assertion below ("an active
+       * wager offers no Cancel") failed against a row it was never meant to inspect. It passed
+       * for as long as ordering happened to put the active wager first.
+       */
+      const activeRows = $panel.find('.mm-table-row').filter((_, el) => /active/i.test(el.textContent || ''))
+      if (activeRows.length > 0) {
+        cy.wrap(activeRows.first()).click()
 
-          cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
 
-          // Active wager should NOT have Withdraw or Cancel button
-          cy.get('.mm-detail').then(($detail) => {
-            const withdrawBtn = $detail.find('button:contains("Withdraw")')
-            const cancelBtn = $detail.find('button:contains("Cancel")')
-            // Either no withdraw/cancel buttons, or they should not be for this wager
-            expect(withdrawBtn.length + cancelBtn.length).to.be.lte(0)
-          })
-        }
+        // Active wager should NOT have Withdraw or Cancel button
+        cy.get('.mm-detail').then(($detail) => {
+          const withdrawBtn = $detail.find('button:contains("Withdraw")')
+          const cancelBtn = $detail.find('button:contains("Cancel")')
+          // Either no withdraw/cancel buttons, or they should not be for this wager
+          expect(withdrawBtn.length + cancelBtn.length).to.be.lte(0)
+        })
       } else {
         // No active wagers — verify at the state level
         cy.get('.mm-panel').invoke('text').then((text) => {
@@ -281,64 +316,36 @@ describe('Decline and Cancel Wagers', () => {
   // ---------------------------------------------------------------------------
   // DEC-06: Frozen account cannot decline
   // ---------------------------------------------------------------------------
-  it('[DEC-06] Frozen account cannot decline wager', () => {
+  it('[DEC-06] A frozen account cannot decline a wager, and can once unfrozen', () => {
     // Create a wager where the opponent is account #1
     connectAndVisit(0)
     createWagerForTest('DEC-06: Frozen decline test')
 
-    // Switch to opponent
-    cy.switchAccount(1)
+    cy.lastWagerId().then((wagerId) => {
+      cy.task('chainTx', { action: 'freeze', args: { address: TEST_ACCOUNTS[1] } }).then((r) => {
+        expect(r.ok, `freeze the opponent (${r.error || ''})`).to.be.true
+      })
 
-    cy.openMyWagers('participating')
+      // Blocked while frozen — and the wager stays Open, which is the part that matters.
+      cy.task('chainTx', { action: 'declineWager', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, 'a frozen account cannot decline').to.equal(false)
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager stays Open while the opponent is frozen').to.equal(1)
+      })
 
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-      if (viewBtn.length > 0) {
-        cy.wrap(viewBtn.first()).click({ force: true })
-
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-
-        // If account is frozen, the decline action should show an error
-        // from the contract: AccountFrozenError
-        cy.get('.ma-modal').invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          // Verify offer review is visible (frozen is enforced at TX level)
-          const hasOfferView = lower.includes('offer') ||
-                              lower.includes('review') ||
-                              lower.includes('decline') ||
-                              lower.includes('accept')
-          expect(hasOfferView).to.be.true
-        })
-
-        // Attempt to decline — the contract may revert with AccountFrozenError
-        cy.get('.ma-modal').then(($modal) => {
-          const declineBtn = $modal.find('button:contains("Decline")')
-          if (declineBtn.length > 0) {
-            cy.wrap(declineBtn.first()).click()
-
-            // Look for confirm decline
-            cy.get('.ma-modal').then(($m) => {
-              const confirmBtn = $m.find('button:contains("Confirm Decline")')
-              if (confirmBtn.length > 0) {
-                cy.wrap(confirmBtn.first()).click()
-
-                // Should get AccountFrozenError or succeed (if not frozen)
-                cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((t) => {
-                  const l = t.toLowerCase()
-                  const validOutcome = l.includes('frozen') ||
-                                      l.includes('declined') ||
-                                      l.includes('returned') ||
-                                      l.includes('error') ||
-                                      l.includes('failed')
-                  expect(validOutcome).to.be.true
-                })
-              }
-            })
-          }
-        })
-      } else {
-        expect(true).to.be.true
-      }
+      // Reversible, matching CLM-10: unfreezing restores the ability to decline. A declined
+      // Open wager's storage is released for reuse (DEC-01's Open→None pattern), so status
+      // reading back as None (0) IS the on-chain proof the decline landed.
+      cy.task('chainTx', { action: 'unfreeze', args: { address: TEST_ACCOUNTS[1] } }).then((r) => {
+        expect(r.ok, `unfreeze the opponent (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'declineWager', args: { wagerId, callerIndex: 1 } }).then((r) => {
+        expect(r.ok, `decline succeeds once unfrozen (${r.error || ''})`).to.be.true
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is released (None) after the decline').to.equal(0)
+      })
     })
   })
 })

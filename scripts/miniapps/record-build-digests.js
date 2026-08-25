@@ -28,7 +28,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const ROOT = path.join(__dirname, "..", "..");
-const APPS = ["token-mint", "clearpath"];
+const APPS = ["token-mint", "clearpath", "api-access"];
 const FILES = ["entry.js", "manifest.json", "style.css"];
 
 function digests() {

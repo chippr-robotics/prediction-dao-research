@@ -8,6 +8,7 @@ import { generateCode, normalizeCode } from '../utils/claimCode/wordlist.js'
 import { deriveFromCode } from '../utils/claimCode/deriveFromCode.js'
 import { encryptEnvelopeCode } from '../utils/crypto/envelopeEncryption.js'
 import { getCurrentDocument } from '../utils/legalDocs'
+import { revertReasonFrom, screenedActorMessage } from '../lib/wagers/sanctionsRevert'
 
 // Honest passkey-UserOp lifecycle states as returned by sendCalls (mirrors LIFECYCLE in
 // lib/passkey/submission.js — kept as literals here to avoid pulling the relay graph into this hook).
@@ -125,7 +126,7 @@ export function useOpenChallengeCreate() {
       try {
         await registry.createOpenWager.staticCall(...args, { from: actor })
       } catch (sim) {
-        const raw = sim.reason || sim.shortMessage || sim.message || ''
+        const raw = revertReasonFrom(sim)
         const isAllowanceRevert = /(exceeds|insufficient) allowance/i.test(raw)
         if (!(isAllowanceRevert && allowance < stakeWei)) {
           throw new Error(translateOpenCreateRevert(raw), { cause: sim })
@@ -211,6 +212,10 @@ export function useOpenChallengeCreate() {
 /** Map known createOpenWager reverts to friendly messages. */
 export function translateOpenCreateRevert(reason) {
   const r = String(reason)
+  // Compliance screening (spec 007 FR-054) — `createOpenWager` opens with `_screen(msg.sender)`
+  // (contracts/wagers/WagerRegistry.sol), so the acting member is the only account screened here.
+  // Without this the same revert #1292 reports reached the member as the raw "unknown custom error".
+  if (r.includes('SanctionedAddress')) return screenedActorMessage('the open challenge was not created')
   if (r.includes('InsufficientMembershipTier')) return 'Creating an open challenge requires a Silver membership or above. Upgrade your tier to post one.'
   if (r.includes('MembershipDenied')) return 'An active membership is required to create a challenge.'
   if (r.includes('OpenResolutionTypeNotAllowed')) return 'Open challenges can use Either-side, third-party arbitrator, or an oracle — not single-party self-resolution.'

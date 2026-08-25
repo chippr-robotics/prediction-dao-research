@@ -20,6 +20,20 @@ describe('FreshnessIndicator (spec 020 US5)', () => {
     expect(screen.getByText(/stale — showing last known/i)).toBeInTheDocument()
   })
 
+  // Issue #1280 — a partial read is its own status. It is not `fresh` (the
+  // update was not complete) and not `stale` (something WAS just read, and on
+  // a first load there is no last-known data to be "showing").
+  it('shows a partial badge that neither claims completeness nor cached data', () => {
+    render(<FreshnessIndicator state={{ lastUpdated: Date.now() - 5000, status: 'partial' }} />)
+    expect(screen.getByText(/partly updated \d+s ago — some sources unread/i)).toBeInTheDocument()
+    expect(screen.queryByText(/stale — showing last known/i)).not.toBeInTheDocument()
+  })
+
+  it('reports a partial FIRST read without inventing a timestamp for it', () => {
+    render(<FreshnessIndicator state={{ lastUpdated: null, status: 'partial' }} />)
+    expect(screen.getByText(/^partly updated — some sources unread$/i)).toBeInTheDocument()
+  })
+
   it('disables refresh while refreshing', () => {
     render(<FreshnessIndicator state={{ status: 'refreshing' }} onRefresh={vi.fn()} />)
     expect(screen.getByRole('button', { name: /refresh account data/i })).toBeDisabled()

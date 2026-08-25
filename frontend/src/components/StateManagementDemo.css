@@ -117,8 +117,8 @@
 }
 
 .primary-button {
-  background: var(--gradient-brand);
-  color: white;
+  background: var(--gradient-primary-button);
+  color: var(--primary-button-text);
 }
 
 .primary-button:hover:not(:disabled) {

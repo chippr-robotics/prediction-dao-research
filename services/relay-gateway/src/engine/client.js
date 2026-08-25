@@ -9,12 +9,13 @@
  * an equivalent submit + webhook surface) without touching policy.
  */
 import { EngineUnavailableError } from '../errors.js'
+import { stripTrailingSlashes } from '../strings.js'
 
 /**
  * @param {{url: string, apiKey?: string|null, timeoutMs?: number, retries?: number, fetchImpl?: typeof fetch}} opts
  */
 export function createEngineClient({ url, apiKey = null, timeoutMs = 5000, retries = 2, fetchImpl = fetch }) {
-  const base = url.replace(/\/+$/, '')
+  const base = stripTrailingSlashes(url)
 
   async function post(path, body) {
     let lastErr

@@ -411,14 +411,33 @@ function MyMarketsModal({
         drawProposedBy: drawProposerById[String(market.id)] ?? null,
       }
 
-      // Apply status filter. The default ("all") view also hides expired
-      // offers so they don't clutter the list — pick "Expired" explicitly
-      // to see them.
-      if (statusFilter === 'all') {
-        if (status === MarketStatus.EXPIRED) return
-      } else if (status !== statusFilter) {
-        return
-      }
+      // Apply status filter. The default ("all") view hides expired offers so
+      // they don't clutter the list (spec 040 US6) — pick "Pending Acceptance"
+      // to see them alongside the offers still inside their accept window.
+      //
+      // EXPIRED here means exactly one thing (see getMarketStatus above): an
+      // offer nobody accepted before the accept deadline. On-chain it is still
+      // Open and the creator's stake is still escrowed until claimRefund, so
+      // "Pending Acceptance" is its honest home in this vocabulary, and the
+      // route by which someone browsing the list reaches its "Reclaim & Clear"
+      // — how the creator asks for that stake back (#1297). The dedicated
+      // "Expired" option was removed with nothing replacing it, which stranded
+      // the row. The other route in is by id, exempted just below.
+      const matchesFilter =
+        statusFilter === 'all'
+          ? status !== MarketStatus.EXPIRED
+          : status === statusFilter ||
+            (statusFilter === MarketStatus.PENDING_ACCEPTANCE && status === MarketStatus.EXPIRED)
+
+      // A wager the member asked for BY ID is exempt from the filter. The filter
+      // decides what a list shows; it must not decide whether a wager the member
+      // navigated straight to exists. selectedMarket is looked up in these lists,
+      // so without this exemption the action-needed feed's "reclaim your stake"
+      // — which opens this modal with the wager id and resets the filter to
+      // "all" — resolves to null and drops the creator on an empty list (#1297).
+      const isSelected =
+        selectedMarketId != null && String(market.id) === String(selectedMarketId)
+      if (!isSelected && !matchesFilter) return
 
       // Terminal markets go to history
       if (
@@ -483,7 +502,7 @@ function MyMarketsModal({
     history.sort(comparator)
 
     return { participating, created, arbitrating, history }
-  }, [markets, decryptableMarkets, userPositions, account, sortKey, statusFilter, dismissedIds, chainId, drawProposerById])
+  }, [markets, decryptableMarkets, userPositions, account, sortKey, statusFilter, selectedMarketId, dismissedIds, chainId, drawProposerById])
 
   // Derive the selected market from the live categorized lists so the detail
   // view reflects fresh data (e.g., decryptedMetadata) after decryption
@@ -726,46 +745,6 @@ function MyMarketsModal({
     fetchMarketsData()
   }
 
-  // Clear an expired offer from the user's view. For the creator this also
-  // calls claimRefund on-chain so the stake comes back; for an invited
-  // opponent (no stake at risk) we just hide locally and let the creator
-  // reclaim on their own.
-  const handleClearExpired = useCallback(async (market) => {
-    const userAddr = account?.toLowerCase()
-    const isCreator = userAddr && market.creator?.toLowerCase() === userAddr
-
-    if (isCreator && (signer || isPasskey)) {
-      try {
-        if (!isCorrectNetwork) {
-          try { await switchNetwork() } catch { /* user declined */ }
-        }
-        if (isPasskey) {
-          // Passkey creator reclaims the stake over the sendCalls rail (no signer to reclaim it
-          // otherwise strands the funds and only dismisses the row locally).
-          await sendRegistryCall(sendCalls, chainId, 'claimRefund', [market.wagerId ?? market.id])
-        } else {
-          const registry = new ethers.Contract(
-            getContractAddressForChain('wagerRegistry', chainId),
-            WAGER_REGISTRY_ABI,
-            signer
-          )
-          const tx = await registry.claimRefund(market.wagerId ?? market.id)
-          await tx.wait()
-        }
-      } catch (err) {
-        const reason = err?.reason || err?.shortMessage || err?.message || ''
-        const userRejected = err?.code === 'ACTION_REJECTED' ||
-          err?.code === 4001 || reason.toLowerCase().includes('user rejected')
-        if (userRejected) return // leave row visible so they can retry
-        // Anything else (e.g. NotRefundable because the chain advanced state)
-        // we still dismiss locally — the user's intent is clear.
-        console.warn('[MyMarkets] claimRefund failed, dismissing locally:', err)
-      }
-    }
-
-    dismissMarket(market.id)
-  }, [account, signer, isPasskey, sendCalls, isCorrectNetwork, switchNetwork, dismissMarket, chainId])
-
   const handleClearAllExpired = useCallback((markets) => {
     dismissMarkets(markets.map(m => m.id))
   }, [dismissMarkets])
@@ -921,6 +900,93 @@ function MyMarketsModal({
     }
   }, [signer, isPasskey, sendCalls, chainId, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimRefundRowTx])
 
+  // "Reclaim & Clear" on an expired offer. For the CREATOR this is a money move
+  // first and a dismissal second: the offer is still Open on chain with their
+  // stake escrowed, so the refund has to land before the row — and with it the
+  // only route back to that stake — is hidden. Dismissal is one-way in this UI
+  // (nothing calls restoreMarket), so a failed reclaim leaves the row where it
+  // is and says why, instead of looking exactly like a successful one (#1297).
+  // An invited opponent has nothing escrowed, so for them this really is just
+  // "hide it".
+  //
+  // Declared after claimRefundRowTx so it can share that rail: the reclaim is
+  // relayed where the relayer serves the chain and self-submits otherwise, same
+  // as the sibling "Refund" button, and reports through the same per-row
+  // refundingId/refundError. No vault branch is needed — claimRefund pays the
+  // wager's creator whoever submits it, so a member operating as a vault can
+  // send it from their own wallet and the vault still receives the stake.
+  const handleClearExpired = useCallback(async (market) => {
+    const userAddr = account?.toLowerCase()
+    const isCreator = !!userAddr && market.creator?.toLowerCase() === userAddr
+    const id = String(market.id)
+
+    if (!isCreator) {
+      dismissMarket(market.id)
+      return
+    }
+
+    if (!signer && !isPasskey) {
+      setRefundError({ id, message: 'Connect your wallet to reclaim this stake.' })
+      return
+    }
+    if (!isCorrectNetwork) {
+      try {
+        await switchNetwork()
+      } catch {
+        setRefundError({ id, message: 'Please switch to the correct network.' })
+        return
+      }
+    }
+
+    setRefundingId(id)
+    setRefundError(null)
+
+    try {
+      const wagerId = market.wagerId ?? market.id
+      const result = isPasskey
+        ? await sendRegistryCall(sendCalls, chainId, 'claimRefund', [wagerId])
+        : await claimRefundRowTx.run(wagerId)
+      if (result?.error) throw result.error
+      // A txHash is the ONLY evidence the refund landed. The relay rail can also
+      // come back `{status:'pending'}` (poll budget exhausted) or
+      // `{status:'expired'}` (the signed intent passed validBefore and can now
+      // never execute) — neither carries `error`, and neither is a refund. Since
+      // dismissal here is one-way (nothing calls restoreMarket) and the row is the
+      // creator's last route to a stake that is still escrowed, an unconfirmed
+      // reclaim leaves the row exactly where it is and says so (#1297).
+      if (!result?.txHash) {
+        setRefundError({
+          id,
+          message: result?.status === 'expired'
+            ? 'The reclaim request expired before it was submitted. Please try again.'
+            : 'Reclaim submitted — still confirming. This offer stays here until your stake is back.',
+        })
+        await refreshFriendMarkets?.()
+        return
+      }
+      markWagerRead?.(id)
+      fireToast('Stake reclaimed')
+      dismissMarket(market.id)
+      await refreshFriendMarkets?.()
+    } catch (err) {
+      const reason = err?.reason || err?.shortMessage || err?.data?.message || err?.message || ''
+      const lower = reason.toLowerCase()
+      let message
+      if (err?.code === 'ACTION_REJECTED' || err?.code === 4001 || lower.includes('user rejected')) {
+        message = 'Transaction was cancelled in your wallet.'
+      } else if (lower.includes('alreadyrefunded') || lower.includes('already refunded')) {
+        message = 'This stake has already been returned.'
+      } else if (lower.includes('notrefundable') || lower.includes('not refundable')) {
+        message = 'Not reclaimable yet — the accept window has not closed.'
+      } else {
+        message = 'Failed to reclaim your stake. Please try again.'
+      }
+      setRefundError({ id, message })
+    } finally {
+      setRefundingId(null)
+    }
+  }, [account, signer, isPasskey, sendCalls, chainId, isCorrectNetwork, switchNetwork, dismissMarket, markWagerRead, refreshFriendMarkets, fireToast, claimRefundRowTx])
+
   if (!isOpen) return null
 
   return (
@@ -1052,11 +1118,14 @@ function MyMarketsModal({
               onChange={(e) => setStatusFilter(e.target.value)}
               className="mm-filter-select"
             >
-              {/* Disputed and Expired options removed (spec 040 US6): Expired is
-                  hidden from the default view, and Disputed is not a reachable
-                  state here — offering them returned empty/misleading results. */}
+              {/* Disputed and Expired options removed (spec 040 US6): Disputed is
+                  not a reachable state here, and a standalone Expired option
+                  returned empty/misleading results. Expired offers are not
+                  dropped, though — they are still Open on-chain with the
+                  creator's stake escrowed, so "Pending Acceptance" shows them
+                  too and is how the list reaches their "Reclaim & Clear" (#1297). */}
               <option value="all">All Status</option>
-              <option value={MarketStatus.PENDING_ACCEPTANCE}>Pending Acceptance</option>
+              <option value={MarketStatus.PENDING_ACCEPTANCE}>Pending Acceptance (incl. expired)</option>
               <option value={MarketStatus.ACTIVE}>Active</option>
               <option value={MarketStatus.PENDING_RESOLUTION}>Pending Resolution</option>
               <option value={MarketStatus.RESOLVED}>Resolved</option>
@@ -1552,8 +1621,16 @@ function MarketDetailView({
   const isParticipant = market.participants?.some(
     p => p.toLowerCase() === account?.toLowerCase()
   )
-  const showRefundButton = isParticipant && (signer || isPasskey) &&
-    status === MarketStatus.PENDING_RESOLUTION && !refundSuccess
+  // An offer nobody accepted before its deadline reads EXPIRED in this UI, but on
+  // chain it is still Open with the creator's stake escrowed — claimRefund is
+  // exactly what its creator needs. This detail view is where the action-needed
+  // feed's "reclaim your stake" lands, so the action has to be here too, or that
+  // route ends on a status badge and no way to act on it (#1297).
+  const isUnacceptedOfferCreator =
+    status === MarketStatus.EXPIRED &&
+    !!account && market.creator?.toLowerCase() === account.toLowerCase()
+  const showRefundButton = (signer || isPasskey) && !refundSuccess &&
+    ((isParticipant && status === MarketStatus.PENDING_RESOLUTION) || isUnacceptedOfferCreator)
 
   // Gasless claimRefund (spec 035/036): relayed where available, transparent self-submit otherwise.
   const claimRefundTx = useGaslessWrite('claimRefund', {
@@ -1604,7 +1681,9 @@ function MarketDetailView({
           reason.toLowerCase().includes('user rejected')) {
         setRefundError('Transaction was cancelled in your wallet.')
       } else if (reason.includes('NotRefundable')) {
-        setRefundError('This wager is not yet refundable. The resolution window may still be open — try resolving instead.')
+        setRefundError(isUnacceptedOfferCreator
+          ? 'Not reclaimable yet — the accept window has not closed.'
+          : 'This wager is not yet refundable. The resolution window may still be open — try resolving instead.')
       } else {
         setRefundError(reason || 'Failed to claim refund. Please try again.')
       }
@@ -1936,7 +2015,11 @@ function MarketDetailView({
         {refundSuccess && (
           <div className="mm-withdraw-success">
             <span className="mm-withdraw-success-icon">&#10003;</span>
-            <p>Refund claimed successfully. Stakes have been returned to both participants.</p>
+            <p>
+              {isUnacceptedOfferCreator
+                ? 'Refund claimed successfully. Your stake has been returned.'
+                : 'Refund claimed successfully. Stakes have been returned to both participants.'}
+            </p>
             {refundTxHash && (
               <a
                 href={getTransactionUrl(chainId, refundTxHash)}
@@ -1973,7 +2056,9 @@ function MarketDetailView({
               )}
             </button>
             <p className="mm-refund-hint">
-              If the resolution window has expired without a winner declared, both participants can reclaim their stakes.
+              {isUnacceptedOfferCreator
+                ? 'Nobody accepted this offer before its deadline. Your stake is still held by the contract — this returns it to you.'
+                : 'If the resolution window has expired without a winner declared, both participants can reclaim their stakes.'}
             </p>
             {refundError && (
               <p className="mm-withdraw-error">{refundError}</p>

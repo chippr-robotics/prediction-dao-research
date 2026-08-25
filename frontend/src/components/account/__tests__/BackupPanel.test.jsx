@@ -16,7 +16,7 @@ import BackupPanel from '../BackupPanel'
 beforeEach(() => {
   ctx = {
     available: true, isConnected: true, onCanonical: true, canonicalChainId: 137,
-    status: 'idle', lastBackupAt: null, hasRemote: false,
+    status: 'idle', lastBackupAt: null, remoteState: 'none',
     refreshStatus: vi.fn(), backup: vi.fn(), restore: vi.fn(async () => ({ restored: true })), remove: vi.fn(),
   }
 })
@@ -41,14 +41,14 @@ describe('BackupPanel', () => {
   })
 
   it('summarises the last backup date once one exists, with no attention badge', () => {
-    ctx = { ...ctx, hasRemote: true, lastBackupAt: 1765000000000 }
+    ctx = { ...ctx, remoteState: 'yes', lastBackupAt: 1765000000000 }
     render(<BackupPanel />)
     expect(screen.getByText(/^Last backup /)).toBeInTheDocument()
     expect(screen.queryByText('Not backed up')).not.toBeInTheDocument()
   })
 
   it('restores from a sheet and closes it on success', async () => {
-    ctx = { ...ctx, hasRemote: true }
+    ctx = { ...ctx, remoteState: 'yes' }
     renderExpanded()
     fireEvent.click(screen.getByRole('button', { name: /restore my data/i }))
     const dialog = screen.getByRole('dialog')
@@ -58,7 +58,7 @@ describe('BackupPanel', () => {
   })
 
   it('confirms before removing the stored backup — the button alone never deletes', async () => {
-    ctx = { ...ctx, hasRemote: true }
+    ctx = { ...ctx, remoteState: 'yes' }
     renderExpanded()
     fireEvent.click(screen.getByRole('button', { name: /remove stored backup/i }))
     const dialog = screen.getByRole('dialog')
@@ -70,6 +70,30 @@ describe('BackupPanel', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^remove backup$/i }))
     await waitFor(() => expect(ctx.remove).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  /*
+   * The third state. `readPointer` separates "" (no pointer) from `null` (the read did not
+   * complete), and this panel used to collapse both into "None found" plus a "Not backed up"
+   * badge — a definite claim about the member's safety net that nothing established. The two
+   * remedies diverge, which is what makes it worth a test: told they have no backup, a member
+   * pays gas for one they may already have, or gives up on restoring one that exists.
+   */
+  it('never reports "no backup" from a read that did not complete', () => {
+    ctx = { ...ctx, remoteState: 'unknown' }
+    render(<BackupPanel />)
+    expect(screen.queryByText('Not backed up')).not.toBeInTheDocument()
+    expect(screen.queryByText('No backup yet')).not.toBeInTheDocument()
+    expect(screen.getByText('Backup status unavailable')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /data backup/i }))
+    expect(screen.getByText(/Couldn’t check/)).toBeInTheDocument()
+    expect(screen.queryByText('None found')).not.toBeInTheDocument()
+    // …and the consequences-of-having-none warning is not asserted either, because we do not
+    // know that they have none.
+    expect(screen.queryByText(/Without a backup/)).not.toBeInTheDocument()
+    // Removing a backup we cannot confirm exists is not offered.
+    expect(screen.queryByRole('button', { name: /remove stored backup/i })).not.toBeInTheDocument()
   })
 
   it('says so honestly when backup is unavailable on this network', () => {

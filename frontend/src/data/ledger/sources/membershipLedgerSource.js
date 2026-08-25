@@ -58,6 +58,9 @@ export function createMembershipLedgerSource(deps = {}) {
   const query = deps.querySubgraph || querySubgraph
   return {
     class: LEDGER_CLASS.MEMBERSHIP,
+    // Crosses the network (subgraph/RPC), so a rejection here IS evidence the
+    // chain could not be read (#1280).
+    backing: 'network',
     async list({ account, chainId }) {
       const data = await query(chainId, VOUCHER_QUERY, { account })
       if (!data) {

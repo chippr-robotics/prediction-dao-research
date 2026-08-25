@@ -47,6 +47,10 @@ export const NOTIFICATION_CATEGORIES = [
   // category is delivered, never silently off.
   { domain: 'bridge', label: 'Bridge', description: 'Cross-chain transfers delivered, refunded, or needing your attention' },
   { domain: 'liquidity', label: 'Liquidity', description: 'Supplied and withdrawn positions, fees to claim, and pools closed to new deposits' },
+  // Spec 095: API keys and the assistant switch. Appended with no saved mode, so
+  // getNotificationPrefs() resolves it to DEFAULT_MODE ('app') — a category about what can reach
+  // your account is delivered by default, never silently off.
+  { domain: 'access', label: 'Programmatic access', description: 'API keys created or revoked, and the assistant being switched on or off' },
 ]
 
 const KNOWN_DOMAINS = NOTIFICATION_CATEGORIES.map((c) => c.domain)

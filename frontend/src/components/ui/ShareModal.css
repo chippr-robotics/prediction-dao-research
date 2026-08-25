@@ -319,8 +319,8 @@
   align-items: center;
   gap: 12px;
   padding: 14px 32px;
-  background: linear-gradient(135deg, rgb(var(--brand-primary-rgb)) 0%, rgb(42, 157, 110) 100%);
-  color: white;
+  background: var(--gradient-primary-button);
+  color: var(--primary-button-text);
   border: none;
   border-radius: 12px;
   font-size: 1.125rem;
