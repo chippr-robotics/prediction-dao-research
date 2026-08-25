@@ -887,6 +887,37 @@ export default defineConfig({
                 totalAssets: (await vault.totalAssets()).toString(),
               }
             }
+            // ------------------------------------------------- membership/role admin e2e (#1228)
+            case 'hasAdminRole': {
+              // The role registry the AccessControlApp grants on: the WagerRegistry for
+              // operator roles, the MembershipManager for ROLE_MANAGER.
+              const target = args.contract === 'membershipManager'
+                ? d.contracts.membershipManager
+                : d.contracts.wagerRegistry
+              const c = new ethers.Contract(
+                target,
+                ['function hasRole(bytes32 role, address account) view returns (bool)'],
+                provider,
+              )
+              return { ok: true, held: await c.hasRole(ethers.id(args.role), args.address) }
+            }
+            case 'membershipAdminState': {
+              // Compiled ABI for the same reason voucherFixture spells out: TierConfig is a
+              // nested tuple and a hand-written one decodes to garbage without throwing.
+              const managerAbi = loadArtifact('access/MembershipManager.sol', 'MembershipManager').abi
+              const m = new ethers.Contract(d.contracts.membershipManager, managerAbi, provider)
+              const cfg = await m.getTierConfig(WAGER_PARTICIPANT_ROLE, args.tier ?? 1)
+              return {
+                ok: true,
+                manager: d.contracts.membershipManager,
+                paymentToken: d.paymentToken,
+                treasury: await m.treasury(),
+                accruedFees: (await m.accruedFees()).toString(),
+                tierPriceUSDC: cfg.priceUSDC.toString(),
+                tierDurationDays: Number(cfg.durationDays),
+                tierActive: Boolean(cfg.active),
+              }
+            }
             case 'blockNumber':
               return { ok: true, blockNumber: await provider.getBlockNumber() }
 
@@ -1833,6 +1864,49 @@ export default defineConfig({
                 // construction.
                 const held = await ownedVouchers(new ethers.Contract(voucherAddress, VOUCHER_ABI, provider), buyerAddress)
                 return { ok: rc.status === 1, address: buyerAddress, tier, held, priceUSDC: cfg.priceUSDC.toString() }
+              }
+              /*
+               * USDC for a UI voucher purchase — and only the balance. The Buy section sends
+               * its own `approve` before the mint (useVouchers' EOA rail), so approving here
+               * would leave that half of the flow untested.
+               */
+              case 'fundBuyer': {
+                const manager = new ethers.Contract(d.contracts.membershipManager, MANAGER_ABI, provider)
+                const cfg = await manager.getTierConfig(WAGER_PARTICIPANT_ROLE, args.tier ?? 1)
+                if (!cfg.active) return { ok: false, error: `tier ${args.tier ?? 1} is not active for WAGER_PARTICIPANT_ROLE` }
+                const token = new ethers.Contract(d.paymentToken, TOKEN, admin)
+                await (await token.mint(args.address, cfg.priceUSDC * 4n)).wait(1)
+                return { ok: true, priceUSDC: cfg.priceUSDC.toString() }
+              }
+              /*
+               * A real purchaseTier by a fresh derived account, so `accruedFees` is non-zero —
+               * the treasury-withdrawal flow's precondition. Purchases (not grants, not voucher
+               * mints) are what accrue into MembershipManager.accruedFees, so ARRANGING accrued
+               * money means buying a membership. Walks for an inactive account the same way
+               * freshRedeemer does, from the top of the range so the two never race each other.
+               */
+              case 'purchaseTier': {
+                const managerRead = new ethers.Contract(d.contracts.membershipManager, MANAGER_ABI, provider)
+                let buyer = null
+                for (let i = args.startIndex ?? 19; i >= (args.endIndex ?? 10); i -= 1) {
+                  const w = ethers.HDNodeWallet.fromPhrase(HARDHAT_MNEMONIC, undefined, `m/44'/60'/0'/0/${i}`)
+                  if (Number(await managerRead.getActiveTier(w.address, WAGER_PARTICIPANT_ROLE)) === 0) {
+                    buyer = new ethers.NonceManager(w.connect(provider))
+                    break
+                  }
+                }
+                if (!buyer) {
+                  return { ok: false, error: 'no derived account without an active membership left in 10..19 — restart the node' }
+                }
+                const buyerAddress = await buyer.getAddress()
+                const tier = args.tier ?? 1
+                const cfg = await managerRead.getTierConfig(WAGER_PARTICIPANT_ROLE, tier)
+                if (!cfg.active) return { ok: false, error: `tier ${tier} is not active for WAGER_PARTICIPANT_ROLE` }
+                const token = new ethers.Contract(d.paymentToken, TOKEN, admin)
+                await (await token.mint(buyerAddress, cfg.priceUSDC * 2n)).wait(1)
+                await (await new ethers.Contract(d.paymentToken, TOKEN, buyer).approve(d.contracts.membershipManager, cfg.priceUSDC * 2n)).wait(1)
+                const rc = await (await new ethers.Contract(d.contracts.membershipManager, MANAGER_ABI, buyer).purchaseTier(WAGER_PARTICIPANT_ROLE, tier)).wait(1)
+                return { ok: rc.status === 1, address: buyerAddress, priceUSDC: cfg.priceUSDC.toString() }
               }
               case 'vouchersOf': {
                 const v = new ethers.Contract(voucherAddress, VOUCHER_ABI, provider)
