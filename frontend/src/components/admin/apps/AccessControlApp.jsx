@@ -13,11 +13,11 @@
  * network — deployment is config (the address book), not a chain read, so
  * the table is exact and needs no three-state hedging.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import AdminAppShell from '../AdminAppShell'
 import { NetworkScopeCard } from '../scopeControls'
-import { useScopedChain } from '../scopeGate'
+import { useScopedChain, contractAuthorityGate } from '../scopeGate'
 import { adminAppById } from '../adminApps'
 import { useAdminAccess } from '../useAdminAccess'
 import { useAdminTx } from '../useAdminTx'
@@ -27,7 +27,13 @@ import { useEnsResolution } from '../../../hooks/useEnsResolution'
 import { isValidEthereumAddress } from '../../../utils/validation'
 import { getContractAddressForChain } from '../../../config/contracts'
 import { membershipChainId } from '../../../config/networks'
-import { networkName, estateNetworks } from '../../../lib/chains/estate'
+import { getProvider } from '../../../utils/blockchainService'
+import {
+  networkName,
+  estateNetworks,
+  readAuthority,
+  readProviderFor,
+} from '../../../lib/chains/estate'
 
 const APP = adminAppById('access-control')
 
@@ -63,13 +69,26 @@ const ACCESS_CONTROL_ABI = [
   'function revokeRole(bytes32 role, address account)',
 ]
 
+/** The contract each grantable role is defined on — named in every refusal (FR-019). */
+const ROLE_HOME_LABELS = {
+  ROLE_MANAGER: 'MembershipManager',
+  SANCTIONS_ADMIN: 'SanctionsGuard',
+  TOKEN_ISSUER: 'TokenFactory',
+  STAKING_ADMIN: 'StakingRouter',
+  LIQUIDITY_ADMIN_BRIDGE: 'BridgeRouter',
+  GUARDIAN_BRIDGE: 'BridgeRouter',
+  LIQUIDITY_ADMIN_LIQUIDITY: 'LiquidityRouter',
+  GUARDIAN_LIQUIDITY: 'LiquidityRouter',
+  FEE_ADMIN: 'FeeRouter',
+}
+
 function shortAddr(address) {
   return address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : ''
 }
 
 export default function AccessControlApp() {
   const access = useAdminAccess()
-  const { signer, chainId } = useWeb3()
+  const { account, signer, provider, chainId } = useWeb3()
   const { showNotification } = useNotification()
   const { runTx, pendingTx } = useAdminTx()
 
@@ -98,6 +117,10 @@ export default function AccessControlApp() {
     if (role === 'FEE_ADMIN') return feeRouterAddr
     return roleRegistryAddr
   }
+
+  // The name of that contract, for the refusal messages below: "you do not hold
+  // DEFAULT_ADMIN_ROLE" means nothing without saying *where*.
+  const roleHomeLabel = (role) => ROLE_HOME_LABELS[role] || 'WagerRegistry'
 
   // The chain a role grant is SIGNED on. Every role follows the scope picker
   // except ROLE_MANAGER, whose home contract is reference-chain pinned (above):
@@ -130,6 +153,57 @@ export default function AccessControlApp() {
   const selectedWriteChainId = roleWriteChainId(adminRoleForm.role)
   const onSelectedWriteChain = Number(chainId) === Number(selectedWriteChainId)
 
+  // ── AUTHORITY IS READ FROM THE CONTRACT THAT WILL ENFORCE IT (spec 071 FR-019) ──
+  // OpenZeppelin's `grantRole`/`revokeRole` are gated on the role's ADMIN role,
+  // which is `DEFAULT_ADMIN_ROLE` on every contract this picker targets (no
+  // `_setRoleAdmin` call exists on any of them). So that is what is asked of the
+  // SELECTED role's home contract, on the chain that grant actually signs on —
+  // for ROLE_MANAGER the membership reference chain, for everything else the
+  // scoped one. `access.flags.isAdmin` cannot answer this: it is true when
+  // DEFAULT_ADMIN_ROLE is held on ANY cohort chain, on a candidate list that
+  // need not include this contract at all, so it would offer an enabled Grant
+  // button for a transaction the contract then reverts.
+  const selectedRoleContract = roleHomeContract(adminRoleForm.role)
+  const authorityProvider =
+    readProviderFor(selectedWriteChainId, chainId, provider) || getProvider(selectedWriteChainId)
+  const [roleAdminAuthority, setRoleAdminAuthority] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    setRoleAdminAuthority(null)
+    readAuthority({
+      provider: authorityProvider,
+      address: selectedRoleContract,
+      account,
+      roles: ['admin'],
+    }).then((a) => {
+      if (!cancelled) setRoleAdminAuthority(a)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [authorityProvider, selectedRoleContract, account])
+
+  const roleAdminGate = contractAuthorityGate({
+    authority: roleAdminAuthority,
+    roles: ['admin'],
+    // Stands in for one round-trip only, so an operator who does hold it is not
+    // shown a dead button while the read is in flight.
+    fallback: access.flags.isAdmin,
+    chainId: selectedWriteChainId,
+    contractLabel: roleHomeLabel(adminRoleForm.role),
+    roleLabel: 'DEFAULT_ADMIN_ROLE',
+    accountLabel: account ? shortAddr(account) : 'This account',
+  })
+
+  // Re-checked at the call site as well as in the disabled button: only a
+  // DEFINITE "not held" refuses, so an unconfirmed read still sends and lets the
+  // contract be the gate.
+  const requireRoleAdminAuthority = () => {
+    if (roleAdminGate.allowed) return true
+    showNotification(roleAdminGate.reason || 'You do not hold DEFAULT_ADMIN_ROLE here.', 'error')
+    return false
+  }
+
   const handleGrantAdminRole = () => {
     const target = adminRoleEns.resolvedAddress || adminRoleForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
@@ -137,6 +211,7 @@ export default function AccessControlApp() {
     const roleHash = ROLE_HASHES[adminRoleForm.role]
     const addr = roleHomeContract(adminRoleForm.role)
     if (!addr) return showNotification('Role contract not deployed on this network', 'error')
+    if (!requireRoleAdminAuthority()) return false
     return runTx(
       () => new ethers.Contract(addr, ACCESS_CONTROL_ABI, signer).grantRole(roleHash, target),
       `Granted ${adminRoleForm.role} to ${shortAddr(target)} on ${networkName(roleWriteChainId(adminRoleForm.role))}`,
@@ -150,6 +225,7 @@ export default function AccessControlApp() {
     const roleHash = ROLE_HASHES[adminRoleForm.role]
     const addr = roleHomeContract(adminRoleForm.role)
     if (!addr) return showNotification('Role contract not deployed on this network', 'error')
+    if (!requireRoleAdminAuthority()) return false
     return runTx(
       () => new ethers.Contract(addr, ACCESS_CONTROL_ABI, signer).revokeRole(roleHash, target),
       `Revoked ${adminRoleForm.role} from ${shortAddr(target)} on ${networkName(roleWriteChainId(adminRoleForm.role))}`,
@@ -306,14 +382,22 @@ export default function AccessControlApp() {
               </select>
             </label>
             <div className="emergency-actions">
-              <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx || !onSelectedWriteChain}>
+              <button
+                className="confirm-btn primary"
+                onClick={handleGrantAdminRole}
+                disabled={pendingTx || !onSelectedWriteChain || !roleAdminGate.allowed}
+              >
                 {pendingTx
                   ? 'Processing...'
                   : onSelectedWriteChain
                     ? 'Grant Role'
                     : `Switch to ${networkName(selectedWriteChainId)} to grant`}
               </button>
-              <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx || !onSelectedWriteChain}>
+              <button
+                className="confirm-btn danger"
+                onClick={handleRevokeAdminRole}
+                disabled={pendingTx || !onSelectedWriteChain || !roleAdminGate.allowed}
+              >
                 {pendingTx
                   ? 'Processing...'
                   : onSelectedWriteChain
@@ -321,6 +405,14 @@ export default function AccessControlApp() {
                     : `Switch to ${networkName(selectedWriteChainId)} to revoke`}
               </button>
             </div>
+            {/* One reason at a time, and the actionable one: while the wallet is on
+                the wrong network the notice above already says what to do, and the
+                authority verdict there would be about a chain nobody is signing on. */}
+            {onSelectedWriteChain && roleAdminGate.reason && (
+              <p className="card-info warning-text" role="status">
+                {roleAdminGate.reason}
+              </p>
+            )}
           </div>
         </div>
       </div>

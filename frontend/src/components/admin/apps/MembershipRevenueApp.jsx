@@ -34,8 +34,9 @@ import { isValidEthereumAddress } from '../../../utils/validation'
 import { getContractAddressForChain } from '../../../config/contracts'
 import { membershipChainId } from '../../../config/networks'
 import { getProvider } from '../../../utils/blockchainService'
-import { networkName, readProviderFor } from '../../../lib/chains/estate'
+import { networkName, readProviderFor, readAuthority } from '../../../lib/chains/estate'
 import { isRead, isNotDeployed, formatUnitAmount } from '../../../lib/chains/chainReadResult'
+import { contractAuthorityGate } from '../scopeGate'
 
 const APP = adminAppById('membership-revenue')
 
@@ -120,6 +121,64 @@ export default function MembershipRevenueApp() {
     return false
   }
 
+  // ── AUTHORITY IS READ FROM THE MEMBERSHIPMANAGER ITSELF (spec 071 FR-019) ──
+  // The two write families on this app answer to DIFFERENT roles, and OpenZeppelin
+  // AccessControl has no hierarchy — DEFAULT_ADMIN_ROLE does not satisfy
+  // `onlyRole(ROLE_MANAGER_ROLE)`. Verified against contracts/access/MembershipManager.sol:
+  //
+  //   grantMembership / revokeMembership  → onlyRole(ROLE_MANAGER_ROLE)   (:223, :237)
+  //   setTier                             → onlyRole(DEFAULT_ADMIN_ROLE)  (:146)
+  //   withdrawFees                        → onlyRole(DEFAULT_ADMIN_ROLE)  (:247)
+  //
+  // `flags.isAdmin` / `flags.isRoleManager` are estate-wide — true when held on ANY
+  // cohort chain — so they were offering these writes to accounts the reference
+  // chain's manager would reject. Both roles are asked of the one contract, in one
+  // read, on the chain the transaction signs on.
+  const accountLabel = account ? shortAddr(account) : 'This account'
+  const [membershipAuthority, setMembershipAuthority] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    setMembershipAuthority(null)
+    readAuthority({
+      provider: membershipProvider,
+      address: membershipManagerAddr,
+      account,
+      roles: ['admin', 'roleManager'],
+    }).then((a) => {
+      if (!cancelled) setMembershipAuthority(a)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [membershipProvider, membershipManagerAddr, account])
+
+  const memberGate = contractAuthorityGate({
+    authority: membershipAuthority,
+    roles: ['roleManager'],
+    fallback: flags.isRoleManager || flags.isAdmin,
+    chainId: membershipAdminChainId,
+    contractLabel: 'MembershipManager',
+    roleLabel: 'ROLE_MANAGER_ROLE',
+    accountLabel,
+  })
+  const tierGate = contractAuthorityGate({
+    authority: membershipAuthority,
+    roles: ['admin'],
+    fallback: flags.isAdmin,
+    chainId: membershipAdminChainId,
+    contractLabel: 'MembershipManager',
+    roleLabel: 'DEFAULT_ADMIN_ROLE',
+    accountLabel,
+  })
+
+  // Re-checked at the call site as well as in the disabled button. Only a DEFINITE
+  // "not held" refuses — an unconfirmed read still sends, and the contract decides.
+  const requireAuthority = (gate) => {
+    if (gate.allowed) return true
+    showNotification(gate.reason || 'You do not hold the role this change requires.', 'error')
+    return false
+  }
+
   // ── Forms (state shapes carried over from the monolith) ──
   const [tierForm, setTierForm] = useState({
     role: 'WAGER_PARTICIPANT', tier: 1, price: '2', durationDays: 30, monthly: 15, concurrent: 5, active: true,
@@ -141,6 +200,44 @@ export default function MembershipRevenueApp() {
     setWithdrawChainId((onWallet || anyRead || feeEstate.accrued[0]).chainId)
   }, [feeEstate.accrued, chainId, withdrawChainId])
 
+  // A withdrawal signs on the CHOSEN chain, not the reference chain, so its
+  // authority is read from that chain's own MembershipManager. Reading the
+  // reference chain's would answer a question nobody asked (FR-019: the contract
+  // that will enforce it, on the chain in scope).
+  const withdrawManagerAddr =
+    withdrawChainId == null ? '' : getContractAddressForChain('membershipManager', withdrawChainId)
+  const withdrawProvider =
+    withdrawChainId == null
+      ? null
+      : readProviderFor(withdrawChainId, chainId, provider) || getProvider(withdrawChainId)
+  const [withdrawAuthority, setWithdrawAuthority] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    setWithdrawAuthority(null)
+    if (withdrawChainId == null) return undefined
+    readAuthority({
+      provider: withdrawProvider,
+      address: withdrawManagerAddr,
+      account,
+      roles: ['admin'],
+    }).then((a) => {
+      if (!cancelled) setWithdrawAuthority(a)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [withdrawProvider, withdrawManagerAddr, account, withdrawChainId])
+
+  const withdrawGate = contractAuthorityGate({
+    authority: withdrawAuthority,
+    roles: ['admin'],
+    fallback: flags.isAdmin,
+    chainId: withdrawChainId,
+    contractLabel: 'MembershipManager',
+    roleLabel: 'DEFAULT_ADMIN_ROLE',
+    accountLabel,
+  })
+
   const [withdrawForm, setWithdrawForm] = useState({ to: '', amount: '' })
   useEffect(() => {
     if (membershipState.treasury) {
@@ -152,6 +249,7 @@ export default function MembershipRevenueApp() {
   // ── Handlers (verbatim from the monolith) ──
   const handleConfigureTier = () => {
     if (!requireMembershipChain()) return false
+    if (!requireAuthority(tierGate)) return false
     const priceUSDC = ethers.parseUnits(String(tierForm.price), USDC_DECIMALS)
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).setTier(
@@ -170,6 +268,7 @@ export default function MembershipRevenueApp() {
     const target = grantEns.resolvedAddress || grantForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
     if (!requireMembershipChain()) return false
+    if (!requireAuthority(memberGate)) return false
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).grantMembership(
         target, membershipRole(grantForm.role).hash, grantForm.tier, grantForm.durationDays,
@@ -182,6 +281,7 @@ export default function MembershipRevenueApp() {
     const target = revokeEns.resolvedAddress || revokeForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
     if (!requireMembershipChain()) return false
+    if (!requireAuthority(memberGate)) return false
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).revokeMembership(
         target, membershipRole(revokeForm.role).hash,
@@ -204,6 +304,7 @@ export default function MembershipRevenueApp() {
     }
     const addr = getContractAddressForChain('membershipManager', withdrawChainId)
     if (!addr) return showNotification(`No MembershipManager on ${networkName(withdrawChainId)}`, 'error')
+    if (!requireAuthority(withdrawGate)) return false
     const decimals = withdrawScope?.unit?.decimals ?? USDC_DECIMALS
     const symbol = withdrawScope?.unit?.symbol ?? 'USDC'
     const amount = ethers.parseUnits(String(withdrawForm.amount || '0'), decimals)
@@ -311,9 +412,16 @@ export default function MembershipRevenueApp() {
                   onChange={(e) => setTierForm({ ...tierForm, active: e.target.checked })} />
                 Active (available for purchase)
               </label>
-              <button className="confirm-btn primary" onClick={handleConfigureTier} disabled={pendingTx || !onMembershipChain}>
+              <button
+                className="confirm-btn primary"
+                onClick={handleConfigureTier}
+                disabled={pendingTx || !onMembershipChain || !tierGate.allowed}
+              >
                 {pendingTx ? 'Saving...' : 'Save Tier Config'}
               </button>
+              {onMembershipChain && tierGate.reason && (
+                <p className="card-info warning-text" role="status">{tierGate.reason}</p>
+              )}
             </div>
           </div>
         </div>
@@ -361,9 +469,16 @@ export default function MembershipRevenueApp() {
                 <input type="number" min="1" max="3650" value={grantForm.durationDays}
                   onChange={(e) => setGrantForm({ ...grantForm, durationDays: Number(e.target.value) })} />
               </label>
-              <button className="confirm-btn primary" onClick={handleGrantMembership} disabled={pendingTx || !onMembershipChain}>
+              <button
+                className="confirm-btn primary"
+                onClick={handleGrantMembership}
+                disabled={pendingTx || !onMembershipChain || !memberGate.allowed}
+              >
                 {pendingTx ? 'Granting...' : 'Grant Membership'}
               </button>
+              {onMembershipChain && memberGate.reason && (
+                <p className="card-info warning-text" role="status">{memberGate.reason}</p>
+              )}
             </div>
           </div>
 
@@ -388,9 +503,16 @@ export default function MembershipRevenueApp() {
                   <span className="hint">→ {shortAddr(revokeEns.resolvedAddress)}</span>
                 )}
               </label>
-              <button className="confirm-btn danger" onClick={handleRevokeMembership} disabled={pendingTx || !onMembershipChain}>
+              <button
+                className="confirm-btn danger"
+                onClick={handleRevokeMembership}
+                disabled={pendingTx || !onMembershipChain || !memberGate.allowed}
+              >
                 {pendingTx ? 'Revoking...' : 'Revoke Membership'}
               </button>
+              {onMembershipChain && memberGate.reason && (
+                <p className="card-info warning-text" role="status">{memberGate.reason}</p>
+              )}
             </div>
           </div>
         </div>
@@ -471,7 +593,7 @@ export default function MembershipRevenueApp() {
               <button
                 className="confirm-btn primary"
                 onClick={handleWithdraw}
-                disabled={pendingTx || Number(chainId) !== Number(withdrawChainId)}
+                disabled={pendingTx || Number(chainId) !== Number(withdrawChainId) || !withdrawGate.allowed}
               >
                 {pendingTx
                   ? 'Withdrawing...'
@@ -479,6 +601,9 @@ export default function MembershipRevenueApp() {
                     ? `Switch to ${networkName(withdrawChainId)} to withdraw`
                     : `Withdraw on ${networkName(withdrawChainId)}`}
               </button>
+              {Number(chainId) === Number(withdrawChainId) && withdrawGate.reason && (
+                <p className="card-info warning-text" role="status">{withdrawGate.reason}</p>
+              )}
             </div>
           </div>
         </div>

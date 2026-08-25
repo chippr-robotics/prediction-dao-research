@@ -15,6 +15,12 @@
  *     satisfy. The tier/grant/revoke forms carry a role selector that
  *     DEFAULTS to Wager Participant (existing behaviour unchanged) and passes
  *     the selected role hash through.
+ *  4. FR-019: both apps offered their writes on ESTATE-WIDE role flags
+ *     (`isAdmin` / `isRoleManager` — true when held on ANY cohort chain,
+ *     against a candidate list that need not include the contract being
+ *     written to) plus a wallet-chain match. No `hasRole` was ever asked of
+ *     the contract that would enforce the call. Authority now comes from that
+ *     contract, on the chain the transaction signs on, in three states.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
@@ -22,6 +28,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { ethers as realEthers } from 'ethers'
 import { membershipChainId, cohortChainIds } from '../../config/networks'
 import { networkName } from '../../lib/chains/estate'
+import { readOk } from '../../lib/chains/chainReadResult'
 
 const m = vi.hoisted(() => ({
   chainId: 137,
@@ -29,6 +36,11 @@ const m = vi.hoisted(() => ({
   contractCalls: [],
   notify: null, // assigned in beforeEach
   runTx: null,
+  // Every readAuthority the apps make lands here, and its answer comes from
+  // `authorityFor` — the seam these FR-019 tests drive.
+  authorityReads: [],
+  authorityFor: null, // assigned in beforeEach
+  feeEstate: null, // assigned in beforeEach
 }))
 
 vi.mock('../../hooks/useRoles', () => ({
@@ -54,18 +66,26 @@ vi.mock('../../utils/blockchainService', () => ({ getProvider: () => null }))
 vi.mock('../../lib/miniapps/registryAuthority', () => ({
   readCuratorAuthority: () => Promise.resolve({ held: false, outcome: 'not-held' }),
 }))
-vi.mock('../../hooks/useFeeEstate', () => ({
-  useFeeEstate: () => ({ accrued: [], received: [], accruedTotals: null, receivedTotals: null, refresh: vi.fn() }),
-}))
+vi.mock('../../hooks/useFeeEstate', () => ({ useFeeEstate: () => m.feeEstate }))
 vi.mock('../../config/contracts', () => ({
   NETWORK_CONFIG: { name: 'Test', blockExplorer: 'https://x' },
   DEPLOYED_CONTRACTS: {},
   getContractAddressForChain: (key, chainId) => m.deployed[`${key}:${Number(chainId)}`] || '',
 }))
-// Reads in these apps are not under test; a null provider keeps effects inert.
+// Data reads in these apps are not under test; a null provider keeps them inert.
+// The AUTHORITY read is under test, so it is the one seam this file controls: the
+// default answer is the honest one a null provider produces (UNCONFIRMED), which
+// is what every pre-FR-019 assertion in this file was written against.
 vi.mock('../../lib/chains/estate', async (importOriginal) => {
   const actual = await importOriginal()
-  return { ...actual, readProviderFor: () => null }
+  return {
+    ...actual,
+    readProviderFor: () => null,
+    readAuthority: (args) => {
+      m.authorityReads.push(args)
+      return Promise.resolve(m.authorityFor(args))
+    },
+  }
 })
 // Heavy re-hosted views are not under test here.
 vi.mock('../../components/admin/MembershipTreasuryOverview', () => ({ default: () => <div data-testid="mto" /> }))
@@ -126,9 +146,16 @@ const mount = (El, path) =>
     </MemoryRouter>,
   )
 
+/** The three authority answers, in the shape `readAuthority` returns. */
+const UNCONFIRMED = { roles: {}, readable: false, deployed: true, reason: 'no read connection to this network' }
+const heldAuthority = (roles) => ({ roles, readable: true, deployed: true, reason: null })
+
 beforeEach(() => {
   m.chainId = OTHER
   m.contractCalls = []
+  m.authorityReads = []
+  m.authorityFor = () => UNCONFIRMED
+  m.feeEstate = { accrued: [], received: [], accruedTotals: null, receivedTotals: null, refresh: vi.fn() }
   m.notify = vi.fn()
   m.runTx = vi.fn(async (fn) => {
     await fn()
@@ -382,5 +409,287 @@ describe('MembershipRevenueApp: membership role selector', () => {
       screen.getAllByText(new RegExp(`Memberships live on ${membershipName}`, 'i')).length,
     ).toBeGreaterThan(0)
     expect(m.runTx).not.toHaveBeenCalled()
+  })
+})
+
+// ── Finding 4: authority is READ FROM THE CONTRACT, in three states (FR-019) ──
+//
+// The defect: Grant/Revoke here, and grant/revoke/tier/withdraw next door, were
+// offered on `useAdminAccess().flags` — estate-wide booleans, true when the role
+// is held on ANY cohort chain — plus a wallet-chain match. Neither is authority
+// over the contract the transaction goes to. An operator holding DEFAULT_ADMIN on
+// one network was shown an enabled Grant Role on every other, and the only thing
+// that ever said no was the revert.
+//
+// The three states are not interchangeable, and each is asserted separately:
+//   held        → offered, exactly as before
+//   not held    → WITHHELD, and it says who lacks what on which contract, on which chain
+//   unconfirmed → still OFFERED (an RPC timeout is not a denial), and says so
+describe('AccessControlApp: DEFAULT_ADMIN_ROLE is read from the role’s home contract (FR-019)', () => {
+  const openRolesView = () => mount(AccessControlApp, '/admin/access-control?view=admin-roles')
+  const grantBtn = () => screen.getByRole('button', { name: 'Grant Role' })
+  const revokeBtn = () => screen.getByRole('button', { name: 'Revoke Role' })
+
+  it('asks the SELECTED role’s home contract, on the chain that grant signs on', async () => {
+    m.chainId = MEMBERSHIP
+    openRolesView()
+
+    // Default GUARDIAN: the WagerRegistry on the scoped chain.
+    await waitFor(() => expect(m.authorityReads.length).toBeGreaterThan(0))
+    expect(m.authorityReads.at(-1)).toMatchObject({
+      address: ADDRS.wagerRegistry,
+      account: '0xabc',
+      roles: ['admin'],
+    })
+
+    // ROLE_MANAGER: the reference-chain MembershipManager, never the scoped chain's registry.
+    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: 'ROLE_MANAGER' } })
+    await waitFor(() =>
+      expect(m.authorityReads.at(-1)).toMatchObject({
+        address: ADDRS.membershipManager,
+        roles: ['admin'],
+      }),
+    )
+  })
+
+  it('HELD ⇒ the controls are offered, with their labels unchanged', async () => {
+    m.authorityFor = () => heldAuthority({ admin: true })
+    m.chainId = OTHER
+    openRolesView()
+
+    await waitFor(() => expect(grantBtn()).toBeEnabled())
+    expect(revokeBtn()).toBeEnabled()
+    expect(screen.queryByText(/does not hold/i)).toBeNull()
+    expect(screen.queryByText(/could not be confirmed/i)).toBeNull()
+  })
+
+  it('NOT HELD ⇒ withheld, naming the account, the role, the contract and the chain', async () => {
+    m.authorityFor = () => heldAuthority({ admin: false })
+    m.chainId = OTHER
+    openRolesView()
+
+    await waitFor(() => expect(grantBtn()).toBeDisabled())
+    expect(revokeBtn()).toBeDisabled()
+
+    const notice = screen.getByText(/does not hold DEFAULT_ADMIN_ROLE/)
+    expect(notice).toHaveTextContent('0xabc') // who
+    expect(notice).toHaveTextContent('DEFAULT_ADMIN_ROLE') // what
+    expect(notice).toHaveTextContent('WagerRegistry') // on which contract
+    expect(notice).toHaveTextContent(otherName) // on which chain
+    expect(notice).toHaveTextContent(/withheld/i)
+  })
+
+  it('NOT HELD on the MembershipManager names THAT contract and the membership chain', async () => {
+    m.authorityFor = () => heldAuthority({ admin: false })
+    m.chainId = MEMBERSHIP
+    openRolesView()
+
+    fireEvent.change(await screen.findByLabelText(/^Role/), { target: { value: 'ROLE_MANAGER' } })
+    await waitFor(() => expect(grantBtn()).toBeDisabled())
+
+    const notice = screen.getByText(/does not hold DEFAULT_ADMIN_ROLE/)
+    expect(notice).toHaveTextContent('MembershipManager')
+    expect(notice).toHaveTextContent(membershipName)
+    // The WagerRegistry is not what enforces a ROLE_MANAGER grant, so it is not named.
+    expect(notice).not.toHaveTextContent('WagerRegistry')
+  })
+
+  it('UNCONFIRMED ⇒ still offered, and says the contract is the real gate', async () => {
+    m.authorityFor = () => UNCONFIRMED
+    m.chainId = OTHER
+    openRolesView()
+
+    await waitFor(() => expect(screen.getByText(/could not be confirmed/i)).toBeInTheDocument())
+    // An RPC timeout is not a denial: the control stays available.
+    expect(grantBtn()).toBeEnabled()
+    expect(revokeBtn()).toBeEnabled()
+    const notice = screen.getByText(/could not be confirmed/i)
+    expect(notice).toHaveTextContent('WagerRegistry')
+    expect(notice).toHaveTextContent(otherName)
+    expect(notice).toHaveTextContent(/will refuse anything you do not hold/i)
+    expect(screen.queryByText(/does not hold/i)).toBeNull()
+  })
+
+  it('an UNCONFIRMED read still signs — the contract, not the app, refuses', async () => {
+    m.authorityFor = () => UNCONFIRMED
+    m.chainId = OTHER
+    openRolesView()
+
+    fireEvent.change(await screen.findByLabelText(/Account \(address or ENS\)/), { target: { value: TARGET } })
+    fireEvent.click(grantBtn())
+    await waitFor(() => expect(m.runTx).toHaveBeenCalled())
+    expect(m.contractCalls[0]).toMatchObject({ address: ADDRS.wagerRegistry, method: 'grantRole' })
+  })
+
+  it('re-checks authority at the call site, not only in the disabled button', async () => {
+    const src = (await import('../../components/admin/apps/AccessControlApp.jsx?raw')).default
+    const grantBody = src.slice(src.indexOf('const handleGrantAdminRole'), src.indexOf('const handleRevokeAdminRole'))
+    const revokeBody = src.slice(src.indexOf('const handleRevokeAdminRole'), src.indexOf('// Dashboard:'))
+    expect(grantBody).toMatch(/if \(!requireRoleAdminAuthority\(\)\) return false/)
+    expect(revokeBody).toMatch(/if \(!requireRoleAdminAuthority\(\)\) return false/)
+  })
+
+  it('the chain guard is untouched: off the write chain the chain notice is the one shown', async () => {
+    // Two reasons at once is two instructions; the actionable one is the network.
+    m.authorityFor = () => heldAuthority({ admin: false })
+    m.chainId = OTHER
+    openRolesView()
+    fireEvent.change(await screen.findByLabelText(/^Role/), { target: { value: 'ROLE_MANAGER' } })
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: new RegExp(`Switch to ${membershipName} to grant`) }),
+      ).toBeDisabled(),
+    )
+    expect(screen.queryByText(/does not hold DEFAULT_ADMIN_ROLE/)).toBeNull()
+  })
+})
+
+describe('MembershipRevenueApp: each write is gated on the role its function requires (FR-019)', () => {
+  const openMembers = () => mount(MembershipRevenueApp, '/admin/membership-revenue?view=members')
+  const openTiers = () => mount(MembershipRevenueApp, '/admin/membership-revenue?view=tiers')
+  const grantBtn = () => screen.getByRole('button', { name: 'Grant Membership' })
+  const revokeBtn = () => screen.getByRole('button', { name: 'Revoke Membership' })
+  const tierBtn = () => screen.getByRole('button', { name: 'Save Tier Config' })
+
+  it('asks the reference-chain MembershipManager for BOTH roles in one read', async () => {
+    m.chainId = MEMBERSHIP
+    openMembers()
+    await waitFor(() => expect(m.authorityReads.length).toBeGreaterThan(0))
+    expect(m.authorityReads[0]).toMatchObject({
+      address: ADDRS.membershipManager,
+      account: '0xabc',
+      roles: ['admin', 'roleManager'],
+    })
+  })
+
+  it('HELD ⇒ grant/revoke offered on ROLE_MANAGER_ROLE, tier offered on DEFAULT_ADMIN_ROLE', async () => {
+    m.authorityFor = () => heldAuthority({ admin: true, roleManager: true })
+    m.chainId = MEMBERSHIP
+    openMembers()
+    await waitFor(() => expect(grantBtn()).toBeEnabled())
+    expect(revokeBtn()).toBeEnabled()
+    expect(screen.queryByText(/does not hold/i)).toBeNull()
+  })
+
+  /*
+   * The sharp case, and the reason these are two separate gates: OpenZeppelin
+   * AccessControl has NO hierarchy. `grantMembership`/`revokeMembership` are
+   * `onlyRole(ROLE_MANAGER_ROLE)` (MembershipManager.sol:223/:237), so holding
+   * DEFAULT_ADMIN_ROLE does not satisfy them — a single "is an admin" gate would
+   * offer a write the contract reverts.
+   */
+  it('DEFAULT_ADMIN alone does NOT unlock grant/revoke — but it does unlock the tier ladder', async () => {
+    m.authorityFor = () => heldAuthority({ admin: true, roleManager: false })
+    m.chainId = MEMBERSHIP
+    openMembers()
+
+    await waitFor(() => expect(grantBtn()).toBeDisabled())
+    expect(revokeBtn()).toBeDisabled()
+    const notice = screen.getAllByText(/does not hold ROLE_MANAGER_ROLE/)[0]
+    expect(notice).toHaveTextContent('MembershipManager')
+    expect(notice).toHaveTextContent(membershipName)
+
+    // Same authority, different function, different answer.
+    openTiers()
+    await waitFor(() => expect(tierBtn()).toBeEnabled())
+  })
+
+  it('ROLE_MANAGER alone does NOT unlock setTier — it is onlyRole(DEFAULT_ADMIN_ROLE)', async () => {
+    m.authorityFor = () => heldAuthority({ admin: false, roleManager: true })
+    m.chainId = MEMBERSHIP
+    openTiers()
+
+    await waitFor(() => expect(tierBtn()).toBeDisabled())
+    const notice = screen.getByText(/does not hold DEFAULT_ADMIN_ROLE/)
+    expect(notice).toHaveTextContent('MembershipManager')
+    expect(notice).toHaveTextContent(membershipName)
+    expect(notice).toHaveTextContent(/withheld/i)
+  })
+
+  it('UNCONFIRMED ⇒ every membership write stays offered, and says why it is unsure', async () => {
+    m.authorityFor = () => UNCONFIRMED
+    m.chainId = MEMBERSHIP
+    openMembers()
+
+    await waitFor(() => expect(screen.getAllByText(/could not be confirmed/i).length).toBeGreaterThan(0))
+    expect(grantBtn()).toBeEnabled()
+    expect(revokeBtn()).toBeEnabled()
+    expect(screen.queryByText(/does not hold/i)).toBeNull()
+  })
+
+  it('a definite NOT HELD refuses at the call site too, in the same words', async () => {
+    m.authorityFor = () => heldAuthority({ admin: true, roleManager: false })
+    m.chainId = MEMBERSHIP
+    const src = (await import('../../components/admin/apps/MembershipRevenueApp.jsx?raw')).default
+    expect(src).toMatch(/if \(!requireAuthority\(memberGate\)\) return false/)
+    expect(src).toMatch(/if \(!requireAuthority\(tierGate\)\) return false/)
+    expect(src).toMatch(/if \(!requireAuthority\(withdrawGate\)\) return false/)
+  })
+
+  it('the reference-chain pin still wins: off the membership chain, no authority verdict is shown', async () => {
+    m.authorityFor = () => heldAuthority({ admin: false, roleManager: false })
+    m.chainId = OTHER
+    openMembers()
+    await waitFor(() => expect(grantBtn()).toBeDisabled())
+    expect(screen.queryByText(/does not hold/i)).toBeNull()
+    expect(screen.getAllByText(new RegExp(`Memberships live on ${membershipName}`, 'i')).length)
+      .toBeGreaterThan(0)
+  })
+})
+
+describe('MembershipRevenueApp: a withdrawal is gated on the CHOSEN chain’s manager (FR-019)', () => {
+  const USDC = { symbol: 'USDC', decimals: 6 }
+  const openTreasury = () => mount(MembershipRevenueApp, '/admin/membership-revenue?view=treasury')
+  const withdrawBtn = () => screen.getByRole('button', { name: new RegExp(`^Withdraw on ${membershipName}`) })
+
+  const withAccrued = () => {
+    m.feeEstate = {
+      accrued: [readOk(MEMBERSHIP, 1_000_000n, USDC)],
+      received: [],
+      accruedTotals: null,
+      receivedTotals: null,
+      refresh: vi.fn(),
+    }
+  }
+
+  it('reads DEFAULT_ADMIN_ROLE from the MembershipManager on the withdrawal chain', async () => {
+    withAccrued()
+    m.chainId = MEMBERSHIP
+    openTreasury()
+    await waitFor(() =>
+      expect(m.authorityReads.some((r) => r.roles.length === 1 && r.roles[0] === 'admin')).toBe(true),
+    )
+    const read = m.authorityReads.find((r) => r.roles.length === 1)
+    expect(read).toMatchObject({ address: ADDRS.membershipManager, account: '0xabc' })
+  })
+
+  it('HELD ⇒ the withdrawal is offered, with the label the e2e drives', async () => {
+    withAccrued()
+    m.authorityFor = () => heldAuthority({ admin: true, roleManager: true })
+    m.chainId = MEMBERSHIP
+    openTreasury()
+    await waitFor(() => expect(withdrawBtn()).toBeEnabled())
+  })
+
+  it('NOT HELD ⇒ withheld, naming DEFAULT_ADMIN_ROLE on that chain’s MembershipManager', async () => {
+    withAccrued()
+    m.authorityFor = () => heldAuthority({ admin: false, roleManager: true })
+    m.chainId = MEMBERSHIP
+    openTreasury()
+
+    await waitFor(() => expect(withdrawBtn()).toBeDisabled())
+    const notice = screen.getByText(/does not hold DEFAULT_ADMIN_ROLE/)
+    expect(notice).toHaveTextContent('MembershipManager')
+    expect(notice).toHaveTextContent(membershipName)
+  })
+
+  it('UNCONFIRMED ⇒ the withdrawal stays offered rather than vanishing on a timeout', async () => {
+    withAccrued()
+    m.authorityFor = () => UNCONFIRMED
+    m.chainId = MEMBERSHIP
+    openTreasury()
+    await waitFor(() => expect(withdrawBtn()).toBeEnabled())
+    expect(screen.getByText(/could not be confirmed/i)).toHaveTextContent(membershipName)
   })
 })

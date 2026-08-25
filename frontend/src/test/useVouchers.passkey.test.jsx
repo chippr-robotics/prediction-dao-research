@@ -38,6 +38,8 @@ vi.mock('ethers', async () => {
 
 import { useWallet } from '../hooks/useWalletManagement'
 import { useVouchers } from '../hooks/useVouchers'
+import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
+import { getCurrentDocument } from '../utils/legalDocs'
 
 const MANAGER = '0x' + 'b2'.repeat(20)
 const VOUCHER = '0x' + 'a1'.repeat(20)
@@ -90,6 +92,44 @@ describe('useVouchers passkey rail (sendCalls, no signer)', () => {
     })
     expect(sendCalls).toHaveBeenCalledTimes(1)
     expect(sendCalls.mock.calls[0][0][0].target).toBe(MANAGER)
+  })
+
+  // Spec 026 FR-013/SC-005 (audit finding): passing no termsHash must still no-op honestly
+  // (ZeroHash), never crash — but the real fix is the next test, which proves a resolved
+  // hash actually reaches the contract call instead of being dropped.
+  it('redeem with no termsHash encodes the zero hash (contract-side no-op), not garbage', async () => {
+    const { result } = renderHook(() => useVouchers())
+    await act(async () => {
+      await result.current.redeemVoucher('7', undefined)
+    })
+    const iface = new (await vi.importActual('ethers')).ethers.Interface(MEMBERSHIP_MANAGER_ABI)
+    const [voucherId, acceptedTermsHash] = iface.decodeFunctionData(
+      'redeemVoucher',
+      sendCalls.mock.calls[0][0][0].data,
+    )
+    expect(voucherId.toString()).toBe('7')
+    expect(acceptedTermsHash).toBe('0x' + '00'.repeat(32))
+  })
+
+  // This is the actual regression the audit finding named: VouchersPage used to call
+  // redeemVoucher(id, undefined), so no rail — including this passkey one — ever recorded
+  // Terms acceptance. Assert the SAME hash the purchase rail resolves
+  // (getCurrentDocument('terms').hash, see PremiumPurchaseModal.jsx) reaches the encoded
+  // contract call, normalized to 0x-bytes32, when the caller supplies it.
+  it('redeem with the current in-force terms hash encodes that hash, not the zero hash', async () => {
+    const acceptedTermsHash = getCurrentDocument('terms').hash // bare 64-char hex, no 0x
+    const { result } = renderHook(() => useVouchers())
+    await act(async () => {
+      await result.current.redeemVoucher('7', acceptedTermsHash)
+    })
+    const iface = new (await vi.importActual('ethers')).ethers.Interface(MEMBERSHIP_MANAGER_ABI)
+    const [voucherId, encodedTermsHash] = iface.decodeFunctionData(
+      'redeemVoucher',
+      sendCalls.mock.calls[0][0][0].data,
+    )
+    expect(voucherId.toString()).toBe('7')
+    expect(encodedTermsHash).toBe(`0x${acceptedTermsHash}`)
+    expect(encodedTermsHash).not.toBe('0x' + '00'.repeat(32))
   })
 
   it('transfer → sendCalls([safeTransferFrom on the voucher])', async () => {
