@@ -50,6 +50,11 @@ const ROLE_HASHES = {
   // there was NO in-app way to give anyone the routers' killswitch.
   GUARDIAN_BRIDGE: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
   GUARDIAN_LIQUIDITY: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
+  // FEE_ADMIN_ROLE (spec 060) lives on the FeeRouter — the same defect-class as
+  // the router guardians above: the role gates the whole Fees tab, so leaving it
+  // out of this picker meant there was NO in-app way to hand anyone fee-rate
+  // authority. Hash matches contracts/fees/FeeRouter.sol.
+  FEE_ADMIN: ethers.keccak256(ethers.toUtf8Bytes('FEE_ADMIN_ROLE')),
   DEFAULT_ADMIN: ethers.ZeroHash,
 }
 
@@ -71,7 +76,6 @@ export default function AccessControlApp() {
   const roleNetworks = useMemo(() => estateNetworks(), [])
   const { scopeChainId: roleChainId, setScopeChainId: setRoleChainId } =
     useScopedChain(roleNetworks, chainId)
-  const onRoleChain = Number(roleChainId) === Number(chainId)
 
   // ROLE_MANAGER lives on the MembershipManager, which is reference-chain
   // pinned like the membership it manages — deliberately NOT scope-following.
@@ -81,6 +85,7 @@ export default function AccessControlApp() {
   const stakingRouterAddr = getContractAddressForChain('stakingRouter', roleChainId)
   const bridgeRouterAddr = getContractAddressForChain('bridgeRouter', roleChainId)
   const liquidityRouterAddr = getContractAddressForChain('liquidityRouter', roleChainId)
+  const feeRouterAddr = getContractAddressForChain('feeRouter', roleChainId)
   const roleRegistryAddr = getContractAddressForChain('wagerRegistry', roleChainId)
 
   const roleHomeContract = (role) => {
@@ -90,33 +95,64 @@ export default function AccessControlApp() {
     if (role === 'STAKING_ADMIN') return stakingRouterAddr
     if (role === 'LIQUIDITY_ADMIN_BRIDGE' || role === 'GUARDIAN_BRIDGE') return bridgeRouterAddr
     if (role === 'LIQUIDITY_ADMIN_LIQUIDITY' || role === 'GUARDIAN_LIQUIDITY') return liquidityRouterAddr
+    if (role === 'FEE_ADMIN') return feeRouterAddr
     return roleRegistryAddr
+  }
+
+  // The chain a role grant is SIGNED on. Every role follows the scope picker
+  // except ROLE_MANAGER, whose home contract is reference-chain pinned (above):
+  // signing that grant on the scoped chain would send a transaction to the
+  // membership chain's ADDRESS on a chain where it holds no code — which
+  // "succeeds" as a no-op and reports a grant that never happened.
+  const roleWriteChainId = (role) =>
+    role === 'ROLE_MANAGER' ? Number(membershipChainId()) : Number(roleChainId)
+
+  // Re-checked at call time as well as in the disabled button, so a stale
+  // render can never sign on the wrong network (the sibling membership app's
+  // requireMembershipChain pattern, spec 071 FR-017/FR-018).
+  const requireRoleWriteChain = (role) => {
+    const wantChainId = roleWriteChainId(role)
+    if (Number(chainId) === wantChainId) return true
+    showNotification(
+      role === 'ROLE_MANAGER'
+        ? `Role Manager lives on the MembershipManager on ${networkName(wantChainId)}. Switch your wallet there first.`
+        : `This grant is signed on ${networkName(wantChainId)}. Switch your wallet there first.`,
+      'error',
+    )
+    return false
   }
 
   const [adminRoleForm, setAdminRoleForm] = useState({ address: '', role: 'GUARDIAN' })
   const adminRoleEns = useEnsResolution(adminRoleForm.address || '')
 
+  // The chain the SELECTED role's grant signs on — ROLE_MANAGER pins to the
+  // membership chain, everything else follows the scope picker.
+  const selectedWriteChainId = roleWriteChainId(adminRoleForm.role)
+  const onSelectedWriteChain = Number(chainId) === Number(selectedWriteChainId)
+
   const handleGrantAdminRole = () => {
     const target = adminRoleEns.resolvedAddress || adminRoleForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!requireRoleWriteChain(adminRoleForm.role)) return false
     const roleHash = ROLE_HASHES[adminRoleForm.role]
     const addr = roleHomeContract(adminRoleForm.role)
     if (!addr) return showNotification('Role contract not deployed on this network', 'error')
     return runTx(
       () => new ethers.Contract(addr, ACCESS_CONTROL_ABI, signer).grantRole(roleHash, target),
-      `Granted ${adminRoleForm.role} to ${shortAddr(target)} on ${networkName(roleChainId)}`,
+      `Granted ${adminRoleForm.role} to ${shortAddr(target)} on ${networkName(roleWriteChainId(adminRoleForm.role))}`,
     )
   }
 
   const handleRevokeAdminRole = () => {
     const target = adminRoleEns.resolvedAddress || adminRoleForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!requireRoleWriteChain(adminRoleForm.role)) return false
     const roleHash = ROLE_HASHES[adminRoleForm.role]
     const addr = roleHomeContract(adminRoleForm.role)
     if (!addr) return showNotification('Role contract not deployed on this network', 'error')
     return runTx(
       () => new ethers.Contract(addr, ACCESS_CONTROL_ABI, signer).revokeRole(roleHash, target),
-      `Revoked ${adminRoleForm.role} from ${shortAddr(target)} on ${networkName(roleChainId)}`,
+      `Revoked ${adminRoleForm.role} from ${shortAddr(target)} on ${networkName(roleWriteChainId(adminRoleForm.role))}`,
     )
   }
 
@@ -134,6 +170,7 @@ export default function AccessControlApp() {
     { role: 'LIQUIDITY_ADMIN_LIQUIDITY', label: 'Liquidity Administrator (LiquidityRouter)', addr: liquidityRouterAddr },
     { role: 'GUARDIAN_BRIDGE', label: 'Guardian (BridgeRouter)', addr: bridgeRouterAddr },
     { role: 'GUARDIAN_LIQUIDITY', label: 'Guardian (LiquidityRouter)', addr: liquidityRouterAddr },
+    { role: 'FEE_ADMIN', label: 'Fee Administrator (FeeRouter)', addr: feeRouterAddr },
     { role: 'DEFAULT_ADMIN', label: 'Default Admin (WagerRegistry)', addr: roleRegistryAddr },
   ]
   const deployedCount = roleTargets.filter((t) => Boolean(t.addr)).length
@@ -194,10 +231,21 @@ export default function AccessControlApp() {
         />
         <div className="admin-card">
           <h3>Grant / Revoke Admin Roles on {networkName(roleChainId)}</h3>
-          {!onRoleChain && (
+          {!onSelectedWriteChain && (
             <p className="card-info warning-text" role="status">
-              This grant is signed on {networkName(roleChainId)}. Your wallet is on{' '}
-              {networkName(chainId)} — switch it there to grant or revoke.
+              {adminRoleForm.role === 'ROLE_MANAGER' ? (
+                <>
+                  Role Manager lives on the MembershipManager on{' '}
+                  {networkName(selectedWriteChainId)} — whatever network is scoped above. Your
+                  wallet is on {networkName(chainId)} — switch it to{' '}
+                  {networkName(selectedWriteChainId)} to grant or revoke.
+                </>
+              ) : (
+                <>
+                  This grant is signed on {networkName(selectedWriteChainId)}. Your wallet is on{' '}
+                  {networkName(chainId)} — switch it there to grant or revoke.
+                </>
+              )}
             </p>
           )}
           <p>
@@ -243,15 +291,24 @@ export default function AccessControlApp() {
                 <option value="LIQUIDITY_ADMIN_LIQUIDITY">Liquidity Administrator — curated pools + caps (LiquidityRouter only)</option>
                 <option value="GUARDIAN_BRIDGE">Guardian — pause new bridges (BridgeRouter only)</option>
                 <option value="GUARDIAN_LIQUIDITY">Guardian — pause new Uniswap supplies (LiquidityRouter only)</option>
+                <option value="FEE_ADMIN">Fee Administrator — service fee rates (FeeRouter)</option>
                 <option value="DEFAULT_ADMIN">Default Admin — full control (rare)</option>
               </select>
             </label>
             <div className="emergency-actions">
-              <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx || !onRoleChain}>
-                {pendingTx ? 'Processing...' : 'Grant Role'}
+              <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx || !onSelectedWriteChain}>
+                {pendingTx
+                  ? 'Processing...'
+                  : onSelectedWriteChain
+                    ? 'Grant Role'
+                    : `Switch to ${networkName(selectedWriteChainId)} to grant`}
               </button>
-              <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx || !onRoleChain}>
-                {pendingTx ? 'Processing...' : 'Revoke Role'}
+              <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx || !onSelectedWriteChain}>
+                {pendingTx
+                  ? 'Processing...'
+                  : onSelectedWriteChain
+                    ? 'Revoke Role'
+                    : `Switch to ${networkName(selectedWriteChainId)} to revoke`}
               </button>
             </div>
           </div>

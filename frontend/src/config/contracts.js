@@ -201,6 +201,7 @@ const AMOY_CONTRACTS = {
   bridgeRouter: '',
   liquidityRouter: '',
   entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  verifyingPaymaster: '0xA00A06ae44FA2bd40Ec10D9613c96afD779b6898', // spec 050 — sponsored-gas paymaster (EntryPoint v0.6)
   accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
 }
 
