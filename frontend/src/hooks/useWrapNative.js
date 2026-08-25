@@ -22,6 +22,7 @@ import { useEndpointsRevision } from './useRpcEndpoints'
  *
  *   vault    → a threshold-gated proposal (nothing moves until the signers approve)
  *   legacy   → signed by the unlocked recovered key, never the connected wallet
+ *   hardware → signed on the device via the deferred ceremony (spec 088), never the connected wallet
  *   passkey  → one smart-account call (sponsored where the chain runs a paymaster)
  *   classic  → a plain transaction, sender pays the network fee
  *
@@ -52,7 +53,8 @@ const RESERVE_MULTIPLIER = 2n
 export function useWrapNative() {
   const { address, chainId, signer, provider, loginMethod, sendCalls } = useWallet()
   const {
-    identity, isVault, isLegacy, canActAsVault, canActAsLegacy, submit: submitAsActive,
+    identity, isVault, isLegacy, isHardware, canActAsVault, canActAsLegacy, canActAsHardware,
+    submit: submitAsActive,
   } = useActiveAccount()
   const isPasskey = loginMethod === 'passkey'
 
@@ -76,10 +78,12 @@ export function useWrapNative() {
   }, [chainId, isPasskey, provider, net?.rpcUrl, endpointRevision])
 
   // Balances belong to whoever is ACTING — a vault holds its own coin, and so does a
-  // recovered legacy account. Reading the connected wallet's balance while operating as a
-  // vault would offer a MAX the vault cannot cover.
+  // recovered legacy or hardware account (spec 088 FR-001). Reading the connected wallet's
+  // balance while operating as any of them would offer a MAX the acting account cannot cover.
   const actingAddress =
-    (isVault && identity?.vaultAddress) || (isLegacy && identity?.address) || address || null
+    (isVault && identity?.vaultAddress) ||
+    ((isLegacy || isHardware) && identity?.address) ||
+    address || null
 
   const nativeSymbol = net?.nativeCurrency?.symbol || ''
   const wrappedSymbol = onChainSymbol || token?.symbol || ''
@@ -163,7 +167,7 @@ export function useWrapNative() {
   const execute = useCallback(
     async (direction, amount) => {
       if (!token) throw new Error('This network has no wrapped coin configured.')
-      if (!signer && !isPasskey && !isVault && !isLegacy) throw new Error('Wallet not connected.')
+      if (!signer && !isPasskey && !isVault && !isLegacy && !isHardware) throw new Error('Wallet not connected.')
 
       let value
       try {
@@ -197,9 +201,12 @@ export function useWrapNative() {
           return { txHash: null, proposed: true, safeTxHash: res.safeTxHash, sponsored: false }
         }
 
-        // Recovered legacy account: signed by its unlocked key via the active-account seam.
-        if (isLegacy) {
-          if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to wrap from it.')
+        // Recovered legacy / hardware account: signed by THAT account's signer via the
+        // active-account seam (spec 088 FR-002) — the deferred unlock / device ceremony runs
+        // on demand. Never falls through to the connected signer below.
+        if (isLegacy || isHardware) {
+          if (isLegacy && !canActAsLegacy) throw new Error('Unlock the recovered account on its network to wrap from it.')
+          if (isHardware && !canActAsHardware) throw new Error('Connect the hardware account on its network to wrap from it.')
           setStatus('submitting')
           const res = await submitAsActive(call)
           setStatus('success')
@@ -253,7 +260,8 @@ export function useWrapNative() {
       }
     },
     [
-      token, signer, isPasskey, isVault, isLegacy, canActAsVault, canActAsLegacy, submitAsActive,
+      token, signer, isPasskey, isVault, isLegacy, isHardware, canActAsVault, canActAsLegacy,
+      canActAsHardware, submitAsActive,
       sendCalls, decimals, nativeBalance, wrappedBalance, nativeSymbol, wrappedSymbol, sponsored, refresh,
     ],
   )

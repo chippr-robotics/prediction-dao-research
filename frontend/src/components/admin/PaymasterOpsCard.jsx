@@ -59,6 +59,15 @@ const paymasterAt = (id) => getContractAddressForChain('verifyingPaymaster', id)
 
 function PaymasterOpsCard({ signer, account, provider, chainId, nativeSymbol, runTx, pendingTx }) {
   const paymasterNetworks = useMemo(() => estateNetworks(), [])
+  // The networks that DO have a configured paymaster, derived from the same config the reads
+  // use — never hardcoded ("Polygon-only" outlived the Amoy deployment record it contradicted).
+  const sponsoredNetworkNames = useMemo(
+    () =>
+      paymasterNetworks
+        .filter((net) => Boolean(paymasterAt(net.chainId)))
+        .map((net) => networkName(net.chainId)),
+    [paymasterNetworks],
+  )
   const { scopeChainId, setScopeChainId } = useScopedChain(paymasterNetworks, chainId)
   const onScopeNetwork = Number(scopeChainId) === Number(chainId)
   const paymasterAddr = paymasterAt(scopeChainId)
@@ -195,8 +204,10 @@ function PaymasterOpsCard({ signer, account, provider, chainId, nativeSymbol, ru
         <div className="admin-card">
           <div className="admin-card-header"><h3>{networkName(scopeChainId)}</h3></div>
           <p className="card-info">
-            No verifying paymaster is deployed on {networkName(scopeChainId)}. Sponsorship (spec 050)
-            is Polygon-only; the passkey path self-funds elsewhere.
+            No verifying paymaster is deployed on {networkName(scopeChainId)}.{' '}
+            {sponsoredNetworkNames.length > 0
+              ? `Sponsorship (spec 050) is configured on ${sponsoredNetworkNames.join(', ')}; the passkey path self-funds elsewhere.`
+              : 'No network in this build has a configured paymaster; the passkey path self-funds everywhere.'}
           </p>
         </div>
       ) : (

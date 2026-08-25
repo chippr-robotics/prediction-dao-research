@@ -74,8 +74,10 @@ beforeEach(() => {
     identity: { mode: 'personal' },
     isVault: false,
     isLegacy: false,
+    isHardware: false,
     canActAsVault: false,
     canActAsLegacy: false,
+    canActAsHardware: false,
     submit: submitAsActive,
   }
   getBalance.mockResolvedValue(ethers.parseEther('10'))
@@ -212,6 +214,56 @@ describe('who is acting', () => {
     const { result } = await mounted()
     await expect(result.current.wrap('1')).rejects.toThrow(/switch to the vault/i)
     expect(submitAsActive).not.toHaveBeenCalled()
+  })
+
+  // Spec 088 (FR-001/FR-002) — a hardware acting account is the actor, not the connected wallet.
+  // Guards the finding that wrap/unwrap read the CONNECTED wallet's balances and signed with the
+  // connected signer while operating as a hardware account.
+  it('reads balances from the hardware acting address, not the connected wallet (spec 088 FR-001)', async () => {
+    const HW = '0xHaRd000000000000000000000000000000000009'
+    active.current = {
+      ...active.current,
+      isHardware: true,
+      canActAsHardware: true,
+      identity: { mode: 'hardware', address: HW, vendor: 'ledger' },
+    }
+    const { result } = await mounted()
+    expect(getBalance).toHaveBeenCalledWith(HW)
+    expect(getBalance).not.toHaveBeenCalledWith(wallet.current.address)
+    await waitFor(() => expect(result.current.wrappedBalance).not.toBeNull())
+    expect(balanceOf).toHaveBeenCalledWith(HW)
+    expect(balanceOf).not.toHaveBeenCalledWith(wallet.current.address)
+  })
+
+  it('routes a hardware wrap through the acting-account seam, never the connected signer (spec 088 FR-002)', async () => {
+    active.current = {
+      ...active.current,
+      isHardware: true,
+      canActAsHardware: true,
+      identity: { mode: 'hardware', address: '0xHaRd000000000000000000000000000000000009', vendor: 'ledger' },
+    }
+    submitAsActive.mockResolvedValue({ txHash: '0xhwtx' })
+    const { result } = await mounted()
+    let res
+    await act(async () => { res = await result.current.wrap('1') })
+    expect(submitAsActive).toHaveBeenCalledTimes(1)
+    expect(submitAsActive).toHaveBeenCalledWith({ to: WRAPPED, value: ethers.parseEther('1'), data: DEPOSIT })
+    expect(sendTransaction).not.toHaveBeenCalled()
+    expect(res).toMatchObject({ txHash: '0xhwtx', sponsored: false })
+  })
+
+  it('routes a hardware unwrap through the acting-account seam too', async () => {
+    active.current = {
+      ...active.current,
+      isHardware: true,
+      canActAsHardware: true,
+      identity: { mode: 'hardware', address: '0xHaRd000000000000000000000000000000000009', vendor: 'ledger' },
+    }
+    submitAsActive.mockResolvedValue({ txHash: '0xhwtx' })
+    const { result } = await mounted()
+    await act(async () => { await result.current.unwrap('2') })
+    expect(submitAsActive).toHaveBeenCalledWith({ to: WRAPPED, value: 0n, data: withdrawData(ethers.parseEther('2')) })
+    expect(sendTransaction).not.toHaveBeenCalled()
   })
 
   it('reports a submitted-but-not-included passkey op as pending, with no fabricated tx hash', async () => {
