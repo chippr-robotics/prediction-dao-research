@@ -14,6 +14,27 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.11.1 — 2026-08-24
+
+Promoted from: none — released directly from main
+Previous release: v1.11.0 · Range: `v1.11.0..v1.11.1` (4 commits)
+
+### 🧪 Tests
+
+- test(094): carry the E2E cohort seams in networks.js to main
+
+### Artifacts
+
+Range: `v1.11.0..v1.11.1`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.11.0 — 2026-08-17
 
 Promoted from: v1.11.0-rc.6
