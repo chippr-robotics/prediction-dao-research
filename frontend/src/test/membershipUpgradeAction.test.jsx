@@ -39,6 +39,7 @@ vi.mock('../hooks/useTierPrices', () => ({
     getPrice: () => 2,
     getLimits: () => ({ monthly: 15, concurrent: 5 }),
     usingFallbackPrices: false,
+    isTierActive: () => true,
   }),
 }))
 vi.mock('../hooks/useEncryption', () => ({
