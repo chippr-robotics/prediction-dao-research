@@ -170,8 +170,9 @@ describe('POST /v1/paymaster — deposit gate', () => {
 
   it('signs when the deposit covers the v0.6 worst-case prefund (verification counted three times)', async () => {
     // userOp(): cgl 100k, vgl 200k, pvg 50k, maxFee 1 gwei → prefund = (100k + 3×200k + 50k) gas
-    // = 750k gas × 1 gwei = 7.5e14 wei. One wei above must pass; one wei below must refuse —
-    // proving the gate uses the ×3 prefund the EntryPoint charges, not the flat totalGas sum.
+    // = 750k gas × 1 gwei = 7.5e14 wei. EXACTLY the prefund must pass (the gate refuses strictly
+    // below it); one wei below must refuse — proving the gate uses the ×3 prefund the EntryPoint
+    // charges, not the flat totalGas sum.
     const need = 750_000n * 10n ** 9n
     const config = pmConfig()
     const ok = await rpc(
