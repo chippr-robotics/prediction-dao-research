@@ -75,9 +75,17 @@ describe('PremiumPurchaseModal — inactive tiers are not on sale', () => {
   it('moves the default selection off the hidden tier (the default IS Bronze)', async () => {
     render(<PremiumPurchaseModal />)
     await waitFor(() => expect(radio('SILVER')).toBeTruthy())
-    // Whatever is checked must be a tier that is actually offered — never the hidden default.
-    const checked = document.querySelector('input[type="radio"]:checked')
-    expect(checked).toBeTruthy()
+    /*
+     * WAIT for the selection, don't sample it: the repair runs in an effect AFTER the render that
+     * first offers the tiers, so there is a transient frame where the still-selected BRONZE is not
+     * in the DOM and nothing is checked. Sampling once passed locally and failed in CI. This still
+     * fails if the repair never happens (the waitFor times out) or picks a hidden tier.
+     */
+    const checked = await waitFor(() => {
+      const el = document.querySelector('input[type="radio"]:checked')
+      if (!el) throw new Error('no tier is selected yet')
+      return el
+    })
     expect(['SILVER', 'GOLD']).toContain(checked.value)
   })
 

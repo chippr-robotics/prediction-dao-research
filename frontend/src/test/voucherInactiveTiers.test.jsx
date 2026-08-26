@@ -65,8 +65,9 @@ describe('VouchersPage — inactive tiers are not for sale', () => {
   it('does not leave the hidden BRONZE default selected — it buys what is shown', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Silver')).toBeInTheDocument())
-    // The button names the tier it would buy; it must be an offered one.
-    expect(buyButton().textContent).toMatch(/Silver/)
+    // Same timing rule as the modal spec: the selection repair is an effect, so WAIT for the
+    // label to name an offered tier rather than sampling it mid-transient.
+    await waitFor(() => expect(buyButton().textContent).toMatch(/Silver/))
     expect(buyButton().textContent).not.toMatch(/Bronze/)
   })
 
