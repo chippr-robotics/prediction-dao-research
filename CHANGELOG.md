@@ -14,6 +14,38 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.13.3 — 2026-08-25
+
+Promoted from: none — released directly from main
+Previous release: v1.13.0 · Range: `v1.13.0..v1.13.3` (14 commits)
+
+### 🐛 Bug Fixes
+
+- fix(review): restore readProviderFor's JSDoc to its function; anchor test paths to the file
+- fix(assistant): say why the assistant is unreachable when that is knowable
+- fix(membership): the other two surfaces that stated the wrong account's status
+- fix(membership): read the acting account, and scan on the configured endpoint
+- fix(vouchers): block the buy control when no tier is on sale
+- fix(membership): never offer a tier the contract has switched off
+- fix(paymaster): refuse sponsorship an empty pool cannot pay for; un-strand the AA31 fallback
+
+### 🧪 Tests
+
+- test: wait for the tier-selection repair instead of sampling it
+- test(paymaster): correct the deposit-gate boundary comment
+
+### Artifacts
+
+Range: `v1.13.2..v1.13.3`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | unchanged | `v0.3.0` |
+
 ## v1.13.0 — 2026-08-25
 
 Promoted from: v1.13.0-rc.2
