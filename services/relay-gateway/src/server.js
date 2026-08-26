@@ -55,7 +55,7 @@ import { createPaywall } from './x402/paywall.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
-import { checkOpLimits } from './paymaster/policy.js'
+import { checkOpLimits, createDepositGate } from './paymaster/policy.js'
 import { createLocalSigner, createKmsSigner } from './paymaster/sign.js'
 
 /** Resolve the sponsorship signer (spec 050): dev/CI raw key, else lazy KMS, else null (disabled). */
@@ -165,6 +165,9 @@ export function createApp(config, deps = {}) {
     now: nowMs,
   })
   const paymasterSigner = deps.paymasterSigner ?? buildPaymasterSigner(config.paymaster)
+  // Refuses sponsorship the pool cannot pay for, so the SPA self-funds instead of hitting the
+  // bundler's AA31 (see createDepositGate for the incident this answers). Injectable in tests.
+  const paymasterDepositGate = deps.paymasterDepositGate ?? createDepositGate({ providers, chains: config.chains, now: nowMs })
 
   const app = express()
   app.disable('x-powered-by')
@@ -618,6 +621,17 @@ export function createApp(config, deps = {}) {
       if (!limit.ok) return rpcError(res, id, limit.code, limit.detail)
 
       await screen.screen(chainId, userOp.sender) // fail-closed; throws GatewayError 403/503
+
+      // A definite "pool can't cover this op" refuses HERE, where the client's answer is an
+      // honest self-funded rebuild; an unreadable deposit does not refuse (an RPC blip is not
+      // an empty pool — the bundler's AA31 stays the backstop). AFTER the sanctions screen (a
+      // sanctioned signer is told so, never masked by an ops condition) and BEFORE quotas (an
+      // empty pool must not consume the member's sponsorship quota).
+      const dep = await paymasterDepositGate.check(chainId, userOp)
+      if (!dep.ok) {
+        audit({ chainId, action: 'sponsor', targetContract: pm, outcome: `rejected(${dep.code})` })
+        return rpcError(res, id, dep.code, 'sponsorship pool cannot cover this operation; self-submit')
+      }
 
       const q = pmQuotas.hit(userOp.sender)
       if (!q.allowed) {
