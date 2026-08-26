@@ -71,7 +71,7 @@ export default function AssistantLauncher() {
 
 /**
  * The half that costs a membership read. Split out so the hook only ever mounts for an account that
- * has already opted in — `useRoleDetails` resolves the connected account itself, so this takes no
+ * has already opted in — `useRoleDetails` resolves the ACTING account itself, so this takes no
  * props.
  */
 function MemberLauncher() {

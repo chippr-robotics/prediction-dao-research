@@ -34,7 +34,7 @@ import { isValidEthereumAddress } from '../../../utils/validation'
 import { getContractAddressForChain } from '../../../config/contracts'
 import { membershipChainId } from '../../../config/networks'
 import { getProvider } from '../../../utils/blockchainService'
-import { networkName, readProviderFor, readAuthority } from '../../../lib/chains/estate'
+import { networkName, readProviderFor, scanProviderFor, readAuthority } from '../../../lib/chains/estate'
 import { isRead, isNotDeployed, formatUnitAmount } from '../../../lib/chains/chainReadResult'
 import { contractAuthorityGate } from '../scopeGate'
 
@@ -82,6 +82,10 @@ export default function MembershipRevenueApp() {
   const membershipManagerAddr = getContractAddressForChain('membershipManager', membershipAdminChainId)
   const membershipProvider =
     readProviderFor(membershipAdminChainId, chainId, provider) || getProvider(membershipAdminChainId)
+  // The statistics panel scans the MembershipManager's event log, which needs history the
+  // browser wallet's RPC usually does not keep — see `scanProviderFor`. Point reads
+  // (`accruedFees`, `treasury`) keep using `membershipProvider`; only the scan needs this.
+  const membershipScanProvider = scanProviderFor(membershipAdminChainId) || membershipProvider
 
   // `accruedFees` is money. A failed read must not arrive as 0n: an operator
   // reading a zero accrued balance concludes the fees were already withdrawn.
@@ -331,7 +335,7 @@ export default function MembershipRevenueApp() {
       {/* Spec 071 T046: the address is the REFERENCE chain's MembershipManager, so the
           provider and the cache key must name that chain too. */}
       <MembershipTreasuryOverview
-        provider={membershipProvider}
+        provider={membershipScanProvider}
         chainId={membershipAdminChainId}
         address={membershipManagerAddr}
         accruedFees={membershipState.accruedFees}

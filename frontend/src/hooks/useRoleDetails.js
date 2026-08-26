@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
-import { useAccount } from 'wagmi'
 import { useWeb3 } from './useWeb3'
+import { useEffectiveAccount } from './useEffectiveAccount'
 import { getContractAddressForChain } from '../config/contracts'
 import { membershipChainId } from '../config/networks'
 import { getReadProvider } from '../utils/rpcProvider'
@@ -13,6 +13,19 @@ import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
  * The protocol has a single user-purchasable role (`WAGER_PARTICIPANT_ROLE`).
  * For each fetch we read `getMembership(user, role)` + `getTierConfig(role, tier)`
  * and project both into the shape consumed by RoleDetailsCard / Dashboard.
+ *
+ * ── WHICH ACCOUNT (specs 063 + 088) ──────────────────────────────────────────────────────
+ * The ACTING account, never the connected wallet. `MembershipManager.purchaseTier` credits
+ * `msg.sender` and has no beneficiary parameter, so a membership belongs to exactly one
+ * address; and every gated action — creating a wager, registering a callsign — is sent BY the
+ * acting account, so the contract checks the acting account's membership. Reading the
+ * connected wallet therefore showed a member switched to a multisig/recovered account the
+ * WRONG account's tier and expiry: the card said Gold while the account they were operating
+ * as held nothing, and the gate that actually matters would have refused.
+ *
+ * This resolves through `useEffectiveAccount` rather than WalletContext because
+ * `CustodyProvider` nests INSIDE `WalletProvider` — the context that knows the acting account
+ * is not visible from the one that loads roles, which is why this could not be fixed there.
  */
 
 export const MembershipTier = {
@@ -67,8 +80,9 @@ function emptyDetails(roleName) {
 }
 
 export function useRoleDetails() {
-  const { address, isConnected } = useAccount()
-  const { provider, chainId } = useWeb3()
+  // The acting account's address — the connected wallet only when acting as yourself.
+  const { address } = useEffectiveAccount()
+  const { provider, chainId, isConnected } = useWeb3()
   const [roleDetails, setRoleDetails] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
