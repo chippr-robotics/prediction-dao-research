@@ -7,6 +7,7 @@ import { useTierPrices } from '../../hooks/useTierPrices'
 import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { getUserTierOnChain, buildMembershipPurchaseCalls } from '../../utils/blockchainService'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { membershipChainId } from '../../config/networks'
 import { networkName } from '../../lib/chains/estate'
 import { ensurePasskeyEncryptionKeys } from '../../lib/passkey/encryption'
@@ -104,6 +105,17 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
     loginMethod, sendCalls, provider,
   } = useWeb3()
   const { showNotification } = useNotification()
+  // ── WHICH ACCOUNT GETS THE MEMBERSHIP (specs 063 + 088) ────────────────────────────────
+  // `MembershipManager.purchaseTier` credits `msg.sender` and takes NO beneficiary, so a
+  // membership lands on exactly the address that sent the transaction. This modal's rails all
+  // sign with the CONNECTED wallet, so that address is `account` — never the acting account.
+  //
+  // The tier below is therefore read for the acting account (what the member is looking at and
+  // what every gate will check), while a purchase while acting as somebody else is REFUSED
+  // rather than credited to a different address than the one on screen.
+  const { address: actingAddress, isActingAccount, label: actingLabel, type: actingType } =
+    useEffectiveAccount()
+  const membershipAddress = actingAddress || account
   const { getPrice, getLimits, usingFallbackPrices } = useTierPrices()
   const { ensureInitialized } = useEncryption()
   const flow = usePurchaseFlow()
@@ -126,6 +138,14 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
   //
   // `isCorrectNetwork` is not enough here: it means "any supported chain". The purchase needs
   // one specific chain, disclosed before signature, with the wallet actually on it.
+
+  // A purchase signs with the CONNECTED wallet, so it would credit that address rather than the
+  // account on screen. Refuse instead of quietly buying a membership for the wrong account.
+  const ACTING_KIND_LABEL = { vault: 'multisig vault', legacy: 'recovered account', hardware: 'hardware account', derived: 'derived account' }
+  const actingBlocksPurchase = isActingAccount
+  const actingAccountName =
+    actingLabel || ACTING_KIND_LABEL[actingType] || 'another account'
+
   const purchaseChainId = membershipChainId()
   const purchaseNetworkName = networkName(purchaseChainId)
   const onPurchaseChain = Number(chainId) === Number(purchaseChainId)
@@ -152,13 +172,13 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
 
   useEffect(() => {
     let cancelled = false
-    if (!account) return
+    if (!membershipAddress) return
     // Clear any tier read from a previously-selected chain so a testnet tier
     // doesn't linger when the wallet switches to mainnet (where the user may
     // have no membership). Re-fetch for the chain the wallet is now on.
     setUserCurrentTier(0)
     setIsLoadingTier(true)
-    getUserTierOnChain(account, ROLE_KEY, chainId).then(({ tier, readable }) => {
+    getUserTierOnChain(membershipAddress, ROLE_KEY, chainId).then(({ tier, readable }) => {
       if (cancelled) return
       // FR-004/FR-005: an unreadable reference chain is NOT tier 0. Offering "upgrade from
       // None" to a member who already holds Platinum — because their RPC blipped — would take
@@ -179,7 +199,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
       if (!cancelled) setIsLoadingTier(false)
     })
     return () => { cancelled = true }
-  }, [account, chainId, tierRetry])
+  }, [membershipAddress, chainId, tierRetry])
 
   /*
    * ENTRY MODE — what this modal is for, from the caller or from the member.
@@ -291,6 +311,16 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
     if (!tierReadable) {
       showNotification(
         `Cannot purchase yet: your current membership could not be read from ${networkName(membershipChainId())}. Retry the check first.`,
+        'error',
+      )
+      return
+    }
+    // The membership would be credited to whoever signs — the connected wallet — which is NOT
+    // the account whose tier this modal is showing. Same rule as spec 088 FR-002's submit(): name
+    // the account and refuse, rather than acting as one identity under another's label.
+    if (actingBlocksPurchase) {
+      showNotification(
+        `You are acting as ${actingAccountName}, but a membership is credited to whichever account signs — your personal wallet. Switch back to your personal wallet to buy, so the membership lands on the account you are looking at.`,
         'error',
       )
       return
@@ -808,6 +838,21 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
                   settles there and is recognised from every network afterwards.
                 </p>
 
+                {actingBlocksPurchase && (
+                  <div className="ppm-network-warning">
+                    <span aria-hidden="true">⚠️</span>
+                    <div>
+                      <strong>Switch back to your personal wallet to buy</strong>
+                      <p>
+                        You are acting as {actingAccountName}. A membership is credited to
+                        whichever account signs the transaction, and this purchase would be signed
+                        by your personal wallet — so it would land there, not on the account shown
+                        above.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {isConnected && !onPurchaseChain && (
                   <div className="ppm-network-warning">
                     <span aria-hidden="true">⚠️</span>
@@ -938,7 +983,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
                 type="button"
                 className="ppm-btn-primary ppm-btn-purchase"
                 onClick={handlePurchase}
-                disabled={isBusy || !isConnected || !onPurchaseChain || !tierReadable || !acknowledged}
+                disabled={isBusy || !isConnected || !onPurchaseChain || !tierReadable || !acknowledged || actingBlocksPurchase}
               >
                 Confirm Purchase (${selectedPrice.toFixed(2)} USDC)
               </button>

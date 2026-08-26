@@ -63,8 +63,39 @@ export function estateNetworks(capability = null) {
  * and it is already the transport the member chose. Otherwise `getReadProvider` resolves the
  * member's endpoint, headers and failover for that chain (see the file header).
  *
+ * NOT for an event-log scan — that wallet-provider preference is precisely wrong there. Use
+ * `scanProviderFor` above, which explains why.
+ *
  * Returns null rather than throwing; the caller reports that as `unreadable`, never as empty.
  */
+/**
+ * A read connection for `chainId` for an EVENT-LOG SCAN — deliberately NEVER the wallet's provider.
+ *
+ * `readProviderFor` prefers the injected wallet provider whenever the scope is the connected
+ * chain. That is right for a point `eth_call`, and WRONG for `eth_getLogs` over history: the
+ * transport then belongs to the browser wallet, whose RPC is whatever MetaMask/Brave happens to
+ * be pointed at — typically a free pruned node. The admin membership scan on Polygon failed with
+ *
+ *   "History has been pruned for this block"
+ *
+ * for exactly that reason, and no amount of member RPC configuration could fix it, because the
+ * configured endpoint was never consulted. A scan therefore always goes through
+ * `getReadProvider`, which resolves the member's own endpoint + credential header + failover
+ * (spec 069) — which is where an archival provider such as QuickNode is configured, and the only
+ * place it CAN be configured: a credentialed URL in a `VITE_` variable ships in the public
+ * bundle (spec 097).
+ *
+ * Returns null rather than throwing; the caller reports that as `unreadable`, never as empty.
+ */
+export function scanProviderFor(chainId, { requireCohort = true } = {}) {
+  if (requireCohort && !isInCohort(chainId)) return null
+  try {
+    return getReadProvider(chainId)
+  } catch {
+    return null
+  }
+}
+
 export function readProviderFor(chainId, walletChainId, walletProvider, { requireCohort = true } = {}) {
   if (walletProvider && Number(chainId) === Number(walletChainId)) return walletProvider
   // Estate reads are cohort-bounded (FR-002). The spec-067 Bridge/Supply tabs opt out because
