@@ -143,6 +143,11 @@ export default function VouchersPage() {
   const qtyNum = Math.min(MAX_QUANTITY, Math.max(1, Math.floor(Number(quantity) || 1)))
   const unitPrice = getPrice('WAGER_PARTICIPANT', selectedTier)
   const totalPrice = unitPrice * qtyNum
+  // Every tier switched off on-chain: there is nothing to sell, so the buy control must be
+  // withheld too. Hiding the tier radios alone left `selectedTier` at its BRONZE default with the
+  // Buy button still live — which would mint the very inactive tier this change exists to avoid.
+  const nothingOnSale = activeTiers.length === 0
+
   // Multiple or gifting needs the batch helper; a single self-purchase does not.
   const needsHelper = qtyNum > 1 || giftMode
   const buyBlocked = needsHelper && !batchMintAvailable
@@ -169,6 +174,8 @@ export default function VouchersPage() {
 
   async function onBuy() {
     setMinted(null)
+    // Defense in depth behind the disabled button: never submit a tier that is not on offer.
+    if (nothingOnSale) return
     try {
       // Pass the resolved 0x address (ENS-resolved or directly typed) so the hook's
       // address check passes for gifts entered as an ENS name.
@@ -353,11 +360,16 @@ export default function VouchersPage() {
           variant="primary"
           onClick={onBuy}
           loading={status === 'minting'}
-          disabled={!voucherAvailable || busy || buyBlocked || !recipientValid}
+          disabled={!voucherAvailable || busy || buyBlocked || !recipientValid || nothingOnSale}
         >
-          {giftMode
-            ? `Gift ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`
-            : `Buy ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`}
+          {/* With nothing on sale the label must not quote a tier and price that are not being
+              offered — `selectedTier` is still its default, and naming it would advertise a
+              purchase the contract refuses. */}
+          {nothingOnSale
+            ? 'No tiers available'
+            : giftMode
+              ? `Gift ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`
+              : `Buy ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`}
         </Button>
         {minted && (
           <p className="vch-success" role="status">
