@@ -14,6 +14,31 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.13.1 — 2026-08-25
+
+Promoted from: none — released directly from main
+Previous release: v1.13.0 · Range: `v1.13.0..v1.13.1` (5 commits)
+
+### 🐛 Bug Fixes
+
+- fix(paymaster): refuse sponsorship an empty pool cannot pay for; un-strand the AA31 fallback
+
+### 🧪 Tests
+
+- test(paymaster): correct the deposit-gate boundary comment
+
+### Artifacts
+
+Range: `v1.13.0..v1.13.1`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.13.0 — 2026-08-25
 
 Promoted from: v1.13.0-rc.2

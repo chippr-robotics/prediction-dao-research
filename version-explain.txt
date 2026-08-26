@@ -1,30 +1,10 @@
-previous: v1.12.0
-commits:  25
-  [unclassified] Merge pull request #1341 from chippr-robotics/staging
-  [unclassified] Merge pull request #1339 from chippr-robotics/claude/walletconnect-signin-error-9mhusd
-  [unclassified] Merge pull request #1340 from chippr-robotics/claude/membership-validation-e2e-tests-4mm8h1
-  [feat -> minor] acting-account routing for wager refund/resolve; Earn refuses acting accounts
-  [feat -> minor] record redemption terms, verify admin write authority, route acting accounts
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/walletconnect-signin-error-9mhusd
-  [unclassified] Merge pull request #1337 from chippr-robotics/claude/membership-validation-e2e-tests-4mm8h1
-  [unclassified] Merge pull request #1335 from chippr-robotics/dependabot/npm_and_yarn/staging/google-cloud/bigquery-9.0.2
-  [unclassified] Merge pull request #1338 from chippr-robotics/chore/auto-backmerge-main-into-staging
-  [fix -> patch] repair lockfile from the earlier full re-resolve
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/walletconnect-signin-error-9mhusd
-  [fix -> patch] stub the real WalletConnect connector under Cypress
-  [fix -> patch] compare BigInt accrued fees as booleans in ADM-05
-  [chore -> patch] bump @google-cloud/bigquery from 7.9.4 to 9.0.2
-  [unclassified] Merge pull request #1333 from chippr-robotics/dependabot/npm_and_yarn/staging/solana-program/system-0.14.0
-  [unclassified] Merge pull request #1331 from chippr-robotics/dependabot/npm_and_yarn/staging/solidity-sources-beab58d943
-  [test -> patch] cover admin membership/role writes and voucher purchase on-chain
-  [unclassified] Fix WalletConnect sign-in: add missing @walletconnect/ethereum-provider dep
-  [fix -> patch] name the actual signing chain in the role header; fix multi-match test query
-  [unclassified] Merge pull request #1328 from chippr-robotics/release/v1.12.0-changelog
-  [fix -> patch] expired-renewal purchase-mode fallback refinements
-  [unclassified] WIP: membership validation fixes from audit swarm (tests pending deps reinstall)
-  [chore -> patch] bump @solana-program/system from 0.13.0 to 0.14.0
-  [chore -> patch] bump @chainlink/contracts in the solidity-sources group
-  [skipped] chore(release): v1.12.0 [skip release]
-bump:     minor
+previous: v1.13.0
+commits:  5
+  [unclassified] Merge pull request #1344 from chippr-robotics/hotfix/paymaster-deposit-gate
+  [test -> patch] correct the deposit-gate boundary comment
+  [fix -> patch] refuse sponsorship an empty pool cannot pay for; un-strand the AA31 fallback
+  [unclassified] Merge pull request #1342 from chippr-robotics/release/v1.13.0-changelog
+  [skipped] chore(release): v1.13.0 [skip release]
+bump:     patch
 reason:   computed
-next:     v1.13.0
+next:     v1.13.1
