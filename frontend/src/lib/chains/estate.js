@@ -64,10 +64,23 @@ export function estateNetworks(capability = null) {
  * member's endpoint, headers and failover for that chain (see the file header).
  *
  * NOT for an event-log scan — that wallet-provider preference is precisely wrong there. Use
- * `scanProviderFor` above, which explains why.
+ * `scanProviderFor` below, which explains why.
  *
  * Returns null rather than throwing; the caller reports that as `unreadable`, never as empty.
  */
+export function readProviderFor(chainId, walletChainId, walletProvider, { requireCohort = true } = {}) {
+  if (walletProvider && Number(chainId) === Number(walletChainId)) return walletProvider
+  // Estate reads are cohort-bounded (FR-002). The spec-067 Bridge/Supply tabs opt out because
+  // their routers exist only on mainnets, so a testnet build would otherwise blank them — see
+  // the note on `adminNetworks` in components/admin/liquidityAdminCommon.js.
+  if (requireCohort && !isInCohort(chainId)) return null
+  try {
+    return getReadProvider(chainId)
+  } catch {
+    return null
+  }
+}
+
 /**
  * A read connection for `chainId` for an EVENT-LOG SCAN — deliberately NEVER the wallet's provider.
  *
@@ -88,19 +101,6 @@ export function estateNetworks(capability = null) {
  * Returns null rather than throwing; the caller reports that as `unreadable`, never as empty.
  */
 export function scanProviderFor(chainId, { requireCohort = true } = {}) {
-  if (requireCohort && !isInCohort(chainId)) return null
-  try {
-    return getReadProvider(chainId)
-  } catch {
-    return null
-  }
-}
-
-export function readProviderFor(chainId, walletChainId, walletProvider, { requireCohort = true } = {}) {
-  if (walletProvider && Number(chainId) === Number(walletChainId)) return walletProvider
-  // Estate reads are cohort-bounded (FR-002). The spec-067 Bridge/Supply tabs opt out because
-  // their routers exist only on mainnets, so a testnet build would otherwise blank them — see
-  // the note on `adminNetworks` in components/admin/liquidityAdminCommon.js.
   if (requireCohort && !isInCohort(chainId)) return null
   try {
     return getReadProvider(chainId)

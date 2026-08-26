@@ -12,6 +12,14 @@
  * paid-up member into a transaction that reverts `AlreadyActive` after their approval has landed.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+
+// Anchored to THIS FILE, not the working directory — the repo's structural tests
+// (brand/noHardcodedColors, miniapps/packageBoundary) all do this, and a cwd-relative read only
+// works while vitest happens to be invoked from `frontend/`.
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const m = vi.hoisted(() => ({ membership: undefined }))
 
@@ -91,26 +99,23 @@ describe('membership status is three-state everywhere it is stated', () => {
  * gates (packageBoundary, noHardcodedColors).
  */
 describe('the surfaces read the acting account’s membership hook', () => {
-  const read = async (rel) => {
-    const [fs, path] = await Promise.all([import('fs'), import('path')])
-    return fs.readFileSync(path.join(process.cwd(), 'src', rel), 'utf8')
-  }
+  const read = (rel) => readFileSync(join(SRC, rel), 'utf8')
 
-  it('WalletPage states its membership from useRoleDetails, not hasRole', async () => {
-    const src = await read('pages/WalletPage.jsx')
+  it('WalletPage states its membership from useRoleDetails, not hasRole', () => {
+    const src = read('pages/WalletPage.jsx')
     expect(src).toMatch(/useRoleDetails/)
     // The regression, spelled out: this gate read the connected wallet.
     expect(src).not.toMatch(/hasRole\(ROLES\.WAGER_PARTICIPANT\)/)
   })
 
-  it('the Dashboard banner is gated on useRoleDetails, not hasRole', async () => {
-    const src = await read('components/fairwins/Dashboard.jsx')
+  it('the Dashboard banner is gated on useRoleDetails, not hasRole', () => {
+    const src = read('components/fairwins/Dashboard.jsx')
     expect(src).toMatch(/useRoleDetails/)
     expect(src).not.toMatch(/hasRole\(ROLES\.WAGER_PARTICIPANT\)/)
   })
 
-  it('the wallet dropdown does too — the surface the regression was reported on', async () => {
-    const src = await read('components/wallet/WalletButton.jsx')
+  it('the wallet dropdown does too — the surface the regression was reported on', () => {
+    const src = read('components/wallet/WalletButton.jsx')
     expect(src).toMatch(/useRoleDetails/)
     expect(src).not.toMatch(/hasRole\(ROLES\.WAGER_PARTICIPANT\)/)
   })
