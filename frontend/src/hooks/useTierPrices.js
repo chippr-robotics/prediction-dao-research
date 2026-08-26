@@ -133,8 +133,23 @@ export function useTierPrices() {
     return tierLimits[tierName]?.[roleKey] ?? null
   }, [tierLimits])
 
+  /**
+   * THREE-STATE, and the third state is why this exists: `true` (the chain says purchasable),
+   * `false` (the chain says NOT purchasable — `MembershipManager.setTier(..., active=false)`),
+   * `null` (never read, or that tier's read failed).
+   *
+   * It used to answer `?? true`, so an unknown tier claimed to be purchasable — and no caller
+   * consumed it at all, which is how production offered Bronze at 2 USDC while the contract had
+   * it inactive: the member approved USDC and `purchaseTierWithTerms` reverted `TierInactive()`
+   * (0x4ed1bf50) with their approval already on chain.
+   *
+   * Callers hide a DEFINITE `false` and keep offering `null` — an RPC blip must not empty the
+   * tier grid, and the contract stays the real gate (the same rule the admin write controls use).
+   */
   const isTierActive = useCallback((roleKey, tierName) => {
-    return tierLimits[tierName]?.[roleKey]?.isActive ?? true
+    const known = tierLimits[tierName]?.[roleKey]
+    if (!known) return null
+    return known.isActive
   }, [tierLimits])
 
   return {

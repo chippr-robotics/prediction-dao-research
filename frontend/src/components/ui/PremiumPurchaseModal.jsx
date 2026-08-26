@@ -104,7 +104,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
     loginMethod, sendCalls, provider,
   } = useWeb3()
   const { showNotification } = useNotification()
-  const { getPrice, getLimits, usingFallbackPrices } = useTierPrices()
+  const { getPrice, getLimits, usingFallbackPrices, isTierActive } = useTierPrices()
   const { ensureInitialized } = useEncryption()
   const flow = usePurchaseFlow()
   const navigate = useNavigate()
@@ -211,7 +211,12 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
   const isExpiredRenewal = allowsSameTier && tierReadable && !isLoadingTier && userCurrentTier === 0
 
   const availableTiers = useMemo(() => {
-    return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => {
+    return Object.entries(MEMBERSHIP_TIERS).filter(([tierKey, tier]) => {
+      // A tier the CONTRACT will refuse is never offered: `purchaseTier` reverts TierInactive()
+      // for `active == false`, and it does so AFTER the member's USDC approval has landed.
+      // Only a DEFINITE false hides — `null` (unread) keeps the tier offered so an RPC blip
+      // cannot empty the grid, and the contract remains the real gate.
+      if (isTierActive(ROLE_KEY, tierKey) === false) return false
       if (allowsSameTier) {
         // Offer the current tier and up — but only while a current tier exists. At an ACTUALLY
         // READ tier 0 (expired renewal) fall back to the full purchase offering; never return
@@ -222,7 +227,19 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
       }
       return tier.id > userCurrentTier
     })
-  }, [userCurrentTier, allowsSameTier, tierReadable])
+  }, [userCurrentTier, allowsSameTier, tierReadable, isTierActive])
+
+  /*
+   * The default selection is BRONZE, which is exactly the tier production had INACTIVE — so a
+   * member opened the modal already pointed at a purchase the contract would refuse. If the
+   * current selection is not on offer, move to the first tier that is; never price, quote or
+   * submit a tier the grid is not showing.
+   */
+  useEffect(() => {
+    if (availableTiers.length === 0) return
+    if (availableTiers.some(([tierKey]) => tierKey === selectedTier)) return
+    setSelectedTier(availableTiers[0][0])
+  }, [availableTiers, selectedTier])
 
   const selectedTierInfo = MEMBERSHIP_TIERS[selectedTier]
 
@@ -635,6 +652,21 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
                     <div className="ppm-warning-content">
                       <strong>Maximum Tier Reached</strong>
                       <p>You're already on Platinum — the highest tier. There's nothing to upgrade to.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Every tier the contract has switched off — an empty grid is a real state
+                    (nothing is on sale), and it must say so rather than render blank. */}
+                {!isLoadingTier && tierReadable && availableTiers.length === 0 && userCurrentTier < 4 && (
+                  <div className="ppm-warning-card" role="status">
+                    <span className="ppm-warning-icon" aria-hidden="true">🔒</span>
+                    <div className="ppm-warning-content">
+                      <strong>No memberships are on sale right now</strong>
+                      <p>
+                        Every tier is currently switched off in the membership contract. Nothing was
+                        charged. Please check back later.
+                      </p>
                     </div>
                   </div>
                 )}

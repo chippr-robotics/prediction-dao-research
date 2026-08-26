@@ -44,6 +44,8 @@ vi.mock('../hooks/useTierPrices', () => ({
     getPrice: () => 2,
     getLimits: () => ({ monthly: 15, concurrent: 5 }),
     usingFallbackPrices: false,
+    // Every tier active — these specs are about the expiry path, not tier availability.
+    isTierActive: () => true,
   }),
 }))
 vi.mock('../hooks/useEncryption', () => ({
