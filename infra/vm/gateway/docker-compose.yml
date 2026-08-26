@@ -69,9 +69,23 @@ services:
       POLYMARKET_BUILDER_TAKER_FEE_BPS: "50"
       POLYMARKET_BUILDER_MAKER_FEE_BPS: "0"
       # ---- Member API + assistant (spec 095) and x402 agentic payments (spec 096) ----
-      # COMMENTED UNTIL THE IMAGE PIN ADVANCES: the pinned image above predates the memberApi
-      # module, and this file's own perps history shows what a flag with no code behind it looks
-      # like. Enable procedure (image build → push → repin → uncomment → converge) is
+      # THE PIN HAS ADVANCED; THESE ARE STILL OFF BY CHOICE. The image above (agentic-096) DOES
+      # carry the memberApi module — the note that used to sit here ("commented until the image pin
+      # advances") outlived the repin and read as if code were missing when only a decision was.
+      #
+      # MEASURED ON THE LIVE GATEWAY 2026-08-26, and worth keeping because it is how you tell a
+      # stale CONTAINER from a stale PIN: `GET /status` returned no `memberApi` block at all, every
+      # `/v1/member/*` route 404'd from Express's default handler, and the response advertised
+      # `Access-Control-Allow-Headers: Content-Type` where this repo's server.js sends
+      # `Content-Type, Authorization`. All three say the running container predates the pin, so a
+      # CONVERGE is required before any flag below can change anything observable.
+      #
+      # Turning ASSISTANT_ENABLED on in this committed file is ALSO a FinOps decision, by
+      # construction: `assistant-model-api` is catalogued `planned`, and check:finops rule B3 fails
+      # a planned money path that a committed deployment switches on. Promotion to `live` needs a
+      # collector, which does not exist yet — so enabling it is that work, not a flag flip.
+      # X402_PAY_TO has no safe default for the same reason in reverse: it is where agent payments
+      # LAND. Enable procedure (image build → push → repin → uncomment → converge) is
       # docs/runbooks/member-api-operations.md §3.1 "Enable the Member API". The reference-chain
       # pin is LOAD-BEARING: ENABLED_CHAIN_IDS starts with 63, and the default reference chain is
       # the FIRST enabled chain with a recorded membershipManager — Mordor also has one, so leaving
