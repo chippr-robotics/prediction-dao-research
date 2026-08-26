@@ -7,6 +7,7 @@ import { usePwaInstall } from '../hooks/usePwaInstall'
 import { usePwaUpdate } from '../hooks/usePwaUpdate'
 import { useChainTokens } from '../hooks/useChainTokens'
 import { useModal } from '../hooks/useUI'
+import { useRoleDetails } from '../hooks/useRoleDetails'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey } from '../utils/keyRegistryService'
 import TradeSection from '../components/fairwins/TradeSection'
@@ -142,6 +143,19 @@ function WalletPage() {
   const isPasskey = loginMethod === 'passkey'
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
+  /*
+   * Membership status is the ACTING account's, so it comes from `useRoleDetails` rather than
+   * `hasRole` (which reads the connected wallet and cannot see an acting account —
+   * CustodyProvider nests inside WalletProvider). Saying "Active — you have access to create
+   * wagers" off the wrong account is a claim the contract would refuse.
+   *
+   * `readable === false`, or no answer yet, is UNKNOWN — neither "Active" nor "get one". A
+   * separate branch says so instead of picking one and being confidently wrong.
+   */
+  const { getRoleDetails: getMembershipDetails } = useRoleDetails()
+  const membershipDetails = getMembershipDetails('WAGER_PARTICIPANT')
+  const membershipUnknown = !membershipDetails || membershipDetails.readable === false
+  const membershipActive = Boolean(membershipDetails?.isActive)
   const { isInitialized, isInitializing, registerKeyNow } = useEncryption()
   const { preferences, setPolymarketCategories } = useUserPreferences()
   const { capabilities } = useChainTokens()
@@ -462,7 +476,15 @@ function WalletPage() {
 
                     <div className="section">
                       <h3>Membership</h3>
-                      {hasRole(ROLES.WAGER_PARTICIPANT) ? (
+                      {membershipUnknown ? (
+                        <div className="membership-inactive">
+                          <p>
+                            Your membership could not be read right now, so this may be out of
+                            date. It is not a sign that you have none — check back in a moment.
+                          </p>
+                          <button onClick={handleOpenPurchaseModal} className="get-roles-btn">View Membership</button>
+                        </div>
+                      ) : membershipActive ? (
                         <div className="membership-active">
                           <div className="membership-status-badge active">Active</div>
                           <p>You have access to create and accept P2P wagers.</p>
