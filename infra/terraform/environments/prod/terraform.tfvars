@@ -61,11 +61,13 @@ managed_secret_ids = [
   # spec 095. Container only — the payload (the Anthropic API key for the member assistant) is
   # created out of band (guardrail G-04) and read solely by the gateway container.
   "anthropic-api-key",
-  # QuickNode Multi-Chain RPC. ALL FOUR are declared, but only QUICKNODE_POLYGON_API is granted to
-  # anything (see gateway_secret_ids above and the bundler module in main.tf). Declaring the other
-  # three is not busywork: it puts them under `prevent_destroy`, gives them an import block, and
-  # turns their empty IAM policy from an accident into a recorded decision. They were hand-created
-  # at the console on 2026-08-21 with no Terraform label and no bindings at all.
+  # QuickNode Multi-Chain RPC. Only QUICKNODE_POLYGON_API is granted to anything (see
+  # gateway_secret_ids above and the bundler module in main.tf) and only it still exists — all
+  # four were hand-created on 2026-08-21, and the operator deleted the other three on 2026-08-24
+  # (Cloud Audit Log, cody.w.burns@gmail.com), leaving only the one this estate reads. The three
+  # absent ones stay DECLARED anyway (not busywork: it's what makes a stray future hand-create at
+  # the console show up as drift instead of vanishing into an unmanaged secret), and imports.tf
+  # is explicit that they are creates, not imports, for exactly that reason.
   #
   # ⚠ ONE ENDPOINT, ONE TOKEN, CHAIN CHOSEN BY A HOSTNAME INFIX. `<name>.matic.quiknode.pro` is
   # Polygon and `<name>.matic-amoy.quiknode.pro` is Amoy, on the SAME credential. A mis-set variable
