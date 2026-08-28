@@ -14,6 +14,29 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.13.4 — 2026-08-27
+
+Promoted from: v1.13.4-rc.4
+Previous release: v1.13.3 · Range: `v1.13.3..v1.13.4` (10 commits)
+
+### 🐛 Bug Fixes
+
+- fix(prod): adopt 4 secret containers the failed apply would recreate
+- fix(bundler): the uptime probe proxied INTO the origin lock it documents bypassing
+- fix(bootstrap): the apply identity could adopt but not create
+
+### Artifacts
+
+Range: `v1.13.3..v1.13.4`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.13.3 — 2026-08-25
 
 Promoted from: none — released directly from main

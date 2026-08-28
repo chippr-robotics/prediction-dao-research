@@ -1,10 +1,15 @@
-previous: v1.13.2
-commits:  5
-  [unclassified] Merge pull request #1349 from chippr-robotics/hotfix/membership-acting-account
-  [fix -> patch] restore readProviderFor's JSDoc to its function; anchor test paths to the file
-  [fix -> patch] say why the assistant is unreachable when that is knowable
-  [fix -> patch] the other two surfaces that stated the wrong account's status
-  [fix -> patch] read the acting account, and scan on the configured endpoint
+previous: v1.13.3
+commits:  10
+  [unclassified] Merge pull request #1355 from chippr-robotics/staging
+  [unclassified] Merge pull request #1353 from chippr-robotics/chore/auto-backmerge-main-into-staging
+  [unclassified] Merge pull request #1354 from chippr-robotics/fix/secret-container-adoption
+  [fix -> patch] adopt 4 secret containers the failed apply would recreate
+  [unclassified] Merge pull request #1351 from chippr-robotics/fix/bundler-probe-reaches-alto
+  [unclassified] Merge pull request #1352 from chippr-robotics/release/v1.13.3-changelog
+  [unclassified] Merge pull request #1350 from chippr-robotics/fix/apply-sa-create-permissions
+  [skipped] chore(release): v1.13.3 [skip release]
+  [fix -> patch] the uptime probe proxied INTO the origin lock it documents bypassing
+  [fix -> patch] the apply identity could adopt but not create
 bump:     patch
 reason:   computed
-next:     v1.13.3
+next:     v1.13.4
