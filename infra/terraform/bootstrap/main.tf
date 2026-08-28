@@ -195,6 +195,57 @@ resource "google_project_iam_custom_role" "tf_service_account_manager" {
   ]
 }
 
+# Custom role rather than roles/secretmanager.admin at project scope — which the exclusion list
+# above rules out by name, because it would grant every secret in a shared project. This role can
+# create secret CONTAINERS and set their bindings; it deliberately carries NO
+# secretmanager.versions.* permission, so the apply identity can never read (or write) a payload.
+# Needed since spec 097: the prod plan's first genuine creates are eight secret containers, and the
+# 2026-08-25 promotion apply failed on exactly this ("Permission 'secretmanager.secrets.create'
+# denied" x8).
+resource "google_project_iam_custom_role" "tf_secret_container_manager" {
+  project     = var.project_id
+  role_id     = "fairwins.tfSecretContainerManager"
+  title       = "FairWins Terraform secret-container manager"
+  description = "Create/read/update secret containers and their IAM. No version access — cannot read payloads. Spec 097."
+
+  permissions = [
+    "secretmanager.secrets.create",
+    "secretmanager.secrets.get",
+    "secretmanager.secrets.list",
+    "secretmanager.secrets.update",
+    "secretmanager.secrets.getIamPolicy",
+    "secretmanager.secrets.setIamPolicy",
+  ]
+}
+
+resource "google_project_iam_member" "tf_apply_secret_containers" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.tf_secret_container_manager.id
+  member  = "serviceAccount:${google_service_account.tf_apply.email}"
+}
+
+# The FinOps billing reader (google_bigquery_dataset_iam_member) edits ONE dataset's access list.
+# BigQuery expresses dataset IAM through datasets.get/update, and the same failed apply also
+# reported "Permission bigquery.datasets.get denied". No project-wide BigQuery role: this pair of
+# permissions on a custom role is the whole requirement.
+resource "google_project_iam_custom_role" "tf_bq_dataset_access" {
+  project     = var.project_id
+  role_id     = "fairwins.tfBqDatasetAccess"
+  title       = "FairWins Terraform BigQuery dataset access editor"
+  description = "Read and update dataset metadata/access lists for declared dataset IAM members. Spec 097."
+
+  permissions = [
+    "bigquery.datasets.get",
+    "bigquery.datasets.update",
+  ]
+}
+
+resource "google_project_iam_member" "tf_apply_bq_dataset_access" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.tf_bq_dataset_access.id
+  member  = "serviceAccount:${google_service_account.tf_apply.email}"
+}
+
 resource "google_project_iam_member" "tf_apply_sa_manager" {
   project = var.project_id
   role    = google_project_iam_custom_role.tf_service_account_manager.id

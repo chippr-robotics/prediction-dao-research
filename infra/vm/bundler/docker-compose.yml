@@ -24,6 +24,12 @@ services:
     pull_policy: missing          # boot must not depend on the registry being reachable
     ports:
       - "127.0.0.1:8080:8080"     # host nginx -> nginx sidecar (which proxies to :3000 in-namespace)
+      # Loopback-published so the host nginx's /__probe/health can reach alto DIRECTLY. The probe's
+      # own comment says it must bypass the origin lock, but until this line the only host-reachable
+      # path was :8080 — the origin-lock sidecar itself — which 403s the headerless probe. Result:
+      # the uptime check read 0% for 14 days over a healthy alto. Loopback only; nothing binds a
+      # VPC-reachable interface, and every other caller still goes through the sidecar on :8080.
+      - "127.0.0.1:3000:3000"
     env_file:
       # ALTO_EXECUTOR_PRIVATE_KEYS + ALTO_UTILITY_PRIVATE_KEY + ALTO_RPC_URL.
       - /run/fairwins/alto.env
