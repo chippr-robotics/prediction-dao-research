@@ -14,6 +14,7 @@ vi.mock('../hooks/useTierPrices', () => ({
     getPrice: (_role, tier) => ({ BRONZE: 2, SILVER: 8, GOLD: 25, PLATINUM: 100 }[tier]),
     ROLE_HASHES: { WAGER_PARTICIPANT: '0xrole' },
     TIER_IDS: { BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 },
+    isTierActive: () => true,
   }),
 }))
 

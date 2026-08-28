@@ -41,6 +41,8 @@ export const ASSISTANT_SESSION_SCOPES = Object.freeze([
 export const SESSION_TTL_DAYS = 1
 
 const CHAT_TIMEOUT_MS = 45_000
+/** The availability probe runs only on the failure path, so it stays short. */
+const STATUS_TIMEOUT_MS = 5_000
 
 /** Module-memory session. One account at a time; never persisted. */
 let session = null
@@ -151,7 +153,9 @@ export async function sendChat({ account, messages, surface = null, baseUrl, tim
     throw new AssistantError('Authorize an assistant session to continue.', { state: 'unauthorized' })
   }
 
-  const res = await boundedFetch(
+  let res
+  try {
+    res = await boundedFetch(
     `${base}/v1/member/assistant/chat`,
     {
       method: 'POST',
@@ -164,7 +168,17 @@ export async function sendChat({ account, messages, surface = null, baseUrl, tim
       body: JSON.stringify({ messages, ...(surface ? { surface } : {}) }),
     },
     timeoutMs
-  )
+    )
+  } catch (e) {
+    // A transport failure is the one case where the browser has thrown away the distinguishing
+    // fact. Spend one short request on `/status` to recover it — and keep the original error when
+    // `/status` cannot answer either, because "unreachable" is then true rather than a guess.
+    if (e instanceof AssistantError && e.state === 'unreachable') {
+      const better = await probeAssistantAvailability(base)
+      if (better) throw better
+    }
+    throw e
+  }
   const data = await readJson(res)
   const code = data?.error?.code ?? null
   const reason = data?.error?.reason ?? null
@@ -215,6 +229,66 @@ export async function sendChat({ account, messages, surface = null, baseUrl, tim
       outputTokens: data.usage?.outputTokens ?? null,
     },
   }
+}
+
+
+/**
+ * Why could the assistant not be reached? Ask `/status`, which can answer.
+ *
+ * A transport failure is ambiguous from inside the browser, and the ambiguity is not academic —
+ * it is what a member saw on 2026-08-26. When the gateway does not carry the spec-095 module,
+ * `POST /v1/member/assistant/chat` 404s from Express's default handler, and that response
+ * additionally advertises `Access-Control-Allow-Headers: Content-Type` — without `Authorization`,
+ * which this request must send. The browser therefore rejects the PREFLIGHT, `fetch` throws, and
+ * every distinguishable fact is lost: "not offered on this deployment" arrives looking exactly
+ * like "your network is down".
+ *
+ * `/status` is unauthenticated, sends no `Authorization`, needs no preflight, and is served by
+ * every gateway build — so it answers where the chat request cannot. Its `memberApi` block
+ * (absent entirely on a build predating the module) says which of the two is true.
+ *
+ * Returns null when `/status` itself cannot be read — then the original "unreachable" stands,
+ * because it is then the honest answer rather than a guess.
+ */
+export async function probeAssistantAvailability(base, { timeoutMs = STATUS_TIMEOUT_MS } = {}) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let status
+  try {
+    const res = await fetch(`${base}/status`, { signal: controller.signal })
+    if (!res.ok) return null
+    status = await res.json()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!status || typeof status !== 'object') return null
+
+  // The whole block is missing: this gateway build has no member API at all.
+  if (status.memberApi == null) {
+    return new AssistantError(
+      'The assistant is not available on this deployment. The service is reachable, but this ' +
+        'version of it does not offer the member API the assistant needs.',
+      { state: 'unconfigured', code: 'member_api_absent' },
+    )
+  }
+  if (status.memberApi.enabled !== true) {
+    return new AssistantError(
+      status.memberApi.killSwitch === true
+        ? 'The assistant is switched off on this deployment right now.'
+        : 'The assistant is not enabled on this deployment.',
+      { state: 'unconfigured', code: 'member_api_unconfigured' },
+    )
+  }
+  if (status.memberApi.assistant?.configured !== true) {
+    return new AssistantError(
+      'The assistant is enabled here but has no model provider configured, so it cannot answer.',
+      { state: 'unconfigured', code: 'assistant_unconfigured' },
+    )
+  }
+  // The module is on and configured, so the failure really was the transport.
+  return null
 }
 
 /** Test seam: forget the module-memory session. */

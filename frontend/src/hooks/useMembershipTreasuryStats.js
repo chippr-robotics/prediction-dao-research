@@ -35,6 +35,33 @@ function fmtUsdc(v) {
 }
 
 /**
+ * Turn a provider failure into something an operator can act on.
+ *
+ * A pruned-history refusal arrives as a raw JSON-RPC dump — the error object, the whole
+ * `eth_getLogs` payload, hex block numbers, and the vendor's own upsell link — which tells an
+ * operator nothing about what to DO. It is also not a bug in the scan: the endpoint simply does
+ * not keep the blocks, and the fix is to point the chain at an archival endpoint, which spec 069
+ * puts in the member's hands (Settings ▸ Network). Say that instead.
+ *
+ * The raw text is still appended, because a failure nobody can diagnose is its own problem.
+ */
+export function describeScanFailure(err) {
+  const raw = err?.message || String(err || '')
+  // -32701 is the code seen from Polygon public nodes; the phrasing varies by vendor, so match
+  // the condition rather than any one provider's wording.
+  const pruned =
+    /has been pruned|missing trie node|state is not available|older than \d+ blocks|archive (node|data)/i.test(raw) ||
+    String(err?.error?.code || err?.code || '') === '-32701'
+  if (!pruned) return raw
+  return (
+    'This endpoint does not keep enough history for the scan — it has pruned the blocks the ' +
+    'lifetime tallies are read from. Point this chain at an archival RPC endpoint under ' +
+    'Settings ▸ Network, then run the scan again. ' +
+    `(Endpoint said: ${raw})`
+  )
+}
+
+/**
  * Pure reducer: fold parsed MembershipManager events into app-wide membership + treasury metrics.
  * Exported for unit testing. All USDC sums are returned as bigint (6-decimal base units); the caller
  * formats. `nowSec` (unix seconds) decides which memberships are still active — pass the current time.
@@ -218,7 +245,7 @@ export function useMembershipTreasuryStats({ provider, chainId, address } = {}) 
         cacheByKey.set(key, { at: Date.now(), data })
         setState({ loading: false, error: null, data, truncated: data.truncated })
       } catch (err) {
-        setState({ loading: false, error: err?.message || String(err), data: null, truncated: false })
+        setState({ loading: false, error: describeScanFailure(err), data: null, truncated: false })
       }
     },
     [provider, chainId, address],

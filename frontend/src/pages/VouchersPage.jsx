@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { useWallet } from '../hooks/useWalletManagement'
@@ -26,7 +26,7 @@ const MAX_QUANTITY = 50
  */
 export default function VouchersPage() {
   const { account, isConnected, openConnectModal } = useWallet()
-  const { getPrice, ROLE_HASHES, TIER_IDS, usingFallbackPrices } = useTierPrices()
+  const { getPrice, ROLE_HASHES, TIER_IDS, usingFallbackPrices, isTierActive } = useTierPrices()
   const {
     status, error, lastTxHash, voucherAvailable, batchMintAvailable,
     mintVouchers, redeemVoucher, transferVoucher, listMyVouchers,
@@ -94,6 +94,26 @@ export default function VouchersPage() {
     refreshVouchers()
   }, [refreshVouchers])
 
+  /*
+   * Minting a voucher runs the SAME tier check the purchase does — `MembershipVoucher.mint`
+   * reads the tier config and reverts `TierInactive()` for `active == false`, after the buyer's
+   * USDC approval. So a tier the contract has switched off is not offered here either. Only a
+   * DEFINITE false is hidden; an unread tier stays listed (an RPC blip must not empty the list)
+   * and the estimate warning below already covers that case.
+   */
+  const activeTiers = useMemo(
+    () => TIER_ORDER.filter((tierKey) => isTierActive('WAGER_PARTICIPANT', tierKey) !== false),
+    [isTierActive],
+  )
+
+  // The default selection is BRONZE — the very tier production had inactive. Never leave a
+  // hidden tier selected: it would price and submit a mint the contract refuses.
+  useEffect(() => {
+    if (activeTiers.length === 0) return
+    if (activeTiers.includes(selectedTier)) return
+    setSelectedTier(activeTiers[0])
+  }, [activeTiers, selectedTier])
+
   // Disconnected members stay HERE rather than being bounced to the landing
   // page: the app's unlock dialog is already opening over this route, and
   // connecting drops them straight into the vouchers they came for.
@@ -123,6 +143,11 @@ export default function VouchersPage() {
   const qtyNum = Math.min(MAX_QUANTITY, Math.max(1, Math.floor(Number(quantity) || 1)))
   const unitPrice = getPrice('WAGER_PARTICIPANT', selectedTier)
   const totalPrice = unitPrice * qtyNum
+  // Every tier switched off on-chain: there is nothing to sell, so the buy control must be
+  // withheld too. Hiding the tier radios alone left `selectedTier` at its BRONZE default with the
+  // Buy button still live — which would mint the very inactive tier this change exists to avoid.
+  const nothingOnSale = activeTiers.length === 0
+
   // Multiple or gifting needs the batch helper; a single self-purchase does not.
   const needsHelper = qtyNum > 1 || giftMode
   const buyBlocked = needsHelper && !batchMintAvailable
@@ -149,6 +174,8 @@ export default function VouchersPage() {
 
   async function onBuy() {
     setMinted(null)
+    // Defense in depth behind the disabled button: never submit a tier that is not on offer.
+    if (nothingOnSale) return
     try {
       // Pass the resolved 0x address (ENS-resolved or directly typed) so the hook's
       // address check passes for gifts entered as an ENS name.
@@ -228,9 +255,15 @@ export default function VouchersPage() {
 
       <section className="vch-card" aria-labelledby="vch-buy-h">
         <h2 id="vch-buy-h">Buy a voucher</h2>
+        {activeTiers.length === 0 && (
+          <p className="vch-warn" role="status">
+            No voucher tiers are on sale right now — every tier is switched off in the membership
+            contract. Nothing was charged.
+          </p>
+        )}
         <fieldset className="vch-tiers" disabled={!voucherAvailable || busy}>
           <legend>Choose a tier</legend>
-          {TIER_ORDER.map((tierKey) => {
+          {activeTiers.map((tierKey) => {
             const id = TIER_IDS[tierKey]
             const price = getPrice('WAGER_PARTICIPANT', tierKey)
             return (
@@ -327,11 +360,16 @@ export default function VouchersPage() {
           variant="primary"
           onClick={onBuy}
           loading={status === 'minting'}
-          disabled={!voucherAvailable || busy || buyBlocked || !recipientValid}
+          disabled={!voucherAvailable || busy || buyBlocked || !recipientValid || nothingOnSale}
         >
-          {giftMode
-            ? `Gift ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`
-            : `Buy ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`}
+          {/* With nothing on sale the label must not quote a tier and price that are not being
+              offered — `selectedTier` is still its default, and naming it would advertise a
+              purchase the contract refuses. */}
+          {nothingOnSale
+            ? 'No tiers available'
+            : giftMode
+              ? `Gift ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`
+              : `Buy ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`}
         </Button>
         {minted && (
           <p className="vch-success" role="status">
