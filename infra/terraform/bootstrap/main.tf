@@ -240,6 +240,37 @@ resource "google_project_iam_custom_role" "tf_bq_dataset_access" {
   ]
 }
 
+# Custom role granting NOTHING but resourcemanager.projects.getIamPolicy. The v1.13.4 apply's own
+# log is what surfaced this: module.gateway.google_project_iam_member.node["roles/bigquery.jobUser"]
+# failed "Error retrieving IAM policy for project ... 403" — a READ failure, not a write one. The
+# grant it was trying to reconcile (roles/bigquery.jobUser on fairwins-relay-engine@) was ALREADY
+# live, set out of band alongside its logging.logWriter / monitoring.metricWriter /
+# secretmanager.secretAccessor siblings — Terraform simply could not READ the project's IAM policy
+# to notice the binding already matched. `google_project_iam_member` is additive: once it can read
+# the current policy and finds the (role, member) pair present, it reports no change and never
+# calls setIamPolicy. This role therefore deliberately carries NO write permission — the exclusion
+# list at the top of this file rules out a broad `resourcemanager.projectIamAdmin`-equivalent grant
+# for exactly this reason (IAM offers no way to scope setIamPolicy to "only this one role"), and
+# nothing observed here needs write. If a future change genuinely adds a NEW project-level member
+# this apply identity does not yet see, that will surface its own permission-denied error — fixed
+# the same deliberate way this one was, not preemptively.
+resource "google_project_iam_custom_role" "tf_project_iam_reader" {
+  project     = var.project_id
+  role_id     = "fairwins.tfProjectIamReader"
+  title       = "FairWins Terraform project IAM policy reader"
+  description = "Read-only: resourcemanager.projects.getIamPolicy. Lets additive IAM-member resources detect an already-satisfied grant without needing write access. Spec 097."
+
+  permissions = [
+    "resourcemanager.projects.getIamPolicy",
+  ]
+}
+
+resource "google_project_iam_member" "tf_apply_project_iam_reader" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.tf_project_iam_reader.id
+  member  = "serviceAccount:${google_service_account.tf_apply.email}"
+}
+
 resource "google_project_iam_member" "tf_apply_bq_dataset_access" {
   project = var.project_id
   role    = google_project_iam_custom_role.tf_bq_dataset_access.id
