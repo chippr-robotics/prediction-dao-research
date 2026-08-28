@@ -10,6 +10,12 @@
  * not depend on itself. Committing `terraform.tfstate` is safe here because this root manages only
  * a bucket, a federation pool and two service accounts — no secrets, no payloads — and it makes the
  * establishment of the trust root auditable at any commit.
+ *
+ * COMMIT AND PUSH, EVERY TIME. "Custom project role ... already exists and must be imported" on a
+ * resource this exact config already created is what a committed-but-unpushed apply looks like on
+ * the next run: `import` it (harmless — nothing here is destroy-sensitive) and finish the push this
+ * time. Hit three times in the 2026-08-28 IAM rounds, once per resource that had been created but
+ * whose recording commit never reached `origin`.
  */
 
 terraform {
