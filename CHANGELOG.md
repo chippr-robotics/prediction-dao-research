@@ -14,6 +14,27 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.13.5 — 2026-08-28
+
+Promoted from: v1.13.5-rc.2
+Previous release: v1.13.4 · Range: `v1.13.4..v1.13.5` (6 commits)
+
+### 🐛 Bug Fixes
+
+- fix(bootstrap): the apply identity could not even read project IAM policy
+
+### Artifacts
+
+Range: `v1.13.4..v1.13.5`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.13.4 — 2026-08-27
 
 Promoted from: v1.13.4-rc.4
