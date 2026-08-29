@@ -26,34 +26,64 @@ import { ensureNodeGlobals } from './nodeShims'
 
 export const VENDOR_LABELS = Object.freeze({ ledger: 'Ledger', trezor: 'Trezor' })
 
+/** The rails a Ledger can be reached over from a browser. */
+export const TRANSPORT_KINDS = Object.freeze({
+  WEBHID: 'webhid',
+  WEBUSB: 'webusb',
+  WEBBLE: 'webble',
+})
+
 /** Which browser transports exist here. Pure capability read — no permission prompt. */
 export function detectTransports(nav = typeof navigator !== 'undefined' ? navigator : undefined) {
   return {
     webhid: Boolean(nav && 'hid' in nav),
     webusb: Boolean(nav && 'usb' in nav),
+    webble: Boolean(nav && 'bluetooth' in nav),
   }
 }
 
 /**
+ * Which rail this browser should use for a Ledger, or null when it has none.
+ *
+ * WebHID first: that is what every desktop Chromium exposes, so a computer keeps exactly the
+ * transport it has always used. Bluetooth comes SECOND — ahead of WebUSB — and only where WebHID
+ * is absent, which in practice is Android Chrome: it exposes WebUSB too, but reaching a Ledger
+ * that way needs an OTG cable, while BLE is the rail a Nano X actually offers a phone. WebUSB
+ * stays as the last fallback for a browser that has only that. iOS Safari has none of the three,
+ * which is a stated refusal, not a dead button (FR-003).
+ */
+export function ledgerTransportKind(transports = detectTransports()) {
+  if (transports.webhid) return TRANSPORT_KINDS.WEBHID
+  if (transports.webble) return TRANSPORT_KINDS.WEBBLE
+  if (transports.webusb) return TRANSPORT_KINDS.WEBUSB
+  return null
+}
+
+/** The one sentence for "no rail at all" — same text the thrown error carries (errors.js). */
+const noTransportReason = () => new HardwareWalletError(HW_ERROR_CODES.TRANSPORT_UNSUPPORTED).message
+
+/**
  * Whether a vendor's connect flow can run in this browser, with the honest reason when it cannot
  * (FR-003 — a vendor the browser cannot reach renders disabled with the reason, never as a dead
- * control).
- * @returns {{ available: boolean, reason: string|null }}
+ * control). `transport` names the rail that would be used, so the connect copy can describe the
+ * ceremony the member will actually see instead of assuming a cable.
+ * @returns {{ available: boolean, reason: string|null, transport: string|null }}
  */
 export function vendorAvailability(vendor, transports = detectTransports()) {
   if (vendor === 'ledger') {
-    if (transports.webhid || transports.webusb) return { available: true, reason: null }
-    return {
-      available: false,
-      reason: 'Ledger needs WebHID or WebUSB, which this browser does not offer. Use a Chromium-based browser.',
-    }
+    const transport = ledgerTransportKind(transports)
+    if (transport) return { available: true, reason: null, transport }
+    return { available: false, reason: noTransportReason(), transport: null }
   }
   if (vendor === 'trezor') {
-    // Trezor Connect runs in a vendor popup and needs no local transport, but it does need a window.
-    if (typeof window === 'undefined') return { available: false, reason: 'Trezor Connect needs a browser window.' }
-    return { available: true, reason: null }
+    // Trezor Connect runs in a vendor popup and needs no local transport, but it does need a
+    // window. It has no Bluetooth rail at all, so nothing here changes with one present.
+    if (typeof window === 'undefined') {
+      return { available: false, reason: 'Trezor Connect needs a browser window.', transport: null }
+    }
+    return { available: true, reason: null, transport: null }
   }
-  return { available: false, reason: 'Unknown device vendor.' }
+  return { available: false, reason: 'Unknown device vendor.', transport: null }
 }
 
 /**

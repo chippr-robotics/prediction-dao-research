@@ -4,6 +4,9 @@
 
 export const HW_ERROR_CODES = Object.freeze({
   TRANSPORT_UNSUPPORTED: 'transport-unsupported',
+  // Distinct from TRANSPORT_UNSUPPORTED on purpose: the browser DOES have Web Bluetooth, the radio
+  // is simply off or blocked. The remedy is the member's, and it is not "use another browser".
+  BLUETOOTH_UNAVAILABLE: 'bluetooth-unavailable',
   PERMISSION_DENIED: 'permission-denied',
   DEVICE_LOCKED: 'device-locked',
   WRONG_APP: 'wrong-app',
@@ -30,8 +33,13 @@ export class HardwareWalletError extends Error {
 }
 
 const DESCRIPTIONS = {
+  // Names both rails, because which one is missing depends on the device the member is holding:
+  // a computer connects over USB, an Android phone over Bluetooth, and an iPhone or iPad can do
+  // neither — saying "use Chromium" alone would be advice an iOS member cannot act on.
   [HW_ERROR_CODES.TRANSPORT_UNSUPPORTED]:
-    'This browser cannot talk to the device. Use a Chromium-based browser with WebHID or WebUSB enabled.',
+    'This browser cannot reach the device over USB or Bluetooth. On a computer use a Chromium-based browser (Chrome, Edge, Brave); on Android use Chrome and pair over Bluetooth. iPhones and iPads cannot connect a device to a website.',
+  [HW_ERROR_CODES.BLUETOOTH_UNAVAILABLE]:
+    'Bluetooth is off or unavailable on this device. Turn Bluetooth on, then try again.',
   [HW_ERROR_CODES.PERMISSION_DENIED]:
     'The browser was not given permission to use the device. Choose the device in the browser prompt to continue.',
   [HW_ERROR_CODES.DEVICE_LOCKED]: 'The device is locked. Unlock it with your PIN and try again.',

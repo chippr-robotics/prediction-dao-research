@@ -28,10 +28,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 103 |
 | With a member-facing flow | 81 |
-| Member-facing flows | 158 |
+| Member-facing flows | 159 |
 | 🟢 covered | 141 |
 | 🟡 partial | 1 |
-| 🔴 absent | 10 |
+| 🔴 absent | 11 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-61 flows — 🟢 48 · 🟡 0 · 🔴 7 · ⚪ 6 · covered-but-not-proven 0
+62 flows — 🟢 48 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -269,6 +269,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `hardware.add-and-reconnect` | Add a hardware account and reconnect to it later | 🟢 covered | flow | `no-chain` | `27-protect-hardware.cy.js` (HW-01, HW-02, HW-03, HW-04, HW-05) |  |
 | `hardware.physical-confirmation` | Confirm a transaction on the device screen | ⚪ out-of-scope | none | — (proposed: no-chain) | — | Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier. |
+| `hardware.bluetooth-transport` | Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy) | 🔴 absent | none | — (proposed: no-chain) | #1370 | The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs. |
 
 ### `088-instant-acting-accounts` — Instant acting accounts
 

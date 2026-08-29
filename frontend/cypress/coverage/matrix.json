@@ -2372,6 +2372,18 @@
           "risk": "custody",
           "tests": [],
           "reason": "Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier."
+        },
+        {
+          "id": "hardware.bluetooth-transport",
+          "name": "Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1370",
+          "missing": "The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs."
         }
       ]
     },

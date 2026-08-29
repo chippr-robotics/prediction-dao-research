@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
+import { connectGuidance } from '../../lib/hardware/connectCopy'
 import { HardwareWalletError, HW_ERROR_CODES } from '../../lib/hardware/errors'
 import HardwareConnectDialog from '../../components/account/HardwareConnectDialog'
 
@@ -47,6 +48,28 @@ describe('HardwareConnectDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /^connect$/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/does not hold this account/i)
     expect(onConnected).not.toHaveBeenCalled()
+  })
+
+  // Spec 085 follow-up — the reconnect hint follows the rail the adapter would open. Telling a
+  // phone member to plug in a Ledger they are about to pair over Bluetooth is simply untrue.
+  it('describes Bluetooth pairing, not a cable, when BLE is the rail', () => {
+    renderDialog({
+      connectAccount: vi.fn(),
+      provider: {},
+      guidance: (vendor) => connectGuidance(vendor, { webhid: false, webusb: true, webble: true }),
+    })
+    const hint = screen.getByText(/bluetooth pairing prompt/i)
+    expect(hint).toBeInTheDocument()
+    expect(hint.textContent).not.toMatch(/plug/i)
+  })
+
+  it('keeps the cable wording on a USB rail', () => {
+    renderDialog({
+      connectAccount: vi.fn(),
+      provider: {},
+      guidance: (vendor) => connectGuidance(vendor, { webhid: true, webusb: true, webble: false }),
+    })
+    expect(screen.getByText(/plug in the device, unlock it, and open the ethereum app/i)).toBeInTheDocument()
   })
 
   it('never leaks a raw SDK error message', async () => {
