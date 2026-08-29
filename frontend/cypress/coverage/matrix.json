@@ -1096,6 +1096,32 @@
           "tests": [
             "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-03"
           ]
+        },
+        {
+          "id": "custody.vault-action-sheet",
+          "name": "One sheet offers the four vault actions, and states why any is closed",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-01",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-05",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-06"
+          ]
+        },
+        {
+          "id": "custody.create-vault-defaults",
+          "name": "A new vault defaults to a majority threshold and a starter policy, and refuses 1-of-1 with none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-02",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-03",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-04"
+          ]
         }
       ]
     },

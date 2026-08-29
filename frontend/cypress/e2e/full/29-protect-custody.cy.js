@@ -10,8 +10,9 @@
  * task fails loudly rather than mysteriously if that step was skipped.
  *
  * Only CV-01 drives the creation wizard, because only CV-01 is about creating a vault. The rest
- * take an on-chain vault from the fixture and bring it in through the app's own "Load existing"
- * path, so each test spends its assertions on its own flow.
+ * take an on-chain vault from the fixture and bring it in through the app's own "Load a vault"
+ * path (release 1.14.0: the four vault actions live behind the Protect vault ActionSheet), so each
+ * test spends its assertions on its own flow.
  *
  * CV-02 drives the cycle through a governance change rather than a transfer, because the
  * governance panel is the ONLY propose-from-Protect path by design: there is deliberately no
@@ -251,9 +252,15 @@ function openProtect(account = OWNER_A) {
   cy.get('.custody-panel', { timeout: 20000 }).should('be.visible')
 }
 
+/** Open the Protect vault ActionSheet and pick one of its four actions (release 1.14.0). */
+function openVaultAction(action) {
+  cy.contains('.custody-onchain button', 'Vault actions').click()
+  cy.get(`[data-testid="vault-action-${action}"]`).click()
+}
+
 /** Bring an existing on-chain vault into the app the way a member would: by address. */
 function loadVault(address, label = 'E2E Vault') {
-  cy.contains('.custody-onchain button', 'Load existing').click()
+  openVaultAction('load')
   cy.get('form.custody-load').within(() => {
     cy.get('#load-address').clear().type(address)
     cy.get('#load-label').clear().type(label)
@@ -287,7 +294,7 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
     // Custody must be OFFERED here at all — without the Safe estate this reads as "New vaults
     // cannot be created on this network" and everything below is moot.
     cy.get('.custody-onchain').should('be.visible')
-    cy.contains('.custody-onchain button', 'Create vault').click()
+    openVaultAction('create')
 
     cy.get('form.custody-create').within(() => {
       cy.get('#owner-0').clear().type(OWNER_A)
@@ -301,6 +308,13 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
        */
       cy.get('#vault-threshold').type('{selectall}2').should('have.value', '2')
       cy.get('#vault-label').type('E2E Vault')
+      /*
+       * Release 1.14.0 preselects a starter policy for every new vault, so this test — which is
+       * about the SAFE the wizard deploys, not about policy — opts out explicitly. The guard
+       * assertion below is what that choice means on chain. (A 1-of-1 could not opt out at all;
+       * this vault has two owners.)
+       */
+      cy.get('#vault-policy-none').click().should('be.checked')
       cy.contains('button', 'Create vault').click()
     })
 
@@ -315,7 +329,7 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
         expect(info.owners.map((o) => o.toLowerCase()), 'both owners').to.have.members([
           OWNER_A.toLowerCase(), OWNER_B.toLowerCase(),
         ])
-        expect(info.guard, 'a new vault has no policy guard until one is adopted')
+        expect(info.guard, 'a vault created with "No policy" carries no guard')
           .to.equal('0x0000000000000000000000000000000000000000')
       })
     })

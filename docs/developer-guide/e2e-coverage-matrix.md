@@ -28,8 +28,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 103 |
 | With a member-facing flow | 81 |
-| Member-facing flows | 153 |
-| 🟢 covered | 138 |
+| Member-facing flows | 155 |
+| 🟢 covered | 140 |
 | 🟡 partial | 1 |
 | 🔴 absent | 8 |
 | ⚪ out of scope | 6 |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-57 flows — 🟢 46 · 🟡 0 · 🔴 5 · ⚪ 6 · covered-but-not-proven 0
+59 flows — 🟢 48 · 🟡 0 · 🔴 5 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -142,6 +142,8 @@ establish the outcome. They are listed in full at the end of this document.
 | `custody.create-vault` | Create a Safe vault and add its owners | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-01) |  |
 | `custody.propose-and-execute` | Propose a transaction, collect approvals, execute it | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-02) |  |
 | `custody.operate-as-vault` | Act as the vault rather than as yourself, and see which you are | 🟢 covered | flow | `on-chain` | `29-protect-custody.cy.js` (CV-03) |  |
+| `custody.vault-action-sheet` | One sheet offers the four vault actions, and states why any is closed | 🟢 covered | flow | `no-chain` | `41-protect-vault-actions.cy.js` (VA-01, VA-05, VA-06) |  |
+| `custody.create-vault-defaults` | A new vault defaults to a majority threshold and a starter policy, and refuses 1-of-1 with none | 🟢 covered | flow | `no-chain` | `41-protect-vault-actions.cy.js` (VA-02, VA-03, VA-04) |  |
 
 ### `049-multisig-policy-engine` — Multisig policy engine
 
