@@ -642,6 +642,17 @@
           "tests": [
             "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::VC-02"
           ]
+        },
+        {
+          "id": "membership.send-voucher-from-portfolio",
+          "name": "Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1364"
         }
       ]
     },
@@ -1581,6 +1592,17 @@
           "tests": [
             "frontend/cypress/e2e/passkey/bitcoin-send-fee.cy.js::BTC-03"
           ]
+        },
+        {
+          "id": "bitcoin.network-card-activates",
+          "name": "Open the Bitcoin wallet surface from its network card without touching the EVM chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1364"
         }
       ]
     },
@@ -2154,6 +2176,31 @@
             "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-01",
             "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-06"
           ]
+        },
+        {
+          "id": "trade.wrap-view",
+          "name": "Wrap is a Trade view beside Swap and Perps, with Swap still the default",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::TRADE-WRAP-01",
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::TRADE-WRAP-02"
+          ],
+          "note": "Wrap joined TradeSection's views in release 1.14.0; it rides this spec's rows because 082 owns the Trade view switch"
+        },
+        {
+          "id": "trade.wrap-legacy-redirect",
+          "name": "The old Transfer wrap URL redirects into the Trade wrap view",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::TRADE-WRAP-03",
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::TRADE-WRAP-04"
+          ]
         }
       ]
     },
@@ -2264,6 +2311,50 @@
           "risk": "information",
           "tests": [
             "frontend/cypress/e2e/fast/26-trade-account.cy.js"
+          ]
+        },
+        {
+          "id": "account.add-chooser",
+          "name": "Open the \"+\" chooser and see the three ways to add an account",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::ACC-ADD-01"
+          ]
+        },
+        {
+          "id": "account.add-hardware",
+          "name": "\"Add a hardware account\" deep-links to Protect > Off chain with the card open",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::ACC-ADD-02"
+          ]
+        },
+        {
+          "id": "account.add-vault",
+          "name": "\"Add a vault\" deep-links to Protect > On chain",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::ACC-ADD-03"
+          ]
+        },
+        {
+          "id": "account.add-legacy-recovery",
+          "name": "\"Recover a legacy account\" deep-links to Recovery's legacy import",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::ACC-ADD-04"
           ]
         }
       ]

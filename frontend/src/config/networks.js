@@ -257,7 +257,9 @@ const NETWORKS = {
     isPrimary: false,
     // Surfaced in the My Account → Network tab as a user-switchable network.
     selectable: true,
-    nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
+    // POL since Polygon's MATIC → POL migration (the testnet gas token followed
+    // mainnet's rebrand). Same coin, same decimals — only the ticker moved.
+    nativeCurrency: { decimals: 18, name: 'POL', symbol: 'POL' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_AMOY || 'https://rpc-amoy.polygon.technology',
     explorer: { name: 'Polygonscan', baseUrl: 'https://amoy.polygonscan.com' },
     // The Graph endpoint that indexes this chain's WagerRegistry. When present,
@@ -553,7 +555,9 @@ const NETWORKS = {
     isPrimary: true,
     // Surfaced in the My Account → Network tab as a user-switchable network.
     selectable: true,
-    nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
+    // POL since Polygon's MATIC → POL migration. The rebrand renamed the coin,
+    // not any contract: addresses (WPOL wrapper, price feeds) are unchanged.
+    nativeCurrency: { decimals: 18, name: 'POL', symbol: 'POL' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-bor-rpc.publicnode.com',
     explorer: { name: 'Polygonscan', baseUrl: 'https://polygonscan.com' },
     // The Graph endpoint indexing Polygon. Override with VITE_SUBGRAPH_URL_POLYGON.
@@ -586,7 +590,7 @@ const NETWORKS = {
       swapRouter: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
       quoter: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
       positionManager: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
-      wnative: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', // WMATIC
+      wnative: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', // WPOL (the contract formerly branded WMATIC — same address)
     },
     contracts: {},
     polymarket: {
