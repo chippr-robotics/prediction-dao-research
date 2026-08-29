@@ -276,7 +276,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
+| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
 | `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
 ## Disclosure — a member consents to a cost

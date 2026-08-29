@@ -30,6 +30,12 @@ import { useIntentAction } from './useIntentAction'
  * @param {(...runArgs: any[]) => Promise<object|string>} cfg.selfSubmit - MANDATORY: the existing
  *   wallet write, resolving with the mined receipt (or its hash). Receives the same run() args.
  * @param {(entry: object) => void} [cfg.onActivity] - spec-031 ActivityEntry sink (optional).
+ * @param {object|(() => object|null|undefined)} [cfg.signer] - spec 098 FR-007: sign the intent (and
+ *   its stapled EIP-3009 authorization) as an account OTHER than the connected wallet — the acting
+ *   account. Pass the signer itself, or a GETTER resolved at run time so a deferred ceremony (spec
+ *   088) can supply it after render. The override is authoritative: a getter returning `null` signs
+ *   with nothing rather than quietly falling back to the connected wallet — which is exactly the
+ *   substitution this seam exists to prevent. `undefined` means "no override" (the personal path).
  * @param {string} [cfg.targetContract] - override the EIP-712 verifying contract. Defaults to the
  *   action verifier's address via getContractAddressForChain; pass this when the call site already
  *   holds the exact proxy address (so the relayed target can never diverge from the self-submit one).
@@ -37,9 +43,17 @@ import { useIntentAction } from './useIntentAction'
  * @returns {ReturnType<typeof useIntentAction>} { status, intent, result, error, run, invalidate,
  *   selfSubmitNow, reset }
  */
-export function useGaslessWrite(action, { params, payment, selfSubmit, onActivity, targetContract: targetOverride, ...rest } = {}) {
+export function useGaslessWrite(action, { params, payment, selfSubmit, onActivity, signer: signerOverride, targetContract: targetOverride, ...rest } = {}) {
   const { signer, chainId } = useWeb3()
   const verifier = INTENT_ACTIONS[action]?.verifier
+
+  // Resolved per run, not per render: the acting signer may only exist after the ceremony that
+  // confirm time triggers. `undefined` (including a getter that returns it) means no override.
+  const resolveSigner = () => {
+    if (signerOverride === undefined) return signer
+    const override = typeof signerOverride === 'function' ? signerOverride() : signerOverride
+    return override === undefined ? signer : override
+  }
 
   // The EIP-712 verifying contract is the action's target proxy (wagerRegistry | membershipManager).
   const targetContract = useMemo(() => {
@@ -57,7 +71,7 @@ export function useGaslessWrite(action, { params, payment, selfSubmit, onActivit
     chainId,
     buildIntent: (...runArgs) =>
       signIntent({
-        signer,
+        signer: resolveSigner(),
         chainId,
         action,
         targetContract,

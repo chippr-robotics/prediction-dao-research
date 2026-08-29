@@ -2568,10 +2568,10 @@
       "flows": [
         {
           "id": "purchase.acting-account",
-          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail",
+          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail (money path: on-chain tier required)",
           "status": "absent",
           "tier": "none",
-          "proposedTier": "no-chain",
+          "proposedTier": "on-chain",
           "depth": "none",
           "risk": "custody",
           "tests": [],
