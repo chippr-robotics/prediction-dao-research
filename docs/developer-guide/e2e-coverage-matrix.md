@@ -28,10 +28,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 103 |
 | With a member-facing flow | 81 |
-| Member-facing flows | 153 |
-| 🟢 covered | 138 |
+| Member-facing flows | 157 |
+| 🟢 covered | 141 |
 | 🟡 partial | 1 |
-| 🔴 absent | 8 |
+| 🔴 absent | 9 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-57 flows — 🟢 46 · 🟡 0 · 🔴 5 · ⚪ 6 · covered-but-not-proven 0
+60 flows — 🟢 48 · 🟡 0 · 🔴 6 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -142,6 +142,8 @@ establish the outcome. They are listed in full at the end of this document.
 | `custody.create-vault` | Create a Safe vault and add its owners | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-01) |  |
 | `custody.propose-and-execute` | Propose a transaction, collect approvals, execute it | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-02) |  |
 | `custody.operate-as-vault` | Act as the vault rather than as yourself, and see which you are | 🟢 covered | flow | `on-chain` | `29-protect-custody.cy.js` (CV-03) |  |
+| `custody.vault-action-sheet` | One sheet offers the four vault actions, and states why any is closed | 🟢 covered | flow | `no-chain` | `41-protect-vault-actions.cy.js` (VA-01, VA-05, VA-06) |  |
+| `custody.create-vault-defaults` | A new vault defaults to a majority threshold and a starter policy, and refuses 1-of-1 with none | 🟢 covered | flow | `no-chain` | `41-protect-vault-actions.cy.js` (VA-02, VA-03, VA-04) |  |
 
 ### `049-multisig-policy-engine` — Multisig policy engine
 
@@ -191,6 +193,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `transfer.send-from-home` | Send funds to someone from the home screen | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (TR-01) |  |
+| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), or sequential sends with per-recipient outcomes | 🔴 absent | none | — (proposed: on-chain) | #1366 |  |
 
 ### `061-bitcoin-transactions` — Bitcoin
 
@@ -281,7 +284,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Disclosure — a member consents to a cost
 
-12 flows — 🟢 12 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
+13 flows — 🟢 13 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -306,6 +309,12 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `predict.builder-fee-disclosed` | See the additive builder fee as its own line before signing an order | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-02, PR-04) |  |
+
+### `058-send-request-home` — Send and request from home
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `pay.group-recipient-list` | Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee) | 🟢 covered | flow | `no-chain` | `41-group-pay.cy.js` (GP-01, GP-02, GP-03, GP-04, GP-05, GP-06, GP-07, GP-08, GP-09) |  |
 
 ### `060-platform-fee-wrapper` — Platform fees
 

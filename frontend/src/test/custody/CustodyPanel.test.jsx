@@ -86,4 +86,40 @@ describe('CustodyPanel', () => {
     const { container } = render(<CustodyPanel />)
     expect(await axe(container)).toHaveNoViolations()
   })
+  // ------------------------------------------------------------- release 1.14.0
+  // The four vault actions moved behind one bottom sheet. What the panel owes is a single door and
+  // an honest one: the sheet must open from here, and it must not pretend a closed action is live.
+
+  it('opens the vault ActionSheet with all four actions', () => {
+    render(<CustodyPanel />)
+    // Closed by default — the sheet is a door, not a permanent panel.
+    expect(screen.queryByTestId('vault-action-create')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('custody-open-vault-actions'))
+    expect(screen.getByRole('dialog', { name: /vault actions/i })).toBeInTheDocument()
+    for (const id of ['create', 'load', 'propose', 'approve']) {
+      expect(screen.getByTestId(`vault-action-${id}`)).toBeInTheDocument()
+    }
+  })
+
+  it('offers the sheet on an unsupported chain, with creation closed and the reason stated', () => {
+    walletCtx = { chainId: 1 }
+    render(<CustodyPanel />)
+    fireEvent.click(screen.getByTestId('custody-open-vault-actions'))
+    expect(screen.getByTestId('vault-action-create')).toBeDisabled()
+    expect(screen.getByTestId('vault-action-create')).toHaveTextContent(/not available on/i)
+  })
+
+  it('closes propose and approve while no vault is open', () => {
+    render(<CustodyPanel />)
+    fireEvent.click(screen.getByTestId('custody-open-vault-actions'))
+    expect(screen.getByTestId('vault-action-propose')).toBeDisabled()
+    expect(screen.getByTestId('vault-action-approve')).toBeDisabled()
+    expect(screen.getByTestId('vault-action-approve')).toHaveTextContent(/open a vault in the list below first/i)
+  })
+
+  it('has no axe violations with the vault sheet open', async () => {
+    const { container } = render(<CustodyPanel />)
+    fireEvent.click(screen.getByTestId('custody-open-vault-actions'))
+    expect(await axe(container)).toHaveNoViolations()
+  })
 })

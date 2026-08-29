@@ -16,8 +16,7 @@ import { useVaultProposals } from '../../hooks/useVaultProposals'
 import { isCustodySupported, CUSTODY_SUPPORTED_CHAIN_IDS } from '../../config/safeContracts'
 import { NETWORKS } from '../../config/networks'
 import VaultList from './VaultList'
-import CreateVaultWizard from './CreateVaultWizard'
-import LoadVaultForm from './LoadVaultForm'
+import VaultActionSheet from './VaultActionSheet'
 import VerifySection from './VerifySection'
 import HardwareWalletSection from './HardwareWalletSection'
 import AccordionGroup from '../account/AccordionGroup'
@@ -48,7 +47,10 @@ function OnChainSection() {
     previewVaultAddress,
     forget,
   } = useCustodyVaults()
-  const [mode, setMode] = useState(null) // null | 'create' | 'load'
+  // Release 1.14.0 — the four vault actions live in one bottom sheet (VaultActionSheet) instead of
+  // two inline toggles plus two flows buried inside the open vault's card. `sheet` is null when
+  // closed; `{ action }` names the view it should land on (null ⇒ the chooser).
+  const [sheet, setSheet] = useState(null)
   // Spec 049 — one shared proposal-queue instance for the active vault, so policy-change proposals
   // (VaultDetail → PolicyPanel) land in the same queue the VaultProposalsPanel renders.
   const proposals = useVaultProposals(activeVault)
@@ -57,16 +59,16 @@ function OnChainSection() {
 
   return (
     <div className="custody-onchain" role="region" aria-label="On-chain vaults">
-      {canCreateHere ? (
-        <div className="custody-actions">
-          <button type="button" onClick={() => setMode(mode === 'create' ? null : 'create')}>
-            Create vault
-          </button>
-          <button type="button" onClick={() => setMode(mode === 'load' ? null : 'load')}>
-            Load existing
-          </button>
-        </div>
-      ) : (
+      {/* One door. The sheet itself decides which of the four actions can be taken right now and
+          says why for the rest — a control that is closed is still shown, because a control that
+          has vanished reads as a broken app rather than as an unavailable network. */}
+      <div className="custody-actions">
+        <button type="button" data-testid="custody-open-vault-actions" onClick={() => setSheet({ action: null })}>
+          Vault actions
+        </button>
+      </div>
+
+      {!canCreateHere && (
         // FR-005: creation is honestly unavailable here, but the member's existing vaults on other
         // chains stay listed below — the estate never disappears because of the connected network.
         <div className="custody-unavailable" role="status">
@@ -84,18 +86,19 @@ function OnChainSection() {
         </div>
       )}
 
-      {canCreateHere && mode === 'create' && (
-        <CreateVaultWizard
-          connectedAddress={address}
-          chainId={chainId}
-          onCreate={createVault}
-          onPreview={previewVaultAddress}
-          onDone={() => setMode(null)}
-        />
-      )}
-      {canCreateHere && mode === 'load' && (
-        <LoadVaultForm onLoad={loadByAddress} chainId={chainId} onDone={() => setMode(null)} />
-      )}
+      <VaultActionSheet
+        open={Boolean(sheet)}
+        onClose={() => setSheet(null)}
+        initialAction={sheet?.action ?? null}
+        chainId={chainId}
+        connectedAddress={address}
+        canCreateHere={canCreateHere}
+        onCreate={createVault}
+        onPreview={previewVaultAddress}
+        onLoad={loadByAddress}
+        vault={activeVault}
+        proposals={proposals}
+      />
 
       {loading && <p className="custody-hint">Loading vaults…</p>}
       {error && (

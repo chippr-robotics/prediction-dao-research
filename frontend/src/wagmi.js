@@ -222,9 +222,10 @@ function inertWalletConnectStub() {
  * Transport for one chain, honouring the member's own endpoint (spec 069).
  *
  * Precedence per chain: the member's endpoint (+ their failover, + the build default behind
- * it) → `VITE_RPC_URL` when this is the env-selected chain → the curated default. A member
- * endpoint yields a viem `fallback` transport so a rate-limited or down provider hands over
- * instead of taking the wallet's chain with it.
+ * it) → `VITE_RPC_URL` when this is the env-selected chain → the curated default (+ the
+ * chain's own `rpcFailoverUrl`, where NETWORKS declares one). A member endpoint, or an
+ * unconfigured chain with a declared build failover, yields a viem `fallback` transport so a
+ * rate-limited or down provider hands over instead of taking the wallet's chain with it.
  *
  * These are built ONCE at module load. localStorage is synchronous so that is fine, but it
  * also means a member who repoints a network needs a reload before wallet-signed
@@ -237,7 +238,15 @@ function transportFor(chainId, defaultUrl) {
   const route = resolveRpcEndpoints(chainId)
 
   if (route.source !== 'member' || !route.primary) {
-    // Pre-069 behavior exactly: `http()` with no URL lets viem use the chain's own rpcUrls.
+    // Pre-069 behavior when the chain declares no build failover: `http()` with no URL lets
+    // viem use the chain's own rpcUrls. Generalized (this task) beyond ETC — every chain whose
+    // NETWORKS entry declares `rpcFailoverUrl` now gets it wired in here too, not only through
+    // the ethers read path (`utils/rpcProvider.js`), which already honoured it. Without this a
+    // member on default settings never saw the failover on wagmi's public client (wallet reads),
+    // only on ethers reads — the exact "only ETC is wired for failover" gap.
+    const primaryUrl = route.primary?.url || fallbackUrl
+    const failoverUrl = route.failover && route.failover.url !== primaryUrl ? route.failover.url : null
+    if (failoverUrl) return fallback([http(primaryUrl), http(failoverUrl)])
     return http(fallbackUrl)
   }
 

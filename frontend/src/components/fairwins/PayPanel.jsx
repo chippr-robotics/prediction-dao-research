@@ -7,19 +7,37 @@ import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import UniversalAssetSelect from '../ui/UniversalAssetSelect'
 import BitcoinSendPanel from '../wallet/BitcoinSendPanel'
+import GroupPayRecipients from '../wallet/GroupPayRecipients'
+import { GroupPayBreakdown, GroupPayOutcomes } from '../wallet/GroupPaySummary'
 import { useWallet } from '../../hooks'
 import { useTransfer } from '../../hooks/useTransfer'
 import { useSelectableAssets } from '../../hooks/useSelectableAssets'
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useBitcoinWallet } from '../../hooks/useBitcoinWallet'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
+import { useGroupPay } from '../../hooks/useGroupPay'
 import { useNotification } from '../../hooks/useUI'
 import { getNetwork } from '../../config/networks'
 import { ASSET_ACTIVITIES } from '../../lib/assets/assetActivity'
 import { getDefaultCurrencyKind } from '../../utils/homePreference'
 import { parsePaymentRequest, NOTE_MAX_LENGTH } from '../../lib/payments/paymentRequest'
+import { GROUP_RAIL, validateRecipients } from '../../lib/payments/groupPay'
 
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
+
+/** The form's own To/amount fields are recipient 1; GroupPayRecipients owns rows 2..N. */
+const PRIMARY_ID = 'primary'
+
+/** An honest one-liner for a finished group payment — every non-zero bucket is named. */
+function groupNotice(summary) {
+  const parts = []
+  if (summary?.sent) parts.push(`${summary.sent} sent`)
+  if (summary?.proposed) parts.push(`${summary.proposed} proposed to the vault`)
+  if (summary?.pending) parts.push(`${summary.pending} still confirming`)
+  if (summary?.failed) parts.push(`${summary.failed} failed`)
+  if (summary?.skipped) parts.push(`${summary.skipped} skipped`)
+  return `Group payment: ${parts.join(', ') || 'nothing was sent'}.`
+}
 
 /** Format base units for the keypad; trims trailing zeros ("12.50" → "12.5"). */
 function formatUnitsForKeypad(units, decimals) {
@@ -59,6 +77,8 @@ function PayPanel({ onSuccess }) {
   const { address: effectiveAddress, isActingAccount } = useEffectiveAccount()
   const actingAddress = isActingAccount ? effectiveAddress : null
   const { options, defaultKey, isGasless } = useSelectableAssets({ activity: ASSET_ACTIVITIES.PAY, actingAddress })
+  // Group pay (release 1.14.0): dormant until the member adds a second recipient.
+  const groupPay = useGroupPay()
 
   const [selectedKey, setSelectedKey] = useState(null)
   const [amount, setAmount] = useState('')
@@ -74,9 +94,15 @@ function PayPanel({ onSuccess }) {
   // A scanned request payable on another network pins that chain until the user
   // switches, even when we hold no matching asset to preselect (FR-007).
   const [pinnedChainId, setPinnedChainId] = useState(null)
+  // Recipients 2..N, and the screening statuses / result for a group payment. Empty ⇒ this is
+  // the ordinary single-recipient form and NOTHING below behaves differently.
+  const [extraRecipients, setExtraRecipients] = useState([])
+  const [groupScreening, setGroupScreening] = useState({})
+  const [groupResult, setGroupResult] = useState(null)
 
   const connectedChainId = Number(chainId)
-  const busy = status === 'signing' || status === 'submitting' || status === 'pending'
+  const groupBusy = groupPay.status === 'screening' || groupPay.status === 'submitting'
+  const busy = status === 'signing' || status === 'submitting' || status === 'pending' || groupBusy
 
   // Preference-aware default (spec 058): the home currency preference still picks
   // the STARTING asset — 'native' preselects the connected native coin, otherwise
@@ -143,9 +169,60 @@ function PayPanel({ onSuccess }) {
     return Number(amount) > Number(bal)
   }, [bal, amount, amountValid])
 
+  // ── Group pay ─────────────────────────────────────────────────────────────────────────────
+  // The list is the form's own recipient followed by the extra rows, so the member's first entry
+  // keeps its place and its number. `isGroup` is false until a second recipient exists, and while
+  // it is false every branch below is the single-recipient one that shipped before.
+  const isGroup = extraRecipients.length > 0
+  const allRecipients = useMemo(
+    () => [{ id: PRIMARY_ID, raw: toRaw, address: toResolved, amount }, ...extraRecipients],
+    [toRaw, toResolved, amount, extraRecipients],
+  )
+  const groupAddressKey = allRecipients.map((r) => r.address).join(',')
+
+  // Advisory screening for every recipient in the list (the engine re-screens, forced, at submit).
+  useEffect(() => {
+    if (!isGroup) return undefined
+    let cancelled = false
+    const addrs = [...new Set(groupAddressKey.split(',').filter(Boolean).map((a) => a.toLowerCase()))]
+    Promise.all(addrs.map((a) =>
+      Promise.resolve(screenOne(a, assetChainId)).then((s) => [a, s]).catch(() => [a, 'uncertain']),
+    )).then((pairs) => {
+      if (cancelled) return
+      setGroupScreening((prev) => {
+        const next = { ...prev }
+        let changed = false
+        for (const [a, s] of pairs) if (next[a] !== s) { next[a] = s; changed = true }
+        return changed ? next : prev
+      })
+    })
+    return () => { cancelled = true }
+  }, [isGroup, groupAddressKey, screenOne, assetChainId])
+
+  const groupValidation = useMemo(
+    () => (isGroup
+      ? validateRecipients(allRecipients, {
+          decimals: selectedAsset?.decimals ?? 18,
+          symbol,
+          balance: bal,
+          selfAddress: effectiveAddress,
+          screening: groupScreening,
+        })
+      : null),
+    [isGroup, allRecipients, selectedAsset, symbol, bal, effectiveAddress, groupScreening],
+  )
+  const groupRefused = isGroup && groupPay.rail === GROUP_RAIL.REFUSED
+  const issuesFor = useCallback(
+    (id) => groupValidation?.rows.find((r) => r.id === id)?.issues ?? [],
+    [groupValidation],
+  )
+
   const canPay =
-    isConnected && Boolean(selectedAsset) && !chainMismatch && Boolean(toResolved) && amountValid &&
-    !overBalance && screening !== 'restricted' && !busy
+    isConnected && Boolean(selectedAsset) && !chainMismatch && !busy && (
+      isGroup
+        ? !groupValidation.blocking && !groupRefused
+        : Boolean(toResolved) && amountValid && !overBalance && screening !== 'restricted'
+    )
 
   const applyAddress = useCallback((addr) => {
     setToRaw(addr)
@@ -157,6 +234,7 @@ function PayPanel({ onSuccess }) {
     setAmount(''); setToRaw(''); setToResolved(''); setNote('')
     setScreeningResult(null); setFormError(null); setScanNotice(null)
     setConfirming(false); setPinnedChainId(null)
+    setExtraRecipients([]); setGroupScreening({}); setGroupResult(null)
   }, [])
 
   const handleSelectAsset = useCallback((option) => {
@@ -246,11 +324,36 @@ function PayPanel({ onSuccess }) {
     }
   }, [send, selectedAsset, toResolved, amount, symbol, showNotification, resetDraft, onSuccess])
 
-  const blockReason = !amountValid
-    ? null
-    : overBalance
-      ? `That's more ${symbol} than you have.`
-      : null
+  /**
+   * Submit the whole list. The rail (one batch, one vault proposal, or N sequential sends) is the
+   * engine's decision, and its per-recipient outcomes are what gets shown afterwards — a partial
+   * result is reported as a partial result, never rounded up to "sent".
+   */
+  const handleGroupSend = useCallback(async () => {
+    setFormError(null)
+    try {
+      const res = await groupPay.submitGroup({ asset: selectedAsset, recipients: allRecipients })
+      setGroupResult(res)
+      const clean = !res.summary?.failed && !res.summary?.skipped
+      showNotification(groupNotice(res.summary), clean ? 'success' : 'info')
+      onSuccess?.(res)
+    } catch (err) {
+      // Nothing was signed: stay on the confirm with the draft intact so the member can fix it.
+      setFormError(err?.shortMessage || err?.message || 'The payment could not be submitted.')
+    }
+  }, [groupPay, selectedAsset, allRecipients, showNotification, onSuccess])
+
+  const blockReason = isGroup
+    ? (groupValidation.overBalance
+        ? `That's more ${symbol} than you have.`
+        : groupValidation.tooMany
+          ? 'That is more recipients than one payment can carry.'
+          : groupRefused ? groupPay.railReason : null)
+    : !amountValid
+      ? null
+      : overBalance
+        ? `That's more ${symbol} than you have.`
+        : null
 
   const assetSelect = (
     <UniversalAssetSelect
@@ -280,6 +383,50 @@ function PayPanel({ onSuccess }) {
         ) : (
           <BitcoinSendPanel btc={btc} usdPerBtc={null} onSent={onSuccess} />
         )}
+      </div>
+    )
+  }
+
+  // A finished group payment reports itself per recipient before the draft is cleared.
+  if (confirming && groupResult) {
+    return (
+      <div className="fm-form fm-pay-form pay-panel">
+        <GroupPayOutcomes
+          outcomes={groupResult.outcomes}
+          summary={groupResult.summary}
+          symbol={symbol}
+          onDone={() => { groupPay.reset(); resetDraft() }}
+        />
+      </div>
+    )
+  }
+
+  if (confirming && isGroup) {
+    return (
+      <div className="fm-form fm-pay-form pay-panel">
+        <GroupPayBreakdown
+          recipients={allRecipients}
+          total={groupValidation.total}
+          symbol={symbol}
+          networkName={selectedAsset?.networkName}
+          rail={groupPay.rail}
+          gasless={gasless}
+          nativeSymbol={getNetwork(assetChainId)?.nativeCurrency?.symbol || ''}
+        />
+        {note && <div className="pay-confirm-row"><span className="k">Note</span><span className="v">{note}</span></div>}
+
+        {(formError || sendError || groupPay.error) && (
+          <div className="fm-error-banner" role="alert">{formError || sendError || groupPay.error}</div>
+        )}
+
+        <div className="pay-confirm-actions">
+          <button type="button" className="fm-btn-secondary" onClick={() => setConfirming(false)} disabled={busy}>
+            Back
+          </button>
+          <button type="button" className="fm-btn-primary" onClick={handleGroupSend} disabled={busy}>
+            {busy ? 'Sending…' : 'Confirm'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -376,6 +523,26 @@ function PayPanel({ onSuccess }) {
         {screening === 'uncertain' && toResolved && (
           <span className="fm-hint">Screening unavailable — proceed with care.</span>
         )}
+        {isGroup && issuesFor(PRIMARY_ID).map((issue) => (
+          <div
+            key={issue.code}
+            className={issue.blocking ? 'fm-error-banner' : 'fm-hint'}
+            {...(issue.blocking ? { role: 'alert' } : {})}
+          >
+            {issue.message}
+          </div>
+        ))}
+
+        {/* Rows 2..N. Absent — and inert — until the member presses Add. */}
+        <GroupPayRecipients
+          recipients={extraRecipients}
+          onChange={setExtraRecipients}
+          issuesFor={issuesFor}
+          chainId={assetChainId}
+          symbol={symbol}
+          disabled={busy}
+          idPrefix="pay"
+        />
       </div>
 
       {/* Note — client-side only; a plain transfer carries no on-chain memo. */}
@@ -411,7 +578,7 @@ function PayPanel({ onSuccess }) {
           </button>
         ) : (
           <button type="button" className="fm-btn-primary" onClick={() => setConfirming(true)} disabled={!canPay}>
-            Pay
+            {isGroup ? `Pay ${allRecipients.length} recipients` : 'Pay'}
           </button>
         )}
       </div>
