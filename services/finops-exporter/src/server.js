@@ -34,6 +34,7 @@ import { createBurnTracker } from './burnRate.js'
 import { createFeeRouterCollector } from './collectors/feeRouter.js'
 import { createMembershipCollector } from './collectors/membership.js'
 import { createReferralCollector } from './collectors/referral.js'
+import { createX402Collector } from './collectors/x402.js'
 import { createPoolsCollector, emitPoolSeries } from './collectors/pools.js'
 import { createGcpBillingCollector, emitGcpDetail } from './collectors/gcpBilling.js'
 import { createCloudflareCollector, emitCloudflareUsage } from './collectors/cloudflare.js'
@@ -83,6 +84,7 @@ export function createApp(overrides = {}) {
     feeRouter: createFeeRouterCollector({ config, providers, cursors, log }),
     membership: createMembershipCollector({ config, providers, cursors, log }),
     referral: createReferralCollector({ config, fetchImpl: overrides.fetchImpl }),
+    x402: createX402Collector({ config, providers, cursors, log }),
     pools: createPoolsCollector({ config, providers, burn }),
     gcpBilling,
     cloudflare,

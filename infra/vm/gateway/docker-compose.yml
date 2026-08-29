@@ -31,10 +31,10 @@ services:
     # #1311. Verified before push: /status returns a `memberApi` block (with x402 nested inside it)
     # that the live perps-083 does not. Digest sha256:c57e88ae0960519ef461a7316f782281e0f1bcccc499a…
     #
-    # The module is PRESENT but OFF: every spec-095/096 switch below stays commented, so this image
-    # behaves exactly as perps-083 did until someone turns one on deliberately. Shipping the code
-    # and flipping the switch are different decisions, and X402_PAY_TO has no safe default to
-    # guess — it is where agent payments LAND.
+    # The member API and the x402 rail were switched ON in the same change that promoted
+    # `x402-agent-payments` to a live FinOps source — shipping a revenue path and the thing that
+    # watches it together is what the C2b gate exists to force. ASSISTANT_ENABLED is still off;
+    # see the flag block below for why that one is not a flag flip.
     image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:agentic-096
     restart: unless-stopped
     pull_policy: missing
@@ -84,8 +84,7 @@ services:
       # construction: `assistant-model-api` is catalogued `planned`, and check:finops rule B3 fails
       # a planned money path that a committed deployment switches on. Promotion to `live` needs a
       # collector, which does not exist yet — so enabling it is that work, not a flag flip.
-      # X402_PAY_TO has no safe default for the same reason in reverse: it is where agent payments
-      # LAND. Enable procedure (image build → push → repin → uncomment → converge) is
+      # Enable procedure (image build → push → repin → uncomment → converge) is
       # docs/runbooks/member-api-operations.md §3.1 "Enable the Member API". The reference-chain
       # pin is LOAD-BEARING: ENABLED_CHAIN_IDS starts with 63, and the default reference chain is
       # the FIRST enabled chain with a recorded membershipManager — Mordor also has one, so leaving
@@ -94,15 +93,26 @@ services:
       # Mordor deliberately has no MEMBER_API_SUBGRAPH_63 — no subgraph exists there, and
       # `not-configured` is the honest answer. ANTHROPIC_API_KEY arrives via fetch-secrets
       # (optional): absent ⇒ the assistant route answers 503 assistant_unconfigured, nothing else
-      # degrades. x402 (spec 096) additionally needs X402_PAY_TO — the treasury that RECEIVES agent
-      # payments; it has no default on purpose and enabling it is a funds decision, not a flag flip.
-      # MEMBER_API_ENABLED: "true"
-      # MEMBER_API_REFERENCE_CHAIN_ID: "137"
-      # MEMBER_API_SUBGRAPH_137: "https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.3.0"
+      # degrades.
+      # ENABLED 2026-08-28. x402 needs MEMBER_API_ENABLED (its own status logic reports `enabled:
+      # false` whenever the member API is off — the priced ops it sells access to ARE member-api
+      # routes, so there is nothing to charge for without it). ASSISTANT_ENABLED stays OFF: turning
+      # it on is a FinOps decision, not a flag flip (see the comment above) — `assistant-model-api`
+      # is still catalogued `planned`, and check:finops rule B3 fails a planned money path a
+      # committed deployment switches on. The x402 assistant PRICE class is harmless to leave
+      # nonzero here: with no assistant ROUTE live, nothing can ever be billed for it.
+      MEMBER_API_ENABLED: "true"
+      MEMBER_API_REFERENCE_CHAIN_ID: "137"
+      MEMBER_API_SUBGRAPH_137: "https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.3.0"
       # ASSISTANT_ENABLED: "true"
-      # X402_ENABLED: "true"
-      # X402_CHAIN_ID: "137"
-      # X402_PAY_TO: "<treasury address — REQUIRED, no default>"
+      X402_ENABLED: "true"
+      X402_CHAIN_ID: "137"
+      # The estate's admin Safe (2-of-3), NOT the FeeRouter's own treasury() — that address is still
+      # an individual owner's EOA on Polygon as of this commit (0x1215…8575; every other chain the
+      # FeeRouter is deployed on already points at this Safe). Fixing the FeeRouter to match is a
+      # separate Safe transaction (setTreasury), tracked independently — this repins x402 to where
+      # revenue is MOVING, not where one specific router still happens to point today.
+      X402_PAY_TO: "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447"
       # ---- Perps read proxy (specs 082 + 083) ----
       # READ-ONLY BY CONSTRUCTION: this module has no write route at all. It proxies three PUBLIC
       # venue APIs (Gains, GMX, Hyperliquid) for market data and a member's own positions, and holds
@@ -213,6 +223,13 @@ services:
       # but all three are deployed, so leaving them unset would hide revenue that exists.
       FEE_ROUTER_ADDRESS: "0xf8161fC26172621E9fbcc6c39500Bb14b0902B35"
       MEMBERSHIP_MANAGER_ADDRESS: "0xEfd1a880c6BfBf38A661A3F5fF6d5ECB296D557a"
+      # x402 settlement discovery (spec 096). READ-ONLY: the treasury the rail pays INTO and the
+      # token it pays IN. Deliberately the SAME values the gateway service above is given, from the
+      # same names — two services disagreeing about where money went is the failure this avoids.
+      # The exporter holds no key and settles nothing; it only scans for settlements already made.
+      X402_PAY_TO: "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447"
+      X402_CHAIN_ID: "137"
+      X402_PAYMENT_TOKEN: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
       BUNDLER_EXECUTOR_137: "0x7C6da19ae005D4F13BB8660Ac989c48aCcFE84F6"
       GCP_PROJECT_ID: "chippr-bots-site-wp"
       FINOPS_BILLING_DATASET: "billing_export"
