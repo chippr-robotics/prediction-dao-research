@@ -36,7 +36,7 @@ const OWNER_A = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0 — the conne
 const OWNER_B = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1 — co-owner
 const ONE_COIN = (10n ** 18n).toString()
 const PAYEE = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' // #2 — a transfer destination
-const NATIVE_SYMBOL = 'MATIC' // this chain's coin, as the app labels it
+const NATIVE_SYMBOL = 'POL' // this chain's coin, as the app labels it
 const HUB = '0x94b5b38C247CE51F7C42C83B63115998b7e970E7' // HARDHAT_CONTRACTS.safeProposalHub
 // A custody chain this test deliberately cannot reach (NETWORKS[137].rpcUrl).
 const POLYGON_RPC = 'https://polygon-bor-rpc.publicnode.com'

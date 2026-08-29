@@ -16,9 +16,9 @@
  * so honestly (Constitution III) rather than guessing at a canonical deployment.
  *
  * `symbol`/`name` here are DERIVED labels for a surface that has to render before a
- * chain read returns. They are not authority: Polygon's contract, for one, has been
- * renamed on-chain (WMATIC → WPOL) while this config still calls the coin MATIC, so
- * a caller that can read the contract should prefer what the contract says about
+ * chain read returns. They are not authority: a wrapper can be re-branded on-chain
+ * (Polygon's was, WMATIC → WPOL — the config now says POL so both agree), so a
+ * caller that can read the contract should prefer what the contract says about
  * itself and fall back to these.
  */
 import { NETWORKS } from './networks'

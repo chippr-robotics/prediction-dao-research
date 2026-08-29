@@ -182,13 +182,13 @@ describe('Wager Creation with Real Transactions', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // CRE-02: 1v1 MATIC (native token, no approval needed)
+  // CRE-02: 1v1 POL (native token, no approval needed)
   // ---------------------------------------------------------------------------
-  it('[CRE-02] Create 1v1 wager with MATIC (native token)', () => {
+  it('[CRE-02] Create 1v1 wager with POL (native token)', () => {
     connectWalletAndVisit(0)
 
     openAndFillWagerForm({
-      description: 'CRE-02: Native MATIC wager test',
+      description: 'CRE-02: Native POL wager test',
       opponent: TEST_ACCOUNTS[1],
       stake: 1,
       stakeToken: 'NATIVE',
@@ -208,13 +208,13 @@ describe('Wager Creation with Real Transactions', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // CRE-03: 1v1 WMATIC
+  // CRE-03: 1v1 WPOL
   // ---------------------------------------------------------------------------
-  it('[CRE-03] Create 1v1 wager with WMATIC', () => {
+  it('[CRE-03] Create 1v1 wager with WPOL', () => {
     connectWalletAndVisit(0)
 
     openAndFillWagerForm({
-      description: 'CRE-03: Wrapped MATIC wager test',
+      description: 'CRE-03: Wrapped POL wager test',
       opponent: TEST_ACCOUNTS[1],
       stake: 1,
       stakeToken: 'WNATIVE',

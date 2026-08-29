@@ -179,7 +179,7 @@ const AMOY_CONTRACTS = {
   keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
   sanctionsGuard: '0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3',
   polymarketAdapter: '0x98fe63209f5BffcCe905bF8779a1F06576A2C313',
-  // Stake / payment tokens (Circle USDC + Wrapped MATIC on Amoy)
+  // Stake / payment tokens (Circle USDC + wrapped native (WPOL) on Amoy)
   paymentToken: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
   wmatic: '0x0ae690AAD8663aaB12a671A6A0d74242332de85f',
   chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
@@ -218,7 +218,7 @@ const POLYGON_CONTRACTS = {
   keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
   sanctionsGuard: '0x2Dc53d91A189be71DfE96Ea9BCFCF6aDDA77BC76', // Spec 007 compliance guard
   polymarketAdapter: '0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4', // tie-fix + admin-owner redeploy
-  // Stake / payment tokens (Circle USDC + Wrapped MATIC on Polygon)
+  // Stake / payment tokens (Circle USDC + wrapped native (WPOL) on Polygon)
   paymentToken: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
   wmatic: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
   chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
