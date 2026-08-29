@@ -44,6 +44,32 @@ endpoint itself and cannot be called with a URL that contradicts the member's se
 member's route, and the bypass is invisible in review. Go through `makeReadProvider` /
 `getReadProvider`, or `getRpcUrlForChain(chainId)` when a service client needs a bare URL.
 
+### Build-curated failover (`NETWORKS[chainId].rpcFailoverUrl`)
+
+A chain can also declare its own failover at build time, independent of any member
+configuration — `defaultRpcFailoverUrlForChain(chainId)` reads `NETWORKS[chainId].rpcFailoverUrl`.
+On a member's default settings this participates as:
+
+```
+build default (rpcUrl)  →  build failover (rpcFailoverUrl, if declared and distinct)
+```
+
+Ethereum Classic (61) was the only chain with one until release 1.14.0 task 8 generalized the
+pattern to every EVM mainnet the app supports (1, 10, 137, 8453, 42161): each now pairs a
+`VITE_RPC_URL_<CHAIN>` primary (defaulting to a public `publicnode.com` endpoint — a deploy-time
+override may point it at a keyed QuickNode endpoint instead, see `frontend/.env.example`) with a
+distinct `VITE_RPC_URL_<CHAIN>_FAILOVER` (defaulting to a second independent public provider,
+`drpc.org`, mirroring the relay-gateway's own Polygon pair in
+`services/relay-gateway/src/config/chains.js`) — so a keyed primary going dark still leaves the
+chain readable. **Both `makeReadProvider` (ethers reads) and `wagmi.js`'s `transportFor` (wallet
+reads) consume this** — a chain-declared failover with no member override still wires viem's
+`fallback([...])` transport, not just the ethers path, so a member who has configured nothing
+gets the same redundancy on every read surface.
+
+This layer is orthogonal to a member's own `failoverUrl` (above): once a member sets their own
+primary endpoint, `rpcFailoverUrl` stops participating directly — the member's failover, or the
+build's `rpcUrl` default behind it, takes over instead (unchanged by this generalization).
+
 ## Rules that are not negotiable
 
 - **Credentials never enter a URL that could be logged.** Header/bearer keys ride on an

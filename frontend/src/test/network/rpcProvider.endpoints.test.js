@@ -67,9 +67,11 @@ describe('makeReadProvider — member endpoints', () => {
   })
 
   it('uses the caller-supplied default when the member has configured nothing', () => {
-    makeReadProvider(NETWORKS[137].rpcUrl, 137)
+    // 137 now declares a build-curated rpcFailoverUrl (generalized beyond ETC), so this legitimately
+    // builds a fallback pair rather than a single provider — Amoy is the chain still on one leg.
+    makeReadProvider(NETWORKS[80002].rpcUrl, 80002)
     expect(constructed).toHaveLength(1)
-    expect(constructed[0]).toMatchObject({ kind: 'json-rpc', target: NETWORKS[137].rpcUrl })
+    expect(constructed[0]).toMatchObject({ kind: 'json-rpc', target: NETWORKS[80002].rpcUrl })
   })
 
   it('overrides the caller-supplied URL with the member endpoint', () => {
@@ -142,8 +144,25 @@ describe('makeReadProvider — build-curated failover', () => {
   })
 
   it('leaves chains without a declared failover on a single provider', () => {
-    makeReadProvider(NETWORKS[137].rpcUrl, 137)
+    // 137 now declares a build failover too (this task, generalizing beyond ETC) — Amoy is the
+    // one still genuinely undeclared, so it is the honest fixture for "no failover at all".
+    expect(NETWORKS[80002].rpcFailoverUrl).toBeFalsy()
+    makeReadProvider(NETWORKS[80002].rpcUrl, 80002)
     expect(constructed.some((c) => c.kind === 'fallback')).toBe(false)
+  })
+
+  it('also falls back to the chain-declared endpoint on Polygon with no member settings', () => {
+    // Generalized (this task) beyond ETC: every EVM mainnet the app supports now declares a
+    // distinct public rpcFailoverUrl, so a deploy-time-keyed VITE_RPC_URL_POLYGON going dark
+    // degrades to this route rather than leaving the chain unreadable.
+    makeReadProvider(NETWORKS[137].rpcUrl, 137)
+
+    const fallbackCall = constructed.find((c) => c.kind === 'fallback')
+    expect(fallbackCall).toBeTruthy()
+    expect(fallbackCall.configs.map((c) => c.provider.target)).toEqual([
+      NETWORKS[137].rpcUrl,
+      NETWORKS[137].rpcFailoverUrl,
+    ])
   })
 
   it('still prefers the member endpoint, keeping the build default behind it', () => {

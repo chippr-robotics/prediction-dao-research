@@ -559,6 +559,14 @@ const NETWORKS = {
     // not any contract: addresses (WPOL wrapper, price feeds) are unchanged.
     nativeCurrency: { decimals: 18, name: 'POL', symbol: 'POL' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-bor-rpc.publicnode.com',
+    // Build-level failover (spec 069 precedent: ETC's rpcFailoverUrl, ~L477). A distinct public
+    // provider so redundancy is real even before ops set VITE_RPC_URL_POLYGON — and critically, once
+    // ops DO point VITE_RPC_URL_POLYGON at a deploy-time-keyed QuickNode endpoint (any `VITE_` var
+    // ships public in the client bundle per spec 097 — never a reason to withhold the failover), a
+    // keyed primary going dark degrades to this route instead of leaving the chain unreadable.
+    // Mirrors the relay-gateway's own Polygon pair (services/relay-gateway/src/config/chains.js:
+    // publicnode primary, drpc.org secondary). Override via VITE_RPC_URL_POLYGON_FAILOVER.
+    rpcFailoverUrl: import.meta.env?.VITE_RPC_URL_POLYGON_FAILOVER || 'https://polygon.drpc.org',
     explorer: { name: 'Polygonscan', baseUrl: 'https://polygonscan.com' },
     // The Graph endpoint indexing Polygon. Override with VITE_SUBGRAPH_URL_POLYGON.
     //
@@ -651,6 +659,9 @@ const NETWORKS = {
     selectable: true,
     nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_ARBITRUM || 'https://arbitrum-one-rpc.publicnode.com',
+    // Build-level failover — see the Polygon entry above for the full rationale. Override via
+    // VITE_RPC_URL_ARBITRUM_FAILOVER.
+    rpcFailoverUrl: import.meta.env?.VITE_RPC_URL_ARBITRUM_FAILOVER || 'https://arbitrum.drpc.org',
     explorer: { name: 'Arbiscan', baseUrl: 'https://arbiscan.io' },
     // No FairWins wager subgraph on this network.
     subgraphUrl: null,
@@ -698,6 +709,9 @@ const NETWORKS = {
     selectable: true,
     nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_BASE || 'https://base-rpc.publicnode.com',
+    // Build-level failover — see the Polygon entry above for the full rationale. Override via
+    // VITE_RPC_URL_BASE_FAILOVER.
+    rpcFailoverUrl: import.meta.env?.VITE_RPC_URL_BASE_FAILOVER || 'https://base.drpc.org',
     explorer: { name: 'Basescan', baseUrl: 'https://basescan.org' },
     subgraphUrl: null,
     stablecoin: {
@@ -752,6 +766,9 @@ const NETWORKS = {
     selectable: true,
     nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_OPTIMISM || 'https://optimism-rpc.publicnode.com',
+    // Build-level failover — see the Polygon entry above for the full rationale. Override via
+    // VITE_RPC_URL_OPTIMISM_FAILOVER.
+    rpcFailoverUrl: import.meta.env?.VITE_RPC_URL_OPTIMISM_FAILOVER || 'https://optimism.drpc.org',
     explorer: { name: 'Etherscan', baseUrl: 'https://optimistic.etherscan.io' },
     subgraphUrl: null,
     stablecoin: {
@@ -805,6 +822,9 @@ const NETWORKS = {
     // enabled on the Ethereum family in this cut — a passkey member transacts via a linked wallet
     // and may still select the network for view-only use (FR-003a).
     rpcUrl: import.meta.env?.VITE_RPC_URL_MAINNET || 'https://ethereum-rpc.publicnode.com',
+    // Build-level failover — see the Polygon entry (networks.js ~L561) for the full rationale.
+    // Override via VITE_RPC_URL_MAINNET_FAILOVER.
+    rpcFailoverUrl: import.meta.env?.VITE_RPC_URL_MAINNET_FAILOVER || 'https://eth.drpc.org',
     explorer: { name: 'Etherscan', baseUrl: 'https://etherscan.io' },
     // No wager subgraph for this network. ClearPath reads a DAO's own data subgraph-first (per-DAO,
     // see config/clearpath/daoSubgraphs.js) then falls back to a bounded on-chain scan.
