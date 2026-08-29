@@ -89,6 +89,54 @@ describe('useGaslessWrite', () => {
     )
   })
 
+  // ── Spec 098 FR-007 — acting-signer injection ────────────────────────────────────────────────
+  // The relayed rail must be able to sign as the ACTING account: an explicit `signer` (value or
+  // per-run getter) overrides the wallet-context signer. And when the override is engaged it is
+  // AUTHORITATIVE: a null result must never quietly fall back to the connected wallet's signer.
+  describe('acting-signer override (spec 098 FR-007)', () => {
+    it('signs with an explicitly provided signer object instead of the context signer', async () => {
+      const acting = { getAddress: async () => '0xACTING' }
+      renderHook(() =>
+        useGaslessWrite('purchaseTier', { signer: acting, params: () => ({}), selfSubmit: vi.fn() })
+      )
+      const cfg = h.useIntentAction.mock.calls[0][0]
+      await cfg.buildIntent()
+      expect(h.signIntent.mock.calls[0][0].signer).toBe(acting)
+    })
+
+    it('resolves a signer GETTER per run (deferred-ceremony compatible)', async () => {
+      let current = null
+      const acting = { getAddress: async () => '0xACTING' }
+      renderHook(() =>
+        useGaslessWrite('purchaseTier', { signer: () => current, params: () => ({}), selfSubmit: vi.fn() })
+      )
+      const cfg = h.useIntentAction.mock.calls[0][0]
+      current = acting // the ceremony completed between render and run
+      await cfg.buildIntent()
+      expect(h.signIntent.mock.calls[0][0].signer).toBe(acting)
+    })
+
+    it('a getter returning undefined means "no override" — the context signer signs (personal path)', async () => {
+      renderHook(() =>
+        useGaslessWrite('purchaseTier', { signer: () => undefined, params: () => ({}), selfSubmit: vi.fn() })
+      )
+      const cfg = h.useIntentAction.mock.calls[0][0]
+      await cfg.buildIntent()
+      const used = h.signIntent.mock.calls[0][0].signer
+      expect(used).toBeTruthy()
+      expect(await used.getAddress()).toBe('0xSIGNER')
+    })
+
+    it('a getter returning null NEVER falls back to the connected wallet signer', async () => {
+      renderHook(() =>
+        useGaslessWrite('purchaseTier', { signer: () => null, params: () => ({}), selfSubmit: vi.fn() })
+      )
+      const cfg = h.useIntentAction.mock.calls[0][0]
+      await cfg.buildIntent()
+      expect(h.signIntent.mock.calls[0][0].signer).toBeNull()
+    })
+  })
+
   it('tolerates an unconfigured chain (getContractAddressForChain throws) → null target, no crash', () => {
     h.getContractAddressForChain.mockImplementationOnce(() => {
       throw new Error('no address for chain')

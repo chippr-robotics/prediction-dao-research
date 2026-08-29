@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
@@ -6,8 +6,10 @@ import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
 import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { getUserTierOnChain, buildMembershipPurchaseCalls } from '../../utils/blockchainService'
+import { getUserTierOnChain, buildMembershipPurchaseCalls, checkApprovalNeededForAddress } from '../../utils/blockchainService'
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
+import { useActiveAccount } from '../../hooks/useActiveAccount'
+import { getReadProvider } from '../../utils/rpcProvider'
 import { membershipChainId } from '../../config/networks'
 import { networkName } from '../../lib/chains/estate'
 import { ensurePasskeyEncryptionKeys } from '../../lib/passkey/encryption'
@@ -61,7 +63,7 @@ const ROLE_COPY = {
   icon: '🎲',
   tagline: 'Create and accept peer-to-peer wagers',
   features: [
-    'Create 1v1 wagers in USDC or WMATIC',
+    'Create 1v1 wagers in USDC or WPOL',
     'Self-resolve, third-party arbitrator, or Polymarket auto-resolve',
     'Share via QR code or direct link',
     'Escrow + refund protection if a counterparty no-shows',
@@ -105,16 +107,17 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
     loginMethod, sendCalls, provider,
   } = useWeb3()
   const { showNotification } = useNotification()
-  // ── WHICH ACCOUNT GETS THE MEMBERSHIP (specs 063 + 088) ────────────────────────────────
+  // ── WHICH ACCOUNT GETS THE MEMBERSHIP (specs 063 + 088 + 098) ──────────────────────────
   // `MembershipManager.purchaseTier` credits `msg.sender` and takes NO beneficiary, so a
-  // membership lands on exactly the address that sent the transaction. This modal's rails all
-  // sign with the CONNECTED wallet, so that address is `account` — never the acting account.
-  //
-  // The tier below is therefore read for the acting account (what the member is looking at and
-  // what every gate will check), while a purchase while acting as somebody else is REFUSED
-  // rather than credited to a different address than the one on screen.
-  const { address: actingAddress, isActingAccount, label: actingLabel, type: actingType } =
-    useEffectiveAccount()
+  // membership lands on exactly the address that signed. Spec 098 threads the purchase THROUGH
+  // the acting account on every rail it has one for, so the account whose tier this modal shows
+  // is the account that signs — and the accounts that genuinely cannot be `msg.sender` on the
+  // membership chain keep a refusal that names them and says why (FR-003).
+  const {
+    address: actingAddress, isActingAccount, label: actingLabel, type: actingType,
+    chainId: actingChainId,
+  } = useEffectiveAccount()
+  const { submit: submitAsActive, resolveActingSigner } = useActiveAccount()
   const membershipAddress = actingAddress || account
   const { getPrice, getLimits, usingFallbackPrices, isTierActive } = useTierPrices()
   const { ensureInitialized } = useEncryption()
@@ -139,16 +142,66 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
   // `isCorrectNetwork` is not enough here: it means "any supported chain". The purchase needs
   // one specific chain, disclosed before signature, with the wallet actually on it.
 
-  // A purchase signs with the CONNECTED wallet, so it would credit that address rather than the
-  // account on screen. Refuse instead of quietly buying a membership for the wrong account.
   const ACTING_KIND_LABEL = { vault: 'multisig vault', legacy: 'recovered account', hardware: 'hardware account', derived: 'derived account' }
-  const actingBlocksPurchase = isActingAccount
   const actingAccountName =
     actingLabel || ACTING_KIND_LABEL[actingType] || 'another account'
 
   const purchaseChainId = membershipChainId()
   const purchaseNetworkName = networkName(purchaseChainId)
   const onPurchaseChain = Number(chainId) === Number(purchaseChainId)
+
+  /*
+   * ── WHICH RAIL, AND WHETHER THERE IS ONE (spec 098 FR-003) ─────────────────────────────
+   *
+   * Identity FIRST, rail second. An acting account is purchase-eligible exactly when it can be
+   * `msg.sender` on the membership chain, and each eligible kind has its own way of signing:
+   *
+   *   personal (incl. passkey)  → today's rails, byte-identical (FR-016)
+   *   vault ON the membership chain → one threshold-gated Safe proposal (FR-005)
+   *   recovered legacy / hardware   → the spec-088 deferred ceremony's own signer (FR-004)
+   *
+   * Everything else refuses BEFORE any signature, naming the account and the specific reason —
+   * never the spec-088-era blanket "switch back to your personal wallet", which said nothing
+   * about which accounts could be helped by switching CHAINS instead, and nothing about the
+   * accounts that nothing would unblock.
+   *
+   * The passkey batch is deliberately not reachable while acting: `sendCalls` executes as the
+   * passkey smart account, so using it under an acting label would put both the funds and the
+   * tier on the passkey address while the screen named another account (FR-006).
+   */
+  const purchaseRail = useMemo(() => {
+    if (!isActingAccount) {
+      return { rail: loginMethod === 'passkey' ? 'passkey' : 'classic', eligible: true, reason: null }
+    }
+    if (actingType === 'vault') {
+      if (actingChainId == null || Number(actingChainId) !== Number(purchaseChainId)) {
+        const where = actingChainId == null ? 'another network' : networkName(actingChainId)
+        return {
+          rail: null,
+          eligible: false,
+          reason: `Memberships live on ${purchaseNetworkName}, and ${actingAccountName} exists only on ${where} — so a purchase here could never be credited to it. Nothing has been proposed.`,
+        }
+      }
+      return { rail: 'vault', eligible: true, reason: null }
+    }
+    if (actingType === 'legacy' || actingType === 'hardware') {
+      return { rail: 'acting-signer', eligible: true, reason: null }
+    }
+    return {
+      rail: null,
+      eligible: false,
+      reason: `${actingAccountName} has no sending identity on ${purchaseNetworkName}, and a membership is credited only to the account that sends the transaction — so it cannot be given one. Switching accounts would unblock this; switching networks would not.`,
+    }
+  }, [isActingAccount, actingType, actingChainId, actingAccountName, loginMethod, purchaseChainId, purchaseNetworkName])
+
+  // FR-010: one place says who is credited, who pays, where it settles, and (vault) that the
+  // outcome is a proposal.
+  const creditedName = isActingAccount ? actingAccountName : 'your account'
+  const payerDescription = purchaseRail.rail === 'vault'
+    ? "the vault's own USDC"
+    : isActingAccount
+      ? `${actingAccountName}'s own USDC`
+      : 'your connected wallet'
 
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedTier, setSelectedTier] = useState('BRONZE')
@@ -158,6 +211,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
   const [errors, setErrors] = useState({})
   const [keyRegStatus, setKeyRegStatus] = useState(null) // null | 'registering' | 'success' | 'skipped' | 'failed'
   const [keyRegError, setKeyRegError] = useState(null)
+  // Spec 098 FR-013: the identity this run was bound to at confirm time.
+  const boundIdentityRef = useRef(null)
 
   // While any wallet interaction is in flight the modal must not be dismissed
   // (FR-012) and the step/footer controls are locked.
@@ -332,14 +387,11 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
       )
       return
     }
-    // The membership would be credited to whoever signs — the connected wallet — which is NOT
-    // the account whose tier this modal is showing. Same rule as spec 088 FR-002's submit(): name
-    // the account and refuse, rather than acting as one identity under another's label.
-    if (actingBlocksPurchase) {
-      showNotification(
-        `You are acting as ${actingAccountName}, but a membership is credited to whichever account signs — your personal wallet. Switch back to your personal wallet to buy, so the membership lands on the account you are looking at.`,
-        'error',
-      )
+    // FR-003: the acting account must be able to be `msg.sender` on the membership chain. When it
+    // cannot, refuse here — before anything is signed, sent or proposed — with the reason, rather
+    // than substituting the connected wallet (the exact bug class spec 088 FR-002 eliminated).
+    if (!purchaseRail.eligible) {
+      showNotification(purchaseRail.reason, 'error')
       return
     }
     // FR-006/FR-007: not "a supported network" — THE reference chain, named. Declining the
@@ -360,14 +412,33 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
 
     const tierValue = selectedTierInfo.id
     const tierName = selectedTierInfo.name
-    const isPasskey = loginMethod === 'passkey'
+    const rail = purchaseRail.rail
     showNotification(
-      isPasskey
+      rail === 'passkey'
         ? `Confirm with your passkey to complete your ${tierName} membership (${selectedPrice} USDC)`
-        : `Confirm the wallet prompts to complete your ${tierName} membership (${selectedPrice} USDC)`,
+        : rail === 'vault'
+          ? `Confirm the wallet prompts to propose your ${tierName} membership (${selectedPrice} USDC) to ${actingAccountName}`
+          : rail === 'acting-signer'
+            ? `Unlock ${actingAccountName} when prompted to complete its ${tierName} membership (${selectedPrice} USDC)`
+            : `Confirm the wallet prompts to complete your ${tierName} membership (${selectedPrice} USDC)`,
       'info',
       10000,
     )
+
+    /*
+     * FR-013 — bind the identity HERE, at confirm, not at render. Everything the flow does from
+     * this point resolves against this binding; if the acting selection (or the connected wallet)
+     * changes while the run is in flight, the effect below invalidates it rather than letting a
+     * later step re-resolve to whoever is selected by then.
+     */
+    const acting = isActingAccount
+      ? { kind: actingType, address: actingAddress, chainId: actingChainId ?? null, label: actingLabel || null }
+      : undefined
+    boundIdentityRef.current = {
+      address: (membershipAddress || '').toLowerCase(),
+      connectedAddress: (account || '').toLowerCase(),
+      name: creditedName,
+    }
 
     // Switch to the dedicated Processing view (spec 022) — the step indicator
     // surfaces each wallet interaction in turn.
@@ -377,22 +448,118 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
       const acceptedTermsHash = getCurrentDocument('terms')?.hash || null
 
       // Membership is active the moment payment confirms — run side effects then,
-      // before the (non-blocking) key steps.
+      // before the (non-blocking) key steps. The purchaser is `membershipAddress`, which is the
+      // ACTING account on an acting rail: the connected member's own role cache must not be
+      // granted a membership somebody else now holds.
       const onPaid = async (receipt) => {
-        grantRole(ROLE_KEY)
-        recordRolePurchase(account, ROLE_KEY, {
+        if (!isActingAccount) {
+          grantRole(ROLE_KEY)
+          try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
+        }
+        recordRolePurchase(membershipAddress, ROLE_KEY, {
           price: selectedPrice,
           currency: 'USDC',
           tier: selectedTier,
           tierValue,
           txHash: receipt?.hash,
-          purchasedBy: account,
+          purchasedBy: membershipAddress,
         }, chainId)
-        try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
-        showNotification(`${tierName} membership activated.`, 'success', 7000)
+        showNotification(
+          isActingAccount
+            ? `${tierName} membership activated for ${actingAccountName}.`
+            : `${tierName} membership activated.`,
+          'success', 7000,
+        )
       }
 
-      if (isPasskey) {
+      if (rail === 'vault') {
+        /*
+         * ── VAULT RAIL (FR-005) ──────────────────────────────────────────────────────────────
+         * A Safe has no key, so the purchase becomes ONE threshold-gated proposal whose batch is
+         * [approve(price)?, purchase] via MultiSendCallOnly. On execution `msg.sender` is the
+         * vault, so the membership is credited to it and paid from its USDC.
+         *
+         * approve and purchase are ONE proposal on purpose: split across two, the gap between
+         * them is a live allowance to `membershipManager` controlled by a shared queue. Because
+         * MultiSend reverts atomically, a price rise before execution reverts the purchase leg AND
+         * the approve — leaving no orphaned allowance.
+         */
+        const proposePurchase = async () => {
+          const readProvider = getReadProvider(purchaseChainId)
+          const { calls } = await buildMembershipPurchaseCalls(
+            readProvider, actingAddress, ROLE_KEY, tierValue, effectiveAction, acceptedTermsHash,
+          )
+          // FR-015: the approve leg is omitted when the VAULT's live allowance already covers the
+          // quoted price — read for the vault's address, never signer-implicit.
+          const needsApprove = await checkApprovalNeededForAddress(
+            actingAddress, ROLE_KEY, selectedPrice, tierValue, effectiveAction,
+            { provider: readProvider, chainId: purchaseChainId },
+          )
+          const legs = (needsApprove ? calls : calls.slice(1))
+            .map((c) => ({ to: c.target, value: c.value ?? 0n, data: c.data }))
+          return submitAsActive({ batch: legs })
+        }
+
+        await flow.start({
+          signer: null,
+          account: actingAddress,
+          acting,
+          chainId: purchaseChainId,
+          roleName: ROLE_KEY,
+          priceUSD: selectedPrice,
+          tier: tierValue,
+          action: effectiveAction,
+          termsHash: acceptedTermsHash,
+          proposePurchase,
+        })
+        return
+      }
+
+      if (rail === 'acting-signer') {
+        /*
+         * ── CLASSIC ACTING RAIL (FR-004) ─────────────────────────────────────────────────────
+         * A recovered or hardware account signs for itself. The ceremony (unlock passphrase /
+         * connect device) runs at CONFIRM time through the spec-088 broker — never at modal-open
+         * or account-switch time — and one ceremony serves the whole flow.
+         */
+        const getActingSigner = async () => {
+          if (typeof resolveActingSigner !== 'function') {
+            throw new Error('No signing ceremony is available for this account, so nothing has been signed.')
+          }
+          return resolveActingSigner()
+        }
+
+        /*
+         * FR-012 — the key steps follow the PURCHASER. `useEncryption.ensureInitialized` derives
+         * (and caches) keys for the CONNECTED account; using it here would publish the operator's
+         * key against the acting address. Derive from the acting signer instead, and keep it out
+         * of the connected member's key state entirely.
+         */
+        const ensureInitializedAsActing = async (actingSigner) => {
+          if (!actingSigner) throw new Error('No signer for the acting account')
+          const { deriveKeyPair } = await import('../../utils/crypto/envelopeEncryption.js')
+          const derived = await deriveKeyPair(actingSigner)
+          return { publicKey: derived.publicKey }
+        }
+
+        await flow.start({
+          signer: null,
+          account: actingAddress,
+          acting,
+          chainId: purchaseChainId,
+          roleName: ROLE_KEY,
+          priceUSD: selectedPrice,
+          tier: tierValue,
+          action: effectiveAction,
+          termsHash: acceptedTermsHash,
+          getActingSigner,
+          ensureInitialized: ensureInitializedAsActing,
+          onPaid,
+        })
+        return
+      }
+
+      if (rail === 'passkey') {
         // Passkey smart account (spec 041, FR-016): approve + purchase are batched into
         // ONE WebAuthn ceremony via the ERC-4337 bundler/relayer (WalletContext.sendCalls) —
         // no browser-wallet prompt and no separate on-chain approval. Reads use the session's
@@ -468,9 +635,41 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
     }
   }
 
-  // React to the flow reaching a terminal success (all steps done, or the member
-  // chose "Continue anyway" past a non-blocking key step).
+  /*
+   * FR-013 — the acting selection (or the connected wallet) changed while a run was in flight.
+   * The run is bound to the identity captured at confirm; it cannot be re-pointed at a new one, so
+   * fail it and name the account it was bound to. A payment that already confirmed stays honestly
+   * attributed to that address — the flow keeps its receipt.
+   */
   useEffect(() => {
+    const bound = boundIdentityRef.current
+    if (!bound || flow.status !== 'running') return
+    const nowActing = (membershipAddress || '').toLowerCase()
+    const nowConnected = (account || '').toLowerCase()
+    if (nowActing === bound.address && nowConnected === bound.connectedAddress) return
+    boundIdentityRef.current = null
+    flow.invalidateIdentity?.(
+      `This purchase was bound to ${bound.name}, and the account changed while it was in flight. ` +
+      'Nothing further will be signed, and no step will run under a different account.',
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [membershipAddress, account, flow.status])
+
+  // React to the flow reaching a terminal state: success (all steps done, or the member chose
+  // "Continue anyway" past a non-blocking key step), or — on the vault rail — PROPOSED, which is
+  // deliberately not success: nothing is paid and no membership is active until the vault executes.
+  useEffect(() => {
+    if (flow.status === 'proposed') {
+      setPurchaseResult({
+        proposed: true,
+        tier: selectedTierInfo?.name,
+        safeTxHash: flow.purchaseReceipt?.safeTxHash || null,
+      })
+      setKeyRegStatus(null)
+      setShowProcessing(false)
+      setCurrentStep(2)
+      return
+    }
     if (flow.status !== 'succeeded') return
     setPurchaseResult({ success: true, tier: selectedTierInfo?.name, txHash: flow.purchaseReceipt?.hash })
     setKeyRegStatus(flow.keyRegOutcome) // 'success' | 'skipped' | 'failed'
@@ -491,6 +690,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
     setShowProcessing(false)
     setKeyRegStatus(null)
     setKeyRegError(null)
+    boundIdentityRef.current = null
     flow.reset()
   }, [flow])
 
@@ -785,11 +985,16 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
 
                 <div className="ppm-review-card">
                   <h4>Order Summary</h4>
+                  {/* FR-001/FR-010: the recipient IS the acting account on an acting rail — the
+                      membership is credited to whoever signs, and spec 098 makes that the account
+                      named here rather than the connected wallet. */}
                   <div className="ppm-review-recipient">
                     <span className="ppm-review-label">Recipient</span>
                     <span className="ppm-review-value">
-                      <span className="ppm-recipient-badge">You</span>
-                      <code>{account?.slice(0, 6)}...{account?.slice(-4)}</code>
+                      <span className="ppm-recipient-badge">
+                        {isActingAccount ? actingAccountName : 'You'}
+                      </span>
+                      <code>{membershipAddress?.slice(0, 6)}...{membershipAddress?.slice(-4)}</code>
                     </span>
                   </div>
                   <div className="ppm-review-tier">
@@ -862,25 +1067,40 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
                   </div>
                 </div>
 
-                {/* FR-007: the settlement network is disclosed BEFORE signature, always —
-                    not only when it is wrong. A member should not have to infer where their
-                    money is going from the absence of a warning. */}
-                <p className="ppm-settlement-note" role="note">
-                  Memberships are held on <strong>{purchaseNetworkName}</strong>, so this purchase
-                  settles there and is recognised from every network afterwards.
-                </p>
+                {/* Spec 071 FR-007 + spec 098 FR-010: ONE pre-signature disclosure — which
+                    account is credited, which account pays, which network it settles on, and (on
+                    the vault rail) that the outcome is a proposal, not an active membership. It is
+                    unconditional: a member should not have to infer any of it from the absence of
+                    a warning. */}
+                <div className="ppm-settlement-note" role="note">
+                  <p>
+                    This membership is credited to <strong>{creditedName}</strong>
+                    {isActingAccount && membershipAddress
+                      ? <> (<code>{membershipAddress.slice(0, 6)}...{membershipAddress.slice(-4)}</code>)</>
+                      : null}
+                    , and the price is paid from {payerDescription}.
+                  </p>
+                  <p>
+                    Memberships are held on <strong>{purchaseNetworkName}</strong>, so this purchase
+                    settles there and is recognised from every network afterwards.
+                  </p>
+                  {purchaseRail.rail === 'vault' && (
+                    <p>
+                      Confirming creates a <strong>proposal</strong> in the vault&rsquo;s queue. The
+                      membership activates when the vault&rsquo;s threshold approves and executes
+                      it — not when you confirm here.
+                    </p>
+                  )}
+                </div>
 
-                {actingBlocksPurchase && (
+                {/* FR-003/US4: refusal names the account AND the specific reason, so the member
+                    knows whether switching accounts, switching chains, or nothing would help. */}
+                {!purchaseRail.eligible && (
                   <div className="ppm-network-warning">
                     <span aria-hidden="true">⚠️</span>
                     <div>
-                      <strong>Switch back to your personal wallet to buy</strong>
-                      <p>
-                        You are acting as {actingAccountName}. A membership is credited to
-                        whichever account signs the transaction, and this purchase would be signed
-                        by your personal wallet — so it would land there, not on the account shown
-                        above.
-                      </p>
+                      <strong>This account cannot hold a membership bought here</strong>
+                      <p>{purchaseRail.reason}</p>
                     </div>
                   </div>
                 )}
@@ -922,15 +1142,22 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
             <div className="ppm-panel" role="tabpanel">
               <section className="ppm-section ppm-complete-section">
                 <div className="ppm-success-icon" aria-hidden="true">
-                  {purchaseResult?.success ? '🎉' : '⚠️'}
+                  {purchaseResult?.proposed ? '🗳️' : purchaseResult?.success ? '🎉' : '⚠️'}
                 </div>
                 <h3 className="ppm-complete-title">
-                  {purchaseResult?.success ? 'Purchase Complete!' : 'Purchase Failed'}
+                  {purchaseResult?.proposed
+                    ? 'Proposed to your vault'
+                    : purchaseResult?.success ? 'Purchase Complete!' : 'Purchase Failed'}
                 </h3>
+                {/* FR-005/FR-014: `proposed` is NOT `paid`. Nothing has been charged and no
+                    membership is active until the vault's threshold executes the proposal, which
+                    lives in the vault queue whether or not this modal stays open. */}
                 <p className="ppm-complete-desc">
-                  {purchaseResult?.success
-                    ? <>Your <strong style={{ color: selectedTierInfo?.color }}>{selectedTierInfo?.name}</strong> Wager Participant membership is active for 30 days.</>
-                    : purchaseResult?.error}
+                  {purchaseResult?.proposed
+                    ? <>The <strong style={{ color: selectedTierInfo?.color }}>{selectedTierInfo?.name}</strong> membership for {actingAccountName} is waiting in the vault&rsquo;s queue. Nothing has been charged yet — it activates when the vault&rsquo;s threshold approves and executes the proposal. Closing this window changes nothing.</>
+                    : purchaseResult?.success
+                      ? <>Your <strong style={{ color: selectedTierInfo?.color }}>{selectedTierInfo?.name}</strong> Wager Participant membership is active for 30 days.</>
+                      : purchaseResult?.error}
                 </p>
                 {purchaseResult?.txHash && (
                   <a
@@ -1015,7 +1242,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
                 type="button"
                 className="ppm-btn-primary ppm-btn-purchase"
                 onClick={handlePurchase}
-                disabled={isBusy || !isConnected || !onPurchaseChain || !tierReadable || !acknowledged || actingBlocksPurchase}
+                disabled={isBusy || !isConnected || !onPurchaseChain || !tierReadable || !acknowledged || !purchaseRail.eligible}
               >
                 Confirm Purchase (${selectedPrice.toFixed(2)} USDC)
               </button>

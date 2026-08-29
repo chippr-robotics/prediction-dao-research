@@ -93,20 +93,20 @@ describe('underlyingSymbolOf', () => {
 
 describe('fetchPortfolioPrices', () => {
   it('prices baseline assets from Chainlink feeds (highest trust)', async () => {
-    setFeed(137, 'MATIC', feedFixture(0.52))
+    setFeed(137, 'POL', feedFixture(0.52))
     setFeed(137, 'ETH', feedFixture(2358.22))
     setFeed(137, 'BTC', feedFixture(64000))
     setFeed(137, 'LINK', feedFixture(14.5))
 
     const prices = await fetchPortfolioPrices(providers, registry, NOW)
-    expect(prices.get('MATIC')).toMatchObject({ usd: 0.52, source: 'chainlink', chainId: 137 })
+    expect(prices.get('POL')).toMatchObject({ usd: 0.52, source: 'chainlink', chainId: 137 })
     expect(prices.get('ETH').usd).toBeCloseTo(2358.22)
     expect(prices.get('BTC').usd).toBeCloseTo(64000)
     expect(prices.get('LINK').usd).toBeCloseTo(14.5)
   })
 
   it('never prices stablecoins or collectibles', async () => {
-    setFeed(137, 'MATIC', feedFixture(0.52))
+    setFeed(137, 'POL', feedFixture(0.52))
     const prices = await fetchPortfolioPrices(providers, registry, NOW)
     for (const symbol of ['USDC', 'USDT', 'USC', 'FWMV']) {
       expect(prices.has(symbol)).toBe(false)

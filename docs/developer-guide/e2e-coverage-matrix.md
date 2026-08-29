@@ -26,12 +26,12 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 99 |
-| With a member-facing flow | 80 |
-| Member-facing flows | 142 |
-| 🟢 covered | 132 |
+| Spec directories | 103 |
+| With a member-facing flow | 81 |
+| Member-facing flows | 153 |
+| 🟢 covered | 138 |
 | 🟡 partial | 1 |
-| 🔴 absent | 3 |
+| 🔴 absent | 8 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-54 flows — 🟢 46 · 🟡 0 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
+57 flows — 🟢 46 · 🟡 0 · 🔴 5 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -82,6 +82,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `membership.redeem-voucher` | Redeem a voucher for membership without paying | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-01) |  |
 | `membership.buy-voucher` | Buy a voucher at the tier price, paid in USDC | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-02) |  |
+| `membership.send-voucher-from-portfolio` | Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
 ### `028-token-mint` — Token Mint mini-app
 
@@ -271,6 +272,13 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `account.act-immediately-after-create` | Switch to an acting account and use it immediately, with no ceremony at switch time | 🟢 covered | flow | `no-chain` | `33-account-surfaces.cy.js` (AA-01) |  |
 
+### `098-acting-account-purchase` — Membership purchase lands on the acting account
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
+| `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
+
 ## Disclosure — a member consents to a cost
 
 12 flows — 🟢 12 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
@@ -329,7 +337,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-44 flows — 🟢 42 · 🟡 1 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
+46 flows — 🟢 42 · 🟡 1 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -392,6 +400,7 @@ establish the outcome. They are listed in full at the end of this document.
 | `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | settled | `account-native` | `returning-user.cy.js` (RU-01, RU-02) |  |
 | `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-03, UL-05) |  |
 | `passkey.controllers` | Add and remove the controllers that may act for the account | 🔴 absent | skipped | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
+| `passkey.app-lock` | Lock the screen after idle or on leaving, and unlock with a passkey | 🔴 absent | none | — (proposed: no-chain) | #1364 | no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card). |
 
 ### `042-clearpath-multi-network` — ClearPath across networks
 
@@ -420,6 +429,12 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `predict.hidden-off-polygon` | See the Predict tab hidden on a chain Polymarket does not serve | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-03) |  |
+
+### `061-bitcoin-transactions` — Bitcoin
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `bitcoin.network-card-activates` | Open the Bitcoin wallet surface from its network card without touching the EVM chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
 ### `066-staking-admin-controls` — Staking admin controls
 
@@ -482,7 +497,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 32 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
+38 flows — 🟢 38 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -652,6 +667,8 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `perps.browse-venues` | Compare perpetuals pairs across venues | 🟢 covered | flow | `no-chain` | `24-perps.cy.js` (PERPS-01, PERPS-02, PERPS-03, PERPS-04, PERPS-05) |  |
 | `perps.degraded-venue-named` | A degraded venue is named and its pairs omitted, never shown as zeros | 🟢 covered | flow | `no-chain` | `24-perps.cy.js` (PERPS-01, PERPS-06) |  |
+| `trade.wrap-view` | Wrap is a Trade view beside Swap and Perps, with Swap still the default | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (TRADE-WRAP-01, TRADE-WRAP-02) |  |
+| `trade.wrap-legacy-redirect` | The old Transfer wrap URL redirects into the Trade wrap view | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (TRADE-WRAP-03, TRADE-WRAP-04) |  |
 
 ### `083-perps-position-management` — Perps positions
 
@@ -664,6 +681,10 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `account.cards` | See your accounts as cards and switch between them | 🟢 covered | smoke | `no-chain` | `26-trade-account.cy.js` |  |
+| `account.add-chooser` | Open the "+" chooser and see the three ways to add an account | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (ACC-ADD-01) |  |
+| `account.add-hardware` | "Add a hardware account" deep-links to Protect > Off chain with the card open | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (ACC-ADD-02) |  |
+| `account.add-vault` | "Add a vault" deep-links to Protect > On chain | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (ACC-ADD-03) |  |
+| `account.add-legacy-recovery` | "Recover a legacy account" deep-links to Recovery's legacy import | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (ACC-ADD-04) |  |
 
 ### `092-multi-chain-activity` — Multi-chain activity
 
@@ -696,6 +717,9 @@ Listed so the gate can tell "correctly omitted" from "forgotten".
 | `094-e2e-coverage-expansion` — E2E coverage expansion | This feature: the matrix, the tiering policy and the suite's own gates. Its subject is the coverage of every other row. |
 | `096-x402-agentic-payments` — x402 pay-per-request access to the member API | An agent-facing HTTP rail with no member surface: an unauthenticated caller is answered 402 with a price, pays with an X-PAYMENT header, and is served as the payer. No component, route or member journey changes, and a member holding a capability token never enters the path. Its gate is the gateway vitest suite (services/relay-gateway/test/x402.test.js) plus the spec-095 suites passing unchanged with the rail enabled, and node:test coverage of the MCP server's 402 surfacing and payment passthrough. |
 | `097-workstation-secrets-observability` — Workstation secrets and local observability | Operator tooling with no member surface: credentials move off a local .env into Secret Manager and are delivered per least-privilege profile by a wrapper, and the Prometheus and Grafana stack is a read-only viewing surface bound to loopback. Nothing here is reachable from the app, and the workstation identity is declared Terraform with no service-account key file. Gated by the scripts/secrets vitest suites (including the registry/tfvars parity test, which fails on drift because a missing grant surfaces later as PERMISSION_DENIED), check:env-hygiene, and the Terraform plan. |
+| `099-network-status-miniapp` — Network status mini-app | Spec landed in release 1.14.0; the mini-app package has no member surface yet. Flows are owed when the package ships (#1364). |
+| `100-passkey-solana` — Passkey-native Solana | Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364). |
+| `101-passkey-zcash` — Passkey-native Zcash | Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364). |
 
 ## Covered but not proven
 

@@ -642,6 +642,17 @@
           "tests": [
             "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::VC-02"
           ]
+        },
+        {
+          "id": "membership.send-voucher-from-portfolio",
+          "name": "Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1364"
         }
       ]
     },
@@ -1011,6 +1022,18 @@
           ],
           "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
           "issue": "#1271"
+        },
+        {
+          "id": "passkey.app-lock",
+          "name": "Lock the screen after idle or on leaving, and unlock with a passkey",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1364",
+          "missing": "no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card)."
         }
       ]
     },
@@ -1581,6 +1604,17 @@
           "tests": [
             "frontend/cypress/e2e/passkey/bitcoin-send-fee.cy.js::BTC-03"
           ]
+        },
+        {
+          "id": "bitcoin.network-card-activates",
+          "name": "Open the Bitcoin wallet surface from its network card without touching the EVM chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1364"
         }
       ]
     },
@@ -2154,6 +2188,31 @@
             "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-01",
             "frontend/cypress/e2e/fast/24-perps.cy.js::PERPS-06"
           ]
+        },
+        {
+          "id": "trade.wrap-view",
+          "name": "Wrap is a Trade view beside Swap and Perps, with Swap still the default",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::TRADE-WRAP-01",
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::TRADE-WRAP-02"
+          ],
+          "note": "Wrap joined TradeSection's views in release 1.14.0; it rides this spec's rows because 082 owns the Trade view switch"
+        },
+        {
+          "id": "trade.wrap-legacy-redirect",
+          "name": "The old Transfer wrap URL redirects into the Trade wrap view",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::TRADE-WRAP-03",
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::TRADE-WRAP-04"
+          ]
         }
       ]
     },
@@ -2264,6 +2323,50 @@
           "risk": "information",
           "tests": [
             "frontend/cypress/e2e/fast/26-trade-account.cy.js"
+          ]
+        },
+        {
+          "id": "account.add-chooser",
+          "name": "Open the \"+\" chooser and see the three ways to add an account",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::ACC-ADD-01"
+          ]
+        },
+        {
+          "id": "account.add-hardware",
+          "name": "\"Add a hardware account\" deep-links to Protect > Off chain with the card open",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::ACC-ADD-02"
+          ]
+        },
+        {
+          "id": "account.add-vault",
+          "name": "\"Add a vault\" deep-links to Protect > On chain",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::ACC-ADD-03"
+          ]
+        },
+        {
+          "id": "account.add-legacy-recovery",
+          "name": "\"Recover a legacy account\" deep-links to Recovery's legacy import",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/40-account-add-wrap-move.cy.js::ACC-ADD-04"
           ]
         }
       ]
@@ -2468,6 +2571,56 @@
       "title": "Workstation secrets and local observability",
       "memberFacing": false,
       "reason": "Operator tooling with no member surface: credentials move off a local .env into Secret Manager and are delivered per least-privilege profile by a wrapper, and the Prometheus and Grafana stack is a read-only viewing surface bound to loopback. Nothing here is reachable from the app, and the workstation identity is declared Terraform with no service-account key file. Gated by the scripts/secrets vitest suites (including the registry/tfvars parity test, which fails on drift because a missing grant surfaces later as PERMISSION_DENIED), check:env-hygiene, and the Terraform plan.",
+      "flows": []
+    },
+    {
+      "id": "098-acting-account-purchase",
+      "title": "Membership purchase lands on the acting account",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "purchase.acting-account",
+          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail (money path: on-chain tier required)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1364"
+        },
+        {
+          "id": "purchase.acting-refusals",
+          "name": "Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1364"
+        }
+      ]
+    },
+    {
+      "id": "099-network-status-miniapp",
+      "title": "Network status mini-app",
+      "memberFacing": false,
+      "reason": "Spec landed in release 1.14.0; the mini-app package has no member surface yet. Flows are owed when the package ships (#1364).",
+      "flows": []
+    },
+    {
+      "id": "100-passkey-solana",
+      "title": "Passkey-native Solana",
+      "memberFacing": false,
+      "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
+      "flows": []
+    },
+    {
+      "id": "101-passkey-zcash",
+      "title": "Passkey-native Zcash",
+      "memberFacing": false,
+      "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
       "flows": []
     }
   ]

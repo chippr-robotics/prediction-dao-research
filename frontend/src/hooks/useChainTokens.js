@@ -5,7 +5,7 @@ import { getNetwork, getCurrentChainId } from '../config/networks'
 /**
  * Hook returning chain-aware token symbols, decimals, and per-chain
  * capabilities. Use this anywhere the UI would otherwise hardcode a token
- * symbol — on Polygon Amoy the native is MATIC and the stable is USDC.
+ * symbol — on the Polygon pair the native is POL and the stable is USDC.
  *
  * Capabilities flow through here so screens can decide whether to gate
  * features (e.g. Polymarket-pegged side bets only render on chains where

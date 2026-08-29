@@ -43,6 +43,7 @@ import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
 import StagingBanner from './components/ui/StagingBanner'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
+import AppLockOverlay from './components/applock/AppLockOverlay'
 import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
 import PwaUpdateNotification from './components/pwa/PwaUpdateNotification'
 
@@ -207,6 +208,13 @@ function AppContent() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {/* Spec 041 amendment: the optional app lock. Rendered LAST and BESIDE the routes, never
+          around them — the overlay covers the app, it does not unmount it, so an FR-008
+          confirmation that was open when the lock fired is still there (unconfirmed, unsubmitted,
+          undropped) after the member unlocks. It renders null for everyone who has not turned the
+          setting on, which is everyone by default. */}
+      <AppLockOverlay />
     </>
   )
 }

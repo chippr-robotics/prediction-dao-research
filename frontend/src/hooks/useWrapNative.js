@@ -116,7 +116,7 @@ export function useWrapNative() {
 
   // What the wrapper calls itself. The config label is a derivation from the coin's name and
   // can lag a rename (Polygon's contract now answers WPOL while the app's config still says
-  // MATIC), so prefer the contract's own answer where the chain gives one.
+  // POL), so prefer the contract's own answer where the chain gives one.
   useEffect(() => {
     let cancelled = false
     setOnChainSymbol(null)

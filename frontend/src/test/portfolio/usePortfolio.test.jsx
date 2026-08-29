@@ -126,11 +126,11 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
   it('values holdings from the on-chain price map and hides zero aggregates by default (FR-022/023)', async () => {
     fixtures.nativeBalances.set(137, 2n * 10n ** 18n)
     fixtures.tokenBalances.set(addr(137, 'USDC'), 100_000_000n)
-    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    fixtures.prices.set('POL', { usd: 0.5, source: 'chainlink', chainId: 137 })
     await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
 
-    const matic = aggFor('MATIC')
+    const matic = aggFor('POL')
     expect(matic.usd).toBeCloseTo(1)
     expect(matic.unitPriceUsd).toBe(0.5)
     expect(matic.priceEntry.source).toBe('chainlink')
@@ -202,7 +202,7 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
     fixtures.nativeBalances.set(137, 10n ** 18n)
     await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
-    const matic = aggFor('MATIC')
+    const matic = aggFor('POL')
     expect(matic.usd).toBeNull()
     expect(latest.totalUsd).toBe(0)
   })
@@ -274,7 +274,7 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
   it('remounting hydrates the last real snapshot instantly while a refresh runs (spec 074 follow-up)', async () => {
     // First mount: a real read lands and warms the session snapshot cache.
     fixtures.nativeBalances.set(137, 2n * 10n ** 18n)
-    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    fixtures.prices.set('POL', { usd: 0.5, source: 'chainlink', chainId: 137 })
     const first = await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
     expect(latest.totalUsd).toBeCloseTo(1)
@@ -294,7 +294,7 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
   it('persists snapshots to device storage and hydrates them after a reload (spec 074 follow-up)', async () => {
     // A successful read writes the snapshot store (BigInt-safe round trip).
     fixtures.nativeBalances.set(137, 4n * 10n ** 18n)
-    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    fixtures.prices.set('POL', { usd: 0.5, source: 'chainlink', chainId: 137 })
     const first = await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
     expect(latest.totalUsd).toBeCloseTo(2)

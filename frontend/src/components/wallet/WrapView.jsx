@@ -4,6 +4,10 @@ import SensitiveValue from '../common/SensitiveValue'
 import { useWrapNative, WRAP_DIRECTION } from '../../hooks/useWrapNative'
 import { useNotification } from '../../hooks/useUI'
 import { getNetwork } from '../../config/networks'
+// The view is built on the Transfer section's `pt-*` vocabulary. It used to inherit this
+// stylesheet from PayTransferPanel; now that it also mounts under Trade (release 1.14.0) it
+// carries its own import so its styles never depend on which section mounted first.
+import './PayTransfer.css'
 
 /**
  * Wrap — turn the connected network's coin into its canonical wrapped token, and back.

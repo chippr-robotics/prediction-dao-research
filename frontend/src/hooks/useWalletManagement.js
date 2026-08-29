@@ -31,7 +31,7 @@ import { WalletContext } from '../contexts/WalletContext'
  *       {isConnected ? (
  *         <div>
  *           <p>Address: {address}</p>
- *           <p>Balance: {balances.native} MATIC</p>
+ *           <p>Balance: {balances.native} POL</p>
  *           {hasRole('WAGER_PARTICIPANT') && <p>Wager Access</p>}
  *         </div>
  *       ) : (

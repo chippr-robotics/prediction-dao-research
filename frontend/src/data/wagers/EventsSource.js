@@ -122,7 +122,7 @@ function toWager(marketId, withStatus, full) {
     arbitrator: hasArbitrator ? arbitrator : null,
     stakeAmount: ethers.formatUnits(withStatus.stakePerParticipant || 0, tokenDecimals),
     stakeTokenAddress: stakeToken,
-    stakeTokenSymbol: isStable ? 'USDC' : 'MATIC',
+    stakeTokenSymbol: isStable ? 'USDC' : 'POL',
     tradingPeriodSeconds,
     createdAt: createdAtMs,
     acceptanceDeadline: acceptanceDeadlineMs,
