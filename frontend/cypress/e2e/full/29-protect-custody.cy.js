@@ -41,6 +41,7 @@ const NATIVE_SYMBOL = 'POL' // this chain's coin, as the app labels it
 const HUB = '0x94b5b38C247CE51F7C42C83B63115998b7e970E7' // HARDHAT_CONTRACTS.safeProposalHub
 // A custody chain this test deliberately cannot reach (NETWORKS[137].rpcUrl).
 const POLYGON_RPC = 'https://polygon-bor-rpc.publicnode.com'
+const POLYGON_RPC_FAILOVER = 'https://polygon.drpc.org'
 const POLYGON_VAULT = '0x1111111111111111111111111111111111111111'
 const GUARD_V1 = '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38' // HARDHAT_CONTRACTS.safePolicyGuard
 const NO_GUARD = '0x0000000000000000000000000000000000000000'
@@ -533,7 +534,13 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
        * RPC is made unreachable. Only the FAILING side is stubbed — the readable side is a real
        * Safe on a real chain, so this cannot pass against an emulator that agrees with itself.
        */
+      // Both endpoints must be dead: since the RPC-failover work, chain 137 declares a build-level
+      // rpcFailoverUrl that participates in default reads, so killing only the primary leaves the
+      // vault genuinely READABLE through the failover — and the honest state is then "unreadable"
+      // (provider answered, no Safe there), not "unreachable". This test is about the unreachable
+      // state, so it takes the whole chain down.
       cy.intercept('POST', POLYGON_RPC, { forceNetworkError: true }).as('polygonDown')
+      cy.intercept('POST', POLYGON_RPC_FAILOVER, { forceNetworkError: true }).as('polygonFailoverDown')
 
       cy.mockWeb3Provider({ account: OWNER_A, preAuthorized: true, realBalances: true })
       cy.visit('/wallet?tab=custody', {
