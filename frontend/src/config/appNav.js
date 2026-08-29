@@ -96,6 +96,16 @@ export const TAB_ALIASES = { swap: 'trade', backup: 'security', preferences: 'se
 /** The canonical location of the Wagers view — the one place that URL is spelled out. */
 export const WAGERS_PATH = `/wallet?tab=${WAGERS_VIEW.tab}&view=${WAGERS_VIEW.view}`
 
+/**
+ * The canonical location of the Wrap view (release 1.14.0): Wrap moved from the Transfer section
+ * into Trade, beside Swap — wrapping changes the FORM of the coin you hold, not where the money
+ * is, and it is what a member needs immediately before a DEX. The old
+ * `?tab=paytransfer&view=wrap` deep link redirects here (PayTransferPanel owns that redirect, the
+ * same way App.jsx's `/wagers` route redirects into Transfer), and both point at THIS constant so
+ * the redirect and the Trade section cannot drift into disagreeing about the URL.
+ */
+export const TRADE_WRAP_PATH = '/wallet?tab=trade&view=wrap'
+
 import { isFeatureEnabled } from './tenant'
 
 // Tenant feature gating (spec 072 T019/FR-002): nav item id -> manifest feature id.

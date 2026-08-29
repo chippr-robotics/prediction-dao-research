@@ -94,6 +94,16 @@ export default function VouchersPage() {
     refreshVouchers()
   }, [refreshVouchers])
 
+  // Arriving at #vch-transfer (the portfolio asset sheet's Send / Gift deep link) means the
+  // member came to SEND: preselect the first held voucher so they land on a usable form, not a
+  // disabled Transfer button. Only fills an EMPTY selection — it never overrides a choice, and a
+  // plain visit (no hash) keeps selection an explicit act.
+  useEffect(() => {
+    if (hash !== '#vch-transfer') return
+    if (myVouchers.length === 0) return
+    setSelectedVoucherId((cur) => (cur ? cur : myVouchers[0].tokenId))
+  }, [hash, myVouchers])
+
   /*
    * Minting a voucher runs the SAME tier check the purchase does — `MembershipVoucher.mint`
    * reads the tier config and reverts `TierInactive()` for `active == false`, after the buyer's
@@ -444,7 +454,10 @@ export default function VouchersPage() {
             No membership is granted by transferring — the recipient redeems it
             themselves. Same address entry / address book / QR as the gift field. */}
         {myVouchers.length > 0 && (
-          <div className="vch-transfer">
+          /* `id` is a deep-link anchor: the portfolio's FWMV asset sheet sends its Send / Gift
+             action to `/vouchers#vch-transfer` (release 1.14.0 task 9), and the page's hash
+             effect scrolls whatever element carries the hash's id into view. */
+          <div className="vch-transfer" id="vch-transfer">
             <span className="vch-subhead">Transfer this voucher to someone else</span>
             <p className="vch-help">
               Send the selected voucher to another wallet — they can redeem it for their own membership.
