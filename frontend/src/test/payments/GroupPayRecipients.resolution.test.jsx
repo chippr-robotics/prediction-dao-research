@@ -14,8 +14,8 @@
  * renders, and a typed amount survives resolution traffic.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { useEffect, useState } from 'react'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { useState } from 'react'
+import { render, fireEvent, act } from '@testing-library/react'
 
 vi.mock('../../components/ui/AddressInput', () => {
   const { useEffect } = require('react')
