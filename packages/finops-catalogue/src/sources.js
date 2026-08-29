@@ -253,6 +253,47 @@ const planned = [
 ]
 
 /**
+ * x402 agent payments (spec 096) — LIVE since 2026-08-28.
+ *
+ * Promoted together with the deployment that switched the rail on, which is the sequencing the C2b
+ * gate exists to force: a revenue path and the thing that watches it ship in one change, so there
+ * is never a window where money can arrive unobserved.
+ *
+ * The collector reads settlements FROM CHAIN, not from the gateway, and that is deliberate. A
+ * gateway counter would reset on every restart and vanish entirely if the container were replaced —
+ * for a revenue figure that is an undercount which still looks like a number. The chain is the
+ * durable record, and `collectors/x402.js` documents how a settlement is told apart from every
+ * other USDC arrival at the same treasury (a `Transfer` into it whose transaction ALSO used an
+ * EIP-3009 authorization — a shape only `transferWithAuthorization` produces).
+ */
+const x402 = [
+  {
+    id: 'x402-agent-payments',
+    kind: 'revenue',
+    status: 'live',
+    label: 'Member API — x402 agent payments',
+    metric: 'fairwins_finops_revenue_total',
+    collector: 'x402',
+    chains: [POLYGON],
+    interval: CHAIN_EVENTS,
+    credential: null,
+    docs: 'finops-operations.md#x402-agent-payments',
+    moneyPath: { namespace: 'x402', payeeEnv: 'X402_PAY_TO', enableEnv: 'X402_ENABLED' },
+    meaning:
+      'An agent holding no membership pays per request: it signs an EIP-3009 USDC authorization to the platform ' +
+      'treasury (X402_PAY_TO) and the gateway settles it — $0.01 a read, $0.05 a typed-data build, $0.10 an ' +
+      'assistant message. Unambiguously revenue, and it routes around the FeeRouter entirely, which is why the ' +
+      'coverage gate could not see it until C2 learned to look for configured platform payees. The treasury is the ' +
+      'admin Safe, which the FeeRouter also pays into on most chains — so counting arrivals at that address would ' +
+      'attribute fee revenue to agents. The collector counts only authorization-settled transfers, which nothing ' +
+      'else in this estate produces at this address. Counters are cumulative SINCE EXPORTER START, not all-time: ' +
+      'cursors are in memory by design (owning a datastore whose corruption silently understates revenue is the ' +
+      'worse failure), and the dashboard states that rather than implying a lifetime total.',
+  },
+]
+
+
+/**
  * BUILT, NOT OFFERED. Two money paths whose code is complete and whose deployment is switched off.
  *
  * These are a different thing from the `planned` block above, and the difference is worth stating
@@ -273,29 +314,6 @@ const planned = [
  * dashboard.
  */
 const dormant = [
-  {
-    id: 'x402-agent-payments',
-    kind: 'revenue',
-    status: 'planned',
-    label: 'Member API — x402 agent payments',
-    metric: null,
-    collector: 'none',
-    chains: [POLYGON],
-    interval: CHAIN_EVENTS,
-    credential: null,
-    docs: 'finops-operations.md#planned-sources',
-    moneyPath: { namespace: 'x402', payeeEnv: 'X402_PAY_TO', enableEnv: 'X402_ENABLED' },
-    meaning:
-      'BUILT, NOT OFFERED. The x402 paid rail (spec 096) lets an agent holding no membership pay per request: it ' +
-      'signs an EIP-3009 USDC authorization to the platform treasury (X402_PAY_TO) and the gateway settles it — ' +
-      '$0.01 a read, $0.05 a typed-data build, $0.10 an assistant message. Unambiguously revenue, and it routes ' +
-      'around the FeeRouter entirely, which is why the coverage gate could not see it until C2 learned to look for ' +
-      'configured platform payees. It is enabled on NO deployment: X402_ENABLED and X402_PAY_TO are commented out, ' +
-      'the treasury has no default on purpose, and the pinned gateway image predates the module. So no payment has ' +
-      'ever been possible and there is no value to read — not a $0, which would claim the rail was offered and ' +
-      'ignored. Promoting this to `live` needs a collector that can tell x402 settlements apart from every other ' +
-      'USDC arrival at the same treasury; the gate now forces that work to happen BEFORE the first payment, not after.',
-  },
   {
     id: 'assistant-model-api',
     kind: 'cost',
@@ -475,6 +493,7 @@ export const SOURCES = [
   ...membership,
   ...referral,
   ...planned,
+  ...x402,
   ...dormant,
   ...gasPools,
   ...vendors,
