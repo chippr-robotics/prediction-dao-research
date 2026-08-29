@@ -28,10 +28,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 103 |
 | With a member-facing flow | 81 |
-| Member-facing flows | 157 |
+| Member-facing flows | 158 |
 | 🟢 covered | 141 |
 | 🟡 partial | 1 |
-| 🔴 absent | 9 |
+| 🔴 absent | 10 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-60 flows — 🟢 48 · 🟡 0 · 🔴 6 · ⚪ 6 · covered-but-not-proven 0
+61 flows — 🟢 48 · 🟡 0 · 🔴 7 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -94,7 +94,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.clearpath-create-dao` | Create a standard DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) | the flow covers what ships — registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does |
+| `miniapp.clearpath-register-dao` | Register an external DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) |  |
+| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🔴 absent | none | — (proposed: on-chain) | #1268 | no member surface exists: OZ 5.4.0's GovernorUpgradeable pulls the Cancun mcopy opcode (via SignatureChecker -> Bytes.sol) and is not deployable on the pre-Cancun ETC/Mordor chains this platform targets, so pillar A's contract side was deliberately deferred (recorded in scripts/deploy/deploy-clearpath.js). #1268 tracks the decision to build it or withdraw it from spec 030. |
 
 ### `033-network-aware-swap` — Network-aware swap
 
