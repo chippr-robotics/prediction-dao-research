@@ -43,7 +43,9 @@ const openSheet = () => cy.get('[data-testid="custody-open-vault-actions"]').cli
 function openCreate() {
   openSheet()
   cy.get('[data-testid="vault-action-create"]').click()
-  cy.get('form.custody-create').should('be.visible')
+  // The sheet's panel scrolls (max-height 85vh); an element below its fold is reachable by the
+  // member but "not visible" to Cypress until scrolled — so bring it into view first.
+  cy.get('form.custody-create').scrollIntoView().should('be.visible')
 }
 
 function addOwner(address) {
@@ -85,6 +87,7 @@ describe('Protect — vault ActionSheet (release 1.14.0)', () => {
     // vault will not enforce.
     cy.get('form.custody-create')
       .contains(/these rules will be active from the first transaction/i)
+      .scrollIntoView()
       .should('be.visible')
     cy.get('form.custody-create').contains(/must pass between fund movements/i).should('exist')
     cy.get('form.custody-create').contains('button', 'Create vault').should('not.be.disabled')
@@ -103,7 +106,7 @@ describe('Protect — vault ActionSheet (release 1.14.0)', () => {
 
     addOwner(OWNER_C)
     cy.get('#vault-threshold').should('have.value', '2') // ceil(3/2)
-    cy.get('form.custody-create').contains(/suggested: 2 of 3 owners/i).should('be.visible')
+    cy.get('form.custody-create').contains(/suggested: 2 of 3 owners/i).scrollIntoView().should('be.visible')
 
     // Once the member states a number it is theirs — adding a fourth owner must not move it.
     cy.get('#vault-threshold').type('{selectall}3').should('have.value', '3')
@@ -122,6 +125,7 @@ describe('Protect — vault ActionSheet (release 1.14.0)', () => {
     cy.get('#vault-policy-none').click().should('be.checked')
     cy.get('form.custody-create')
       .contains(/not safer than an ordinary account/i)
+      .scrollIntoView()
       .should('be.visible')
     cy.get('form.custody-create').contains(/add a second owner, or keep a policy/i).should('exist')
     cy.get('form.custody-create').contains('button', 'Create vault').should('be.disabled')

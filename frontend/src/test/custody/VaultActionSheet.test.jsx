@@ -230,3 +230,14 @@ describe('unavailableReason', () => {
     expect(unavailableReason('propose', ctx)).toMatch(/could not be reached/i)
   })
 })
+
+describe('scroll reset on view change', () => {
+  it("resets the sheet panel's scroll when switching views, so a form never opens clipped", () => {
+    renderSheet({ open: true })
+    const panel = document.querySelector('.action-sheet')
+    expect(panel).toBeTruthy()
+    panel.scrollTop = 240
+    fireEvent.click(screen.getByTestId('vault-action-create'))
+    expect(panel.scrollTop).toBe(0)
+  })
+})

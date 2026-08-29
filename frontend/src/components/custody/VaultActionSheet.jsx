@@ -19,7 +19,7 @@
  * carries that same check for its own actions.)
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import ActionSheet from '../account/ActionSheet'
 import CreateVaultWizard from './CreateVaultWizard'
@@ -57,6 +57,14 @@ export default function VaultActionSheet({
     setSeen({ open, initialAction })
     if (open) setAction(initialAction)
   }
+
+  // The sheet's panel scrolls (max-height 85vh); switching views must not inherit the previous
+  // view's scroll offset, or a form opens with its top clipped under the header.
+  const bodyRef = useRef(null)
+  useEffect(() => {
+    const panel = bodyRef.current?.closest('.action-sheet')
+    if (panel) panel.scrollTop = 0
+  }, [action])
 
   const ctx = { canCreateHere, chainId, vault }
   const close = () => {
@@ -142,7 +150,7 @@ export default function VaultActionSheet({
           {vault.label || 'Unnamed vault'} on {vaultChainLabel(vault.chainId)}
         </p>
       )}
-      {body()}
+      <div ref={bodyRef} className="vault-action-sheet__body">{body()}</div>
     </ActionSheet>
   )
 }
