@@ -111,8 +111,8 @@ export function DexProvider({ children }) {
         },
     NATIVE: {
       address: 'native',
-      symbol: nativeConfig?.symbol || 'MATIC',
-      name: nativeConfig?.name || 'MATIC',
+      symbol: nativeConfig?.symbol || 'POL',
+      name: nativeConfig?.name || 'POL',
       decimals: nativeConfig?.decimals || 18,
       icon: '💎',
     },
