@@ -1022,6 +1022,18 @@
           ],
           "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
           "issue": "#1271"
+        },
+        {
+          "id": "passkey.app-lock",
+          "name": "Lock the screen after idle or on leaving, and unlock with a passkey",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1364",
+          "missing": "no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card)."
         }
       ]
     },

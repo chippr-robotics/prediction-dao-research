@@ -28,10 +28,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 103 |
 | With a member-facing flow | 81 |
-| Member-facing flows | 152 |
+| Member-facing flows | 153 |
 | 🟢 covered | 138 |
 | 🟡 partial | 1 |
-| 🔴 absent | 7 |
+| 🔴 absent | 8 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -337,7 +337,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-45 flows — 🟢 42 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
+46 flows — 🟢 42 · 🟡 1 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -400,6 +400,7 @@ establish the outcome. They are listed in full at the end of this document.
 | `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | settled | `account-native` | `returning-user.cy.js` (RU-01, RU-02) |  |
 | `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-03, UL-05) |  |
 | `passkey.controllers` | Add and remove the controllers that may act for the account | 🔴 absent | skipped | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
+| `passkey.app-lock` | Lock the screen after idle or on leaving, and unlock with a passkey | 🔴 absent | none | — (proposed: no-chain) | #1364 | no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card). |
 
 ### `042-clearpath-multi-network` — ClearPath across networks
 
