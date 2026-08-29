@@ -211,29 +211,29 @@ describe('usePortfolio — bitcoin branch (spec 061)', () => {
       expect(btc.instances.every((h) => h.asset.chainId !== 'bitcoin')).toBe(true)
     }
     // EVM portfolio unaffected.
-    expect(aggFor('MATIC').balance).toBeCloseTo(2)
+    expect(aggFor('POL').balance).toBeCloseTo(2)
   })
 
   it('makes NO gateway calls and adds no bitcoin row for a wallet with no issued addresses (SC-008)', async () => {
     fixtures.nativeBalances.set(137, 10n ** 18n)
-    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    fixtures.prices.set('POL', { usd: 0.5, source: 'chainlink', chainId: 137 })
     await renderPortfolio()
 
     expect(fixtures.gatewayCalls).toHaveLength(0)
     expect(latest.holdings.every((h) => h.asset.chainId !== 'bitcoin')).toBe(true)
     expect(latest.failedAssets).toEqual([])
     expect(aggFor('BTC')).toBeUndefined()
-    expect(aggFor('MATIC').usd).toBeCloseTo(0.5)
+    expect(aggFor('POL').usd).toBeCloseTo(0.5)
     expect(latest.totalUsd).toBeCloseTo(0.5)
   })
 
   it('EVM-only regression: existing behavior unchanged when bitcoin is unused', async () => {
     fixtures.nativeBalances.set(137, 2n * 10n ** 18n)
     fixtures.tokenBalances.set(addr(137, 'USDC'), 100_000_000n)
-    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    fixtures.prices.set('POL', { usd: 0.5, source: 'chainlink', chainId: 137 })
     await renderPortfolio()
 
-    expect(aggFor('MATIC').usd).toBeCloseTo(1)
+    expect(aggFor('POL').usd).toBeCloseTo(1)
     expect(aggFor('USDC').usd).toBeCloseTo(100)
     expect(latest.totalUsd).toBeCloseTo(101)
     expect(latest.aggregates.every((a) => a.balance > 0)).toBe(true)

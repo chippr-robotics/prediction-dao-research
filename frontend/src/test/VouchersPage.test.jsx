@@ -23,9 +23,9 @@ import { useVouchers } from '../hooks/useVouchers'
 import { getCurrentDocument } from '../utils/legalDocs'
 import VouchersPage from '../pages/VouchersPage'
 
-function renderPage() {
+function renderPage(initialEntries = ['/vouchers']) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <VouchersPage />
     </MemoryRouter>
   )
@@ -171,6 +171,44 @@ describe('VouchersPage (spec 026)', () => {
     expect(acceptedTermsHash).not.toBeUndefined()
     expect(typeof acceptedTermsHash).toBe('string')
     expect(acceptedTermsHash).toMatch(/^[0-9a-f]{64}$/) // bare hex; useVouchers normalizes to 0x
+  })
+
+  // Release 1.14.0 task 9 — the portfolio FWMV asset sheet deep-links Send / Gift to
+  // `/vouchers#vch-transfer`. The transfer block must be addressable (the page's hash effect
+  // scrolls by element id), and arriving on it with vouchers held preselects the first one so
+  // the member lands on a usable form instead of a disabled Transfer button.
+  it('gives the transfer block the #vch-transfer anchor the asset sheet deep-links to', async () => {
+    const listMyVouchers = vi.fn().mockResolvedValue([
+      { tokenId: '7', tier: 1, durationDays: 30, role: '0xrole' },
+    ])
+    useVouchers.mockReturnValue({ ...baseVouchers, listMyVouchers })
+    renderPage()
+    await waitFor(() => expect(screen.getByText('#7')).toBeInTheDocument())
+    expect(document.getElementById('vch-transfer')).toBeInTheDocument()
+  })
+
+  it('preselects the first held voucher when arriving at #vch-transfer', async () => {
+    const listMyVouchers = vi.fn().mockResolvedValue([
+      { tokenId: '7', tier: 1, durationDays: 30, role: '0xrole' },
+      { tokenId: '9', tier: 3, durationDays: 30, role: '0xrole' },
+    ])
+    useVouchers.mockReturnValue({ ...baseVouchers, listMyVouchers })
+    renderPage(['/vouchers#vch-transfer'])
+    await waitFor(() => expect(screen.getByText('#7')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(document.querySelector('input[name="redeem-voucher"][value="7"]')).toBeChecked(),
+    )
+    expect(document.querySelector('input[name="redeem-voucher"][value="9"]')).not.toBeChecked()
+  })
+
+  it('does not preselect a voucher on a plain visit — selection stays an explicit choice', async () => {
+    const listMyVouchers = vi.fn().mockResolvedValue([
+      { tokenId: '7', tier: 1, durationDays: 30, role: '0xrole' },
+    ])
+    useVouchers.mockReturnValue({ ...baseVouchers, listMyVouchers })
+    renderPage()
+    await waitFor(() => expect(screen.getByText('#7')).toBeInTheDocument())
+    expect(document.querySelector('input[name="redeem-voucher"][value="7"]')).not.toBeChecked()
   })
 
   it('shows an honest "not available on this network" notice when the voucher is undeployed', () => {

@@ -136,7 +136,7 @@ describe('AddHardwareWalletSheet', () => {
       "m/44'/60'/4'/0/0",
     ])
     expect(screen.getAllByRole('checkbox')).toHaveLength(5)
-    expect(screen.getAllByText('1.5 MATIC').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('1.5 POL').length).toBeGreaterThan(0)
   })
 
   it('switches derivation scheme and reloads from the device (FR-004)', async () => {
