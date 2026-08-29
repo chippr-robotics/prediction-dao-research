@@ -2469,6 +2469,56 @@
       "memberFacing": false,
       "reason": "Operator tooling with no member surface: credentials move off a local .env into Secret Manager and are delivered per least-privilege profile by a wrapper, and the Prometheus and Grafana stack is a read-only viewing surface bound to loopback. Nothing here is reachable from the app, and the workstation identity is declared Terraform with no service-account key file. Gated by the scripts/secrets vitest suites (including the registry/tfvars parity test, which fails on drift because a missing grant surfaces later as PERMISSION_DENIED), check:env-hygiene, and the Terraform plan.",
       "flows": []
+    },
+    {
+      "id": "098-acting-account-purchase",
+      "title": "Membership purchase lands on the acting account",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "purchase.acting-account",
+          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1364"
+        },
+        {
+          "id": "purchase.acting-refusals",
+          "name": "Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1364"
+        }
+      ]
+    },
+    {
+      "id": "099-network-status-miniapp",
+      "title": "Network status mini-app",
+      "memberFacing": false,
+      "reason": "Spec landed in release 1.14.0; the mini-app package has no member surface yet. Flows are owed when the package ships (#1364).",
+      "flows": []
+    },
+    {
+      "id": "100-passkey-solana",
+      "title": "Passkey-native Solana",
+      "memberFacing": false,
+      "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
+      "flows": []
+    },
+    {
+      "id": "101-passkey-zcash",
+      "title": "Passkey-native Zcash",
+      "memberFacing": false,
+      "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
+      "flows": []
     }
   ]
 }
