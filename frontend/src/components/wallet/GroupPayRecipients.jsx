@@ -48,6 +48,12 @@ export default function GroupPayRecipients({
   }, [onChange])
 
   const patch = useCallback((id, changes) => {
+    // No-op patches must not commit. AddressInput re-announces its resolved address from an
+    // effect keyed on the callback's identity — which this component regenerates every render —
+    // so an unconditional commit here turns each announcement into announce → commit → render →
+    // announce: an unbounded update loop whose churn can eat keystrokes in the amount field.
+    const cur = latest.current.find((r) => r.id === id)
+    if (!cur || Object.keys(changes).every((k) => Object.is(cur[k], changes[k]))) return
     commit(latest.current.map((r) => (r.id === id ? { ...r, ...changes } : r)))
   }, [commit])
 
