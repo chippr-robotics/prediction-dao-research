@@ -251,6 +251,30 @@ describe('describeRail', () => {
     expect(d.feeLine).toMatch(/vault/i)
   })
 
+  // Issue #1368 — a vault whose policy guard denies delegatecall cannot execute a MultiSend, so
+  // the confirm screen must say which shape is being created and WHY, before anything is signed.
+  it('says N separate proposals — and why — when the vault’s policy denies a batch', () => {
+    const d = describeRail(GROUP_RAIL.VAULT_PROPOSAL, { count: 4, batchSupport: 'batch-denied' })
+    expect(d.atomic).toBe(false)
+    expect(d.shape).toBe('split')
+    expect(d.submissionLine).toMatch(/4 separate proposals/i)
+    expect(d.submissionLine).toMatch(/does not allow batched transactions/i)
+    expect(d.outcomeLine).toMatch(/in order/i)
+  })
+
+  it('distinguishes “could not confirm” from “denied” — an RPC timeout is not a policy', () => {
+    const d = describeRail(GROUP_RAIL.VAULT_PROPOSAL, { count: 2, batchSupport: 'unknown' })
+    expect(d.shape).toBe('split')
+    expect(d.submissionLine).toMatch(/could not confirm/i)
+    expect(d.submissionLine).not.toMatch(/does not allow/i)
+  })
+
+  it('keeps the one-proposal shape when the vault’s guard allows a batch', () => {
+    const d = describeRail(GROUP_RAIL.VAULT_PROPOSAL, { count: 4, batchSupport: 'batch-ok' })
+    expect(d.atomic).toBe(true)
+    expect(d.shape).toBe('batch')
+  })
+
   it('says a sequential run is N transactions and that one failure does not stop the rest', () => {
     const d = describeRail(GROUP_RAIL.SEQUENTIAL, { count: 3, gasless: false, nativeSymbol: 'POL' })
     expect(d.atomic).toBe(false)

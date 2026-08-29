@@ -590,6 +590,7 @@ export default function TransferForm({ onSent }) {
             symbol={symbol}
             networkName={selectedAsset?.networkName}
             rail={groupPay.rail}
+            batchSupport={groupPay.vaultBatch?.support ?? null}
             gasless={gasless}
             nativeSymbol={tokens.native}
           />

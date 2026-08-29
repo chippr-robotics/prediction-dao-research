@@ -1560,7 +1560,7 @@
         },
         {
           "id": "pay.group-settlement",
-          "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), or sequential sends with per-recipient outcomes",
+          "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes",
           "status": "absent",
           "tier": "none",
           "proposedTier": "on-chain",
@@ -2658,7 +2658,7 @@
       "flows": [
         {
           "id": "purchase.acting-account",
-          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail (money path: on-chain tier required)",
+          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required)",
           "status": "absent",
           "tier": "none",
           "proposedTier": "on-chain",

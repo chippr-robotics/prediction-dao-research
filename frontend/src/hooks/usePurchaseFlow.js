@@ -52,7 +52,25 @@ const STEP_DEFS = {
   register: { id: 'register', label: 'Register your encryption key', detail: 'Publish your encryption key so others can send you private wagers.', kind: 'transaction', blocking: false },
 }
 
-const makeStep = (id) => ({ ...STEP_DEFS[id], state: 'pending', failureReason: null, txHash: null })
+/*
+ * Issue #1368 — a vault whose policy guard denies delegatecall cannot execute a MultiSend, so the
+ * approval and the purchase are proposed SEPARATELY (at consecutive nonces). The propose step must
+ * say so: "the approval and the purchase together" is a false statement about that run.
+ */
+const PROPOSE_DETAIL_BY_SHAPE = {
+  split: 'Create two threshold-gated proposals — the USDC approval, then the purchase — queued in order. Nothing is charged until your vault executes them.',
+  single: "Create one threshold-gated proposal for the purchase — the vault's USDC approval already covers this price. Nothing is charged until your vault executes it.",
+}
+
+const makeStep = (id, { proposalShape = null } = {}) => ({
+  ...STEP_DEFS[id],
+  ...(id === 'propose' && PROPOSE_DETAIL_BY_SHAPE[proposalShape]
+    ? { detail: PROPOSE_DETAIL_BY_SHAPE[proposalShape] }
+    : null),
+  state: 'pending',
+  failureReason: null,
+  txHash: null,
+})
 
 /**
  * @param {object} [deps] - injectable for tests; defaults to the real services.
@@ -282,7 +300,7 @@ export function usePurchaseFlow(deps = {}) {
     // Vault rail: the approve leg lives INSIDE the proposed batch, so there is no separate
     // approve step to show — the whole purchase is one proposal.
     if (params.proposePurchase) {
-      setSteps(['propose', 'sign', 'register'].map(makeStep))
+      setSteps(['propose', 'sign', 'register'].map((id) => makeStep(id, { proposalShape: params.proposalShape })))
       await runSegments('purchase')
       return
     }

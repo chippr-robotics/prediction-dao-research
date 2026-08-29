@@ -11,13 +11,31 @@ import { emitProposal } from './proposalHub'
 /**
  * Pure: turn an action payload into the SafeTx to propose. A `batch` (array of {to,value,data}) is wrapped in
  * a MultiSendCallOnly delegatecall (e.g. approve + action); otherwise the single call is used directly.
+ *
+ * Issue #1368 — a ONE-leg batch is emitted as that leg's plain CALL. Wrapping a single call in
+ * MultiSend produced an identical on-chain effect through a delegatecall, which both policy guards
+ * deny for a vault with an active policy (`SafePolicyGuardV2._preCheck`). Nothing is gained by the
+ * wrapper and a guarded vault is refused at execution for no reason.
+ *
+ * An explicit `payload.nonce` overrides the vault's current nonce, so a batch that has to be split
+ * into N proposals can be queued at CONSECUTIVE nonces. Same-nonce proposals are mutually
+ * exclusive on a Safe — executing one invalidates the others — so a split without this would leave
+ * exactly one of N payments executable.
  */
-export function buildActiveAccountSafeTx({ to, value = 0n, data = '0x', operation = 0, batch }, { nonce, multiSendCallOnly }) {
+export function buildActiveAccountSafeTx(
+  { to, value = 0n, data = '0x', operation = 0, batch, nonce: nonceOverride },
+  { nonce, multiSendCallOnly },
+) {
+  const at = nonceOverride ?? nonce
+  if (Array.isArray(batch) && batch.length === 1) {
+    const only = batch[0]
+    return buildSafeTx({ to: only.to, value: only.value ?? 0n, data: only.data ?? '0x', operation: 0, nonce: at })
+  }
   if (Array.isArray(batch) && batch.length > 0) {
     const ms = encodeMultiSend(multiSendCallOnly, batch)
-    return buildSafeTx({ to: ms.to, value: ms.value, data: ms.data, operation: ms.operation, nonce })
+    return buildSafeTx({ to: ms.to, value: ms.value, data: ms.data, operation: ms.operation, nonce: at })
   }
-  return buildSafeTx({ to, value, data, operation, nonce })
+  return buildSafeTx({ to, value, data, operation, nonce: at })
 }
 
 /**
@@ -40,13 +58,15 @@ export async function submitAsActiveAccount(payload, ctx) {
       }
     }
     const safe = new Contract(vaultAddress, SAFE_ABI, signer)
-    const nonce = await safe.nonce()
+    // An explicit nonce queues an ordered follow-up (issue #1368's split shape); otherwise the
+    // vault's current nonce is read, exactly as before.
+    const nonce = payload.nonce ?? (await safe.nonce())
     const safeTx = buildActiveAccountSafeTx(payload, { nonce, multiSendCallOnly: safeContracts.multiSendCallOnly })
     const safeTxHash = computeSafeTxHash(vaultAddress, chainId, safeTx)
     await emitProposal({ hubAddress, safe: vaultAddress, safeTx, safeTxHash, signer })
     const approveTx = await safe.approveHash(safeTxHash)
     await approveTx.wait()
-    return { kind: 'proposed', safeTxHash }
+    return { kind: 'proposed', safeTxHash, nonce: Number(nonce) }
   }
   // Single-signer mode (personal wallet, or a recovered legacy account whose
   // unlocked signer is passed in). A `batch` (e.g. [approve, swap]) is sent as

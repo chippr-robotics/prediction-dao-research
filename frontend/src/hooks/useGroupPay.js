@@ -1,4 +1,4 @@
-import { useCallback, useContext, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Interface } from 'ethers'
 import { WalletContext } from '../contexts/WalletContext'
 import { useTransfer } from './useTransfer'
@@ -6,6 +6,7 @@ import { useActiveAccount } from './useActiveAccount'
 import { useEffectiveAccount } from './useEffectiveAccount'
 import { useAddressScreening } from './useAddressScreening'
 import { isBitcoinNetworkId } from '../config/bitcoinNetworks'
+import { BATCH_SUPPORT, mustSplitBatch, previewBatchSupport } from '../lib/custody/batchPreflight'
 import { TRANSFER_ABI } from '../lib/transfer/eip3009Transfer'
 import { recordTransfer, updateTransfer, TRANSFER_STATUS } from '../lib/transfer/transferStore'
 import { appendClientRecord } from '../data/ledger'
@@ -23,7 +24,9 @@ import {
  * identity actually has.
  *
  *   passkey account acting as itself → ONE `sendCalls` batch (one ceremony, one transaction)
- *   acting as a vault                → ONE MultiSend proposal (one threshold approval)
+ *   acting as a vault                → ONE MultiSend proposal (one threshold approval), unless the
+ *                                       vault's own policy guard denies delegatecall — then N
+ *                                       proposals at consecutive nonces, disclosed before signing
  *   classic wallet / recovered / hardware account → SEQUENTIAL sends through the existing
  *                                       transfer engine, with a per-recipient outcome
  *   anything else (a derived account) → REFUSED, with the reason
@@ -78,9 +81,11 @@ function mirrorToLedger(account, record, patch = null, suffix = null) {
   }
 }
 
-const summarise = (outcomes, rail, route) => ({
+const summarise = (outcomes, rail, route, { shape = null, batchSupport = null } = {}) => ({
   rail,
   route,
+  shape,
+  batchSupport,
   total: outcomes.length,
   sent: outcomes.filter((o) => o.status === GROUP_OUTCOME.SENT).length,
   pending: outcomes.filter((o) => o.status === GROUP_OUTCOME.PENDING).length,
@@ -95,7 +100,7 @@ export function useGroupPay() {
   // isolated component test where no WalletProvider is present.
   const { address, chainId, sendCalls } = useContext(WalletContext) ?? {}
   const { isPasskey, send } = useTransfer()
-  const { canActAsVault, submit: submitAsActive } = useActiveAccount()
+  const { identity, canActAsVault, submit: submitAsActive } = useActiveAccount()
   const { type: actingType, address: effectiveAddress } = useEffectiveAccount()
   const { screenOne } = useAddressScreening()
 
@@ -108,6 +113,44 @@ export function useGroupPay() {
     () => selectGroupRail({ actingType, isPasskey, canActAsVault }),
     [actingType, isPasskey, canActAsVault],
   )
+
+  /*
+   * ── Issue #1368: which SHAPE will the vault rail actually create? ───────────────────────────
+   * One proposal carrying N payments is a MultiSend, which executes by DELEGATECALL. Both policy
+   * guards deny delegatecall once a vault has an active policy, so the batch would be approved by
+   * the vault's signers and then revert — on exactly the vaults that followed our own starter-policy
+   * guidance. Ask the vault's own guard, once per vault, and let the confirm screen say which shape
+   * it is creating BEFORE anything is signed. `unknown` is treated as "split" on this money path
+   * (an unconfirmed policy is never assumed to allow a batch) but is disclosed as its own state.
+   */
+  const vaultAddress = identity?.vaultAddress || (actingType === 'vault' ? effectiveAddress : null)
+  const vaultChainId = identity?.chainId ?? null
+  const [vaultBatch, setVaultBatch] = useState(null)
+  const batchProbe = useRef({ key: null, promise: null })
+
+  const resolveVaultBatch = useCallback((chainIdForRead) => {
+    const key = `${String(vaultAddress).toLowerCase()}:${chainIdForRead}`
+    if (batchProbe.current.key !== key) {
+      batchProbe.current = {
+        key,
+        promise: Promise.resolve(previewBatchSupport(vaultAddress, chainIdForRead)).catch(() => ({
+          support: BATCH_SUPPORT.UNKNOWN,
+          reason: "Could not confirm the vault's policy allows a batch.",
+          detail: null,
+          engine: null,
+        })),
+      }
+    }
+    return batchProbe.current.promise
+  }, [vaultAddress])
+
+  const onVaultRail = railInfo.rail === GROUP_RAIL.VAULT_PROPOSAL
+  useEffect(() => {
+    if (!onVaultRail || !vaultAddress || vaultChainId == null) return undefined
+    let on = true
+    resolveVaultBatch(vaultChainId).then((res) => { if (on) setVaultBatch(res) })
+    return () => { on = false }
+  }, [onVaultRail, vaultAddress, vaultChainId, resolveVaultBatch])
 
   const reset = useCallback(() => {
     setStatus('idle')
@@ -175,7 +218,15 @@ export function useGroupPay() {
     if (railInfo.rail === GROUP_RAIL.BATCH_PASSKEY && typeof sendCalls !== 'function') {
       throw new Error('This account cannot batch payments right now, so nothing has been signed.')
     }
-    const { atomic } = describeRail(railInfo.rail, { count: prepared.length })
+    // The vault's guard decides the SHAPE, and it must be resolved before screening: a split batch
+    // is N independent proposals, so a flagged recipient is skipped rather than stopping the rest.
+    let batchSupport = null
+    if (railInfo.rail === GROUP_RAIL.VAULT_PROPOSAL) {
+      const probe = await resolveVaultBatch(vaultChainId ?? assetChainId)
+      batchSupport = probe.support
+      setVaultBatch(probe)
+    }
+    const { atomic, shape } = describeRail(railInfo.rail, { count: prepared.length, batchSupport })
 
     // ── Screening, per recipient, forced past the cache ────────────────────────────────────
     setStatus('screening')
@@ -275,7 +326,7 @@ export function useGroupPay() {
             mirrorToLedger(address, e, { status: TRANSFER_STATUS.COMPLETE, txHash, route }, 'done')
           })
         }
-      } else if (railInfo.rail === GROUP_RAIL.VAULT_PROPOSAL) {
+      } else if (railInfo.rail === GROUP_RAIL.VAULT_PROPOSAL && !mustSplitBatch(batchSupport)) {
         // ONE threshold-gated proposal whose MultiSend carries every payment (the spec-098
         // membership precedent). Nothing is paid here — the vault's signers execute it.
         route = 'vault'
@@ -288,6 +339,36 @@ export function useGroupPay() {
         } catch (err) {
           const reason = err?.shortMessage || err?.message || 'Could not create the vault proposal.'
           results = payable.map((p) => ({ ...base(p), status: GROUP_OUTCOME.FAILED, txHash: null, reason }))
+        }
+      } else if (railInfo.rail === GROUP_RAIL.VAULT_PROPOSAL) {
+        /*
+         * Issue #1368 — the vault's guard denies delegatecall (or could not be read), so a
+         * MultiSend proposal would be approved and then revert. One proposal per recipient instead.
+         *
+         * The nonces MUST be consecutive: proposals sharing a nonce are mutually exclusive on a
+         * Safe (executing one invalidates the rest), so N same-nonce proposals would leave exactly
+         * one payment executable. The first read is the vault's live nonce; each success advances
+         * it. A FAILURE consumes no nonce, so the next attempt re-uses that slot — a gap would make
+         * every proposal after it permanently unexecutable, which is the one way this fallback
+         * could be worse than the bug it fixes.
+         */
+        route = 'vault'
+        let nextNonce = null
+        for (const p of payable) {
+          const leg = legFor(p)
+          try {
+            const res = await submitAsActive(nextNonce == null ? leg : { ...leg, nonce: nextNonce })
+            if (res?.nonce != null) nextNonce = Number(res.nonce) + 1
+            results.push({
+              ...base(p), status: GROUP_OUTCOME.PROPOSED, txHash: null,
+              safeTxHash: res?.safeTxHash ?? null, reason: null,
+            })
+          } catch (err) {
+            results.push({
+              ...base(p), status: GROUP_OUTCOME.FAILED, txHash: null,
+              reason: err?.shortMessage || err?.message || 'Could not create this proposal.',
+            })
+          }
         }
       } else {
         // Sequential: the existing engine per recipient, so each payment keeps its own gasless
@@ -325,13 +406,13 @@ export function useGroupPay() {
     // Outcomes stay in the member's own row order, skipped ones included.
     const byId = new Map([...results, ...skippedOutcomes].map((o) => [o.id, o]))
     const ordered = prepared.map((p) => byId.get(p.id)).filter(Boolean)
-    const nextSummary = summarise(ordered, railInfo.rail, route)
+    const nextSummary = summarise(ordered, railInfo.rail, route, { shape, batchSupport })
 
     setOutcomes(ordered)
     setSummary(nextSummary)
     setStatus('done')
     return { outcomes: ordered, summary: nextSummary }
-  }, [address, chainId, effectiveAddress, railInfo, screenOne, sendCalls, submitAsActive, send])
+  }, [address, chainId, effectiveAddress, railInfo, screenOne, sendCalls, submitAsActive, send, resolveVaultBatch, vaultChainId])
 
   const submitGroupSafely = useCallback(async (payload) => {
     try {
@@ -346,13 +427,16 @@ export function useGroupPay() {
   return useMemo(() => ({
     rail: railInfo.rail,
     railReason: railInfo.reason,
+    // Issue #1368 — the resolved batch shape for the vault rail, so the confirm screen can state
+    // which one it will create (and why) before the member signs. Null on every other rail.
+    vaultBatch: onVaultRail ? vaultBatch : null,
     status,
     outcomes,
     summary,
     error,
     submitGroup: submitGroupSafely,
     reset,
-  }), [railInfo, status, outcomes, summary, error, submitGroupSafely, reset])
+  }), [railInfo, onVaultRail, vaultBatch, status, outcomes, summary, error, submitGroupSafely, reset])
 }
 
 export default useGroupPay

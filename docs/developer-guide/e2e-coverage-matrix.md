@@ -194,7 +194,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `transfer.send-from-home` | Send funds to someone from the home screen | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (TR-01) |  |
-| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), or sequential sends with per-recipient outcomes | 🔴 absent | none | — (proposed: on-chain) | #1366 |  |
+| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes | 🔴 absent | none | — (proposed: on-chain) | #1366 |  |
 
 ### `061-bitcoin-transactions` — Bitcoin
 
@@ -281,7 +281,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
+| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
 | `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
 ## Disclosure — a member consents to a cost

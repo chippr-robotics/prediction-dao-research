@@ -365,6 +365,23 @@ describe('usePurchaseFlow — vault proposal rail (spec 098 FR-005/FR-012/FR-014
     expect(ensureKeyRegistered).not.toHaveBeenCalled()
   })
 
+  // Issue #1368 — a policy-guarded vault cannot execute a MultiSend, so the purchase is proposed
+  // as TWO transactions. The step the member watches must not claim they are "together".
+  it('the propose step says TWO proposals when the vault’s policy forces a split', async () => {
+    const params = vaultParams({ proposalShape: 'split' })
+    const { result } = renderHook(() => usePurchaseFlow())
+    await act(async () => { await result.current.start(params) })
+    const propose = result.current.steps.find((s) => s.id === 'propose')
+    expect(propose.detail).toMatch(/two/i)
+    expect(propose.detail).not.toMatch(/together/i)
+  })
+
+  it('the propose step copy is unchanged for a vault that can batch', async () => {
+    const { result } = renderHook(() => usePurchaseFlow())
+    await act(async () => { await result.current.start(vaultParams()) })
+    expect(result.current.steps.find((s) => s.id === 'propose').detail).toMatch(/together/i)
+  })
+
   it('a failed proposal fails the propose step and is retryable', async () => {
     const params = vaultParams({
       proposePurchase: vi.fn()

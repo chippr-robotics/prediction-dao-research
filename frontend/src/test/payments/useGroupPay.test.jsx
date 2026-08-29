@@ -59,6 +59,16 @@ vi.mock('../../hooks/useAddressScreening', () => ({
   }),
 }))
 
+// Issue #1368 — the vault rail asks the vault's own guard whether a MultiSend delegatecall would
+// survive it. Default here is the pre-#1368 world (unguarded / policy-free vault), so every
+// existing vault assertion below is unchanged; the split tests flip it.
+const preflight = { support: 'batch-ok', reason: null, detail: null, engine: 'none' }
+const previewBatchSupport = vi.fn(async () => preflight)
+vi.mock('../../lib/custody/batchPreflight', async (importOriginal) => ({
+  ...(await importOriginal()),
+  previewBatchSupport: (...a) => previewBatchSupport(...a),
+}))
+
 const store = { recordTransfer: vi.fn(), updateTransfer: vi.fn() }
 vi.mock('../../lib/transfer/transferStore', () => ({
   recordTransfer: (...a) => store.recordTransfer(...a) ?? { id: 'rec1' },
@@ -100,9 +110,12 @@ beforeEach(() => {
     send: vi.fn(async ({ to }) => ({ txHash: `${TX.slice(0, 20)}${to.slice(-4)}`, route: 'gasless', id: to })),
   })
   Object.assign(active, {
+    identity: { mode: 'personal' },
     isVault: false, canActAsVault: false, isLegacy: false, isHardware: false,
     submit: vi.fn(async () => ({ kind: 'proposed', safeTxHash: '0xsafe' })),
   })
+  Object.assign(preflight, { support: 'batch-ok', reason: null, detail: null, engine: 'none' })
+  previewBatchSupport.mockClear()
   Object.assign(effective, { type: 'personal', address: wallet.address, isActingAccount: false })
   screening.statuses = {}
   screening.calls = []
@@ -184,9 +197,12 @@ describe('passkey batch rail', () => {
   })
 })
 
+const VAULT = '0x4444444444444444444444444444444444444444'
+
 describe('vault rail', () => {
   beforeEach(() => {
-    Object.assign(effective, { type: 'vault', address: '0xvault', isActingAccount: true })
+    Object.assign(effective, { type: 'vault', address: VAULT, isActingAccount: true })
+    active.identity = { mode: 'vault', vaultAddress: VAULT, chainId: 137 }
     active.isVault = true
     active.canActAsVault = true
   })
@@ -208,6 +224,83 @@ describe('vault rail', () => {
     const { out } = await run({ asset: STABLE, recipients: three })
     expect(out.outcomes.every((o) => o.status === 'failed')).toBe(true)
     expect(out.summary.failed).toBe(3)
+  })
+
+  it('asks the vault’s own guard before choosing the batch shape', async () => {
+    await run({ asset: STABLE, recipients: three })
+    expect(previewBatchSupport).toHaveBeenCalledWith(VAULT, 137)
+  })
+
+  /*
+   * Issue #1368 — the whole point. A vault whose policy guard denies delegatecall would approve
+   * the MultiSend proposal and then revert executing it. Fall back to one proposal per recipient,
+   * at CONSECUTIVE nonces (same-nonce proposals are mutually exclusive on a Safe, so only one
+   * payment could ever land).
+   */
+  describe('policy-guarded vault (batch denied)', () => {
+    beforeEach(() => { Object.assign(preflight, { support: 'batch-denied', reason: "This vault's policy does not allow batched transactions.", engine: 'v2' }) })
+
+    it('creates N proposals — one per recipient — instead of one MultiSend', async () => {
+      let n = 7
+      active.submit = vi.fn(async (p) => ({ kind: 'proposed', safeTxHash: `0xsafe${p.nonce ?? n}`, nonce: p.nonce ?? n }))
+      const { out } = await run({ asset: STABLE, recipients: three })
+      expect(active.submit).toHaveBeenCalledTimes(3)
+      expect(active.submit.mock.calls.every(([p]) => p.batch === undefined)).toBe(true)
+      expect(active.submit.mock.calls.map(([p]) => p.to)).toEqual([USDC, USDC, USDC])
+      expect(out.summary).toMatchObject({ proposed: 3, rail: GROUP_RAIL.VAULT_PROPOSAL, shape: 'split' })
+      expect(out.outcomes.map((o) => o.status)).toEqual(['proposed', 'proposed', 'proposed'])
+    })
+
+    it('queues them at consecutive nonces so every one of them can execute', async () => {
+      let next = 7
+      active.submit = vi.fn(async (p) => {
+        const nonce = p.nonce ?? next
+        next = nonce + 1
+        return { kind: 'proposed', safeTxHash: `0xsafe${nonce}`, nonce }
+      })
+      await run({ asset: STABLE, recipients: three })
+      expect(active.submit.mock.calls.map(([p]) => p.nonce)).toEqual([undefined, 8, 9])
+    })
+
+    it('a failed proposal does not abort the rest, and does not leave a nonce gap', async () => {
+      let next = 7
+      let seen = 0
+      active.submit = vi.fn(async (p) => {
+        seen += 1
+        if (seen === 1) throw new Error('rejected in the wallet')
+        const nonce = p.nonce ?? next
+        next = nonce + 1
+        return { kind: 'proposed', safeTxHash: `0xsafe${nonce}`, nonce }
+      })
+      const { out } = await run({ asset: STABLE, recipients: three })
+      expect(out.outcomes.map((o) => o.status)).toEqual(['failed', 'proposed', 'proposed'])
+      // The failed one consumed no nonce, so the next attempt re-uses the slot rather than
+      // skipping it — a gap would make every later proposal unexecutable.
+      expect(active.submit.mock.calls.map(([p]) => p.nonce)).toEqual([undefined, undefined, 8])
+    })
+
+    it('a flagged recipient is SKIPPED, not a whole-batch refusal — these payments are independent', async () => {
+      screening.statuses[B.toLowerCase()] = 'restricted'
+      active.submit = vi.fn(async () => ({ kind: 'proposed', safeTxHash: '0xsafe', nonce: 7 }))
+      const { out } = await run({ asset: STABLE, recipients: three })
+      expect(active.submit).toHaveBeenCalledTimes(2)
+      expect(out.outcomes.map((o) => o.status)).toEqual(['proposed', 'skipped', 'proposed'])
+    })
+  })
+
+  it('an UNREADABLE guard also splits — an unconfirmed policy is never assumed to allow a batch', async () => {
+    Object.assign(preflight, { support: 'unknown', reason: "Could not confirm the vault's policy allows a batch.", engine: 'foreign' })
+    active.submit = vi.fn(async () => ({ kind: 'proposed', safeTxHash: '0xsafe', nonce: 3 }))
+    const { out } = await run({ asset: STABLE, recipients: three })
+    expect(active.submit).toHaveBeenCalledTimes(3)
+    expect(out.summary.shape).toBe('split')
+    expect(out.summary.batchSupport).toBe('unknown')
+  })
+
+  it('exposes the resolved shape so the confirm screen can say which one it will create', async () => {
+    Object.assign(preflight, { support: 'batch-denied', reason: 'nope', engine: 'v2' })
+    const { hook } = await run({ asset: STABLE, recipients: three })
+    expect(hook.current.vaultBatch?.support).toBe('batch-denied')
   })
 })
 

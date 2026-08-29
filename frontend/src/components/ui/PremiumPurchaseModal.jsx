@@ -10,6 +10,7 @@ import { getUserTierOnChain, buildMembershipPurchaseCalls, checkApprovalNeededFo
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { getReadProvider } from '../../utils/rpcProvider'
+import { mustSplitBatch, previewBatchSupport } from '../../lib/custody/batchPreflight'
 import { membershipChainId } from '../../config/networks'
 import { networkName } from '../../lib/chains/estate'
 import { ensurePasskeyEncryptionKeys } from '../../lib/passkey/encryption'
@@ -347,6 +348,85 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
   const selectedPrice = getPrice(ROLE_KEY, selectedTier)
   const chainLimits = getLimits(ROLE_KEY, selectedTier)
 
+  /*
+   * ── Issue #1368 — WHAT SHAPE will the vault proposal be, and why? ───────────────────────────
+   *
+   * The batched purchase is [approve(exact), purchase] through MultiSendCallOnly, i.e. a
+   * DELEGATECALL. Both policy guards deny operation != 0 once a vault has an active policy
+   * (`SafePolicyGuardV2._preCheck`), so on a policy-guarded vault that proposal is approved by the
+   * signers and then reverts — no funds lost, but a dishonest screen, on exactly the vaults that
+   * followed our own starter-policy guidance.
+   *
+   * Three shapes, resolved ONCE (the same answer the propose closure uses, so the screen cannot
+   * describe something other than what is created):
+   *
+   *   'single' — the vault's live allowance already covers the price, so there is one leg. The
+   *              submit seam emits a one-leg batch as a plain CALL, which every guard evaluates
+   *              normally. Nothing to split.
+   *   'batch'  — the guard allows delegatecall (no policy, or no guard). Unchanged behaviour.
+   *   'split'  — the guard denies it, or could not be read. TWO proposals at CONSECUTIVE nonces:
+   *              approve at N, purchase at N+1.
+   *
+   * Why split rather than refuse the purchase outright: the approve is for the EXACT quoted price
+   * to one FairWins contract, and consecutive nonces mean the purchase cannot execute before the
+   * approve and nothing else can take the slot between them — so the exposure is bounded to the
+   * membership price, for as long as the queue takes. Refusing instead would tell members who
+   * followed our own hardening guidance that they must LOOSEN their policy to buy a membership,
+   * which is a worse outcome than a bounded, disclosed, exact-amount allowance. The residual case
+   * — a purchase leg never executed, leaving a standing exact-price allowance — is stated on the
+   * confirm screen, and the vault can cancel or revoke it from its own queue.
+   */
+  const [resolvedVaultShape, setResolvedVaultShape] = useState(null) // null | {shape, batchSupport, legs}
+  const vaultShapeRef = useRef({ key: null, promise: null })
+
+  const resolveVaultShape = useCallback(async (acceptedTermsHash) => {
+    const tierValue = selectedTierInfo?.id
+    const key = `${actingAddress}:${purchaseChainId}:${tierValue}:${effectiveAction}`
+    if (vaultShapeRef.current.key !== key) {
+      vaultShapeRef.current = {
+        key,
+        promise: (async () => {
+          const readProvider = getReadProvider(purchaseChainId)
+          const { calls } = await buildMembershipPurchaseCalls(
+            readProvider, actingAddress, ROLE_KEY, tierValue, effectiveAction, acceptedTermsHash,
+          )
+          // FR-015: the approve leg is omitted when the VAULT's live allowance already covers the
+          // quoted price — read for the vault's address, never signer-implicit.
+          const needsApprove = await checkApprovalNeededForAddress(
+            actingAddress, ROLE_KEY, selectedPrice, tierValue, effectiveAction,
+            { provider: readProvider, chainId: purchaseChainId },
+          )
+          const legs = (needsApprove ? calls : calls.slice(1))
+            .map((c) => ({ to: c.target, value: c.value ?? 0n, data: c.data }))
+          if (legs.length < 2) return { shape: 'single', batchSupport: null, legs }
+          const probe = await previewBatchSupport(actingAddress, purchaseChainId)
+          return {
+            shape: mustSplitBatch(probe.support) ? 'split' : 'batch',
+            batchSupport: probe.support,
+            legs,
+          }
+        })(),
+      }
+    }
+    return vaultShapeRef.current.promise
+  }, [actingAddress, purchaseChainId, selectedTierInfo?.id, effectiveAction, selectedPrice])
+
+  // Resolve it for DISPLAY as soon as the vault rail is the one in play, so the shape is on the
+  // confirm screen before the member signs rather than discovered afterwards.
+  const onVaultRail = purchaseRail.rail === 'vault'
+  useEffect(() => {
+    if (!onVaultRail || !actingAddress || !selectedTierInfo?.id) return undefined
+    let on = true
+    const termsHash = getCurrentDocument('terms')?.hash || null
+    resolveVaultShape(termsHash)
+      .then((res) => { if (on) setResolvedVaultShape(res) })
+      .catch(() => { /* the shape stays unstated rather than guessed */ })
+    return () => { on = false }
+  }, [onVaultRail, actingAddress, selectedTierInfo?.id, resolveVaultShape])
+  // Read only on the rail it describes: a shape resolved for a vault the member has since switched
+  // away from must never describe a different account's proposal.
+  const vaultShape = onVaultRail ? resolvedVaultShape : null
+
   const validateStep = useCallback((step) => {
     const next = {}
     if (step === 0) {
@@ -485,19 +565,22 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
          * the approve — leaving no orphaned allowance.
          */
         const proposePurchase = async () => {
-          const readProvider = getReadProvider(purchaseChainId)
-          const { calls } = await buildMembershipPurchaseCalls(
-            readProvider, actingAddress, ROLE_KEY, tierValue, effectiveAction, acceptedTermsHash,
+          // The SAME resolution the confirm screen read, so what is created is what was disclosed.
+          const { shape, legs } = await resolveVaultShape(acceptedTermsHash)
+          if (shape !== 'split') return { ...(await submitAsActive({ batch: legs })), shape }
+
+          /*
+           * Issue #1368 — the guard denies delegatecall (or could not be read), so the MultiSend
+           * would be approved and then revert. Two proposals instead, at CONSECUTIVE nonces:
+           * the purchase sits at N+1 and therefore cannot execute before the approve at N, and no
+           * other queued vault transaction can occupy the slot between them. The approve is for
+           * the EXACT price, so the window between executions authorises nothing beyond it.
+           */
+          const first = await submitAsActive(legs[0])
+          const second = await submitAsActive(
+            first?.nonce != null ? { ...legs[1], nonce: Number(first.nonce) + 1 } : legs[1],
           )
-          // FR-015: the approve leg is omitted when the VAULT's live allowance already covers the
-          // quoted price — read for the vault's address, never signer-implicit.
-          const needsApprove = await checkApprovalNeededForAddress(
-            actingAddress, ROLE_KEY, selectedPrice, tierValue, effectiveAction,
-            { provider: readProvider, chainId: purchaseChainId },
-          )
-          const legs = (needsApprove ? calls : calls.slice(1))
-            .map((c) => ({ to: c.target, value: c.value ?? 0n, data: c.data }))
-          return submitAsActive({ batch: legs })
+          return { ...second, shape: 'split', proposals: [first, second] }
         }
 
         await flow.start({
@@ -511,6 +594,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
           action: effectiveAction,
           termsHash: acceptedTermsHash,
           proposePurchase,
+          // #1368 — the propose step must describe the shape it is actually creating.
+          proposalShape: vaultShape?.shape ?? null,
         })
         return
       }
@@ -1089,6 +1174,31 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action }) {
                       Confirming creates a <strong>proposal</strong> in the vault&rsquo;s queue. The
                       membership activates when the vault&rsquo;s threshold approves and executes
                       it — not when you confirm here.
+                    </p>
+                  )}
+                  {/* Issue #1368 — WHICH SHAPE, and why. A vault whose policy guard denies
+                      delegatecall cannot execute a batched proposal at all, so the approval and
+                      the purchase are proposed separately. The member reads that here, before
+                      signing, rather than discovering it when the batch reverts. */}
+                  {purchaseRail.rail === 'vault' && vaultShape?.shape === 'split' && (
+                    <p>
+                      This will be <strong>two separate proposals</strong> — the USDC approval, then
+                      the purchase — because{' '}
+                      {vaultShape.batchSupport === 'batch-denied'
+                        ? "this vault's policy does not allow batched transactions"
+                        : "we could not confirm this vault's policy allows a batched transaction"}
+                      . They are queued <strong>in order</strong>, so the purchase cannot execute
+                      before the approval. The approval is for the <strong>exact</strong> price
+                      ({selectedPrice} USDC) and nothing more; if the purchase is never executed,
+                      that approval stays in place until the vault cancels or revokes it.
+                    </p>
+                  )}
+                  {purchaseRail.rail === 'vault' && vaultShape?.shape && vaultShape.shape !== 'split' && (
+                    <p>
+                      This will be <strong>one proposal</strong>
+                      {vaultShape.shape === 'batch'
+                        ? ' carrying the USDC approval and the purchase together.'
+                        : " — the vault's USDC approval already covers this price, so only the purchase is proposed."}
                     </p>
                   )}
                 </div>
