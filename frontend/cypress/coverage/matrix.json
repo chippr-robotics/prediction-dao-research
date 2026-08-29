@@ -1528,6 +1528,36 @@
           "tests": [
             "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::TR-01"
           ]
+        },
+        {
+          "id": "pay.group-recipient-list",
+          "name": "Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee)",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-01",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-02",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-03",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-04",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-05",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-06",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-07",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-08",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-09"
+          ]
+        },
+        {
+          "id": "pay.group-settlement",
+          "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), or sequential sends with per-recipient outcomes",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1366"
         }
       ]
     },
