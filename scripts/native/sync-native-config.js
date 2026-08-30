@@ -64,6 +64,18 @@ function loadNativeIdentity(tenantId) {
   return native;
 }
 
+/** The tenant's primary web domain — the RP id and link host (specs 102 R3/R5). */
+function loadTenantDomain(tenantId) {
+  const manifestPath = path.join(REPO_ROOT, "tenants", tenantId, "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const domain = manifest?.identity?.domains?.[0];
+  if (!domain) {
+    console.error(`✖ Tenant "${tenantId}" declares no identity.domains — nothing to associate the apps with.`);
+    process.exit(1);
+  }
+  return domain;
+}
+
 function resolveVersion(explicit) {
   const raw = explicit ?? execFileSync(
     process.execPath,
@@ -96,12 +108,25 @@ function replaceAll(content, replacements, fileLabel, problems) {
   return updated;
 }
 
-function buildFileEdits({ native, version }) {
+function buildFileEdits({ native, version, domain }) {
   const iosId = native.ios.appId;
   const androidId = native.android.appId;
   const name = native.displayName;
 
   return [
+    {
+      file: path.join(FRONTEND, "ios", "App", "App", "App.entitlements"),
+      replacements: [
+        { field: "applinks domain", pattern: /<string>applinks:[^<]*<\/string>/, replacement: `<string>applinks:${domain}</string>` },
+        { field: "webcredentials domain", pattern: /<string>webcredentials:[^<]*<\/string>/, replacement: `<string>webcredentials:${domain}</string>` },
+      ],
+    },
+    {
+      file: path.join(FRONTEND, "android", "app", "src", "main", "AndroidManifest.xml"),
+      replacements: [
+        { field: "app-link host", pattern: /android:scheme="https" android:host="[^"]*"/, replacement: `android:scheme="https" android:host="${domain}"` },
+      ],
+    },
     {
       file: path.join(FRONTEND, "capacitor.config.ts"),
       replacements: [
@@ -151,11 +176,12 @@ function buildFileEdits({ native, version }) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const native = loadNativeIdentity(args.tenant);
+  const domain = loadTenantDomain(args.tenant);
   const version = resolveVersion(args.version);
   const problems = [];
   const drifted = [];
 
-  for (const { file, replacements } of buildFileEdits({ native, version })) {
+  for (const { file, replacements } of buildFileEdits({ native, version, domain })) {
     const label = path.relative(REPO_ROOT, file);
     if (!fs.existsSync(file)) {
       problems.push(`${label}: missing — run \`npx cap add\` for the platform first`);
@@ -194,4 +220,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { resolveVersion, buildFileEdits, loadNativeIdentity };
+module.exports = { resolveVersion, buildFileEdits, loadNativeIdentity, loadTenantDomain };

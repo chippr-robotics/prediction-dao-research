@@ -46,6 +46,7 @@ import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 import AppLockOverlay from './components/applock/AppLockOverlay'
 import StaleBuildNotice from './components/native/StaleBuildNotice'
+import NativeDeepLinks from './components/native/NativeDeepLinks'
 import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
 import PwaUpdateNotification from './components/pwa/PwaUpdateNotification'
 
@@ -223,6 +224,10 @@ function AppContent() {
           whenever no floor is knowable — it never manufactures a banner from
           a network failure. */}
       <StaleBuildNotice />
+
+      {/* Spec 102 US5: universal/app links land on the linked surface. Inert
+          on web; renders nothing everywhere. */}
+      <NativeDeepLinks />
     </>
   )
 }

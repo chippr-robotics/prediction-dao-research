@@ -113,8 +113,8 @@ code under `frontend/src/lib/native/`; sync/gate scripts under
 
 **Independent test**: quickstart.md device validation 3.
 
-- [ ] T027 [US5] Implement `frontend/src/lib/native/deepLinks.js` per contract §5 (`appUrlOpen` → SPA route via existing navigation; tenant-origin URLs only; unroutable → home claiming nothing; pending-link held through the sign-in/lock gate, consumed exactly once, dropped only on sign-out) + Vitest `frontend/src/test/native/deepLinks.test.js` including the locked-arrival case.
-- [ ] T028 [P] [US5] Register the associated domains in both shells (iOS entitlements `applinks:`, Android intent filters with `autoVerify`) from the tenant manifest via `sync-native-config.js`, and extend the T018 association-file generator with the `applinks` entries.
+- [X] T027 [US5] Implement `frontend/src/lib/native/deepLinks.js` per contract §5 (`appUrlOpen` → SPA route via existing navigation; tenant-origin URLs only; unroutable → home claiming nothing; pending-link held through the sign-in/lock gate, consumed exactly once, dropped only on sign-out) + Vitest `frontend/src/test/native/deepLinks.test.js` including the locked-arrival case.
+- [X] T028 [P] [US5] Register the associated domains in both shells (iOS entitlements `applinks:`, Android intent filters with `autoVerify`) from the tenant manifest via `sync-native-config.js`, and extend the T018 association-file generator with the `applinks` entries.
 
 **Checkpoint**: Share link → in-app surface with the gate honored; web fallback untouched.
 
