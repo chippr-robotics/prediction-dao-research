@@ -28,6 +28,7 @@
  * from the plugin carry their own names; link drops surface with
  * gatt/bluetooth wording).
  */
+import { Buffer } from 'buffer'
 import Transport from '@ledgerhq/hw-transport'
 
 export const LEDGER_BLE_SERVICE = '13d63400-2c97-0004-0000-4c6564676572'
