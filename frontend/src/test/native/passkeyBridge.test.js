@@ -21,7 +21,6 @@ import {
   nativeCredentialManager,
   encodeExtensionBinaries,
   decodePrfResults,
-  credentialFromJson,
 } from '../../lib/native/nativeCredentials'
 import { createCredential, getAssertion, detectCapability, AuthenticatorUnavailable } from '../../lib/passkey/credentials'
 import { __resetRuntimeForTests } from '../../lib/native/runtime'
