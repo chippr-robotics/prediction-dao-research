@@ -4,7 +4,12 @@
  * gas reserve, and per-asset outcome behavior (including partial failure).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { quoteAllAssets, sweepAllAssets, supportedAssetsForChain } from '../../lib/recovery/legacyKeys'
+import {
+  quoteAllAssets,
+  sweepAllAssets,
+  supportedAssetsForChain,
+  describeTransferFailure,
+} from '../../lib/recovery/legacyKeys'
 
 const USDC = ('0x' + 'a'.repeat(40)).toLowerCase()
 const DAI = ('0x' + 'b'.repeat(40)).toLowerCase()
@@ -30,7 +35,11 @@ vi.mock('ethers', async () => {
     constructor() { this.address = ADDR }
     connect(provider) { this.provider = provider; return this }
     async sendTransaction(tx) {
-      if (this.provider?._failNative) throw new Error('native reverted')
+      // `_failNative` may be a bare flag or the actual error object a node/library would raise,
+      // so a test can drive how the failure is REPORTED and not only that it happened.
+      if (this.provider?._failNative) {
+        throw this.provider._failNative === true ? new Error('native reverted') : this.provider._failNative
+      }
       this.provider?._nonces?.push({ asset: 'native', nonce: tx?.nonce })
       this.provider?._sent?.push({
         address: 'native',
@@ -52,11 +61,25 @@ vi.mock('ethers', async () => {
       this.balanceOf = async () => provider?._balances?.[address.toLowerCase()] ?? 0n
       this.transfer = async (to, value, overrides) => {
         if (provider?._failToken === address.toLowerCase()) throw new Error('ERC20 transfer reverted')
-        provider?._sent?.push({ address: address.toLowerCase(), to, value })
+        provider?._sent?.push({
+          address: address.toLowerCase(),
+          to,
+          value,
+          // The fee the sweep asked for, or undefined where it left the choice to the library.
+          maxFeePerGas: overrides?.maxFeePerGas,
+          maxPriorityFeePerGas: overrides?.maxPriorityFeePerGas,
+          gasPrice: overrides?.gasPrice,
+        })
         provider?._nonces?.push({ asset: address.toLowerCase(), nonce: overrides?.nonce })
         // A real ERC-20 transfer pays for itself out of the sender's coin balance.
-        if (provider?._gasPerTransfer) provider._balances.native -= provider._gasPerTransfer
-        return { hash: `0xtx_${address.slice(2, 8)}`, wait: async () => ({ status: 1 }) }
+        const fee = provider?._gasPerTransfer ?? 0n
+        if (fee) provider._balances.native -= fee
+        return {
+          hash: `0xtx_${address.slice(2, 8)}`,
+          // A real receipt states what the transfer actually cost; the sweep reads it to keep its
+          // own running figure for the coin, independent of the (cacheable) balance read.
+          wait: async () => (fee ? { status: 1, fee } : { status: 1 }),
+        }
       }
     }
   }
@@ -149,7 +172,21 @@ describe('sweepAllAssets', () => {
     const provider = makeProvider({ native: 1000n })
     const outcomes = await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
     expect(outcomes).toEqual([
-      { asset: expect.objectContaining({ symbol: 'ETH' }), status: 'skipped', error: expect.any(String) },
+      {
+        asset: expect.objectContaining({ symbol: 'ETH' }),
+        status: 'skipped',
+        error: expect.any(String),
+        // Why it could not: the price used, what was reserved, and what was there (issues
+        // #1301/#1327). Without these a CI-only failure says an asset did not move, not by how
+        // much it missed.
+        detail: {
+          gasPrice: String(GAS),
+          gasLimit: String((21000n * 12n) / 10n),
+          reserve: String(((21000n * 12n) / 10n) * GAS),
+          balance: '1000',
+          coinBalance: '1000',
+        },
+      },
     ])
   })
 
@@ -316,5 +353,230 @@ describe('sweepAllAssets — the native reserve tracks a rising fee', () => {
     const nativeSend = provider._sent.find((s) => s.address === 'native')
     const quotedReserve = ((21000n * 12n) / 10n) * GAS
     expect(nativeSend.value, 'the quoted reserve still stands').toBe(balance - quotedReserve)
+  })
+})
+
+/*
+ * The marginal draw the full-tier spec kept hitting (issues #1301 / #1327).
+ *
+ * `28-legacy-recovery-sweep.cy.js::LKR-S2` failed intermittently with the coin reported as
+ *   `MATIC failed — could not coalesce error`
+ * while the token behind it moved. Two facts produce that exactly:
+ *
+ *  1. ethers shares an identical `getBalance` for 250ms (`AbstractProvider` `cacheTimeout`), and a
+ *     failover RPC pool (spec 069) can answer from a node that has not yet seen the token transfer.
+ *     On a fast local chain the ERC-20 leg mines well inside that window, so the coin leg's
+ *     "fresh" re-read comes back as the balance BEFORE that leg paid its gas. `value + gas` is then
+ *     larger than the account really holds and the node refuses the transaction.
+ *  2. Hardhat's refusal reads "Sender doesn't have enough funds to send tx…", which matches none
+ *     of the shapes ethers knows, so it is wrapped as `could not coalesce error` — a placeholder
+ *     that names no cause. That is what reached the member.
+ *
+ * The fix has both halves: the coin leg is sized from the SMALLER of the live read and the sweep's
+ * own receipt-tracked figure, and no failure is ever reported in the library's placeholder words.
+ */
+describe('sweepAllAssets — a stale balance read never over-sizes the coin leg', () => {
+  const GAS_PER_TRANSFER = 30_000_000_000_000n
+
+  /** A provider whose balance read is frozen at the quote — exactly what the 250ms cache serves. */
+  const staleReadProvider = (balances, extra = {}) => {
+    const atQuote = balances.native
+    return makeProvider(balances, {
+      _gasPerTransfer: GAS_PER_TRANSFER,
+      getBalance: async () => atQuote,
+      ...extra,
+    })
+  }
+
+  it('sizes the coin from the receipts when the balance read is stale', async () => {
+    const start = 10n ** 17n
+    const balances = { native: start, [USDC]: 5_000_000n }
+    const provider = staleReadProvider(balances)
+
+    const outcomes = await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+    expect(outcomes.map((o) => `${o.asset.symbol}:${o.status}`)).toEqual(['USDC:sent', 'ETH:sent'])
+
+    const nativeLeg = provider._sent.find((t) => t.address === 'native')
+    const reserve = ((21000n * 12n) / 10n) * GAS
+    // The read still says `start`; the receipt says a transfer's gas has gone. The smaller governs.
+    expect(nativeLeg.value, 'sized from the receipt, not from the stale read')
+      .toBe(start - GAS_PER_TRANSFER - reserve)
+    expect(
+      nativeLeg.value + reserve,
+      'what is sent plus what its own fee can cost still fits what the account HOLDS',
+    ).toBeLessThanOrEqual(balances.native)
+  })
+
+  it('stays affordable when the price jumps between the quote and the send', async () => {
+    // Both failures at once: the read is stale AND the fee rose after the quote — the draw the
+    // reserve was still marginal under.
+    const LATER = GAS * 3n
+    const start = 10n ** 17n
+    const balances = { native: start, [USDC]: 5_000_000n }
+    let feeCalls = 0
+    const provider = staleReadProvider(balances, {
+      getFeeData: async () => {
+        feeCalls += 1
+        return feeCalls === 1 ? { maxFeePerGas: GAS, gasPrice: GAS } : { maxFeePerGas: LATER, gasPrice: LATER }
+      },
+    })
+
+    const outcomes = await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+    expect(outcomes.map((o) => o.status)).toEqual(['sent', 'sent'])
+
+    const nativeLeg = provider._sent.find((t) => t.address === 'native')
+    const nativeGasLimit = (21000n * 12n) / 10n
+    expect(nativeLeg.maxFeePerGas, 'the coin carries the risen price its reserve was sized from').toBe(LATER)
+    expect(
+      nativeLeg.value + nativeGasLimit * nativeLeg.maxFeePerGas,
+      'the node funding check holds against the balance that is really there',
+    ).toBeLessThanOrEqual(balances.native)
+  })
+
+  it('degrades to a skipped coin with an honest reason when the draw leaves nothing', async () => {
+    // A token leg that eats almost the whole coin balance: there is genuinely nothing left to move
+    // after the fee, and that must read as "skipped, not enough for the fee" — never as a node
+    // refusal the member cannot interpret.
+    const reserve = ((21000n * 12n) / 10n) * GAS
+    const start = reserve + 10n
+    const provider = staleReadProvider({ native: start, [USDC]: 5_000_000n }, { _gasPerTransfer: 100n })
+
+    const outcomes = await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+    const coin = outcomes.find((o) => o.asset.symbol === 'ETH')
+    expect(coin.status).toBe('skipped')
+    expect(coin.error).toMatch(/network fee/i)
+    // Nothing was signed for it — a refusal that never reaches the chain costs nothing.
+    expect(provider._sent.some((s) => s.address === 'native')).toBe(false)
+    // And it says by how much: price, reserve, and what was actually left.
+    expect(coin.detail).toEqual({
+      gasPrice: String(GAS),
+      gasLimit: String((21000n * 12n) / 10n),
+      reserve: String(reserve),
+      balance: String(start - 100n),
+      coinBalance: String(start - 100n),
+    })
+  })
+})
+
+/*
+ * The ERC-20 legs get the same treatment as the coin leg (issue #1301).
+ *
+ * Left to the library, every token transfer reads the fee again at populate time — so the coin
+ * those legs burn is decided by a price the sweep never saw, taken out of the very balance the
+ * coin leg's reserve is computed from. Pinning makes what a leg can cost knowable BEFORE it is
+ * sent, which is what lets the reserve behind it be sized from a schedule nothing has invalidated.
+ */
+describe('sweepAllAssets — the ERC-20 legs are pinned to the same fee schedule', () => {
+  it('states the fee on a token transfer instead of leaving it to be read again', async () => {
+    const provider = makeProvider({ native: 10n ** 17n, [USDC]: 5_000_000n })
+    await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const tokenLeg = provider._sent.find((t) => t.address === USDC)
+    expect(tokenLeg.maxFeePerGas, 'the token leg carries the fee, not a promise to look it up').toBe(GAS)
+    expect(tokenLeg.maxPriorityFeePerGas).toBe(0n)
+    expect(tokenLeg.gasPrice, 'no legacy field on a 1559-priced chain').toBeUndefined()
+  })
+
+  it('pins gasPrice on a chain that prices in gasPrice, and no 1559 fields', async () => {
+    const provider = makeProvider({ native: 10n ** 17n, [USDC]: 5_000_000n }, {
+      getFeeData: async () => ({ maxFeePerGas: null, gasPrice: GAS }),
+    })
+    await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const tokenLeg = provider._sent.find((t) => t.address === USDC)
+    expect(tokenLeg.gasPrice).toBe(GAS)
+    expect(tokenLeg.maxFeePerGas).toBeUndefined()
+  })
+
+  it('never pins a token leg BELOW a risen base fee — the schedule only goes up', async () => {
+    // A pinned price that the chain has already outgrown is its own stranding: the transfer sits
+    // unmineable and `wait()` never returns. The schedule is monotone for exactly that reason.
+    const LATER = GAS * 4n
+    let feeCalls = 0
+    const provider = makeProvider({ native: 10n ** 18n, [USDC]: 5_000_000n }, {
+      getFeeData: async () => {
+        feeCalls += 1
+        return feeCalls === 1 ? { maxFeePerGas: GAS, gasPrice: GAS } : { maxFeePerGas: LATER, gasPrice: LATER }
+      },
+    })
+    await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const tokenLeg = provider._sent.find((t) => t.address === USDC)
+    expect(tokenLeg.maxFeePerGas, 'the token leg pays the fee that is current when it goes out').toBe(LATER)
+  })
+
+  it('reports a token failure with the price, the reserve and the balances it saw', async () => {
+    const provider = makeProvider({ native: 10n ** 17n, [USDC]: 5_000_000n }, { _failToken: USDC })
+    const outcomes = await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+
+    const token = outcomes.find((o) => o.asset.symbol === 'USDC')
+    expect(token.status).toBe('failed')
+    expect(token.detail).toEqual({
+      gasPrice: String(GAS),
+      reserve: String(((21000n * 12n) / 10n) * GAS),
+      balance: '5000000',
+      coinBalance: String(10n ** 17n),
+    })
+    // `toEqual` above is the guard that a diagnostic carries fees and balances and NOTHING else:
+    // a key, an address or a mnemonic appearing here would fail it outright.
+  })
+})
+
+/*
+ * `could not coalesce error` must never be what a member (or a CI log) is left with.
+ *
+ * ethers raises it whenever a JSON-RPC failure matches none of the shapes it knows — which
+ * includes Hardhat's insufficient-funds wording, because that wording does not contain the string
+ * "insufficient funds". The underlying error is still attached, and reaching for it is the
+ * difference between naming the cause and naming nothing.
+ */
+describe('describeTransferFailure', () => {
+  const coalesced = (nodeMessage) => {
+    const e = new Error('could not coalesce error')
+    e.shortMessage = 'could not coalesce error'
+    e.code = 'UNKNOWN_ERROR'
+    if (nodeMessage) e.error = { code: -32000, message: nodeMessage }
+    return e
+  }
+
+  it('names the fee when the node refused for want of funds, in words ethers does not know', () => {
+    expect(
+      describeTransferFailure(coalesced(
+        "Sender doesn't have enough funds to send tx. The max upfront cost is: 1000 and the sender's account only has: 999",
+      )),
+    ).toMatch(/network fee/i)
+  })
+
+  it('falls back to the node’s own words rather than the placeholder', () => {
+    expect(describeTransferFailure(coalesced('replacement transaction rejected by the pool')))
+      .toBe('replacement transaction rejected by the pool')
+  })
+
+  it('never returns the placeholder, even with nothing underneath it', () => {
+    const text = describeTransferFailure(coalesced(null))
+    expect(text).not.toMatch(/coalesce/i)
+    expect(text).toMatch(/refused/i)
+  })
+
+  it('passes a contract revert reason through unchanged', () => {
+    const e = new Error('execution reverted')
+    e.reason = 'ERC20: transfer amount exceeds balance'
+    expect(describeTransferFailure(e)).toBe('ERC20: transfer amount exceeds balance')
+  })
+
+  it('is what the coin leg reports when the node refuses it', async () => {
+    const provider = makeProvider({ native: 10n ** 17n }, {
+      _failNative: (() => {
+        const e = new Error('could not coalesce error')
+        e.shortMessage = 'could not coalesce error'
+        e.error = { message: "Sender doesn't have enough funds to send tx." }
+        return e
+      })(),
+    })
+    const outcomes = await sweepAllAssets({ kind: 'privateKey', secret: PK, to: TO, chainId: 1, provider })
+    expect(outcomes[0].status).toBe('failed')
+    expect(outcomes[0].error).not.toMatch(/coalesce/i)
+    expect(outcomes[0].error).toMatch(/network fee/i)
+    expect(outcomes[0].detail.gasPrice).toBe(String(GAS))
   })
 })
