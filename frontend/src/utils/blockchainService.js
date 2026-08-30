@@ -381,7 +381,7 @@ function processMarketResult(marketId, marketResult, acceptanceStatus, acceptanc
     minAcceptanceThreshold: Number(marketResult.minThreshold) || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
     stakeAmount: stakeAmountFormatted,
     stakeTokenAddress: stakeToken,
-    stakeTokenSymbol: isStable ? 'USDC' : 'MATIC',
+    stakeTokenSymbol: isStable ? 'USDC' : 'POL',
     acceptances,
     acceptedCount: Number(acceptanceStatus.accepted),
     endDate: endDateStr,
@@ -420,9 +420,9 @@ export function toWagerShape(id, w, chainId) {
   const isWrapped = !!tl && tl === wmatic
   const decimals = isUSDC ? 6 : 18
   // USDC → "USDC"; the wrapped-native stake token's symbol differs by chain (WETC on ETC/Mordor 61/63,
-  // else WMATIC); anything else falls back to "tokens".
+  // else WPOL); anything else falls back to "tokens".
   const isEtcChain = chainId != null && (Number(chainId) === 63 || Number(chainId) === 61)
-  const stakeTokenSymbol = isUSDC ? 'USDC' : (isWrapped ? (isEtcChain ? 'WETC' : 'WMATIC') : 'tokens')
+  const stakeTokenSymbol = isUSDC ? 'USDC' : (isWrapped ? (isEtcChain ? 'WETC' : 'WPOL') : 'tokens')
 
   const metadataUri = w.metadataUri || ''
   const ipfsRef = parseEncryptedIpfsReference(metadataUri)
@@ -1699,6 +1699,75 @@ export async function checkApprovalNeeded(signer, roleName, priceUSD, tier = Mem
     return BigInt(allowance.toString()) < BigInt(amountWei.toString())
   } catch (e) {
     console.warn('[checkApprovalNeeded] pre-flight failed, assuming approval needed:', e?.message)
+    return true
+  }
+}
+
+/**
+ * Spec 098 (FR-002/FR-015) — the ADDRESS-based twin of {@link checkApprovalNeeded}.
+ *
+ * A purchase made while operating as another account is credited to — and paid by — the ACTING
+ * account, so its allowance is what decides whether an approve step exists. `checkApprovalNeeded`
+ * cannot answer that: it derives the owner from `signer.getAddress()`, which is the CONNECTED
+ * wallet, and would happily report "no approval needed" because the operator happens to have an
+ * allowance the acting account does not. Taking the address explicitly makes that mistake
+ * unrepresentable.
+ *
+ * Read-only, no signer, no wallet prompt. Conservative on every failure (returns `true`), for the
+ * same reason as its sibling: hiding a prompt that does appear is worse than showing one that
+ * doesn't.
+ *
+ * @param {string} address - the account whose allowance is read (the future member)
+ * @param {string} roleName
+ * @param {number} priceUSD - display price; only used by the legacy PaymentProcessor fallback
+ * @param {number} [tier=1]
+ * @param {string} [action='purchase'] - 'purchase' | 'upgrade' | 'extend'
+ * @param {{provider?: ethers.Provider, chainId?: number}} [opts] - read provider (defaults to the
+ *   membership reference chain's, spec 071 — purchases settle nowhere else)
+ * @returns {Promise<boolean>} true if an approval transaction will be required
+ */
+export async function checkApprovalNeededForAddress(
+  address, roleName, priceUSD, tier = MembershipTier.BRONZE, action = 'purchase', opts = {},
+) {
+  if (!address) return true
+  try {
+    const chainId = opts.chainId ?? membershipChainId()
+    const provider = opts.provider || getProvider(chainId)
+    if (!provider) return true
+
+    let readChainId = chainId
+    try {
+      readChainId = Number((await provider.getNetwork()).chainId)
+    } catch { /* provider without a network; keep the requested chain */ }
+
+    const mmAddress = getContractAddressForChain('membershipManager', readChainId)
+    if (!mmAddress) return true
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) return true
+    const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
+
+    const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, provider)
+    const paymentTokenAddr = await mm.paymentToken()
+    if (!paymentTokenAddr || paymentTokenAddr === ethers.ZeroAddress) return true
+    const paymentToken = new ethers.Contract(paymentTokenAddr, ERC20_ABI, provider)
+
+    // The exact amount the contract will pull — an upgrade charges only the delta, so quoting the
+    // full tier price here would show an approve step the purchase never needs.
+    let price
+    if (action === 'upgrade') {
+      const membership = await mm.getMembership(address, roleHash)
+      const currentCfg = await mm.getTierConfig(roleHash, membership.tier)
+      const newCfg = await mm.getTierConfig(roleHash, validTier)
+      price = newCfg.priceUSDC - currentCfg.priceUSDC
+    } else {
+      const tierCfg = await mm.getTierConfig(roleHash, validTier)
+      price = tierCfg.priceUSDC
+    }
+
+    const allowance = await paymentToken.allowance(address, mmAddress)
+    return BigInt(allowance) < BigInt(price)
+  } catch (e) {
+    console.warn('[checkApprovalNeededForAddress] pre-flight failed, assuming approval needed:', e?.message)
     return true
   }
 }

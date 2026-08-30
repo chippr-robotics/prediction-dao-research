@@ -147,6 +147,16 @@ export const NAV_DESTINATIONS = [
     keywords: ['uniswap', 'etcswap', 'dex', 'swap', 'exchange', 'convert', 'slippage', 'quote', 'router'],
   },
   {
+    // Wrap moved here from Transfer (release 1.14.0) — the id doubles as the tabpanel's
+    // `data-attention` marker, so it moved with the surface (`transfer-wrap` → `trade-wrap`).
+    id: 'trade-wrap',
+    navId: 'trade',
+    label: 'Wrap',
+    summary: 'Wrap the network coin into its ERC-20 form, or unwrap it back.',
+    path: '/wallet?tab=trade&view=wrap',
+    keywords: ['wrap', 'unwrap', 'wrapped', 'weth', 'wmatic', 'wpol', 'wetc', 'deposit', 'withdraw', 'erc-20', 'erc20', 'native'],
+  },
+  {
     id: 'trade-perps',
     navId: 'trade',
     label: 'Perps',
@@ -163,14 +173,6 @@ export const NAV_DESTINATIONS = [
     summary: 'Send tokens to any address on the same network.',
     path: '/wallet?tab=paytransfer&view=transfer',
     keywords: ['send', 'pay', 'usdc', 'stablecoin', 'gasless', 'recipient', 'bitcoin', 'btc'],
-  },
-  {
-    id: 'transfer-wrap',
-    navId: 'paytransfer',
-    label: 'Wrap',
-    summary: 'Wrap the network coin into its ERC-20 form, or unwrap it back.',
-    path: '/wallet?tab=paytransfer&view=wrap',
-    keywords: ['wrap', 'unwrap', 'wrapped', 'weth', 'wmatic', 'wpol', 'wetc', 'deposit', 'withdraw', 'erc-20', 'erc20', 'native'],
   },
   {
     id: 'transfer-bridge',
@@ -384,6 +386,18 @@ export const NAV_DESTINATIONS = [
     path: '/wallet?tab=settings',
     hash: '#api-access',
     keywords: ['api', 'key', 'api key', 'token', 'mcp', 'agent', 'programmatic', 'developer', 'openapi', 'integration'],
+  },
+  // Spec 041 amendment. Members look for this by what it does ("lock", "screen lock", "idle
+  // timeout"), not by its card name — and "auto lock" is what every other app calls it.
+  {
+    id: 'app-lock',
+    navId: 'settings',
+    section: true,
+    label: 'App lock',
+    summary: 'Cover the screen when idle; your passkey unlocks it.',
+    path: '/wallet?tab=settings',
+    hash: '#app-lock',
+    keywords: ['app lock', 'lock', 'auto lock', 'screen lock', 'idle', 'timeout', 'unlock', 'biometric'],
   },
   {
     id: 'markets',

@@ -1,7 +1,7 @@
 /**
  * Verifiable on-chain USD prices for portfolio assets (spec 044 v1.2, FR-022).
  *
- * Resolution ladder per underlying symbol (ETH, BTC, MATIC, ETC, LINK, …):
+ * Resolution ladder per underlying symbol (ETH, BTC, POL, ETC, LINK, …):
  *   1. Chainlink AggregatorV3 feed (config/priceFeeds.js) — rejected when the
  *      answer is non-positive or older than FEED_MAX_AGE_SECONDS.
  *   2. DEX pool spot: the asset's representative ERC-20 vs the network's

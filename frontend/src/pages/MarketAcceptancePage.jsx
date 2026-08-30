@@ -20,7 +20,7 @@ function tokenInfo(addr) {
   const usdc = (DEPLOYED_CONTRACTS.paymentToken || '').toLowerCase()
   const wmatic = (DEPLOYED_CONTRACTS.wmatic || '').toLowerCase()
   if (a === usdc) return { decimals: 6, symbol: 'USDC' }
-  if (a === wmatic) return { decimals: 18, symbol: 'WMATIC' }
+  if (a === wmatic) return { decimals: 18, symbol: 'WPOL' }
   return { decimals: 18, symbol: 'tokens' }
 }
 

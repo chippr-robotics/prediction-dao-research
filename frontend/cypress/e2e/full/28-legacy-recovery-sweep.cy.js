@@ -45,9 +45,9 @@ const PASSPHRASE = 'correct-horse-battery'
  */
 const APP_WRAPPED_NATIVE = '0x007e106a5664D48e02f571b58694B74c9D5c22a1'
 const APP_STABLECOIN = '0xbc4D54AE49ED9C6075770CD6acA930A728dcf526'
-const WRAPPED_SYMBOL = 'WMATIC'
+const WRAPPED_SYMBOL = 'WPOL'
 const STABLE_SYMBOL = 'USDC'
-const NATIVE_SYMBOL = 'MATIC'
+const NATIVE_SYMBOL = 'POL'
 // Registry order: the wrapped coin, then the stablecoin, then the coin itself (native last —
 // it pays for every transfer, so it can only go last).
 const ASSET_ORDER = [WRAPPED_SYMBOL, STABLE_SYMBOL, NATIVE_SYMBOL]

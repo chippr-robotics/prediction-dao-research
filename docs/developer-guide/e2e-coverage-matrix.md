@@ -28,10 +28,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 99 |
 | With a member-facing flow | 80 |
-| Member-facing flows | 142 |
-| 🟢 covered | 132 |
+| Member-facing flows | 150 |
+| 🟢 covered | 138 |
 | 🟡 partial | 1 |
-| 🔴 absent | 3 |
+| 🔴 absent | 5 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-54 flows — 🟢 46 · 🟡 0 · 🔴 2 · ⚪ 6 · covered-but-not-proven 0
+55 flows — 🟢 46 · 🟡 0 · 🔴 3 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -82,6 +82,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `membership.redeem-voucher` | Redeem a voucher for membership without paying | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-01) |  |
 | `membership.buy-voucher` | Buy a voucher at the tier price, paid in USDC | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-02) |  |
+| `membership.send-voucher-from-portfolio` | Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
 ### `028-token-mint` — Token Mint mini-app
 
@@ -329,7 +330,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-44 flows — 🟢 42 · 🟡 1 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
+45 flows — 🟢 42 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -421,6 +422,12 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `predict.hidden-off-polygon` | See the Predict tab hidden on a chain Polymarket does not serve | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-03) |  |
 
+### `061-bitcoin-transactions` — Bitcoin
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `bitcoin.network-card-activates` | Open the Bitcoin wallet surface from its network card without touching the EVM chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
+
 ### `066-staking-admin-controls` — Staking admin controls
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
@@ -482,7 +489,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-32 flows — 🟢 32 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
+38 flows — 🟢 38 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -652,6 +659,8 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `perps.browse-venues` | Compare perpetuals pairs across venues | 🟢 covered | flow | `no-chain` | `24-perps.cy.js` (PERPS-01, PERPS-02, PERPS-03, PERPS-04, PERPS-05) |  |
 | `perps.degraded-venue-named` | A degraded venue is named and its pairs omitted, never shown as zeros | 🟢 covered | flow | `no-chain` | `24-perps.cy.js` (PERPS-01, PERPS-06) |  |
+| `trade.wrap-view` | Wrap is a Trade view beside Swap and Perps, with Swap still the default | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (TRADE-WRAP-01, TRADE-WRAP-02) |  |
+| `trade.wrap-legacy-redirect` | The old Transfer wrap URL redirects into the Trade wrap view | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (TRADE-WRAP-03, TRADE-WRAP-04) |  |
 
 ### `083-perps-position-management` — Perps positions
 
@@ -664,6 +673,10 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `account.cards` | See your accounts as cards and switch between them | 🟢 covered | smoke | `no-chain` | `26-trade-account.cy.js` |  |
+| `account.add-chooser` | Open the "+" chooser and see the three ways to add an account | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (ACC-ADD-01) |  |
+| `account.add-hardware` | "Add a hardware account" deep-links to Protect > Off chain with the card open | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (ACC-ADD-02) |  |
+| `account.add-vault` | "Add a vault" deep-links to Protect > On chain | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (ACC-ADD-03) |  |
+| `account.add-legacy-recovery` | "Recover a legacy account" deep-links to Recovery's legacy import | 🟢 covered | flow | `no-chain` | `40-account-add-wrap-move.cy.js` (ACC-ADD-04) |  |
 
 ### `092-multi-chain-activity` — Multi-chain activity
 

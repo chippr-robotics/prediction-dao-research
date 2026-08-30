@@ -17,7 +17,7 @@
  * That double answers a fixed rate. So SW-01 can claim — and does claim — that the app quoted,
  * showed the member a number, obtained the approval, encoded the swap, and that BOTH of the
  * member's balances then moved by exactly what the quote named. It claims nothing about Uniswap's
- * pricing or routing, which are not ours to regress. The rate is asymmetric on purpose (2 WMATIC
+ * pricing or routing, which are not ours to regress. The rate is asymmetric on purpose (2 WPOL
  * per USDC, 0.5 the other way) so a swap that silently ran backwards cannot pass.
  *
  * TR-01 and VC-01 use no doubles at all: the transfer is a real ERC-20 transfer and the redemption
@@ -206,7 +206,7 @@ describe('Transfers, swap and vouchers (specs 058 / 033 / 026)', () => {
            */
           pickToken('Token to sell', 'USDC')
           cy.get('#trade-amount').clear().type('10')
-          pickToken('Token to buy', 'WMATIC')
+          pickToken('Token to buy', 'WPOL')
 
           // A quote must actually arrive — the summary only renders when one does.
           cy.get('.trade-summary', { timeout: 40000 }).should('be.visible')

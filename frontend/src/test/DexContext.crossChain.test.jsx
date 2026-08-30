@@ -86,7 +86,7 @@ describe('DexContext — cross-chain quoting (the read half of multi-network tra
 
     const args = mockQuoteBestRoute.mock.calls.at(-1)[0]
     expect(args.chainId).toBe(137)
-    expect(args.symbolIn).toBe('WMATIC')
+    expect(args.symbolIn).toBe('WPOL')
     expect(args.symbolOut).toBe('USDC')
   })
 

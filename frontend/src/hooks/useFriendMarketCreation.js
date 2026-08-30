@@ -103,7 +103,7 @@ export const clearPendingTransaction = () => {
  * v2 friend market creation: drives WagerRegistry.createWager.
  *
  * Differences from v1:
- *  - ERC20-only stakes (USDC or WMATIC); native MATIC not supported.
+ *  - ERC20-only stakes (USDC or WPOL); native POL not supported.
  *  - No proposalId / no ConditionalMarketFactory dependency.
  *  - Resolution types: Either/Creator/Opponent/ThirdParty/Polymarket.
  *  - On-chain only stores a 32-byte metadataHash; the description/envelope
@@ -202,7 +202,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         ? requestedToken
         : resolve('paymentToken')
       if (!stakeTokenAddress || stakeTokenAddress === ethers.ZeroAddress) {
-        throw new Error('A stake token (USDC or WMATIC) is required. Native MATIC is not supported.')
+        throw new Error('A stake token (USDC or WPOL) is required. Native POL is not supported.')
       }
 
       // Spec 088 FR-001 — the creator is whoever is ACTING. Everything keyed off this address
@@ -712,7 +712,7 @@ export function translateRevert(reason) {
   if (reason.includes('SanctionedAddress')) return SCREENED_ADDRESS_MESSAGE
   if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
-  if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WMATIC.'
+  if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WPOL.'
   if (reason.includes('BadDeadlines')) return 'Invalid deadlines. Accept window must be within 30 days; resolve window within 180 days.'
   if (reason.includes('ZeroStake')) return 'Stakes must be greater than zero.'
   if (reason.includes('ConditionAlreadyResolved')) return 'That Polymarket condition is already resolved. Pick an unresolved one.'
