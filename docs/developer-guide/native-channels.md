@@ -49,7 +49,19 @@ cd frontend && npx cap sync android && npx cap run android   # or: ios
 Fixes made to let the production bundle boot in the Capacitor WebView are
 recorded here as they land, each with its reasoning.
 
-- (none yet)
+- **Pipeline proven, no code fixes needed so far**: `vite build` →
+  `node scripts/native/inject-native-csp.js` → `npx cap sync android` lands
+  the bundle (CSP meta included) in `android/app/src/main/assets/public/`,
+  with `@capacitor/app` detected as a plugin. Runtime boot on a device is
+  arbitrated by the CI smoke tier; anything it surfaces gets recorded here.
+- **Mini-apps need no change for the SW-less iOS WebView (research R6
+  confirmed)**: the package cache lives entirely inside `public/sw.js` as
+  fetch interception — `lib/miniapps/loader.js` just calls `fetch()` and
+  verifies keccak(manifest) + sha256 of every executed byte AFTER retrieval,
+  so with no service worker the loader's path is simply the network path,
+  same invariant. SW registration itself is guarded
+  (`serviceWorkerUpdate.js`: `if (!('serviceWorker' in navigator)) return`),
+  so a WebView without SW support boots clean.
 
 ## Release chain
 

@@ -23,6 +23,18 @@ vi.mock('../../lib/passkey/credentials', async (importOriginal) => {
   return { ...actual, getAssertion: (...args) => getAssertionMock(...args) }
 })
 
+// Spec 102: the overlay also subscribes the native lifecycle seam. The seam's
+// own event mapping (and its web inertness) is proven in
+// src/test/native/lifecycle.test.js; here we capture the callback the overlay
+// hands it and fire it to stand in for the OS backgrounding the app.
+const nativeHiddenRef = { fire: null }
+vi.mock('../../lib/native/lifecycle', () => ({
+  subscribeAppHidden: (onHidden) => {
+    nativeHiddenRef.fire = onHidden
+    return () => { nativeHiddenRef.fire = null }
+  },
+}))
+
 import AppLockOverlay from '../../components/applock/AppLockOverlay'
 import {
   APP_LOCK_STATE_KEY,
@@ -129,6 +141,18 @@ describe('engaging the lock (FR-025)', () => {
       hideDocument()
     })
     expect(overlay()).not.toBeNull()
+  })
+
+  it('locks immediately when the NATIVE lifecycle reports backgrounding (spec 102)', () => {
+    setAppLockEnabled(true)
+    render(<AppLockOverlay />)
+    expect(nativeHiddenRef.fire).toBeTypeOf('function')
+    act(() => {
+      nativeHiddenRef.fire()
+    })
+    expect(overlay()).not.toBeNull()
+    // Persisted like every other engage: a process restart relaunches locked.
+    expect(readLockState()).toBe(true)
   })
 
   it('locks immediately on pagehide, persisting the lock for the return visit', () => {
