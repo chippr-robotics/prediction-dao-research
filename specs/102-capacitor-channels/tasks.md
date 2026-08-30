@@ -25,10 +25,10 @@ code under `frontend/src/lib/native/`; sync/gate scripts under
 
 **Purpose**: Dependencies and generated shells, under the spec-075 lockfile rules.
 
-- [ ] T001 Add `@capacitor/core`, `@capacitor/cli`, `@capacitor/ios`, `@capacitor/android`, `@capacitor/app` (pinned EXACT) to `frontend/package.json` via `npm run deps:reinstall`; verify `npm run check:deps` passes and the rolldown platform binary survived (root `package-lock.json`).
-- [ ] T002 Run both byte gates on the dependency change (`node scripts/codegen/bytecode-digest.js --check`, `node scripts/miniapps/record-build-digests.js --compare`); if mini-app output bytes moved, STOP and treat per spec 075 (deliberate re-record + version bump), do not fold silently into this PR.
-- [ ] T003 Generate the native shells: `npx cap add ios && npx cap add android` from `frontend/` with a provisional `frontend/capacitor.config.ts` (default tenant appId placeholder, `webDir: 'dist'`); commit the generated `frontend/ios/` + `frontend/android/` trees.
-- [ ] T004 [P] Add `docs/developer-guide/native-channels.md` skeleton (channels, seams, build commands) — filled through the phases below.
+- [X] T001 Add `@capacitor/core`, `@capacitor/cli`, `@capacitor/ios`, `@capacitor/android`, `@capacitor/app` (pinned EXACT) to `frontend/package.json` via `npm run deps:reinstall`; verify `npm run check:deps` passes and the rolldown platform binary survived (root `package-lock.json`).
+- [X] T002 Run both byte gates on the dependency change (`node scripts/codegen/bytecode-digest.js --check`, `node scripts/miniapps/record-build-digests.js --compare`); if mini-app output bytes moved, STOP and treat per spec 075 (deliberate re-record + version bump), do not fold silently into this PR.
+- [X] T003 Generate the native shells: `npx cap add ios && npx cap add android` from `frontend/` with a provisional `frontend/capacitor.config.ts` (default tenant appId placeholder, `webDir: 'dist'`); commit the generated `frontend/ios/` + `frontend/android/` trees.
+- [X] T004 [P] Add `docs/developer-guide/native-channels.md` skeleton (channels, seams, build commands) — filled through the phases below.
 
 ---
 
@@ -36,11 +36,11 @@ code under `frontend/src/lib/native/`; sync/gate scripts under
 
 **Purpose**: The runtime seam, tenant identity, and version sync every story reads.
 
-- [ ] T005 Implement `frontend/src/lib/native/runtime.js` per `contracts/native-runtime-seams.md` §1 (`getRuntime()`, `nativeCapability(name)` three-state with member-renderable reasons; web answers wrap existing checks; memoized; no UA sniffing) + Vitest `frontend/src/test/native/runtime.test.js` covering web/native resolution and the never-fabricate-available rule.
-- [ ] T006 Extend the tenant manifest schema with the `native` block (data-model.md): update `tenants/fairwins/manifest.json` with real iOS/Android appIds + displayName + iconSource, extend the validator behind `npm run tenants:validate` (schema + cross-tenant appId uniqueness + absent-block ⇒ no native channel), with a must-fail fixture per gate convention.
-- [ ] T007 Implement `scripts/native/sync-native-config.js` (tenant manifest + cohort + `scripts/release/version.js` → `frontend/capacitor.config.ts`, Android `versionName`/`versionCode`, iOS `CFBundleShortVersionString`/`CFBundleVersion`, per `contracts/release-artifacts.md` derivation); unknown tenant or missing `native` block fails naming the tenant.
-- [ ] T008 Implement `scripts/native/check-native-versions.js` (regenerate-and-diff gate over every synced field) + wire `npm run check:native-versions` into the root `package.json` scripts and the CI gate group that runs the other regenerate-and-diff checks in `.github/workflows/test.yml`.
-- [ ] T009 [P] Native CSP: inject the per-platform `<meta http-equiv="Content-Security-Policy">` into the bundled `index.html` at native build (in `sync-native-config.js` or a sibling step) per research R7 (`script-src` keeps `blob:`, never gains `https:`; `connect-src` keeps spec-069 grants) + parity gate `frontend/src/test/native/nativeCspParity.test.js` asserting shared directives agree with the nginx policy files.
+- [X] T005 Implement `frontend/src/lib/native/runtime.js` per `contracts/native-runtime-seams.md` §1 (`getRuntime()`, `nativeCapability(name)` three-state with member-renderable reasons; web answers wrap existing checks; memoized; no UA sniffing) + Vitest `frontend/src/test/native/runtime.test.js` covering web/native resolution and the never-fabricate-available rule.
+- [X] T006 Extend the tenant manifest schema with the `native` block (data-model.md): update `tenants/fairwins/manifest.json` with real iOS/Android appIds + displayName + iconSource, extend the validator behind `npm run tenants:validate` (schema + cross-tenant appId uniqueness + absent-block ⇒ no native channel), with a must-fail fixture per gate convention.
+- [X] T007 Implement `scripts/native/sync-native-config.js` (tenant manifest + cohort + `scripts/release/version.js` → `frontend/capacitor.config.ts`, Android `versionName`/`versionCode`, iOS `CFBundleShortVersionString`/`CFBundleVersion`, per `contracts/release-artifacts.md` derivation); unknown tenant or missing `native` block fails naming the tenant.
+- [X] T008 Implement `scripts/native/check-native-versions.js` (regenerate-and-diff gate over every synced field) + wire `npm run check:native-versions` into the root `package.json` scripts and the CI gate group that runs the other regenerate-and-diff checks in `.github/workflows/test.yml`.
+- [X] T009 [P] Native CSP: inject the per-platform `<meta http-equiv="Content-Security-Policy">` into the bundled `index.html` at native build (in `sync-native-config.js` or a sibling step) per research R7 (`script-src` keeps `blob:`, never gains `https:`; `connect-src` keeps spec-069 grants) + parity gate `frontend/src/test/native/nativeCspParity.test.js` asserting shared directives agree with the nginx policy files.
 
 **Checkpoint**: `npx cap sync` produces tenant-correct, version-correct shells; gates fail on hand edits.
 
