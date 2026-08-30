@@ -359,7 +359,12 @@ describe('Decline and Cancel Wagers', () => {
        * (anti-pattern 3) and would have reported "no Withdraw, no Cancel" of an area that had
        * simply not rendered.
        */
-      cy.get('.mm-detail .mm-status-badge').should('contain.text', 'Active')
+      // The badge is computed from the browser clock against the wager's end time, exactly like
+      // the row above — an on-chain-Active wager reads 'Pending Resolution' once the shard's
+      // clock passes its end time. Either label is on-chain status 2; the id pin above is what
+      // ties the detail to THIS wager.
+      cy.get('.mm-detail .mm-status-badge').invoke('text')
+        .should('match', /active|pending resolution/i)
       cy.get('.mm-detail').contains('button', /withdraw/i).should('not.exist')
       cy.get('.mm-detail').contains('button', /cancel/i).should('not.exist')
 

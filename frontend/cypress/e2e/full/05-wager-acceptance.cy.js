@@ -320,10 +320,14 @@ describe('Wager Acceptance', () => {
        * Matching the row by its own status badge is retryable: if no Active row ever lists, the
        * test fails HERE naming that, rather than reporting a missing button.
        */
+      // 'Pending Resolution' is the same on-chain Active wager: row and badge are computed from
+      // the browser clock against the wager's end time (the hazard DEC-05 hit), so match either
+      // label and pin the detail to the id below.
       cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
-        .contains('.mm-table-row', /active/i, { timeout: 20000 })
+        .contains('.mm-table-row', /active|pending resolution/i, { timeout: 20000 })
         .click()
       cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+      cy.get('.mm-detail', { timeout: 10000 }).should('contain.text', `#${wagerId}`)
 
       /*
        * ANCHOR THE ABSENCE. `$detail.find(...)` inside `.then()` is a one-shot DOM snapshot
@@ -333,7 +337,8 @@ describe('Wager Acceptance', () => {
        * the same market record, so asserting it first proves the panel is describing an ACTIVE
        * wager; only then does the missing Accept control mean what this test claims it means.
        */
-      cy.get('.mm-detail .mm-status-badge').should('contain.text', 'Active')
+      cy.get('.mm-detail .mm-status-badge').invoke('text')
+        .should('match', /active|pending resolution/i)
       cy.get('.mm-detail').contains('button', /accept/i).should('not.exist')
       cy.get('.mm-detail').find('.mm-action-accept').should('not.exist')
 
