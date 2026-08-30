@@ -734,7 +734,7 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/094-e2e-coverage-expansion/plan.md
+at specs/102-capacitor-channels/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also
