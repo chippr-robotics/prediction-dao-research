@@ -135,9 +135,9 @@ code under `frontend/src/lib/native/`; sync/gate scripts under
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T031 Add spec-094 matrix rows: replace the placeholder 102 row in `frontend/cypress/coverage/matrix.json` with flows for the native-only behaviors (lifecycle lock, native passkey ceremony, BLE signing, deep-link entry) — statuses honest (smoke-tier covered vs staged-manual with the runbook named), regenerate `docs/developer-guide/e2e-coverage-matrix.md` (`npm run e2e:matrix`), keep `frontend/src/test/e2e-policy/` green.
-- [ ] T032 [P] Finish `docs/developer-guide/native-channels.md` (seams, contracts, build/run, gates, degradation rules) and add the CLAUDE.md guardrail bullet for spec 102 (seam-only rule, lockfile rule, version-sync-only rule, CSP parity gate).
-- [ ] T033 Full verification pass per the `monorepo-verify` skill on the final PR state (check:deps, byte gates, tenants:validate, check:native-versions, scoped Vitest for every new test file, eslint on touched files); confirm the web channel's nginx CSP files and service worker are byte-identical to staging.
+- [X] T031 Add spec-094 matrix rows: replace the placeholder 102 row in `frontend/cypress/coverage/matrix.json` with flows for the native-only behaviors (lifecycle lock, native passkey ceremony, BLE signing, deep-link entry) — statuses honest (smoke-tier covered vs staged-manual with the runbook named), regenerate `docs/developer-guide/e2e-coverage-matrix.md` (`npm run e2e:matrix`), keep `frontend/src/test/e2e-policy/` green.
+- [X] T032 [P] Finish `docs/developer-guide/native-channels.md` (seams, contracts, build/run, gates, degradation rules) and add the CLAUDE.md guardrail bullet for spec 102 (seam-only rule, lockfile rule, version-sync-only rule, CSP parity gate).
+- [X] T033 Full verification pass per the `monorepo-verify` skill on the final PR state (check:deps, byte gates, tenants:validate, check:native-versions, scoped Vitest for every new test file, eslint on touched files); confirm the web channel's nginx CSP files and service worker are byte-identical to staging.
 
 ---
 

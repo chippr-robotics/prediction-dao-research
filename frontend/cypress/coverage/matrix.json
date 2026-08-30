@@ -2721,9 +2721,53 @@
     {
       "id": "102-capacitor-channels",
       "title": "Native release channels (iOS + Android + web)",
-      "memberFacing": false,
-      "reason": "Spec stage only; no member surface exists yet. When the native channels ship, flows are owed for the native-only behaviors the spec names (app-lock on lifecycle, native passkey ceremony, Bluetooth hardware signing, deep-link entry), with hardware-bound legs recorded honestly as staged manual validation (#1382).",
-      "flows": []
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "native.passkey-signin",
+          "name": "A member signs in on the native app with the platform passkey ceremony and lands on the SAME account they hold on the web channel, PRF-derived keys intact; an unsupported device refuses with a named reason (unit: src/test/native/passkeyBridge.test.js; device leg: staged manual protocol in docs/runbooks/native-release-operations.md)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "account-native",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.lifecycle-lock",
+          "name": "Backgrounding the native app past the lock threshold re-prompts before any wallet surface on foreground (unit: src/test/native/lifecycle.test.js + the native case in src/test/applock/AppLockOverlay.test.jsx; the release smoke jobs prove launch/render/lifecycle-survival but cannot reach a signed-in lock)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.deep-link-entry",
+          "name": "A share link opened with the app installed lands on the linked surface in-app through any due gate; foreign-origin URLs through the link channel are ignored (unit: src/test/native/deepLinks.test.js)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "none",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.ble-signing",
+          "name": "Ledger signing over the native Bluetooth rail with physical confirmation on the device screen",
+          "status": "out-of-scope",
+          "reason": "Requires a physical Nano X and a human pressing its buttons - automation cannot confirm on a device screen. Protocol arithmetic and error normalization are unit-pinned (src/test/native/ledgerBleRung.test.js); the device run is the staged manual addendum in docs/runbooks/hardware-wallet-staging-validation.md, required before store submission.",
+          "tier": "none",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "proposedTier": "account-native"
+        }
+      ]
     }
   ]
 }
