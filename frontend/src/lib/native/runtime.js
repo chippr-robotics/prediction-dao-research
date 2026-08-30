@@ -60,7 +60,7 @@ function unavailable(reason) {
  * gap it is, not as a capability.
  */
 const NATIVE_PLUGIN_FOR = Object.freeze({
-  [NATIVE_CAPABILITIES.PASSKEY_CEREMONY]: 'NativeCredentials',
+  [NATIVE_CAPABILITIES.PASSKEY_CEREMONY]: 'CapacitorPasskey',
   [NATIVE_CAPABILITIES.BLE]: 'BluetoothLe',
   [NATIVE_CAPABILITIES.DEEP_LINKS]: 'App',
 })

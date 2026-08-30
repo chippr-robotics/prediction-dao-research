@@ -72,6 +72,40 @@ kept as the disclosed fallback when the platform ceremony is unavailable.
 In-WebView `navigator.credentials` as primary — unreliable/unsupported;
 rejected.
 
+## R3a — Bridge choice: `@capgo/capacitor-passkey` (pinned 8.5.1) behind an in-repo adapter
+
+**Decision**: The platform ceremony runs through `@capgo/capacitor-passkey`
+(Cap-go, the established Capacitor plugin vendor; Capacitor 8; WebAuthn-shaped
+`createCredential`/`getCredential` taking browser-shaped options and returning
+WebAuthn-JSON), wrapped by `frontend/src/lib/native/nativeCredentials.js` — a
+`navigator.credentials`-shaped adapter consumed through the credential layer's
+existing `deps.credentials` seam.
+
+**Why the adapter is not optional**: reading the plugin source found two
+encoding hazards the contract's PRF rule exists for. (1) The plugin JSON-clones
+request extensions (`JSON.parse(JSON.stringify(...))`), which mangles a
+`Uint8Array` PRF salt into an index-keyed object — the adapter pre-encodes
+binary extension leaves to WebAuthn-JSON base64url strings, which the clone
+carries losslessly. (2) Responses arrive as WebAuthn-JSON strings while the
+credential layer reads API shapes (buffers, `getPublicKey()`,
+`getClientExtensionResults()`) — the adapter decodes, including
+`prf.results.first/second`. Both are pinned by
+`src/test/native/passkeyBridge.test.js`.
+
+**Security review**: this dependency sits on the key-custody path and needs
+the `.github/agents` smart-contract-security-adjacent review posture on the PR
+that ships it; the PRF round-trip on REAL devices (iOS 18+ exposes PRF via
+AuthenticationServices; Android via Credential Manager) is part of the staged
+manual validation protocol — until a device run confirms PRF output, native
+sign-in for prf-derived wallets must be treated as unvalidated.
+
+**Alternatives considered**: in-repo thin plugin over the two platform APIs —
+full control but ships Swift/Kotlin this repo cannot compile-verify outside
+the CI platform jobs; kept as the fallback if the vendor plugin's PRF support
+proves insufficient on device. Older community plugins
+(`@darkedges/capacitor-native-webauthn`, `capacitor-native-passkey`) — pinned
+to Capacitor 4/5; rejected.
+
 ## R4 — App lock on native lifecycle: adapter onto the existing activity events
 
 **Decision**: `lib/native/lifecycle.js` subscribes to Capacitor

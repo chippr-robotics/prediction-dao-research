@@ -31,6 +31,7 @@
   "dependencies": {
     "@capacitor/app": "8.1.1",
     "@capacitor/core": "8.5.0",
+    "@capgo/capacitor-passkey": "8.5.1",
     "@fairwins/intent-types": "*",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
