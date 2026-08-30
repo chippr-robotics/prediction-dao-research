@@ -40,6 +40,10 @@ const MORDOR_CONTRACTS = {
   voucherBatchMinter: '0xc26F02da923263e2c9CFB722006e0B8Da2F952B2',
   tokenFactory: '0x5bdf74Ce98D41bf35192c20B25ACd561C75CFe62',
   externalDAORegistry: '0xcEE0fb2e1407f0A0d19Bcf4Fee2726A3005FA3C0',
+  // NOTE: there is deliberately NO `standardDaoFactory` key here, and none is coming (issue #1268).
+  // Mordor's EVM is pre-Cancun, so OpenZeppelin 5.4.0's Governor — which uses MCOPY — cannot be
+  // deployed on it at all. The absence IS the answer: ClearPath's Launch tab names that reason,
+  // while the registry above keeps serving register/track/govern on this chain unchanged.
   backupPointerRegistry: '0x664ACAd4d604c626A6160948Df9C10FE38010E11',
   // Wager Pools (spec 034, address-based — Semaphore removed). Pending the fresh WagerPoolFactory
   // deploy; populated by `npm run sync:frontend-contracts` after `deploy-wager-pool-factory.js`.
@@ -143,7 +147,7 @@ const HARDHAT_CONTRACTS = {
    * commit→reveal, so the on-chain flow needs a registry it can actually write to; a shipped build
    * still resolves this from the per-network maps above (Polygon has one, Mordor does not yet).
    */
-  callsignRegistry: '0x7A9Ec1d04904907De0ED7b6839CcdD59c3716AC9',
+  callsignRegistry: '0xf953b3A269d80e3eB0F2947630Da976B896A8C5b',
   /*
    * THE TWO ENTRIES BELOW ARE NONCE-DERIVED, AND THEIR ORDER IS THE `setup:e2e` ORDER.
    *
@@ -203,6 +207,7 @@ const AMOY_CONTRACTS = {
   entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
   verifyingPaymaster: '0xA00A06ae44FA2bd40Ec10D9613c96afD779b6898', // spec 050 — sponsored-gas paymaster (EntryPoint v0.6)
   accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
+  standardDaoFactory: '', // spec 030 pillar A — native standard-DAO factory (synced after deploy)
 }
 
 // Polygon mainnet deployment (v2 — P2P betting architecture) — LIVE
@@ -246,6 +251,10 @@ const POLYGON_CONTRACTS = {
   liquidityRouter: '0x13762c059c2A22E3bCd8A44F36EA44e8e3B22B31',
   safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
   feeRouter: '0xf8161fC26172621E9fbcc6c39500Bb14b0902B35',
+  // spec 030 pillar A — native standard-DAO factory. Empty until
+  // `deploy-clearpath.js` runs; `npm run sync:frontend-contracts` populates it.
+  // Undeployed ⇒ ClearPath's Launch tab says so honestly and offers nothing.
+  standardDaoFactory: '',
 }
 
 // Ethereum Classic mainnet (chainId 61) — CUSTODY ONLY. ETC hosts no FairWins wager/membership

@@ -28,10 +28,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 103 |
 | With a member-facing flow | 81 |
-| Member-facing flows | 159 |
+| Member-facing flows | 160 |
 | 🟢 covered | 141 |
 | 🟡 partial | 1 |
-| 🔴 absent | 11 |
+| 🔴 absent | 12 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -95,7 +95,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `miniapp.clearpath-register-dao` | Register an external DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) |  |
-| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🔴 absent | none | — (proposed: on-chain) | #1268 | no member surface exists: OZ 5.4.0's GovernorUpgradeable pulls the Cancun mcopy opcode (via SignatureChecker -> Bytes.sol) and is not deployable on the pre-Cancun ETC/Mordor chains this platform targets, so pillar A's contract side was deliberately deferred (recorded in scripts/deploy/deploy-clearpath.js). #1268 tracks the decision to build it or withdraw it from spec 030. |
+| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🔴 absent | none | — (proposed: on-chain) | #1268 | The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17). |
 
 ### `033-network-aware-swap` — Network-aware swap
 
@@ -508,7 +508,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-38 flows — 🟢 38 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
+39 flows — 🟢 38 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -587,6 +587,12 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `oracle.graph-unavailable-degrades` | See an honest degraded state when the oracle index is unreachable | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (OG-01) |  |
+
+### `030-clearpath-standard-daos` — ClearPath mini-app
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `miniapp.clearpath-create-dao-unavailable` | ClearPath Launch tab states why a DAO cannot be created on this chain | 🔴 absent | none | — (proposed: no-chain) | #1268 | Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec. |
 
 ### `031-platform-notifications` — Platform notifications
 

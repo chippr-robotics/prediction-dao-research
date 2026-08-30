@@ -12,10 +12,16 @@
 import { vi } from 'vitest'
 
 /** Declared in vite.config.js; anything else must throw, exactly as the host does. */
-const DECLARED = ['externalDAORegistry', 'paymentToken', 'sanctionsGuard']
+const DECLARED = ['externalDAORegistry', 'standardDaoFactory', 'paymentToken', 'sanctionsGuard']
 
 const DEPLOYMENTS = {
   externalDAORegistry: { 63: '0x00000000000000000000000000000000000000e1' },
+  /*
+   * Spec 030 pillar A. Present on 137 and ABSENT on 63 on purpose: Mordor is pre-Cancun and never gets
+   * this factory (issue #1268), so the stub reproduces the exact asymmetry the app has to render — a
+   * declared name that resolves on one chain and answers `null` on another.
+   */
+  standardDaoFactory: { 137: '0x00000000000000000000000000000000000000da' },
   paymentToken: { 63: '0x00000000000000000000000000000000000000cc' },
   sanctionsGuard: { 63: '0x00000000000000000000000000000000000000ff' },
 }

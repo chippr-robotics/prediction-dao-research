@@ -709,7 +709,19 @@
           "risk": "custody",
           "tests": [],
           "issue": "#1268",
-          "missing": "no member surface exists: OZ 5.4.0's GovernorUpgradeable pulls the Cancun mcopy opcode (via SignatureChecker -> Bytes.sol) and is not deployable on the pre-Cancun ETC/Mordor chains this platform targets, so pillar A's contract side was deliberately deferred (recorded in scripts/deploy/deploy-clearpath.js). #1268 tracks the decision to build it or withdraw it from spec 030."
+          "missing": "The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17)."
+        },
+        {
+          "id": "miniapp.clearpath-create-dao-unavailable",
+          "name": "ClearPath Launch tab states why a DAO cannot be created on this chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1268",
+          "missing": "Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec."
         }
       ]
     },
