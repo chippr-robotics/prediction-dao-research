@@ -146,6 +146,14 @@ jobs:
       - name: Compile contracts
         uses: ./.github/actions/setup-hardhat-solc
 
+      # The compile above runs inside the composite action, not `npm run compile`, so npm's
+      # postcompile hook (issue #1090's freshness marker) does not fire here. Write the marker
+      # explicitly: this step running at all means the action's compile exited 0, which is the
+      # exact condition the marker asserts. Without it the byte gate below fails closed on
+      # "no build marker" — correctly, but about the wrong thing.
+      - name: Record build marker for the byte gate
+        run: node scripts/codegen/write-build-marker.js
+
       # Gate (spec 025, FR-010/SC-005): block a storage-incompatible / upgrade-unsafe implementation BEFORE
       # it can ship. Must fail the pipeline loudly — do NOT add continue-on-error (Constitution IV).
       - name: Check upgradeable storage layout
