@@ -101,7 +101,7 @@ test("--compare refuses when a source file changed after the marker was written"
 
   // Bump the marker's own mtime back in time so the freshly-edited source unambiguously reads
   // as newer than it, independent of how fast this test runs.
-  const markerPath = path.join(root, "artifacts", ".build-marker.json");
+  const markerPath = path.join(root, ".build-marker.json");
   const past = new Date(Date.now() - 60_000);
   fs.utimesSync(markerPath, past, past);
 
@@ -120,7 +120,7 @@ test("--compare refuses when the marker's hash does not match the current source
 
   // Corrupt just the marker's recorded hash — content on disk still matches what was hashed at
   // write time, but the marker itself is now lying about it.
-  const markerPath = path.join(root, "artifacts", ".build-marker.json");
+  const markerPath = path.join(root, ".build-marker.json");
   const marker = JSON.parse(fs.readFileSync(markerPath, "utf8"));
   marker.sourcesHash = "0".repeat(64);
   fs.writeFileSync(markerPath, JSON.stringify(marker));

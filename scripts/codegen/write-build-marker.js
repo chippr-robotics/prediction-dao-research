@@ -11,7 +11,7 @@
  * This script is the ONLY thing that writes the marker, and it runs ONLY as npm's `postcompile`
  * hook (package.json: `compile` -> `hardhat compile`, npm auto-runs `postcompile` after it exits
  * 0) — so it fires exactly when `hardhat compile` itself succeeded, never on a failed or skipped
- * one. It commits to `artifacts/.build-marker.json`:
+ * one. It commits to the repo-root `.build-marker.json` (beside artifacts/, which hardhat prunes):
  *   - sourcesHash: sha256 over every `contracts/**\/*.sol` file's path + bytes
  *   - fileCount:   how many source files went into that hash (surfaced in mismatch errors)
  *   - writtenAt:   for a human reading the file; freshness is judged from the marker's own
@@ -27,7 +27,11 @@ const path = require("path");
 const { hashSources, ROOT } = require("./lib/sourceHash");
 
 const ARTIFACTS_DIR = path.join(ROOT, "artifacts");
-const MARKER_PATH = path.join(ARTIFACTS_DIR, ".build-marker.json");
+// The marker lives BESIDE artifacts/, never inside it: hardhat prunes files it did not emit
+// from artifacts/ on every invocation (a no-op `hardhat compile` deletes a foreign dotfile
+// there — measured), so a marker inside the directory disappears the moment any later step
+// runs `hardhat run`/`compile`, and the gate then fails about the wrong thing.
+const MARKER_PATH = path.join(ROOT, ".build-marker.json");
 
 if (!fs.existsSync(ARTIFACTS_DIR)) {
   console.error(

@@ -24,7 +24,9 @@ const { hashSources, ROOT } = require("./lib/sourceHash");
 
 const ARTIFACTS_ROOT = path.join(__dirname, "..", "..", "artifacts");
 const ARTIFACTS = path.join(ARTIFACTS_ROOT, "contracts");
-const MARKER_PATH = path.join(ARTIFACTS_ROOT, ".build-marker.json");
+// Beside artifacts/, not inside it — hardhat prunes foreign files from artifacts/ on every
+// invocation, so an in-tree marker would vanish under any later `hardhat run` step.
+const MARKER_PATH = path.join(__dirname, "..", "..", ".build-marker.json");
 
 // Fail CLOSED: --compare must never trust artifacts/ that were not just produced by a
 // successful `npm run compile` of the sources currently on disk. Never "fix" a failure here by
