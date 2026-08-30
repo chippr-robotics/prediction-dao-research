@@ -607,8 +607,12 @@ describe('Manual Resolution', () => {
       // And the UI does not show a resolve control on it either.
       connectAndVisit(0)
       cy.openMyWagers('created')
+      // 'Under Consideration', not 'Pending': the row VM swaps the status text for the CREATOR of
+      // a pending wager (wagerVm.js#statusText, isCreatorOfPending) — and this test is the
+      // creator. The detail badge below still says 'Pending Acceptance' (it renders
+      // getStatusLabel directly, without the swap).
       cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
-        .contains('.mm-table-row', /pending/i, { timeout: 20000 })
+        .contains('.mm-table-row', /under consideration|pending/i, { timeout: 20000 })
         .click()
       cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
 
