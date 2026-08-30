@@ -282,8 +282,13 @@ describe('WalletButton Component - Wagers', () => {
       await user.click(button)
 
       await waitFor(() => {
-        expect(screen.getByText(/Get Access - from \$2 USDC \/ month/)).toBeInTheDocument()
+        expect(screen.getByRole('menuitem', { name: /get access/i })).toBeInTheDocument()
       })
+      // And it quotes NO price: the old "from $2 USDC / month" was hardcoded, and on the live
+      // ladder Bronze ($2) is inactive while the term is 30 days, not a recurring month. A price
+      // belongs only where it is read from the contract (the purchase modal's grid).
+      expect(screen.queryByText(/\$\d/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/\/ month/i)).not.toBeInTheDocument()
     })
 
     it('no longer shows the "My Wagers" entry in the dropdown', async () => {

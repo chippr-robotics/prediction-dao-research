@@ -68,6 +68,9 @@ export const custodySource = {
     const accountLc = String(account).toLowerCase()
     let anyOk = false
     let partial = false
+    // Genuine unreadable vaults only — a reference whose address holds no code is an absence and
+    // is deliberately counted by neither this nor `anyOk` (see the catch below).
+    let failedCount = 0
 
     const mk = (vaultAddr, type, message, severity, actionable) => ({
       id: `custody:${vaultAddr}:${type}:${nowMs}`,
@@ -97,9 +100,44 @@ export const custodySource = {
           maxChunks: CHUNK_BUDGET_PER_POLL,
         })
         anyOk = true
-      } catch {
-        // Can't read this vault — keep its prior snapshot so we don't lose the baseline.
+      } catch (error) {
+        // Keep the prior snapshot either way, so a failed read never loses the baseline.
         if (prior.snapshots?.[sid]) nextSnapshots[sid] = prior.snapshots[sid]
+
+        /*
+         * A failed read is TWO different facts and they must not be collapsed.
+         *
+         * If the address holds no code on this chain, the saved reference is stale or belongs to
+         * another chain (references have carried a chainId since spec 068). That is an ABSENCE:
+         * there is nothing to read and there never will be, so reporting it as an outage produces
+         * a "will keep retrying" notice that retries forever against something that cannot appear.
+         * Only a read that failed against an address that IS a contract is `unreadable`.
+         *
+         * The code check runs only on the failure path, so the happy path costs no extra call.
+         */
+        let hasCode
+        try {
+          hasCode = (await provider.getCode(vaultAddr)) !== '0x'
+        } catch {
+          hasCode = null // could not even ask — fall through and treat as unreadable
+        }
+
+        if (hasCode === false) {
+          console.warn(
+            `[custody] vault ${vaultAddr} holds no code on chain ${chainId} — ` +
+            'skipping a stale or mis-chained vault reference (not an outage)'
+          )
+          continue
+        }
+
+        // These catches used to be bare, which is why the member-facing "Couldn't refresh Custody
+        // activity" notice arrived with ZERO console evidence — undebuggable in production. Name
+        // the vault and the reason.
+        failedCount += 1
+        console.warn(
+          `[custody] could not read vault ${vaultAddr} on chain ${chainId}:`,
+          error?.message || error
+        )
         continue
       }
 
@@ -172,8 +210,15 @@ export const custodySource = {
       }
     }
 
-    // If every vault read failed, report not-ok so the engine retains the prior slice.
-    if (!anyOk && refs.length > 0) return { ok: false }
+    /*
+     * Report not-ok only when something genuinely FAILED and nothing succeeded — the engine then
+     * retains the prior slice and the member is told it will keep retrying.
+     *
+     * A member whose only references are stale (no code on this chain) lands here with
+     * `failedCount === 0`: that is an honest empty answer, not an outage, and it no longer
+     * produces a retry notice for a vault that will never resolve.
+     */
+    if (!anyOk && failedCount > 0) return { ok: false }
     return { ok: true, entries, nextSnapshots, currentIds, actionNeededById, partial }
   },
 }
