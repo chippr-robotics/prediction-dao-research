@@ -244,5 +244,30 @@ esac
 #   emit "$FO" RPC_URL_PRIMARY_80002    QUICKNODE_AMOY_API    latest optional
 #   emit "$GW" RPC_WSS_URL_137          QUICKNODE_POLYGON_WSS latest optional
 #   emit "$GW" RPC_WSS_URL_80002        QUICKNODE_AMOY_WSS    latest optional
+#
+# ---- the numbered MULTICHAIN endpoints (QUICKNODE_RPC_001..005, 2026-08-30) are not delivered
+#      either, for the same reason: no chain they serve is in ENABLED_CHAIN_IDS / the FinOps
+#      cohort today (both are 63,137, and 137 already rides QUICKNODE_POLYGON_API above). ----
+#
+# 001 is the one with a foreseeable VM consumer: its base network is eth, and the SAME token
+# serves Ethereum 1, Optimism 10, Base 8453 and Arbitrum 42161 by hostname infix (Ethereum
+# mainnet OMITS the infix — `<name>.quiknode.pro/<token>`; the others are
+# `<name>.<slug>.quiknode.pro/<token>`, slugs in scripts/secrets/quicknode-chains.js). Because
+# the config surface (`RPC_URL_PRIMARY_<chainId>`) already exists for every chain, wiring a new
+# chain when ENABLED_CHAIN_IDS grows is three steps, none of them here first:
+#
+#   1. store the derived per-chain URL as ITS OWN secret version — derive and VERIFY it with
+#      `node scripts/secrets/quicknode-chains.js --verify` first (a wrong infix answers 200 with
+#      ANOTHER CHAIN'S state, not 401; the gateway's boot-time eth_chainId assertion is the last
+#      line of defence, not the first) — or emit from QUICKNODE_RPC_001_API directly if the
+#      chain is Ethereum mainnet, whose URL is the payload verbatim;
+#   2. add the secret to `gateway_secret_ids` in infra/terraform/environments/prod/terraform.tfvars;
+#   3. uncomment/add the matching emit lines, e.g.:
+#        emit "$GW" RPC_URL_PRIMARY_1    QUICKNODE_RPC_001_API latest optional
+#        emit "$FO" RPC_URL_PRIMARY_1    QUICKNODE_RPC_001_API latest optional
+#
+# The frontend build's VITE_RPC_URL_MAINNET/OPTIMISM/BASE/ARBITRUM primaries are the consumers
+# that exist TODAY; they are deploy-time envs set outside this script (VITE_ values compile into
+# the public bundle — spec 097 rule 5 — so only a domain-restricted token belongs there).
 
 log "wrote per-container env files to ${RUN_DIR} (tmpfs, 0600)"

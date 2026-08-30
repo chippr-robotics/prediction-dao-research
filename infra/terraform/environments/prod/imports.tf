@@ -158,6 +158,55 @@ import {
   id = "projects/chippr-bots-site-wp/secrets/finops-quicknode-key"
 }
 
+# ── the QuickNode MULTICHAIN endpoints (2026-08-30) ───────────────────────────────────────────
+#
+# All nine were hand-created at the console on 2026-08-30 (numbered multichain endpoints 001–005
+# plus the account admin key — the scheme is documented on `managed_secret_ids` in
+# terraform.tfvars). They EXIST, so like QUICKNODE_POLYGON_API above they are adopted by importing
+# the CONTAINER ONLY; without these blocks the next apply tries to create them and fails
+# ALREADY_EXISTS. Console-created secrets replicate `automatic`, matching what
+# `google_secret_manager_secret.managed` declares — if a plan shows a REPLACEMENT here instead of
+# a clean adoption, one of them was created with a user-managed replication policy: STOP (replacing
+# a container destroys its versions; prevent_destroy will refuse) and fix the secret, not the plan.
+# No accessor bindings exist or are created — nothing reads these yet (least privilege, same
+# reasoning as the WSS/AMOY family).
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_ADMIN_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_ADMIN_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_001_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_001_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_001_WSS"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_001_WSS"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_002_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_002_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_002_WSS"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_002_WSS"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_003_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_003_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_003_WSS"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_003_WSS"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_004_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_004_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_005_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_005_API"
+}
+
 # import {
 #   to = google_artifact_registry_repository.cloud_run_source_deploy
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/repositories/cloud-run-source-deploy"

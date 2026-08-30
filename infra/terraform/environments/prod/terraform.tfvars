@@ -78,6 +78,41 @@ managed_secret_ids = [
   "QUICKNODE_AMOY_API",
   "QUICKNODE_AMOY_WSS",
 
+  # QuickNode MULTICHAIN endpoints (created at the console 2026-08-30, adopted by import — see
+  # imports.tf). One endpoint name + one token serves every network enabled on it; the chain is
+  # selected by the hostname infix (`<name>.<network>.quiknode.pro/<token>`, with Ethereum mainnet
+  # omitting the infix entirely). The payload stored in each secret is the BASE-network URL; per-
+  # chain URLs are derived by swapping the infix — scripts/secrets/quicknode-chains.js holds the
+  # slug map and verifies a derived URL answers the right eth_chainId before anyone configures it,
+  # because a wrong infix returns 200 with another chain's state, not 401.
+  #
+  #   001 = base eth   → serves Ethereum 1, Optimism 10, Base 8453, Arbitrum 42161 (frontend
+  #         VITE_RPC_URL_* build primaries; the VM nodes read only 63/137 today, so NO node is
+  #         granted this — see the commented wiring in infra/vm/common/fetch-secrets.sh for the
+  #         day ENABLED_CHAIN_IDS grows)
+  #   002 = base matic → same chains as the QUICKNODE_POLYGON/AMOY pair above, which stays the
+  #         live credential (alto's ONLY RPC is REQUIRED on it — consolidating onto 002 is a
+  #         deliberate future rotation, never a side effect)
+  #   003 = base sol   → spec 100 (Solana) is spec+plan only; no consumer exists yet
+  #   004 = base btc   → NO CURRENT CONSUMER AND NOT A DROP-IN: the spec-061 gateway module reads
+  #         an Esplora-compatible REST API (BTC_ESPLORA_URL, mempool.space shape), not Bitcoin
+  #         Core JSON-RPC, which is what this endpoint speaks
+  #   005 = base zec   → spec 101 (Zcash) is spec+plan only; no consumer exists yet
+  #
+  # Declared (not busywork): management is what makes these show as drift instead of vanishing
+  # into unmanaged secrets, and prevent_destroy is what stops a container deletion destroying the
+  # token. NONE of them is granted to any node — an env var nothing reads is a credential sitting
+  # in a container for no benefit (the same reasoning as the WSS/AMOY block above).
+  "QUICKNODE_ADMIN_API",
+  "QUICKNODE_RPC_001_API",
+  "QUICKNODE_RPC_001_WSS",
+  "QUICKNODE_RPC_002_API",
+  "QUICKNODE_RPC_002_WSS",
+  "QUICKNODE_RPC_003_API",
+  "QUICKNODE_RPC_003_WSS",
+  "QUICKNODE_RPC_004_API",
+  "QUICKNODE_RPC_005_API",
+
 
   # Workstation secrets (spec 097). Mirrors scripts/secrets/registry.js — the parity test keeps
   # these in step; do not edit one list without the other.
