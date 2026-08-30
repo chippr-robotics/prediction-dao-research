@@ -202,9 +202,15 @@ describe('Decline and Cancel Wagers', () => {
        * is offered only on a PENDING_ACCEPTANCE wager, so an accepted or withdrawn leftover
        * sitting first in the list would send this test looking for a control that correctly
        * is not there.
+       *
+       * "Under Consideration", not "Pending": the row VM swaps the status text for the
+       * CREATOR of a pending wager (wagerVm.js#statusText, isCreatorOfPending) — and this test
+       * is the creator. The detail badge below still says "Pending Acceptance" because the
+       * detail view renders getStatusLabel directly; only the row wears the creator-facing
+       * label. /pending/i alone burned the full 60s here without ever matching.
        */
       cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
-        .contains('.mm-table-row', /pending/i, { timeout: 60000 })
+        .contains('.mm-table-row', /under consideration|pending/i, { timeout: 60000 })
         .click()
 
       cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -332,11 +338,20 @@ describe('Decline and Cancel Wagers', () => {
        * ordering. `cy.contains` retries until an Active row lists, so a scan that has not
        * finished is a wait rather than a silently-skipped test (#1250).
        */
+      /*
+       * The chain says Active (pinned above); the ROW may already say "Pending Resolution" —
+       * computedStatus is a function of the browser clock against the wager's own end time,
+       * and this spec's earlier tests advance both clocks, so the label depends on where the
+       * shard's clock sits when the scan lands. Either label is this wager; the detail is
+       * then pinned to the id so a stale row matching the same label fails loudly instead of
+       * quietly standing in.
+       */
       cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 })
-        .contains('.mm-table-row', /active/i, { timeout: 60000 })
+        .contains('.mm-table-row', /active|pending resolution/i, { timeout: 60000 })
         .click()
 
       cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+      cy.get('.mm-detail', { timeout: 10000 }).should('contain.text', `#${wagerId}`)
 
       /*
        * ANCHOR THE ABSENCE on the detail agreeing which wager it is describing, then assert the

@@ -148,7 +148,17 @@ function createAcceptAndResolve(config = {}) {
    * row's control is `.wc-action` labelled "Resolve"; the detail view's is "Resolve Market".
    */
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).should('exist')
-  cy.contains('.mm-panel button, [role="tabpanel"] button', /^resolve$|resolve wager/i, { timeout: 30000 })
+  /*
+   * scrollIntoView BEFORE the visibility assertion: the resolve control can sit below the
+   * modal's scrolled fold, and Cypress reports a fixed-position element whose centre is
+   * outside `.mm-content`'s viewport as "covered" — a state the member fixes by scrolling,
+   * so the test does the same rather than failing on it (the CLM-01/CLM-10 red on this PR).
+   * The pattern also matches "Resolve Market" — the label the detail view and the row's
+   * countdown control actually render (ResolveButtonWithCountdown); "resolve wager" is not a
+   * string any component produces.
+   */
+  cy.contains('.mm-panel button, [role="tabpanel"] button', /^resolve$|resolve (wager|market)/i, { timeout: 30000 })
+    .scrollIntoView()
     .should('be.visible')
     .and('not.be.disabled')
     .click({ force: true })
