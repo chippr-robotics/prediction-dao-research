@@ -234,7 +234,7 @@ function syncTenant({ repoRoot, tenant, network, chainId, deploymentFileArg }) {
   const record = {}
   const keys = [
     'wagerRegistry', 'membershipManager', 'membershipVoucher', 'voucherBatchMinter',
-    'keyRegistry', 'sanctionsGuard', 'tokenFactory', 'externalDAORegistry',
+    'keyRegistry', 'sanctionsGuard', 'tokenFactory', 'externalDAORegistry', 'standardDaoFactory',
     'backupPointerRegistry', 'wagerPoolFactory', 'callsignRegistry', 'feeRouter',
     'stakingRouter', 'bridgeRouter', 'liquidityRouter', 'miniAppRegistry', 'safeProposalHub',
     'safePolicyGuard', 'safePolicyGuardV2', 'policyGuardSetup', 'entryPoint',
@@ -316,6 +316,9 @@ function main() {
         sanctionsGuard: deployed.sanctionsGuard,
         tokenFactory: deployed.tokenFactory, // spec 028 — token issuance (only present where deployed)
         externalDAORegistry: deployed.externalDAORegistry, // spec 030 — ClearPath external-DAO registry
+        // spec 030 pillar A — native standard-DAO factory. Cancun-only (issue #1268), so it is
+        // absent on ETC 61 / Mordor 63 BY DECISION; absence is the honest answer there, not a gap.
+        standardDaoFactory: deployed.standardDaoFactory,
         backupPointerRegistry: deployed.backupPointerRegistry, // spec 032 — encrypted-backup pointer registry
         wagerPoolFactory: deployed.wagerPoolFactory, // spec 034 — WagerPools factory, address-based (only where deployed)
         callsignRegistry: deployed.callsignRegistry, // spec 054 — %callsign naming registry (only where deployed)

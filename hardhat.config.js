@@ -403,8 +403,67 @@ module.exports = {
     //
     // `test/config/CompilerTargets.test.js` now fails on any override whose target is not a real
     // file belonging to a package contracts/ actually imports, so this cannot silently come back.
-    overrides: Object.fromEntries(
-      [
+    overrides: Object.fromEntries([
+      // ── THE ONE CANCUN ISLAND (spec 030 pillar A, issue #1268) ─────────────────────────────────
+      //
+      // Everything else in this repo targets `paris`, because ETC 61 / Mordor 63 are live networks
+      // that have neither PUSH0 nor MCOPY. The OpenZeppelin 5.4.0 Governor closure cannot meet that
+      // target: `Governor` -> `SignatureChecker` -> `utils/Bytes.sol` uses `mcopy` directly, and no
+      // compiler flag emulates it. Spec 030 deferred native DAO creation for exactly this reason.
+      //
+      // The maintainer's decision (#1268) is to take the LATEST OZ Governor and DROP pre-Cancun
+      // chains for THIS CONTRACT ONLY. Native DAO creation therefore ships on the Cancun EVM
+      // mainnets + Amoy and is absent — honestly, by decision rather than by deferral — on ETC and
+      // Mordor. Pillar B's `ExternalDAORegistry` imports only the `IGovernor` INTERFACE, stays
+      // paris, and keeps serving every chain unchanged.
+      //
+      // WHY THE LIST IS THIS LONG, AND WHY IT IS A LIST. Hardhat builds one compilation job per
+      // RESOLVED file — dependencies included, not just the contracts under `contracts/` — and picks
+      // that job's settings from the file's OWN override. So overriding only the two first-party
+      // contracts leaves `SignatureChecker.sol` (and every Governor file) rooting its own `paris`
+      // job that still pulls in `Bytes.sol`, and the build fails with `Function "mcopy" not found`
+      // pointing at a file nobody edited. Every file below transitively imports `utils/Bytes.sol`.
+      //
+      // `TimelockController.sol` and `StandardDAOToken.sol` do NOT import it, and are here for a
+      // different reason: `StandardDAOFactory` DEPLOYS both, so their creation code is embedded
+      // from ITS job. Left on the default target their committed artifacts would describe `paris`
+      // bytes while the factory deployed `cancun` bytes — a source-verification mismatch on a live
+      // treasury contract. The artifact must be the thing that gets deployed.
+      //
+      // Regenerate after changing the pillar-A imports: any file reaching
+      // `@openzeppelin/contracts/utils/Bytes.sol` from `contracts/clearpath/StandardDAO*.sol`
+      // belongs here. Adding an unrelated file here would silently make it undeployable on ETC and
+      // Mordor, which is why `test/config/CompilerTargets.test.js` pins this set exactly.
+      ...[
+        "contracts/clearpath/StandardDAOFactory.sol",
+        "contracts/clearpath/StandardDAODeployers.sol",
+        "contracts/clearpath/StandardDAOGovernor.sol",
+        "contracts/clearpath/StandardDAOToken.sol",
+        "@openzeppelin/contracts/governance/Governor.sol",
+        "@openzeppelin/contracts/governance/TimelockController.sol",
+        "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol",
+        "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol",
+        "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol",
+        "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol",
+        "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol",
+        "@openzeppelin/contracts/utils/Bytes.sol",
+        "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol",
+      ].map((f) => [
+        f,
+        // Identical to the 0.8.24 compiler entry in EVERY other setting — only the EVM target moves.
+        // A second difference here (optimizer runs, viaIR, metadata) would make the pillar-A
+        // bytecode differ from the rest of the estate for a reason nobody chose.
+        {
+          version: "0.8.24",
+          settings: {
+            optimizer: { enabled: true, runs: 1 },
+            viaIR: true,
+            evmVersion: "cancun",
+            metadata: { bytecodeHash: "none" },
+          },
+        },
+      ]),
+      ...[
         "contracts/mocks/vendor/SafeVendorImports.sol",
         "@safe-global/safe-contracts/contracts/Safe.sol",
         "@safe-global/safe-contracts/contracts/SafeL2.sol",
@@ -442,8 +501,8 @@ module.exports = {
       ].map((f) => [
         f,
         { version: "0.8.24", settings: { optimizer: { enabled: true, runs: 1 }, viaIR: false, evmVersion: "paris", metadata: { bytecodeHash: "none" } } },
-      ])
-    ),
+      ]),
+    ]),
   },
   networks: {
     hardhat: {
