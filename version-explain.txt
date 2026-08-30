@@ -1,11 +1,11 @@
-previous: v1.13.4
+previous: v1.13.5
 commits:  6
-  [unclassified] Merge pull request #1359 from chippr-robotics/staging
-  [unclassified] Merge pull request #1358 from chippr-robotics/chore/auto-backmerge-main-into-staging
-  [unclassified] Merge pull request #1357 from chippr-robotics/fix/apply-sa-project-iam-read
-  [fix -> patch] the apply identity could not even read project IAM policy
-  [unclassified] Merge pull request #1356 from chippr-robotics/release/v1.13.4-changelog
-  [skipped] chore(release): v1.13.4 [skip release]
-bump:     patch
+  [unclassified] Merge pull request #1369 from chippr-robotics/hotfix/networks-pol-rename
+  [feat -> minor] complete the POL rename sweep and wrap/voucher test alignment
+  [feat -> minor] MATIC to POL on Polygon/Amoy, Bitcoin network card
+  [feat -> minor] account add chooser, wrap as a Trade view, FWMV send from portfolio
+  [unclassified] Merge pull request #1360 from chippr-robotics/release/v1.13.5-changelog
+  [skipped] chore(release): v1.13.5 [skip release]
+bump:     minor
 reason:   computed
-next:     v1.13.5
+next:     v1.14.0

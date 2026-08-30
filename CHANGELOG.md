@@ -14,6 +14,29 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.14.0 — 2026-08-29
+
+Promoted from: none — released directly from main
+Previous release: v1.13.5 · Range: `v1.13.5..v1.14.0` (6 commits)
+
+### 🚀 Features
+
+- feat(networks): complete the POL rename sweep and wrap/voucher test alignment
+- feat(networks): MATIC to POL on Polygon/Amoy, Bitcoin network card
+- feat(nav): account add chooser, wrap as a Trade view, FWMV send from portfolio
+
+### Artifacts
+
+Range: `v1.13.5..v1.14.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
 ## v1.13.5 — 2026-08-28
 
 Promoted from: v1.13.5-rc.2
