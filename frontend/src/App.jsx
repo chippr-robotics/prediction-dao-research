@@ -1,4 +1,5 @@
 //core
+import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import './theme.css'
 import './App.css'
@@ -227,6 +228,12 @@ function AppContent() {
 }
 
 function App() {
+  // Spec 102: one boot marker for the native smoke tier. Capacitor forwards
+  // console output to logcat / the simulator console, so the smoke jobs can
+  // assert "the shell actually rendered" instead of "the process exists".
+  useEffect(() => {
+    console.info('[fw-smoke] shell-mounted')
+  }, [])
   return (
     <Router>
       <AppContent />

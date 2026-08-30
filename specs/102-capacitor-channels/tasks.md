@@ -83,11 +83,11 @@ code under `frontend/src/lib/native/`; sync/gate scripts under
 
 **Independent test**: quickstart.md "Release-chain validation" on a test tag.
 
-- [ ] T019 [US3] Add `android-artifact` job to the release workflow (web build → `cap sync android` → Gradle `bundleRelease` → sign with the upload key via the spec-097 delivery; missing credential FAILS naming the secret) producing `.aab` + sha256; add the upload-key secret to `scripts/secrets/registry.js` AND both tfvars lists together (`npm run test:secrets` proves no drift).
-- [ ] T020 [P] [US3] Add `ios-artifact` job (macOS runner: web build → `cap sync ios` → `xcodebuild archive` + unsigned export → zipped archive + sha256) per `contracts/release-artifacts.md`; signing/upload stays the operator ceremony.
-- [ ] T021 [US3] Add `native-smoke-android` (emulator) and `native-smoke-ios` (simulator) jobs asserting launch → sign-in gate visible → one live read surface → background/foreground past threshold re-prompts (FR-010); all four new jobs GATE the release (no `continue-on-error` — constitution IV).
-- [ ] T022 [US3] Extend the release record generation (spec-076 scripts) with the per-channel artifact rows (`channel`/`artifact`/`sha256`/`signed` per data-model.md), with the row-only-if-built-and-smoked rule enforced in the generator, and a must-fail check for a record describing a missing artifact.
-- [ ] T023 [P] [US3] Write `docs/runbooks/native-release-operations.md`: store account setup, iOS signing + upload ceremony, Android track promotion, association-file deployment, store-policy review checklist (mini-apps/wagering), consuming the recorded digests.
+- [X] T019 [US3] Add `android-artifact` job to the release workflow (web build → `cap sync android` → Gradle `bundleRelease` → sign with the upload key via the spec-097 delivery; missing credential FAILS naming the secret) producing `.aab` + sha256; add the upload-key secret to `scripts/secrets/registry.js` AND both tfvars lists together (`npm run test:secrets` proves no drift).
+- [X] T020 [P] [US3] Add `ios-artifact` job (macOS runner: web build → `cap sync ios` → `xcodebuild archive` + unsigned export → zipped archive + sha256) per `contracts/release-artifacts.md`; signing/upload stays the operator ceremony.
+- [X] T021 [US3] Add `native-smoke-android` (emulator) and `native-smoke-ios` (simulator) jobs asserting launch → sign-in gate visible → one live read surface → background/foreground past threshold re-prompts (FR-010); all four new jobs GATE the release (no `continue-on-error` — constitution IV).
+- [X] T022 [US3] Extend the release record generation (spec-076 scripts) with the per-channel artifact rows (`channel`/`artifact`/`sha256`/`signed` per data-model.md), with the row-only-if-built-and-smoked rule enforced in the generator, and a must-fail check for a record describing a missing artifact.
+- [X] T023 [P] [US3] Write `docs/runbooks/native-release-operations.md`: store account setup, iOS signing + upload ceremony, Android track promotion, association-file deployment, store-policy review checklist (mini-apps/wagering), consuming the recorded digests.
 
 **Checkpoint**: A test tag yields three digest-recorded artifacts with gating smoke jobs.
 

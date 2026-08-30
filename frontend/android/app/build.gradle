@@ -16,10 +16,29 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Spec 102: upload-key signing, ENV-ONLY. The release workflow materialises
+    // the keystore from Secret Manager into the runner's temp dir and passes
+    // everything through the environment — never argv, never a committed
+    // property file (spec 097 rule 4). With no env set, the release build is
+    // UNSIGNED and the release record says so (`signed: false`); it never
+    // half-signs or guesses.
+    signingConfigs {
+        upload {
+            if (System.getenv("ANDROID_UPLOAD_KEYSTORE_FILE")) {
+                storeFile file(System.getenv("ANDROID_UPLOAD_KEYSTORE_FILE"))
+                storePassword System.getenv("ANDROID_UPLOAD_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_UPLOAD_KEY_ALIAS") ?: "upload"
+                keyPassword System.getenv("ANDROID_UPLOAD_KEY_PASSWORD") ?: System.getenv("ANDROID_UPLOAD_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (System.getenv("ANDROID_UPLOAD_KEYSTORE_FILE")) {
+                signingConfig signingConfigs.upload
+            }
         }
     }
 }
