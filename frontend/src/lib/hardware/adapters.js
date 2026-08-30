@@ -31,6 +31,10 @@ export const TRANSPORT_KINDS = Object.freeze({
   WEBHID: 'webhid',
   WEBUSB: 'webusb',
   WEBBLE: 'webble',
+  // Spec 102: the native apps' Bluetooth rail — the OS BLE stack via the
+  // Capacitor plugin, since a native WebView has no Web Bluetooth. Selected
+  // by runtime in ledgerAdapter.js, never by this browser-capability probe.
+  NATIVEBLE: 'nativeble',
 })
 
 /** Which browser transports exist here. Pure capability read — no permission prompt. */

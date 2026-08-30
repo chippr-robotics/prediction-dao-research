@@ -99,9 +99,9 @@ code under `frontend/src/lib/native/`; sync/gate scripts under
 
 **Independent test**: quickstart.md device validation 4 (staged manual protocol).
 
-- [ ] T024 [US4] Add `@capacitor-community/bluetooth-le` (pinned exact) via `npm run deps:reinstall` (byte gates re-run) and implement the native BLE transport rung in `frontend/src/lib/hardware/ledgerAdapter.js` per contract §3 (Ledger BLE service/characteristic framing over the plugin; `exchange`/`close` interface; selected by runtime seam + capability).
-- [ ] T025 [US4] Normalize every plugin failure to `HW_ERROR_CODES` (distinct permission-denied vs radio-off vs discovery codes with recovery guidance) in `frontend/src/lib/hardware/errors.js`/`ledgerAdapter.js`; Vitest `frontend/src/test/native/ledgerBleRung.test.js` with a stub plugin proving framing round-trip and error normalization (a raw SDK message reaching the member is the must-fail case).
-- [ ] T026 [P] [US4] Extend `docs/runbooks/hardware-wallet-staging-validation.md` with the native-BLE staged manual protocol (pair, verify-on-device, sign, permission-denied leg) referenced by the matrix row.
+- [X] T024 [US4] Add `@capacitor-community/bluetooth-le` (pinned exact) via `npm run deps:reinstall` (byte gates re-run) and implement the native BLE transport rung in `frontend/src/lib/hardware/ledgerAdapter.js` per contract §3 (Ledger BLE service/characteristic framing over the plugin; `exchange`/`close` interface; selected by runtime seam + capability).
+- [X] T025 [US4] Normalize every plugin failure to `HW_ERROR_CODES` (distinct permission-denied vs radio-off vs discovery codes with recovery guidance) in `frontend/src/lib/hardware/errors.js`/`ledgerAdapter.js`; Vitest `frontend/src/test/native/ledgerBleRung.test.js` with a stub plugin proving framing round-trip and error normalization (a raw SDK message reaching the member is the must-fail case).
+- [X] T026 [P] [US4] Extend `docs/runbooks/hardware-wallet-staging-validation.md` with the native-BLE staged manual protocol (pair, verify-on-device, sign, permission-denied leg) referenced by the matrix row.
 
 **Checkpoint**: Rung compiled into native builds; guarantees above the transport untouched.
 
