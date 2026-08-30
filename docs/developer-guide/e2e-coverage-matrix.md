@@ -26,7 +26,7 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 103 |
+| Spec directories | 104 |
 | With a member-facing flow | 81 |
 | Member-facing flows | 160 |
 | 🟢 covered | 142 |
@@ -737,6 +737,7 @@ Listed so the gate can tell "correctly omitted" from "forgotten".
 | `099-network-status-miniapp` — Network status mini-app | Spec landed in release 1.14.0; the mini-app package has no member surface yet. Flows are owed when the package ships (#1364). |
 | `100-passkey-solana` — Passkey-native Solana | Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364). |
 | `101-passkey-zcash` — Passkey-native Zcash | Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364). |
+| `102-capacitor-channels` — Native release channels (iOS + Android + web) | Spec stage only; no member surface exists yet. When the native channels ship, flows are owed for the native-only behaviors the spec names (app-lock on lifecycle, native passkey ceremony, Bluetooth hardware signing, deep-link entry), with hardware-bound legs recorded honestly as staged manual validation (#1382). |
 
 ## Covered but not proven
 
