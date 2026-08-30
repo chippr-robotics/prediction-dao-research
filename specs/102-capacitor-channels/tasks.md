@@ -126,8 +126,8 @@ code under `frontend/src/lib/native/`; sync/gate scripts under
 
 **Independent test**: quickstart.md "Tenant validation".
 
-- [ ] T029 [US6] Add a test tenant fixture with a `native` block and a build-time test (Vitest or script-level, `frontend/src/test/native/tenantNativeIdentity.test.js`) proving: shells carry only that tenant's appId/name; unknown tenant fails naming it; two tenants' appIds are distinct (uniqueness gate from T006 exercised).
-- [ ] T030 [P] [US6] Document the tenant native-onboarding path (manifest block, icons, association files, store identity) in `docs/developer-guide/white-label-tenants.md` + cross-link from `native-channels.md`.
+- [X] T029 [US6] Add a test tenant fixture with a `native` block and a build-time test (Vitest or script-level, `frontend/src/test/native/tenantNativeIdentity.test.js`) proving: shells carry only that tenant's appId/name; unknown tenant fails naming it; two tenants' appIds are distinct (uniqueness gate from T006 exercised).
+- [X] T030 [P] [US6] Document the tenant native-onboarding path (manifest block, icons, association files, store identity) in `docs/developer-guide/white-label-tenants.md` + cross-link from `native-channels.md`.
 
 **Checkpoint**: Tenant isolation provable without a second real tenant.
 

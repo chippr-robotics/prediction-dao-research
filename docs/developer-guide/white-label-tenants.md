@@ -70,3 +70,31 @@ Suspension never traps value: contracts don't know about suspension; members kee
 documented direct-claim path. Shared-mode ("branding-only") tenants have cosmetic
 isolation only — this must be disclosed to the tenant, and graduation to dedicated
 contracts preserves claimability of positions opened on the shared estate.
+
+## Native channels (spec 102)
+
+A tenant gets iOS/Android apps by adding the OPTIONAL `native` block to its
+manifest (`tenants/<id>/manifest.json`; schema in `tenants/manifest.schema.json`):
+
+```jsonc
+"native": {
+  "ios":     { "appId": "app.<tenant>.member" },   // bundle identifier
+  "android": { "appId": "app.<tenant>.member" },   // application id
+  "displayName": "<Home-screen name>",
+  "iconSource": "icons/native/"
+}
+```
+
+Rules, all gated: appIds are reverse-DNS and globally unique ACROSS tenants
+(the same tenant may reuse one id on both platforms); an absent block means
+NO native channel — a native build for that tenant fails naming it, never
+borrowing another tenant's identity; the associated domain (passkey RP +
+universal links) is the tenant's `identity.domains[0]`, synced into both
+shells by `scripts/native/sync-native-config.js --tenant <id>`.
+
+Onboarding beyond the manifest is the OPERATOR ceremony — store records under
+the tenant's appIds, association files generated per tenant
+(`scripts/native/generate-association-files.js --tenant <id> …`) and served
+from the TENANT's origin, and its own support-floor document. See
+`docs/runbooks/native-release-operations.md` and
+`docs/developer-guide/native-channels.md`.
