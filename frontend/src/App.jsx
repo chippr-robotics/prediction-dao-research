@@ -1,4 +1,5 @@
 //core
+import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import './theme.css'
 import './App.css'
@@ -44,6 +45,8 @@ import StagingBanner from './components/ui/StagingBanner'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 import AppLockOverlay from './components/applock/AppLockOverlay'
+import StaleBuildNotice from './components/native/StaleBuildNotice'
+import NativeDeepLinks from './components/native/NativeDeepLinks'
 import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
 import PwaUpdateNotification from './components/pwa/PwaUpdateNotification'
 
@@ -215,11 +218,27 @@ function AppContent() {
           undropped) after the member unlocks. It renders null for everyone who has not turned the
           setting on, which is everyone by default. */}
       <AppLockOverlay />
+
+      {/* Spec 102 FR-015: on a native build older than the published support
+          floor, say so with the update path named. Renders null on web and
+          whenever no floor is knowable — it never manufactures a banner from
+          a network failure. */}
+      <StaleBuildNotice />
+
+      {/* Spec 102 US5: universal/app links land on the linked surface. Inert
+          on web; renders nothing everywhere. */}
+      <NativeDeepLinks />
     </>
   )
 }
 
 function App() {
+  // Spec 102: one boot marker for the native smoke tier. Capacitor forwards
+  // console output to logcat / the simulator console, so the smoke jobs can
+  // assert "the shell actually rendered" instead of "the process exists".
+  useEffect(() => {
+    console.info('[fw-smoke] shell-mounted')
+  }, [])
   return (
     <Router>
       <AppContent />

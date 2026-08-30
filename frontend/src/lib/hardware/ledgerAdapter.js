@@ -13,6 +13,7 @@
 
 import { HardwareWalletError, HW_ERROR_CODES } from './errors'
 import { detectTransports, ledgerTransportKind, TRANSPORT_KINDS } from './adapters'
+import { isNativeRuntime, nativeCapability, NATIVE_CAPABILITIES } from '../native/runtime'
 
 // hw-app-eth expects paths without the leading "m/".
 const appPath = (path) => String(path).replace(/^m\//, '')
@@ -46,6 +47,13 @@ export function classifyLedgerError(err) {
   }
   if (name === 'BluetoothRequired') return HW_ERROR_CODES.BLUETOOTH_UNAVAILABLE
   if (/web bluetooth not supported/i.test(message)) return HW_ERROR_CODES.TRANSPORT_UNSUPPORTED
+  // The native BLE plugin (spec 102) reports its failures as plain Errors with
+  // these wordings: a radio that is off/unauthorized is the member's Bluetooth
+  // state (distinct remedy), a dismissed device chooser is a declined pairing.
+  if (/bluetooth.*(disabled|turned off|not enabled|unauthorized)|location.*(disabled|denied)/i.test(message)) {
+    return HW_ERROR_CODES.BLUETOOTH_UNAVAILABLE
+  }
+  if (/request ?device.*(cancel|closed)|user cancel/i.test(message)) return HW_ERROR_CODES.PERMISSION_DENIED
   if (status === 0x5515 || status === 0x6982 || status === 0x6b0c) return HW_ERROR_CODES.DEVICE_LOCKED
   if (status === 0x6511 || status === 0x6e00 || status === 0x6d00 || status === 0x6e01) {
     return HW_ERROR_CODES.WRONG_APP
@@ -82,6 +90,24 @@ async function assertBluetoothRadio() {
 
 /** @returns {Promise<{ transport: object, kind: string }>} */
 async function openTransport() {
+  // Spec 102: in the native apps the browser transports do not exist — the
+  // rail is the OS Bluetooth stack behind the runtime seam, offered only when
+  // the plugin has actually confirmed itself, refused with the seam's own
+  // member-renderable reason otherwise. Everything below the `return` is
+  // byte-identical web behavior.
+  if (isNativeRuntime()) {
+    const capability = nativeCapability(NATIVE_CAPABILITIES.BLE)
+    if (capability.state !== 'available') {
+      throw new HardwareWalletError(HW_ERROR_CODES.BLUETOOTH_UNAVAILABLE, capability.reason, { vendor: 'ledger' })
+    }
+    try {
+      const { openNativeBleTransport } = await import('../native/ledgerBleTransport')
+      return { transport: await openNativeBleTransport(), kind: TRANSPORT_KINDS.NATIVEBLE }
+    } catch (err) {
+      throw wrap(err)
+    }
+  }
+
   const kind = ledgerTransportKind(detectTransports())
   if (!kind) {
     throw new HardwareWalletError(HW_ERROR_CODES.TRANSPORT_UNSUPPORTED, undefined, { vendor: 'ledger' })

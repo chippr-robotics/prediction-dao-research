@@ -480,6 +480,34 @@ artifacts live under `specs/<feature>/`.
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
+- **Native release channels (spec 102): the app ships as Capacitor iOS/Android shells beside the
+  web/PWA, and FIVE rules govern every change.** (1) **Seam-only native logic**:
+  `frontend/src/lib/native/runtime.js` is the ONE runtime/capability read (three-state,
+  `available` only when the bridging plugin confirmed itself — never fabricate); the four gaps
+  bridge inside EXISTING seams — passkey ceremony in `lib/passkey/credentials.js`
+  (`resolveCredentialManager`, `@capgo/capacitor-passkey` behind a credentials-shaped adapter that
+  pre-encodes PRF salts to WebAuthn-JSON and decodes results — the plugin JSON-clones extensions
+  and would mangle a Uint8Array), Ledger BLE as a `hw-transport` rung in `ledgerAdapter.js`
+  (`lib/native/ledgerBleTransport.js`), app-lock via `lib/native/lifecycle.js` feeding the
+  existing hidden⇒engage rule (INERT on web), deep links via `lib/native/deepLinks.js`
+  (tenant-origin URLs ONLY). (2) **Version/identity fields in the shells are SYNC-ONLY**:
+  `scripts/native/sync-native-config.js` writes them from the tenant manifest (`native` block —
+  one tenant, one appId per platform, absence = no native channel, never a fallback) +
+  `scripts/release/version.js`; `check:native-versions` fails CI on hand edits.
+  (3) **CSP is DERIVED, never widened**: the native meta policy is computed FROM `nginx.conf`
+  (`scripts/native/nativeCsp.js`; parity-gated — `script-src` keeps `blob:`, never gains
+  `https:`); the web nginx files stay byte-identical. (4) **Release artifacts precede the tag**:
+  release.yml's native-gate → android/ios artifact + emulator/simulator smoke jobs all gate the
+  `release` job, so a record row exists exactly when its artifact was built and smoked; iOS ships
+  an UNSIGNED archive (Apple identity is operator-held), Android signs only via env-delivered
+  Secret Manager material once `ANDROID_SIGNING_SERVICE_ACCOUNT` is set — unsigned is recorded
+  `signed:false`, loudly. (5) **Honest degradation everywhere**: capability gaps render the seam's
+  reason in place (`NativeCapabilityNotice`), the FR-015 stale-build floor renders NOTHING when
+  unknowable (a network failure is not a fact about the member's build), and device-bound flows
+  (BLE signing, real passkey PRF) are staged MANUAL protocols in the runbooks, never fake CI
+  coverage. Capacitor deps are pinned EXACT under the spec-075 lockfile rules. See
+  `docs/developer-guide/native-channels.md` + `docs/runbooks/native-release-operations.md` +
+  `specs/102-capacitor-channels/`.
 - **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
   (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
   each of which has a way to be silently wrong:
@@ -734,7 +762,7 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/094-e2e-coverage-expansion/plan.md
+at specs/102-capacitor-channels/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also

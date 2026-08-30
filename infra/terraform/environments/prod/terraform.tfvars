@@ -113,6 +113,18 @@ managed_secret_ids = [
   "QUICKNODE_RPC_004_API",
   "QUICKNODE_RPC_005_API",
 
+  # Android upload-key signing (spec 102, release channel CI). CONTAINERS ONLY,
+  # created empty by Terraform; the operator adds the payloads (a JKS keystore
+  # and its password — created WITHOUT a trailing newline, since the release
+  # job reads it through $() which strips one) per
+  # docs/runbooks/native-release-operations.md. Read at release time by a
+  # dedicated CI service account over workload identity — deliberately NOT the
+  # workstation identity and NOT any node, so neither grant list carries these.
+  # Signing stays disabled (unsigned .aab, recorded signed:false) until the
+  # ANDROID_SIGNING_SERVICE_ACCOUNT repo variable is set.
+  "fairwins-android-upload-keystore",
+  "fairwins-android-upload-keystore-password",
+
 
   # Workstation secrets (spec 097). Mirrors scripts/secrets/registry.js — the parity test keeps
   # these in step; do not edit one list without the other.

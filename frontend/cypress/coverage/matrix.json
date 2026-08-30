@@ -4,7 +4,7 @@
   "specs": [
     {
       "id": "001-cypress-e2e-flows",
-      "title": "Core wager lifecycle (create → accept → resolve → claim/refund)",
+      "title": "Core wager lifecycle (create \u2192 accept \u2192 resolve \u2192 claim/refund)",
       "memberFacing": true,
       "flows": [
         {
@@ -252,7 +252,7 @@
             "frontend/cypress/e2e/full/38-passkey-compliance.cy.js::CP-02",
             "frontend/cypress/e2e/full/38-passkey-compliance.cy.js::CP-03"
           ],
-          "note": "CP-01 is no-chain (the entry gate is a browser decision and passkey sign-in needs no chain): it proves the gate is not bypassable by the passkey route, asserted by OCCLUSION rather than absence, and that entering then lets the passkey session complete. CP-02/CP-03 need chain state: screening (SanctionsGuard) and the membership gate. CP-02 grants membership BEFORE flagging so the membership gate cannot explain the refusal, and attributes it to screening by a control — lifting only the flag makes the pre-submission refusal disappear. It cannot yet assert the refusal's WORDING because the guard's custom error is not decoded (#1292)."
+          "note": "CP-01 is no-chain (the entry gate is a browser decision and passkey sign-in needs no chain): it proves the gate is not bypassable by the passkey route, asserted by OCCLUSION rather than absence, and that entering then lets the passkey session complete. CP-02/CP-03 need chain state: screening (SanctionsGuard) and the membership gate. CP-02 grants membership BEFORE flagging so the membership gate cannot explain the refusal, and attributes it to screening by a control \u2014 lifting only the flag makes the pre-submission refusal disappear. It cannot yet assert the refusal's WORDING because the guard's custom error is not decoded (#1292)."
         }
       ]
     },
@@ -761,7 +761,7 @@
             "frontend/cypress/e2e/full/37-backup-roundtrip.cy.js::BKC-01",
             "frontend/cypress/e2e/full/37-backup-roundtrip.cy.js::BKC-02"
           ],
-          "note": "The no-chain half pins the honest-state rules (no secret material rendered; an unsettled pointer read is never reported as \"no backup\"). The on-chain half is the round trip itself: recording the pointer is a transaction the member pays gas for, so admission rule 2 puts it there — BKC-01 reads the pointer back from chain and checks it names the blob that was pinned (and that the pinned bytes are ciphertext), BKC-02 wipes the device and restores from that pointer. Both tiers drive the classic signer rail; the passkey sendCalls pointer path is covered by frontend/src/test/backup/useDataBackup.backup.test.jsx only."
+          "note": "The no-chain half pins the honest-state rules (no secret material rendered; an unsettled pointer read is never reported as \"no backup\"). The on-chain half is the round trip itself: recording the pointer is a transaction the member pays gas for, so admission rule 2 puts it there \u2014 BKC-01 reads the pointer back from chain and checks it names the blob that was pinned (and that the pinned bytes are ciphertext), BKC-02 wipes the device and restores from that pointer. Both tiers drive the classic signer rail; the passkey sendCalls pointer path is covered by frontend/src/test/backup/useDataBackup.backup.test.jsx only."
         }
       ]
     },
@@ -869,7 +869,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "reason": "The gateway is a separate service with its own test suite; driving it from the browser suite would test the deployment, not the product. The member-visible half — the self-submit fallback — is tracked under intents.sign-and-relay."
+          "reason": "The gateway is a separate service with its own test suite; driving it from the browser suite would test the deployment, not the product. The member-visible half \u2014 the self-submit fallback \u2014 is tracked under intents.sign-and-relay."
         }
       ]
     },
@@ -1029,7 +1029,7 @@
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-03"
           ],
           "issue": "#1271",
-          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
+          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
         },
         {
           "id": "passkey.recover-account",
@@ -1042,7 +1042,7 @@
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-01",
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-04"
           ],
-          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
+          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
           "issue": "#1271"
         },
         {
@@ -1270,7 +1270,7 @@
     },
     {
       "id": "050-earn-lending-rewards",
-      "title": "Earn — lending",
+      "title": "Earn \u2014 lending",
       "memberFacing": true,
       "flows": [
         {
@@ -1459,7 +1459,7 @@
     },
     {
       "id": "055-collectibles-portfolio",
-      "title": "Collect — buy side",
+      "title": "Collect \u2014 buy side",
       "memberFacing": true,
       "flows": [
         {
@@ -1478,7 +1478,7 @@
     },
     {
       "id": "056-collectibles-sell-side",
-      "title": "Collect — sell side",
+      "title": "Collect \u2014 sell side",
       "memberFacing": true,
       "flows": [
         {
@@ -1496,7 +1496,7 @@
     },
     {
       "id": "057-predict-polymarket",
-      "title": "Predict — Polymarket",
+      "title": "Predict \u2014 Polymarket",
       "memberFacing": true,
       "flows": [
         {
@@ -1520,7 +1520,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "reason": "The order book is a third-party venue with no local stand-in; the member-visible half — quoting, fee disclosure and the Polygon-only gate — is drivable and tracked as predict.builder-fee-disclosed."
+          "reason": "The order book is a third-party venue with no local stand-in; the member-visible half \u2014 quoting, fee disclosure and the Polygon-only gate \u2014 is drivable and tracked as predict.builder-fee-disclosed."
         },
         {
           "id": "predict.hidden-off-polygon",
@@ -1877,7 +1877,7 @@
     },
     {
       "id": "068-protect-multi-chain-policies",
-      "title": "Protect — policy v2",
+      "title": "Protect \u2014 policy v2",
       "memberFacing": true,
       "flows": [
         {
@@ -2331,7 +2331,7 @@
       "flows": [
         {
           "id": "verify.three-verdicts",
-          "name": "Verify a signature and get valid, invalid, or unverifiable — never a forged-looking result from an RPC timeout",
+          "name": "Verify a signature and get valid, invalid, or unverifiable \u2014 never a forged-looking result from an RPC timeout",
           "status": "covered",
           "tier": "no-chain",
           "proposedTier": "no-chain",
@@ -2534,7 +2534,7 @@
       "flows": [
         {
           "id": "admin.control-room-gating",
-          "name": "An operator sees granted, denied, or could-not-verify — never a silent denial",
+          "name": "An operator sees granted, denied, or could-not-verify \u2014 never a silent denial",
           "status": "covered",
           "tier": "no-chain",
           "depth": "settled",
@@ -2583,7 +2583,7 @@
           "tests": [
             "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-01"
           ],
-          "note": "default OFF is the absence of the feature, not a UI state, so it is proved by absence at both ends — before the switch and after it is switched back"
+          "note": "default OFF is the absence of the feature, not a UI state, so it is proved by absence at both ends \u2014 before the switch and after it is switched back"
         },
         {
           "id": "assistant.honest-unreachable",
@@ -2595,7 +2595,7 @@
           "tests": [
             "frontend/cypress/e2e/fast/38-assistant.cy.js::AS-02"
           ],
-          "note": "no intercept — the no-chain dev server points VITE_RELAYER_URL at a dead port, so the transport failure is real; the test asserts the named error, the retry, and the ABSENCE of an assistant bubble"
+          "note": "no intercept \u2014 the no-chain dev server points VITE_RELAYER_URL at a dead port, so the transport failure is real; the test asserts the named error, the retry, and the ABSENCE of an assistant bubble"
         },
         {
           "id": "assistant.memory-clear",
@@ -2620,7 +2620,7 @@
             "frontend/cypress/e2e/fast/39-api-access.cy.js::API-01",
             "frontend/cypress/e2e/fast/39-api-access.cy.js::API-05"
           ],
-          "note": "cy.assertNoClearSecret sweeps every storage key and the whole DOM after the reveal is dismissed; the metadata record is re-read after a reload. API-05 holds the three-state gate in both directions — an unreadable membership offers a retry, a chain that answered tier 0 offers the upgrade route, and neither is the console."
+          "note": "cy.assertNoClearSecret sweeps every storage key and the whole DOM after the reveal is dismissed; the metadata record is re-read after a reload. API-05 holds the three-state gate in both directions \u2014 an unreadable membership offers a retry, a chain that answered tier 0 offers the upgrade route, and neither is the console."
         },
         {
           "id": "api-access.revoke-key",
@@ -2650,7 +2650,7 @@
             "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-09",
             "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-10"
           ],
-          "note": "The console is a spec-073 registry package, so its surface only exists where a registry can be written to and package bytes can be served: the on-chain tier publishes api-access through publish:local:miniapps and launches it through the real submit/approve/launchable path, with only the IPFS transport and the member API stubbed (bodies copied from services/relay-gateway/src/memberApi/). API-06 reads the permission set out of the manifest the chain committed to — no wallet:submit, no contracts — and API-10 asserts the key ceremony lands on the HOST Settings card, because a package cannot sign. API-08 reads the app's store namespace back out of localStorage to prove the bearer token was never persisted. The unconfigured-gateway branch of the host card is NOT reachable from any e2e build (no dev server produces relayerBaseUrl() === ''), so it is held at unit level in frontend/src/test/ApiAccessPanel.test.jsx instead."
+          "note": "The console is a spec-073 registry package, so its surface only exists where a registry can be written to and package bytes can be served: the on-chain tier publishes api-access through publish:local:miniapps and launches it through the real submit/approve/launchable path, with only the IPFS transport and the member API stubbed (bodies copied from services/relay-gateway/src/memberApi/). API-06 reads the permission set out of the manifest the chain committed to \u2014 no wallet:submit, no contracts \u2014 and API-10 asserts the key ceremony lands on the HOST Settings card, because a package cannot sign. API-08 reads the app's store namespace back out of localStorage to prove the bearer token was never persisted. The unconfigured-gateway branch of the host card is NOT reachable from any e2e build (no dev server produces relayerBaseUrl() === ''), so it is held at unit level in frontend/src/test/ApiAccessPanel.test.jsx instead."
         }
       ]
     },
@@ -2717,6 +2717,57 @@
       "memberFacing": false,
       "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
       "flows": []
+    },
+    {
+      "id": "102-capacitor-channels",
+      "title": "Native release channels (iOS + Android + web)",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "native.passkey-signin",
+          "name": "A member signs in on the native app with the platform passkey ceremony and lands on the SAME account they hold on the web channel, PRF-derived keys intact; an unsupported device refuses with a named reason (unit: src/test/native/passkeyBridge.test.js; device leg: staged manual protocol in docs/runbooks/native-release-operations.md)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "account-native",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.lifecycle-lock",
+          "name": "Backgrounding the native app past the lock threshold re-prompts before any wallet surface on foreground (unit: src/test/native/lifecycle.test.js + the native case in src/test/applock/AppLockOverlay.test.jsx; the release smoke jobs prove launch/render/lifecycle-survival but cannot reach a signed-in lock)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.deep-link-entry",
+          "name": "A share link opened with the app installed lands on the linked surface in-app through any due gate; foreign-origin URLs through the link channel are ignored (unit: src/test/native/deepLinks.test.js)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "none",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.ble-signing",
+          "name": "Ledger signing over the native Bluetooth rail with physical confirmation on the device screen",
+          "status": "out-of-scope",
+          "reason": "Requires a physical Nano X and a human pressing its buttons - automation cannot confirm on a device screen. Protocol arithmetic and error normalization are unit-pinned (src/test/native/ledgerBleRung.test.js); the device run is the staged manual addendum in docs/runbooks/hardware-wallet-staging-validation.md, required before store submission.",
+          "tier": "none",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "proposedTier": "account-native"
+        }
+      ]
     }
   ]
 }

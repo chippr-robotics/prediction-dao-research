@@ -41,6 +41,7 @@ import {
   releaseLock,
   subscribeAppLock,
 } from '../../lib/applock/appLock'
+import { subscribeAppHidden } from '../../lib/native/lifecycle'
 import './AppLockOverlay.css'
 
 /**
@@ -124,6 +125,11 @@ function ArmedAppLock({ disconnectWallet }) {
     }
     window.addEventListener('pagehide', engageLock)
     document.addEventListener('visibilitychange', onVisibility)
+    // Spec 102 (native channels): a backgrounded native WebView does not
+    // reliably fire visibilitychange, so the OS lifecycle feeds the same rule
+    // through the native seam. Inert on web — the DOM listeners above stay the
+    // only source there, so nothing double-fires.
+    const unsubscribeNative = subscribeAppHidden(engageLock)
     arm()
 
     return () => {
@@ -131,6 +137,7 @@ function ArmedAppLock({ disconnectWallet }) {
       for (const type of ACTIVITY_EVENTS) window.removeEventListener(type, arm)
       window.removeEventListener('pagehide', engageLock)
       document.removeEventListener('visibilitychange', onVisibility)
+      unsubscribeNative()
     }
   }, [locked])
 

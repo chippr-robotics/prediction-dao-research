@@ -26,13 +26,13 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 103 |
-| With a member-facing flow | 81 |
-| Member-facing flows | 160 |
+| Spec directories | 104 |
+| With a member-facing flow | 82 |
+| Member-facing flows | 164 |
 | 🟢 covered | 142 |
 | 🟡 partial | 0 |
-| 🔴 absent | 12 |
-| ⚪ out of scope | 6 |
+| 🔴 absent | 15 |
+| ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
 The last row is the honest read of the suite: those flows have passing tests that do not
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-62 flows — 🟢 48 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
+64 flows — 🟢 48 · 🟡 0 · 🔴 9 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -284,6 +284,13 @@ establish the outcome. They are listed in full at the end of this document.
 | `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
 | `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
+### `102-capacitor-channels` — Native release channels (iOS + Android + web)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `native.passkey-signin` | A member signs in on the native app with the platform passkey ceremony and lands on the SAME account they hold on the web channel, PRF-derived keys intact; an unsupported device refuses with a named reason (unit: src/test/native/passkeyBridge.test.js; device leg: staged manual protocol in docs/runbooks/native-release-operations.md) | 🔴 absent | none | — (proposed: account-native) | #1389 |  |
+| `native.ble-signing` | Ledger signing over the native Bluetooth rail with physical confirmation on the device screen | ⚪ out-of-scope | none | — (proposed: account-native) | — | Requires a physical Nano X and a human pressing its buttons - automation cannot confirm on a device screen. Protocol arithmetic and error normalization are unit-pinned (src/test/native/ledgerBleRung.test.js); the device run is the staged manual addendum in docs/runbooks/hardware-wallet-staging-validation.md, required before store submission. |
+
 ## Disclosure — a member consents to a cost
 
 13 flows — 🟢 13 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
@@ -348,7 +355,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-46 flows — 🟢 43 · 🟡 0 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
+47 flows — 🟢 43 · 🟡 0 · 🔴 4 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -505,6 +512,12 @@ establish the outcome. They are listed in full at the end of this document.
 | `api-access.create-key` | A member-signed grant is revealed once, persisted nowhere, and leaves only metadata | 🟢 covered | settled | `no-chain` | `39-api-access.cy.js` (API-01, API-05) |  |
 | `api-access.revoke-key` | A signed revocation is registered without overstating what registration means | 🟢 covered | flow | `no-chain` | `39-api-access.cy.js` (API-02, API-03) |  |
 | `api-access.console` | The api-access developer console: OpenAPI explorer, token introspection, try-it, and the key-ceremony deep link into the host | 🟢 covered | flow | `on-chain` | `39-api-access.cy.js` (API-04); `39-api-access-console.cy.js` (API-06, API-07, API-08, API-09, API-10) |  |
+
+### `102-capacitor-channels` — Native release channels (iOS + Android + web)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `native.lifecycle-lock` | Backgrounding the native app past the lock threshold re-prompts before any wallet surface on foreground (unit: src/test/native/lifecycle.test.js + the native case in src/test/applock/AppLockOverlay.test.jsx; the release smoke jobs prove launch/render/lifecycle-survival but cannot reach a signed-in lock) | 🔴 absent | none | — (proposed: no-chain) | #1389 |  |
 
 ## Information — read-only surfaces
 
@@ -708,6 +721,16 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01, MC-02) |  |
+
+## No member consequence
+
+1 flows — 🟢 0 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 0
+
+### `102-capacitor-channels` — Native release channels (iOS + Android + web)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `native.deep-link-entry` | A share link opened with the app installed lands on the linked surface in-app through any due gate; foreign-origin URLs through the link channel are ignored (unit: src/test/native/deepLinks.test.js) | 🔴 absent | none | — (proposed: no-chain) | #1389 |  |
 
 ## No member-facing flow
 

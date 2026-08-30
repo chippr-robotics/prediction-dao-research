@@ -38,6 +38,8 @@
     "verify:passkey-support": "node scripts/ops/verify-passkey-support.js",
     "check:storage-layout": "hardhat run scripts/deploy/check-storage-layout.js",
     "tenants:validate": "node scripts/tenants/validate-tenant-manifest.js",
+    "test:tenants": "node --test \"scripts/tenants/__tests__/*.test.js\"",
+    "check:native-versions": "node scripts/native/check-native-versions.js",
     "sync:frontend-contracts": "node scripts/utils/sync-frontend-contracts.js --network mordor --chainId 63",
     "sync:frontend-contracts:amoy": "node scripts/utils/sync-frontend-contracts.js --network amoy --chainId 80002",
     "sync:frontend-contracts:polygon": "node scripts/utils/sync-frontend-contracts.js --network polygon --chainId 137",
