@@ -12,8 +12,9 @@ from taking that seriously.
 
 | Concern | Module |
 |---|---|
-| The vendor seam (`connectHardware`, `vendorAvailability`, `detectTransports`) | `frontend/src/lib/hardware/adapters.js` |
-| Ledger adapter (WebHID/WebUSB + `@ledgerhq/hw-app-eth`) | `frontend/src/lib/hardware/ledgerAdapter.js` |
+| The vendor seam (`connectHardware`, `vendorAvailability`, `detectTransports`, `ledgerTransportKind`) | `frontend/src/lib/hardware/adapters.js` |
+| Connect copy derived from the chosen transport (`connectGuidance`) | `frontend/src/lib/hardware/connectCopy.js` |
+| Ledger adapter (WebHID/Web Bluetooth/WebUSB + `@ledgerhq/hw-app-eth`) | `frontend/src/lib/hardware/ledgerAdapter.js` |
 | Trezor adapter (`@trezor/connect-web` popup) | `frontend/src/lib/hardware/trezorAdapter.js` |
 | Typed failure vocabulary (`HW_ERROR_CODES`, `describeHardwareError`) | `frontend/src/lib/hardware/errors.js` |
 | Derivation-path schemes | `frontend/src/lib/hardware/derivations.js` |
@@ -51,16 +52,59 @@ Three reasons the seam is absolute:
   `classifyTrezorError` maps Connect payloads). The UI renders `describeHardwareError` verbatim
   and never a raw SDK message (FR-012).
 - **Testability.** Component tests hand mock adapters through the `deps` props
-  (`{ connect, availability, provider }` on the sheet, `{ connectAccount, provider }` on the
-  dialog); nothing needs hardware (FR-013).
+  (`{ connect, availability, guidance, provider }` on the sheet,
+  `{ connectAccount, guidance, provider }` on the dialog); nothing needs hardware (FR-013).
 
-The two vendors differ underneath and the seam absorbs it: Ledger is local — WebHID (preferred)
-or WebUSB, one APDU at a time, and the adapter probes one address at connect time so "locked" /
-"wrong app" surface in the step whose UI explains them. Trezor runs vendor code in a trezor.io
+The two vendors differ underneath and the seam absorbs it: Ledger is local — WebHID, Web Bluetooth
+or WebUSB (see below), one APDU at a time, and the adapter probes one address at connect time so
+"locked" / "wrong app" surface in the step whose UI explains them. Trezor runs vendor code in a trezor.io
 popup; `TrezorConnect.init` is once-per-page (memoized, with a retry path after a failed init such
 as a blocked popup), `getAddresses` is one popup round-trip for a whole page, and `close()` is a
 no-op because the popup lifecycle is per-call. The caller owns the session and must `close()` it
 when the flow ends — the sheet's teardown does — so the transport is released for other tabs.
+
+### Which rail a Ledger uses (and why the copy follows it)
+
+Transport selection is **capability-driven and lives inside the adapter** — `ledgerTransportKind`
+in `adapters.js`, read from `navigator`:
+
+| Browser exposes | Rail | Who that is |
+|---|---|---|
+| `navigator.hid` | `webhid` | any desktop Chromium — **exactly the transport it always used** |
+| no `hid`, `navigator.bluetooth` | `webble` (`@ledgerhq/hw-transport-web-ble`) | Android Chrome |
+| no `hid`, no `bluetooth`, `navigator.usb` | `webusb` | fallback for a browser with only that |
+| none of the three | *(none)* | iOS Safari, old browsers — a stated refusal |
+
+Bluetooth is ranked **above** WebUSB but only where WebHID is absent. Android Chrome exposes
+WebUSB too, yet reaching a Ledger that way needs an OTG cable, while BLE is the rail a Nano X
+actually offers a phone. A desktop keeps WebHID, so nothing about the existing flow moves.
+
+Two consequences that are easy to get wrong:
+
+- **Copy is derived, never assumed.** `connectCopy.js#connectGuidance(vendor)` returns the vendor
+  hint, the connect checklist and the reconnect sentence for the rail that would actually open.
+  "Plug the device into this computer" is *false* on a phone pairing over Bluetooth, and a member
+  who follows it concludes the feature is broken — so every hardware-connect string in the UI
+  comes from that one function. A component that hardcodes a sentence is the bug this prevents.
+- **Trezor has no Bluetooth rail and is untouched by any of this.** Its `transport` is `null`, its
+  copy is the same as it ever was, and it must never claim a capability the vendor lacks.
+
+Everything above the adapter stays transport-agnostic: the session shape is identical on either
+rail, which is what lets `HardwareSigner` sign without knowing how the bytes reach the device. The
+session carries a `transport` field for diagnostics only — nothing branches on it.
+
+No header change was needed: `bluetooth` is a policy-controlled feature whose default allowlist is
+`self`, and `frontend/nginx.conf`'s `Permissions-Policy` lists only the features it restricts — the
+same reason WebHID and WebUSB already work without appearing there. Do not "fix" this by adding
+`bluetooth=(self)` alone; the header is an allowlist of *stated* features and rewriting it changes
+the others.
+
+BLE-specific failures land in the existing vocabulary rather than a new one: a dismissed pairing
+chooser is `permission-denied` (`TransportOpenUserCancelled`, or a raw `NotFoundError` /
+`NotAllowedError` DOMException), a link dropping mid-session is `disconnected` (a GATT
+`NetworkError`, same member-visible fact as a yanked cable), and the radio being switched off is
+`bluetooth-unavailable` — checked with `navigator.bluetooth.getAvailability()` **before** any
+chooser appears, because a chooser that can never find a device also reads as a broken feature.
 
 One deliberate privacy choice in the Ledger adapter: `signTransaction` passes `null` resolution,
 skipping Ledger's remote clear-signing metadata service. No external call is made from the app;
@@ -134,8 +178,9 @@ never a silent close, never a raw SDK message:
 
 | Code | Rendered sentence (summary) |
 |---|---|
-| `transport-unsupported` | this browser cannot talk to the device — use Chromium |
-| `permission-denied` | the browser prompt was dismissed — choose the device to continue |
+| `transport-unsupported` | this browser cannot reach the device over USB **or Bluetooth** — Chromium on a computer, Chrome + Bluetooth on Android, and iPhone/iPad cannot at all |
+| `bluetooth-unavailable` | Web Bluetooth exists but the radio is off or blocked — turn Bluetooth on |
+| `permission-denied` | the browser prompt was dismissed (USB chooser or Bluetooth pairing) — choose the device to continue |
 | `device-locked` | unlock with your PIN and try again |
 | `wrong-app` | open the Ethereum app on the device |
 | `user-cancelled` | the request was cancelled on the device |

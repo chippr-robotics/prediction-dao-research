@@ -19,12 +19,23 @@ cd infra/terraform/bootstrap
 terraform init          # no backend block — local state by design
 terraform apply
 git add terraform.tfstate && git commit -m "chore(085): record bootstrap state"
+git push
 ```
 
 **The local state stays local.** Do not run `terraform init -migrate-state`: the bucket cannot store
 the state that creates it, and the trust root must not depend on itself. Committing the state file is
 safe — bootstrap manages a bucket, a pool and two service accounts, no secrets — and it makes the
 establishment of the trust root auditable at any commit.
+
+**`git push`, not just `git commit`.** The 2026-08-28 IAM permission rounds hit "Custom project role
+... already exists and must be imported" three separate times, for three different resources
+(the WIF pool, then two custom roles) — each one had been created successfully in an *earlier* apply,
+but the commit recording it never reached `origin`. A fresh checkout (or a second operator, or the
+same operator days later) starts from whatever was last pushed, not whatever was last applied. If
+that gap exists, the next `terraform apply` re-attempts a create against something that already
+exists live, and the fix each time is `terraform import` for the orphaned resource — annoying but
+harmless (bootstrap manages no destroy-sensitive state), and entirely avoidable by finishing the
+`git add && git commit && git push` sequence every time, not just the commit.
 
 Then set the repository variables the workflows read:
 

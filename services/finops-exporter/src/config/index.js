@@ -82,6 +82,22 @@ export function loadConfig(env = process.env) {
       entryPoint: env.ENTRYPOINT_ADDRESS || '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
     },
 
+    /**
+     * x402 agent payments (spec 096). READ-ONLY, like everything else here — the treasury the rail
+     * pays INTO and the token it pays IN, which is all the collector needs to find settlements on
+     * chain. The exporter never holds a key and never settles anything.
+     *
+     * Unset `payTo` is the honest signal that the rail is not offered, and the collector reports
+     * `not-configured` rather than $0 for exactly that reason. These deliberately mirror the
+     * gateway's own X402_PAY_TO / X402_CHAIN_ID rather than inferring either: two services reading
+     * one address from one name is what stops them disagreeing about where money went.
+     */
+    x402: {
+      payTo: env.X402_PAY_TO || null,
+      chainId: num(env.X402_CHAIN_ID, 137),
+      paymentToken: env.X402_PAYMENT_TOKEN || null,
+    },
+
     /** Prepaid pool owners. Balances only — the exporter never holds a key (FR-026). */
     pools: {
       'paymaster-137': { kind: 'paymaster', chain: 137, unit: 'POL' },

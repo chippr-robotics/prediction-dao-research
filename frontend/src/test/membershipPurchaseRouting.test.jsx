@@ -48,6 +48,13 @@ vi.mock('../hooks/useTierPrices', () => ({
 vi.mock('../hooks/useEncryption', () => ({
   useEncryption: () => ({ ensureInitialized: vi.fn(), isInitialized: true }),
 }))
+// Spec 098: the modal resolves the acting account's write rail through the spec-043/088 seam,
+// which reads the wallet context. These tests mount the modal in isolation (no WalletProvider),
+// so stub the seam in personal mode — every one of these cases acts as the connected wallet.
+vi.mock('../hooks/useActiveAccount', () => {
+  const hook = () => ({ submit: vi.fn(), resolveActingSigner: vi.fn() })
+  return { useActiveAccount: hook, default: hook }
+})
 vi.mock('../utils/blockchainService', async (orig) => {
   const actual = await orig()
   return {

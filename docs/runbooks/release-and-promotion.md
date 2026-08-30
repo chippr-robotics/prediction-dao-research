@@ -324,12 +324,27 @@ The check names the offending build arg. Two possibilities:
   the list is a decision about how faithful staging is; it should not be made while unblocking a
   release.
 
-### A promotion is blocked because `networks.js` changed
+### A promotion is blocked because the cohort boundary moved
 
 Staging reaches both cohorts by being two services, never by changing how a build resolves its
-cohort (FR-026b). If the change is genuinely unrelated, split it into its own pull request where it
-gets reviewed as what it is: a change to the testnet/mainnet boundary, which is a constitution III
-concern.
+cohort (FR-026b). The gate names exactly what moved — a chain-id constant, one of the resolver
+functions (`buildIsTestnet`, `cohortChainIds`, `membershipChainId`, `miniAppChainId`, `isInCohort`,
+`listSupportedChainIds`, `getCurrentChainId`), a network's `isTestnet` flag, or a chain entering or
+leaving `NETWORKS`. Split that change into its own pull request where it gets reviewed as what it
+is: a change to the testnet/mainnet boundary, a constitution III concern.
+
+**It no longer fires on ordinary edits to `networks.js`.** It used to fail on ANY change to the
+file, and that proxy was too coarse: the file changed 36 times in 90 days — tickers, RPC failovers,
+explorer links — and each one blocked a release it had nothing to do with. The documented remedy
+(land the file on `main` in its own PR first) only works for a file that changes rarely; for this
+one it became a treadmill, and on 2026-08-29 the file changed again *mid-remedy*, twice in six
+hours. A guard that cries wolf on ordinary configuration gets worked around, and a worked-around
+guard protects nothing.
+
+If the gate reports it **could not locate the cohort machinery**, that is a refusal, not a pass —
+somebody restructured `networks.js` and `COHORT_CONSTANTS`/`COHORT_FUNCTIONS` in
+`scripts/release/check-promotion-config.js` need to follow. It fails closed on purpose: a guard that
+cannot read the file must never report a safety it did not establish.
 
 ### An environment reports `unreleased+<sha>`
 

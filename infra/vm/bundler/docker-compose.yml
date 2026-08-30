@@ -48,6 +48,17 @@ services:
       # It is fetched as REQUIRED: alto takes one endpoint, has no failover and no default, so an
       # unavailable secret must abort the boot with a diagnosis rather than crash-loop without one.
       #
+      # ⚠ RELEASE 1.14.0 TASK 8 generalized "QuickNode primary, publicnode failover" across the
+      # frontend (NETWORKS[chainId].rpcFailoverUrl, every EVM mainnet) and the relay gateway
+      # (RPC_URL_PRIMARY_<chainId> prepended to a public RPC_URLS_<chainId> list) — alto is the
+      # DELIBERATE exception, not an oversight. alto v1.2.7 has no multi-URL / failover config
+      # surface at all: ALTO_RPC_URL is a single value, full stop. A "publicnode fallback" here
+      # would need either a second alto process behind a proxy (new machinery on the write path,
+      # not undertaken for a problem not yet observed — see the rate-limit note below) or an alto
+      # version bump, neither of which is a config/docs change. If alto ever gains multi-endpoint
+      # support, wire it the same way — keyed primary via Secret Manager, public failover written
+      # in the clear here — and update this comment.
+      #
       # ⚠ 50 req/s, SHARED. The endpoint's rate limit is per ENDPOINT, not per consumer, and three
       # processes now sit behind it: alto (here), the gateway and the FinOps exporter. alto is both
       # the heaviest — a continuous block-poll plus receipt polling, independent of UserOp volume —

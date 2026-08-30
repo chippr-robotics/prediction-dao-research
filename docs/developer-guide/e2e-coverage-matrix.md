@@ -26,12 +26,12 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 99 |
-| With a member-facing flow | 80 |
-| Member-facing flows | 150 |
-| 🟢 covered | 138 |
+| Spec directories | 103 |
+| With a member-facing flow | 81 |
+| Member-facing flows | 160 |
+| 🟢 covered | 141 |
 | 🟡 partial | 1 |
-| 🔴 absent | 5 |
+| 🔴 absent | 12 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-55 flows — 🟢 46 · 🟡 0 · 🔴 3 · ⚪ 6 · covered-but-not-proven 0
+62 flows — 🟢 48 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -94,7 +94,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.clearpath-create-dao` | Create a standard DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) | the flow covers what ships — registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does |
+| `miniapp.clearpath-register-dao` | Register an external DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) |  |
+| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🔴 absent | none | — (proposed: on-chain) | #1268 | The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17). |
 
 ### `033-network-aware-swap` — Network-aware swap
 
@@ -142,6 +143,8 @@ establish the outcome. They are listed in full at the end of this document.
 | `custody.create-vault` | Create a Safe vault and add its owners | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-01) |  |
 | `custody.propose-and-execute` | Propose a transaction, collect approvals, execute it | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-02) |  |
 | `custody.operate-as-vault` | Act as the vault rather than as yourself, and see which you are | 🟢 covered | flow | `on-chain` | `29-protect-custody.cy.js` (CV-03) |  |
+| `custody.vault-action-sheet` | One sheet offers the four vault actions, and states why any is closed | 🟢 covered | flow | `no-chain` | `41-protect-vault-actions.cy.js` (VA-01, VA-05, VA-06) |  |
+| `custody.create-vault-defaults` | A new vault defaults to a majority threshold and a starter policy, and refuses 1-of-1 with none | 🟢 covered | flow | `no-chain` | `41-protect-vault-actions.cy.js` (VA-02, VA-03, VA-04) |  |
 
 ### `049-multisig-policy-engine` — Multisig policy engine
 
@@ -191,6 +194,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `transfer.send-from-home` | Send funds to someone from the home screen | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (TR-01) |  |
+| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes | 🔴 absent | none | — (proposed: on-chain) | #1366 |  |
 
 ### `061-bitcoin-transactions` — Bitcoin
 
@@ -265,6 +269,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `hardware.add-and-reconnect` | Add a hardware account and reconnect to it later | 🟢 covered | flow | `no-chain` | `27-protect-hardware.cy.js` (HW-01, HW-02, HW-03, HW-04, HW-05) |  |
 | `hardware.physical-confirmation` | Confirm a transaction on the device screen | ⚪ out-of-scope | none | — (proposed: no-chain) | — | Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier. |
+| `hardware.bluetooth-transport` | Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy) | 🔴 absent | none | — (proposed: no-chain) | #1370 | The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs. |
 
 ### `088-instant-acting-accounts` — Instant acting accounts
 
@@ -272,9 +277,16 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `account.act-immediately-after-create` | Switch to an acting account and use it immediately, with no ceremony at switch time | 🟢 covered | flow | `no-chain` | `33-account-surfaces.cy.js` (AA-01) |  |
 
+### `098-acting-account-purchase` — Membership purchase lands on the acting account
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
+| `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
+
 ## Disclosure — a member consents to a cost
 
-12 flows — 🟢 12 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
+13 flows — 🟢 13 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -299,6 +311,12 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `predict.builder-fee-disclosed` | See the additive builder fee as its own line before signing an order | 🟢 covered | settled | `no-chain` | `37-predict-and-collect.cy.js` (PR-02, PR-04) |  |
+
+### `058-send-request-home` — Send and request from home
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `pay.group-recipient-list` | Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee) | 🟢 covered | flow | `no-chain` | `41-group-pay.cy.js` (GP-01, GP-02, GP-03, GP-04, GP-05, GP-06, GP-07, GP-08, GP-09) |  |
 
 ### `060-platform-fee-wrapper` — Platform fees
 
@@ -330,7 +348,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-45 flows — 🟢 42 · 🟡 1 · 🔴 2 · ⚪ 0 · covered-but-not-proven 1
+46 flows — 🟢 42 · 🟡 1 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -393,6 +411,7 @@ establish the outcome. They are listed in full at the end of this document.
 | `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | settled | `account-native` | `returning-user.cy.js` (RU-01, RU-02) |  |
 | `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-03, UL-05) |  |
 | `passkey.controllers` | Add and remove the controllers that may act for the account | 🔴 absent | skipped | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
+| `passkey.app-lock` | Lock the screen after idle or on leaving, and unlock with a passkey | 🔴 absent | none | — (proposed: no-chain) | #1364 | no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card). |
 
 ### `042-clearpath-multi-network` — ClearPath across networks
 
@@ -489,7 +508,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-38 flows — 🟢 38 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
+39 flows — 🟢 38 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -568,6 +587,12 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `oracle.graph-unavailable-degrades` | See an honest degraded state when the oracle index is unreachable | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (OG-01) |  |
+
+### `030-clearpath-standard-daos` — ClearPath mini-app
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `miniapp.clearpath-create-dao-unavailable` | ClearPath Launch tab states why a DAO cannot be created on this chain | 🔴 absent | none | — (proposed: no-chain) | #1268 | Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec. |
 
 ### `031-platform-notifications` — Platform notifications
 
@@ -709,6 +734,9 @@ Listed so the gate can tell "correctly omitted" from "forgotten".
 | `094-e2e-coverage-expansion` — E2E coverage expansion | This feature: the matrix, the tiering policy and the suite's own gates. Its subject is the coverage of every other row. |
 | `096-x402-agentic-payments` — x402 pay-per-request access to the member API | An agent-facing HTTP rail with no member surface: an unauthenticated caller is answered 402 with a price, pays with an X-PAYMENT header, and is served as the payer. No component, route or member journey changes, and a member holding a capability token never enters the path. Its gate is the gateway vitest suite (services/relay-gateway/test/x402.test.js) plus the spec-095 suites passing unchanged with the rail enabled, and node:test coverage of the MCP server's 402 surfacing and payment passthrough. |
 | `097-workstation-secrets-observability` — Workstation secrets and local observability | Operator tooling with no member surface: credentials move off a local .env into Secret Manager and are delivered per least-privilege profile by a wrapper, and the Prometheus and Grafana stack is a read-only viewing surface bound to loopback. Nothing here is reachable from the app, and the workstation identity is declared Terraform with no service-account key file. Gated by the scripts/secrets vitest suites (including the registry/tfvars parity test, which fails on drift because a missing grant surfaces later as PERMISSION_DENIED), check:env-hygiene, and the Terraform plan. |
+| `099-network-status-miniapp` — Network status mini-app | Spec landed in release 1.14.0; the mini-app package has no member surface yet. Flows are owed when the package ships (#1364). |
+| `100-passkey-solana` — Passkey-native Solana | Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364). |
+| `101-passkey-zcash` — Passkey-native Zcash | Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364). |
 
 ## Covered but not proven
 

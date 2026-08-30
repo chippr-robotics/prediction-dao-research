@@ -41,6 +41,30 @@ export function useActiveAccount() {
   const isLegacy = active.mode === 'legacy'
   const isHardware = active.mode === 'hardware'
 
+  /**
+   * Spec 088 — get-or-request the ACTING account's signer, running the deferred ceremony (unlock
+   * passphrase / connect device) only when one is not already in hand. A cached signer whose chain
+   * binding no longer matches the wallet's network is stale: drop it and run a fresh ceremony
+   * (which binds to the CURRENT chain) rather than telling the member to switch back.
+   *
+   * Exposed (spec 098) because a purchase needs the signer ITSELF, not just a {to,value,data} send:
+   * the pay leg resolves intent params from it, signs the relayed intent with it, and derives the
+   * acting account's encryption key from it. Callers must never hold it beyond the flow run.
+   */
+  const resolveActingSigner = useCallback(async () => {
+    if (active.mode !== 'legacy' && active.mode !== 'hardware') {
+      throw new Error('There is no signing ceremony for this account, so nothing has been signed.')
+    }
+    let acting = active.mode === 'legacy' ? legacySigner : hardwareSigner
+    const stale = acting && active.chainId != null && Number(chainId) !== Number(active.chainId)
+    if (stale) {
+      dropActingSigner()
+      acting = null
+    }
+    if (!acting) acting = await requestActingSigner()
+    return acting
+  }, [active, chainId, legacySigner, hardwareSigner, requestActingSigner, dropActingSigner])
+
   const submit = useCallback(
     async (payload) => {
       if (active.mode === 'vault') {
@@ -55,17 +79,7 @@ export function useActiveAccount() {
         })
       }
       if (active.mode === 'legacy' || active.mode === 'hardware') {
-        // Spec 088 — get-or-request the acting signer. A cached signer whose chain binding no
-        // longer matches the wallet's network is stale: drop it and run a fresh ceremony (which
-        // binds to the CURRENT chain) rather than telling the member to switch back.
-        let acting = active.mode === 'legacy' ? legacySigner : hardwareSigner
-        const stale = acting && active.chainId != null && Number(chainId) !== Number(active.chainId)
-        if (stale) {
-          dropActingSigner()
-          acting = null
-        }
-        if (!acting) acting = await requestActingSigner()
-        return submitAsActiveAccount(payload, { mode: 'personal', signer: acting })
+        return submitAsActiveAccount(payload, { mode: 'personal', signer: await resolveActingSigner() })
       }
       // Spec 088 FR-002 — every non-personal kind must be handled ABOVE. A mode with no branch
       // here (today: 'derived', the cross-chain identity useEffectiveAccount already resolves)
@@ -79,7 +93,7 @@ export function useActiveAccount() {
       }
       return submitAsActiveAccount(payload, { mode: 'personal', signer })
     },
-    [active, chainId, signer, provider, legacySigner, hardwareSigner, requestActingSigner, dropActingSigner],
+    [active, signer, provider, resolveActingSigner],
   )
 
   // Whether a vault action can currently be sent (connected to the vault's network).
@@ -90,7 +104,7 @@ export function useActiveAccount() {
   const canActAsLegacy = isLegacy
   const canActAsHardware = isHardware
 
-  return { identity: active, isVault, isLegacy, isHardware, canActAsVault, canActAsLegacy, canActAsHardware, submit, operateAsPersonal, operateAsVault, operateAsLegacy, operateAsHardware }
+  return { identity: active, isVault, isLegacy, isHardware, canActAsVault, canActAsLegacy, canActAsHardware, submit, resolveActingSigner, operateAsPersonal, operateAsVault, operateAsLegacy, operateAsHardware }
 }
 
 export default useActiveAccount

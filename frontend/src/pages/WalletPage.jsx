@@ -26,6 +26,7 @@ import HomePreferencesPanel from '../components/account/HomePreferencesPanel'
 import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
 import PortfolioPreferencesPanel from '../components/account/PortfolioPreferencesPanel'
 import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPanel'
+import AppLockPreferencesPanel from '../components/account/AppLockPreferencesPanel'
 import NavigationPreferencesPanel from '../components/account/NavigationPreferencesPanel'
 import ApiAccessPanel from '../components/account/ApiAccessPanel'
 import AssistantPreferencesPanel from '../components/account/AssistantPreferencesPanel'
@@ -611,6 +612,10 @@ function WalletPage() {
                       <WalletDisplayPreferencesPanel address={address} />
                       <PortfolioPreferencesPanel />
                       <PrivacyPreferencesPanel />
+                      {/* Spec 041 amendment: the optional app lock. Renders NOTHING for a classic
+                          wallet — there is no WebAuthn re-prompt that could reopen it, so the
+                          setting is not offered where the lock could never be lifted. */}
+                      <AppLockPreferencesPanel />
                       <NotificationProfilesPanel />
                       {/* Spec 095 — programmatic access and the opt-in assistant. Both sit with the
                           other privacy-shaped preferences: one decides what can reach this account,

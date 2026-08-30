@@ -688,18 +688,40 @@
       "memberFacing": true,
       "flows": [
         {
-          "id": "miniapp.clearpath-create-dao",
-          "name": "Create a standard DAO through ClearPath",
+          "id": "miniapp.clearpath-register-dao",
+          "name": "Register an external DAO through ClearPath",
           "status": "covered",
           "tier": "on-chain",
-          "proposedTier": "on-chain",
           "depth": "settled",
           "risk": "custody",
           "tests": [
             "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-06"
           ],
-          "missing": "the flow covers what ships \u2014 registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does",
           "issue": "#1268"
+        },
+        {
+          "id": "miniapp.clearpath-create-native-dao",
+          "name": "Create a native standard DAO through ClearPath (spec 030 pillar A)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1268",
+          "missing": "The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17)."
+        },
+        {
+          "id": "miniapp.clearpath-create-dao-unavailable",
+          "name": "ClearPath Launch tab states why a DAO cannot be created on this chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1268",
+          "missing": "Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec."
         }
       ]
     },
@@ -1022,6 +1044,18 @@
           ],
           "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
           "issue": "#1271"
+        },
+        {
+          "id": "passkey.app-lock",
+          "name": "Lock the screen after idle or on leaving, and unlock with a passkey",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1364",
+          "missing": "no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card)."
         }
       ]
     },
@@ -1083,6 +1117,32 @@
           "risk": "custody",
           "tests": [
             "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-03"
+          ]
+        },
+        {
+          "id": "custody.vault-action-sheet",
+          "name": "One sheet offers the four vault actions, and states why any is closed",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-01",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-05",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-06"
+          ]
+        },
+        {
+          "id": "custody.create-vault-defaults",
+          "name": "A new vault defaults to a majority threshold and a starter policy, and refuses 1-of-1 with none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-02",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-03",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-04"
           ]
         }
       ]
@@ -1490,6 +1550,36 @@
           "tests": [
             "frontend/cypress/e2e/full/33-transfers-swap-vouchers.cy.js::TR-01"
           ]
+        },
+        {
+          "id": "pay.group-recipient-list",
+          "name": "Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee)",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-01",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-02",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-03",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-04",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-05",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-06",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-07",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-08",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-09"
+          ]
+        },
+        {
+          "id": "pay.group-settlement",
+          "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1366"
         }
       ]
     },
@@ -2294,6 +2384,18 @@
           "risk": "custody",
           "tests": [],
           "reason": "Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier."
+        },
+        {
+          "id": "hardware.bluetooth-transport",
+          "name": "Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1370",
+          "missing": "The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs."
         }
       ]
     },
@@ -2559,6 +2661,56 @@
       "title": "Workstation secrets and local observability",
       "memberFacing": false,
       "reason": "Operator tooling with no member surface: credentials move off a local .env into Secret Manager and are delivered per least-privilege profile by a wrapper, and the Prometheus and Grafana stack is a read-only viewing surface bound to loopback. Nothing here is reachable from the app, and the workstation identity is declared Terraform with no service-account key file. Gated by the scripts/secrets vitest suites (including the registry/tfvars parity test, which fails on drift because a missing grant surfaces later as PERMISSION_DENIED), check:env-hygiene, and the Terraform plan.",
+      "flows": []
+    },
+    {
+      "id": "098-acting-account-purchase",
+      "title": "Membership purchase lands on the acting account",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "purchase.acting-account",
+          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1364"
+        },
+        {
+          "id": "purchase.acting-refusals",
+          "name": "Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1364"
+        }
+      ]
+    },
+    {
+      "id": "099-network-status-miniapp",
+      "title": "Network status mini-app",
+      "memberFacing": false,
+      "reason": "Spec landed in release 1.14.0; the mini-app package has no member surface yet. Flows are owed when the package ships (#1364).",
+      "flows": []
+    },
+    {
+      "id": "100-passkey-solana",
+      "title": "Passkey-native Solana",
+      "memberFacing": false,
+      "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
+      "flows": []
+    },
+    {
+      "id": "101-passkey-zcash",
+      "title": "Passkey-native Zcash",
+      "memberFacing": false,
+      "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
       "flows": []
     }
   ]
