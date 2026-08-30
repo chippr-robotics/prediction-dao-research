@@ -14,6 +14,75 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.15.0 — 2026-08-29
+
+Promoted from: v1.15.0-rc.4
+Previous release: v1.13.5 · Range: `v1.13.5..v1.15.0` (51 commits)
+
+### 🚀 Features
+
+- feat(clearpath): native standard DAO creation - spec 030 pillar A (#1268)
+- feat(hardware): Ledger over Bluetooth on phones, behind the one adapter seam
+- feat(networks): complete the POL rename sweep and wrap/voucher test alignment
+- feat(networks): MATIC to POL on Polygon/Amoy, Bitcoin network card
+- feat(nav): account add chooser, wrap as a Trade view, FWMV send from portfolio
+- feat(pay): group pay - N recipients from Home Pay and Transfer
+- feat(custody): vault actions in one sheet, majority threshold + starter policy defaults
+- feat(rpc): QuickNode-ready primaries with distinct public failover on every EVM mainnet
+- feat(applock): optional app lock per the spec 041 amendment
+- feat(membership): purchase lands on the acting account (spec 098)
+- feat(networks): complete the POL rename sweep and wrap/voucher test alignment
+- feat(networks): MATIC to POL on Polygon/Amoy, Bitcoin network card
+- feat(nav): account add chooser, wrap as a Trade view, FWMV send from portfolio
+- feat(096): enable the x402 rail, with the collector that watches it
+
+### 🐛 Bug Fixes
+
+- fix(clearpath): move form helpers out of the CreateStandardDao component file
+- fix(e2e): re-derive local addresses after pillar-A deploy-sequence growth
+- fix(076): the cohort gate checked a filename, not the boundary
+- fix(codegen): the build marker lives beside artifacts/, not inside it
+- fix(ci): write the build marker where CI actually compiles
+- fix: a11y suppression retired, byte gate fails closed on stale artifacts, dead archive scripts removed
+- fix(custody): vault batch proposals pre-flight the guard's own delegatecall answer (#1368)
+- fix(e2e): CV-06 must kill Polygon's failover too, now that one exists
+- fix(pay): drop unused imports from the resolution-loop regression test
+- fix(custody): reset sheet scroll on view change; scroll deep assertions into view
+- fix(pay): kill the resolution-announcement update loop in the recipient rows
+
+### 📚 Documentation
+
+- spec(101): passkey-native Zcash - spec, plan, research, tasks, derivation contract
+- spec(100): passkey-native Solana - spec, plan, tasks, derivation contract
+- spec(098): acting-account membership purchase across every submit rail
+- spec(099): network status mini-app board with bridge/supply CTAs
+- spec(041): amend with optional app-lock (FR-025..FR-028, SC-010)
+- docs(085): commit AND push bootstrap state, every time
+
+### 🧪 Tests
+
+- test(mcp): sample the linearity guard best-of-5 so runner noise cannot fail it
+- test(094): the ClearPath matrix row names what it measures (#1268 part 1)
+- test(095): make the reply-links linearity check robust to runner hiccups
+- test(094): add coverage-matrix rows for specs 098-101
+- test(089): the money-path tests encoded x402's dormancy
+
+### 🧹 Maintenance
+
+- chore(085): record bootstrap state
+
+### Artifacts
+
+Range: `v1.14.0..v1.15.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | moved | `amoy-chain80002-v2/membershipManagerImpl` → `0xb6499596703cEE6eA4BE5b5F01DEc4d7ccfe10bD`<br>`amoy-chain80002-v2/wagerRegistryImpl` → `0xa2176F5Fea39888cD1697Be4651415490C78905d`<br>`amoy-chain80002-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`arbitrum-chain42161-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`arbitrum-chain42161-v2/bridgeRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`arbitrum-chain42161-v2/liquidityRouterImpl` → `0x7Af46728e7C969b75723398e3F93b565E968A3ba`<br>`arbitrum-chain42161-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`base-chain8453-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`base-chain8453-v2/bridgeRouterImpl` → `0x41ba6bcA216bd6A4c5A0Bf8F9b2d682ec0a879D5`<br>`base-chain8453-v2/liquidityRouterImpl` → `0x7Af46728e7c969b75723398E3f93b565E968A3bA`<br>`base-chain8453-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`etc-chain61-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mainnet-chain1-v2/feeRouterImpl` → `0x5cCd55D62Ce7Df730c39543B332dD8d6054B5d00`<br>`mainnet-chain1-v2/bridgeRouterImpl` → `0xcA277Cc3485Da12771d6171a9D0A894B8DD159f8`<br>`mainnet-chain1-v2/liquidityRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`mainnet-chain1-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mordor-chain63-v2/membershipManagerImpl` → `0x7D38F7Ef26f7E2409d5C04a62c1d9A3Ec002A49e`<br>`mordor-chain63-v2/wagerRegistryImpl` → `0x9FfE701be18Ff033706f2df19cd8730F5CB884B2`<br>`mordor-chain63-v2/tokenFactoryImpl` → `0x135108EB6f81e361b6cF131d2Cb9A01E92Cd8ED9`<br>`mordor-chain63-v2/openERC20Impl` → `0xd8E67C6C058a6D35E69c691B44b8D5f858591971`<br>`mordor-chain63-v2/openERC721Impl` → `0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB`<br>`mordor-chain63-v2/restrictedERC20Impl` → `0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444`<br>`mordor-chain63-v2/openERC20V2Impl` → `0x92169007926fBc8Ac90cdD311dD3C2557158C395`<br>`mordor-chain63-v2/openERC721V2Impl` → `0xEeaBC05214FF0C42cbA42b365aB400b7ca4311cE`<br>`mordor-chain63-v2/restrictedERC20V2Impl` → `0x664d87bed13ea4D50Cd3da8e0aC5A8D70A302A0B`<br>`mordor-chain63-v2/externalDAORegistryImpl` → `0x28270cB71E87D2D6C662e61CFE6eD02d05d43B7A`<br>`mordor-chain63-v2/zkWagerPoolFactoryImpl` → `0xd3e851FDDa9D5796D503daFd34b2403D7336d9fD`<br>`mordor-chain63-v2/poolImpl` → `0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277`<br>`mordor-chain63-v2/wagerPoolFactoryImpl` → `0xfB6F9F7EfD86a220eE1aD7906278247051B25430`<br>`mordor-chain63-v2/feeRouterImpl` → `0x744b8E56d84bb8D7657b2Bb13426cB882c93B7E6`<br>`mordor-chain63-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mordor-chain63-v2/miniAppRegistryImpl` → `0xc8Dd8601b35aDa3AF367C9E41f24Fd0503Ced674`<br>`optimism-chain10-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`optimism-chain10-v2/bridgeRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`optimism-chain10-v2/liquidityRouterImpl` → `0x7Af46728e7C969b75723398e3F93b565E968A3ba`<br>`optimism-chain10-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`polygon-chain137-v2/membershipManagerImpl` → `0x7177470fE3c5D89CEf965A596540E57cE290C939`<br>`polygon-chain137-v2/wagerRegistryImpl` → `0x9c52C1ef4Bbe65CF19a5C26bebD4A22100964898`<br>`polygon-chain137-v2/tokenFactoryImpl` → `0xE819f7b672D81A8b78d40b1C99Fe5d646513D12C`<br>`polygon-chain137-v2/openERC20Impl` → `0xd8E67C6C058a6D35E69c691B44b8D5f858591971`<br>`polygon-chain137-v2/openERC721Impl` → `0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB`<br>`polygon-chain137-v2/restrictedERC20Impl` → `0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444`<br>`polygon-chain137-v2/wagerPoolFactoryImpl` → `0x754d8aa4785Ec4bEE7c921f8d032D5E3a78d9308`<br>`polygon-chain137-v2/poolImpl` → `0xB153e4456FaD1A7E96e35e14094Cf6964348BC40`<br>`polygon-chain137-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`polygon-chain137-v2/callsignRegistryImpl` → `0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49`<br>`polygon-chain137-v2/feeRouterImpl` → `0x40ee755246E60f66E7bA425F99C6d704859d38db`<br>`polygon-chain137-v2/bridgeRouterImpl` → `0x8F7A7e7437733326BD2F8045BFceD9B821aF1De1`<br>`polygon-chain137-v2/liquidityRouterImpl` → `0x33818052Ca8B5b8Bb9777Bf6eBbaFCD8Faae6e65`<br>`polygon-chain137-v2/miniAppRegistryImpl` → `0x41858006aD6dd0788b84F9fb17A28d8167C7b331` |
+| Mini-app packages | moved | `api-access` v1.0.0<br>`clearpath` v1.1.0<br>`token-mint` v1.0.2 |
+| Subgraph endpoint | unchanged | `v0.3.0` |
+
 ## v1.13.5 — 2026-08-28
 
 Promoted from: v1.13.5-rc.2
