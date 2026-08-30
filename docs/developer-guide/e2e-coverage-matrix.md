@@ -28,10 +28,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 103 |
 | With a member-facing flow | 81 |
-| Member-facing flows | 157 |
+| Member-facing flows | 159 |
 | 🟢 covered | 141 |
 | 🟡 partial | 1 |
-| 🔴 absent | 9 |
+| 🔴 absent | 11 |
 | ⚪ out of scope | 6 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-60 flows — 🟢 48 · 🟡 0 · 🔴 6 · ⚪ 6 · covered-but-not-proven 0
+62 flows — 🟢 48 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -94,7 +94,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.clearpath-create-dao` | Create a standard DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) | the flow covers what ships — registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does |
+| `miniapp.clearpath-register-dao` | Register an external DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) |  |
+| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🔴 absent | none | — (proposed: on-chain) | #1268 | no member surface exists: OZ 5.4.0's GovernorUpgradeable pulls the Cancun mcopy opcode (via SignatureChecker -> Bytes.sol) and is not deployable on the pre-Cancun ETC/Mordor chains this platform targets, so pillar A's contract side was deliberately deferred (recorded in scripts/deploy/deploy-clearpath.js). #1268 tracks the decision to build it or withdraw it from spec 030. |
 
 ### `033-network-aware-swap` — Network-aware swap
 
@@ -193,7 +194,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `transfer.send-from-home` | Send funds to someone from the home screen | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (TR-01) |  |
-| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), or sequential sends with per-recipient outcomes | 🔴 absent | none | — (proposed: on-chain) | #1366 |  |
+| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes | 🔴 absent | none | — (proposed: on-chain) | #1366 |  |
 
 ### `061-bitcoin-transactions` — Bitcoin
 
@@ -268,6 +269,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `hardware.add-and-reconnect` | Add a hardware account and reconnect to it later | 🟢 covered | flow | `no-chain` | `27-protect-hardware.cy.js` (HW-01, HW-02, HW-03, HW-04, HW-05) |  |
 | `hardware.physical-confirmation` | Confirm a transaction on the device screen | ⚪ out-of-scope | none | — (proposed: no-chain) | — | Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier. |
+| `hardware.bluetooth-transport` | Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy) | 🔴 absent | none | — (proposed: no-chain) | #1370 | The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs. |
 
 ### `088-instant-acting-accounts` — Instant acting accounts
 
@@ -279,7 +281,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
+| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
 | `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
 ## Disclosure — a member consents to a cost

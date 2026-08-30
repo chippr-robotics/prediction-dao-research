@@ -70,6 +70,11 @@ jobs:
       - name: Run E2E address-gate tests
         run: npm run test:e2e-addresses
 
+      # The bytecode-digest freshness gate (issue #1090). Dependency-free: node:test plus a
+      # throwaway fixture tree under os.tmpdir(), no compile and no chain.
+      - name: Run build-marker tests
+        run: npm run test:build-marker
+
   # Gate (spec 075, FR-003/FR-015): version skew across manifests and undeclared (phantom)
   # imports. Both invariants were fixed by hand once and had nothing preventing recurrence, which
   # is precisely the failure mode spec 075 exists to remove. Dependency-free, so no npm ci.
@@ -140,6 +145,14 @@ jobs:
       # when binaries.soliditylang.org stalls.
       - name: Compile contracts
         uses: ./.github/actions/setup-hardhat-solc
+
+      # The compile above runs inside the composite action, not `npm run compile`, so npm's
+      # postcompile hook (issue #1090's freshness marker) does not fire here. Write the marker
+      # explicitly: this step running at all means the action's compile exited 0, which is the
+      # exact condition the marker asserts. Without it the byte gate below fails closed on
+      # "no build marker" — correctly, but about the wrong thing.
+      - name: Record build marker for the byte gate
+        run: node scripts/codegen/write-build-marker.js
 
       # Gate (spec 025, FR-010/SC-005): block a storage-incompatible / upgrade-unsafe implementation BEFORE
       # it can ship. Must fail the pipeline loudly — do NOT add continue-on-error (Constitution IV).

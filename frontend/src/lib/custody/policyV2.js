@@ -358,17 +358,23 @@ export function buildEnablePolicyV2Setup(chainId, rules, cooldown) {
 
 // ---------------------------------------------------------------- reads / decoding
 
-/** Pre-flight a payload against the live guard (scope + limits; approvals when a hash is known). */
-export async function previewPolicyV2(vaultAddress, chainId, payload, { executor, approvedTxHash } = {}) {
+/**
+ * Pre-flight a payload against the live guard (scope + limits; approvals when a hash is known).
+ *
+ * `payload.operation` defaults to 0 (a plain CALL), which is what every compose-time preview
+ * wants. Issue #1368 passes 1 to ask the guard directly whether it would deny a MultiSend
+ * delegatecall from this vault — `_preCheck` answers that before any rule evaluation runs.
+ */
+export async function previewPolicyV2(vaultAddress, chainId, payload, { executor, approvedTxHash, provider } = {}) {
   const engine = getPolicyEngineV2Addresses(chainId)
   if (!engine) return { ok: true, reason: null }
-  const guard = new Contract(engine.guard, SAFE_POLICY_GUARD_V2_ABI, getProvider(chainId))
+  const guard = new Contract(engine.guard, SAFE_POLICY_GUARD_V2_ABI, provider || getProvider(chainId))
   const res = await guard.previewTransaction(
     getAddress(vaultAddress),
     getAddress(payload.to),
     payload.value ?? 0n,
     payload.data || '0x',
-    0,
+    payload.operation ?? 0,
     executor ? getAddress(executor) : ZeroAddress,
     approvedTxHash || '0x' + '0'.repeat(64),
   )

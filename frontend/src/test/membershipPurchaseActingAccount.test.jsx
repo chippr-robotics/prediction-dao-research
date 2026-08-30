@@ -24,6 +24,8 @@ const VAULT = '0x1215000000000000000000000000000000008575'
 const HARDWARE = '0x9962000000000000000000000000000000004242'
 const LEGACY = '0x7333000000000000000000000000000000001111'
 const DERIVED = 'bc1qexampleexampleexampleexample'
+const USDC = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+const MM = '0x4444444444444444444444444444444444444444'
 
 const m = vi.hoisted(() => ({
   tierByAddress: {},
@@ -36,6 +38,16 @@ const m = vi.hoisted(() => ({
   sendCalls: null,
   submitAsActing: null,
   loginMethod: 'wallet',
+  // Issue #1368 — the vault's own guard's answer about a MultiSend delegatecall, plus the
+  // allowance pre-flight that decides whether there are two legs at all.
+  batchSupport: { support: 'batch-ok', reason: null, detail: null, engine: 'none' },
+  needsApprove: true,
+  purchaseCalls: [],
+}))
+
+vi.mock('../lib/custody/batchPreflight', async (orig) => ({
+  ...(await orig()),
+  previewBatchSupport: vi.fn(async () => m.batchSupport),
 }))
 
 vi.mock('../hooks/useWeb3', () => ({
@@ -71,6 +83,8 @@ vi.mock('../utils/blockchainService', async (orig) => ({
     m.askedFor.push(String(addr))
     return Promise.resolve(m.tierByAddress[String(addr).toLowerCase()] || { tier: 0, readable: true })
   },
+  buildMembershipPurchaseCalls: vi.fn(async () => ({ calls: m.purchaseCalls })),
+  checkApprovalNeededForAddress: vi.fn(async () => m.needsApprove),
 }))
 vi.mock('../hooks/usePurchaseFlow', () => {
   const flow = () => ({
@@ -288,5 +302,103 @@ describe('a mid-flow acting switch cancels the bound run (FR-013)', () => {
     await waitFor(() => expect(m.invalidated.length).toBeGreaterThan(0))
     // The failure names the account the flow was BOUND to, not the new selection.
     expect(m.invalidated[0]).toMatch(/Old wallet/)
+  })
+})
+
+/*
+ * ── Issue #1368 — a policy-guarded vault never gets a proposal its guard will revert ──────────
+ *
+ * The vault purchase batches [approve(exact), purchase] through MultiSendCallOnly, which executes
+ * by DELEGATECALL. `SafePolicyGuardV2._preCheck` (and v1's `_checkPolicy`) deny operation != 0 for
+ * any vault with an active policy, so that proposal is approved by the vault's signers and then
+ * reverts. The shape is therefore decided from the vault's OWN guard, and disclosed before signing.
+ */
+describe('vault purchase — the proposal shape follows the vault’s policy (#1368)', () => {
+  beforeEach(() => {
+    m.effective = actingAsVault()
+    m.batchSupport = { support: 'batch-ok', reason: null, detail: null, engine: 'none' }
+    m.needsApprove = true
+    m.purchaseCalls = [
+      { target: USDC, value: 0n, data: '0xapprove' },
+      { target: MM, value: 0n, data: '0xpurchase' },
+    ]
+    m.submitAsActing = vi.fn(async (p) => ({ kind: 'proposed', safeTxHash: '0xsafe', nonce: p.nonce ?? 5 }))
+  })
+
+  const proposeFrom = async () => {
+    await toConfirm()
+    fireEvent.click(screen.getByRole('button', { name: /^Confirm Purchase/i }))
+    await waitFor(() => expect(m.started.length).toBe(1))
+    return m.started[0].proposePurchase()
+  }
+
+  it('an unguarded vault still gets ONE batched proposal — unchanged', async () => {
+    await proposeFrom()
+    expect(m.submitAsActing).toHaveBeenCalledTimes(1)
+    const [payload] = m.submitAsActing.mock.calls[0]
+    expect(payload.batch).toHaveLength(2)
+  })
+
+  it('a guarded vault gets TWO proposals at consecutive nonces — approve first, purchase second', async () => {
+    m.batchSupport = { support: 'batch-denied', reason: 'nope', detail: null, engine: 'v2' }
+    const res = await proposeFrom()
+    expect(m.submitAsActing).toHaveBeenCalledTimes(2)
+    const [first] = m.submitAsActing.mock.calls[0]
+    const [second] = m.submitAsActing.mock.calls[1]
+    expect(first.batch).toBeUndefined()
+    expect(first.data).toBe('0xapprove')
+    expect(second.data).toBe('0xpurchase')
+    // Consecutive nonces: the purchase CANNOT execute before the approval it depends on, and no
+    // other queued vault transaction can take the slot between them.
+    expect(second.nonce).toBe(6)
+    expect(res.shape).toBe('split')
+    expect(res.proposals).toHaveLength(2)
+  })
+
+  it('a guard that could not be read splits too — an unconfirmed policy is not permission', async () => {
+    m.batchSupport = { support: 'unknown', reason: 'could not confirm', detail: null, engine: 'foreign' }
+    await proposeFrom()
+    expect(m.submitAsActing).toHaveBeenCalledTimes(2)
+  })
+
+  it('an allowance that already covers the price needs NO split — one plain-call proposal', async () => {
+    m.needsApprove = false
+    m.batchSupport = { support: 'batch-denied', reason: 'nope', detail: null, engine: 'v2' }
+    await proposeFrom()
+    expect(m.submitAsActing).toHaveBeenCalledTimes(1)
+    const [payload] = m.submitAsActing.mock.calls[0]
+    // A one-leg batch is emitted as that leg's plain CALL by the submit seam, so no delegatecall
+    // is involved and the guard evaluates it as an ordinary transaction.
+    expect(payload.batch).toHaveLength(1)
+    expect(payload.batch[0].data).toBe('0xpurchase')
+  })
+
+  it('discloses the SPLIT shape and why, before anything is signed', async () => {
+    m.batchSupport = { support: 'batch-denied', reason: 'nope', detail: null, engine: 'v2' }
+    await toConfirm()
+    await waitFor(() => {
+      expect(screen.getByRole('note')).toHaveTextContent(/two separate proposals/i)
+    })
+    const note = screen.getByRole('note')
+    expect(note).toHaveTextContent(/does not allow batched transactions/i)
+    expect(note).toHaveTextContent(/in order/i)
+    // The exact-amount allowance and its window are stated, not left to be discovered.
+    expect(note).toHaveTextContent(/exact/i)
+  })
+
+  it('names “could not confirm” rather than claiming the policy denies it', async () => {
+    m.batchSupport = { support: 'unknown', reason: 'could not confirm', detail: null, engine: 'foreign' }
+    await toConfirm()
+    await waitFor(() => {
+      expect(screen.getByRole('note')).toHaveTextContent(/could not confirm/i)
+    })
+    expect(screen.getByRole('note')).not.toHaveTextContent(/does not allow batched transactions/i)
+  })
+
+  it('an unguarded vault says one proposal, and says nothing about splitting', async () => {
+    await toConfirm()
+    const note = screen.getByRole('note')
+    await waitFor(() => expect(note).toHaveTextContent(/one\b.*proposal/i))
+    expect(note).not.toHaveTextContent(/two separate proposals/i)
   })
 })

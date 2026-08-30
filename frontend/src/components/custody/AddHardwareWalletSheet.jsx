@@ -25,6 +25,9 @@ import { useAddressBook } from '../../hooks/useAddressBook'
 import { NETWORKS } from '../../config/networks'
 import { getReadProvider } from '../../utils/rpcProvider'
 import { connectHardware, vendorAvailability, VENDOR_LABELS } from '../../lib/hardware/adapters'
+// Connect copy is DERIVED from the transport the adapter would open — a phone pairing over
+// Bluetooth must never be told to plug anything in (spec 085 follow-up).
+import { connectGuidance } from '../../lib/hardware/connectCopy'
 import { reportHardwareError } from '../../lib/hardware/errors'
 import { defaultSchemeFor, pagePaths, PATH_SCHEMES } from '../../lib/hardware/derivations'
 import { hardwareWalletVault } from '../../lib/hardware/hardwareAccounts'
@@ -71,6 +74,7 @@ export default function AddHardwareWalletSheet({ open, onClose, onSaved, deps = 
   const symbol = network?.nativeCurrency?.symbol || 'ETH'
   const connectFn = deps.connect ?? connectHardware
   const availability = deps.availability ?? vendorAvailability
+  const guidance = deps.guidance ?? connectGuidance
 
   const releaseSession = useCallback(() => {
     const s = sessionRef.current
@@ -237,6 +241,9 @@ export default function AddHardwareWalletSheet({ open, onClose, onSaved, deps = 
       <div className="hw-vendor-options">
         {['ledger', 'trezor'].map((v) => {
           const a = availability(v)
+          // The hint names the rail this browser would actually use — USB on a computer,
+          // Bluetooth on a phone — or, when there is none, the reason it cannot.
+          const hint = a.available ? guidance(v).optionHint : a.reason
           return (
             <button
               key={v}
@@ -247,13 +254,7 @@ export default function AddHardwareWalletSheet({ open, onClose, onSaved, deps = 
               data-testid={`hw-vendor-${v}`}
             >
               <span className="hw-vendor-option__name">{VENDOR_LABELS[v]}</span>
-              <span className="hw-vendor-option__hint">
-                {a.available
-                  ? v === 'ledger'
-                    ? 'Connect over USB'
-                    : 'Connect through the Trezor window'
-                  : a.reason}
-              </span>
+              <span className="hw-vendor-option__hint">{hint}</span>
             </button>
           )
         })}
@@ -261,19 +262,19 @@ export default function AddHardwareWalletSheet({ open, onClose, onSaved, deps = 
     </div>
   )
 
+  const connectSteps = vendor ? guidance(vendor).steps : []
   const connectStep = (
     <div className="hw-step" data-testid="hw-step-connect">
-      <ol className="hw-checklist">
-        <li>Plug the device into this computer.</li>
-        <li>Unlock it with your PIN.</li>
-        {vendor === 'ledger' ? (
-          <li>
-            Open the <strong>Ethereum</strong> app on the device.
-          </li>
-        ) : (
-          <li>Approve the connection in the Trezor window when it opens.</li>
-        )}
-      </ol>
+      {connectSteps.length > 0 ? (
+        <ol className="hw-checklist">
+          {connectSteps.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ol>
+      ) : (
+        // No rail at all: the stated reason stands in for a checklist that could not succeed.
+        <p className="hw-step__lead">{vendor ? guidance(vendor).optionHint : ''}</p>
+      )}
       {error && (
         <p role="alert" className="hw-error">
           {error}
@@ -417,6 +418,6 @@ AddHardwareWalletSheet.propTypes = {
   onClose: PropTypes.func,
   /** Called with the saved entries after a successful save. */
   onSaved: PropTypes.func,
-  /** Test seam: { connect, availability, provider } */
+  /** Test seam: { connect, availability, guidance, provider } */
   deps: PropTypes.object,
 }

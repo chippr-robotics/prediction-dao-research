@@ -688,18 +688,28 @@
       "memberFacing": true,
       "flows": [
         {
-          "id": "miniapp.clearpath-create-dao",
-          "name": "Create a standard DAO through ClearPath",
+          "id": "miniapp.clearpath-register-dao",
+          "name": "Register an external DAO through ClearPath",
           "status": "covered",
           "tier": "on-chain",
-          "proposedTier": "on-chain",
           "depth": "settled",
           "risk": "custody",
           "tests": [
             "frontend/cypress/e2e/full/32-miniapps.cy.js::MA-06"
           ],
-          "missing": "the flow covers what ships \u2014 registering an EXTERNAL DAO on the ExternalDAORegistry. Spec 030's pillar A (creating a native standard DAO) has no member surface: the OZ Governor was deferred for the pre-Cancun `mcopy` problem, so the id names more than the product does",
           "issue": "#1268"
+        },
+        {
+          "id": "miniapp.clearpath-create-native-dao",
+          "name": "Create a native standard DAO through ClearPath (spec 030 pillar A)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1268",
+          "missing": "no member surface exists: OZ 5.4.0's GovernorUpgradeable pulls the Cancun mcopy opcode (via SignatureChecker -> Bytes.sol) and is not deployable on the pre-Cancun ETC/Mordor chains this platform targets, so pillar A's contract side was deliberately deferred (recorded in scripts/deploy/deploy-clearpath.js). #1268 tracks the decision to build it or withdraw it from spec 030."
         }
       ]
     },
@@ -1550,7 +1560,7 @@
         },
         {
           "id": "pay.group-settlement",
-          "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), or sequential sends with per-recipient outcomes",
+          "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes",
           "status": "absent",
           "tier": "none",
           "proposedTier": "on-chain",
@@ -2362,6 +2372,18 @@
           "risk": "custody",
           "tests": [],
           "reason": "Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier."
+        },
+        {
+          "id": "hardware.bluetooth-transport",
+          "name": "Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1370",
+          "missing": "The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs."
         }
       ]
     },
@@ -2636,7 +2658,7 @@
       "flows": [
         {
           "id": "purchase.acting-account",
-          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail (money path: on-chain tier required)",
+          "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required)",
           "status": "absent",
           "tier": "none",
           "proposedTier": "on-chain",

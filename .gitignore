@@ -209,3 +209,4 @@ infra/ansible/collections/
 # publishes a snapshot of somebody's throwaway chain. The full E2E tier regenerates
 # it on every run, in CI and locally alike.
 deployments/localhost-chain*-v2.json
+.build-marker.json

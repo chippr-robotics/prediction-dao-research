@@ -31,6 +31,22 @@ describe('buildActiveAccountSafeTx', () => {
     expect(tx.data.startsWith('0x8d80ff0a')).toBe(true) // multiSend(bytes)
     expect(tx.nonce).toBe(9n)
   })
+
+  // Issue #1368 — when a batch has to be split into N proposals for a policy-guarded vault, they
+  // MUST occupy consecutive nonces. Proposed at the same nonce they would be mutually exclusive
+  // (executing one invalidates the rest), so only one payment could ever land.
+  it('honours an explicit nonce so a split batch can be queued in order', () => {
+    const tx = buildActiveAccountSafeTx({ to: TO, value: 1n, nonce: 12n }, { nonce: 4n, multiSendCallOnly: MS })
+    expect(tx.nonce).toBe(12n)
+    expect(tx.operation).toBe(CALL)
+  })
+
+  it('a single-leg batch is a plain CALL, not a one-entry MultiSend delegatecall', () => {
+    const tx = buildActiveAccountSafeTx({ batch: [{ to: TOKEN, data: '0xabcd' }] }, { nonce: 1n, multiSendCallOnly: MS })
+    expect(getAddress(tx.to)).toBe(getAddress(TOKEN))
+    expect(tx.operation).toBe(CALL)
+    expect(tx.data).toBe('0xabcd')
+  })
 })
 
 describe('submitAsActiveAccount (personal mode)', () => {

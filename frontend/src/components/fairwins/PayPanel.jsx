@@ -410,6 +410,7 @@ function PayPanel({ onSuccess }) {
           symbol={symbol}
           networkName={selectedAsset?.networkName}
           rail={groupPay.rail}
+          batchSupport={groupPay.vaultBatch?.support ?? null}
           gasless={gasless}
           nativeSymbol={getNetwork(assetChainId)?.nativeCurrency?.symbol || ''}
         />

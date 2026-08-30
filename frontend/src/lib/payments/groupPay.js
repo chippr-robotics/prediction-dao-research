@@ -29,6 +29,7 @@
  */
 
 import { formatUnits, isAddress, parseUnits } from 'ethers'
+import { BATCH_SUPPORT } from '../custody/batchPreflight'
 import { classifyAddress } from '../bitcoin/addresses'
 import { isValidSolanaAddress } from '../solana/address'
 
@@ -277,11 +278,12 @@ export function selectGroupRail({ actingType = 'personal', isPasskey = false, ca
  * of it fails. Every line is a statement of fact about the rail actually selected — the fee line
  * never says "gasless" unless the batch is genuinely sponsored (spec 050).
  */
-export function describeRail(rail, { count = 0, gasless = false, nativeSymbol = '' } = {}) {
+export function describeRail(rail, { count = 0, gasless = false, nativeSymbol = '', batchSupport = null } = {}) {
   switch (rail) {
     case GROUP_RAIL.BATCH_PASSKEY:
       return {
         atomic: true,
+        shape: 'batch',
         submissionLine: `One transaction carrying all ${count} payments — a single confirmation.`,
         feeLine: gasless
           ? 'Gasless — no network fee.'
@@ -289,8 +291,31 @@ export function describeRail(rail, { count = 0, gasless = false, nativeSymbol = 
         outcomeLine: `All ${count} go through together, or none of them do.`,
       }
     case GROUP_RAIL.VAULT_PROPOSAL:
+      /*
+       * Issue #1368 — one proposal carrying every payment is a MultiSend, which executes by
+       * DELEGATECALL, which both policy guards deny for a vault with an active policy. Where the
+       * guard is known to deny it (or could not be read at all), the shape is N proposals and the
+       * member must be told that BEFORE signing: what they are approving here is a different
+       * thing, with a different failure mode, from the one-proposal batch.
+       */
+      if (batchSupport === BATCH_SUPPORT.DENIED || batchSupport === BATCH_SUPPORT.UNKNOWN) {
+        return {
+          atomic: false,
+          shape: 'split',
+          submissionLine:
+            `${count} separate proposals — one per recipient. ` +
+            (batchSupport === BATCH_SUPPORT.DENIED
+              ? "This vault's policy does not allow batched transactions, so each payment is proposed on its own."
+              : "We could not confirm this vault's policy allows a batched transaction, so each payment is proposed on its own."),
+          feeLine: `The vault pays the network fee for each of the ${count} proposals its signers execute.`,
+          outcomeLine:
+            `The ${count} proposals are queued in order and are approved and executed one at a time — ` +
+            'a proposal that is never executed holds up the ones after it.',
+        }
+      }
       return {
         atomic: true,
+        shape: 'batch',
         submissionLine: `One proposal covering all ${count} payments — the vault's signers must approve it before anything moves.`,
         feeLine: 'The vault pays the network fee when its signers execute the proposal.',
         outcomeLine: `All ${count} execute together, or none of them do.`,
@@ -298,6 +323,7 @@ export function describeRail(rail, { count = 0, gasless = false, nativeSymbol = 
     case GROUP_RAIL.SEQUENTIAL:
       return {
         atomic: false,
+        shape: 'sequential',
         submissionLine: `${count} separate transactions — one confirmation each.`,
         feeLine: gasless
           ? `Gasless — no network fee for any of the ${count} payments.`
@@ -305,7 +331,7 @@ export function describeRail(rail, { count = 0, gasless = false, nativeSymbol = 
         outcomeLine: "If one payment fails the rest still go through, and you'll see the outcome for each.",
       }
     default:
-      return { atomic: false, submissionLine: '', feeLine: '', outcomeLine: '' }
+      return { atomic: false, shape: null, submissionLine: '', feeLine: '', outcomeLine: '' }
   }
 }
 

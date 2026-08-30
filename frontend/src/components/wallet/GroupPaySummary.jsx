@@ -20,8 +20,10 @@ const STATUS_LABEL = {
  * and "one failure does not stop the rest" is true for THIS submission, because a member's
  * expectation of what a partial failure means is the thing most likely to be wrong.
  */
-export function GroupPayBreakdown({ recipients = [], total, symbol = '', networkName, rail, gasless = false, nativeSymbol = '' }) {
-  const d = describeRail(rail, { count: recipients.length, gasless, nativeSymbol })
+export function GroupPayBreakdown({ recipients = [], total, symbol = '', networkName, rail, gasless = false, nativeSymbol = '', batchSupport = null }) {
+  // Issue #1368 — `batchSupport` is the vault's OWN guard's answer about a MultiSend delegatecall.
+  // It changes the submission, fee and outcome lines, so the member reads the shape they will get.
+  const d = describeRail(rail, { count: recipients.length, gasless, nativeSymbol, batchSupport })
   return (
     <div className="gp-confirm" data-testid="group-pay-confirm" aria-live="polite">
       <div className="gp-breakdown" data-testid="group-pay-breakdown">
@@ -37,7 +39,7 @@ export function GroupPayBreakdown({ recipients = [], total, symbol = '', network
         <span>{total} {symbol}</span>
       </div>
       <div className="pay-confirm-row"><span className="k">Network</span><span className="v">{networkName}</span></div>
-      <div className="gp-note" data-testid="group-pay-rail">
+      <div className="gp-note" data-testid="group-pay-rail" data-shape={d.shape || undefined}>
         <div>{d.submissionLine}</div>
         <div>{d.feeLine}</div>
         <div>{d.outcomeLine}</div>

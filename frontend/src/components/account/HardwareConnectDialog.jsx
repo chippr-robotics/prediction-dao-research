@@ -16,6 +16,9 @@ import { getReadProvider } from '../../utils/rpcProvider'
 import { connectHardwareAccount } from '../../lib/hardware/connectAccount'
 import { reportHardwareError } from '../../lib/hardware/errors'
 import { VENDOR_LABELS } from '../../lib/hardware/adapters'
+// The ceremony hint follows the transport the adapter would open, so a phone member pairing over
+// Bluetooth is never told to plug in a cable (spec 085 follow-up).
+import { connectGuidance } from '../../lib/hardware/connectCopy'
 import ActionSheet from './ActionSheet'
 import './LegacyKeyRecoveryPanel.css'
 
@@ -27,6 +30,7 @@ export default function HardwareConnectDialog({ open, entry, onClose, onConnecte
   const [error, setError] = useState(null)
 
   const vendorLabel = VENDOR_LABELS[entry?.vendor] || 'hardware wallet'
+  const guidance = deps.guidance ?? connectGuidance
   const networkName = (chainId != null && NETWORKS[chainId]?.name) || 'this network'
 
   const close = useCallback(() => {
@@ -60,11 +64,7 @@ export default function HardwareConnectDialog({ open, entry, onClose, onConnecte
           Act as <code>{shortAddr(entry?.address)}</code> — every action will be confirmed on your{' '}
           {vendorLabel} screen while the app signs with this account on {networkName}.
         </p>
-        <p className="recover-step__hint">
-          {entry?.vendor === 'ledger'
-            ? 'Plug in the device, unlock it, and open the Ethereum app.'
-            : 'Plug in the device and approve the connection in the Trezor window.'}
-        </p>
+        <p className="recover-step__hint">{entry?.vendor ? guidance(entry.vendor).reconnectHint : ''}</p>
         {error && (
           <p role="alert" className="lkr-notice lkr-notice--error">
             {error}
@@ -88,6 +88,6 @@ HardwareConnectDialog.propTypes = {
   entry: PropTypes.object,
   onClose: PropTypes.func,
   onConnected: PropTypes.func,
-  /** Test seam: { connectAccount, provider } */
+  /** Test seam: { connectAccount, guidance, provider } */
   deps: PropTypes.object,
 }

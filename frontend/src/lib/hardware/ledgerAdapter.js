@@ -1,13 +1,18 @@
-// Spec 085 — Ledger adapter. Talks to the device over WebHID (preferred) or WebUSB via the official
-// @ledgerhq transports and the Ethereum app protocol (@ledgerhq/hw-app-eth). Loaded only through
-// `connectHardware('ledger')` — never import this module directly from UI code.
+// Spec 085 — Ledger adapter. Talks to the device over WebHID, Web Bluetooth, or WebUSB via the
+// official @ledgerhq transports and the Ethereum app protocol (@ledgerhq/hw-app-eth). Loaded only
+// through `connectHardware('ledger')` — never import this module directly from UI code.
+//
+// WHICH RAIL: decided by capability, in `ledgerTransportKind` (adapters.js) — a desktop keeps
+// WebHID exactly as before, a phone with no WebHID pairs over Bluetooth. Everything above this
+// module is transport-agnostic: the session shape is identical either way, which is what lets
+// HardwareSigner sign without knowing (or caring) how the bytes reach the device.
 //
 // The device exposes public keys/addresses per derivation path and signs on-device; no secret can
 // reach this code. Status words from the Ethereum app are normalized into typed errors so the UI
 // can say "unlock the device" / "open the Ethereum app" instead of "0x6511".
 
 import { HardwareWalletError, HW_ERROR_CODES } from './errors'
-import { detectTransports } from './adapters'
+import { detectTransports, ledgerTransportKind, TRANSPORT_KINDS } from './adapters'
 
 // hw-app-eth expects paths without the leading "m/".
 const appPath = (path) => String(path).replace(/^m\//, '')
@@ -19,13 +24,28 @@ const bytesToHex = (bytes) =>
 export function classifyLedgerError(err) {
   const name = err?.name || ''
   const status = err?.statusCode
+  const message = String(err?.message || '')
+  // TransportWebBLE turns a dismissed chooser into TransportOpenUserCancelled, but a raw
+  // DOMException reaches us whenever the pairing prompt is answered outside that wrapper —
+  // both are the member declining, not a fault.
   if (name === 'TransportOpenUserCancelled') return HW_ERROR_CODES.PERMISSION_DENIED
+  if (name === 'NotFoundError' || name === 'NotAllowedError' || name === 'SecurityError') {
+    return HW_ERROR_CODES.PERMISSION_DENIED
+  }
   if (name === 'TransportInterfaceNotAvailable' || name === 'TransportWebUSBGestureRequired') {
     return HW_ERROR_CODES.PERMISSION_DENIED
   }
   if (name === 'DisconnectedDevice' || name === 'DisconnectedDeviceDuringOperation') {
     return HW_ERROR_CODES.DISCONNECTED
   }
+  // A BLE link dropping mid-session surfaces as a GATT DOMException (NetworkError) or as one of
+  // TransportWebBLE's own "bluetooth … not found" throws while it re-reads the service. Same
+  // member-visible fact as a yanked cable: the device went away, reconnect and retry.
+  if (name === 'NetworkError' || /gatt|bluetooth service/i.test(message)) {
+    return HW_ERROR_CODES.DISCONNECTED
+  }
+  if (name === 'BluetoothRequired') return HW_ERROR_CODES.BLUETOOTH_UNAVAILABLE
+  if (/web bluetooth not supported/i.test(message)) return HW_ERROR_CODES.TRANSPORT_UNSUPPORTED
   if (status === 0x5515 || status === 0x6982 || status === 0x6b0c) return HW_ERROR_CODES.DEVICE_LOCKED
   if (status === 0x6511 || status === 0x6e00 || status === 0x6d00 || status === 0x6e01) {
     return HW_ERROR_CODES.WRONG_APP
@@ -39,25 +59,52 @@ const wrap = (err) =>
     ? err
     : new HardwareWalletError(classifyLedgerError(err), undefined, { cause: err, vendor: 'ledger' })
 
-async function openTransport() {
-  const transports = detectTransports()
+/**
+ * Web Bluetooth exists but the radio can still be off or blocked. `getAvailability()` answers that
+ * without a permission prompt, so the refusal is stated BEFORE a pairing chooser appears — a
+ * chooser that can never find a device reads as a broken feature.
+ */
+async function assertBluetoothRadio() {
+  const bt = typeof navigator !== 'undefined' ? navigator.bluetooth : undefined
+  if (!bt || typeof bt.getAvailability !== 'function') return
+  let available
   try {
-    if (transports.webhid) {
+    available = await bt.getAvailability()
+  } catch {
+    // An implementation that cannot answer is not an implementation that said "no" — carry on and
+    // let the real open attempt decide.
+    return
+  }
+  if (!available) {
+    throw new HardwareWalletError(HW_ERROR_CODES.BLUETOOTH_UNAVAILABLE, undefined, { vendor: 'ledger' })
+  }
+}
+
+/** @returns {Promise<{ transport: object, kind: string }>} */
+async function openTransport() {
+  const kind = ledgerTransportKind(detectTransports())
+  if (!kind) {
+    throw new HardwareWalletError(HW_ERROR_CODES.TRANSPORT_UNSUPPORTED, undefined, { vendor: 'ledger' })
+  }
+  if (kind === TRANSPORT_KINDS.WEBBLE) await assertBluetoothRadio()
+  try {
+    if (kind === TRANSPORT_KINDS.WEBHID) {
       const { default: TransportWebHID } = await import('@ledgerhq/hw-transport-webhid')
-      return await TransportWebHID.create()
+      return { transport: await TransportWebHID.create(), kind }
     }
-    if (transports.webusb) {
-      const { default: TransportWebUSB } = await import('@ledgerhq/hw-transport-webusb')
-      return await TransportWebUSB.create()
+    if (kind === TRANSPORT_KINDS.WEBBLE) {
+      const { default: TransportWebBLE } = await import('@ledgerhq/hw-transport-web-ble')
+      return { transport: await TransportWebBLE.create(), kind }
     }
+    const { default: TransportWebUSB } = await import('@ledgerhq/hw-transport-webusb')
+    return { transport: await TransportWebUSB.create(), kind }
   } catch (err) {
     throw wrap(err)
   }
-  throw new HardwareWalletError(HW_ERROR_CODES.TRANSPORT_UNSUPPORTED, undefined, { vendor: 'ledger' })
 }
 
 export async function connectLedger() {
-  const transport = await openTransport()
+  const { transport, kind } = await openTransport()
   const { default: Eth } = await import('@ledgerhq/hw-app-eth')
   const eth = new Eth(transport)
 
@@ -72,6 +119,9 @@ export async function connectLedger() {
 
   return {
     vendor: 'ledger',
+    // Informational only — every method below behaves identically on either rail, and nothing
+    // above this module branches on it (HardwareSigner must never learn what a transport is).
+    transport: kind,
 
     async getAddress(path, { display = false } = {}) {
       try {
