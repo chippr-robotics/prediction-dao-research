@@ -1,6 +1,6 @@
 {
   "name": "prediction-dao-research",
-  "version": "1.15.1",
+  "version": "1.15.2",
   "description": "Futarchy Prediction DAO with privacy-preserving mechanisms",
   "private": true,
   "workspaces": [
