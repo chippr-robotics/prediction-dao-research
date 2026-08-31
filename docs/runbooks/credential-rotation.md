@@ -146,7 +146,7 @@ the `gcloud secrets list` command under [Keeping this current](#keeping-this-cur
 | `fairwins-floppy-keystore-password` / `-mordor-` / `-nazgul-prime-` | Air-gapped floppy keystore passphrases. |
 | `fairwins-etherscan-api-key` | Contract verification. |
 | `fairwins-graph-api-key` / `-graph-deploy-key` | Subgraph query / deploy. Deploy ≠ query key. |
-| `fairwins-pinata-jwt` | IPFS pinning for mini-app packages. |
+| `fairwins-pinata-jwt` | IPFS pinning. **Not just mini-app packages** — see the Pinata row under [Connected external systems](#connected-external-systems). |
 | `fairwins-quicknode-polygon-url` / `-token` | Archive RPC. |
 | `fairwins-seed-player-keys` | Testnet seeding. Testnet only. |
 
@@ -163,12 +163,34 @@ the `gcloud secrets list` command under [Keeping this current](#keeping-this-cur
 | **Polymarket CLOB** | Gateway proxies public reads; members sign their own orders | 4 `POLYMARKET_API_*` | Predict degrades to 503; SPA hides the tab. |
 | **OpenSea** | Gateway proxies collectible reads | `OPENSEA_API_KEY` | Collect degrades to 503. |
 | **The Graph** | Subgraph queries/deploys | `fairwins-graph-*` | Wager history degrades to direct chain reads. |
-| **Pinata / IPFS** | Mini-app package pinning | `fairwins-pinata-jwt` | Publishing blocked; already-published CIDs unaffected. |
+| **Pinata / IPFS** | Mini-app package pinning **and every member write that pins JSON** — wager creation, open challenges, encrypted data backup | `fairwins-pinata-jwt` (workstation, for publishing) + the Cloud Run runtime `VITE_PINATA_JWT` the SPA's `/api/pinata` proxy injects | **Member-facing, not just publishing.** Already-published CIDs are unaffected, but a member cannot create a wager or an open challenge at all — those flows pin JSON with no fallback. See the scope note below. |
 | **GitHub Actions** | CI and (nominally) infra apply | Workload Identity Federation — **no stored key** | See the caveat below. |
 
 > **⚠️ `infra-apply` has never run.** It is gated on repository variables `WIF_PROVIDER` and
 > `TF_APPLY_SERVICE_ACCOUNT`, which are unset — so every Terraform change merges and silently does
 > nothing. Do not assume a merged infra PR has been applied. Verified 2026-08-16.
+
+> **⚠️ A Pinata key can be valid and still be the wrong key.** Pinata scopes each endpoint
+> separately, and `pinJSONToIPFS` is a **different scope** from `pinFileToIPFS`. Mini-app
+> publishing uploads *files*; wager creation, open challenges and encrypted data backup upload
+> *JSON*. A key minted for publishing therefore authenticates fine and then answers member writes
+> with `NO_SCOPES_FOUND` — which is what happened in production on 2026-08-30.
+>
+> **`testAuthentication` does not catch this** — it succeeds for any valid key, whatever its
+> scopes. Verify a rotation against the endpoint the app actually calls:
+>
+> ```bash
+> # Expect a CID. NO_SCOPES_FOUND ⇒ the key lacks pinJSONToIPFS and every member write is broken.
+> curl -sS -X POST https://api.pinata.cloud/pinning/pinJSONToIPFS \
+>   -H "Authorization: Bearer $JWT" -H 'Content-Type: application/json' \
+>   -d '{"pinataContent":{"probe":"rotation-check"}}'
+> ```
+>
+> The member-facing credential is the **Cloud Run runtime** env var `VITE_PINATA_JWT` on the SPA
+> service (Terraform-unmanaged, so it does not appear in any plan). The browser never holds it:
+> nginx proxies same-origin `/api/pinata` to Pinata and injects the header
+> (`frontend/nginx.conf.template`). Rotating the workstation secret alone leaves production on the
+> old key.
 
 ---
 
