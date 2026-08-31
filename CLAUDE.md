@@ -638,6 +638,26 @@ artifacts live under `specs/<feature>/`.
   `fetch-secrets.sh` refuses to boot if key material reaches its env. See
   `docs/developer-guide/finops.md` + `docs/runbooks/finops-operations.md` + `specs/089-finops-dashboard/`.
 
+- **The release train (spec 076) can release its own paperwork, and the only thing normally stopping
+  it is a merge subject that fails to parse.** `release.yml` triggers on a push to `main` and reads
+  **`github.event.head_commit.message`** — the MERGE commit. The `[skip release]` marker lives one
+  commit deeper, in the record branch's own commit, so it is invisible there; `classify.js` honours
+  it per-commit, which stops the *record* commit voting but not the *merge* commit. `version.js`
+  runs `git log --format=%s…` with **no `--no-merges`**, so a merge subject is classified like any
+  other commit. GitHub's default (`Merge pull request #N from …/release/vX.Y.Z-changelog`) fails to
+  classify and therefore votes for nothing — **that failure to parse IS the guard.** So: **merge a
+  `release/*-changelog` PR with GitHub's DEFAULT commit message; never retitle it to a conventional
+  commit.** `chore(release): v1.15.1 (#1391)` parses as `chore(release)` → patch, which minted
+  **v1.15.2 out of the v1.15.1 record** (2026-08-31); `v1.5.6`/`v1.5.7` were the same failure by the
+  other route. Before merging one, run `node scripts/release/classify.js --title "<subject>"` and
+  confirm it FAILS — or put `[skip release]` in the merge **body**, the one lever that works from
+  the merge commit (it short-circuits the workflow's top-level `if`). Tags are **immutable**
+  (FR-004): a version minted this way cannot be withdrawn, and its record PR must then be merged
+  anyway, or `git describe` disagrees with every manifest and the version gate's backfill exemption
+  fails on every later back-merge. Related invariants: promotions `staging`→`main` use a **merge
+  commit, never a squash**; the back-merge `main`→`staging` is **mandatory** (FR-019); record PRs are
+  opened by GITHUB_TOKEN and therefore get **no check runs** until closed and reopened by hand. See
+  `docs/runbooks/release-and-promotion.md`.
 - **The repo is an npm WORKSPACE (spec 075): one root lockfile, 10 members, `contracts/` deliberately
   NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
   detail — **`monorepo-workspace`** (dependencies, adding a package, recovering a broken install)

@@ -178,6 +178,25 @@ describe('the single-recipient path is untouched', () => {
     expect(screen.getByTestId('group-pay-add')).toBeInTheDocument()
     expect(screen.queryAllByTestId('group-pay-row')).toHaveLength(0)
   })
+
+  /*
+   * The To field is recipient ONE of the group, not the destination. With no marker beside it the
+   * form says "To: <one address>" while the money goes to several people — so the marker is
+   * present exactly when there is more than one recipient, and absent when there is not.
+   */
+  it('marks the To field as multi only once a second recipient exists', async () => {
+    render(<PayPanel />)
+    expect(screen.queryByLabelText(/multiple recipients/i)).not.toBeInTheDocument()
+
+    typeAmount(['1', '2', '.', '5'])
+    setRecipient(RECIPIENT)
+    addRecipient()
+    setRow(2, SECOND, '5')
+
+    const marker = await screen.findByLabelText('Multiple recipients: 2')
+    expect(marker).toHaveTextContent(/multi/i)
+    expect(marker).toHaveTextContent('2')
+  })
 })
 
 describe('building the recipient list', () => {
