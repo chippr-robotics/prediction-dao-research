@@ -1,10 +1,7 @@
-previous: v1.15.0
-commits:  5
-  [unclassified] Merge pull request #1390 from chippr-robotics/hotfix/ansible-inventory-connection
-  [fix -> patch] unblock the converge — dead stdout callback, backwards docker pin
-  [fix -> patch] the ansible inventory could never reach a node
-  [unclassified] Merge pull request #1380 from chippr-robotics/release/v1.15.0-changelog
-  [skipped] chore(release): v1.15.0 [skip release]
+previous: v1.15.1
+commits:  2
+  [chore -> patch] v1.15.1 (#1391)
+  [skipped] chore(release): v1.15.1 [skip release]
 bump:     patch
 reason:   computed
-next:     v1.15.1
+next:     v1.15.2

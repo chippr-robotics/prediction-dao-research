@@ -1,7 +1,7 @@
 {
-  "version": "v1.15.1",
+  "version": "v1.15.2",
   "reason": "computed",
   "bump": "patch",
-  "previous": "v1.15.0",
-  "commits": 5
+  "previous": "v1.15.1",
+  "commits": 2
 }
