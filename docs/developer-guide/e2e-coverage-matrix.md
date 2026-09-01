@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 104 |
 | With a member-facing flow | 82 |
 | Member-facing flows | 164 |
-| 🟢 covered | 142 |
-| 🟡 partial | 1 |
-| 🔴 absent | 14 |
+| 🟢 covered | 149 |
+| 🟡 partial | 2 |
+| 🔴 absent | 6 |
 | ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-64 flows — 🟢 48 · 🟡 1 · 🔴 8 · ⚪ 7 · covered-but-not-proven 0
+64 flows — 🟢 51 · 🟡 2 · 🔴 4 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -95,7 +95,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `miniapp.clearpath-register-dao` | Register an external DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) |  |
-| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🔴 absent | none | — (proposed: on-chain) | #1400 | The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17). |
+| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🟢 covered | settled | `on-chain` | `42-clearpath-native-dao.cy.js` (CD-01) |  |
 
 ### `033-network-aware-swap` — Network-aware swap
 
@@ -134,7 +134,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `passkey.recover-account` | Recover the account on a new device | 🔴 absent | skipped | `account-native` | `recovery.cy.js` (RC-01, RC-04) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
+| `passkey.recover-account` | Recover the account on a new device | 🟡 partial | settled | `account-native` | `recovery.cy.js` (RC-01, RC-04) | FR-021's three mandated device-loss warning moments (creation / first funding / membership purchase) are UNIMPLEMENTED: components/wallet/DeviceLossWarning.jsx is imported by nothing but its own unit test, so device-loss-warning-* can never render. RC-04 asserts the risk disclosure the app does make (the controllers card badge + single-controller-warning alert); the three moments need the component mounted before they can be covered. |
 
 ### `043-safe-multisig-custody` — Safe multisig custody
 
@@ -163,7 +163,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `paymaster.sponsored-userop` | Send a passkey transaction with the fee sponsored | 🔴 absent | none | — (proposed: account-native) | #1400 | the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver, and the fee line names the member as the payer). The positive half is unreachable from any tier for two independent reasons: sponsorPaymasterUrl resolves at BUILD time from VITE_SPONSOR_PAYMASTER_<NET> and is null here, so the client never issues POST /v1/paymaster and there is nothing to intercept; and actually sending a sponsored UserOp needs a live ERC-4337 bundler plus the KMS-signed endpoint, i.e. the PASSKEY_FULL_STACK harness that was never built (#1271). A stub would assert that the stub was called, not that a member paid nothing. The runtime refusal of a CONFIGURED endpoint is covered at unit level in frontend/src/lib/passkey/__tests__/sendBatch.fallback.test.js |
+| `paymaster.sponsored-userop` | Send a passkey transaction with the fee sponsored | 🟢 covered | settled | `account-native` | `sponsored-userop.cy.js` (SU-01, SU-02) |  |
 
 ### `052-payments-style-wager-create` — Payments-style wager create
 
@@ -269,7 +269,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `hardware.add-and-reconnect` | Add a hardware account and reconnect to it later | 🟢 covered | flow | `no-chain` | `27-protect-hardware.cy.js` (HW-01, HW-02, HW-03, HW-04, HW-05) |  |
 | `hardware.physical-confirmation` | Confirm a transaction on the device screen | ⚪ out-of-scope | none | — (proposed: no-chain) | — | Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier. |
-| `hardware.bluetooth-transport` | Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy) | 🔴 absent | none | — (proposed: no-chain) | #1400 | The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs. |
+| `hardware.bluetooth-transport` | Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy) | 🟢 covered | settled | `no-chain` | `45-hardware-ble-transport.cy.js` (BLE-01, BLE-02) |  |
 
 ### `088-instant-acting-accounts` — Instant acting accounts
 
@@ -355,7 +355,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-47 flows — 🟢 43 · 🟡 0 · 🔴 4 · ⚪ 0 · covered-but-not-proven 1
+47 flows — 🟢 46 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -417,8 +417,8 @@ establish the outcome. They are listed in full at the end of this document.
 | `passkey.create-account` | Create an account with a passkey and no seed phrase | 🟢 covered | settled | `account-native` | `onboarding-journey.cy.js` (PK-02) |  |
 | `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | settled | `account-native` | `returning-user.cy.js` (RU-01, RU-02) |  |
 | `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-03, UL-05) |  |
-| `passkey.controllers` | Add and remove the controllers that may act for the account | 🔴 absent | skipped | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
-| `passkey.app-lock` | Lock the screen after idle or on leaving, and unlock with a passkey | 🔴 absent | none | — (proposed: no-chain) | #1400 | no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card). |
+| `passkey.controllers` | Add and remove the controllers that may act for the account | 🟢 covered | settled | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) |  |
+| `passkey.app-lock` | Lock the screen after idle or on leaving, and unlock with a passkey | 🟢 covered | settled | `account-native` | `app-lock.cy.js` (AL-01, AL-02, AL-03, AL-04, AL-05) |  |
 
 ### `042-clearpath-multi-network` — ClearPath across networks
 
@@ -452,7 +452,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `bitcoin.network-card-activates` | Open the Bitcoin wallet surface from its network card without touching the EVM chain | 🔴 absent | none | — (proposed: no-chain) | #1400 |  |
+| `bitcoin.network-card-activates` | Open the Bitcoin wallet surface from its network card without touching the EVM chain | 🟢 covered | flow | `no-chain` | `44-bitcoin-network-card.cy.js` (BC-01, BC-02, BC-03) |  |
 
 ### `066-staking-admin-controls` — Staking admin controls
 
@@ -521,7 +521,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-39 flows — 🟢 38 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
+39 flows — 🟢 39 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -605,7 +605,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.clearpath-create-dao-unavailable` | ClearPath Launch tab states why a DAO cannot be created on this chain | 🔴 absent | none | — (proposed: no-chain) | #1400 | Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec. |
+| `miniapp.clearpath-create-dao-unavailable` | ClearPath Launch tab states why a DAO cannot be created on this chain | 🟢 covered | flow | `no-chain` | `46-clearpath-unavailable.cy.js` (CDU-01, CDU-02) |  |
 
 ### `031-platform-notifications` — Platform notifications
 

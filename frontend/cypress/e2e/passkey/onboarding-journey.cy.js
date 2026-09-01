@@ -103,8 +103,27 @@ import {
     cy.contains(/connect wallet/i).should('not.exist')
   })
 
-  it('[PK-03] full money journey: fund → membership → wager round-trip (SC-002)', function () {
-    if (!Cypress.env('PASSKEY_FULL_STACK')) this.skip() // quickstart.md §4 local stack
+  /*
+   * PENDING (#1400). The full-stack tier now EXISTS — `cypress-passkey-full-stack` brings up a real
+   * EntryPoint, alto bundler and verifying paymaster, and `sponsored-userop.cy.js`, `controllers.cy.js`
+   * and `recovery.cy.js` run against it. This test is deliberately NOT in that job's spec list,
+   * because as written it cannot pass and could not be made to pass by turning a flag on:
+   *
+   *  - `[data-testid="passkey-account-address"]` does not exist in the app and never has (the address
+   *    renders on the header account control — see support/webauthn.js).
+   *  - `[data-testid="confirm-passkey"]` lives in `components/wallet/PasskeyConfirm.jsx`, which is
+   *    imported by nothing but its own unit test. There is no mounted surface with that control.
+   *  - `cy.task('seedUsdc')` is not a registered task; the tier's funding task is
+   *    `seedUsdcForActiveSession`, which takes the address explicitly (a Node task cannot see the
+   *    browser's session).
+   *
+   * The parts of SC-002 that are reachable today ARE covered: first-use activation and a funded
+   * passkey account moving real money ride `sponsored-userop.cy.js::SU-01`. What is left is the
+   * MEMBERSHIP purchase from a passkey session, which means driving the multi-step
+   * PremiumPurchaseModal — a real piece of work, not a flag, and tracked separately rather than
+   * left here as a skip that reads like coverage.
+   */
+  it.skip('[PK-03] full money journey: fund → membership → wager round-trip (SC-002)', function () {
     addVirtualAuthenticator()
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
