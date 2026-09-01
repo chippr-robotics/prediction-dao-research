@@ -93,6 +93,17 @@ gasless relay path — the never-stranded rule.
 > | `QUICKNODE_POLYGON_API` / `_WSS`, `QUICKNODE_AMOY_API` / `_WSS` | **RPC endpoint URLs**, token in the path | gateway + finops + alto (Polygon HTTP only — see below) |
 > | `finops-quicknode-key` | the **Admin API** key, for reading credit usage | FinOps exporter |
 > | `fairwins-quicknode-polygon-url` / `-token` | workstation archive RPC, operator only | never on a VM |
+> | `fairwins-quicknode-{ethereum,optimism,base,arbitrum}-url` | **PER-CHAIN** workstation archive RPC (chains 1 / 10 / 8453 / 42161) | workstation only — no node reads them |
+>
+> **The four per-chain endpoints are derived, not separately purchased.** They come from the
+> `QUICKNODE_RPC_001_API` multichain endpoint by swapping the hostname infix, done ONCE under
+> verification by `node scripts/secrets/quicknode-chains.js --provision 1,10,8453,42161` — which
+> asserts `eth_chainId` and refuses to store a URL that did not verify. Rotating the source
+> endpoint means re-running that command; the four containers are versioned independently, so a
+> chain that fails verification keeps its previous version rather than being poisoned.
+>
+> They are workstation-only on purpose: the gateway does not define those chains at all
+> (`CHAIN_DEFS` covers 61, 63, 137, 80002) and `ENABLED_CHAIN_IDS` is `63,137`.
 >
 > **One endpoint, one token, chain by hostname infix.** `<name>.matic.quiknode.pro` is Polygon and
 > `<name>.matic-amoy.quiknode.pro` is Amoy, on the SAME credential — so a mis-set variable answers
@@ -147,7 +158,8 @@ the `gcloud secrets list` command under [Keeping this current](#keeping-this-cur
 | `fairwins-etherscan-api-key` | Contract verification. |
 | `fairwins-graph-api-key` / `-graph-deploy-key` | Subgraph query / deploy. Deploy ≠ query key. |
 | `fairwins-pinata-jwt` | IPFS pinning. **Not just mini-app packages** — see the Pinata row under [Connected external systems](#connected-external-systems). |
-| `fairwins-quicknode-polygon-url` / `-token` | Archive RPC. |
+| `fairwins-quicknode-polygon-url` / `-token` | Archive RPC, Polygon 137. Also reaches alto as `ALTO_RPC_URL` via its node-facing twin `QUICKNODE_POLYGON_API` — rotate with the bundler in scope. |
+| `fairwins-quicknode-ethereum-url` / `-optimism-` / `-base-` / `-arbitrum-` | Per-chain archive RPC for 1 / 10 / 8453 / 42161. Hard requirements of `hardhat.config.js` on those networks. |
 | `fairwins-seed-player-keys` | Testnet seeding. Testnet only. |
 
 ---
