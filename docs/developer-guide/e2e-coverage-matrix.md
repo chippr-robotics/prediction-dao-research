@@ -30,8 +30,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | With a member-facing flow | 82 |
 | Member-facing flows | 164 |
 | 🟢 covered | 142 |
-| 🟡 partial | 0 |
-| 🔴 absent | 15 |
+| 🟡 partial | 1 |
+| 🔴 absent | 14 |
 | ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-64 flows — 🟢 48 · 🟡 0 · 🔴 9 · ⚪ 7 · covered-but-not-proven 0
+64 flows — 🟢 48 · 🟡 1 · 🔴 8 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -82,7 +82,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `membership.redeem-voucher` | Redeem a voucher for membership without paying | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-01) |  |
 | `membership.buy-voucher` | Buy a voucher at the tier price, paid in USDC | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-02) |  |
-| `membership.send-voucher-from-portfolio` | Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
+| `membership.send-voucher-from-portfolio` | Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected | 🔴 absent | none | — (proposed: no-chain) | #1400 |  |
 
 ### `028-token-mint` — Token Mint mini-app
 
@@ -95,7 +95,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `miniapp.clearpath-register-dao` | Register an external DAO through ClearPath | 🟢 covered | settled | `on-chain` | `32-miniapps.cy.js` (MA-06) |  |
-| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🔴 absent | none | — (proposed: on-chain) | #1268 | The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17). |
+| `miniapp.clearpath-create-native-dao` | Create a native standard DAO through ClearPath (spec 030 pillar A) | 🔴 absent | none | — (proposed: on-chain) | #1400 | The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17). |
 
 ### `033-network-aware-swap` — Network-aware swap
 
@@ -163,7 +163,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `paymaster.sponsored-userop` | Send a passkey transaction with the fee sponsored | 🔴 absent | none | — (proposed: account-native) | #1240 | the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver, and the fee line names the member as the payer). The positive half is unreachable from any tier for two independent reasons: sponsorPaymasterUrl resolves at BUILD time from VITE_SPONSOR_PAYMASTER_<NET> and is null here, so the client never issues POST /v1/paymaster and there is nothing to intercept; and actually sending a sponsored UserOp needs a live ERC-4337 bundler plus the KMS-signed endpoint, i.e. the PASSKEY_FULL_STACK harness that was never built (#1271). A stub would assert that the stub was called, not that a member paid nothing. The runtime refusal of a CONFIGURED endpoint is covered at unit level in frontend/src/lib/passkey/__tests__/sendBatch.fallback.test.js |
+| `paymaster.sponsored-userop` | Send a passkey transaction with the fee sponsored | 🔴 absent | none | — (proposed: account-native) | #1400 | the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver, and the fee line names the member as the payer). The positive half is unreachable from any tier for two independent reasons: sponsorPaymasterUrl resolves at BUILD time from VITE_SPONSOR_PAYMASTER_<NET> and is null here, so the client never issues POST /v1/paymaster and there is nothing to intercept; and actually sending a sponsored UserOp needs a live ERC-4337 bundler plus the KMS-signed endpoint, i.e. the PASSKEY_FULL_STACK harness that was never built (#1271). A stub would assert that the stub was called, not that a member paid nothing. The runtime refusal of a CONFIGURED endpoint is covered at unit level in frontend/src/lib/passkey/__tests__/sendBatch.fallback.test.js |
 
 ### `052-payments-style-wager-create` — Payments-style wager create
 
@@ -194,7 +194,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `transfer.send-from-home` | Send funds to someone from the home screen | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (TR-01) |  |
-| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes | 🔴 absent | none | — (proposed: on-chain) | #1366 |  |
+| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes | 🟡 partial | settled | `on-chain` | `41-group-settlement.cy.js` (GS-01, GS-02, GS-03) | the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain. |
 
 ### `061-bitcoin-transactions` — Bitcoin
 
@@ -269,7 +269,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `hardware.add-and-reconnect` | Add a hardware account and reconnect to it later | 🟢 covered | flow | `no-chain` | `27-protect-hardware.cy.js` (HW-01, HW-02, HW-03, HW-04, HW-05) |  |
 | `hardware.physical-confirmation` | Confirm a transaction on the device screen | ⚪ out-of-scope | none | — (proposed: no-chain) | — | Requires a physical device; the vendor seam is unit-tested behind connectHardware and the adapter errors are covered by the fast tier. |
-| `hardware.bluetooth-transport` | Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy) | 🔴 absent | none | — (proposed: no-chain) | #1370 | The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs. |
+| `hardware.bluetooth-transport` | Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy) | 🔴 absent | none | — (proposed: no-chain) | #1400 | The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs. |
 
 ### `088-instant-acting-accounts` — Instant acting accounts
 
@@ -281,8 +281,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
-| `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
+| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1400 |  |
+| `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1400 |  |
 
 ### `102-capacitor-channels` — Native release channels (iOS + Android + web)
 
@@ -418,7 +418,7 @@ establish the outcome. They are listed in full at the end of this document.
 | `passkey.return-and-sign-in` | Come back on the same device and sign in | 🟢 covered | settled | `account-native` | `returning-user.cy.js` (RU-01, RU-02) |  |
 | `passkey.unified-login` | Reach the same account whether you arrive by passkey or by wallet | 🟢 covered | flow | `account-native` | `unified-login.cy.js` (UL-03, UL-05) |  |
 | `passkey.controllers` | Add and remove the controllers that may act for the account | 🔴 absent | skipped | `account-native` | `controllers.cy.js` (CT-01, CT-02, CT-03) | these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js — so the flag alone would not run them; the local-stack harness behind it was never built (#1271) |
-| `passkey.app-lock` | Lock the screen after idle or on leaving, and unlock with a passkey | 🔴 absent | none | — (proposed: no-chain) | #1364 | no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card). |
+| `passkey.app-lock` | Lock the screen after idle or on leaving, and unlock with a passkey | 🔴 absent | none | — (proposed: no-chain) | #1400 | no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card). |
 
 ### `042-clearpath-multi-network` — ClearPath across networks
 
@@ -452,7 +452,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `bitcoin.network-card-activates` | Open the Bitcoin wallet surface from its network card without touching the EVM chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
+| `bitcoin.network-card-activates` | Open the Bitcoin wallet surface from its network card without touching the EVM chain | 🔴 absent | none | — (proposed: no-chain) | #1400 |  |
 
 ### `066-staking-admin-controls` — Staking admin controls
 
@@ -605,7 +605,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `miniapp.clearpath-create-dao-unavailable` | ClearPath Launch tab states why a DAO cannot be created on this chain | 🔴 absent | none | — (proposed: no-chain) | #1268 | Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec. |
+| `miniapp.clearpath-create-dao-unavailable` | ClearPath Launch tab states why a DAO cannot be created on this chain | 🔴 absent | none | — (proposed: no-chain) | #1400 | Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec. |
 
 ### `031-platform-notifications` — Platform notifications
 

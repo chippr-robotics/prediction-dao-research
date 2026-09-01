@@ -652,7 +652,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "issue": "#1364"
+          "issue": "#1400"
         }
       ]
     },
@@ -708,7 +708,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "issue": "#1268",
+          "issue": "#1400",
           "missing": "The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17)."
         },
         {
@@ -720,7 +720,7 @@
           "depth": "none",
           "risk": "information",
           "tests": [],
-          "issue": "#1268",
+          "issue": "#1400",
           "missing": "Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec."
         }
       ]
@@ -1028,7 +1028,7 @@
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-02",
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-03"
           ],
-          "issue": "#1271",
+          "issue": "#1400",
           "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
         },
         {
@@ -1043,7 +1043,7 @@
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-04"
           ],
           "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
-          "issue": "#1271"
+          "issue": "#1400"
         },
         {
           "id": "passkey.app-lock",
@@ -1054,7 +1054,7 @@
           "depth": "none",
           "risk": "access",
           "tests": [],
-          "issue": "#1364",
+          "issue": "#1400",
           "missing": "no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card)."
         }
       ]
@@ -1313,7 +1313,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "issue": "#1240",
+          "issue": "#1400",
           "missing": "the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver, and the fee line names the member as the payer). The positive half is unreachable from any tier for two independent reasons: sponsorPaymasterUrl resolves at BUILD time from VITE_SPONSOR_PAYMASTER_<NET> and is null here, so the client never issues POST /v1/paymaster and there is nothing to intercept; and actually sending a sponsored UserOp needs a live ERC-4337 bundler plus the KMS-signed endpoint, i.e. the PASSKEY_FULL_STACK harness that was never built (#1271). A stub would assert that the stub was called, not that a member paid nothing. The runtime refusal of a CONFIGURED endpoint is covered at unit level in frontend/src/lib/passkey/__tests__/sendBatch.fallback.test.js"
         },
         {
@@ -1574,13 +1574,17 @@
         {
           "id": "pay.group-settlement",
           "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1366"
+          "tests": [
+            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-01",
+            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-02",
+            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-03"
+          ],
+          "issue": "#1400",
+          "missing": "the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain."
         }
       ]
     },
@@ -1693,7 +1697,7 @@
           "depth": "none",
           "risk": "access",
           "tests": [],
-          "issue": "#1364"
+          "issue": "#1400"
         }
       ]
     },
@@ -2395,7 +2399,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "issue": "#1370",
+          "issue": "#1400",
           "missing": "The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs."
         }
       ]
@@ -2682,7 +2686,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "issue": "#1364"
+          "issue": "#1400"
         },
         {
           "id": "purchase.acting-refusals",
@@ -2693,7 +2697,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "issue": "#1364"
+          "issue": "#1400"
         }
       ]
     },
