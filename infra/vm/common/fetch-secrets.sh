@@ -245,29 +245,49 @@ esac
 #   emit "$GW" RPC_WSS_URL_137          QUICKNODE_POLYGON_WSS latest optional
 #   emit "$GW" RPC_WSS_URL_80002        QUICKNODE_AMOY_WSS    latest optional
 #
-# ---- the numbered MULTICHAIN endpoints (QUICKNODE_RPC_001..005, 2026-08-30) are not delivered
-#      either, for the same reason: no chain they serve is in ENABLED_CHAIN_IDS / the FinOps
-#      cohort today (both are 63,137, and 137 already rides QUICKNODE_POLYGON_API above). ----
+# ---- the PER-CHAIN endpoints for chains 1 / 10 / 8453 / 42161 are not delivered either ----
 #
-# 001 is the one with a foreseeable VM consumer: its base network is eth, and the SAME token
-# serves Ethereum 1, Optimism 10, Base 8453 and Arbitrum 42161 by hostname infix (Ethereum
-# mainnet OMITS the infix — `<name>.quiknode.pro/<token>`; the others are
-# `<name>.<slug>.quiknode.pro/<token>`, slugs in scripts/secrets/quicknode-chains.js). Because
-# the config surface (`RPC_URL_PRIMARY_<chainId>`) already exists for every chain, wiring a new
-# chain when ENABLED_CHAIN_IDS grows is three steps, none of them here first:
+# Step 1 of the recipe that used to live here is DONE. Each of those four chains now has its own
+# Secret Manager container holding a VERIFIED per-chain URL, derived once from the QUICKNODE_RPC_001
+# multichain endpoint rather than re-derived by every consumer:
 #
-#   1. store the derived per-chain URL as ITS OWN secret version — derive and VERIFY it with
-#      `node scripts/secrets/quicknode-chains.js --verify` first (a wrong infix answers 200 with
-#      ANOTHER CHAIN'S state, not 401; the gateway's boot-time eth_chainId assertion is the last
-#      line of defence, not the first) — or emit from QUICKNODE_RPC_001_API directly if the
-#      chain is Ethereum mainnet, whose URL is the payload verbatim;
-#   2. add the secret to `gateway_secret_ids` in infra/terraform/environments/prod/terraform.tfvars;
-#   3. uncomment/add the matching emit lines, e.g.:
-#        emit "$GW" RPC_URL_PRIMARY_1    QUICKNODE_RPC_001_API latest optional
-#        emit "$FO" RPC_URL_PRIMARY_1    QUICKNODE_RPC_001_API latest optional
+#   Ethereum  1      fairwins-quicknode-ethereum-url
+#   Optimism  10     fairwins-quicknode-optimism-url
+#   Base      8453   fairwins-quicknode-base-url
+#   Arbitrum  42161  fairwins-quicknode-arbitrum-url
 #
-# The frontend build's VITE_RPC_URL_MAINNET/OPTIMISM/BASE/ARBITRUM primaries are the consumers
-# that exist TODAY; they are deploy-time envs set outside this script (VITE_ values compile into
-# the public bundle — spec 097 rule 5 — so only a domain-restricted token belongs there).
+# They are declared in scripts/secrets/registry.js, managed + granted to the WORKSTATION only in
+# infra/terraform/environments/prod/terraform.tfvars, and written by
+# `node scripts/secrets/quicknode-chains.js --provision 1,10,8453,42161`, which asserts eth_chainId
+# and refuses to store a URL that did not verify. Doing the infix swap once, under verification, is
+# the whole reason these are per-chain secrets and not one multichain payload: a wrong infix answers
+# 200 WITH ANOTHER CHAIN'S STATE, not 401, and the gateway's boot-time assertion is the last line of
+# defence rather than the first.
+#
+# NO NODE READS THEM, and that is not an oversight. This estate's cohort is ENABLED_CHAIN_IDS /
+# FINOPS_COHORT_CHAIN_IDS = "63,137"; more to the point the gateway does not DEFINE those chains at
+# all (CHAIN_DEFS in services/relay-gateway/src/config/chains.js covers 61, 63, 137, 80002), so an
+# RPC_URL_PRIMARY_1 here would be an env var nothing parses — a credential sitting in a container
+# for no benefit, which is the same reasoning that keeps the WSS/AMOY pair out of this file.
+#
+# When a node genuinely needs one, it is two steps, and the config surface
+# (`RPC_URL_PRIMARY_<chainId>`) already exists:
+#
+#   1. add the secret to `gateway_secret_ids` in infra/terraform/environments/prod/terraform.tfvars
+#      — without the accessor binding the fetch fails, and (being optional) it fails on ONE
+#      journal line;
+#   2. add the matching emit lines, e.g.:
+#        emit "$GW" RPC_URL_PRIMARY_1    fairwins-quicknode-ethereum-url latest optional
+#        emit "$FO" RPC_URL_PRIMARY_1    fairwins-quicknode-ethereum-url latest optional
+#
+# QUICKNODE_RPC_002..005 stay undelivered with no per-chain derivative at all: 002 duplicates the
+# Polygon/Amoy pair already served by QUICKNODE_POLYGON_API above, and 003 (sol) / 004 (btc) /
+# 005 (zec) have no consumer — 004 is not even a drop-in, since the spec-061 gateway module speaks
+# Esplora REST (BTC_ESPLORA_URL), not Bitcoin Core JSON-RPC.
+#
+# The frontend build's VITE_RPC_URL_MAINNET/OPTIMISM/BASE/ARBITRUM primaries are a SEPARATE
+# credential and must stay one: VITE_ values compile into the public bundle (spec 097 rule 5), so
+# only a QuickNode endpoint with referrer/origin restrictions may be set there — NEVER the archive
+# URLs above. They are deploy-time build args on the Cloud Build trigger, set outside this script.
 
 log "wrote per-container env files to ${RUN_DIR} (tmpfs, 0600)"

@@ -48,6 +48,20 @@ ARG VITE_WALLETCONNECT_PROJECT_ID
 ARG VITE_APP_URL
 ARG VITE_NETWORK_ID
 ARG VITE_RPC_URL
+# Per-chain RPC primaries for the EVM mainnets (spec 069's `NETWORKS[chainId].rpcUrl`, resolved
+# through lib/network/rpcEndpoints.js). Unset or BLANK falls back to the committed public default
+# in config/networks.js, so an image that sets none of these is byte-identical to the pre-existing
+# build — `'' || 'https://ethereum-rpc.publicnode.com'` takes the fallback.
+#
+# ⚠ THESE COMPILE INTO THE PUBLIC BUNDLE (spec 097 rule 5). A VITE_ value is readable by anyone who
+# loads the app, so ONLY a QuickNode endpoint with referrer/origin restrictions may be set here.
+# The archive endpoints in the secrets registry (fairwins-quicknode-<chain>-url) are a DIFFERENT
+# credential and must never be passed to this build — moving one here does not hide it, it
+# publishes it.
+ARG VITE_RPC_URL_MAINNET
+ARG VITE_RPC_URL_OPTIMISM
+ARG VITE_RPC_URL_BASE
+ARG VITE_RPC_URL_ARBITRUM
 ARG VITE_IPFS_GATEWAY
 # v2 WagerRegistry subgraph (Spec 017 / #707) — public, build-time only.
 ARG VITE_SUBGRAPH_URL
@@ -87,6 +101,10 @@ ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
 ENV VITE_APP_URL=${VITE_APP_URL}
 ENV VITE_NETWORK_ID=${VITE_NETWORK_ID}
 ENV VITE_RPC_URL=${VITE_RPC_URL}
+ENV VITE_RPC_URL_MAINNET=${VITE_RPC_URL_MAINNET}
+ENV VITE_RPC_URL_OPTIMISM=${VITE_RPC_URL_OPTIMISM}
+ENV VITE_RPC_URL_BASE=${VITE_RPC_URL_BASE}
+ENV VITE_RPC_URL_ARBITRUM=${VITE_RPC_URL_ARBITRUM}
 ENV VITE_IPFS_GATEWAY=${VITE_IPFS_GATEWAY}
 ENV VITE_SUBGRAPH_URL=${VITE_SUBGRAPH_URL}
 ENV VITE_WAGER_SOURCE=${VITE_WAGER_SOURCE}
