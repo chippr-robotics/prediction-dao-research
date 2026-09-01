@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 104 |
 | With a member-facing flow | 82 |
 | Member-facing flows | 164 |
-| 🟢 covered | 149 |
-| 🟡 partial | 2 |
-| 🔴 absent | 6 |
+| 🟢 covered | 150 |
+| 🟡 partial | 4 |
+| 🔴 absent | 3 |
 | ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-64 flows — 🟢 51 · 🟡 2 · 🔴 4 · ⚪ 7 · covered-but-not-proven 0
+64 flows — 🟢 52 · 🟡 4 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -82,7 +82,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `membership.redeem-voucher` | Redeem a voucher for membership without paying | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-01) |  |
 | `membership.buy-voucher` | Buy a voucher at the tier price, paid in USDC | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (VC-02) |  |
-| `membership.send-voucher-from-portfolio` | Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected | 🔴 absent | none | — (proposed: no-chain) | #1400 |  |
+| `membership.send-voucher-from-portfolio` | Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected | 🟢 covered | settled | `on-chain` | `43-voucher-send-from-portfolio.cy.js` (VSP-01) |  |
 
 ### `028-token-mint` — Token Mint mini-app
 
@@ -281,8 +281,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1400 |  |
-| `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1400 |  |
+| `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🟡 partial | settled | `on-chain` | `40-acting-account-purchase.cy.js` (AAP-01, AAP-02, AAP-03) | The vault rail (batched and policy-split) and the acting-signer rail are covered end to end. Three rails are not reachable in this tier and are not faked: the HARDWARE rail (the dev-only adapter seam cannot sign or broadcast - hardware takes the identical acting-signer branch AAP-03 drives), the PASSKEY-batch negative of FR-006 (belongs to the cypress-passkey-full-stack job), and the RELAYED-intent rail of FR-007 (dev:e2e configures no relayer, so every gasless path self-submits - which is the never-stranded fallback AAP-03 exercises). |
+| `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🟡 partial | flow | `no-chain` | `42-acting-purchase-refusals.cy.js` (APR-01, APR-02, APR-03) | FR-003 names two refusal reasons. The chain-mismatch reason is covered (APR-01), as is the negative that the refusal no longer applies to eligible kinds (APR-02 hardware, APR-03 same-chain vault). The second reason - '<account> has no sending identity on <chain>' - is reachable only for acting kind `derived`, and CustodyContext exposes no way to enter that state (personal/vault/legacy/hardware only), so there is no member-facing route to drive. |
 
 ### `102-capacitor-channels` — Native release channels (iOS + Android + web)
 

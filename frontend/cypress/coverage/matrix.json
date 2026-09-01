@@ -646,13 +646,15 @@
         {
           "id": "membership.send-voucher-from-portfolio",
           "name": "Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1400"
+          "tests": [
+            "frontend/cypress/e2e/full/43-voucher-send-from-portfolio.cy.js::VSP-01"
+          ],
+          "issue": "#1400",
+          "note": "Proposed no-chain, placed on-chain: the preselection is a claim about a HOLDING, and without a chain the holding would be invented by the test (a stubbed balanceOf plus Transfer scan), so the no-chain version could only assert that the app preselects the voucher the fixture made up. The transfer half moves value (admission rule 2). One test drives the deep link on the way to the transfer and settles every claim by ownerOf, including that the recipient's tier is still 0."
         }
       ]
     },
@@ -2692,24 +2694,32 @@
         {
           "id": "purchase.acting-account",
           "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required)",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1400"
+          "tests": [
+            "frontend/cypress/e2e/full/40-acting-account-purchase.cy.js::AAP-01",
+            "frontend/cypress/e2e/full/40-acting-account-purchase.cy.js::AAP-02",
+            "frontend/cypress/e2e/full/40-acting-account-purchase.cy.js::AAP-03"
+          ],
+          "issue": "#1400",
+          "missing": "The vault rail (batched and policy-split) and the acting-signer rail are covered end to end. Three rails are not reachable in this tier and are not faked: the HARDWARE rail (the dev-only adapter seam cannot sign or broadcast - hardware takes the identical acting-signer branch AAP-03 drives), the PASSKEY-batch negative of FR-006 (belongs to the cypress-passkey-full-stack job), and the RELAYED-intent rail of FR-007 (dev:e2e configures no relayer, so every gasless path self-submits - which is the never-stranded fallback AAP-03 exercises)."
         },
         {
           "id": "purchase.acting-refusals",
           "name": "Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1400"
+          "tests": [
+            "frontend/cypress/e2e/fast/42-acting-purchase-refusals.cy.js::APR-01",
+            "frontend/cypress/e2e/fast/42-acting-purchase-refusals.cy.js::APR-02",
+            "frontend/cypress/e2e/fast/42-acting-purchase-refusals.cy.js::APR-03"
+          ],
+          "issue": "#1400",
+          "missing": "FR-003 names two refusal reasons. The chain-mismatch reason is covered (APR-01), as is the negative that the refusal no longer applies to eligible kinds (APR-02 hardware, APR-03 same-chain vault). The second reason - '<account> has no sending identity on <chain>' - is reachable only for acting kind `derived`, and CustodyContext exposes no way to enter that state (personal/vault/legacy/hardware only), so there is no member-facing route to drive."
         }
       ]
     },
