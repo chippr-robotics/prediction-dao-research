@@ -64,7 +64,14 @@ const OVERLAY = '[data-testid="app-lock-overlay"]'
 // frontend/src/config/navSearchIndex.js:393-399 — the deep-link hash opens the card.
 const SETTINGS_APP_LOCK = '/wallet?tab=settings#app-lock'
 // frontend/cypress/support/webauthn.js's own header control, used by every passkey spec.
-const ACCOUNT_BUTTON = '[aria-label="Wallet Account"]'
+// The occlusion probe target. Page-local on purpose: the header's account button sits in a
+// fixed container that the settings route clips at the desktop viewport (measured on CI: "not
+// visible because its ancestor has position: fixed and it is overflowed"), so a click there was
+// never a fair baseline. The App lock toggle is on every screen this file drives, is real
+// content, and is exactly what a member would reach for — before the lock it must take the
+// click, after the lock the overlay must.
+const PROBE = '[data-testid="app-lock-toggle"]'
+const ACCOUNT_BUTTON = PROBE
 // frontend/src/connectors/passkey.js session key, read back to prove FR-026 (session intact).
 const SESSION_KEY = 'fairwins.passkey.session.v1'
 
@@ -167,9 +174,9 @@ function setVisibility(state) {
 
     // Baseline: before the lock is even armed, the header account control is really
     // reachable — a real click there would hit the button, not a cover.
-    cy.get(ACCOUNT_BUTTON, { timeout: 20000 }).should('be.visible')
+    cy.get(ACCOUNT_BUTTON, { timeout: 20000 }).scrollIntoView().should('be.visible')
     elementAtCenterOf(ACCOUNT_BUTTON).then((el) => {
-      expect(el && el.closest(ACCOUNT_BUTTON), 'the account button is reachable before the lock').to.exist
+      expect(el && el.closest(ACCOUNT_BUTTON), 'the app-lock toggle is reachable before the lock').to.exist
     })
     cy.get(OVERLAY).should('not.exist')
 
@@ -192,14 +199,14 @@ function setVisibility(state) {
     // the overlay, not the button. Remove the overlay and this reverts to the button —
     // exactly the failure this test exists to catch.
     elementAtCenterOf(ACCOUNT_BUTTON).then((el) => {
-      expect(el && el.closest(OVERLAY), 'the account button is now covered by the lock overlay').to.exist
+      expect(el && el.closest(OVERLAY), 'the app-lock toggle is now covered by the lock overlay').to.exist
     })
   })
 
   it('[AL-03] passkey.app-lock — leaving the tab locks immediately, and returning re-prompts rather than auto-unlocking', () => {
     signInAndOpenAppLockSettings()
     enableAppLock()
-    cy.get(ACCOUNT_BUTTON, { timeout: 20000 }).should('be.visible')
+    cy.get(ACCOUNT_BUTTON, { timeout: 20000 }).scrollIntoView().should('be.visible')
     cy.get(OVERLAY).should('not.exist')
 
     // FR-025b: backgrounding is immediate, not idle-timed — a phone going to the home
@@ -229,7 +236,7 @@ function setVisibility(state) {
     cy.get(OVERLAY, { timeout: 20000 }).should('not.exist')
     readLockState().then((locked) => expect(locked, 'the lock state was cleared').to.equal(false))
     elementAtCenterOf(ACCOUNT_BUTTON).then((el) => {
-      expect(el && el.closest(ACCOUNT_BUTTON), 'the account button is reachable again').to.exist
+      expect(el && el.closest(ACCOUNT_BUTTON), 'the app-lock toggle is reachable again').to.exist
     })
     // FR-026: unlock touches nothing about the session.
     cy.window().then((win) => {

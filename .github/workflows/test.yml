@@ -910,7 +910,8 @@ jobs:
       # production bundle).
       - name: Start local chain
         run: |
-          HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node > /tmp/hardhat-node.log 2>&1 &
+          # HARDHAT_HARDFORK=prague: Amoy has no EIP-7825 per-tx gas cap; see hardhat.config.js.
+          HARDHAT_HARDFORK=prague HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node > /tmp/hardhat-node.log 2>&1 &
           ready=""
           for i in $(seq 1 60); do
             if curl -s -X POST http://127.0.0.1:8545 \
@@ -1133,17 +1134,13 @@ jobs:
       - name: Deploy and seed the local chain
         run: npm run setup:e2e
 
-      # The 4337 prerequisites, then the SHIPPED deploy scripts unmodified. `deploy-account-stack.js`
-      # refuses a chain without the Arachnid proxy and EntryPoint (correctly — a non-deterministic
-      # factory address breaks FR-023 and the pinned init-code hash), so the bootstrap makes this
-      # node look like every other EVM network first. If the deterministic deploy does not reproduce
-      # the recorded addresses, both scripts fail loudly here rather than as an AA14 inside a
-      # WebAuthn ceremony.
-      - name: Bootstrap the ERC-4337 prerequisites
+      # The 4337 prerequisites AND the account stack at its canonical addresses. The current
+      # compile does not reproduce the live factory's CREATE2 address (the first run proved it —
+      # FR-023 refused), so the bootstrap installs the current runtime AT the canonical addresses
+      # with hardhat_setCode and records them; see the script header for why that is the honest
+      # shape. The verifying paymaster then deploys through its SHIPPED script unmodified.
+      - name: Bootstrap the ERC-4337 prerequisites and the account stack
         run: npx hardhat run scripts/e2e/passkey-stack/deploy-passkey-stack.js --network localhost
-
-      - name: Deploy the passkey account stack
-        run: npx hardhat run scripts/deploy/deploy-account-stack.js --network localhost
 
       # PM_SIGNER_PRIVATE_KEY is HARDHAT'S PUBLISHED TEST ACCOUNT #9 — printed by `npx hardhat node`
       # on every start, worthless on every real network, and deliberately NOT a secret: a workflow
@@ -1222,7 +1219,7 @@ jobs:
         run: |
           set -o pipefail
           npx start-server-and-test dev:e2e:passkey http://localhost:5173 \
-            'cypress run --spec "cypress/e2e/passkey/controllers.cy.js,cypress/e2e/passkey/recovery.cy.js,cypress/e2e/passkey/sponsored-userop.cy.js"' \
+            'cypress run --spec "cypress/e2e/passkey/controllers.cy.js,cypress/e2e/passkey/recovery.cy.js,cypress/e2e/passkey/sponsored-userop.cy.js,cypress/e2e/passkey/membership-purchase.cy.js"' \
             2>&1 | tee cypress-passkey-output.txt
 
       - name: Summarize passkey E2E results

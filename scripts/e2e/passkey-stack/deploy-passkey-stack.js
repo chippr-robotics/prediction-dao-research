@@ -3,8 +3,7 @@
  *
  *   HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node
  *   npm run setup:e2e
- *   npx hardhat run scripts/e2e/passkey-stack/deploy-passkey-stack.js --network localhost
- *   npx hardhat run scripts/deploy/deploy-account-stack.js --network localhost
+ *   npx hardhat run scripts/e2e/passkey-stack/deploy-passkey-stack.js --network localhost   # proxy + EntryPoint + account stack
  *   PM_VERIFYING_SIGNER=… npx hardhat run scripts/deploy/deploy-verifying-paymaster.js --network localhost
  *
  * WHY THIS SCRIPT EXISTS AT ALL. `deploy-account-stack.js` deliberately REFUSES a chain that has
@@ -91,6 +90,96 @@ function entryPointCreationBytecode() {
   return artifact.bytecode;
 }
 
+/*
+ * THE ACCOUNT STACK AT ITS CANONICAL ADDRESSES.
+ *
+ * FR-023 pins `accountFactory` (0xd519…8734) and `accountImpl` (0xfC50…5E61) to the SAME address on
+ * every network, and the SPA asserts that across its configured networks (smartAccount.js
+ * accountFactoryAddress). The first CI run showed that the CURRENT compile of CoinbaseSmartWallet
+ * does not reproduce them through the canonical CREATE2 path — it lands at 0x33Bf…/0xc36e… —
+ * because the live factories were deployed from an earlier compile (metadata/settings drift that
+ * the spec-075 byte gate only started pinning afterwards). So `deploy-account-stack.js` correctly
+ * REFUSES here (its FR-023 check), and reproducing the old bytes is impossible without the old
+ * artifacts.
+ *
+ * What the e2e tier actually needs is a local chain that LOOKS like every other network to the
+ * app: working account code AT the canonical addresses. That is what this installs — the current
+ * compile's runtime code, placed with `hardhat_setCode` at the addresses the app is built against:
+ *
+ *   1. deploy the implementation the ordinary way (any address), copy its runtime to CANON_IMPL;
+ *   2. deploy the factory with `implementation_ = CANON_IMPL` (its constructor requires code
+ *      there, and bakes the address in as an immutable — so the constructor arg is what makes
+ *      the copied runtime point at the canonical impl), copy its runtime to CANON_FACTORY.
+ *
+ * Storage is not copied: the implementation's constructor locks its own owner slot, and clones
+ * carry their own storage, so an unlocked local impl changes nothing a test can observe. The
+ * divergence itself is printed loudly every run so nobody mistakes this chain for a proof that
+ * the deploy script reproduces production.
+ */
+const CANON_IMPL = "0xfC5086A397e4FbAAF8f73892807415Da8d255E61";
+const CANON_FACTORY = "0xd519C25e9dEd0DAC586B764574100479CB318734";
+const ACCOUNT_SALT = ethers.id("fairwins.041.account-stack.v1");
+
+async function setCode(address, code) {
+  await hre.network.provider.request({ method: "hardhat_setCode", params: [address, code] });
+  if ((await ethers.provider.getCode(address)) === "0x") throw new Error(`hardhat_setCode left no code at ${address}`);
+}
+
+async function installCanonicalAccountStack(deployer) {
+  if ((await ethers.provider.getCode(CANON_FACTORY)) !== "0x") {
+    console.log(`account stack: already present at ${CANON_FACTORY}`);
+    return;
+  }
+  const Wallet = await ethers.getContractFactory("CoinbaseSmartWallet");
+  const Factory = await ethers.getContractFactory("CoinbaseSmartWalletFactory");
+
+  // Where the CURRENT compile would land through the canonical CREATE2 path — reported, not used.
+  const predictedImpl = ethers.getCreate2Address(CREATE2_DEPLOYER, ACCOUNT_SALT, ethers.keccak256(Wallet.bytecode));
+  const predictedFactory = ethers.getCreate2Address(
+    CREATE2_DEPLOYER,
+    ACCOUNT_SALT,
+    ethers.keccak256(ethers.concat([Factory.bytecode, ethers.AbiCoder.defaultAbiCoder().encode(["address"], [predictedImpl])]))
+  );
+  if (predictedFactory.toLowerCase() !== CANON_FACTORY.toLowerCase()) {
+    console.warn(
+      `account stack: the current compile does NOT reproduce the canonical CREATE2 addresses ` +
+        `(would land impl ${predictedImpl} / factory ${predictedFactory}; canonical ${CANON_IMPL} / ${CANON_FACTORY}). ` +
+        `Installing the current runtime AT the canonical addresses via hardhat_setCode. ` +
+        `A fresh network deployed with deploy-account-stack.js today would diverge — that is a fact about the ` +
+        `live deployments' compile, and this chain is not evidence either way.`
+    );
+  }
+
+  const impl = await Wallet.deploy();
+  await impl.waitForDeployment();
+  await setCode(CANON_IMPL, await ethers.provider.getCode(await impl.getAddress()));
+  console.log(`account stack: CoinbaseSmartWallet runtime installed at ${CANON_IMPL}`);
+
+  const factory = await Factory.deploy(CANON_IMPL);
+  await factory.waitForDeployment();
+  await setCode(CANON_FACTORY, await ethers.provider.getCode(await factory.getAddress()));
+  const reads = await ethers.getContractAt("CoinbaseSmartWalletFactory", CANON_FACTORY);
+  const impl_ = await reads.implementation();
+  if (impl_.toLowerCase() !== CANON_IMPL.toLowerCase()) {
+    throw new Error(`account stack: factory at ${CANON_FACTORY} points at ${impl_}, expected ${CANON_IMPL}`);
+  }
+  console.log(`account stack: CoinbaseSmartWalletFactory runtime installed at ${CANON_FACTORY} (implementation ${impl_})`);
+
+  // The deployment record the gateway and stack-env.js read (mirrors deploy-account-stack.js#recordStack).
+  const { getDeploymentFilename, saveDeployment } = require("../../deploy/lib/helpers");
+  const network = await ethers.provider.getNetwork();
+  const filename = getDeploymentFilename(network, "v2");
+  const filepath = path.join(process.cwd(), "deployments", filename);
+  const record = fs.existsSync(filepath) ? JSON.parse(fs.readFileSync(filepath, "utf8")) : { chainId: Number(network.chainId), contracts: {} };
+  record.contracts = record.contracts || {};
+  record.contracts.entryPoint = ENTRYPOINT_V06;
+  record.contracts.accountImpl = CANON_IMPL;
+  record.contracts.accountFactory = CANON_FACTORY;
+  record.contracts.p256Verifier = record.contracts.p256Verifier || null;
+  saveDeployment(filename, record);
+  console.log(`account stack: recorded in deployments/${filename}`);
+}
+
 async function deployCreate2Proxy() {
   if ((await ethers.provider.getCode(CREATE2_DEPLOYER)) !== "0x") {
     console.log(`CREATE2 proxy: already present at ${CREATE2_DEPLOYER}`);
@@ -166,6 +255,7 @@ async function main() {
 
   await deployCreate2Proxy();
   await deployEntryPoint(deployer);
+  await installCanonicalAccountStack(deployer);
 
   /*
    * A BLOCK HEARTBEAT. alto drives its bundling loop off new blocks; a hardhat node in auto-mine
@@ -178,7 +268,7 @@ async function main() {
   await hre.network.provider.send("evm_setIntervalMining", [1000]);
   console.log("interval mining: 1000ms");
 
-  console.log("\nReady for: deploy-account-stack.js, then deploy-verifying-paymaster.js");
+  console.log("\nReady for: deploy-verifying-paymaster.js");
 }
 
 main().catch((e) => {

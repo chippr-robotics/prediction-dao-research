@@ -28,9 +28,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 104 |
 | With a member-facing flow | 82 |
-| Member-facing flows | 164 |
-| 🟢 covered | 150 |
-| 🟡 partial | 4 |
+| Member-facing flows | 165 |
+| 🟢 covered | 152 |
+| 🟡 partial | 3 |
 | 🔴 absent | 3 |
 | ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-64 flows — 🟢 52 · 🟡 4 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
+65 flows — 🟢 54 · 🟡 3 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -134,7 +134,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `passkey.recover-account` | Recover the account on a new device | 🟡 partial | settled | `account-native` | `recovery.cy.js` (RC-01, RC-04) | FR-021's three mandated device-loss warning moments (creation / first funding / membership purchase) are UNIMPLEMENTED: components/wallet/DeviceLossWarning.jsx is imported by nothing but its own unit test, so device-loss-warning-* can never render. RC-04 asserts the risk disclosure the app does make (the controllers card badge + single-controller-warning alert); the three moments need the component mounted before they can be covered. |
+| `passkey.recover-account` | Recover the account on a new device | 🟢 covered | settled | `account-native` | `recovery.cy.js` (RC-01, RC-04) |  |
+| `membership.purchase-from-passkey` | Buy a membership from a passkey account in one ceremony: sponsored when the paymaster offers it, self-funded (never stranded) when it does not | 🟢 covered | settled | `account-native` | `membership-purchase.cy.js` (MP-01, MP-02) |  |
 
 ### `043-safe-multisig-custody` — Safe multisig custody
 

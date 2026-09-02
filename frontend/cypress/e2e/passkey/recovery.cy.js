@@ -140,23 +140,26 @@ function sendUsdc(amount) {
 
   /*
    * RC-04 — FR-021 says a single-credential account is warned at three moments: creation, first
-   * funding, and membership purchase. `components/wallet/DeviceLossWarning.jsx` implements exactly
-   * that and IS NOT MOUNTED ANYWHERE — the only file that imports it is its own unit test. The
-   * three `device-loss-warning-*` testids the previous version of this test drove therefore cannot
-   * appear, at any moment, in any build.
-   *
-   * The test is not weakened to "some warning somewhere exists": it asserts the disclosure the app
-   * genuinely makes — the controllers card flags the risk in its collapsed summary badge AND in an
-   * alert inside it — and the missing three-moment warning is recorded as a gap on the coverage
-   * row rather than papered over with a passing test. If DeviceLossWarning is ever mounted, this
-   * test should grow the three moments back; if the risk disclosure below is deleted, this fails.
+   * funding, and membership purchase. `components/wallet/DeviceLossWarning.jsx` is mounted at all
+   * three (issue #1405): HomeScreen (creation — the surface the ceremony lands on), MyAccountView
+   * (first funding — the wallet home once the portfolio reports a non-zero holding) and the
+   * Review step of PremiumPurchaseModal (before the member commits money). Each moment is driven
+   * here through the real UI and asserted by its own testid; the controllers card's badge + alert
+   * are the fourth, standing disclosure on the surface that can fix it. Remove any one mount and
+   * exactly one assertion below fails.
    */
-  it('[RC-04] a single-credential account is told, on the surface that can fix it, that one key guards it', () => {
+  it('[RC-04] a single-credential account is warned at creation, first funding and membership purchase, and told where to fix it', () => {
     addVirtualAuthenticator()
     cy.visit('/fairwins')
     cy.contains('button', /connect wallet/i).click()
     choosePasskey()
     expectConnected()
+
+    // Moment 1 — CREATION. The first surface a brand-new passkey account renders on.
+    cy.get('[data-testid="device-loss-warning-creation"]', { timeout: 30000 })
+      .should('have.attr', 'role', 'alert')
+      .and('contain.text', 'one')
+
     connectedAddress().then((address) => {
       cy.window().then((win) => {
         cy.task('seedUsdcForActiveSession', {
@@ -167,7 +170,27 @@ function sendUsdc(amount) {
       })
     })
 
+    // Moment 2 — FIRST FUNDING. The wallet home, once the portfolio has READ a non-zero holding
+    // (never on a totalUsd, which a missing price feed would zero — MyAccountView.jsx).
+    cy.visit('/wallet?tab=account')
+    expectConnected()
+    cy.get('[data-testid="device-loss-warning-first-funding"]', { timeout: 90000 }).should('have.attr', 'role', 'alert')
+
+    // Moment 3 — MEMBERSHIP PURCHASE. On the Review step, before the member signs; it warns and
+    // never gates, so the purchase button underneath stays untouched.
+    cy.visit('/wallet?tab=membership')
+    expectConnected()
+    cy.get('.membership-section .get-roles-btn', { timeout: 30000 }).click()
+    cy.get('.ppm-overlay', { timeout: 30000 }).should('exist')
+    cy.contains('.ppm-tier-card', /Bronze/i, { timeout: 30000 }).click()
+    cy.get('.ppm-overlay').contains('button', /^Continue$/).click()
+    cy.get('[data-testid="device-loss-warning-membership-purchase"]', { timeout: 30000 }).should('have.attr', 'role', 'alert')
+    cy.get('.ppm-btn-purchase').should('exist')
+    cy.get('.ppm-close-btn').click({ force: true })
+
+    // The standing disclosure on the surface that can fix it.
     cy.visit('/wallet?tab=security')
+    expectConnected()
     // Collapsed: the badge is the whole warning a member sees while scanning the tab, so it has to
     // say something actionable rather than a count.
     cy.get('#controllers-header', { timeout: 30000 }).should('contain.text', 'Add a backup key')

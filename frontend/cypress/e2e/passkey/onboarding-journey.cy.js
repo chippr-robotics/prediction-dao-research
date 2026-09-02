@@ -9,16 +9,27 @@
 //
 // Tier notes:
 //  - The gating + sign-up + funded-view sections run WITHOUT a chain: the
-//    account address derivation is the only read and is stubbed at the RPC
-//    boundary here (fast tier).
-//  - The full money journey (fund → membership → wager round-trip, SC-002)
-//    additionally needs the local stack with a bundler
-//    (VITE_BUNDLER_URLS_LOCAL + hardhat + alto per quickstart.md §4) and is
-//    gated on CYPRESS_PASSKEY_FULL_STACK=1 so the fast tier stays honest
-//    about what it proves.
+//    account address derivation is the only read, and the ceremony needs no
+//    chain — which is precisely why this flow belongs in a tier that has none.
+//  - SC-002's money journey is NOT here any more (see below): it needs the
+//    local stack with a bundler and lives in the specs the
+//    `cypress-passkey-full-stack` job runs.
+//
+// WHERE PK-03 WENT (#1407). This file used to end with `it.skip('[PK-03] full
+// money journey …')`, a sketch written against three things that do not exist —
+// `[data-testid="passkey-account-address"]`, `[data-testid="confirm-passkey"]`
+// (the only mount of which was `components/wallet/PasskeyConfirm.jsx`, imported
+// by nothing but its own unit test and now deleted) and a `cy.task('seedUsdc')`
+// that was never registered. A skip cannot be turned into coverage by a flag, so
+// it has been REPLACED by tests that run:
+//   · fund → move money, first-use activation → `sponsored-userop.cy.js::SU-01`
+//   · fund → MEMBERSHIP purchase, sponsored and self-funded →
+//     `membership-purchase.cy.js::MP-01/MP-02`
+// The wager round-trip half is covered from the chain side by
+// `full/04-wager-creation-tx.cy.js` and `full/05-wager-acceptance.cy.js`; a
+// passkey-signed wager is a further flow and is tracked as such, not left here
+// as a skip that reads like coverage.
 // =============================================================================
-
-const ACCOUNT = '0x1111000000000000000000000000000000001111'
 
 import {
   addVirtualAuthenticator,
@@ -103,49 +114,4 @@ import {
     cy.contains(/connect wallet/i).should('not.exist')
   })
 
-  /*
-   * PENDING (#1400). The full-stack tier now EXISTS — `cypress-passkey-full-stack` brings up a real
-   * EntryPoint, alto bundler and verifying paymaster, and `sponsored-userop.cy.js`, `controllers.cy.js`
-   * and `recovery.cy.js` run against it. This test is deliberately NOT in that job's spec list,
-   * because as written it cannot pass and could not be made to pass by turning a flag on:
-   *
-   *  - `[data-testid="passkey-account-address"]` does not exist in the app and never has (the address
-   *    renders on the header account control — see support/webauthn.js).
-   *  - `[data-testid="confirm-passkey"]` lives in `components/wallet/PasskeyConfirm.jsx`, which is
-   *    imported by nothing but its own unit test. There is no mounted surface with that control.
-   *  - `cy.task('seedUsdc')` is not a registered task; the tier's funding task is
-   *    `seedUsdcForActiveSession`, which takes the address explicitly (a Node task cannot see the
-   *    browser's session).
-   *
-   * The parts of SC-002 that are reachable today ARE covered: first-use activation and a funded
-   * passkey account moving real money ride `sponsored-userop.cy.js::SU-01`. What is left is the
-   * MEMBERSHIP purchase from a passkey session, which means driving the multi-step
-   * PremiumPurchaseModal — a real piece of work, not a flag, and tracked separately rather than
-   * left here as a skip that reads like coverage.
-   */
-  it.skip('[PK-03] full money journey: fund → membership → wager round-trip (SC-002)', function () {
-    addVirtualAuthenticator()
-    cy.visit('/fairwins')
-    cy.contains('button', /connect wallet/i).click()
-    choosePasskey()
-    cy.get('[data-testid="passkey-account-address"]', { timeout: 15000 })
-      .invoke('text')
-      .then((address) => {
-        // Seed USDC to the counterfactual account via the local-stack task
-        // (defined in cypress support for the full-stack tier).
-        cy.task('seedUsdc', { to: address.trim(), amount: '1000' })
-      })
-
-    // Membership purchase: ONE confirmation covers approve+pay (FR-016).
-    cy.visit('/fairwins/account')
-    cy.contains(/purchase|membership/i).click()
-    cy.get('[data-testid="confirm-passkey"]').click()
-    cy.contains(/membership.*active|bronze/i, { timeout: 60000 }).should('exist')
-
-    // Wager creation from the passkey account.
-    cy.visit('/fairwins')
-    cy.contains(/create.*wager/i).click()
-    cy.get('[data-testid="confirm-passkey"]').click()
-    cy.contains(/wager.*created|pending/i, { timeout: 60000 }).should('exist')
-  })
 })

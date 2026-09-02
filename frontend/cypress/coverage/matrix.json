@@ -991,7 +991,7 @@
             "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-02"
           ],
           "issue": "#1271",
-          "note": "PK-01 and PK-03 remain pending (#1019 / PASSKEY_FULL_STACK); PK-02 runs and is the flow"
+          "note": "PK-01 remains pending (#1019); PK-03 (membership purchase from a passkey account) moved to membership-purchase.cy.js as MP-01/MP-02 on the full-stack job (#1407). PK-02 runs and is the flow"
         },
         {
           "id": "passkey.return-and-sign-in",
@@ -1037,7 +1037,7 @@
         {
           "id": "passkey.recover-account",
           "name": "Recover the account on a new device",
-          "status": "partial",
+          "status": "covered",
           "tier": "account-native",
           "depth": "settled",
           "risk": "custody",
@@ -1046,7 +1046,7 @@
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-04"
           ],
           "issue": "#1400",
-          "missing": "FR-021's three mandated device-loss warning moments (creation / first funding / membership purchase) are UNIMPLEMENTED: components/wallet/DeviceLossWarning.jsx is imported by nothing but its own unit test, so device-loss-warning-* can never render. RC-04 asserts the risk disclosure the app does make (the controllers card badge + single-controller-warning alert); the three moments need the component mounted before they can be covered."
+          "note": "RC-01 unplugs the authenticator, clears storage, hands the synced credential to a new authenticator and proves the recovered session can still SPEND (recipient balance read off chain). RC-04 drives FR-021's three device-loss warning moments through the real UI \u2014 creation (HomeScreen), first funding (MyAccountView once the portfolio has read a non-zero holding), membership purchase (the Review step) \u2014 each by its own testid (#1405), plus the controllers card's standing disclosure."
         },
         {
           "id": "passkey.app-lock",
@@ -1063,6 +1063,20 @@
             "frontend/cypress/e2e/passkey/app-lock.cy.js::AL-05"
           ],
           "issue": "#1400"
+        },
+        {
+          "id": "membership.purchase-from-passkey",
+          "name": "Buy a membership from a passkey account in one ceremony: sponsored when the paymaster offers it, self-funded (never stranded) when it does not",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/passkey/membership-purchase.cy.js::MP-01",
+            "frontend/cypress/e2e/passkey/membership-purchase.cy.js::MP-02"
+          ],
+          "issue": "#1400",
+          "note": "Runs only on the cypress-passkey-full-stack job. MP-01: a zero-native, still-counterfactual account buys Bronze; getActiveTier reads 1, exactly the quoted price left the account, native stayed 0 while the paymaster deposit fell, and the first-use deployment rode the same batch. MP-02: with sponsorship paused at the real gateway the same purchase lands self-funded and the deposit is untouched. Was PK-03 (#1407)."
         }
       ]
     },

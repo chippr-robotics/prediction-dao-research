@@ -179,6 +179,17 @@ describe('ClearPath native standard DAOs (spec 030 pillar A)', () => {
           cy.get('#cp-dao-token-symbol').clear().type(TOKEN_SYMBOL)
           cy.get('#cp-dao-supply').clear().type(String(SUPPLY_WHOLE))
 
+          // Issue #1408 — the fee disclosure sits directly above the button, BEFORE the signature.
+          // The statement is unconditional; the estimate line must have settled to either a read
+          // number or the honest "could not be confirmed" sentence — never the pending copy.
+          cy.get('.cp-fee-v').should('contain.text', 'You pay the network fee for this deployment')
+          cy.get('.cp-fee-est', { timeout: 30000 }).should(($p) => {
+            const text = $p.text()
+            expect(text, 'the estimate settled').not.to.match(/Estimating the fee/)
+            expect(text, 'the estimate is a read number or an honest refusal').to.match(
+              /Estimated [\d,]+ gas|could not be confirmed/
+            )
+          })
           cy.contains('button', /^Launch DAO$/).should('not.be.disabled').click()
 
           /*

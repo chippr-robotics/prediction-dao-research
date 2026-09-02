@@ -172,7 +172,7 @@ describe('Hardware wallets — Bluetooth transport (spec 085 + 102)', () => {
       // The EXACT field set (hardwareAccounts.js: { address, vendor, path, label, addedAt })
       // — not a superset, not a subset. A field this list does not name would be new data
       // riding along with a BLE save that a USB save never had to declare.
-      expect(Object.keys(entry).sort()).to.deep.equal(['address', 'addedAt', 'label', 'path', 'vendor'])
+      expect(Object.keys(entry).sort()).to.deep.equal(['address', 'addedAt', 'label', 'path', 'vendor'].sort())
       expect(entry.vendor).to.equal('ledger')
       expect(entry.address).to.match(/^0x[0-9a-fA-F]{40}$/)
       expect(entry.address.toLowerCase()).to.equal(HW_ADDRESSES[0].toLowerCase())
