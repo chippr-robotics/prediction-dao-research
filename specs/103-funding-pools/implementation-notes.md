@@ -55,6 +55,22 @@ Both Cypress tiers failed on this spec's own tests, on nothing the sandbox could
 
 Copilot's four review comments (goal string through `Number()`, the 30-day option shaved to 29d 23h, the settle clamp's hidden hour, "characters" for a byte cap) were all right and are fixed in the same push: the decimal string is passed untouched, the window options carry their true values and `deadlinesFor` applies one named `DEADLINE_MARGIN_SECONDS`, and the purpose message says bytes.
 
+## CI round 3 (head `63e9d5d`, after merging `staging`) — a failure outside the feature
+
+Full-tier shard 2 failed on `40-acting-account-purchase` AAP-03 (spec 098), which this PR does not
+touch and which had passed on `staging`'s own run. The screenshot and the chain log named the cause:
+the recovered account's **approve** mined at nonce 0, and the **pay** that followed was signed at
+nonce 0 too — with no `eth_getTransactionCount` between them. ethers v6 caches every provider result
+for 250 ms (`cacheTimeout`), so on an automining chain the pay leg's nonce lookup was served from the
+approve's; the flow fails only when the approve lands inside that window, which is why it is
+intermittent. The injected-wallet path never sees it (the wallet numbers its own transactions) and
+the multi-asset sweep already numbers its legs itself for exactly this reason (`legacyKeys.js`,
+"The nonce is tracked HERE rather than left to the provider"). Fix, in the one seam that builds the
+connected legacy signer: `walletFromSecret` now returns an ethers `NonceManager` around the
+connected wallet (own nonce count per send, reset on a refused send, explicit nonces passed through
+so the sweep's numbering is untouched), with a regression test. The failed job could not be re-run
+from here (the integration lacks the permission), so the fix is what re-runs CI.
+
 **Cypress in the authoring sandbox.** Every run that performs the header connect flow (click "Connect
 Wallet" → pick the injected connector) dies with `read ECONNRESET` in the Cypress server process on the
 NEXT navigation — reproduced with a throwaway spec that only does what `24-wager-pools.cy.js` does on

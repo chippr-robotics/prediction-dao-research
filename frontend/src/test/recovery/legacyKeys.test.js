@@ -157,4 +157,37 @@ describe('native sweep', () => {
     expect(walletFromSecret({ kind: 'privateKey', secret: PK }).address).toBe(EXPECTED_ADDR)
     expect(walletFromSecret({ kind: 'mnemonic', secret: MNEMONIC }).address).toBe(EXPECTED_ADDR)
   })
+
+  /*
+   * ethers v6 caches provider results for 250 ms, so a bare Wallet asked for its nonce twice in
+   * quick succession is handed the same one and the second send is refused "Nonce too low" (the
+   * spec-098 recovered-account purchase failed exactly this way in CI: approve then pay). The
+   * connected signer therefore manages its own nonce: sequential sends count up however stale the
+   * provider's answer is, and a refused send gives its nonce back.
+   */
+  it('a provider-connected signer assigns consecutive nonces even when the provider answer is stale', async () => {
+    let chainCount = 0 // what the provider answers — held at 0 to stand in for the 250 ms cache
+    const provider = { getTransactionCount: async () => chainCount }
+    const signer = walletFromSecret({ kind: 'privateKey', secret: PK }, provider)
+    expect(signer.address).toBe(EXPECTED_ADDR)
+    expect(await signer.getAddress()).toBe(EXPECTED_ADDR)
+
+    const sent = []
+    // Only the nonce is under test; the inner wallet's population needs a full provider.
+    signer.signer.populateTransaction = async (tx) => ({ ...tx })
+    signer.signer.sendTransaction = async (tx) => { sent.push(tx.nonce); return { nonce: tx.nonce } }
+    await signer.sendTransaction({ to: EXPECTED_ADDR })
+    await signer.sendTransaction({ to: EXPECTED_ADDR })
+    expect(sent).toEqual([0, 1])
+
+    // A refused send never consumed its nonce, so the local count is re-synced from the provider:
+    // once the cache has cleared and the chain reports both sends, the next nonce is exactly 2 —
+    // not the 3 an un-reset manager would have skipped ahead to.
+    signer.signer.sendTransaction = async () => { throw new Error('Nonce too low') }
+    await expect(signer.sendTransaction({ to: EXPECTED_ADDR })).rejects.toThrow('Nonce too low')
+    chainCount = 2
+    signer.signer.sendTransaction = async (tx) => { sent.push(tx.nonce); return { nonce: tx.nonce } }
+    await signer.sendTransaction({ to: EXPECTED_ADDR })
+    expect(sent).toEqual([0, 1, 2])
+  })
 })
