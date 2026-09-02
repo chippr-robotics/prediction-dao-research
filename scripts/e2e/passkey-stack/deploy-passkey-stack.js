@@ -91,7 +91,7 @@ function entryPointCreationBytecode() {
   return artifact.bytecode;
 }
 
-async function deployCreate2Proxy(funder) {
+async function deployCreate2Proxy() {
   if ((await ethers.provider.getCode(CREATE2_DEPLOYER)) !== "0x") {
     console.log(`CREATE2 proxy: already present at ${CREATE2_DEPLOYER}`);
     return;
@@ -103,11 +103,18 @@ async function deployCreate2Proxy(funder) {
         `depends on that nonce, so this chain cannot reproduce the canonical proxy. Restart the node.`
     );
   }
-  await funder.sendTransaction({ to: CREATE2_DEPLOYER_EOA, value: ethers.parseEther("1") });
+  // Balance is SET, not sent: a funding transfer would spend a nonce on the deployer account and
+  // 1 ETH is not enough anyway — with no gasLimit hardhat prices the tx at the block gas limit
+  // (measured: 8.37 ETH upfront on the first CI run). The canonical presigned deployment used
+  // 100 gwei x 100,000 gas; the same explicit limit keeps the upfront cost at 0.01 ETH.
+  await hre.network.provider.request({
+    method: "hardhat_setBalance",
+    params: [CREATE2_DEPLOYER_EOA, "0x" + ethers.parseEther("10").toString(16)],
+  });
   await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [CREATE2_DEPLOYER_EOA] });
   try {
     const signer = await ethers.getSigner(CREATE2_DEPLOYER_EOA);
-    const tx = await signer.sendTransaction({ data: CREATE2_PROXY_INITCODE });
+    const tx = await signer.sendTransaction({ data: CREATE2_PROXY_INITCODE, gasLimit: 100_000 });
     const receipt = await tx.wait();
     const landed = receipt.contractAddress;
     if (!landed || landed.toLowerCase() !== CREATE2_DEPLOYER.toLowerCase()) {
@@ -157,7 +164,7 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log(`passkey-stack bootstrap on ${hre.network.name} (chainId ${chainId}) — deployer ${deployer.address}`);
 
-  await deployCreate2Proxy(deployer);
+  await deployCreate2Proxy();
   await deployEntryPoint(deployer);
 
   /*
