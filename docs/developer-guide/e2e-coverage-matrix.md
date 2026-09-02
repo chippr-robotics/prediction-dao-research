@@ -26,10 +26,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 104 |
-| With a member-facing flow | 82 |
-| Member-facing flows | 165 |
-| 🟢 covered | 152 |
+| Spec directories | 105 |
+| With a member-facing flow | 83 |
+| Member-facing flows | 173 |
+| 🟢 covered | 160 |
 | 🟡 partial | 3 |
 | 🔴 absent | 3 |
 | ⚪ out of scope | 7 |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-65 flows — 🟢 54 · 🟡 3 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
+70 flows — 🟢 59 · 🟡 3 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -291,6 +291,16 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `native.passkey-signin` | A member signs in on the native app with the platform passkey ceremony and lands on the SAME account they hold on the web channel, PRF-derived keys intact; an unsupported device refuses with a named reason (unit: src/test/native/passkeyBridge.test.js; device leg: staged manual protocol in docs/runbooks/native-release-operations.md) | 🔴 absent | none | — (proposed: account-native) | #1389 |  |
 | `native.ble-signing` | Ledger signing over the native Bluetooth rail with physical confirmation on the device screen | ⚪ out-of-scope | none | — (proposed: account-native) | — | Requires a physical Nano X and a human pressing its buttons - automation cannot confirm on a device screen. Protocol arithmetic and error normalization are unit-pinned (src/test/native/ledgerBleRung.test.js); the device run is the staged manual addendum in docs/runbooks/hardware-wallet-staging-validation.md, required before store submission. |
+
+### `103-funding-pools` — Funding pools (Request ▸ Pool)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `funding.create-and-contribute` | Create a pool from Request ▸ Pool; a contributor opens the link and contributes | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-01) |  |
+| `funding.organizer-close` | The organizer closes below the goal and collects the whole pot | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-02) |  |
+| `funding.majority-refund` | A strict majority of contributors votes to refund; each collects their own contribution | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-03) |  |
+| `funding.deadline-refund` | A pool nobody closes refunds after the settle deadline | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-04) |  |
+| `funding.organizer-refund` | The organizer refunds everyone from an open pool | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-05) |  |
 
 ## Disclosure — a member consents to a cost
 
@@ -725,13 +735,21 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## No member consequence
 
-1 flows — 🟢 0 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 0
+4 flows — 🟢 3 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 0
 
 ### `102-capacitor-channels` — Native release channels (iOS + Android + web)
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `native.deep-link-entry` | A share link opened with the app installed lands on the linked surface in-app through any due gate; foreign-origin URLs through the link channel are ignored (unit: src/test/native/deepLinks.test.js) | 🔴 absent | none | — (proposed: no-chain) | #1389 |  |
+
+### `103-funding-pools` — Funding pools (Request ▸ Pool)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `funding.request-pool-form` | Switch the Request view from Direct to Pool, validate the form, see the public-purpose disclosure | 🟢 covered | flow | `no-chain` | `42-funding-pools.cy.js` (FP-FAST-01, FP-FAST-02, FP-FAST-03, FP-FAST-04, FP-FAST-07) |  |
+| `funding.my-pools-sheet` | Open My Pools, see the honest empty state, find a pool by words or link | 🟢 covered | flow | `no-chain` | `42-funding-pools.cy.js` (FP-FAST-05) |  |
+| `funding.unreadable-link` | A pool link the chain cannot answer renders as unreadable, never as zeros | 🟢 covered | flow | `no-chain` | `42-funding-pools.cy.js` (FP-FAST-06) |  |
 
 ## No member-facing flow
 
