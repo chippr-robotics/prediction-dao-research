@@ -91,21 +91,34 @@ managed_secret_ids = [
   # slug map and verifies a derived URL answers the right eth_chainId before anyone configures it,
   # because a wrong infix returns 200 with another chain's state, not 401.
   #
-  #   001 = base eth   → serves Ethereum 1, Optimism 10, Base 8453, Arbitrum 42161. It is now the
-  #         SOURCE the four per-chain `fairwins-quicknode-<chain>-url` containers below are derived
-  #         from (`quicknode-chains.js --provision`), NOT a credential anything reads directly —
-  #         that is the point of provisioning per-chain: the infix swap happens once, verified,
-  #         instead of in every consumer. The VM nodes read only 63/137 today, so NO node is
-  #         granted this or its derivatives — see the wiring notes in
-  #         infra/vm/common/fetch-secrets.sh for the day ENABLED_CHAIN_IDS grows.
-  #   002 = base matic → same chains as the QUICKNODE_POLYGON/AMOY pair above, which stays the
-  #         live credential (alto's ONLY RPC is REQUIRED on it — consolidating onto 002 is a
-  #         deliberate future rotation, never a side effect)
-  #   003 = base sol   → spec 100 (Solana) is spec+plan only; no consumer exists yet
-  #   004 = base btc   → NO CURRENT CONSUMER AND NOT A DROP-IN: the spec-061 gateway module reads
-  #         an Esplora-compatible REST API (BTC_ESPLORA_URL, mempool.space shape), not Bitcoin
-  #         Core JSON-RPC, which is what this endpoint speaks
-  #   005 = base zec   → spec 101 (Zcash) is spec+plan only; no consumer exists yet
+  # ⚠ THE "BASE NETWORK" IS COSMETIC — corrected 2026-09-01 against the Admin API, which reports
+  # `is_multichain: true` on ALL FIVE. An earlier version of this list read 001 as "base eth" and
+  # reasoned from that; the API reports endpoint `radial-necessary-tree` (which 001 addresses) as
+  # `chain: matic, network: matic`. It is a MATIC-base endpoint whose stored URL carries an
+  # `ethereum-mainnet` infix, and it answers eth_chainId 0x1 anyway. Do not infer a credential's
+  # reach from the network it was created on: the INFIX decides the chain, and the base network is
+  # only what the console happened to open with.
+  #
+  #   001 → the SOURCE the four per-chain `fairwins-quicknode-<chain>-url` containers are derived
+  #         from (`quicknode-chains.js --provision`), NOT a credential anything reads directly.
+  #         MEASURED 2026-09-01: Ethereum 1, Optimism 10, Base 8453 and Arbitrum 42161 all PASS a
+  #         live eth_chainId check off it, which is why no dedicated per-chain endpoint was bought —
+  #         the isolation one would buy (separate rate limit, independent revocation) is a real but
+  #         SEPARATE argument from reachability, and reachability was the one being asserted here.
+  #         The VM nodes read only 63/137, so NO node is granted this or its derivatives.
+  #   002 → ⚠ NOT a second credential. Byte-compared 2026-09-01: `QUICKNODE_RPC_002_API` and
+  #         `QUICKNODE_POLYGON_API` are the SAME endpoint (`chaotic-still-smoke.matic`) with the
+  #         SAME token. They differ by ONE BYTE — 002 has a TRAILING NEWLINE (88 vs 87). So
+  #         "consolidating onto 002" (what this comment used to promise as a future rotation) is
+  #         not a rotation at all, and doing it naively would be a REGRESSION: fetch-secrets.sh
+  #         emits `VAR='<payload>'` verbatim, so 002 yields a URL with a newline inside the quotes.
+  #         alto reads QUICKNODE_POLYGON_API, the clean one — that is luck, not design. If 002 is
+  #         ever wired, re-store it without the trailing byte FIRST.
+  #   003 → spec 100 (Solana) is spec+plan only; no consumer exists yet
+  #   004 → NO CURRENT CONSUMER AND NOT A DROP-IN: the spec-061 gateway module reads an
+  #         Esplora-compatible REST API (BTC_ESPLORA_URL, mempool.space shape), not Bitcoin Core
+  #         JSON-RPC, which is what this endpoint speaks
+  #   005 → spec 101 (Zcash) is spec+plan only; no consumer exists yet
   #
   # Declared (not busywork): management is what makes these show as drift instead of vanishing
   # into unmanaged secrets, and prevent_destroy is what stops a container deletion destroying the

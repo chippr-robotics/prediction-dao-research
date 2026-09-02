@@ -280,10 +280,18 @@ esac
 #        emit "$GW" RPC_URL_PRIMARY_1    fairwins-quicknode-ethereum-url latest optional
 #        emit "$FO" RPC_URL_PRIMARY_1    fairwins-quicknode-ethereum-url latest optional
 #
-# QUICKNODE_RPC_002..005 stay undelivered with no per-chain derivative at all: 002 duplicates the
-# Polygon/Amoy pair already served by QUICKNODE_POLYGON_API above, and 003 (sol) / 004 (btc) /
-# 005 (zec) have no consumer — 004 is not even a drop-in, since the spec-061 gateway module speaks
-# Esplora REST (BTC_ESPLORA_URL), not Bitcoin Core JSON-RPC.
+# QUICKNODE_RPC_002..005 stay undelivered with no per-chain derivative at all. 003 (sol) / 004
+# (btc) / 005 (zec) have no consumer — 004 is not even a drop-in, since the spec-061 gateway module
+# speaks Esplora REST (BTC_ESPLORA_URL), not Bitcoin Core JSON-RPC.
+#
+# ⚠ 002 IS NOT A SECOND CREDENTIAL, AND IT CARRIES A TRAP. Byte-compared 2026-09-01:
+# QUICKNODE_RPC_002_API and QUICKNODE_POLYGON_API are the same endpoint with the same token,
+# differing by ONE BYTE — 002 has a TRAILING NEWLINE (88 vs 87). `emit` above writes
+# VAR='<payload>' with the payload verbatim (invariant 3, and deliberately so — a PEM must survive
+# unchanged), which means swapping alto's ALTO_RPC_URL onto 002 would hand it a URL with a newline
+# INSIDE the quotes. alto has no failover, so that is a bundler outage arriving as a malformed-URL
+# error nobody expects from a "same credential" swap. If 002 is ever wired here, re-store it
+# without the trailing byte FIRST and re-read it to confirm 87 bytes.
 #
 # The frontend build's VITE_RPC_URL_MAINNET/OPTIMISM/BASE/ARBITRUM primaries are a SEPARATE
 # credential and must stay one: VITE_ values compile into the public bundle (spec 097 rule 5), so

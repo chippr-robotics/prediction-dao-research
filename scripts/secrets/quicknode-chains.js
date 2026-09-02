@@ -7,13 +7,24 @@
  * the chain is selected by a hostname infix:
  *
  *     https://<name>.<slug>.quiknode.pro/<token>      (most networks)
- *     https://<name>.quiknode.pro/<token>             (Ethereum mainnet — NO infix)
+ *     https://<name>.quiknode.pro/<token>             (Ethereum mainnet — legacy, infixless)
+ *
+ * Ethereum mainnet accepts BOTH forms. Measured 2026-09-01 against the live endpoint: the
+ * infixless URL and the `ethereum-mainnet`-infixed one each answer eth_chainId 0x1. This table
+ * derives the infixless form because that is what the estate's stored payload has always used;
+ * the infixed form is not wrong, just a second spelling of the same route.
  *
  * The estate holds five such endpoints (QUICKNODE_RPC_001..005; the numbering scheme is documented
- * on `managed_secret_ids` in infra/terraform/environments/prod/terraform.tfvars). This tool exists
- * because the failure mode of a hand-derived URL is the bad kind: a wrong infix answers 200 WITH
- * ANOTHER CHAIN'S STATE, not 401 — indistinguishable from working until funds move on the wrong
- * network. So derivation and verification live together, and verification asserts eth_chainId.
+ * on `managed_secret_ids` in infra/terraform/environments/prod/terraform.tfvars). ⚠ THE NETWORK AN
+ * ENDPOINT WAS CREATED ON TELLS YOU NOTHING ABOUT ITS REACH: the Admin API reports every one of the
+ * five as `is_multichain: true`, and 001 — the source for chains 1/10/8453/42161 — is reported as
+ * `chain: matic`. Reasoning from the base network is how the tfvars comment came to describe 001 as
+ * "base eth". Ask the chain, don't infer it.
+ *
+ * This tool exists because the failure mode of a hand-derived URL is the bad kind: a wrong infix
+ * answers 200 WITH ANOTHER CHAIN'S STATE, not 401 — indistinguishable from working until funds move
+ * on the wrong network. So derivation and verification live together, and verification asserts
+ * eth_chainId. Measured 2026-09-01: chains 1, 10, 8453 and 42161 all PASS off endpoint 001.
  *
  * Usage (payload arrives on STDIN — never as argv, which is world-readable in /proc):
  *
@@ -62,6 +73,9 @@
  *              container rather than inventing a secret id.
  */
 export const EVM_CHAIN_SLUGS = Object.freeze({
+  // `slug: null` derives the legacy infixless host. The `ethereum-mainnet` infix is an equally
+  // valid spelling (both verified 2026-09-01); do not "fix" this to the infixed form without
+  // re-verifying, since the stored payloads and this table have to agree on one.
   1: { slug: null, envName: 'VITE_RPC_URL_MAINNET', secretId: 'fairwins-quicknode-ethereum-url' },
   10: { slug: 'optimism', envName: 'VITE_RPC_URL_OPTIMISM', secretId: 'fairwins-quicknode-optimism-url' },
   // 137 already had a per-chain container before this table gained secretIds. It is deliberately

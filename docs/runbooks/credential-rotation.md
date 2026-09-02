@@ -111,6 +111,18 @@ gasless relay path — the never-stranded rule.
 > every configured endpoint at boot and refuses to start on a mismatch; nothing else in the estate
 > would notice, because the providers are built with `staticNetwork`.
 >
+> **`QUICKNODE_POLYGON_API` and `QUICKNODE_RPC_002_API` are the same endpoint and the same token.**
+> Byte-compared 2026-09-01: they differ by ONE byte — 002 has a **trailing newline** (88 vs 87).
+> Rotating one does not rotate the other, because they are separate containers holding separate
+> copies; rotate **both** or you leave a live copy of a revoked-looking credential behind. And do
+> not treat them as interchangeable: `fetch-secrets.sh` writes payloads verbatim, so 002 delivers a
+> URL with a newline inside the quoted value.
+>
+> **The base network an endpoint was created on does not bound its reach.** The Admin API reports
+> all five as `is_multichain: true`; 001 is reported `chain: matic` yet serves Ethereum 1,
+> Optimism 10, Base 8453 and Arbitrum 42161 (all verified by live `eth_chainId`, 2026-09-01).
+> Ask the chain, never infer it from the endpoint's name or console network.
+>
 > **`QUICKNODE_POLYGON_WSS`, `QUICKNODE_AMOY_API` and `QUICKNODE_AMOY_WSS` are declared but
 > deliberately UNREAD.** Nothing opens a WebSocket RPC, and there is no Amoy-cohort node. They are
 > under Terraform management with **empty IAM policies on purpose** — a recorded decision rather

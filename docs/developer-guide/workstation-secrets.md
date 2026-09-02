@@ -116,6 +116,13 @@ gcloud secrets versions access latest --secret=QUICKNODE_RPC_001_API \
   | node scripts/secrets/quicknode-chains.js --provision 1,10,8453,42161
 ```
 
+All four chains were verified off endpoint 001 on 2026-09-01 (`--verify` returned PASS for 1, 10,
+8453 and 42161), which is why no dedicated per-chain QuickNode endpoint was bought. Buying four
+would have given rate-limit isolation and independent revocation — a real argument, but a different
+one from "the app cannot reach these chains", which is false. Note also that **the network an
+endpoint was created on says nothing about its reach**: the Admin API reports 001 as `chain: matic`
+and it serves Ethereum mainnet fine. Ask the chain; never infer it.
+
 `--provision` derives each chain's URL, asserts `eth_chainId`, and **only then** adds a version.
 A chain that does not verify is skipped and named; nothing unverified is ever stored. The payload
 reaches `gcloud` on stdin, never argv (world-readable in `/proc`) and never disk, and is written
