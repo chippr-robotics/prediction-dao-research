@@ -138,6 +138,21 @@ describe('the single-recipient send is unchanged', () => {
 })
 
 describe('group send', () => {
+  /* See the twin in PayPanel.groupPay.test.jsx — the To field is recipient one, not the whole
+     destination, and it says so exactly when there is more than one. */
+  it('marks the To field as multi only once a second recipient exists', async () => {
+    const user = userEvent.setup()
+    await draftOne(user)
+    expect(screen.queryByLabelText(/multiple recipients/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('group-pay-add'))
+    setRow(2, TWO, '4')
+
+    const marker = await screen.findByLabelText('Multiple recipients: 2')
+    expect(marker).toHaveTextContent(/multi/i)
+    expect(marker).toHaveTextContent('2')
+  })
+
   it('previews the total, the breakdown and how it will be submitted', async () => {
     const user = userEvent.setup()
     await draftOne(user)

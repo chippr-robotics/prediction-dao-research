@@ -26,13 +26,13 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 104 |
-| With a member-facing flow | 82 |
-| Member-facing flows | 168 |
-| 🟢 covered | 149 |
-| 🟡 partial | 1 |
-| 🔴 absent | 12 |
-| ⚪ out of scope | 6 |
+| Spec directories | 105 |
+| With a member-facing flow | 83 |
+| Member-facing flows | 172 |
+| 🟢 covered | 150 |
+| 🟡 partial | 0 |
+| 🔴 absent | 15 |
+| ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
 The last row is the honest read of the suite: those flows have passing tests that do not
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-67 flows — 🟢 53 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
+69 flows — 🟢 53 · 🟡 0 · 🔴 9 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -48,7 +48,7 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `wagers.claim-payout` | The winner claims the escrowed stakes | 🟢 covered | settled | `on-chain` | `10-claim-payouts.cy.js` (CLM-01, CLM-02, CLM-03, CLM-04, CLM-05, CLM-06, CLM-07, CLM-08, CLM-09, CLM-10) |  |
 | `wagers.refund-on-timeout` | An unaccepted or unresolved wager refunds after its deadline | 🟢 covered | settled | `on-chain` | `11-refund-timeout.cy.js` (REF-01, REF-02) |  |
-| `wagers.decline-and-cancel` | Decline an offer, or cancel one you created before it is accepted | 🟢 covered | flow | `on-chain` | `06-decline-cancel.cy.js` (DEC-01, DEC-02, DEC-03, DEC-04, DEC-05, DEC-06) |  |
+| `wagers.decline-and-cancel` | Decline an offer, or cancel one you created before it is accepted | 🟢 covered | settled | `on-chain` | `06-decline-cancel.cy.js` (DEC-01, DEC-02, DEC-03, DEC-04, DEC-05, DEC-06) |  |
 | `wagers.full-lifecycle` | One wager driven end to end, create through settlement | 🟢 covered | settled | `on-chain` | `23-lifecycle-e2e.cy.js` (E2E-01, E2E-02, E2E-03, E2E-04, E2E-05) |  |
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
@@ -163,7 +163,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `paymaster.sponsored-userop` | Send a passkey transaction with the fee sponsored | 🔴 absent | none | — (proposed: account-native) | #1240 | the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver). Actually sending a sponsored UserOp needs a live ERC-4337 bundler and the KMS-signed /v1/paymaster endpoint, neither of which any test tier runs — and a stub would assert that the stub was called, not that a member paid nothing |
+| `paymaster.sponsored-userop` | Send a passkey transaction with the fee sponsored | 🔴 absent | none | — (proposed: account-native) | #1240 | the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver, and the fee line names the member as the payer). The positive half is unreachable from any tier for two independent reasons: sponsorPaymasterUrl resolves at BUILD time from VITE_SPONSOR_PAYMASTER_<NET> and is null here, so the client never issues POST /v1/paymaster and there is nothing to intercept; and actually sending a sponsored UserOp needs a live ERC-4337 bundler plus the KMS-signed endpoint, i.e. the PASSKEY_FULL_STACK harness that was never built (#1271). A stub would assert that the stub was called, not that a member paid nothing. The runtime refusal of a CONFIGURED endpoint is covered at unit level in frontend/src/lib/passkey/__tests__/sendBatch.fallback.test.js |
 
 ### `052-payments-style-wager-create` — Payments-style wager create
 
@@ -284,6 +284,13 @@ establish the outcome. They are listed in full at the end of this document.
 | `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
 | `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
+### `102-capacitor-channels` — Native release channels (iOS + Android + web)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `native.passkey-signin` | A member signs in on the native app with the platform passkey ceremony and lands on the SAME account they hold on the web channel, PRF-derived keys intact; an unsupported device refuses with a named reason (unit: src/test/native/passkeyBridge.test.js; device leg: staged manual protocol in docs/runbooks/native-release-operations.md) | 🔴 absent | none | — (proposed: account-native) | #1389 |  |
+| `native.ble-signing` | Ledger signing over the native Bluetooth rail with physical confirmation on the device screen | ⚪ out-of-scope | none | — (proposed: account-native) | — | Requires a physical Nano X and a human pressing its buttons - automation cannot confirm on a device screen. Protocol arithmetic and error normalization are unit-pinned (src/test/native/ledgerBleRung.test.js); the device run is the staged manual addendum in docs/runbooks/hardware-wallet-staging-validation.md, required before store submission. |
+
 ### `102-funding-pools` — Funding pools (Request ▸ Pool)
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
@@ -358,7 +365,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-46 flows — 🟢 42 · 🟡 1 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
+47 flows — 🟢 43 · 🟡 0 · 🔴 4 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -514,7 +521,13 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `api-access.create-key` | A member-signed grant is revealed once, persisted nowhere, and leaves only metadata | 🟢 covered | settled | `no-chain` | `39-api-access.cy.js` (API-01, API-05) |  |
 | `api-access.revoke-key` | A signed revocation is registered without overstating what registration means | 🟢 covered | flow | `no-chain` | `39-api-access.cy.js` (API-02, API-03) |  |
-| `api-access.console` | The api-access developer console: OpenAPI explorer, token introspection and MCP setup | 🟡 partial | smoke | `no-chain` | `39-api-access.cy.js` (API-04) | Only the HOST card is exercised — the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them. |
+| `api-access.console` | The api-access developer console: OpenAPI explorer, token introspection, try-it, and the key-ceremony deep link into the host | 🟢 covered | flow | `on-chain` | `39-api-access.cy.js` (API-04); `39-api-access-console.cy.js` (API-06, API-07, API-08, API-09, API-10) |  |
+
+### `102-capacitor-channels` — Native release channels (iOS + Android + web)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `native.lifecycle-lock` | Backgrounding the native app past the lock threshold re-prompts before any wallet surface on foreground (unit: src/test/native/lifecycle.test.js + the native case in src/test/applock/AppLockOverlay.test.jsx; the release smoke jobs prove launch/render/lifecycle-survival but cannot reach a signed-in lock) | 🔴 absent | none | — (proposed: no-chain) | #1389 |  |
 
 ## Information — read-only surfaces
 
@@ -721,7 +734,13 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## No member consequence
 
-3 flows — 🟢 3 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
+4 flows — 🟢 3 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 0
+
+### `102-capacitor-channels` — Native release channels (iOS + Android + web)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `native.deep-link-entry` | A share link opened with the app installed lands on the linked surface in-app through any due gate; foreign-origin URLs through the link channel are ignored (unit: src/test/native/deepLinks.test.js) | 🔴 absent | none | — (proposed: no-chain) | #1389 |  |
 
 ### `102-funding-pools` — Funding pools (Request ▸ Pool)
 

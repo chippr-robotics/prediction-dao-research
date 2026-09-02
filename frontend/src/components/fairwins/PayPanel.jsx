@@ -487,7 +487,18 @@ function PayPanel({ onSuccess }) {
 
       {/* Recipient — the standard address entry stack (typed/pasted + book + scan). */}
       <div className="fm-form-group fm-form-full">
-        <label className="fm-label" htmlFor="pay-to">To</label>
+        <span className="fm-label-row fm-label-row-spaced">
+          <label className="fm-label" htmlFor="pay-to">To</label>
+          {/* Recipient ONE of a group, not the only recipient — see the note in TransferForm. */}
+          {isGroup && (
+            <span
+              className="fm-badge-multi"
+              aria-label={`Multiple recipients: ${allRecipients.length}`}
+            >
+              Multi · {allRecipients.length}
+            </span>
+          )}
+        </span>
         <div className="fm-input-with-action">
           <div className="fm-address-input-wrap">
             <AddressInput

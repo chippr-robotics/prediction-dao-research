@@ -85,6 +85,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # check:native-versions resolves the current release from git tags
+          # (version.js --current); a shallow, tagless checkout would read
+          # "none" and fail every run.
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -93,6 +99,17 @@ jobs:
 
       - name: Check dependency hygiene
         run: npm run check:deps
+
+      # Spec 102: the native shells' version and identity fields are sync-only
+      # (sync-native-config.js writes them from the tenant manifest + the one
+      # version source); a hand edit fails here with the file named. The tenant
+      # `native` block rules are proven by must-fail fixtures in test:tenants.
+      # Both are dependency-free, matching this job's no-install design.
+      - name: Check native config sync (spec 102)
+        run: npm run check:native-versions
+
+      - name: Tenant manifest gate tests
+        run: npm run test:tenants
 
   # Gate (spec 089, FR-019…FR-023): a revenue or cost source that reaches production without a
   # dashboard entry is money moving that nobody is watching. The brief stated updating the dashboard

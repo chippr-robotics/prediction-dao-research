@@ -44,6 +44,11 @@ gateway_secret_ids = [
   # node. Handing a node a credential nothing on it reads is the opposite of least privilege, and
   # the AMOY pair is the same token behind a `matic-amoy` infix, so a node holding it could be
   # pointed at the wrong chain by a four-character typo that returns 200 rather than 401.
+  #
+  # The four per-chain endpoints added for Ethereum 1 / Optimism 10 / Base 8453 / Arbitrum 42161
+  # (fairwins-quicknode-<chain>-url) are NOT granted here either, for the plainer reason that the
+  # gateway does not define those chains at all — CHAIN_DEFS covers 61, 63, 137 and 80002, and
+  # ENABLED_CHAIN_IDS is "63,137". They are workstation-only until a node actually reads one.
   "QUICKNODE_POLYGON_API",
 ]
 
@@ -78,9 +83,68 @@ managed_secret_ids = [
   "QUICKNODE_AMOY_API",
   "QUICKNODE_AMOY_WSS",
 
+  # QuickNode MULTICHAIN endpoints (created at the console 2026-08-30, adopted by import — see
+  # imports.tf). One endpoint name + one token serves every network enabled on it; the chain is
+  # selected by the hostname infix (`<name>.<network>.quiknode.pro/<token>`, with Ethereum mainnet
+  # omitting the infix entirely). The payload stored in each secret is the BASE-network URL; per-
+  # chain URLs are derived by swapping the infix — scripts/secrets/quicknode-chains.js holds the
+  # slug map and verifies a derived URL answers the right eth_chainId before anyone configures it,
+  # because a wrong infix returns 200 with another chain's state, not 401.
+  #
+  #   001 = base eth   → serves Ethereum 1, Optimism 10, Base 8453, Arbitrum 42161. It is now the
+  #         SOURCE the four per-chain `fairwins-quicknode-<chain>-url` containers below are derived
+  #         from (`quicknode-chains.js --provision`), NOT a credential anything reads directly —
+  #         that is the point of provisioning per-chain: the infix swap happens once, verified,
+  #         instead of in every consumer. The VM nodes read only 63/137 today, so NO node is
+  #         granted this or its derivatives — see the wiring notes in
+  #         infra/vm/common/fetch-secrets.sh for the day ENABLED_CHAIN_IDS grows.
+  #   002 = base matic → same chains as the QUICKNODE_POLYGON/AMOY pair above, which stays the
+  #         live credential (alto's ONLY RPC is REQUIRED on it — consolidating onto 002 is a
+  #         deliberate future rotation, never a side effect)
+  #   003 = base sol   → spec 100 (Solana) is spec+plan only; no consumer exists yet
+  #   004 = base btc   → NO CURRENT CONSUMER AND NOT A DROP-IN: the spec-061 gateway module reads
+  #         an Esplora-compatible REST API (BTC_ESPLORA_URL, mempool.space shape), not Bitcoin
+  #         Core JSON-RPC, which is what this endpoint speaks
+  #   005 = base zec   → spec 101 (Zcash) is spec+plan only; no consumer exists yet
+  #
+  # Declared (not busywork): management is what makes these show as drift instead of vanishing
+  # into unmanaged secrets, and prevent_destroy is what stops a container deletion destroying the
+  # token. NONE of them is granted to any node — an env var nothing reads is a credential sitting
+  # in a container for no benefit (the same reasoning as the WSS/AMOY block above).
+  "QUICKNODE_ADMIN_API",
+  "QUICKNODE_RPC_001_API",
+  "QUICKNODE_RPC_001_WSS",
+  "QUICKNODE_RPC_002_API",
+  "QUICKNODE_RPC_002_WSS",
+  "QUICKNODE_RPC_003_API",
+  "QUICKNODE_RPC_003_WSS",
+  "QUICKNODE_RPC_004_API",
+  "QUICKNODE_RPC_005_API",
+
+  # Android upload-key signing (spec 102, release channel CI). CONTAINERS ONLY,
+  # created empty by Terraform; the operator adds the payloads (a JKS keystore
+  # and its password — created WITHOUT a trailing newline, since the release
+  # job reads it through $() which strips one) per
+  # docs/runbooks/native-release-operations.md. Read at release time by a
+  # dedicated CI service account over workload identity — deliberately NOT the
+  # workstation identity and NOT any node, so neither grant list carries these.
+  # Signing stays disabled (unsigned .aab, recorded signed:false) until the
+  # ANDROID_SIGNING_SERVICE_ACCOUNT repo variable is set.
+  "fairwins-android-upload-keystore",
+  "fairwins-android-upload-keystore-password",
+
 
   # Workstation secrets (spec 097). Mirrors scripts/secrets/registry.js — the parity test keeps
   # these in step; do not edit one list without the other.
+  #
+  # The four fairwins-quicknode-<chain>-url entries are the PER-CHAIN archive endpoints for
+  # Ethereum 1, Optimism 10, Base 8453 and Arbitrum 42161. They are containers only, as everything
+  # here is (G-04): the payloads are derived from the QUICKNODE_RPC_001_API multichain endpoint and
+  # written by `node scripts/secrets/quicknode-chains.js --provision`, which VERIFIES eth_chainId
+  # before it writes — a wrong hostname infix answers 200 with another chain's state, not 401.
+  # Before them, hardhat's required MAINNET/OPTIMISM/BASE/ARBITRUM_RPC_URL were public endpoints
+  # kept in a local .env. NO NODE is granted any of the four: the VM cohort is 63,137 and the
+  # gateway does not define these chains at all (services/relay-gateway/src/config/chains.js).
   "fairwins-creator-key",
   "fairwins-deployer-key",
   "fairwins-etherscan-api-key",
@@ -90,6 +154,10 @@ managed_secret_ids = [
   "fairwins-graph-api-key",
   "fairwins-graph-deploy-key",
   "fairwins-pinata-jwt",
+  "fairwins-quicknode-arbitrum-url",
+  "fairwins-quicknode-base-url",
+  "fairwins-quicknode-ethereum-url",
+  "fairwins-quicknode-optimism-url",
   "fairwins-quicknode-polygon-token",
   "fairwins-quicknode-polygon-url",
   "fairwins-seed-player-keys",
@@ -199,6 +267,13 @@ workstation_secret_ids = [
   "fairwins-graph-api-key",
   "fairwins-graph-deploy-key",
   "fairwins-pinata-jwt",
+  # Per-chain QuickNode archive endpoints (profiles `rpc` + `deploy`). The workstation is their
+  # ONLY reader: hardhat.config.js hard-requires MAINNET/OPTIMISM/BASE/ARBITRUM_RPC_URL, and
+  # `--provision` needs write access to the same containers to store a verified derivation.
+  "fairwins-quicknode-arbitrum-url",
+  "fairwins-quicknode-base-url",
+  "fairwins-quicknode-ethereum-url",
+  "fairwins-quicknode-optimism-url",
   "fairwins-quicknode-polygon-token",
   "fairwins-quicknode-polygon-url",
   "fairwins-seed-player-keys",

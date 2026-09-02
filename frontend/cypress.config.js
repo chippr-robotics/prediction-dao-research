@@ -627,7 +627,20 @@ export default defineConfig({
               const addr = d.contracts.backupPointerRegistry
               if (!addr) return { ok: false, error: 'backupPointerRegistry is not in the local deployment record' }
               const bp = new ethers.Contract(addr, BACKUP_POINTER_ABI, provider)
-              return { ok: true, cid: await bp.getPointer(args.address), has: await bp.hasPointer(args.address) }
+              /*
+               * ONE BLOCK FOR BOTH READS. `hasPointer` IS `getPointer().length != 0` on chain, so
+               * the two can only disagree across block heights — and unpinned they are two separate
+               * eth_calls, which a `setPointer` landing between them straddles. That returns
+               * `{ has: true, cid: '' }`: a state the contract cannot be in, which a poll waiting on
+               * `has` reads as settled and then asserts against the pre-write CID (#1327).
+               */
+              const blockTag = await provider.getBlockNumber()
+              return {
+                ok: true,
+                blockTag,
+                cid: await bp.getPointer(args.address, { blockTag }),
+                has: await bp.hasPointer(args.address, { blockTag }),
+              }
             }
             case 'tokenBalance': {
               const t = new ethers.Contract(args.token || d.paymentToken, TOKEN_ABI, provider)

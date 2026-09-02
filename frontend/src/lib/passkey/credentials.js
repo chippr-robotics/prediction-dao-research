@@ -10,7 +10,17 @@
  *
  * The private key NEVER leaves the platform authenticator; this module only
  * handles credential IDs, public keys, and assertion outputs.
+ *
+ * NATIVE CHANNELS (spec 102): on a native runtime the ceremonies run through
+ * the platform credential bridge instead of `navigator.credentials` (the
+ * embedded WebView is not a reliable WebAuthn citizen on either OS). The
+ * selection lives HERE, in `resolveCredentialManager`, and the bridge is
+ * credentials-shaped — every caller above this file is rail-blind, and the
+ * relying party stays the tenant's web origin so the SAME passkey serves web
+ * and native (FR-003).
  */
+import { getRuntime, nativeCapability, NATIVE_CAPABILITIES, RUNTIMES } from '../native/runtime'
+import { nativeCredentialManager } from '../native/nativeCredentials'
 
 const RP_NAME = 'FairWins'
 const CREDENTIALS_KEY = 'fairwins.passkey.credentials.v1'
@@ -42,11 +52,34 @@ function mapCeremonyError(err) {
 }
 
 /**
+ * Which credential manager runs the ceremony. Web: the browser's own —
+ * byte-identical to the pre-102 path. Native: the platform bridge, offered
+ * ONLY when the runtime seam confirms the plugin (an honest
+ * AuthenticatorUnavailable with the seam's reason otherwise, never a dead
+ * ceremony against a WebView API that is not there).
+ */
+function resolveCredentialManager() {
+  if (getRuntime() === RUNTIMES.WEB) return globalThis.navigator?.credentials
+  const capability = nativeCapability(NATIVE_CAPABILITIES.PASSKEY_CEREMONY)
+  if (capability.state !== 'available') throw new AuthenticatorUnavailable(capability.reason)
+  return nativeCredentialManager()
+}
+
+/**
  * Capability detection (FR-004). Returns:
  *   { available: boolean, reason?: string, platformAuthenticator?: boolean }
  * `reason` is user-displayable ("this browser doesn't support passkeys").
  */
 export async function detectCapability(env = globalThis) {
+  // Native runtime: the WebView's own WebAuthn objects are irrelevant — the
+  // platform bridge is the ceremony, and the seam's three-state answer is the
+  // honest capability (spec 102, contract §2).
+  if (getRuntime() !== RUNTIMES.WEB) {
+    const capability = nativeCapability(NATIVE_CAPABILITIES.PASSKEY_CEREMONY)
+    return capability.state === 'available'
+      ? { available: true, platformAuthenticator: true }
+      : { available: false, reason: capability.reason }
+  }
   const pk = env?.window?.PublicKeyCredential ?? env?.PublicKeyCredential
   if (!pk || !(env?.navigator?.credentials ?? env?.window?.navigator?.credentials)) {
     return { available: false, reason: 'This browser does not support passkeys.' }
@@ -139,7 +172,7 @@ const b64url = (buf) => {
  * `deps` is injectable for tests: { credentials, rpId }.
  */
 export async function createCredential({ label, userName = 'FairWins account', deps = {} } = {}) {
-  const credentials = deps.credentials ?? globalThis.navigator?.credentials
+  const credentials = deps.credentials ?? resolveCredentialManager()
   if (!credentials) throw new AuthenticatorUnavailable('no credential manager in this context')
 
   const challenge = crypto.getRandomValues(new Uint8Array(32))
@@ -202,7 +235,7 @@ export async function createCredential({ label, userName = 'FairWins account', d
  *   { credentialId, signature, authenticatorData, clientDataJSON, prfOutput? }
  */
 export async function getAssertion({ challenge, credentialId, prfSalt, discoverable = false, deps = {} }) {
-  const credentials = deps.credentials ?? globalThis.navigator?.credentials
+  const credentials = deps.credentials ?? resolveCredentialManager()
   if (!credentials) throw new AuthenticatorUnavailable('no credential manager in this context')
 
   const pinnedIds = credentialId

@@ -264,9 +264,12 @@ function requiredRpcUrl(networkName, envVar) {
   if (targetNetworkName() === networkName) {
     throw new Error(
       `${envVar} is not set, so network '${networkName}' has no RPC endpoint. ` +
-        `Set ${envVar} in .env to an endpoint for that chain (archive-capable if you are ` +
-        `forking). Refusing to fall back to a public default: a wrong or throttled endpoint ` +
-        `here means deploying to the wrong chain or stranding a partial deployments/ record.`
+        `It is a MANAGED SECRET (spec 097): run the command through the wrapper, which delivers ` +
+        `it from Secret Manager — e.g. \`npm run sec -- --profile deploy --network ${networkName} ` +
+        `-- npx hardhat <cmd> --network ${networkName}\`. Putting it back in .env is what ` +
+        `check:env-hygiene fails on. Refusing to fall back to a public default: a wrong or ` +
+        `throttled endpoint here means deploying to the wrong chain or stranding a partial ` +
+        `deployments/ record.`
     );
   }
   return `http://${envVar.toLowerCase().replace(/_/g, "-")}-is-unset.invalid`;

@@ -20,6 +20,9 @@ const TENANTS_DIR = path.join(REPO_ROOT, "tenants");
 const DEPLOYMENTS_DIR = path.join(REPO_ROOT, "deployments");
 
 const ID_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
+// Reverse-DNS app identity (spec 102): iOS bundle id / Android application id.
+// Segments start with a letter; at least two segments.
+const APP_ID_PATTERN = /^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9_-]*)+$/;
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 const CSS_VAR = /^--[a-z][a-z0-9-]*$/;
 const DOMAIN_PATTERN = /^[a-z0-9.-]+$/;
@@ -227,6 +230,62 @@ function validateManifest(id, manifest, knownFeatures) {
     }
   }
 
+  // --- native (spec 102) ---
+  // OPTIONAL: absence means the tenant has no native channel — the native
+  // build then fails loudly naming the tenant, never borrowing another
+  // tenant's identity. When present, every field is required: a partial
+  // identity would ship an app that is half one tenant.
+  const native = manifest.native;
+  if (native !== undefined) {
+    if (!isPlainObject(native)) {
+      err("native must be an object when present");
+    } else {
+      for (const platform of ["ios", "android"]) {
+        const entry = native[platform];
+        if (!isPlainObject(entry) || typeof entry.appId !== "string") {
+          err(`native.${platform}.appId is required`);
+        } else if (!APP_ID_PATTERN.test(entry.appId)) {
+          err(`native.${platform}.appId "${entry.appId}" is not a valid reverse-DNS app id`);
+        }
+      }
+      if (typeof native.displayName !== "string" || native.displayName.trim() === "") {
+        err("native.displayName is required");
+      }
+      if (typeof native.iconSource !== "string" || native.iconSource.trim() === "") {
+        err("native.iconSource is required");
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Cross-manifest rule (spec 102): a native appId belongs to exactly ONE
+ * tenant. The same tenant may reuse one id across its own two platforms —
+ * two TENANTS sharing an id would install as the same app, which is the
+ * identity collision Story 6 forbids.
+ *
+ * @param {Array<{id: string, manifest: object}>} manifests
+ * @returns {string[]} error messages
+ */
+function checkNativeAppIdUniqueness(manifests) {
+  const errors = [];
+  const owners = new Map();
+  for (const { id, manifest } of manifests) {
+    const native = manifest?.native;
+    if (!isPlainObject(native)) continue;
+    for (const platform of ["ios", "android"]) {
+      const appId = native[platform]?.appId;
+      if (typeof appId !== "string") continue;
+      const owner = owners.get(appId);
+      if (owner && owner !== id) {
+        errors.push(`native appId "${appId}" is claimed by both "${owner}" and "${id}"`);
+      } else {
+        owners.set(appId, id);
+      }
+    }
+  }
   return errors;
 }
 
@@ -266,13 +325,14 @@ function main() {
     manifests.push({ id, manifest });
   }
 
-  // Cross-manifest rule: domains are globally unique. Checked over ALL
-  // manifests even when a subset was requested, so a collision cannot hide
-  // behind a partial run.
+  // Cross-manifest rules: domains and native appIds are globally unique.
+  // Checked over ALL manifests even when a subset was requested, so a
+  // collision cannot hide behind a partial run.
   const allDirs = fs
     .readdirSync(TENANTS_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
+  const allManifests = [];
   for (const id of allDirs) {
     const manifestPath = path.join(TENANTS_DIR, id, "manifest.json");
     if (!fs.existsSync(manifestPath)) continue;
@@ -282,6 +342,7 @@ function main() {
     } catch {
       continue; // parse failures already reported for requested tenants
     }
+    allManifests.push({ id, manifest });
     for (const domain of manifest?.identity?.domains || []) {
       const owner = domainOwners.get(domain);
       if (owner && owner !== id) {
@@ -291,6 +352,10 @@ function main() {
         domainOwners.set(domain, id);
       }
     }
+  }
+  for (const message of checkNativeAppIdUniqueness(allManifests)) {
+    console.error(`✖ ${message}`);
+    failed = true;
   }
 
   for (const { id, manifest } of manifests) {
@@ -311,4 +376,8 @@ function main() {
   console.log(`\n${manifests.length} tenant manifest(s) valid.`);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { validateManifest, checkNativeAppIdUniqueness };
