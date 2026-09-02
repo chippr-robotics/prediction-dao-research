@@ -226,6 +226,9 @@ describe('Funding Pools', () => {
       // A second collect is refused; the organizer cannot close a refunding pool.
       cy.task('chainTx', { action: 'fundingAction', args: { callerIndex: 2, pool, fn: 'claimRefund' } }).its('ok').should('not.equal', true)
       cy.task('chainTx', { action: 'fundingAction', args: { callerIndex: 0, pool, fn: 'close' } }).its('ok').should('not.equal', true)
+      // The other two collected ON-CHAIN, not through this page, which re-reads on its own actions and on
+      // load — never by polling. A fresh load shows the pool fully refunded.
+      cy.reload()
       cy.get('[data-testid="refund-count"]', { timeout: 30000 }).should('contain.text', '3 / 3')
     })
   })
