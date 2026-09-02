@@ -1281,6 +1281,7 @@ jobs:
           path: |
             /tmp/hardhat-node.log
             /tmp/alto.log
+            /tmp/alto-proxy.log
             /tmp/relay-gateway.log
           retention-days: 7
 

@@ -158,7 +158,7 @@ function sendUsdc(amount) {
     // Moment 1 — CREATION. The first surface a brand-new passkey account renders on.
     cy.get('[data-testid="device-loss-warning-creation"]', { timeout: 30000 })
       .should('have.attr', 'role', 'alert')
-      .and('contain.text', 'one')
+      .and('contain.text', 'One passkey guards this account')
 
     connectedAddress().then((address) => {
       cy.window().then((win) => {

@@ -19,7 +19,11 @@
 set -euo pipefail
 
 ALTO_IMAGE="${ALTO_IMAGE:-ghcr.io/pimlicolabs/alto:v1.2.7@sha256:8420c602c1b4618d4e244e693f8d4cfd28fc86fd5808b74fdd185730f934e29e}"
-ALTO_HOST_PORT="${ALTO_HOST_PORT:-4337}"
+# alto itself listens on 4338; the SPA-facing :4337 is the CORS proxy started below (alto 404s the
+# browser's OPTIONS preflight and emits no CORS headers — production has nginx for this, CI has
+# cors-proxy.js). wait-for-stack.js addresses :4337 on purpose: it proves the path the SPA uses.
+ALTO_HOST_PORT="${ALTO_HOST_PORT:-4338}"
+ALTO_PROXY_PORT="${ALTO_PROXY_PORT:-4337}"
 RPC_URL="${ALTO_RPC_URL:-http://127.0.0.1:8545}"
 ENTRYPOINT="${ALTO_ENTRYPOINTS:-0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789}"
 CONTAINER="${ALTO_CONTAINER_NAME:-fairwins-e2e-alto}"
@@ -54,3 +58,9 @@ docker run -d --name "$CONTAINER" --network host \
   "$ALTO_IMAGE"
 
 echo "alto ${ALTO_IMAGE} started as ${CONTAINER} on :${ALTO_HOST_PORT} (entryPoint ${ENTRYPOINT}, rpc ${RPC_URL})"
+
+mkdir -p /tmp/fairwins-passkey-stack
+ALTO_PROXY_PORT="$ALTO_PROXY_PORT" ALTO_UPSTREAM="http://127.0.0.1:${ALTO_HOST_PORT}" \
+  nohup node "$(dirname "$0")/cors-proxy.js" > /tmp/alto-proxy.log 2>&1 &
+echo $! > /tmp/fairwins-passkey-stack/alto-proxy.pid
+echo "alto CORS proxy started on :${ALTO_PROXY_PORT} (pid $(cat /tmp/fairwins-passkey-stack/alto-proxy.pid))"
