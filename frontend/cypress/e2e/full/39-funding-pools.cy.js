@@ -8,6 +8,11 @@
  * under test; setup for the other flows is arranged directly on-chain, the same bypass-the-UI pattern
  * the wager-pool spec uses.
  *
+ * ORDERING RULE: a click submits asynchronously (the app awaits `tx.wait()`, whose receipt poll is
+ * seconds), so every chain read that judges a UI action waits for the page's OWN post-action render
+ * first. Reading the chain straight after the click races the transaction — the first CI run of this
+ * spec read `state: 0` on every flow that way — and is not a stronger test, only an earlier one.
+ *
  * Flows (spec 103, FR-029):
  *   FP-01 funding.create-and-contribute  — create through the Request ▸ Pool form; a second account
  *                                          opens the link and contributes; totals + feed
@@ -111,6 +116,12 @@ describe('Funding Pools', () => {
         cy.enterAmountViaKeypad('fp-amount', '40')
         cy.get('[data-testid="contribute"]').should('be.enabled').click()
 
+        // The page re-reads after the receipt: bar, count, feed. (Waited on BEFORE the chain reads.)
+        cy.get('[role="progressbar"][aria-label="Progress toward the goal"]', { timeout: 60000 }).should('have.attr', 'aria-valuenow', '33')
+        cy.get('[data-testid="funding-contributors"]').should('contain.text', '1 contributor')
+        cy.get('[data-testid="feed-entry"]', { timeout: 30000 }).first().should('contain.text', 'You contributed 40')
+        cy.get('[data-testid="vote-refund"]').should('be.visible')
+
         // Judge by chain state.
         cy.task('chainTx', { action: 'fundingMemberInfo', args: { pool, address: TEST_ACCOUNTS[1] } }).then((m) => {
           expectOk(m, 'fundingMemberInfo')
@@ -123,11 +134,6 @@ describe('Funding Pools', () => {
         cy.task('chainTx', { action: 'tokenBalance', args: { address: pool } }).then((r) => {
           expect(BigInt(r.balance), 'escrow holds the contribution').to.equal(usd(40))
         })
-        // ...and the page reflects it: bar, count, feed.
-        cy.get('[role="progressbar"][aria-label="Progress toward the goal"]', { timeout: 30000 }).should('have.attr', 'aria-valuenow', '33')
-        cy.get('[data-testid="funding-contributors"]').should('contain.text', '1 contributor')
-        cy.get('[data-testid="feed-entry"]', { timeout: 30000 }).first().should('contain.text', 'You contributed 40')
-        cy.get('[data-testid="vote-refund"]').should('be.visible')
       })
     })
   })
@@ -147,6 +153,10 @@ describe('Funding Pools', () => {
         cy.get('[data-testid="confirm-close"]').should('contain.text', 'not yet met').and('contain.text', 'final')
         cy.get('[data-testid="confirm-close-go"]').click()
 
+        // The page's own post-close render lands after the receipt; only then is the chain judged.
+        cy.get('[data-testid="funding-closed"]', { timeout: 60000 }).should('contain.text', '50')
+        cy.get('[data-testid="contribute-control"]').should('not.exist')
+
         cy.task('chainTx', { action: 'fundingInfo', args: { pool } }).then((info) => {
           expect(info.state, 'closed').to.equal(1)
         })
@@ -156,8 +166,6 @@ describe('Funding Pools', () => {
         cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[0] } }).then((after) => {
           expect(BigInt(after.balance) - BigInt(before.balance), 'organizer received the pot').to.equal(usd(50))
         })
-        cy.get('[data-testid="funding-closed"]', { timeout: 30000 }).should('contain.text', '50')
-        cy.get('[data-testid="contribute-control"]').should('not.exist')
 
         // Terminal: a contribution attempt on-chain is refused.
         cy.task('chainTx', { action: 'contributeFunding', args: { index: 3, pool, amount: usd(1).toString() } })
@@ -181,12 +189,12 @@ describe('Funding Pools', () => {
       cy.get('[data-testid="vote-refund"]').click()
       cy.get('[data-testid="confirm-vote"]').should('contain.text', 'organizer can still close')
       cy.get('[data-testid="confirm-vote-go"]').click()
+      cy.get('[data-testid="voted"]', { timeout: 60000 }).should('exist')
+      cy.get('[data-testid="refund-count"]').should('contain.text', '1 / 2')
       cy.task('chainTx', { action: 'fundingInfo', args: { pool } }).then((info) => {
         expect(info.refundVotes).to.equal(1)
         expect(info.state, 'still open after one vote').to.equal(0)
       })
-      cy.get('[data-testid="voted"]', { timeout: 30000 }).should('exist')
-      cy.get('[data-testid="refund-count"]').should('contain.text', '1 / 2')
 
       // Second vote on-chain as contributor #2 → majority → refunding.
       cy.task('chainTx', { action: 'fundingAction', args: { callerIndex: 2, pool, fn: 'voteRefund' } })
@@ -200,6 +208,9 @@ describe('Funding Pools', () => {
       cy.task('chainTx', { action: 'tokenBalance', args: { address: TEST_ACCOUNTS[1] } }).then((before) => {
         cy.reload()
         cy.get('[data-testid="claim-refund"]', { timeout: 30000 }).should('contain.text', 'Collect my 10').click()
+        // Once collected the page re-reads and the control is gone — the signal the receipt landed.
+        cy.get('[data-testid="claim-refund"]', { timeout: 60000 }).should('not.exist')
+        cy.get('[data-testid="refund-count"]').should('contain.text', '1 / 3')
         cy.task('chainTx', { action: 'fundingMemberInfo', args: { pool, address: TEST_ACCOUNTS[1] } }).then((m) => {
           expect(m.refunded).to.be.true
         })
@@ -232,8 +243,13 @@ describe('Funding Pools', () => {
       // An unrelated account (never a contributor) starts refunds from the page.
       cy.task('chainTx', { action: 'fund', args: { address: TEST_ACCOUNTS[3] } })
       connectAs(3, `/fund/${pool}`)
+      cy.get('[data-testid="funding-purpose"]', { timeout: 30000 }).should('contain.text', 'E2E pool')
+      cy.get('[data-testid="funding-state"]').should('contain.text', 'Open')
+      // Both deadlines are judged by the CHAIN's clock (`chainNow`), which advanceTime moved.
       cy.get('[data-testid="contributions-closed"]', { timeout: 30000 }).should('exist')
+      cy.get('[data-testid="contribute-control"]').should('not.exist')
       cy.get('[data-testid="poke-deadline"]').click()
+      cy.get('[data-testid="refund-reason"]', { timeout: 60000 }).should('contain.text', 'deadline')
       cy.task('chainTx', { action: 'fundingInfo', args: { pool } }).then((info) => {
         expect(info.state, 'refunding').to.equal(2)
         expect(info.refundReason, 'reason: deadline').to.equal(3)
@@ -244,7 +260,6 @@ describe('Funding Pools', () => {
           expect(BigInt(after.balance) - BigInt(before.balance)).to.equal(usd(25))
         })
       })
-      cy.get('[data-testid="refund-reason"]', { timeout: 30000 }).should('contain.text', 'deadline')
     })
   })
 
@@ -260,6 +275,8 @@ describe('Funding Pools', () => {
       cy.get('[data-testid="cancel-pool"]', { timeout: 30000 }).click()
       cy.get('[data-testid="confirm-cancel"]').should('contain.text', 'exactly what they put in')
       cy.get('[data-testid="confirm-cancel-go"]').click()
+      cy.get('[data-testid="refund-reason"]', { timeout: 60000 }).should('contain.text', 'organizer')
+      cy.get('[data-testid="close-pool"]').should('not.exist')
       cy.task('chainTx', { action: 'fundingInfo', args: { pool } }).then((info) => {
         expect(info.state).to.equal(2)
         expect(info.refundReason, 'reason: organizer').to.equal(1)
@@ -269,7 +286,6 @@ describe('Funding Pools', () => {
       cy.task('chainTx', { action: 'tokenBalance', args: { address: pool } }).then((r) => {
         expect(BigInt(r.balance)).to.equal(0n)
       })
-      cy.get('[data-testid="refund-reason"]', { timeout: 30000 }).should('contain.text', 'organizer')
     })
   })
 })

@@ -34,7 +34,8 @@ export default function FundingPoolPage() {
   const [notice, setNotice] = useState(null)
   const [confirm, setConfirm] = useState(null) // 'close' | 'cancel' | 'vote' | null
   const [nonce, setNonce] = useState(0)
-  // "Now" is sampled per read, not per render (a re-render must not move deadlines).
+  // "Now" is sampled per read, not per render (a re-render must not move deadlines), and comes from the
+  // chain once a read has landed.
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
 
   const parsed = useMemo(() => parseFundingRef(ref), [ref])
@@ -76,7 +77,8 @@ export default function FundingPoolPage() {
     if (!poolAddress) return
     try {
       const s = await getSummary(poolAddress)
-      setNow(Math.floor(Date.now() / 1000))
+      // The summary's `now` is the chain's clock (see `chainNow`), the one the contract enforces against.
+      setNow(Number(s.now) || Math.floor(Date.now() / 1000))
       setSummary(s)
       setPageState('loaded')
       setError(null)

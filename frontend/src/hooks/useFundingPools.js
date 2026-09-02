@@ -90,7 +90,30 @@ async function readToken(tokenAddr, runner) {
 }
 
 /** Assemble the PoolSummary (data-model.md) from state reads. Throws if the pool cannot be read. */
-export async function summarizeFundingPool(pool, factory, account, chainId, now = Math.floor(Date.now() / 1000)) {
+/**
+ * The chain's own clock, from the latest block. Deadline decisions (contribution open, settle passed)
+ * are enforced by the contract against `block.timestamp`, so the UI judges them by the same clock
+ * rather than the device's — a wrong device clock must not offer a "Start refunds" the contract
+ * would revert, or hide a contribute window that is still open. Falls back to the device clock only
+ * when the runner cannot answer (a mocked runner in tests, a provider without `getBlock`).
+ */
+export async function chainNow(contract) {
+  try {
+    const runner = contract?.runner
+    const provider = runner?.provider ?? runner
+    if (provider && typeof provider.getBlock === 'function') {
+      const block = await provider.getBlock('latest')
+      const ts = Number(block?.timestamp)
+      if (Number.isFinite(ts) && ts > 0) return ts
+    }
+  } catch {
+    /* fall through to the device clock */
+  }
+  return Math.floor(Date.now() / 1000)
+}
+
+export async function summarizeFundingPool(pool, factory, account, chainId, nowOverride = null) {
+  const now = nowOverride ?? (await chainNow(pool))
   const [
     stateNum, organizer, goal, purpose, tokenAddr, contributeDeadline, settleDeadline, createdBlock,
     totalRaised, contributorCount, refundVotes, refundedCount, refundReasonNum, closedAt,
@@ -162,6 +185,7 @@ export async function summarizeFundingPool(pool, factory, account, chainId, now 
     canClose: isOrganizer && state === 0,
     canCancel: isOrganizer && state === 0,
     canPokeDeadline: state === 0 && now >= sd,
+    now,
     me,
     wordIndices,
     phrase,

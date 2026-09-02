@@ -33,7 +33,9 @@ export default function FundingPoolCreatePanel({ isConnected, onConnect, onOpenM
     setFormError(null)
     if (validation) { setFormError(validation); return }
     try {
-      const res = await createPool({ purpose, goal: String(Number(goal)), windowId })
+      // The decimal string goes through untouched: `Number()` would round a long decimal and can render
+      // as scientific notation, which parseUnits refuses. `validateCreate` already vetted it.
+      const res = await createPool({ purpose, goal: String(goal).trim(), windowId })
       setResult(res)
     } catch {
       /* surfaced via hook error */

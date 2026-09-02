@@ -43,6 +43,18 @@ digest changed.
 | Cypress `full/39-funding-pools` (local) | could not complete here (below); the chain tasks it uses (`createFundingPool`, `contributeFunding`, `fundingAction`, `fundingInfo`, `fundingMemberInfo`) were exercised against the 80002 node by the capture harness fixtures |
 | `scripts/ui/capture-funding-pools.mjs` | 36/36 shots, three rounds, see `screenshots/README.md` |
 
+## CI round 1 (PR #1410, head `ee5ab95`) — what the real runner found
+
+Both Cypress tiers failed on this spec's own tests, on nothing the sandbox could have shown:
+
+| Job | Failure | Cause | Fix |
+|---|---|---|---|
+| Fast E2E (desktop 2, phone 1) | FP-FAST-03 `Expected to find content: '22/200'` | An arithmetic slip in the assertion: "Dana's surprise party" is **21** bytes. The test now computes the expected counter from the string it typed. | `42-funding-pools.cy.js` |
+| Full E2E (shard 0) | FP-02 `closed: expected 0 to equal 1`, FP-03 `expected 0 to equal 1`, FP-05 `expected 0 to equal 2` | The spec read the chain **straight after the confirm click**. The app awaits `tx.wait()` (a receipt poll measured in seconds), so the read raced the transaction and saw the pre-action state — a wrong ORDER, not a wrong contract. `24-wager-pools` waits on the page's own post-action render before every chain read; this spec now does the same. | `39-funding-pools.cy.js` |
+| Full E2E (shard 0) | FP-04 `[data-testid="contributions-closed"]` never found after `cy.advanceTime(1300)` | The page decided "contributions open?" and "settle passed?" from the DEVICE clock while the contract enforces `block.timestamp`. That is also wrong for members (a skewed device clock offered a "Start refunds" the contract would revert). `summarizeFundingPool` now takes `now` from the latest block (`chainNow`, device clock only as fallback) and the page's `now` follows it. | `useFundingPools.js`, `FundingPoolPage.jsx` |
+
+Copilot's four review comments (goal string through `Number()`, the 30-day option shaved to 29d 23h, the settle clamp's hidden hour, "characters" for a byte cap) were all right and are fixed in the same push: the decimal string is passed untouched, the window options carry their true values and `deadlinesFor` applies one named `DEADLINE_MARGIN_SECONDS`, and the purpose message says bytes.
+
 **Cypress in the authoring sandbox.** Every run that performs the header connect flow (click "Connect
 Wallet" → pick the injected connector) dies with `read ECONNRESET` in the Cypress server process on the
 NEXT navigation — reproduced with a throwaway spec that only does what `24-wager-pools.cy.js` does on

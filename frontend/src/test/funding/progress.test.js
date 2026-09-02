@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   progressPct, refundVotesNeeded, formatAmount, timeLeft, deadlinesFor, bucketFor, nextActionFor, validateCreate,
+  MAX_CONTRIBUTE_SECONDS, MAX_SETTLE_SECONDS, SETTLE_GRACE_SECONDS, DEADLINE_MARGIN_SECONDS,
   WINDOW_CHOICES, DEFAULT_WINDOW_ID, PURPOSE_MAX,
 } from '../../lib/funding/progress'
 
@@ -57,6 +58,20 @@ describe('deadlinesFor', () => {
       expect(settleDeadline).toBeLessThanOrEqual(now + 180 * 86400)
     }
     expect(deadlinesFor('nope', now)).toEqual(deadlinesFor(DEFAULT_WINDOW_ID, now))
+  })
+
+  it('keeps the window labels true and applies the bound margin once, in deadlinesFor', () => {
+    const now = 1_700_000_000
+    const thirty = WINDOW_CHOICES.find((c) => c.id === '30d')
+    // The option IS 30 days — the margin is not hidden inside the value.
+    expect(thirty.seconds).toBe(MAX_CONTRIBUTE_SECONDS)
+    // A choice sitting on the factory bound is pulled inside it by exactly the named margin.
+    expect(deadlinesFor('30d', now).contributeDeadline).toBe(now + MAX_CONTRIBUTE_SECONDS - DEADLINE_MARGIN_SECONDS)
+    // A choice well inside the bound is untouched.
+    expect(deadlinesFor('1w', now).contributeDeadline).toBe(now + 7 * 86400)
+    // The settle deadline is contribute + grace, capped inside the settle bound by the same margin.
+    expect(deadlinesFor('1w', now).settleDeadline).toBe(now + 7 * 86400 + SETTLE_GRACE_SECONDS)
+    expect(deadlinesFor('30d', now).settleDeadline).toBeLessThanOrEqual(now + MAX_SETTLE_SECONDS - DEADLINE_MARGIN_SECONDS)
   })
 })
 

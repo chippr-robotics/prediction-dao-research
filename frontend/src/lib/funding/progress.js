@@ -53,19 +53,29 @@ export const WINDOW_CHOICES = [
   { id: '3d', label: '3 days', seconds: 3 * DAY },
   { id: '1w', label: '1 week', seconds: 7 * DAY },
   { id: '2w', label: '2 weeks', seconds: 14 * DAY },
-  { id: '30d', label: '30 days', seconds: 30 * DAY - HOUR },
+  { id: '30d', label: '30 days', seconds: 30 * DAY },
 ]
 export const DEFAULT_WINDOW_ID = '1w'
 /** The organizer's settlement grace after contributions close (research R6). */
 export const SETTLE_GRACE_SECONDS = 30 * DAY
+/** The factory's bounds (`MAX_CONTRIBUTE_WINDOW` / `MAX_SETTLE_WINDOW` in FundingPoolFactory.sol). */
+export const MAX_CONTRIBUTE_SECONDS = 30 * DAY
 export const MAX_SETTLE_SECONDS = 180 * DAY
+/**
+ * How far inside a factory bound a form-time deadline is kept. The factory checks the bounds against
+ * the timestamp of the block that MINES the create, and the form computed them earlier — a slow
+ * confirmation on a choice sitting exactly at a bound would revert `BadDeadlines`. Applied here,
+ * once, so the window labels stay true to their values.
+ */
+export const DEADLINE_MARGIN_SECONDS = HOUR
+/** The on-chain cap is in BYTES (`MAX_PURPOSE_BYTES`), not characters — accents and emoji count for more. */
 export const PURPOSE_MAX = 200
 
 /** Derive the two absolute deadlines from a window choice, respecting the factory bounds. */
 export function deadlinesFor(windowId, now = Math.floor(Date.now() / 1000)) {
   const choice = WINDOW_CHOICES.find((c) => c.id === windowId) ?? WINDOW_CHOICES.find((c) => c.id === DEFAULT_WINDOW_ID)
-  const contributeDeadline = now + choice.seconds
-  const settleDeadline = Math.min(contributeDeadline + SETTLE_GRACE_SECONDS, now + MAX_SETTLE_SECONDS - HOUR)
+  const contributeDeadline = now + Math.min(choice.seconds, MAX_CONTRIBUTE_SECONDS - DEADLINE_MARGIN_SECONDS)
+  const settleDeadline = Math.min(contributeDeadline + SETTLE_GRACE_SECONDS, now + MAX_SETTLE_SECONDS - DEADLINE_MARGIN_SECONDS)
   return { contributeDeadline, settleDeadline }
 }
 
@@ -94,7 +104,9 @@ export function nextActionFor(summary, now = Math.floor(Date.now() / 1000)) {
 export function validateCreate({ purpose, goal }) {
   const p = String(purpose ?? '').trim()
   if (!p) return 'Give the pool a purpose so people know what they are chipping in for.'
-  if (new TextEncoder().encode(p).length > PURPOSE_MAX) return `Keep the purpose under ${PURPOSE_MAX} characters.`
+  if (new TextEncoder().encode(p).length > PURPOSE_MAX) {
+    return `Keep the purpose under ${PURPOSE_MAX} bytes — accents and emoji count for more than one.`
+  }
   const g = Number(goal)
   if (!Number.isFinite(g) || g <= 0) return 'Set a goal amount above zero.'
   return null

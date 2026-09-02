@@ -116,8 +116,8 @@ describe('Funding pools — the Request ▸ Pool surface (spec 103, no chain)', 
     cy.get('[data-testid="funding-create"]').should('be.disabled') // goal still zero
     cy.enterAmountViaKeypad('funding-goal', '120')
     cy.get('[data-testid="funding-create"]').should('be.enabled')
-    // The purpose counter tracks bytes against the 200 cap.
-    cy.contains('22/200').should('exist')
+    // The purpose counter tracks BYTES against the 200 cap ("Dana's surprise party" is 21 of them).
+    cy.contains(`${new TextEncoder().encode("Dana's surprise party").length}/200`).should('exist')
     typePurpose('x'.repeat(200))
     cy.contains('200/200').should('exist')
     cy.get('#funding-purpose').should('have.attr', 'maxlength', '200')
