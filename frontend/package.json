@@ -80,7 +80,7 @@
     "@capacitor/android": "8.5.0",
     "@capacitor/cli": "8.5.0",
     "@capacitor/ios": "8.5.0",
-    "@cypress/webpack-preprocessor": "^7.0.2",
+    "@cypress/webpack-preprocessor": "^8.0.0",
     "@eslint/js": "^10.0.1",
     "@fairwins/miniapp-build": "*",
     "@testing-library/jest-dom": "^7.0.0",
