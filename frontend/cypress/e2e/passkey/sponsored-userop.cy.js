@@ -131,7 +131,8 @@ function signInAndFund({ native = '0' } = {}) {
     // deposit that did not move would mean nothing was sponsored.
     cy.get('@poolBefore').then((before) => {
       cy.task('passkeyStack', { action: 'deposit' }).then((after) => {
-        expect(BigInt(after.deposit), 'the paymaster deposit paid the bundler').to.be.lessThan(BigInt(before.deposit))
+        // Explicit comparison: chai's ordering matchers are not a contract for BigInt.
+        expect(BigInt(after.deposit) < BigInt(before.deposit), 'the paymaster deposit paid the bundler').to.equal(true)
       })
     })
 
@@ -177,7 +178,7 @@ function signInAndFund({ native = '0' } = {}) {
     // chain rather than inferred from the other.
     cy.get('@memberBefore').then((before) => {
       cy.task('passkeyStack', { action: 'balances', args: { address: account } }).then((after) => {
-        expect(BigInt(after.native), 'the member funded their own gas').to.be.lessThan(BigInt(before.native))
+        expect(BigInt(after.native) < BigInt(before.native), 'the member funded their own gas').to.equal(true)
       })
     })
     cy.get('@poolBefore').then((before) => {
