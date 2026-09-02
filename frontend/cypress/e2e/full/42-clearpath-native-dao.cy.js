@@ -279,11 +279,12 @@ describe('ClearPath native standard DAOs (spec 030 pillar A)', () => {
                   expect(tx.to.toLowerCase(), 'straight to the factory the host resolved')
                     .to.equal(factory.address.toLowerCase())
                   expect(tx.value, 'the factory holds no funds and is sent none').to.equal('0')
-                  expect(BigInt(tx.fee), 'and the transaction cost real gas').to.be.greaterThan(0n)
+                  // Explicit comparisons: chai's ordering matchers are not a contract for BigInt.
+                  expect(BigInt(tx.fee) > 0n, 'and the transaction cost real gas').to.equal(true)
 
                   dao('nativeBalance', { address: MEMBER }).then(({ wei: balanceAfter }) => {
-                    expect(BigInt(balanceAfter), 'the member is poorer than before they signed')
-                      .to.be.lessThan(BigInt(balanceBefore))
+                    expect(BigInt(balanceAfter) < BigInt(balanceBefore), 'the member is poorer than before they signed')
+                      .to.equal(true)
                     expect(
                       BigInt(balanceBefore) - BigInt(balanceAfter),
                       'by exactly the fee this transaction cost — nothing else spent from this account',
