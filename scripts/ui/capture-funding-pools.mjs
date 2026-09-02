@@ -1,9 +1,9 @@
 /**
- * Visual capture harness for funding pools (spec 102) — the actor half of the actor-critic loop
+ * Visual capture harness for funding pools (spec 103) — the actor half of the actor-critic loop
  * (see .claude/skills/actor-critic-screens). Photographs the Request ▸ Pool form, the share view, the
  * pool page in its member-visible states (open as contributor, open as organizer with the close confirm,
  * refunding with a collectable balance, closed, unreadable), and the My Pools sheet. Final shots live in
- * `specs/102-funding-pools/screenshots/`.
+ * `specs/103-funding-pools/screenshots/`.
  *
  * REAL DATA OVER POSED DATA: the pools are created and contributed to on the local Hardhat node
  * (`HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node` + `npm run setup:e2e`), and the injected wallet
@@ -26,7 +26,7 @@ const { ethers } = require('ethers')
 
 const BASE = process.argv[2] || 'http://127.0.0.1:5199'
 const RPC = process.env.RPC_URL || 'http://127.0.0.1:8545'
-const OUT = resolve(process.cwd(), 'specs/102-funding-pools/screenshots')
+const OUT = resolve(process.cwd(), 'specs/103-funding-pools/screenshots')
 const CHAIN_ID = 80002
 
 const DESKTOP = { width: 1280, height: 900 }

@@ -19,7 +19,7 @@ const {
   signReceiveAuth,
 } = require('../helpers/fundingpool');
 
-// FundingPoolFactory relayer forwarders (spec 102, spec-035/036 pattern): each routes a clone's twin
+// FundingPoolFactory relayer forwarders (spec 103, spec-035/036 pattern): each routes a clone's twin
 // through the STABLE factory address, enforces pool provenance ON-CHAIN (poolAddressToId != 0), and is
 // otherwise a pure pass-through — the clone verifies the signer's EIP-712 signature against its own
 // per-clone domain. Also: createPoolWithSig is verified against the FACTORY's domain.

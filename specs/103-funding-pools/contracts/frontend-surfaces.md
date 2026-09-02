@@ -1,4 +1,4 @@
-# Frontend surfaces: Funding Pools (spec 102)
+# Frontend surfaces: Funding Pools (spec 103)
 
 ## Routes and entry points
 

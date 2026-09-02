@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @notice Funding-pool lifecycle (spec 102). `Closed` and `Refunding` are terminal.
+/// @notice Funding-pool lifecycle (spec 103). `Closed` and `Refunding` are terminal.
 enum FundingState {
     Open,
     Closed,
@@ -9,7 +9,7 @@ enum FundingState {
 }
 
 /// @title IFundingPool
-/// @notice Surface for an isolated, immutable funding-pool clone (spec 102). A sibling of the spec-034
+/// @notice Surface for an isolated, immutable funding-pool clone (spec 103). A sibling of the spec-034
 ///         {IWagerPool} with the wager removed: contributors put in ANY amount, the organizer closes to
 ///         collect the whole pot at any time (goal met or not), and the organizer / a strict majority of
 ///         contributors / the settlement deadline flip the pool to refunding, where each contributor

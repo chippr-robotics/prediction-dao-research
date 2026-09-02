@@ -1,4 +1,4 @@
-# Implementation notes: Funding Pools (spec 102)
+# Implementation notes: Funding Pools (spec 103)
 
 ## Smart-contract security self-review
 

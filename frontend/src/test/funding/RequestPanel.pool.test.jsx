@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-// The Request view gains a kind switch (spec 102, FR-001); the one-time flow must be untouched.
+// The Request view gains a kind switch (spec 103, FR-001); the one-time flow must be untouched.
 vi.mock('../../hooks', () => ({ useWallet: () => ({ isConnected: true, address: '0x5555555555555555555555555555555555555555', openConnectModal: vi.fn() }) }))
 vi.mock('../../hooks/useEffectiveAccount', () => ({ useEffectiveAccount: () => ({ address: '0x5555555555555555555555555555555555555555', isActingAccount: false }) }))
 vi.mock('../../hooks/useSelectableAssets', () => ({ useSelectableAssets: () => ({ options: [], defaultKey: null }) }))

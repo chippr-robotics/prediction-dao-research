@@ -71,7 +71,7 @@ export const CONTRACT_DOMAINS = Object.freeze({
   wagerPool: Object.freeze({ name: 'FairWins WagerPool', version: '1' }),
   wagerPoolFactory: Object.freeze({ name: 'FairWins WagerPoolFactory', version: '1' }),
   callsignRegistry: Object.freeze({ name: 'FairWins CallsignRegistry', version: '1' }),
-  // Funding pools (spec 102) — the same factory/clone split as the wager pools: the FACTORY verifies
+  // Funding pools (spec 103) — the same factory/clone split as the wager pools: the FACTORY verifies
   // createPoolWithSig under its own domain, each CLONE verifies the four actor twins under a per-clone
   // domain (verifyingContract = the clone).
   fundingPool: Object.freeze({ name: 'FairWins FundingPool', version: '1' }),
@@ -323,13 +323,13 @@ export const OPEN_ACCEPT_TYPES = {
  */
 
 /**
- * Funding-pool structs (spec 102) — verified on-chain by FundingPool.sol (the four actor twins, under
+ * Funding-pool structs (spec 103) — verified on-chain by FundingPool.sol (the four actor twins, under
  * the per-clone `fundingPool` domain) and FundingPoolFactory.sol (`CreateFundingPool`, under the
  * `fundingPoolFactory` domain).
  *
  * WHY THEY ARE NOT IN `INTENT_TYPES`
  * `INTENT_TYPES` is gated to be exactly the set of structs the relayed action table can sign, and the
- * relay gateway does not serve funding-pool actions in this release (specs/102 research R8): the
+ * relay gateway does not serve funding-pool actions in this release (specs/103 research R8): the
  * frontend self-submits (or uses the passkey `sendCalls` rail). A struct in `INTENT_TYPES` with no
  * action would fail the "unreachable struct" gate, and an action with no gateway implementation would
  * fail the gateway's coverage gate — both correctly. So, like `OPEN_ACCEPT_TYPES`, they live in their

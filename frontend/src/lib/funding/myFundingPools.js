@@ -1,5 +1,5 @@
 /**
- * Device-local record of the funding pools an account organized or contributed to (spec 102, FR-023).
+ * Device-local record of the funding pools an account organized or contributed to (spec 103, FR-023).
  * Addresses + role only — the summaries are always re-read from chain. Same pattern as
  * `recordJoinedPool` (spec 037): a pool the member touched on this device is always findable even where
  * no indexer exists for the network.

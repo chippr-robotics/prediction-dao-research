@@ -17,7 +17,7 @@ import FundingPoolCreatePanel from '../funding/FundingPoolCreatePanel'
 import MyFundingPoolsSheet from '../funding/MyFundingPoolsSheet'
 import '../funding/funding.css'
 
-// Request kinds (spec 102, FR-001): a DIRECT one-time request, or a funding POOL. Same surface, same
+// Request kinds (spec 103, FR-001): a DIRECT one-time request, or a funding POOL. Same surface, same
 // chrome, a compact switch with a subtle glyph each; the direct form below is byte-for-byte the
 // spec-058/064 flow.
 const REQUEST_KINDS = [

@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { timeLeft } from '../../lib/funding/progress'
 
 /**
- * FundingProgress (spec 102, FR-010) — the goal bar. `role="progressbar"` with the capped percentage
+ * FundingProgress (spec 103, FR-010) — the goal bar. `role="progressbar"` with the capped percentage
  * as the value and a full sentence as `aria-valuetext`, so a screen reader hears "40 of 120 USDC
  * raised (33%)" rather than a bare number. Never renders a number it was not given: an absent
  * summary is the caller's loading/unreadable state, not this component's.

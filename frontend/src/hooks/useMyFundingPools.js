@@ -8,7 +8,7 @@ import { bucketFor, nextActionFor } from '../lib/funding/progress'
 const MAX_READS = 12
 
 /**
- * The connected member's funding pools for the My Pools sheet (spec 102, US6 / FR-022..023).
+ * The connected member's funding pools for the My Pools sheet (spec 103, US6 / FR-022..023).
  *
  * Source of truth is the device record (addresses + role); every row is re-read from chain, scoped to
  * the active network, and reads that fail are reported as `unreadable` rows (never dropped, never

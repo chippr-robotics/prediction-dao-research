@@ -1,8 +1,8 @@
 # Implementation Plan: Funding Pools on the Receive View
 
-**Branch**: `102-funding-pools` | **Date**: 2026-09-02 | **Spec**: [spec.md](spec.md)
+**Branch**: `103-funding-pools` | **Date**: 2026-09-02 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `/specs/102-funding-pools/spec.md`
+**Input**: Feature specification from `/specs/103-funding-pools/spec.md`
 
 ## Summary
 
@@ -76,7 +76,7 @@ introduced (no subgraph, no gateway action, no fee service).
 ### Documentation (this feature)
 
 ```text
-specs/102-funding-pools/
+specs/103-funding-pools/
 ├── spec.md
 ├── plan.md                    # this file
 ├── research.md                # Phase 0

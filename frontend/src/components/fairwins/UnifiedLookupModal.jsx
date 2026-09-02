@@ -73,7 +73,7 @@ export default function UnifiedLookupModal({ isOpen, onClose, onBuyMembership, i
   const showForm = !showingPanel
 
   const openPoolManagement = (address) => { onClose(); navigate(`/pools/${address}`) }
-  // Funding pools (spec 102, FR-021): the words resolve to a funding pool → its own page, never the join panel.
+  // Funding pools (spec 103, FR-021): the words resolve to a funding pool → its own page, never the join panel.
   const openFundingPool = (address) => { onClose(); navigate(`/fund/${address}`) }
   const fundingRow = result?.funding ? (
     <p className="fm-hint" data-testid="lookup-funding-also">

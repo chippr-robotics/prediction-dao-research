@@ -1,4 +1,4 @@
-# Research: Funding Pools (spec 102)
+# Research: Funding Pools (spec 103)
 
 Every decision below resolves a question the plan could not answer from the spec alone. Format:
 decision, rationale, alternatives.

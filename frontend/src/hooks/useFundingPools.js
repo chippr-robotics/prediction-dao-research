@@ -1,5 +1,5 @@
 /**
- * useFundingPools — data hook for funding pools (spec 102). Encapsulates every contract read/write so
+ * useFundingPools — data hook for funding pools (spec 103). Encapsulates every contract read/write so
  * pages stay presentational and testable (the pages mock this hook). Same shape and rails as
  * `usePools` (spec 034): a plain self-submitted EOA transaction when a signer exists, the passkey
  * account's `sendCalls` rail otherwise. The contracts carry `…WithSig` / EIP-3009 twins for a relayer;

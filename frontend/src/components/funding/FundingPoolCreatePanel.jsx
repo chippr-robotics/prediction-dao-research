@@ -10,7 +10,7 @@ import { WINDOW_CHOICES, DEFAULT_WINDOW_ID, PURPOSE_MAX, validateCreate } from '
 import './funding.css'
 
 /**
- * FundingPoolCreatePanel (spec 102, US1) — the Pool kind of the Request view. Purpose, goal (number pad),
+ * FundingPoolCreatePanel (spec 103, US1) — the Pool kind of the Request view. Purpose, goal (number pad),
  * contribution window, one primary action; then the share view. The one-time request form beside it is
  * untouched (FR-001).
  */

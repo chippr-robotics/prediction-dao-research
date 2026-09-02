@@ -32,7 +32,7 @@ interface IERC3009Receive {
 }
 
 /// @title FundingPool
-/// @notice A group funding pool (spec 102): the spec-034 {WagerPool} architecture with the wager removed.
+/// @notice A group funding pool (spec 103): the spec-034 {WagerPool} architecture with the wager removed.
 ///         Deployed as an immutable ERC-1167 clone by {FundingPoolFactory}. Contributors put in ANY amount
 ///         (any number of times) while contributions are open; the organizer closes to collect the whole
 ///         pot at any time, goal met or not; the organizer, a strict majority of contributors, or the
@@ -60,7 +60,7 @@ interface IERC3009Receive {
 ///         non-rebasing) token, which is why the factory curates the token allow-list.
 ///
 ///         SECURITY REVIEW REQUIRED before this template is set live on any value-bearing network
-///         (`.github/agents/smart-contract-security`); see specs/102-funding-pools/implementation-notes.md.
+///         (`.github/agents/smart-contract-security`); see specs/103-funding-pools/implementation-notes.md.
 contract FundingPool is Initializable, ReentrancyGuardUpgradeable, SignerIntentBase, IFundingPool {
     using SafeERC20 for IERC20;
 

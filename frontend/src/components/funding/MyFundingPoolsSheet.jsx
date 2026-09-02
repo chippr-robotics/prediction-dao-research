@@ -12,7 +12,7 @@ const ROLE_LABEL = { organizer: 'Organizer', contributor: 'Contributor', both: '
 const ACTION_LABEL = { collect: 'Collect refund', close: 'Close & collect', contribute: 'Contribute', vote: 'Vote to refund', poke: 'Start refunds', share: 'Share' }
 
 /**
- * MyFundingPoolsSheet (spec 102, US6 / FR-022) — the "My Pools" bottom sheet, built on the shared
+ * MyFundingPoolsSheet (spec 103, US6 / FR-022) — the "My Pools" bottom sheet, built on the shared
  * ActionSheet (focus trap, Escape, backdrop, mobile rise). Lists the pools this device organized or
  * contributed to, grouped Active / Finished, each with its one next action; a find field at the top
  * opens a pool by its four words or its link. Unreadable rows are shown as unreadable, never dropped.

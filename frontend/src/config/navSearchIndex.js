@@ -103,7 +103,7 @@ export const OFF_MENU_ITEMS = [
  * deep link; `hash` (cards only) names the accordion card so it lands OPEN.
  */
 export const NAV_DESTINATIONS = [
-  // ─── Payments ▸ Request ▸ Pool (spec 102) ───────────────────────────────────────────────
+  // ─── Payments ▸ Request ▸ Pool (spec 103) ───────────────────────────────────────────────
   {
     id: 'home-request-pool',
     navId: 'home',

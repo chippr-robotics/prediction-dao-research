@@ -11,7 +11,7 @@ const {
   STATE,
 } = require('../helpers/fundingpool');
 
-// Security properties of FundingPool (spec 102, constitution I / SC-003 / SC-004):
+// Security properties of FundingPool (spec 103, constitution I / SC-003 / SC-004):
 //   I1 escrow == totalRaised while Open; == totalRaised − refunded while Refunding; == 0 once Closed
 //   I2 value leaves ONLY via close (→ organizer) or claimRefund (→ the claimant's own contribution)
 //   I3 Closed / Refunding are terminal

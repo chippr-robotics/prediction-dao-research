@@ -1,4 +1,4 @@
-/* Funding pools (spec 102). Theme tokens only (specs 090/091): the goal bar fills with the brand
+/* Funding pools (spec 103). Theme tokens only (specs 090/091): the goal bar fills with the brand
    colour (a FILL use), the refund bar with the amber signal, and every label reads from text tokens. */
 
 .fp-page {

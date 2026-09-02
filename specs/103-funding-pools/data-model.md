@@ -1,4 +1,4 @@
-# Data Model: Funding Pools (spec 102)
+# Data Model: Funding Pools (spec 103)
 
 ## On-chain
 

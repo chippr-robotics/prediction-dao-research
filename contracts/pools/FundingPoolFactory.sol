@@ -18,7 +18,7 @@ interface IFundingPoolIntentCancel {
     function invalidateNonceWithSig(address signer, bytes32 nonce, uint256 validBefore, bytes calldata sig) external;
 }
 
-/// @title FundingPoolFactory — authority & registry for group funding pools (spec 102)
+/// @title FundingPoolFactory — authority & registry for group funding pools (spec 103)
 /// @notice A SIBLING of the spec-034 {WagerPoolFactory}, deliberately not an extension of it: the live
 ///         wager factory holds escrow-bearing state behind a UUPS proxy, and a funding pool shares no
 ///         lifecycle state with a wager. This factory copies the proven mechanics — screen the organizer

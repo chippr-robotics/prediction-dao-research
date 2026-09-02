@@ -1,4 +1,4 @@
-# Funding pools — screenshot record (spec 102)
+# Funding pools — screenshot record (spec 103)
 
 Captured by `scripts/ui/capture-funding-pools.mjs` (see its header for how to run it): the real
 surface in a real Chromium against the `dev:e2e` server, reading REAL pools created and contributed

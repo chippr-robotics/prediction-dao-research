@@ -49,7 +49,7 @@ const MORDOR_CONTRACTS = {
   // deploy; populated by `npm run sync:frontend-contracts` after `deploy-wager-pool-factory.js`.
   // The prior Semaphore-based factory (0x33cD…) is abandoned and intentionally NOT wired here.
   wagerPoolFactory: '0xac78B4EdeF96e74a2653028dF93A26acFCfC613F',
-  // Funding pools (spec 102) — sibling factory of wagerPoolFactory. Empty until
+  // Funding pools (spec 103) — sibling factory of wagerPoolFactory. Empty until
   // `deploy-funding-pool-factory.js` runs; populated by `npm run sync:frontend-contracts`.
   fundingPoolFactory: '',
   // Callsigns (spec 054) — %callsign naming registry. Empty until `deploy-callsign-registry.js` runs;
@@ -166,7 +166,7 @@ const HARDHAT_CONTRACTS = {
    */
   // spec 034 — Wager Pools factory (address-based, no Semaphore).
   wagerPoolFactory: '0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690',
-  // Funding pools (spec 102). NONCE-DERIVED — deployed by `deploy-funding-pool-factory.js`, which
+  // Funding pools (spec 103). NONCE-DERIVED — deployed by `deploy-funding-pool-factory.js`, which
   // `setup:e2e` runs LAST so no earlier nonce-derived address moves (#1289). Recorded from a real run.
   fundingPoolFactory: '0x18E317A7D70d8fBf8e6E893616b52390EbBdb629',
   /*
@@ -239,7 +239,7 @@ const POLYGON_CONTRACTS = {
   voucherBatchMinter: '0x4b50d24ca28CbDC029714e5830f7D16a0ebEDb0e',
   tokenFactory: '0x5806e76cA3c838524E7cF43db7625bdFBA0783a0',
   wagerPoolFactory: '0x420aEC3c76859eB74ab21c769c16AcdAB221f723',
-  // Funding pools (spec 102) — sibling factory of wagerPoolFactory. Empty until
+  // Funding pools (spec 103) — sibling factory of wagerPoolFactory. Empty until
   // `deploy-funding-pool-factory.js` runs; populated by `npm run sync:frontend-contracts`.
   fundingPoolFactory: '',
   entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',

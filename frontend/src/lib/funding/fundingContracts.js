@@ -1,5 +1,5 @@
 /**
- * Contract wiring for funding pools (spec 102). Addresses come from the synced config
+ * Contract wiring for funding pools (spec 103). Addresses come from the synced config
  * (`getContractAddressForChain`), never hardcoded (Principle V); ABIs are derived from the compiled
  * artifacts (`src/abis/FundingPool*.js`).
  */

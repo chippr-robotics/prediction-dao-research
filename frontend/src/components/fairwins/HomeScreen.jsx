@@ -77,7 +77,7 @@ function HomeScreen() {
   const [unifiedAutoResolve, setUnifiedAutoResolve] = useState(false)
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [initialWagerId, setInitialWagerId] = useState(null)
-  // Request ▸ Pool deep link (spec 102): /app?kind=pool opens the Request mode on its Pool kind. The
+  // Request ▸ Pool deep link (spec 103): /app?kind=pool opens the Request mode on its Pool kind. The
   // nonce re-applies the kind when the link is followed while this screen is already mounted.
   const [requestKind, setRequestKind] = useState({ kind: 'once', nonce: 0 })
   // While the create panel is on its oracle path, hide the secondary actions so the

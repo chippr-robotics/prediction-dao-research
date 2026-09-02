@@ -16,7 +16,7 @@ import { resolvePhraseLookup } from '../lib/lookup/resolvePhraseLookup.js'
 export function useUnifiedLookup() {
   const { lookup: lookupChallenge } = useOpenChallengeAccept()
   const { resolvePhrase } = usePools()
-  // Funding pools (spec 102) share the four-word entry point; the resolver reports which kind it found.
+  // Funding pools (spec 103) share the four-word entry point; the resolver reports which kind it found.
   const { resolvePhrase: resolveFunding } = useFundingPools()
   const { account } = useWeb3()
   const [status, setStatus] = useState('idle')

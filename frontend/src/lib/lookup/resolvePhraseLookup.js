@@ -11,7 +11,7 @@
  *   (see useOpenChallengeAccept().lookup — never throws)
  * deps.resolvePool(phrase, lang) → { summary } | { notFound:true, reason } ; MAY throw on RPC/signer error
  *   (see usePools().resolvePhrase)
- * deps.resolveFunding(phrase, lang) → same shape, against the FUNDING-pool factory (spec 102, FR-021);
+ * deps.resolveFunding(phrase, lang) → same shape, against the FUNDING-pool factory (spec 103, FR-021);
  *   optional — absent means "not checked", which is reported honestly as a `funding` errored source only
  *   when it was supplied and threw.
  *

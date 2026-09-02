@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 /// @title IFundingPoolFactory
-/// @notice Surface for the upgradeable factory that clones isolated funding pools (spec 102). Each pool
+/// @notice Surface for the upgradeable factory that clones isolated funding pools (spec 103). Each pool
 ///         is an immutable ERC-1167 clone; the factory screens the organizer (sanctions +
 ///         `POOL_PARTICIPANT_ROLE` membership), assigns a unique 4-word BIP-39 index tuple in its OWN
 ///         phrase namespace (distinct from the wager-pool factory's), and records the pool in a

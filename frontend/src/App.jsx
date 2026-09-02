@@ -197,7 +197,7 @@ function AppContent() {
           <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
           <Route path="/pools/:address" element={<PoolPage />} />
-          {/* Funding pools (spec 102): the share link lands on the pool page (four words or address). */}
+          {/* Funding pools (spec 103): the share link lands on the pool page (four words or address). */}
           <Route path="/fund/:ref" element={<FundingPoolPage />} />
           {/* Spec 073: one mini-app workspace per registry listing. The slug is
               derived from the listing's on-chain (unique) name, and the workspace

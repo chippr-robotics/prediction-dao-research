@@ -1,4 +1,4 @@
-// Auto-derived from artifacts/contracts/pools/FundingPoolFactory.sol (spec 102, funding pools). Regenerate after contract changes.
+// Auto-derived from artifacts/contracts/pools/FundingPoolFactory.sol (spec 103, funding pools). Regenerate after contract changes.
 export const FUNDING_POOL_FACTORY_ABI = [
   {
     "inputs": [],

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Deploy + intent-signing helpers for the FundingPool tests (spec 102). Mirrors test/helpers/wagerpool.js:
+// Deploy + intent-signing helpers for the FundingPool tests (spec 103). Mirrors test/helpers/wagerpool.js:
 // the factory clones an immutable {FundingPool}; contributors put in any amount; the organizer closes;
 // organizer / majority / settle deadline flip the pool to refunding. Two ABSOLUTE deadlines
 // (contributeDeadline, settleDeadline).

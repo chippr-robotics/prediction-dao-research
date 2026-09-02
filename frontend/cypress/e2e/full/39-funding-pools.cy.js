@@ -1,5 +1,5 @@
 /**
- * E2E Tests: Funding Pools (spec 102, Full-tier)
+ * E2E Tests: Funding Pools (spec 103, Full-tier)
  *
  * Requires a running Hardhat node with `FundingPoolFactory` deployed (a targeted, append-only deploy
  * on top of the core `deploy:local` record — scripts/deploy/deploy-funding-pool-factory.js, last in
@@ -8,7 +8,7 @@
  * under test; setup for the other flows is arranged directly on-chain, the same bypass-the-UI pattern
  * the wager-pool spec uses.
  *
- * Flows (spec 102, FR-029):
+ * Flows (spec 103, FR-029):
  *   FP-01 funding.create-and-contribute  — create through the Request ▸ Pool form; a second account
  *                                          opens the link and contributes; totals + feed
  *   FP-02 funding.organizer-close        — the organizer closes below the goal and collects the pot

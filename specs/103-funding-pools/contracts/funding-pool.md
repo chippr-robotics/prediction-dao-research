@@ -1,4 +1,4 @@
-# Contract: FundingPool + FundingPoolFactory (spec 102)
+# Contract: FundingPool + FundingPoolFactory (spec 103)
 
 Solidity 0.8.24. Both live in `contracts/pools/`. Naming deliberately parallels spec 034 so a
 reader of one can read the other.

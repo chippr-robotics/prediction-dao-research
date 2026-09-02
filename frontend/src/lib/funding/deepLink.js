@@ -1,5 +1,5 @@
 /**
- * Funding-pool share links (spec 102, FR-020 / research R9).
+ * Funding-pool share links (spec 103, FR-020 / research R9).
  *
  *   /fund/<w1>-<w2>-<w3>-<w4>   the four words, hyphen-joined, in the organizer's phrase language
  *   /fund/0x<address>           canonical fallback (share targets that mangle hyphens, other-language readers)

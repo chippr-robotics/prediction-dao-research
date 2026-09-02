@@ -10,7 +10,7 @@ const {
   ZERO,
 } = require('../helpers/fundingpool');
 
-// FundingPoolFactory (spec 102): screens the organizer, validates params + deadlines, clones an immutable
+// FundingPoolFactory (spec 103): screens the organizer, validates params + deadlines, clones an immutable
 // FundingPool, assigns a unique 4-word tuple in its own namespace, and records the pool. Admin surface
 // is DEFAULT_ADMIN_ROLE-gated. Mirrors test/pools/WagerPoolFactory.test.js.
 

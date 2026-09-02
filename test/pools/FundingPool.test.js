@@ -12,7 +12,7 @@ const {
   REASON,
 } = require('../helpers/fundingpool');
 
-// FundingPool (spec 102): contribute any amount → organizer closes (collects) at any time, or the
+// FundingPool (spec 103): contribute any amount → organizer closes (collects) at any time, or the
 // organizer / a strict majority of contributors / the settle deadline flip the pool to refunding and
 // each contributor pulls back exactly what they put in. Timing mirrors WagerPool (two absolute deadlines).
 

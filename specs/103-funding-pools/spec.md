@@ -1,6 +1,6 @@
 # Feature Specification: Funding Pools on the Receive View
 
-**Feature Branch**: `102-funding-pools`
+**Feature Branch**: `103-funding-pools`
 
 **Created**: 2026-09-02
 

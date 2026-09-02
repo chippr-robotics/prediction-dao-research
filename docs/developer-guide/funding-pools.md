@@ -1,12 +1,12 @@
-# Funding Pools (spec 102)
+# Funding Pools (spec 103)
 
 Funding pools let a group **pool money toward a stated purpose and goal** and either hand the pot
 to the organizer or give everyone their money back. They live on the receive side of the Payments
 home — **Request ▸ Pool** — and are the spec-034 wager-pool architecture with the wager removed.
 
-Spec: [`specs/102-funding-pools/`](../../specs/102-funding-pools). Decisions:
-[`research.md`](../../specs/102-funding-pools/research.md). Interface + invariants:
-[`contracts/funding-pool.md`](../../specs/102-funding-pools/contracts/funding-pool.md).
+Spec: [`specs/103-funding-pools/`](../../specs/103-funding-pools). Decisions:
+[`research.md`](../../specs/103-funding-pools/research.md). Interface + invariants:
+[`contracts/funding-pool.md`](../../specs/103-funding-pools/contracts/funding-pool.md).
 
 ## What a member sees
 
@@ -82,9 +82,9 @@ is recorded from a real 80002 run and gated by `check:e2e-addresses`.
 - Vitest: `frontend/src/test/funding/*`, `lib/lookup/__tests__/resolvePhraseLookup.funding.test.js`.
 - Cypress: `fast/42-funding-pools.cy.js` (no chain) and `full/39-funding-pools.cy.js` (create →
   contribute → close; majority / organizer / deadline refunds, judged by chain reads). Matrix row
-  `102-funding-pools`.
+  `103-funding-pools`.
 - Actor–critic screenshots: `scripts/ui/capture-funding-pools.mjs` →
-  `specs/102-funding-pools/screenshots/`.
+  `specs/103-funding-pools/screenshots/`.
 
 ## Things that will bite you
 

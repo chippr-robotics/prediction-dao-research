@@ -321,7 +321,7 @@ function main() {
         standardDaoFactory: deployed.standardDaoFactory,
         backupPointerRegistry: deployed.backupPointerRegistry, // spec 032 — encrypted-backup pointer registry
         wagerPoolFactory: deployed.wagerPoolFactory, // spec 034 — WagerPools factory, address-based (only where deployed)
-        fundingPoolFactory: deployed.fundingPoolFactory, // spec 102 — funding pools factory (only where deployed)
+        fundingPoolFactory: deployed.fundingPoolFactory, // spec 103 — funding pools factory (only where deployed)
         callsignRegistry: deployed.callsignRegistry, // spec 054 — %callsign naming registry (only where deployed)
         feeRouter: deployed.feeRouter, // spec 060 — unified platform-fee registry + wrapper (only where deployed)
         stakingRouter: deployed.stakingRouter, // spec 066 — staking control surface + liquid fee router (only where deployed)

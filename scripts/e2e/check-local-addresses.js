@@ -155,7 +155,7 @@ const NONCE_ORDERED_KEYS = new Set([
   "tokenFactoryImpl",
   "callsignRegistry",
   "callsignRegistryImpl",
-  // spec 102 — deploy-funding-pool-factory.js (appended last in setup:e2e)
+  // spec 103 — deploy-funding-pool-factory.js (appended last in setup:e2e)
   "fundingPoolFactory",
   "fundingPoolFactoryImpl",
 ]);

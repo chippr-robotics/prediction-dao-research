@@ -1,5 +1,5 @@
 /**
- * Targeted spec-102 deploy: add the funding-pool factory (+ its immutable FundingPool clone template) to
+ * Targeted spec-103 deploy: add the funding-pool factory (+ its immutable FundingPool clone template) to
  * an ALREADY-deployed network WITHOUT touching the existing core contracts. Reuses the network's recorded
  * SanctionsGuard (and, when enabled, MembershipManager) and APPENDS the new addresses to its
  * `deployments/<net>-chain<id>-v2.json` record (never overwrites the live UUPS proxies).
@@ -45,7 +45,7 @@ async function main() {
   const balance = await ethers.provider.getBalance(deployer.address);
 
   console.log("=".repeat(60));
-  console.log(`Funding pools (spec 102) — targeted append-only deploy`);
+  console.log(`Funding pools (spec 103) — targeted append-only deploy`);
   console.log("=".repeat(60));
   console.log(`Network:  ${networkName} (chainId ${chainId})`);
   console.log(`Deployer: ${deployer.address}`);

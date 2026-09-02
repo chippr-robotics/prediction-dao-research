@@ -18,7 +18,7 @@ const {
   signReceiveAuth,
 } = require('../helpers/fundingpool');
 
-// FundingPool relayer twins (spec 102, spec-035 pattern): every actor action has a …WithSig twin that
+// FundingPool relayer twins (spec 103, spec-035 pattern): every actor action has a …WithSig twin that
 // authorizes the recovered EIP-712 signer (never the submitter), burns a single-use nonce, and enforces
 // the validity window; the money-in has its EIP-3009 form. The twins reach the same internal path as the
 // self-submit entrypoints, so every state guard bubbles up unchanged.

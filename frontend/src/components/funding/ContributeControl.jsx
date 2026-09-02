@@ -3,7 +3,7 @@ import PropTypes from 'prop-types'
 import AmountKeypad from '../ui/AmountKeypad'
 
 /**
- * ContributeControl (spec 102, US2) — the amount pad + the one primary action. The parent owns
+ * ContributeControl (spec 103, US2) — the amount pad + the one primary action. The parent owns
  * submission; this only enforces "an amount above zero" and disables while a transaction is in flight.
  */
 export default function ContributeControl({ summary, onContribute, busy, isConnected, onConnect }) {

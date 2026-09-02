@@ -15,7 +15,7 @@ import '../components/funding/funding.css'
 const shortAddr = (a) => (a && a.length > 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a || '')
 
 /**
- * FundingPoolPage (spec 102) — /fund/:ref, where ref is the four words (hyphen-joined) or the address.
+ * FundingPoolPage (spec 103) — /fund/:ref, where ref is the four words (hyphen-joined) or the address.
  * Everything shown is a chain read; the four page states are resolving / unreadable / not-found / loaded.
  * Exactly one primary action per state and role (contracts/frontend-surfaces.md).
  */

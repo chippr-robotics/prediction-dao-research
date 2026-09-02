@@ -33,7 +33,7 @@ function sentence(entry, decimals, symbol, account) {
 }
 
 /**
- * FundingActivityFeed (spec 102, FR-009) — the shared, chain-derived activity list. Three honest
+ * FundingActivityFeed (spec 103, FR-009) — the shared, chain-derived activity list. Three honest
  * states: loading, unreadable (sentence + live retry), and the list (or its empty sentence).
  */
 export default function FundingActivityFeed({ entries, status, onRetry, tokenDecimals, tokenSymbol, account }) {

@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { REFUND_REASON_TEXT } from '../../lib/funding/fundingContracts'
 
 /**
- * RefundStatusBar (spec 102, FR-018). Two faces of one bar:
+ * RefundStatusBar (spec 103, FR-018). Two faces of one bar:
  *   Open      → refund votes cast of votes needed (a strict majority of contributors)
  *   Refunding → contributors who have collected of contributors total, plus WHY the pool is refunding
  * Hidden for a Closed pool (nothing to refund). States the member's own standing in words.

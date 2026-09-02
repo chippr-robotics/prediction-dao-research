@@ -27,7 +27,7 @@ async function copyText(text, setFlag) {
 }
 
 /**
- * FundingShareView (spec 102, FR-020) — the one link, the four words, and a QR of the link. Used by
+ * FundingShareView (spec 103, FR-020) — the one link, the four words, and a QR of the link. Used by
  * the create success view and the pool page's share row. `compact` hides the QR behind a toggle.
  */
 export default function FundingShareView({ phrase, address, compact = false, title }) {

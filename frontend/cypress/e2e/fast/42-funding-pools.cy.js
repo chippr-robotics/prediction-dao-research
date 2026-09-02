@@ -1,6 +1,6 @@
 // =============================================================================
 // 42-funding-pools.cy.js
-// Fast-tier E2E for funding pools (spec 102) on Payments ▸ Request ▸ Pool.
+// Fast-tier E2E for funding pools (spec 103) on Payments ▸ Request ▸ Pool.
 //
 // NO CHAIN, and deliberately so (e2e-testing-policy.md, admission rule 1). Everything here happens
 // BEFORE a signature: the Direct | Pool kind switch, what the create form refuses and why, the
@@ -30,7 +30,7 @@ function openPoolKind({ connect = true } = {}) {
 
 const typePurpose = (text) => cy.get('#funding-purpose').clear().type(text, { delay: 0 })
 
-describe('Funding pools — the Request ▸ Pool surface (spec 102, no chain)', () => {
+describe('Funding pools — the Request ▸ Pool surface (spec 103, no chain)', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()

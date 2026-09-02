@@ -1,6 +1,6 @@
 # Tasks: Funding Pools on the Receive View
 
-**Input**: Design documents from `/specs/102-funding-pools/`
+**Input**: Design documents from `/specs/103-funding-pools/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
 
 **Tests**: Required by the constitution (Principle II) and by FR-028/FR-029 — every phase carries
@@ -10,8 +10,8 @@ its tests.
 
 ## Phase 1: Setup
 
-- [x] T001 Spec, plan, research, data-model, contracts, quickstart written under `specs/102-funding-pools/`
-- [x] T002 `.specify/feature.json` points at `specs/102-funding-pools`
+- [x] T001 Spec, plan, research, data-model, contracts, quickstart written under `specs/103-funding-pools/`
+- [x] T002 `.specify/feature.json` points at `specs/103-funding-pools`
 
 ## Phase 2: Foundational (blocking)
 
@@ -63,9 +63,9 @@ its tests.
 - [x] T030 `frontend/cypress.config.js` chainTx tasks: `createFundingPool`, `contributeFunding`, `voteFundingRefund`, `fundingInfo`, `fundingMemberInfo`
 - [x] T031 `frontend/cypress/e2e/fast/42-funding-pools.cy.js` (no chain: kind switch, validation, connect CTA, My Pools empty, deep-link honest unreadable state, a11y)
 - [x] T032 `frontend/cypress/e2e/full/39-funding-pools.cy.js` (FP-01 create+contribute, FP-02 close, FP-03 majority refund + collect, FP-04 deadline refund, FP-05 organizer refund) judged by chain reads
-- [x] T033 `frontend/cypress/coverage/matrix.json` row `102-funding-pools`; `npm run e2e:matrix`; e2e-policy Vitest suites green
-- [x] T034 `scripts/ui/capture-funding-pools.mjs`; run the loop; `specs/102-funding-pools/screenshots/README.md`
-- [x] T035 `docs/developer-guide/funding-pools.md`, `mkdocs.yml`, `CLAUDE.md` guardrail bullet, `specs/102-funding-pools/implementation-notes.md` (security self-review + gate results)
+- [x] T033 `frontend/cypress/coverage/matrix.json` row `103-funding-pools`; `npm run e2e:matrix`; e2e-policy Vitest suites green
+- [x] T034 `scripts/ui/capture-funding-pools.mjs`; run the loop; `specs/103-funding-pools/screenshots/README.md`
+- [x] T035 `docs/developer-guide/funding-pools.md`, `mkdocs.yml`, `CLAUDE.md` guardrail bullet, `specs/103-funding-pools/implementation-notes.md` (security self-review + gate results)
 - [x] T036 Gate sweep: compile, bytecode compare, check:deps, storage-layout, check:abis, contract tests, scoped vitest, frontend lint; commit, push, PR
 
 ## Dependencies

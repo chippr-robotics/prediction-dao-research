@@ -1,4 +1,4 @@
-# Quickstart: Funding Pools (spec 102)
+# Quickstart: Funding Pools (spec 103)
 
 ## Contracts
 
@@ -43,7 +43,7 @@ npm run dev --workspace frontend -- --port 5199 --strictPort &
 NODE_PATH=/tmp/pw/node_modules node scripts/ui/capture-funding-pools.mjs
 ```
 
-Shots land in `specs/102-funding-pools/screenshots/`; the README there records each round.
+Shots land in `specs/103-funding-pools/screenshots/`; the README there records each round.
 
 ## Manual walkthrough
 

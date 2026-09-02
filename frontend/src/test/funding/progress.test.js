@@ -4,7 +4,7 @@ import {
   WINDOW_CHOICES, DEFAULT_WINDOW_ID, PURPOSE_MAX,
 } from '../../lib/funding/progress'
 
-// Pure helpers behind the funding-pool surfaces (spec 102).
+// Pure helpers behind the funding-pool surfaces (spec 103).
 
 describe('progressPct', () => {
   it('caps at 100, handles zero goal, keeps two decimals', () => {
