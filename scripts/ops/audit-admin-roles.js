@@ -49,6 +49,7 @@ const MANAGED = [
   ["feeRouter", "FeeRouter"], ["bridgeRouter", "BridgeRouter"], ["liquidityRouter", "LiquidityRouter"],
   ["stakingRouter", "StakingRouter"], ["wagerRegistry", "WagerRegistry"], ["membershipManager", "MembershipManager"],
   ["callsignRegistry", "CallsignRegistry"], ["wagerPoolFactory", "WagerPoolFactory"],
+  ["fundingPoolFactory", "FundingPoolFactory"], // spec 103 (#1410); absent until deployed
 ];
 
 /**

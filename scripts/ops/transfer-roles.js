@@ -49,6 +49,9 @@ const MANAGED = [
   { key: "membershipManager", contract: "MembershipManager" },
   { key: "callsignRegistry", contract: "CallsignRegistry" },
   { key: "wagerPoolFactory", contract: "WagerPoolFactory" },
+  // spec 103 (#1410). deploy-funding-pool-factory.js passes initArgs[0] = deployer, so this
+  // lands holding a deployer admin the moment it is deployed and needs the same handoff.
+  { key: "fundingPoolFactory", contract: "FundingPoolFactory" },
 ];
 
 /** Every `X_ROLE()` view a contract exposes — so a new role cannot be silently left behind. */

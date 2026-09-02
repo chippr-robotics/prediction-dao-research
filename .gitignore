@@ -210,3 +210,6 @@ infra/ansible/collections/
 # it on every run, in CI and locally alike.
 deployments/localhost-chain*-v2.json
 .build-marker.json
+
+# Safe transaction proposals (scripts/ops/revoke-stale-admin.js) — chain-pinned, never committed
+.safe-proposals/
