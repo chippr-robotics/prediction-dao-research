@@ -86,6 +86,7 @@
     "check:finops": "node scripts/finops/check-finops-coverage.js",
     "e2e:matrix": "node scripts/e2e/generate-coverage-matrix.js",
     "check:e2e-matrix": "node scripts/e2e/generate-coverage-matrix.js --check",
+    "check:e2e-trackers": "node scripts/e2e/check-absent-trackers.js",
     "e2e:split": "node scripts/e2e/split-full-tier.js",
     "e2e:split:fast": "node scripts/e2e/split-fast-tier.js",
     "finops:generate": "node scripts/finops/generate-dashboards.js",
