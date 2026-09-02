@@ -88,10 +88,47 @@ export function classifySecret(input) {
   return { kind: 'invalid' }
 }
 
-/** Build an (optionally provider-connected) signer from a classified secret. */
+/**
+ * A provider-connected legacy signer that assigns its OWN nonces.
+ *
+ * A bare ethers Wallet asks the provider for its nonce on every send, and ethers v6's provider
+ * caches every call result for 250 ms (`cacheTimeout`). Two sends in quick succession — approve
+ * then pay, or a sweep's ERC-20 transfers — can therefore both be handed the SAME nonce when the
+ * first mines inside that window (an automining local chain, a fast L2): the second is refused with
+ * "Nonce too low" and the flow fails on the pay leg. The CI log for spec 098's recovered-account
+ * purchase showed exactly this — no nonce lookup at all between the approve receipt and the failed
+ * pay. ethers' NonceManager tracks the nonce locally and increments per send, so sequential sends
+ * are 0, 1, 2 whatever the provider cache says. On a FAILED send the local count is reset, because
+ * NonceManager increments before the send and a refused transaction never consumed its nonce —
+ * without the reset the next send would be one too high. A transaction that arrives with its own
+ * nonce (the multi-asset sweep numbers each leg itself) is sent as given.
+ *
+ * `address` is kept on the wrapper so callers that read the wallet's address property keep working.
+ */
+class ManagedLegacySigner extends ethers.NonceManager {
+  get address() {
+    return this.signer.address
+  }
+
+  async sendTransaction(tx) {
+    // A caller that numbers its own transactions (the multi-asset sweep) keeps its numbering.
+    if (tx && tx.nonce != null) return this.signer.sendTransaction(tx)
+    try {
+      return await super.sendTransaction(tx)
+    } catch (e) {
+      this.reset()
+      throw e
+    }
+  }
+}
+
+/**
+ * Build a signer from a classified secret: a bare Wallet when no provider is given (address
+ * derivation only), or a provider-connected, nonce-managed signer for sending.
+ */
 export function walletFromSecret({ kind, secret }, provider = null) {
   const wallet = kind === 'mnemonic' ? ethers.HDNodeWallet.fromPhrase(secret) : new ethers.Wallet(secret)
-  return provider ? wallet.connect(provider) : wallet
+  return provider ? new ManagedLegacySigner(wallet.connect(provider)) : wallet
 }
 
 async function deriveWrapKey(passphrase, salt, iterations, subtle) {

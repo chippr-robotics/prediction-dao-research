@@ -121,6 +121,27 @@ artifacts live under `specs/<feature>/`.
   `getContractAddressForChain('wagerPoolFactory', chainId)`. Two-word nicknames are
   **client-side only, never on-chain**. Launch targets **Mordor (ETC testnet) → Polygon**
   (removing Semaphore unblocks ETC/Mordor; no Amoy in the sequence). See `specs/034-zk-wager-pools/`.
+- **Funding Pools (spec 103) are the wager-pool ARCHITECTURE with the wager removed, behind their
+  OWN factory.** `FundingPoolFactory` (UUPS proxy, deployment keys `fundingPoolFactory` /
+  `fundingPoolFactoryImpl` / `fundingPoolImpl`) clones immutable `FundingPool` escrows (ERC-1167):
+  variable contributions toward a public on-chain `purpose` + `goal`, the ORGANIZER closes at any time
+  (goal met or not) and the pot pays the organizer's own address — there is deliberately NO `recipient`
+  on `close` and no admin sweep — and the organizer, a strict majority of contributors (⌊N/2⌋+1, by
+  COUNT, evaluated at each vote) or the settle deadline flip the pool to `Refunding`, where refunds are
+  PULL-based (`claimRefund`, exactly `contributed[addr]`). It is a sibling of `WagerPoolFactory`, not an
+  extension: the live wager factory's layout is never touched, and each factory has its OWN four-word
+  phrase namespace (the lookup reports both kinds, wager first). Timing mirrors the wager pools
+  (`contributeDeadline` ≤ 30d, `settleDeadline` ≤ 180d; `pokeDeadline` is the never-stranded fallback).
+  Contracts are relayer-ready (`…WithSig` twins + EIP-3009 contribute + factory `…For` forwarders) but
+  the frontend ships SELF-SUBMIT + passkey `sendCalls` only: the EIP-712 structs live in
+  `@fairwins/intent-types` under `FUNDING_POOL_TYPES` (merged into `CONTRACT_VERIFIED_TYPES` for the
+  parity gate) and are deliberately NOT in `INTENT_TYPES`/`INTENT_ACTIONS` — promoting them means
+  gateway wiring in the same change. Surface: Payments home ▸ Request ▸ **Pool** kind
+  (`/app?kind=pool`), pool page `/fund/<four-words>` | `/fund/0x…`, My Pools bottom sheet on
+  `components/account/ActionSheet`. Every number is a chain read (unreadable ⇒ sentence + retry, never
+  zeros); the feed is the clone's own log bounded at `createdBlock`; no subgraph entity yet. Locally
+  `deploy:local:funding` is the LAST step of `setup:e2e` — append after it, never before (#1289). See
+  `docs/developer-guide/funding-pools.md` + `specs/103-funding-pools/`.
 - **Callsigns (spec 054) are an OPTIONAL, Gold-tier-and-above identity primitive.** The
   `CallsignRegistry` (UUPS proxy, deployment keys `callsignRegistry` / `callsignRegistryImpl`)
   is an in-house naming registry: a member may OPTIONALLY register a `%callsign` (e.g. `%chipprbots`)
@@ -480,7 +501,7 @@ artifacts live under `specs/<feature>/`.
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
-- **Native release channels (spec 102): the app ships as Capacitor iOS/Android shells beside the
+- **Native release channels (spec 103): the app ships as Capacitor iOS/Android shells beside the
   web/PWA, and FIVE rules govern every change.** (1) **Seam-only native logic**:
   `frontend/src/lib/native/runtime.js` is the ONE runtime/capability read (three-state,
   `available` only when the bridging plugin confirmed itself — never fabricate); the four gaps
@@ -507,7 +528,7 @@ artifacts live under `specs/<feature>/`.
   (BLE signing, real passkey PRF) are staged MANUAL protocols in the runbooks, never fake CI
   coverage. Capacitor deps are pinned EXACT under the spec-075 lockfile rules. See
   `docs/developer-guide/native-channels.md` + `docs/runbooks/native-release-operations.md` +
-  `specs/102-capacitor-channels/`.
+  `specs/103-capacitor-channels/`.
 - **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
   (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
   each of which has a way to be silently wrong:
@@ -782,7 +803,7 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/102-capacitor-channels/plan.md
+at specs/103-capacitor-channels/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also

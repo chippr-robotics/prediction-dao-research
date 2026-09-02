@@ -543,7 +543,14 @@ module.exports = {
       // Pin the highest pre-osaka fork (prague) ONLY under coverage; non-coverage runs
       // (npm test / gas report) keep the realistic default. The account WebAuthn path
       // falls back to the FreshCryptoLib verifier when the osaka P256 precompile is absent.
-      ...(COVERAGE ? { hardfork: "prague" } : {}),
+      // HARDHAT_HARDFORK is the same lever for the on-chain e2e tier. The local node impersonates
+      // Polygon Amoy (no EIP-7825), yet under the osaka default the ClearPath native-DAO deploy
+      // (full/42, ~6.4M gas) was refused at eth_estimateGas with "transaction gas limit
+      // (19069152) is greater than the cap (16777216)" — the wallet rail's buffered limit meets
+      // the osaka per-tx cap, which the chain this node stands in for does not have. The full
+      // tier pins prague; the passkey full-stack tier keeps the default so its P256 path runs
+      // against the precompile the way it does on Polygon.
+      ...(process.env.HARDHAT_HARDFORK ? { hardfork: process.env.HARDHAT_HARDFORK } : COVERAGE ? { hardfork: "prague" } : {}),
       accounts: {
         count: 20, // More accounts for integration tests
         accountsBalance: "100000000000000000000000", // 100,000 ETH each - increased to handle bond-heavy tests
