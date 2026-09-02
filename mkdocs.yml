@@ -111,6 +111,7 @@ nav:
     - Staking Integration: developer-guide/staking-integration.md
     - Perps (specs 082 + 083): developer-guide/perps.md
     - Platform Fees (FeeRouter): developer-guide/platform-fees.md
+    - Funding Pools (spec 102): developer-guide/funding-pools.md
     - Mini-Apps (spec 073): developer-guide/miniapps.md
     - Member API (spec 095): developer-guide/member-api.md
     - MCP Server (spec 095): developer-guide/mcp-server.md

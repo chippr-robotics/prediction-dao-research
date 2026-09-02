@@ -26,10 +26,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 103 |
-| With a member-facing flow | 81 |
-| Member-facing flows | 160 |
-| 🟢 covered | 141 |
+| Spec directories | 104 |
+| With a member-facing flow | 82 |
+| Member-facing flows | 168 |
+| 🟢 covered | 149 |
 | 🟡 partial | 1 |
 | 🔴 absent | 12 |
 | ⚪ out of scope | 6 |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-62 flows — 🟢 48 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
+67 flows — 🟢 53 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -283,6 +283,16 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
 | `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
+
+### `102-funding-pools` — Funding pools (Request ▸ Pool)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `funding.create-and-contribute` | Create a pool from Request ▸ Pool; a contributor opens the link and contributes | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-01) |  |
+| `funding.organizer-close` | The organizer closes below the goal and collects the whole pot | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-02) |  |
+| `funding.majority-refund` | A strict majority of contributors votes to refund; each collects their own contribution | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-03) |  |
+| `funding.deadline-refund` | A pool nobody closes refunds after the settle deadline | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-04) |  |
+| `funding.organizer-refund` | The organizer refunds everyone from an open pool | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-05) |  |
 
 ## Disclosure — a member consents to a cost
 
@@ -708,6 +718,18 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01, MC-02) |  |
+
+## No member consequence
+
+3 flows — 🟢 3 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
+
+### `102-funding-pools` — Funding pools (Request ▸ Pool)
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `funding.request-pool-form` | Switch the Request view from Direct to Pool, validate the form, see the public-purpose disclosure | 🟢 covered | flow | `no-chain` | `42-funding-pools.cy.js` (FP-FAST-01, FP-FAST-02, FP-FAST-03, FP-FAST-04, FP-FAST-07) |  |
+| `funding.my-pools-sheet` | Open My Pools, see the honest empty state, find a pool by words or link | 🟢 covered | flow | `no-chain` | `42-funding-pools.cy.js` (FP-FAST-05) |  |
+| `funding.unreadable-link` | A pool link the chain cannot answer renders as unreadable, never as zeros | 🟢 covered | flow | `no-chain` | `42-funding-pools.cy.js` (FP-FAST-06) |  |
 
 ## No member-facing flow
 

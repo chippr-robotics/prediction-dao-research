@@ -2712,6 +2712,105 @@
       "memberFacing": false,
       "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
       "flows": []
+    },
+    {
+      "id": "102-funding-pools",
+      "title": "Funding pools (Request \u25b8 Pool)",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "funding.request-pool-form",
+          "name": "Switch the Request view from Direct to Pool, validate the form, see the public-purpose disclosure",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "none",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-01",
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-02",
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-03",
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-04",
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-07"
+          ]
+        },
+        {
+          "id": "funding.my-pools-sheet",
+          "name": "Open My Pools, see the honest empty state, find a pool by words or link",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "none",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-05"
+          ]
+        },
+        {
+          "id": "funding.unreadable-link",
+          "name": "A pool link the chain cannot answer renders as unreadable, never as zeros",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "none",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-06"
+          ]
+        },
+        {
+          "id": "funding.create-and-contribute",
+          "name": "Create a pool from Request \u25b8 Pool; a contributor opens the link and contributes",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-01"
+          ]
+        },
+        {
+          "id": "funding.organizer-close",
+          "name": "The organizer closes below the goal and collects the whole pot",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-02"
+          ]
+        },
+        {
+          "id": "funding.majority-refund",
+          "name": "A strict majority of contributors votes to refund; each collects their own contribution",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-03"
+          ]
+        },
+        {
+          "id": "funding.deadline-refund",
+          "name": "A pool nobody closes refunds after the settle deadline",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-04"
+          ]
+        },
+        {
+          "id": "funding.organizer-refund",
+          "name": "The organizer refunds everyone from an open pool",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-05"
+          ]
+        }
+      ]
     }
   ]
 }

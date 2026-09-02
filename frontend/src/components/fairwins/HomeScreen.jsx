@@ -77,6 +77,9 @@ function HomeScreen() {
   const [unifiedAutoResolve, setUnifiedAutoResolve] = useState(false)
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [initialWagerId, setInitialWagerId] = useState(null)
+  // Request ▸ Pool deep link (spec 102): /app?kind=pool opens the Request mode on its Pool kind. The
+  // nonce re-applies the kind when the link is followed while this screen is already mounted.
+  const [requestKind, setRequestKind] = useState({ kind: 'once', nonce: 0 })
   // While the create panel is on its oracle path, hide the secondary actions so the
   // taller oracle form (market + side picker) fits without scrolling (design feedback).
   const [oracleMode, setOracleMode] = useState(false)
@@ -90,6 +93,18 @@ function HomeScreen() {
     setMode('wager')
     navigate(location.pathname, { replace: true, state: {} })
   }, [location.state, location.pathname, navigate])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('kind') === 'pool') {
+      userPickedRef.current = true
+      setMode('request')
+      setRequestKind((k) => ({ kind: 'pool', nonce: k.nonce + 1 }))
+      params.delete('kind')
+      const rest = params.toString()
+      navigate(`${location.pathname}${rest ? `?${rest}` : ''}`, { replace: true, state: location.state ?? {} })
+    }
+  }, [location.search, location.pathname, location.state, navigate])
 
   // Shared-phrase deep link (spec 037): /app?oc=take&code=<four words> opens the unified lookup,
   // prefilled + auto-resolving. Strip the query after consuming it (FR-016).
@@ -155,7 +170,7 @@ function HomeScreen() {
 
       {/* Request — payment-request QR (spec 058 US2). */}
       <section className="home-create home-mode-panel" aria-label="Request" hidden={mode !== 'request'}>
-        <RequestPanel />
+        <RequestPanel initialKind={requestKind.kind} kindNonce={requestKind.nonce} />
       </section>
 
       {/* Wager — the spec-053 inline open-challenge create view, unchanged. No disconnected

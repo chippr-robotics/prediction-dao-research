@@ -126,6 +126,37 @@ const POOL_FACTORY_ABI = [
   'function createPool((address token,uint256 buyIn,uint32 maxMembers,uint16 thresholdBips,uint64 acceptDeadline,uint64 resolveDeadline) p) returns (uint256 poolId, address pool)',
   'event PoolCreated(uint256 indexed poolId, address indexed pool, address indexed creator, uint32[4] wordIndices, address token, uint256 buyIn, uint32 maxMembers, uint16 thresholdBips, uint64 acceptDeadline, uint64 resolveDeadline)',
 ]
+// Spec 102 funding pools — minimal ABIs for the full-tier funding-pools spec's setup/drive transactions
+// (create/contribute/vote/close/cancel/claim/poke) and its chain-state reads. Addresses come from the
+// deployment record's `fundingPoolFactory` key, appended by `deploy-funding-pool-factory.js` (never part
+// of `deploy:local` itself; last in `setup:e2e`).
+const FUNDING_FACTORY_ABI = [
+  'function createPool((address token,uint256 goal,string purpose,uint64 contributeDeadline,uint64 settleDeadline) p) returns (uint256 poolId, address pool)',
+  'function phraseOfPool(address pool) view returns (uint32[4])',
+  'event PoolCreated(uint256 indexed poolId, address indexed pool, address indexed organizer, uint32[4] wordIndices, address token, uint256 goal, string purpose, uint64 contributeDeadline, uint64 settleDeadline)',
+]
+const FUNDING_POOL_ABI = [
+  'function contribute(uint256 amount)',
+  'function close()',
+  'function cancel()',
+  'function voteRefund()',
+  'function claimRefund()',
+  'function pokeDeadline()',
+  'function state() view returns (uint8)',
+  'function organizer() view returns (address)',
+  'function purpose() view returns (string)',
+  'function goal() view returns (uint256)',
+  'function totalRaised() view returns (uint256)',
+  'function contributorCount() view returns (uint32)',
+  'function refundVotes() view returns (uint32)',
+  'function refundedCount() view returns (uint32)',
+  'function refundReason() view returns (uint8)',
+  'function contributeDeadline() view returns (uint64)',
+  'function settleDeadline() view returns (uint64)',
+  'function contributed(address) view returns (uint256)',
+  'function votedRefund(address) view returns (bool)',
+  'function refunded(address) view returns (bool)',
+]
 const POOL_ABI = [
   'function join()',
   'function joinWithAuthorization(address from, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)',
@@ -757,6 +788,81 @@ export default defineConfig({
                 args.from, BigInt(args.value), args.validAfter, args.validBefore, args.nonce, args.v, args.r, args.s
               )
               break
+            }
+            case 'createFundingPool': {
+              if (!d.contracts.fundingPoolFactory) {
+                return { ok: false, error: 'fundingPoolFactory is not deployed — run deploy-funding-pool-factory.js --network localhost' }
+              }
+              const fw = new ethers.Wallet(ACCOUNT_KEYS[args.organizerIndex ?? 0], provider)
+              const ff = new ethers.Contract(d.contracts.fundingPoolFactory, FUNDING_FACTORY_ABI, fw)
+              // Same anchoring rule as createPool above: read the timestamp Hardhat actually assigned.
+              await provider.send('evm_mine', [])
+              const fnow = (await provider.getBlock('latest')).timestamp
+              const fparams = {
+                token: args.token || d.paymentToken,
+                goal: BigInt(args.goal ?? 100n * 10n ** 18n),
+                purpose: args.purpose ?? 'E2E funding pool',
+                contributeDeadline: fnow + (args.contributeIn ?? 3600),
+                settleDeadline: fnow + (args.settleIn ?? 7200),
+              }
+              const fsent = await ff.createPool(fparams)
+              const frc = await fsent.wait(1)
+              const fev = frc.logs
+                .map((l) => { try { return ff.interface.parseLog(l) } catch { return null } })
+                .find((e) => e && e.name === 'PoolCreated')
+              if (!fev) return { ok: false, error: 'PoolCreated event not found in receipt' }
+              const wordIndices = [...fev.args.wordIndices].map(Number)
+              return { ok: frc.status === 1, poolId: Number(fev.args.poolId), pool: fev.args.pool, wordIndices }
+            }
+            case 'contributeFunding': {
+              // Approve-then-contribute as account #index — mirrors useFundingPools.contribute's self-submit path.
+              const cw = new ethers.Wallet(ACCOUNT_KEYS[args.index ?? 1], provider)
+              const cTok = new ethers.Contract(args.token || d.paymentToken, TOKEN_ABI, cw)
+              const cPool = new ethers.Contract(args.pool, FUNDING_POOL_ABI, cw)
+              const amount = BigInt(args.amount)
+              let cNonce = await provider.getTransactionCount(cw.address, 'latest')
+              const cAllow = await cTok.allowance(cw.address, args.pool)
+              if (cAllow < amount) await (await cTok.approve(args.pool, amount, { nonce: cNonce++ })).wait(1)
+              tx = await cPool.contribute(amount, { nonce: cNonce++ })
+              break
+            }
+            case 'fundingAction': {
+              // close | cancel | voteRefund | claimRefund | pokeDeadline as account #callerIndex.
+              const fa = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              const faPool = new ethers.Contract(args.pool, FUNDING_POOL_ABI, fa)
+              if (!['close', 'cancel', 'voteRefund', 'claimRefund', 'pokeDeadline'].includes(args.fn)) {
+                return { ok: false, error: `fundingAction: unknown fn ${args.fn}` }
+              }
+              tx = await faPool[args.fn]()
+              break
+            }
+            case 'fundingInfo': {
+              const fi = new ethers.Contract(args.pool, FUNDING_POOL_ABI, provider)
+              const [fstate, forg, fpurpose, fgoal, fraised, fcount, fvotes, frefunded, freason, fcd, fsd] = await Promise.all([
+                fi.state(), fi.organizer(), fi.purpose(), fi.goal(), fi.totalRaised(), fi.contributorCount(),
+                fi.refundVotes(), fi.refundedCount(), fi.refundReason(), fi.contributeDeadline(), fi.settleDeadline(),
+              ])
+              return {
+                ok: true,
+                state: Number(fstate),
+                organizer: forg,
+                purpose: fpurpose,
+                goal: fgoal.toString(),
+                totalRaised: fraised.toString(),
+                contributorCount: Number(fcount),
+                refundVotes: Number(fvotes),
+                refundedCount: Number(frefunded),
+                refundReason: Number(freason),
+                contributeDeadline: Number(fcd),
+                settleDeadline: Number(fsd),
+              }
+            }
+            case 'fundingMemberInfo': {
+              const fm = new ethers.Contract(args.pool, FUNDING_POOL_ABI, provider)
+              const [contributed, voted, refunded] = await Promise.all([
+                fm.contributed(args.address), fm.votedRefund(args.address), fm.refunded(args.address),
+              ])
+              return { ok: true, contributed: contributed.toString(), voted, refunded }
             }
             case 'isFrozen': {
               const reg3 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)

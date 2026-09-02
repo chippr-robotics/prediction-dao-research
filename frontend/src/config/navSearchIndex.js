@@ -103,6 +103,15 @@ export const OFF_MENU_ITEMS = [
  * deep link; `hash` (cards only) names the accordion card so it lands OPEN.
  */
 export const NAV_DESTINATIONS = [
+  // ─── Payments ▸ Request ▸ Pool (spec 102) ───────────────────────────────────────────────
+  {
+    id: 'home-request-pool',
+    navId: 'home',
+    label: 'Pool money',
+    summary: 'Collect money from a group toward a goal, then collect or refund it.',
+    path: '/app?kind=pool',
+    keywords: ['pool', 'pools', 'funding pool', 'fundraiser', 'collect', 'chip in', 'group gift', 'split', 'contribute', 'contributions', 'goal', 'my pools'],
+  },
   // ─── Finance ▸ Earn (spec 050 / 065 / 067) ────────────────────────────────────────────────
   {
     id: 'earn-lend',
