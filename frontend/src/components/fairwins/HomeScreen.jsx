@@ -10,6 +10,7 @@ import UnifiedLookupModal from './UnifiedLookupModal'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketTickerCrawler from './PolymarketTickerCrawler'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
+import DeviceLossWarning from '../wallet/DeviceLossWarning'
 import SectionIconNav from '../nav/SectionIconNav'
 import NavIcon from '../nav/NavIcon'
 import PillSelect from '../ui/PillSelect'
@@ -146,6 +147,24 @@ function HomeScreen() {
 
   return (
     <div className="dashboard-container home-screen">
+      {/*
+       * FR-021 moment 1 of 3 — ACCOUNT CREATION (spec 041 US5, issue #1405).
+       *
+       * This screen is where the passkey ceremony lands: ConnectModal closes itself the instant
+       * the session connects, so the account it just created does not exist yet on any surface
+       * inside that dialog — there is nothing there to warn. The first surface a brand-new
+       * passkey account ever renders is this one, so this is "at account creation".
+       *
+       * It keeps showing on later visits until the member dismisses it or a second controller
+       * exists, which is the honest reading of FR-021: the warning is about a risk that has not
+       * gone away. It renders for nobody else — a wallet session, or an account with two
+       * controllers, gets nothing (DeviceLossWarning self-gates).
+       */}
+      <DeviceLossWarning
+        moment="creation"
+        onAddController={() => navigate('/wallet?tab=security#controllers')}
+      />
+
       {/* Desktop/tablet mode switcher; mobile uses the bottom SectionIconNav. */}
       {!isMobile && (
         <div className="home-mode-switcher">

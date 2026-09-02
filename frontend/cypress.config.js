@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync, unlinkSync } from 'fs'
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
+import clearpathTasks from './cypress/support/tasks/clearpath.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -379,6 +380,178 @@ export default defineConfig({
           } catch (e) {
             console.error('axeSource: could not resolve axe-core —', e.message)
             return null
+          }
+        },
+
+        /*
+         * ── PASSKEY FULL-STACK TIER (specs 041 + 050) ────────────────────────────────────────
+         * These three tasks serve `cypress/e2e/passkey/**` when the job in
+         * .github/workflows/test.yml (cypress-passkey-full-stack) has brought up the local chain,
+         * the ERC-4337 EntryPoint, the account factory, the verifying paymaster, an alto bundler
+         * and the relay gateway. Every one of them either arranges a precondition the flow cannot
+         * reach through the UI, or reads a fact back from the CHAIN — never from a dialog.
+         */
+
+        /**
+         * Fund a passkey smart account so its first action has something to move.
+         *
+         * NAMED for the flow it serves but it takes the ADDRESS explicitly: a Node task has no view
+         * of the browser, so "the active session" has to be read in the spec (the header account
+         * control publishes it) and handed over. The alternative — a task that guessed — would fund
+         * some other account and the failure would look like a broken transfer.
+         *
+         * `native` defaults to ZERO on purpose. An account holding no native token is what makes a
+         * sponsored UserOp provable: it is the only funding state in which the operation cannot
+         * have paid for itself.
+         */
+        async seedUsdcForActiveSession({ address, usdc = '1000', native = '0', ownerBytes = null } = {}) {
+          if (!/^0x[0-9a-fA-F]{40}$/.test(address || '')) {
+            throw new Error(`seedUsdcForActiveSession: needs the session address, got ${JSON.stringify(address)}`)
+          }
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+          const token = new ethers.Contract(d.paymentToken, TOKEN_ABI, admin)
+          // 18-dec mock stablecoin on the local chain (see VITE_AMOY_USDC_DECIMALS in dev:e2e).
+          await (await token.mint(address, ethers.parseUnits(String(usdc), 18))).wait(1)
+          if (native !== '0' && native !== 0) {
+            await provider.send('hardhat_setBalance', [address, '0x' + ethers.parseEther(String(native)).toString(16)])
+          }
+          /*
+           * ACTIVATION. A counterfactual account has no code until its first UserOp deploys it, and
+           * the controllers panel disables every mutation until it does — so a spec about adding and
+           * removing controllers cannot reach its own subject without one. `createAccount` on the
+           * factory is permissionless and CREATE2-deterministic on the initial owner set, so calling
+           * it here deploys EXACTLY the address the browser derived; it is the same first-use deploy
+           * the sponsored path performs, arranged rather than driven. The sponsored spec drives the
+           * real one. Idempotent: the factory returns the existing account if it is already deployed.
+           */
+          if (ownerBytes) {
+            const factory = new ethers.Contract(
+              d.contracts.accountFactory,
+              ['function createAccount(bytes[] owners, uint256 nonce) payable returns (address)'],
+              admin,
+            )
+            await (await factory.createAccount([ownerBytes], 0)).wait(1)
+            if ((await provider.getCode(address)) === '0x') {
+              throw new Error(
+                `seedUsdcForActiveSession: createAccount left no code at ${address} — the browser's derived ` +
+                  'address and the factory disagree, so nothing this account signs could ever land.',
+              )
+            }
+          }
+          return {
+            ok: true,
+            address,
+            deployed: (await provider.getCode(address)) !== '0x',
+            usdc: (await token.balanceOf(address)).toString(),
+            native: (await provider.getBalance(address)).toString(),
+          }
+        },
+
+        /**
+         * Flag an address on the LOCAL SanctionsGuard — the same contract the app's own
+         * `screenController` reads, so the refusal under test is the product's, not a stub's.
+         * Takes a bare address string because that is how the controllers spec calls it.
+         */
+        async flagAddress(address) {
+          const target = typeof address === 'string' ? address : address?.address
+          if (!/^0x[0-9a-fA-F]{40}$/.test(target || '')) {
+            throw new Error(`flagAddress: expected an address, got ${JSON.stringify(address)}`)
+          }
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const admin = new ethers.NonceManager(new ethers.Wallet(config.env.PRIVATE_KEY, provider))
+          const d = loadLocalDeployment()
+          const guard = new ethers.Contract(
+            d.contracts.sanctionsGuard,
+            [
+              'function setDenied(address account, bool denied, string reason)',
+              'function isDenied(address account) view returns (bool)',
+            ],
+            admin,
+          )
+          if (!(await guard.isDenied(target))) {
+            await (await guard.setDenied(target, true, 'e2e passkey fixture')).wait(1)
+          }
+          const denied = await guard.isDenied(target)
+          // Read back rather than trusting the send: a flag that did not take would make the
+          // refusal test pass for the wrong reason (nothing to refuse).
+          if (!denied) throw new Error(`flagAddress: ${target} is still not denied after setDenied`)
+          return { ok: true, address: target, denied }
+        },
+
+        /**
+         * Chain and service state for the sponsored-UserOp flow.
+         *
+         * action ∈ deposit | balances | ownerCount | deployed | setSponsorship
+         *
+         * `setSponsorship` drives the REAL gateway rather than intercepting the request in the
+         * browser: SIGUSR2 toggles its kill switch (server.js bootstrap), and the task then polls
+         * /status until the gateway AGREES it changed. A stub would prove the client can handle a
+         * refusal it was handed; this proves it handles the refusal the deployment actually issues.
+         */
+        async passkeyStack({ action, args = {} }) {
+          const rpcUrl = config.env.RPC_URL || 'http://localhost:8545'
+          const provider = new ethers.JsonRpcProvider(rpcUrl, E2E_CHAIN_ID, { staticNetwork: true })
+          const d = loadLocalDeployment()
+          const entryPoint = d.contracts.entryPoint
+          const paymaster = d.contracts.verifyingPaymaster
+          const gatewayUrl = config.env.GATEWAY_URL || 'http://127.0.0.1:8788'
+
+          switch (action) {
+            case 'deposit': {
+              // EntryPoint.balanceOf(paymaster) — the sponsorship pool. It going DOWN across a send
+              // is the only direct evidence that the paymaster, and not the member, paid.
+              const ep = new ethers.Contract(entryPoint, ['function balanceOf(address) view returns (uint256)'], provider)
+              return { ok: true, paymaster, deposit: (await ep.balanceOf(paymaster)).toString() }
+            }
+            case 'balances': {
+              const token = new ethers.Contract(d.paymentToken, TOKEN_ABI, provider)
+              return {
+                ok: true,
+                native: (await provider.getBalance(args.address)).toString(),
+                usdc: (await token.balanceOf(args.address)).toString(),
+              }
+            }
+            case 'fundNative': {
+              const wei = ethers.parseEther(String(args.amount ?? '1'))
+              await provider.send('hardhat_setBalance', [args.address, '0x' + wei.toString(16)])
+              return { ok: true, native: (await provider.getBalance(args.address)).toString() }
+            }
+            case 'deployed':
+              return { ok: true, deployed: (await provider.getCode(args.address)) !== '0x' }
+            case 'ownerCount': {
+              // MultiOwnable.ownerCount() on the smart account — the chain's own answer to "how many
+              // keys can move this money", which is what a controller add/remove is FOR.
+              const acct = new ethers.Contract(args.address, ['function ownerCount() view returns (uint256)'], provider)
+              try {
+                return { ok: true, ownerCount: Number(await acct.ownerCount()) }
+              } catch (e) {
+                return { ok: false, error: e.shortMessage || e.message }
+              }
+            }
+            case 'setSponsorship': {
+              const want = Boolean(args.enabled)
+              const read = async () => {
+                const res = await fetch(`${gatewayUrl}/status`)
+                const body = await res.json()
+                return body.killSwitch === false // sponsorship is offered when the switch is OFF
+              }
+              if ((await read()) === want) return { ok: true, sponsorship: want, toggled: false }
+              const pidFile = config.env.GATEWAY_PID_FILE || '/tmp/fairwins-passkey-stack/gateway.pid'
+              const pid = Number(readFileSync(pidFile, 'utf8').trim())
+              if (!Number.isInteger(pid) || pid <= 0) throw new Error(`setSponsorship: no gateway pid in ${pidFile}`)
+              globalThis.process.kill(pid, 'SIGUSR2')
+              for (let i = 0; i < 40; i++) {
+                if ((await read()) === want) return { ok: true, sponsorship: want, toggled: true }
+                await new Promise((r) => setTimeout(r, 250))
+              }
+              throw new Error(`setSponsorship: gateway did not report sponsorship=${want} after SIGUSR2`)
+            }
+            default:
+              throw new Error(`passkeyStack: unknown action '${action}'`)
           }
         },
 
@@ -2617,6 +2790,13 @@ export default defineConfig({
           chainSnapshotId = await provider.send('evm_snapshot', [])
           return { snapshotId: chainSnapshotId }
         },
+        /*
+         * ClearPath native standard DAOs (spec 030 pillar A). `clearpathDao` reads the local
+         * chain for full/42-clearpath-native-dao.cy.js; `clearpathRegistryWorld` ABI-encodes a
+         * registry record for the no-chain fast/46-clearpath-unavailable.cy.js and touches no
+         * chain. See frontend/cypress/support/tasks/clearpath.js.
+         */
+        ...clearpathTasks(config),
       })
 
       /*
