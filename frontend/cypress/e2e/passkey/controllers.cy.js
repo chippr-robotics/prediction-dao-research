@@ -111,9 +111,12 @@ function openControllers() {
     cy.get('.action-sheet').contains('button', /create passkey/i).click()
     cy.get(ROW, { timeout: 90000 }).should('have.length', 2)
 
-    // Remove the one that is NOT this device: removing the session's own key would strand the
-    // browser mid-spec, and the product warns about exactly that.
-    cy.get(`${ROW}:not(:contains("(this device)"))`).find('[aria-label^="Remove"]').first().click()
+    // Remove the key that was just ADDED, by its on-chain owner index (0 is the account's initial
+    // owner — the session's key; 1 is the one added above). Both rows read "(this device)" here:
+    // `isThisDevice` means "matches a credential stored in this browser", and the new passkey was
+    // created by this browser too, so the badge cannot tell the two apart. Removing the session's
+    // own key would strand the browser mid-spec, and the product warns about exactly that.
+    cy.get('[data-testid="controller-1"]').find('[aria-label^="Remove"]').click()
     cy.get('.action-sheet').contains('button', /remove controller/i).click()
 
     cy.get(ROW, { timeout: 90000 }).should('have.length', 1)

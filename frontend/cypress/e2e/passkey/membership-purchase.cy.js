@@ -263,8 +263,9 @@ function confirmBronzePurchase(rawPrice) {
     })
 
     // (e) FR-016's "one ceremony" includes the account's first-use deployment: it was
-    // counterfactual before this purchase and is code on chain after it.
-    cy.task('passkeyStack', { action: 'deployed', args: { address: account } }).then((r) => {
+    // counterfactual before this purchase and is code on chain after it. Inside `cy.then`
+    // because command arguments are built at enqueue time, when `account` is still unset.
+    cy.then(() => cy.task('passkeyStack', { action: 'deployed', args: { address: account } })).then((r) => {
       expect(r.deployed, 'first-use deployment rode the same sponsored batch').to.equal(true)
     })
 

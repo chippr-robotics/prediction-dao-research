@@ -115,13 +115,17 @@ function signInAndFund({ native = '0' } = {}) {
       })
     })
 
+    // `account` is assigned inside an earlier `.then`, but a command's ARGUMENTS are built when the
+    // command is enqueued — before any of the queue has run — so a top-level
+    // `cy.task(..., { address: account })` serialises `undefined` (→ null) and the task reads
+    // `getCode(null)`. Every read of `account` below therefore sits inside `cy.then`.
     // (a) The first action activated the account on chain — the deploy rode the same sponsored op.
-    cy.task('passkeyStack', { action: 'deployed', args: { address: account } }).then((r) => {
+    cy.then(() => cy.task('passkeyStack', { action: 'deployed', args: { address: account } })).then((r) => {
       expect(r.deployed, 'first-use deployment happened inside the sponsored operation').to.equal(true)
     })
 
     // (b) THE PROOF. The sender still holds zero native, so it prefunded nothing.
-    cy.task('passkeyStack', { action: 'balances', args: { address: account } }).then((after) => {
+    cy.then(() => cy.task('passkeyStack', { action: 'balances', args: { address: account } })).then((after) => {
       expect(BigInt(after.native), 'the member paid no gas — their native balance never moved').to.equal(0n)
       expect(BigInt(after.usdc), 'and 5 USDC left the account').to.equal(1000n * 10n ** 18n - FIVE)
     })

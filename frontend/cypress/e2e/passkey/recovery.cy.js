@@ -168,11 +168,22 @@ function sendUsdc(amount) {
           ownerBytes: ownerBytesFromStorage(win, address),
         })
       })
-    })
 
-    // Moment 2 — FIRST FUNDING. The wallet home, once the portfolio has READ a non-zero holding
-    // (never on a totalUsd, which a missing price feed would zero — MyAccountView.jsx).
-    cy.visit('/wallet?tab=account')
+      // Moment 2 — FIRST FUNDING. The wallet home, once the portfolio has READ a non-zero holding
+      // (never on a totalUsd, which a missing price feed would zero — MyAccountView.jsx).
+      //
+      // The portfolio scans testnets only when the member has opted in
+      // (`getPortfolioChainIds({ includeTestnets })`), and this stack runs on a node impersonating
+      // Amoy — so without the preference the 10 USDC is never scanned, the wallet home never shows
+      // the account holding anything, and the warning (judged on what the home SHOWS) is honestly
+      // absent. Seeded as the app itself stores it (Preferences → Portfolio writes the same key;
+      // full/43 does the same); the toggle's own UI is not what this flow is about.
+      cy.visit('/wallet?tab=account', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem(`fw_user_${address.toLowerCase()}_show_testnet_assets`, 'true')
+        },
+      })
+    })
     expectConnected()
     cy.get('[data-testid="device-loss-warning-first-funding"]', { timeout: 90000 }).should('have.attr', 'role', 'alert')
 
