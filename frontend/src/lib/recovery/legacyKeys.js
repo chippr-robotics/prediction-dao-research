@@ -88,10 +88,47 @@ export function classifySecret(input) {
   return { kind: 'invalid' }
 }
 
-/** Build an (optionally provider-connected) signer from a classified secret. */
+/**
+ * A provider-connected legacy signer that assigns its OWN nonces.
+ *
+ * A bare ethers Wallet asks the provider for its nonce on every send, and ethers v6's provider
+ * caches every call result for 250 ms (`cacheTimeout`). Two sends in quick succession — approve
+ * then pay, or a sweep's ERC-20 transfers — can therefore both be handed the SAME nonce when the
+ * first mines inside that window (an automining local chain, a fast L2): the second is refused with
+ * "Nonce too low" and the flow fails on the pay leg. The CI log for spec 098's recovered-account
+ * purchase showed exactly this — no nonce lookup at all between the approve receipt and the failed
+ * pay. ethers' NonceManager tracks the nonce locally and increments per send, so sequential sends
+ * are 0, 1, 2 whatever the provider cache says. On a FAILED send the local count is reset, because
+ * NonceManager increments before the send and a refused transaction never consumed its nonce —
+ * without the reset the next send would be one too high. A transaction that arrives with its own
+ * nonce (the multi-asset sweep numbers each leg itself) is sent as given.
+ *
+ * `address` is kept on the wrapper so callers that read the wallet's address property keep working.
+ */
+class ManagedLegacySigner extends ethers.NonceManager {
+  get address() {
+    return this.signer.address
+  }
+
+  async sendTransaction(tx) {
+    // A caller that numbers its own transactions (the multi-asset sweep) keeps its numbering.
+    if (tx && tx.nonce != null) return this.signer.sendTransaction(tx)
+    try {
+      return await super.sendTransaction(tx)
+    } catch (e) {
+      this.reset()
+      throw e
+    }
+  }
+}
+
+/**
+ * Build a signer from a classified secret: a bare Wallet when no provider is given (address
+ * derivation only), or a provider-connected, nonce-managed signer for sending.
+ */
 export function walletFromSecret({ kind, secret }, provider = null) {
   const wallet = kind === 'mnemonic' ? ethers.HDNodeWallet.fromPhrase(secret) : new ethers.Wallet(secret)
-  return provider ? wallet.connect(provider) : wallet
+  return provider ? new ManagedLegacySigner(wallet.connect(provider)) : wallet
 }
 
 async function deriveWrapKey(passphrase, salt, iterations, subtle) {
@@ -329,6 +366,122 @@ export async function sweepNativeToSmartAccount({ kind, secret, to, provider }) 
 // Minimal ABI for reading an arbitrary account's ERC-20 balance.
 const BALANCE_OF_ABI = ['function balanceOf(address) view returns (uint256)']
 
+/**
+ * The fee fields a transaction must CARRY so it is priced exactly as the reserve set aside for
+ * it was sized — never left to be read again during populate, where a tick up in the price turns
+ * `value + gas <= balance` from an identity into a refusal.
+ *
+ * A chain that reported no fee at all (price 0) is left to the library: an explicit zero would be
+ * a worse guess than its own. A chain that prices in legacy `gasPrice` must NOT be handed
+ * `maxFeePerGas` — the node would reject a type-2 transaction it cannot price.
+ *
+ * @param {bigint} price - max fee per gas (or the legacy gas price)
+ * @param {bigint|null} priority - the tip, or null on a legacy-priced chain
+ */
+export function pinnedFeeFields(price, priority) {
+  if (price === 0n) return {}
+  if (priority == null) return { gasPrice: price }
+  return { maxFeePerGas: price, maxPriorityFeePerGas: priority > price ? price : priority }
+}
+
+/**
+ * Re-read the fee, and never come back with LESS than the floor already reserved.
+ *
+ * Every leg pays out of the same coin balance, so a fee that climbs mid-sweep has to be picked up
+ * by the legs behind it; a fee that falls is not a reason to cut the margin the member was quoted.
+ * Monotone by construction, so the schedule the sweep pins is the highest price it has seen.
+ */
+async function raisedFeeSchedule(provider, price, priority) {
+  try {
+    const fresh = await provider.getFeeData()
+    const freshPrice = fresh?.maxFeePerGas ?? fresh?.gasPrice ?? 0n
+    if (freshPrice > price) {
+      return {
+        price: freshPrice,
+        priority: fresh?.maxFeePerGas != null ? (fresh.maxPriorityFeePerGas ?? 0n) : null,
+      }
+    }
+  } catch {
+    /* fee unavailable — the floor stands, which is strictly safer than guessing lower */
+  }
+  return { price, priority }
+}
+
+const asBigInt = (v) => {
+  try {
+    return v == null ? null : BigInt(v)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * What one broadcast leg actually took out of the coin balance.
+ *
+ * Preferred order is receipt (a fact) → the limit the transaction carried at the pinned price (an
+ * upper bound) → nothing. Never guessed upward from thin air: this figure is only ever used
+ * alongside a live balance read, and the SMALLER of the two is what the coin leg is sized from,
+ * so an unknowable cost degrades to trusting the read rather than to inventing a number.
+ */
+function coinSpentBy(tx, receipt, price) {
+  const fee = asBigInt(receipt?.fee)
+  if (fee != null) return fee
+  const gasUsed = asBigInt(receipt?.gasUsed)
+  const paid = asBigInt(receipt?.gasPrice ?? receipt?.effectiveGasPrice)
+  if (gasUsed != null && paid != null) return gasUsed * paid
+  const limit = asBigInt(tx?.gasLimit)
+  if (limit != null) return limit * price
+  return 0n
+}
+
+/**
+ * The node's own words, where ethers wrapped them in a placeholder.
+ *
+ * ethers raises `could not coalesce error` whenever a JSON-RPC failure matches none of the shapes
+ * it knows — which includes Hardhat's insufficient-funds message, because that message does not
+ * contain the string "insufficient funds". The underlying error is still attached; reaching for it
+ * is the difference between telling a member their coin could not cover the fee and telling them
+ * nothing at all.
+ */
+function nodeMessageOf(e) {
+  return e?.info?.error?.message ?? e?.error?.message ?? e?.info?.message ?? null
+}
+
+/**
+ * A stable, honest reason for a per-asset failure. Never surfaces the library's own
+ * `could not coalesce error` placeholder, which names no cause a member (or a CI log) can act on.
+ *
+ * @returns {string}
+ */
+export function describeTransferFailure(e) {
+  const node = nodeMessageOf(e)
+  const raw = e?.reason || e?.shortMessage || e?.message || ''
+  const both = `${raw} ${node ?? ''}`
+  if (/insufficient funds|enough funds|max upfront cost|gas \* price \+ value/i.test(both)) {
+    return 'Not enough coin left to cover this transfer and its network fee.'
+  }
+  if (/could not coalesce/i.test(raw)) {
+    return node || 'The network refused this transfer without saying why.'
+  }
+  return raw || 'The transfer did not go through.'
+}
+
+/**
+ * Diagnostics for a per-asset outcome: enough to answer "by how much did it miss?" from a CI log
+ * alone. Decimal strings so a bigint survives structured cloning and JSON. Balances and fees
+ * only — NEVER key material, never the secret, never the mnemonic.
+ */
+const outcomeDetail = ({ gasPrice, gasLimit, reserve, balance, coinBalance }) => {
+  const detail = {
+    gasPrice: String(gasPrice),
+    reserve: String(reserve),
+    balance: String(balance),
+    coinBalance: String(coinBalance),
+  }
+  if (gasLimit != null) detail.gasLimit = String(gasLimit)
+  return detail
+}
+
 /** The platform-supported fungible assets on a chain (native + ERC-20; NFTs excluded). */
 export function supportedAssetsForChain(chainId, registry) {
   const all = registry ?? getPortfolioRegistry(chainId)
@@ -413,7 +566,7 @@ export async function quoteAllAssets({ kind, secret, chainId, provider, registry
  *
  * @param {(outcome: object) => void} [onProgress] - called after each asset
  * @returns {Promise<Array<{ asset: object, status: 'sent'|'skipped'|'failed',
- *   txHash?: string, error?: string }>>}
+ *   txHash?: string, error?: string, detail?: object }>>}
  */
 export async function sweepAllAssets({ kind, secret, to, chainId, provider, registry, onProgress }) {
   if (!ethers.isAddress(to)) throw new Error('Enter a valid destination address.')
@@ -445,6 +598,34 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
    */
   let nonce = await provider.getTransactionCount(quote.from, 'pending')
 
+  /*
+   * The coin balance is tracked HERE as well, for the same reason the nonce is — and it is the
+   * same failure, one layer along.
+   *
+   * The coin leg re-reads its balance so the ERC-20 legs' gas is accounted for. But that read can
+   * be STALE: ethers shares an identical `getBalance` for 250ms (`cacheTimeout`), and a failover
+   * RPC pool (spec 069) can answer from a node that has not yet seen the token transfer. On a fast
+   * local chain an ERC-20 leg mines well inside that window, so the "fresh" read comes back as the
+   * balance BEFORE it paid its gas — the sweep then asks to send coin the account no longer holds,
+   * the node refuses it for insufficient funds, and (because Hardhat's wording contains no string
+   * ethers recognises) the member is shown `could not coalesce error` against their coin.
+   *
+   * So the sweep keeps its own figure: the quoted balance, less what each BROADCAST leg actually
+   * took, from its receipt. The coin leg is then sized from the SMALLER of that and the live read
+   * — two independent estimates, neither trusted alone, and the conservative one governs.
+   * (Issues #1301/#1327; intermittent in `28-legacy-recovery-sweep.cy.js::LKR-S2`.)
+   */
+  const quotedCoin = quote.holdings.find((h) => h.asset.kind === 'native')?.balance ?? 0n
+  let coinSpent = 0n
+
+  /*
+   * The fee schedule every leg is PINNED to. Starts at the quote's price and only ever rises
+   * (`raisedFeeSchedule`), so the reserve the coin leg keeps back is sized from the same schedule
+   * the legs ahead of it were priced at — never from a quote a later leg has already invalidated.
+   */
+  let price = quote.gasPrice
+  let priority = quote.maxPriorityFeePerGas
+
   for (const { asset, balance } of quote.holdings) {
     if (asset.kind === 'native') {
       /*
@@ -458,7 +639,16 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
        * member could do nothing about. (Found by the full-tier sweep spec; the unit suite could
        * not see it, because a stubbed provider's balance never moves.)
        */
-      const current = await provider.getBalance(quote.from)
+      let read = null
+      try {
+        read = await provider.getBalance(quote.from)
+      } catch {
+        /* the live read is one of two estimates, not the only one — fall back to the tracked figure */
+      }
+      // What the sweep believes is left, from the receipts of the legs it actually broadcast.
+      const tracked = quotedCoin > coinSpent ? quotedCoin - coinSpent : 0n
+      const current = read == null ? tracked : (read < tracked ? read : tracked)
+
       /*
        * Re-read the FEE for the same reason the balance is re-read, and it is a separate failure.
        *
@@ -470,24 +660,22 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
        * gas limit, which is exactly what fills a block and lifts the base fee.
        *
        * Never reserve LESS than the quote did: a falling fee is not a reason to cut the margin the
-       * member was quoted, and `max` keeps this strictly safer than the value it replaces.
+       * member was quoted, and `raisedFeeSchedule` keeps this strictly safer than what it replaces.
        */
-      let price = quote.gasPrice
-      let priority = quote.maxPriorityFeePerGas
-      try {
-        const freshFee = await provider.getFeeData()
-        const freshPrice = freshFee?.maxFeePerGas ?? freshFee?.gasPrice ?? 0n
-        if (freshPrice > price) {
-          price = freshPrice
-          priority = freshFee?.maxFeePerGas != null ? (freshFee.maxPriorityFeePerGas ?? 0n) : null
-        }
-      } catch {
-        /* fee unavailable — the quote's reserve stands, which is what shipped before this */
-      }
+      const coinFee = await raisedFeeSchedule(provider, price, priority)
+      price = coinFee.price
+      priority = coinFee.priority
       const reserve = quote.nativeGasLimit * price
       const sendable = current > reserve ? current - reserve : 0n
+      const detail = outcomeDetail({
+        gasPrice: price,
+        gasLimit: quote.nativeGasLimit,
+        reserve,
+        balance: current,
+        coinBalance: current,
+      })
       if (sendable <= 0n) {
-        record({ asset, status: 'skipped', error: 'Not enough to cover the network fee.' })
+        record({ asset, status: 'skipped', error: 'Not enough to cover the network fee.', detail })
         continue
       }
       /*
@@ -503,32 +691,61 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
        *
        * Pinning is safe as well as exact: `price` is a max fee (base * 2 + tip on an EIP-1559
        * chain), so it still covers a base fee that climbs after the transaction is signed.
-       * A chain that reported no fee at all (price 0) is left to ethers as before — an explicit
-       * zero would be a worse guess than the library's.
        */
-      const feeFields = price === 0n
-        ? {}
-        : priority == null
-          ? { gasPrice: price }
-          : { maxFeePerGas: price, maxPriorityFeePerGas: priority > price ? price : priority }
+      let coinTx = null
       try {
-        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: quote.nativeGasLimit, nonce, ...feeFields })
+        coinTx = await signer.sendTransaction({
+          to,
+          value: sendable,
+          gasLimit: quote.nativeGasLimit,
+          nonce,
+          ...pinnedFeeFields(price, priority),
+        })
         nonce += 1
-        await tx.wait()
-        record({ asset, status: 'sent', txHash: tx.hash })
+        const receipt = await coinTx.wait()
+        coinSpent += coinSpentBy(coinTx, receipt, price)
+        record({ asset, status: 'sent', txHash: coinTx.hash })
       } catch (e) {
-        record({ asset, status: 'failed', error: e.reason || e.shortMessage || e.message })
+        if (coinTx) coinSpent += coinSpentBy(coinTx, e?.receipt, price)
+        record({ asset, status: 'failed', error: describeTransferFailure(e), detail })
       }
       continue
     }
+    /*
+     * The ERC-20 legs are priced on the SAME pinned schedule as the coin leg (issue #1301).
+     *
+     * Left to the library, each token transfer reads the fee again at populate time — so the coin
+     * these legs burn is decided by a price the sweep never saw, taken out of the very balance the
+     * coin leg's reserve is computed from. Pinning makes what a leg can cost knowable before it is
+     * sent, which is what lets the reserve behind it be sized honestly; the schedule only ever
+     * rises, so a token transfer is never pinned below a base fee that would leave it unmineable.
+     */
+    const tokenFee = await raisedFeeSchedule(provider, price, priority)
+    price = tokenFee.price
+    priority = tokenFee.priority
+    let tokenTx = null
     try {
       const erc20 = new ethers.Contract(asset.address, TRANSFER_ABI, signer)
-      const tx = await erc20.transfer(to, balance, { nonce })
+      tokenTx = await erc20.transfer(to, balance, { nonce, ...pinnedFeeFields(price, priority) })
       nonce += 1
-      await tx.wait()
-      record({ asset, status: 'sent', txHash: tx.hash })
+      const receipt = await tokenTx.wait()
+      coinSpent += coinSpentBy(tokenTx, receipt, price)
+      record({ asset, status: 'sent', txHash: tokenTx.hash })
     } catch (e) {
-      record({ asset, status: 'failed', error: e.reason || e.shortMessage || e.message })
+      if (tokenTx) coinSpent += coinSpentBy(tokenTx, e?.receipt, price)
+      const tracked = quotedCoin > coinSpent ? quotedCoin - coinSpent : 0n
+      record({
+        asset,
+        status: 'failed',
+        error: describeTransferFailure(e),
+        detail: outcomeDetail({
+          gasPrice: price,
+          gasLimit: asBigInt(tokenTx?.gasLimit),
+          reserve: quote.nativeGasLimit * price,
+          balance,
+          coinBalance: tracked,
+        }),
+      })
     }
   }
 

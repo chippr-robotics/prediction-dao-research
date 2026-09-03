@@ -93,12 +93,35 @@ gasless relay path — the never-stranded rule.
 > | `QUICKNODE_POLYGON_API` / `_WSS`, `QUICKNODE_AMOY_API` / `_WSS` | **RPC endpoint URLs**, token in the path | gateway + finops + alto (Polygon HTTP only — see below) |
 > | `finops-quicknode-key` | the **Admin API** key, for reading credit usage | FinOps exporter |
 > | `fairwins-quicknode-polygon-url` / `-token` | workstation archive RPC, operator only | never on a VM |
+> | `fairwins-quicknode-{ethereum,optimism,base,arbitrum}-url` | **PER-CHAIN** workstation archive RPC (chains 1 / 10 / 8453 / 42161) | workstation only — no node reads them |
+>
+> **The four per-chain endpoints are derived, not separately purchased.** They come from the
+> `QUICKNODE_RPC_001_API` multichain endpoint by swapping the hostname infix, done ONCE under
+> verification by `node scripts/secrets/quicknode-chains.js --provision 1,10,8453,42161` — which
+> asserts `eth_chainId` and refuses to store a URL that did not verify. Rotating the source
+> endpoint means re-running that command; the four containers are versioned independently, so a
+> chain that fails verification keeps its previous version rather than being poisoned.
+>
+> They are workstation-only on purpose: the gateway does not define those chains at all
+> (`CHAIN_DEFS` covers 61, 63, 137, 80002) and `ENABLED_CHAIN_IDS` is `63,137`.
 >
 > **One endpoint, one token, chain by hostname infix.** `<name>.matic.quiknode.pro` is Polygon and
 > `<name>.matic-amoy.quiknode.pro` is Amoy, on the SAME credential — so a mis-set variable answers
 > **HTTP 200 with the wrong chain's state**, not a 401. The gateway asserts `eth_chainId` against
 > every configured endpoint at boot and refuses to start on a mismatch; nothing else in the estate
 > would notice, because the providers are built with `staticNetwork`.
+>
+> **`QUICKNODE_POLYGON_API` and `QUICKNODE_RPC_002_API` are the same endpoint and the same token.**
+> Byte-compared 2026-09-01: they differ by ONE byte — 002 has a **trailing newline** (88 vs 87).
+> Rotating one does not rotate the other, because they are separate containers holding separate
+> copies; rotate **both** or you leave a live copy of a revoked-looking credential behind. And do
+> not treat them as interchangeable: `fetch-secrets.sh` writes payloads verbatim, so 002 delivers a
+> URL with a newline inside the quoted value.
+>
+> **The base network an endpoint was created on does not bound its reach.** The Admin API reports
+> all five as `is_multichain: true`; 001 is reported `chain: matic` yet serves Ethereum 1,
+> Optimism 10, Base 8453 and Arbitrum 42161 (all verified by live `eth_chainId`, 2026-09-01).
+> Ask the chain, never infer it from the endpoint's name or console network.
 >
 > **`QUICKNODE_POLYGON_WSS`, `QUICKNODE_AMOY_API` and `QUICKNODE_AMOY_WSS` are declared but
 > deliberately UNREAD.** Nothing opens a WebSocket RPC, and there is no Amoy-cohort node. They are
@@ -146,8 +169,9 @@ the `gcloud secrets list` command under [Keeping this current](#keeping-this-cur
 | `fairwins-floppy-keystore-password` / `-mordor-` / `-nazgul-prime-` | Air-gapped floppy keystore passphrases. |
 | `fairwins-etherscan-api-key` | Contract verification. |
 | `fairwins-graph-api-key` / `-graph-deploy-key` | Subgraph query / deploy. Deploy ≠ query key. |
-| `fairwins-pinata-jwt` | IPFS pinning for mini-app packages. |
-| `fairwins-quicknode-polygon-url` / `-token` | Archive RPC. |
+| `fairwins-pinata-jwt` | IPFS pinning. **Not just mini-app packages** — see the Pinata row under [Connected external systems](#connected-external-systems). |
+| `fairwins-quicknode-polygon-url` / `-token` | Archive RPC, Polygon 137. Also reaches alto as `ALTO_RPC_URL` via its node-facing twin `QUICKNODE_POLYGON_API` — rotate with the bundler in scope. |
+| `fairwins-quicknode-ethereum-url` / `-optimism-` / `-base-` / `-arbitrum-` | Per-chain archive RPC for 1 / 10 / 8453 / 42161. Hard requirements of `hardhat.config.js` on those networks. |
 | `fairwins-seed-player-keys` | Testnet seeding. Testnet only. |
 
 ---
@@ -163,12 +187,34 @@ the `gcloud secrets list` command under [Keeping this current](#keeping-this-cur
 | **Polymarket CLOB** | Gateway proxies public reads; members sign their own orders | 4 `POLYMARKET_API_*` | Predict degrades to 503; SPA hides the tab. |
 | **OpenSea** | Gateway proxies collectible reads | `OPENSEA_API_KEY` | Collect degrades to 503. |
 | **The Graph** | Subgraph queries/deploys | `fairwins-graph-*` | Wager history degrades to direct chain reads. |
-| **Pinata / IPFS** | Mini-app package pinning | `fairwins-pinata-jwt` | Publishing blocked; already-published CIDs unaffected. |
+| **Pinata / IPFS** | Mini-app package pinning **and every member write that pins JSON** — wager creation, open challenges, encrypted data backup | `fairwins-pinata-jwt` (workstation, for publishing) + the Cloud Run runtime `VITE_PINATA_JWT` the SPA's `/api/pinata` proxy injects | **Member-facing, not just publishing.** Already-published CIDs are unaffected, but a member cannot create a wager or an open challenge at all — those flows pin JSON with no fallback. See the scope note below. |
 | **GitHub Actions** | CI and (nominally) infra apply | Workload Identity Federation — **no stored key** | See the caveat below. |
 
 > **⚠️ `infra-apply` has never run.** It is gated on repository variables `WIF_PROVIDER` and
 > `TF_APPLY_SERVICE_ACCOUNT`, which are unset — so every Terraform change merges and silently does
 > nothing. Do not assume a merged infra PR has been applied. Verified 2026-08-16.
+
+> **⚠️ A Pinata key can be valid and still be the wrong key.** Pinata scopes each endpoint
+> separately, and `pinJSONToIPFS` is a **different scope** from `pinFileToIPFS`. Mini-app
+> publishing uploads *files*; wager creation, open challenges and encrypted data backup upload
+> *JSON*. A key minted for publishing therefore authenticates fine and then answers member writes
+> with `NO_SCOPES_FOUND` — which is what happened in production on 2026-08-30.
+>
+> **`testAuthentication` does not catch this** — it succeeds for any valid key, whatever its
+> scopes. Verify a rotation against the endpoint the app actually calls:
+>
+> ```bash
+> # Expect a CID. NO_SCOPES_FOUND ⇒ the key lacks pinJSONToIPFS and every member write is broken.
+> curl -sS -X POST https://api.pinata.cloud/pinning/pinJSONToIPFS \
+>   -H "Authorization: Bearer $JWT" -H 'Content-Type: application/json' \
+>   -d '{"pinataContent":{"probe":"rotation-check"}}'
+> ```
+>
+> The member-facing credential is the **Cloud Run runtime** env var `VITE_PINATA_JWT` on the SPA
+> service (Terraform-unmanaged, so it does not appear in any plan). The browser never holds it:
+> nginx proxies same-origin `/api/pinata` to Pinata and injects the header
+> (`frontend/nginx.conf.template`). Rotating the workstation secret alone leaves production on the
+> old key.
 
 ---
 

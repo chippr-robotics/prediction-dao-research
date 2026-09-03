@@ -456,7 +456,21 @@ export default function TransferForm({ onSent }) {
 
           {/* To — the standard address entry (ENS resolution + address book + QR scan) */}
           <div className="pt-field">
-            <label className="pt-label" htmlFor="pt-to">To</label>
+            <div className="pt-label-row">
+              <label className="pt-label" htmlFor="pt-to">To</label>
+              {/* The To field is recipient ONE of a group, not the only recipient (spec 058:
+                  `allRecipients` puts this form's own address first, then rows 2..N). Without a
+                  marker the field reads as the whole destination while the money goes to several
+                  people, so the count is stated where the address is entered. */}
+              {isGroup && (
+                <span
+                  className="pt-badge pt-badge-multi"
+                  aria-label={`Multiple recipients: ${allRecipients.length}`}
+                >
+                  Multi · {allRecipients.length}
+                </span>
+              )}
+            </div>
             <div className="pt-input-with-action">
               <div className="pt-address-input-wrap">
                 <AddressInput

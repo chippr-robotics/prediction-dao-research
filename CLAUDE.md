@@ -121,6 +121,27 @@ artifacts live under `specs/<feature>/`.
   `getContractAddressForChain('wagerPoolFactory', chainId)`. Two-word nicknames are
   **client-side only, never on-chain**. Launch targets **Mordor (ETC testnet) → Polygon**
   (removing Semaphore unblocks ETC/Mordor; no Amoy in the sequence). See `specs/034-zk-wager-pools/`.
+- **Funding Pools (spec 103) are the wager-pool ARCHITECTURE with the wager removed, behind their
+  OWN factory.** `FundingPoolFactory` (UUPS proxy, deployment keys `fundingPoolFactory` /
+  `fundingPoolFactoryImpl` / `fundingPoolImpl`) clones immutable `FundingPool` escrows (ERC-1167):
+  variable contributions toward a public on-chain `purpose` + `goal`, the ORGANIZER closes at any time
+  (goal met or not) and the pot pays the organizer's own address — there is deliberately NO `recipient`
+  on `close` and no admin sweep — and the organizer, a strict majority of contributors (⌊N/2⌋+1, by
+  COUNT, evaluated at each vote) or the settle deadline flip the pool to `Refunding`, where refunds are
+  PULL-based (`claimRefund`, exactly `contributed[addr]`). It is a sibling of `WagerPoolFactory`, not an
+  extension: the live wager factory's layout is never touched, and each factory has its OWN four-word
+  phrase namespace (the lookup reports both kinds, wager first). Timing mirrors the wager pools
+  (`contributeDeadline` ≤ 30d, `settleDeadline` ≤ 180d; `pokeDeadline` is the never-stranded fallback).
+  Contracts are relayer-ready (`…WithSig` twins + EIP-3009 contribute + factory `…For` forwarders) but
+  the frontend ships SELF-SUBMIT + passkey `sendCalls` only: the EIP-712 structs live in
+  `@fairwins/intent-types` under `FUNDING_POOL_TYPES` (merged into `CONTRACT_VERIFIED_TYPES` for the
+  parity gate) and are deliberately NOT in `INTENT_TYPES`/`INTENT_ACTIONS` — promoting them means
+  gateway wiring in the same change. Surface: Payments home ▸ Request ▸ **Pool** kind
+  (`/app?kind=pool`), pool page `/fund/<four-words>` | `/fund/0x…`, My Pools bottom sheet on
+  `components/account/ActionSheet`. Every number is a chain read (unreadable ⇒ sentence + retry, never
+  zeros); the feed is the clone's own log bounded at `createdBlock`; no subgraph entity yet. Locally
+  `deploy:local:funding` is the LAST step of `setup:e2e` — append after it, never before (#1289). See
+  `docs/developer-guide/funding-pools.md` + `specs/103-funding-pools/`.
 - **Callsigns (spec 054) are an OPTIONAL, Gold-tier-and-above identity primitive.** The
   `CallsignRegistry` (UUPS proxy, deployment keys `callsignRegistry` / `callsignRegistryImpl`)
   is an in-house naming registry: a member may OPTIONALLY register a `%callsign` (e.g. `%chipprbots`)
@@ -496,6 +517,34 @@ artifacts live under `specs/<feature>/`.
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
+- **Native release channels (spec 103): the app ships as Capacitor iOS/Android shells beside the
+  web/PWA, and FIVE rules govern every change.** (1) **Seam-only native logic**:
+  `frontend/src/lib/native/runtime.js` is the ONE runtime/capability read (three-state,
+  `available` only when the bridging plugin confirmed itself — never fabricate); the four gaps
+  bridge inside EXISTING seams — passkey ceremony in `lib/passkey/credentials.js`
+  (`resolveCredentialManager`, `@capgo/capacitor-passkey` behind a credentials-shaped adapter that
+  pre-encodes PRF salts to WebAuthn-JSON and decodes results — the plugin JSON-clones extensions
+  and would mangle a Uint8Array), Ledger BLE as a `hw-transport` rung in `ledgerAdapter.js`
+  (`lib/native/ledgerBleTransport.js`), app-lock via `lib/native/lifecycle.js` feeding the
+  existing hidden⇒engage rule (INERT on web), deep links via `lib/native/deepLinks.js`
+  (tenant-origin URLs ONLY). (2) **Version/identity fields in the shells are SYNC-ONLY**:
+  `scripts/native/sync-native-config.js` writes them from the tenant manifest (`native` block —
+  one tenant, one appId per platform, absence = no native channel, never a fallback) +
+  `scripts/release/version.js`; `check:native-versions` fails CI on hand edits.
+  (3) **CSP is DERIVED, never widened**: the native meta policy is computed FROM `nginx.conf`
+  (`scripts/native/nativeCsp.js`; parity-gated — `script-src` keeps `blob:`, never gains
+  `https:`); the web nginx files stay byte-identical. (4) **Release artifacts precede the tag**:
+  release.yml's native-gate → android/ios artifact + emulator/simulator smoke jobs all gate the
+  `release` job, so a record row exists exactly when its artifact was built and smoked; iOS ships
+  an UNSIGNED archive (Apple identity is operator-held), Android signs only via env-delivered
+  Secret Manager material once `ANDROID_SIGNING_SERVICE_ACCOUNT` is set — unsigned is recorded
+  `signed:false`, loudly. (5) **Honest degradation everywhere**: capability gaps render the seam's
+  reason in place (`NativeCapabilityNotice`), the FR-015 stale-build floor renders NOTHING when
+  unknowable (a network failure is not a fact about the member's build), and device-bound flows
+  (BLE signing, real passkey PRF) are staged MANUAL protocols in the runbooks, never fake CI
+  coverage. Capacitor deps are pinned EXACT under the spec-075 lockfile rules. See
+  `docs/developer-guide/native-channels.md` + `docs/runbooks/native-release-operations.md` +
+  `specs/103-capacitor-channels/`.
 - **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
   (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
   each of which has a way to be silently wrong:
@@ -626,6 +675,26 @@ artifacts live under `specs/<feature>/`.
   `fetch-secrets.sh` refuses to boot if key material reaches its env. See
   `docs/developer-guide/finops.md` + `docs/runbooks/finops-operations.md` + `specs/089-finops-dashboard/`.
 
+- **The release train (spec 076) can release its own paperwork, and the only thing normally stopping
+  it is a merge subject that fails to parse.** `release.yml` triggers on a push to `main` and reads
+  **`github.event.head_commit.message`** — the MERGE commit. The `[skip release]` marker lives one
+  commit deeper, in the record branch's own commit, so it is invisible there; `classify.js` honours
+  it per-commit, which stops the *record* commit voting but not the *merge* commit. `version.js`
+  runs `git log --format=%s…` with **no `--no-merges`**, so a merge subject is classified like any
+  other commit. GitHub's default (`Merge pull request #N from …/release/vX.Y.Z-changelog`) fails to
+  classify and therefore votes for nothing — **that failure to parse IS the guard.** So: **merge a
+  `release/*-changelog` PR with GitHub's DEFAULT commit message; never retitle it to a conventional
+  commit.** `chore(release): v1.15.1 (#1391)` parses as `chore(release)` → patch, which minted
+  **v1.15.2 out of the v1.15.1 record** (2026-08-31); `v1.5.6`/`v1.5.7` were the same failure by the
+  other route. Before merging one, run `node scripts/release/classify.js --title "<subject>"` and
+  confirm it FAILS — or put `[skip release]` in the merge **body**, the one lever that works from
+  the merge commit (it short-circuits the workflow's top-level `if`). Tags are **immutable**
+  (FR-004): a version minted this way cannot be withdrawn, and its record PR must then be merged
+  anyway, or `git describe` disagrees with every manifest and the version gate's backfill exemption
+  fails on every later back-merge. Related invariants: promotions `staging`→`main` use a **merge
+  commit, never a squash**; the back-merge `main`→`staging` is **mandatory** (FR-019); record PRs are
+  opened by GITHUB_TOKEN and therefore get **no check runs** until closed and reopened by hand. See
+  `docs/runbooks/release-and-promotion.md`.
 - **The repo is an npm WORKSPACE (spec 075): one root lockfile, 10 members, `contracts/` deliberately
   NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
   detail — **`monorepo-workspace`** (dependencies, adding a package, recovering a broken install)
@@ -750,7 +819,7 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/094-e2e-coverage-expansion/plan.md
+at specs/103-capacitor-channels/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also
