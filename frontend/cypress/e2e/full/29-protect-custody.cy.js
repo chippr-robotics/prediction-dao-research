@@ -394,6 +394,13 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
         cy.contains('button', /^Propose/).click()
       })
 
+      /*
+       * Wait for the CHAIN to carry the proposal before opening the Queue. The queue reads its
+       * networks on mount and does not poll (Refresh is the member's re-read), so opening it
+       * while the propose transaction is still in flight yields an empty queue that no amount of
+       * Cypress retrying will refill — observed as a CI-only failure of this test.
+       */
+      waitForProposalCount(address, 1)
       // Queued, not applied — the vault still says 2. The Queue view re-reads on mount.
       openVaultCard('queue')
       cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length.at.least', 1)
