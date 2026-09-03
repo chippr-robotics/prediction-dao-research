@@ -278,6 +278,25 @@ function loadVault(address, label = 'E2E Vault') {
  * Spec 102 — a vault card no longer expands; its "⋯" opens the vault sheet, and the proposal
  * queue is the sheet's Queue view. Opens the FIRST card's sheet (these flows hold one vault).
  */
+/**
+ * Wait for the HUB to have recorded `expected` proposals before the queue is read.
+ *
+ * Spec 102 — the Queue view reads when it OPENS (and on Refresh); it does not poll. Opening it
+ * while a proposal is still being mined would assert against a queue that is honestly reporting
+ * what the chain said a moment earlier, so the wait belongs before the read rather than as a
+ * retry around it.
+ */
+function waitForProposalCount(address, expected, tries = 60) {
+  return fixture('proposalCount', { address, hub: HUB }).then(({ count }) => {
+    if (count >= expected) return count
+    if (tries <= 0) {
+      throw new Error(`the hub recorded ${count} proposal(s) for ${address}, expected ${expected}`)
+    }
+    cy.wait(1000, { log: false })
+    return waitForProposalCount(address, expected, tries - 1)
+  })
+}
+
 function openVaultCard(view = 'queue') {
   cy.get('body').then(($b) => {
     if ($b.find('[data-testid="vault-panel-' + view + '"]').length === 0) {
@@ -458,6 +477,7 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
        * once, and the vault is governed only after BOTH land — asserted below, because a test that
        * executed one and saw a guard would be describing a product that cannot exist.
        */
+      waitForProposalCount(address, 2)
       openVaultCard('queue')
       cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length', 2)
       fixture('vaultInfo', { address }).then((info) => {
@@ -516,6 +536,7 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
        * Asserted before executing anything, so "only one was created" fails here saying that,
        * rather than later as a vault that mysteriously ends up ungoverned.
        */
+      waitForProposalCount(address, 2)
       openVaultCard('queue')
       cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length', 2)
 

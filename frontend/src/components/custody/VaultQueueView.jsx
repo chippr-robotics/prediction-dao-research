@@ -162,14 +162,31 @@ export default function VaultQueueView({ group }) {
 
   return (
     <div className="vault-queue" role="region" aria-label="Vault queue">
-      <p
-        className={`vault-queue__summary${summary?.partial ? ' is-partial' : ''}`}
-        role="status"
-        data-testid="vault-queue-summary"
-        data-partial={summary?.partial ? 'true' : 'false'}
-      >
-        {summaryText}
-      </p>
+      <div className="vault-queue__head">
+        <p
+          className={`vault-queue__summary${summary?.partial ? ' is-partial' : ''}`}
+          role="status"
+          data-testid="vault-queue-summary"
+          data-partial={summary?.partial ? 'true' : 'false'}
+        >
+          {summaryText}
+        </p>
+        {/*
+         * The queue reads when it opens, so anything the chain accepted a moment later — a
+         * proposal the member has just made, or a co-owner's approval — is not on screen yet, and
+         * a member with no way to re-read cannot tell a settled queue from a stale one. Always
+         * offered, not just for a chain that failed: this is about time passing, not a bad read.
+         */}
+        <button
+          type="button"
+          className="custody-link"
+          data-testid="vault-queue-refresh"
+          onClick={() => refresh?.()}
+          disabled={reading}
+        >
+          {reading ? 'Reading…' : 'Refresh'}
+        </button>
+      </div>
 
       {!reading && rows.length === 0 && entriesCount > 0 && (
         <p className="custody-hint" role="status" data-testid="vault-queue-empty">

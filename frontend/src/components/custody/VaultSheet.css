@@ -494,3 +494,13 @@
     justify-content: flex-start;
   }
 }
+
+/* Spec 102 — the queue's summary line and its Refresh control share a row: the control is about
+   the whole queue, so it sits with the sentence that describes it rather than with any one row. */
+.vault-queue__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}

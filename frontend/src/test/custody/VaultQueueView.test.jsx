@@ -102,6 +102,18 @@ describe('VaultQueueView', () => {
     expect(chains[0]).toHaveAttribute('data-state', 'read')
   })
 
+  it('re-reads every network on Refresh, so a settled queue is never mistaken for a stale one', () => {
+    /*
+     * The queue reads when it opens and does not poll, so a proposal the chain accepted a moment
+     * later is not on screen. Refresh is offered whatever each chain's state is — this is about
+     * time passing, not about a bad read — and asks for ALL of them, not one.
+     */
+    render(<VaultQueueView group={group(137)} />)
+    fireEvent.click(screen.getByTestId('vault-queue-refresh'))
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(refresh.mock.calls[0][0]).toBeUndefined()
+  })
+
   it('labels the total partial and NAMES an unreadable chain, with a Retry (FR-019)', () => {
     queueCtx = {
       ...queueCtx,
