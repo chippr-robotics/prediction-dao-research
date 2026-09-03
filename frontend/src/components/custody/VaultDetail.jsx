@@ -88,13 +88,15 @@ export default function VaultDetail({
             </dd>
           </div>
         )}
-        <div>
-          <dt>Network</dt>
-          <dd>
-            {chainLabel}
-            {vault.isTestnet ? ' · testnet' : ''}
-          </dd>
-        </div>
+        {variant !== 'network' && (
+          <div>
+            <dt>Network</dt>
+            <dd>
+              {chainLabel}
+              {vault.isTestnet ? ' · testnet' : ''}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Threshold</dt>
           <dd>

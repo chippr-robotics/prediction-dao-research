@@ -21,12 +21,31 @@ import { summarizeQueue } from '../../lib/custody/vaultGroups'
 import { STATUS, approvalsRemaining } from '../../lib/custody/proposalStatus'
 import { chainDisplayName } from '../../lib/custody/chainName'
 import NetworkPill from '../ui/NetworkPill'
+import { useOpponentName } from '../../hooks/useOpponentName'
+import { shortAccountAddr } from '../../hooks/useAccountSwitcher'
 
 function shortHash(h) {
   return h ? `${h.slice(0, 10)}…${h.slice(-6)}` : ''
 }
 
 const ACTION_LABEL = { approve: 'Approval', execute: 'Execution', cancel: 'Cancellation' }
+
+/**
+ * The recipient, cross-referenced the way every address in the app is (spec 054 priority:
+ * address book > callsign > ENS > generated) — a member reads "to Alice", with the hex kept
+ * beside it because the name is a convenience and the address is the fact being signed.
+ */
+function RowRecipient({ address, chainId }) {
+  const { displayName, source } = useOpponentName(address, { chainId })
+  const named = displayName && source !== 'generated'
+  return (
+    <span className="vault-queue__to" data-testid="vault-queue-to" data-source={source || 'none'} title={address}>
+      to {named ? <strong>{displayName}</strong> : null} <code aria-label={address}>{shortAccountAddr(address)}</code>
+    </span>
+  )
+}
+
+RowRecipient.propTypes = { address: PropTypes.string.isRequired, chainId: PropTypes.number }
 
 function chainStatusText(chainId, entry) {
   const name = chainDisplayName(chainId)
@@ -182,12 +201,12 @@ export default function VaultQueueView({ group }) {
                     {p.approvals}/{p.threshold} approvals
                     {p.status === STATUS.PENDING && remaining > 0 ? ` · ${remaining} more needed` : ''}
                   </span>
-                  <code className="custody-proposal-hash">{shortHash(p.safeTxHash)}</code>
+                  <code className="custody-proposal-hash" title={p.safeTxHash} aria-label={`Safe transaction hash ${p.safeTxHash}`}>
+                    {shortHash(p.safeTxHash)}
+                  </code>
                 </div>
                 <div className="vault-queue__facts">
-                  <span>
-                    to <code>{p.to}</code>
-                  </span>
+                  <RowRecipient address={p.to} chainId={Number(p.chainId)} />
                   <span>nonce {String(p.nonce)}</span>
                 </div>
                 {owner ? (

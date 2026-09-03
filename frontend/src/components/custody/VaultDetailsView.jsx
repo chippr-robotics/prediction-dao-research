@@ -224,9 +224,10 @@ export default function VaultDetailsView({ group, onClose, onVaultsChanged }) {
             submit-time chain check VaultProposalsPanel applies, and the queue tab shows the result. */}
         {connectedInstance?.isSafe === true && connectedInstance.owner && typeof proposals?.propose === 'function' && (
           <div className="vault-details__governance" data-testid="vault-governance">
+            <h5 className="vault-details__subheading">Owners &amp; threshold</h5>
             <p className="custody-hint" role="note">
-              Changes to owners or the threshold are proposed on {chainDisplayName(Number(connectedInstance.chainId))} and
-              wait in the queue for the other owners.
+              Changes are proposed on {chainDisplayName(Number(connectedInstance.chainId))} and wait in the queue for the
+              other owners.
             </p>
             <OwnersThresholdPanel vault={connectedInstance} onPropose={proposeOnConnected} busy={govBusy} />
             {govError && (

@@ -455,3 +455,42 @@
   font-size: 0.88rem;
   color: var(--text-secondary);
 }
+
+
+/* Spec 102 (actor-critic round 2) */
+.vault-details__address {
+  align-items: flex-start;
+}
+
+.vault-details__address code {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.vault-details__subheading {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* The governance panel's own heading would repeat the subheading; the panel keeps its buttons. */
+.vault-details__governance .custody-governance > h5,
+.vault-details__governance .custody-governance > h4 {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .vault-owner-row {
+    flex-wrap: wrap;
+  }
+
+  .vault-sheet .vault-owner-row__add {
+    margin-left: 0;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}

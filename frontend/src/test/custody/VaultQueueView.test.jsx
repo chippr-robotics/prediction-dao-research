@@ -12,6 +12,11 @@ let proposalsCtx
 vi.mock('../../hooks', () => ({ useWallet: () => walletCtx }))
 vi.mock('../../hooks/useVaultQueueAcrossChains', () => ({ useVaultQueueAcrossChains: () => queueCtx }))
 vi.mock('../../hooks/useVaultProposals', () => ({ useVaultProposals: (vault) => proposalsCtx(vault) }))
+// Recipient names resolve the way every address does (spec 054); the book is faked per address.
+let names = {}
+vi.mock('../../hooks/useOpponentName', () => ({
+  useOpponentName: (address) => names[String(address).toLowerCase()] || { displayName: 'Quiet Otter', source: 'generated', address },
+}))
 
 import VaultQueueView from '../../components/custody/VaultQueueView'
 
@@ -217,5 +222,19 @@ describe('VaultQueueView', () => {
   it('has no axe violations', async () => {
     const { container } = render(<VaultQueueView group={group(137)} />)
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('names a recipient from the address book, and keeps the address as the fact beside it', async () => {
+    const to = String(queueCtx.rows[0].to).toLowerCase()
+    names = { [to]: { displayName: 'Alice', source: 'addressBook', address: queueCtx.rows[0].to } }
+    render(<VaultQueueView group={group(137)} />)
+    const line = screen.getAllByTestId('vault-queue-to')[0]
+    expect(line).toHaveAttribute('data-source', 'addressBook')
+    expect(line).toHaveTextContent('Alice')
+    // A generated two-word name is not a name the member gave: the full address stays.
+    const generated = screen.getAllByTestId('vault-queue-to').find((el) => el.dataset.source === 'generated')
+    if (generated) expect(generated.textContent).not.toContain('Quiet Otter')
+    // The full address is never lost: it rides on the element for copy/hover and the accessible name.
+    expect(line).toHaveAttribute('title', queueCtx.rows[0].to)
   })
 })

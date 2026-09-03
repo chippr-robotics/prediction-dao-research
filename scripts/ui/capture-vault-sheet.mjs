@@ -145,11 +145,19 @@ function proposedLog(chainId, p) {
   }
 }
 
+const ERC20_IFACE = new Interface(['function balanceOf(address) view returns (uint256)', 'function decimals() view returns (uint8)', 'function symbol() view returns (string)'])
+
 function ethCall(chainId, call) {
   const to = lower(call?.to)
-  if (to !== lower(VAULT) && to !== lower(OTHER_VAULT)) return '0x'
   const data = call?.data || '0x'
   const selector = data.slice(0, 10)
+  if (to !== lower(VAULT) && to !== lower(OTHER_VAULT)) {
+    // Any token contract: a plausible ERC-20 answer, so the Wrap tiles show READ balances rather
+    // than "—" (a placeholder would hide a broken read, critic rule 2).
+    if (selector === ERC20_IFACE.getFunction('balanceOf').selector) return ERC20_IFACE.encodeFunctionResult('balanceOf', [1_250_000_000_000_000_000n])
+    if (selector === ERC20_IFACE.getFunction('decimals').selector) return ERC20_IFACE.encodeFunctionResult('decimals', [18])
+    return '0x'
+  }
   const fn = SAFE_IFACE.fragments.find((f) => f.type === 'function' && SAFE_IFACE.getFunction(f.name).selector === selector)
   if (!fn) return '0x'
   const cfg = CHAINS[chainId]
@@ -200,7 +208,8 @@ function answer(chainId, call) {
     case 'eth_blockNumber':
       return hex(CHAINS[chainId].head)
     case 'eth_getBalance':
-      return '0x1bc16d674ec80000'
+      // 2.006441459389172406 POL — the staging screenshot's balance; the formatter is what is under review.
+      return hex(2006441459389172406n)
     case 'eth_getCode': {
       const a = lower(param)
       return a === lower(VAULT) || a === lower(OTHER_VAULT) || a === lower(HUB) ? '0x6080604052' : '0x'
@@ -253,7 +262,7 @@ function startStubChain(chainId) {
 
 const SHOTS = [
   { name: 'cards', route: 'custody', note: 'Protect ▸ On chain: one compact card per vault (the 3-network vault + a single-network one), threshold, pending count, policy badge' },
-  { name: 'sheet-queue', route: 'custody', sheet: 'queue', note: 'Vault sheet ▸ Queue: rows from Polygon AND Base tagged with their network, Optimism named as unreadable, partial total' },
+  { name: 'sheet-queue', route: 'custody', sheet: 'queue', fullSheet: true, note: 'Vault sheet ▸ Queue: rows from Polygon AND Base tagged with their network, Optimism named as unreadable, partial total' },
   { name: 'sheet-style', route: 'custody', sheet: 'style', note: 'Vault sheet ▸ Style: the spec-086 customize body against the vault address' },
   { name: 'sheet-details', route: 'custody', sheet: 'details', fullSheet: true, note: 'Vault sheet ▸ Details: networks, owners cross-referenced (You / address book / generated + add), acting account radiogroup, remove' },
   { name: 'sheet-create', route: 'custody', action: 'create', note: 'Vault actions ▸ Create vault: the wizard inside the shared sheet, styled like the rest of the app' },
