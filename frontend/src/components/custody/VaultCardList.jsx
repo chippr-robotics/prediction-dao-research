@@ -17,6 +17,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import AccountCard from '../account/AccountCard'
 import PolicyBadge from './PolicyBadge'
+import { useVaultQueueAcrossChains } from '../../hooks/useVaultQueueAcrossChains'
 import { shortAccountAddr } from '../../hooks/useAccountSwitcher'
 import { chainDisplayName, listChainNames } from '../../lib/custody/chainName'
 import './VaultSheet.css'
@@ -35,18 +36,35 @@ function thresholdLine(group) {
   return null
 }
 
+/**
+ * The pending count on the card comes from the same cross-chain read the sheet's Queue uses
+ * (session-cached log scans, so opening the sheet does not pay for it twice). A chain that could
+ * not be read contributes nothing and the count says so with a trailing "+", never a bare number
+ * that claims to be the whole estate.
+ */
+function VaultPendingBadge({ group }) {
+  const { pending, missing, loading } = useVaultQueueAcrossChains(group)
+  if (loading && pending === 0) return null
+  const partial = (missing || []).length > 0
+  if (pending === 0 && !partial) return null
+  if (pending === 0) return null
+  return (
+    <span className="vault-card-meta__pending" data-testid="vault-card-pending" data-partial={partial ? 'true' : 'false'}>
+      {pending}
+      {partial ? '+' : ''} pending
+    </span>
+  )
+}
+
+VaultPendingBadge.propTypes = { group: PropTypes.object.isRequired }
+
 function VaultCardMeta({ group }) {
   const threshold = thresholdLine(group)
-  const pending = Number(group.pendingCount) > 0 ? group.pendingCount : 0
   return (
     <span className="vault-card-meta">
       {threshold && <span className="vault-card-meta__threshold">{threshold}</span>}
       <PolicyBadge status={group.policyStatus} summary={group.policySummary} />
-      {pending > 0 && (
-        <span className="vault-card-meta__pending">
-          {pending} pending
-        </span>
-      )}
+      <VaultPendingBadge group={group} />
     </span>
   )
 }
@@ -123,6 +141,7 @@ export default function VaultCardList({ groups, actingAddress, onOpen }) {
               active={active}
               network={networkLine}
               balance={<VaultCardMeta group={group} />}
+              idleLabel="Tap to open"
               onSelect={() => onOpen(group.address, 'queue')}
             />
           </div>

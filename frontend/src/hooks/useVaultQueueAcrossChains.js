@@ -23,6 +23,17 @@ import { getContractAddressForChain, getDeploymentBlockForChain } from '../confi
 import { getProvider } from '../utils/blockchainService'
 import { readVerifiedProposals } from '../lib/custody/proposalHub'
 import { readExecutionOutcomes } from '../lib/custody/vaultProposalReads'
+
+/** Ceiling on one chain's read. Exported for tests; a member-facing surface waits this long at most. */
+export const QUEUE_READ_TIMEOUT_MS = 20_000
+
+function withReadTimeout(promise, chainId, ms = QUEUE_READ_TIMEOUT_MS) {
+  let timer
+  const ceiling = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Chain ${chainId} did not answer within ${Math.round(ms / 1000)}s`)), ms)
+  })
+  return Promise.race([promise, ceiling]).finally(() => clearTimeout(timer))
+}
 import { deriveProposalStatus, isQueued } from '../lib/custody/proposalStatus'
 
 const EMPTY = Object.freeze({})
@@ -78,19 +89,31 @@ export function useVaultQueueAcrossChains(group) {
         // The wallet's own provider when it is already on this chain; the chain's read provider otherwise.
         const reader = Number(walletChainId) === cid && walletProvider ? walletProvider : getProvider(cid)
         const safe = new Contract(inst.address, SAFE_ABI, reader)
-        const [ownersRaw, thresholdRaw, nonceRaw] = await Promise.all([safe.getOwners(), safe.getThreshold(), safe.nonce()])
+        // A chain whose endpoint never answers must resolve to `unreadable`, not sit on
+        // "reading…" for the life of the sheet: ethers keeps retrying network detection on a dead
+        // endpoint, so without a ceiling the member never learns that this network was not read.
+        const [ownersRaw, thresholdRaw, nonceRaw] = await withReadTimeout(
+          Promise.all([safe.getOwners(), safe.getThreshold(), safe.nonce()]),
+          cid,
+        )
         const owners = ownersRaw.map((o) => getAddress(o))
         const threshold = Number(thresholdRaw)
         const currentNonce = Number(nonceRaw)
 
-        const { proposals: verified, complete: hubComplete } = await readVerifiedProposals({
-          hubAddress,
-          safeAddress: inst.address,
-          chainId: cid,
-          provider: reader,
-          fromBlock,
-        })
-        const { executed, failed, complete: execComplete } = await readExecutionOutcomes({ safe, chainId: cid, fromBlock })
+        const { proposals: verified, complete: hubComplete } = await withReadTimeout(
+          readVerifiedProposals({
+            hubAddress,
+            safeAddress: inst.address,
+            chainId: cid,
+            provider: reader,
+            fromBlock,
+          }),
+          cid,
+        )
+        const { executed, failed, complete: execComplete } = await withReadTimeout(
+          readExecutionOutcomes({ safe, chainId: cid, fromBlock }),
+          cid,
+        )
 
         const proposals = await Promise.all(
           verified.map(async (p) => {

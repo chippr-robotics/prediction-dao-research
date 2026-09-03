@@ -1,9 +1,16 @@
 // Spec 102 (US1, FR-001/FR-002/FR-019) — one compact card per VAULT ADDRESS, the "⋯" outside the
 // option, and a meta line that never fabricates a threshold it could not read.
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { axe } from 'vitest-axe'
+
+// The card's pending badge is the SAME cross-chain read the sheet's Queue makes (spec 102);
+// here it answers from a per-group table so the badge's honesty rules are what is under test.
+let queueByKey = {}
+vi.mock('../../hooks/useVaultQueueAcrossChains', () => ({
+  useVaultQueueAcrossChains: (group) => queueByKey[group.key] || { pending: 0, missing: [], loading: false },
+}))
 
 vi.mock('../../components/ui/BlockiesAvatar', () => ({
   default: () => <div data-testid="blockies" />,
@@ -29,6 +36,18 @@ const group = (over = {}) => ({
   owners: [],
   pendingCount: 0,
   ...over,
+})
+
+beforeEach(() => {
+  queueByKey = {}
+})
+
+describe('VaultCardList idle label (spec 102)', () => {
+  it('says the card opens the sheet, not that it switches accounts', () => {
+    render(<VaultCardList groups={[group({})]} actingAddress={null} onOpen={vi.fn()} />)
+    expect(screen.getByText('Tap to open')).toBeInTheDocument()
+    expect(screen.queryByText('Tap to use')).not.toBeInTheDocument()
+  })
 })
 
 describe('VaultCardList', () => {
@@ -86,10 +105,19 @@ describe('VaultCardList', () => {
     expect(screen.queryByText(/0 of 0/)).not.toBeInTheDocument()
   })
 
-  it('shows a pending count only when there is one', () => {
-    const { rerender } = render(<VaultCardList groups={[group({ pendingCount: 2 })]} actingAddress={null} onOpen={vi.fn()} />)
+  it('shows a pending count only when there is one, and marks a count missing a chain', () => {
+    const g = group({})
+    queueByKey = { [g.key]: { pending: 2, missing: [], loading: false } }
+    const { rerender } = render(<VaultCardList groups={[g]} actingAddress={null} onOpen={vi.fn()} />)
     expect(screen.getByText('2 pending')).toBeInTheDocument()
-    rerender(<VaultCardList groups={[group({ pendingCount: 0 })]} actingAddress={null} onOpen={vi.fn()} />)
+    expect(screen.getByTestId('vault-card-pending')).toHaveAttribute('data-partial', 'false')
+    // A chain that could not be read: the count is real but not the whole estate, and says so.
+    queueByKey = { [g.key]: { pending: 2, missing: [10], loading: false } }
+    rerender(<VaultCardList groups={[g]} actingAddress={null} onOpen={vi.fn()} />)
+    expect(screen.getByText('2+ pending')).toBeInTheDocument()
+    expect(screen.getByTestId('vault-card-pending')).toHaveAttribute('data-partial', 'true')
+    queueByKey = { [g.key]: { pending: 0, missing: [], loading: false } }
+    rerender(<VaultCardList groups={[g]} actingAddress={null} onOpen={vi.fn()} />)
     expect(screen.queryByText(/pending/)).not.toBeInTheDocument()
   })
 
@@ -115,7 +143,7 @@ describe('VaultCardList', () => {
 
   it('has no axe violations', async () => {
     const { container } = render(
-      <VaultCardList groups={[group({ pendingCount: 1, policyStatus: 'managed', policySummary: '2 rules' })]} actingAddress={A} onOpen={vi.fn()} />,
+      <VaultCardList groups={[group({ policyStatus: 'managed', policySummary: '2 rules' })]} actingAddress={A} onOpen={vi.fn()} />,
     )
     expect(await axe(container)).toHaveNoViolations()
   })

@@ -46,7 +46,7 @@ const USDC_POLYGON = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
 // chainId → { port, headBlock (just past the recorded hub deploy block so the scan is one chunk),
 // nonce, proposals }
 const CHAINS = {
-  137: { port: 9811, head: 16645531 + 40, nonce: 5, version: '1.4.1' },
+  137: { port: 9811, head: 90120743 + 40, nonce: 5, version: '1.4.1' },
   8453: { port: 9812, head: 49158472 + 40, nonce: 2, version: '1.4.1' },
 }
 const WALLET_CHAIN = 137
@@ -95,11 +95,11 @@ function txHash(chainId, tx) {
 const ERC20_TRANSFER = new Interface(['function transfer(address to, uint256 amount)'])
 const PROPOSALS = {
   137: [
-    { tx: safeTx({ to: OWNER_B, value: 1_500_000_000_000_000_000n, nonce: 5 }), approvers: [getAddress(ACCOUNT)], block: 16645531 + 12 },
+    { tx: safeTx({ to: OWNER_B, value: 1_500_000_000_000_000_000n, nonce: 5 }), approvers: [getAddress(ACCOUNT)], block: 90120743 + 12 },
     {
       tx: safeTx({ to: USDC_POLYGON, data: ERC20_TRANSFER.encodeFunctionData('transfer', [OWNER_C, 250_000_000n]), nonce: 6 }),
       approvers: [],
-      block: 16645531 + 20,
+      block: 90120743 + 20,
     },
   ],
   8453: [{ tx: safeTx({ to: OWNER_C, value: 40_000_000_000_000_000n, nonce: 2 }), approvers: [], block: 49158472 + 9 }],
@@ -238,7 +238,11 @@ function startStubChain(chainId) {
         res.writeHead(400)
         return res.end('bad json')
       }
-      const one = (call) => ({ jsonrpc: '2.0', id: call?.id ?? 1, result: answer(chainId, call) })
+      const one = (call) => {
+        const result = answer(chainId, call)
+        if (process.env.PROBE) console.log(`[rpc ${chainId}] ${call?.method} ${call?.method === 'eth_call' ? String(call.params?.[0]?.data || '').slice(0, 10) : ''} -> ${typeof result === 'string' ? result.slice(0, 20) : JSON.stringify(result)?.slice(0, 40)}`)
+        return { jsonrpc: '2.0', id: call?.id ?? 1, result }
+      }
       const out = Array.isArray(payload) ? payload.map(one) : one(payload)
       res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' })
       res.end(JSON.stringify(out))
@@ -274,7 +278,7 @@ async function seedPage(page, shot) {
     Object.entries(CHAINS).map(([id, c]) => [id, { url: `http://127.0.0.1:${c.port}`, failoverUrl: `http://127.0.0.1:${c.port}/failover` }]),
   )
   await page.addInitScript(
-    ({ theme, account, chainId, endpoints, vault, otherVault, ownerB, unstubbed, ownedChains }) => {
+    ({ probe, theme, account, chainId, endpoints, vault, otherVault, ownerB, unstubbed, ownedChains }) => {
       window.localStorage.setItem('themeMode', theme)
       window.localStorage.setItem('dev_warning_banner_dismissed', 'true')
       window.localStorage.setItem('fairwins.entryGate.ack.v1', JSON.stringify({ terms: null, risk: null, at: new Date(0).toISOString() }))
@@ -316,6 +320,7 @@ async function seedPage(page, shot) {
           this._callbacks[event] = (this._callbacks[event] || []).filter((f) => f !== cb)
         },
         async request({ method, params }) {
+          if (window.__probe) console.log('[inj]', method, JSON.stringify(params || []).slice(0, 200))
           switch (method) {
             case 'eth_accounts':
             case 'eth_requestAccounts':
@@ -335,6 +340,7 @@ async function seedPage(page, shot) {
           }
         },
       }
+      window.__probe = probe
       window.ethereum = provider
       const announce = () =>
         window.dispatchEvent(
@@ -348,7 +354,7 @@ async function seedPage(page, shot) {
       window.addEventListener('eip6963:requestProvider', announce)
       announce()
     },
-    { theme: shot.theme, account: ACCOUNT, chainId: WALLET_CHAIN, endpoints, vault: VAULT, otherVault: OTHER_VAULT, ownerB: OWNER_B, unstubbed: UNSTUBBED_CHAIN, ownedChains: Object.keys(CHAINS).map(Number) },
+    { probe: Boolean(process.env.PROBE), theme: shot.theme, account: ACCOUNT, chainId: WALLET_CHAIN, endpoints, vault: VAULT, otherVault: OTHER_VAULT, ownerB: OWNER_B, unstubbed: UNSTUBBED_CHAIN, ownedChains: Object.keys(CHAINS).map(Number) },
   )
 }
 
@@ -366,6 +372,15 @@ async function captureOnce(browser, baseOrigin, shot) {
   await isolate(context, baseOrigin)
   const page = await context.newPage()
   await seedPage(page, shot)
+  const consoleErrors = []
+  if (process.env.PROBE) {
+    page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning' || m.text().startsWith('[inj]')) consoleErrors.push(`${m.type()}: ${m.text().slice(0, 400)}`) })
+    page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`))
+    page.on('requestfailed', (r) => consoleErrors.push(`requestfailed: ${r.method()} ${r.url().slice(0, 120)} ${r.failure()?.errorText}`))
+    page.on('request', (r) => {
+      if (r.url().includes('127.0.0.1:98')) consoleErrors.push(`request: ${r.url()} ${(r.postData() || '').slice(0, 160)}`)
+    })
+  }
   try {
     const url = shot.route === 'wrap' ? `${BASE}/wallet?tab=trade&view=wrap` : `${BASE}/wallet?tab=custody`
     await page.goto(url, { waitUntil: 'domcontentloaded' })
@@ -404,15 +419,26 @@ async function captureOnce(browser, baseOrigin, shot) {
       } else if (shot.sheet) {
         await page.locator(`[data-testid="vault-menu-${VAULT.toLowerCase()}"]`).click()
         await page.waitForSelector('[data-testid="vault-panel-queue"]', { timeout: 20_000 })
+        if (process.env.PROBE) {
+          await page.waitForTimeout(12_000)
+          console.log('--- panel text ---')
+          console.log(await page.locator('.vault-sheet').innerText())
+          console.log('--- console ---')
+          console.log(consoleErrors.join('\n'))
+        }
         if (shot.sheet !== 'queue') {
           await page.locator(`[data-testid="vault-tab-${shot.sheet}"]`).click()
           await page.waitForSelector(`[data-testid="vault-panel-${shot.sheet}"]`, { timeout: 20_000 })
         } else {
-          // Rows from both stubbed chains must be present — the shot is about the chain log.
+          // Rows from both stubbed chains must be present — the shot is about the chain log — and
+          // every network must have SETTLED (the unstubbed one to "could not be read"): a shot of
+          // "reading…" would photograph neither the working state nor the honest failure.
           await page.waitForFunction(
-            () => document.querySelectorAll('[data-testid="vault-queue-row"]').length >= 3,
+            () =>
+              document.querySelectorAll('[data-testid="vault-queue-row"]').length >= 3 &&
+              [...document.querySelectorAll('[data-testid="vault-queue-chain"]')].every((li) => li.dataset.state !== 'loading'),
             null,
-            { timeout: 30_000 },
+            { timeout: 45_000 },
           )
         }
         await page.waitForTimeout(400)
@@ -441,6 +467,7 @@ async function main() {
   const browser = await chromium.launch({ executablePath: chromiumExecutable() })
   try {
     for (const shot of expand()) {
+      if (process.env.ONLY && !shot.name.includes(process.env.ONLY)) continue
       try {
         await captureOnce(browser, baseOrigin, shot)
       } catch (error) {

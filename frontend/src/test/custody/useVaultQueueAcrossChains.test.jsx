@@ -48,12 +48,16 @@ vi.mock('ethers', async (importOriginal) => {
       return s
     }
     async getOwners() {
+      // 'hang' models an endpoint that never answers (ethers retrying network detection forever).
+      if (safeState[this.chainId] === 'hang') return new Promise(() => {})
       return this.#facts().owners
     }
     async getThreshold() {
+      if (safeState[this.chainId] === 'hang') return new Promise(() => {})
       return BigInt(this.#facts().threshold)
     }
     async nonce() {
+      if (safeState[this.chainId] === 'hang') return new Promise(() => {})
       return BigInt(this.#facts().nonce ?? 0)
     }
     async approvedHashes(owner, hash) {
@@ -64,7 +68,7 @@ vi.mock('ethers', async (importOriginal) => {
   return { ...actual, Contract: FakeContract }
 })
 
-import { useVaultQueueAcrossChains } from '../../hooks/useVaultQueueAcrossChains'
+import { useVaultQueueAcrossChains, QUEUE_READ_TIMEOUT_MS } from '../../hooks/useVaultQueueAcrossChains'
 
 const instance = (chainId, extra = {}) => ({ address: VAULT, chainId, isSafe: true, ...extra })
 const group = (chainIds) => ({ key: VAULT.toLowerCase(), address: VAULT, instances: chainIds.map((c) => instance(c)) })
@@ -178,6 +182,26 @@ describe('useVaultQueueAcrossChains', () => {
     expect(result.current.byChain[10].state).toBe('unreadable')
     expect(result.current.byChain[137].state).toBe('read')
     expect(result.current.rows.map((r) => r.chainId)).toEqual([137])
+  })
+
+  it('a chain that never answers resolves to unreadable at the read ceiling, never "reading…" forever', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      safeState[10] = 'hang'
+      const { result } = renderHook(() => useVaultQueueAcrossChains(group([137, 10])))
+      await waitFor(() => expect(result.current.byChain[137]?.state).toBe('read'))
+      expect(result.current.byChain[10]?.state).toBe('loading')
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(QUEUE_READ_TIMEOUT_MS + 50)
+      })
+      await waitFor(() => expect(result.current.byChain[10]?.state).toBe('unreadable'))
+      expect(result.current.byChain[10].error).toMatch(/did not answer/)
+      // The chain that answered is untouched, and the total is honest about the missing one.
+      expect(result.current.byChain[137].state).toBe('read')
+      expect(result.current.missing).toEqual([10])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('skips non-Safe / unreachable instances and reads nothing for an empty group', async () => {
