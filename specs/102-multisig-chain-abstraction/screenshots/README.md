@@ -67,6 +67,12 @@ queue one block stale looked exactly like a settled one. The queue now dedupes b
 per-chain Retry is for a chain that failed, Refresh is for time having passed. Shots re-captured
 with the control in place; 11/11 on-chain tests pass locally.
 
+**Round 6 → one finding, then clean.** Allowed to wrap, Refresh dropped onto a line of its own
+under the two-line summary at 390px and read as a stray link rather than this queue's control.
+The summary now takes the room it needs and wraps within itself while Refresh pins top-right at
+every width, flush with the rows' edge rather than inset by the global button padding. Re-captured
+clean in both themes and both viewports.
+
 **Not photographed, deliberately:** an approve on another network (the wallet switch is a real
 wallet prompt — covered by the no-chain Cypress flow VS-04 with a scripted refusal and by the
 on-chain CV-08 on the private chain) and a vault-mode send (spec 088's deferred ceremony).
