@@ -117,7 +117,11 @@ function findArtifact(name) {
 }
 
 async function pickProvider(chainId) {
-  for (const url of CHAINS[chainId].rpcs) {
+  // An operator override, because a public endpoint that answers eth_chainId can still refuse other
+  // methods later (publicnode 403s archive requests) — and the only fix in the moment is a different
+  // endpoint, not a different tool.
+  const urls = process.env.RPC_URL ? [process.env.RPC_URL, ...CHAINS[chainId].rpcs] : CHAINS[chainId].rpcs;
+  for (const url of urls) {
     try {
       const p = new ethers.JsonRpcProvider(url, chainId, { staticNetwork: true });
       if (Number((await p.getNetwork()).chainId) === chainId) return p;
@@ -317,8 +321,34 @@ async function main() {
     console.log(`  KMS balance: ${ethers.formatEther(bal)} (native)`);
     if (approvals.some((a) => a.toLowerCase() === signer.address.toLowerCase())) { console.log("\nAlready approved by the KMS owner. Nothing to do."); return; }
     if (!confirmed) { console.log(`\nWOULD approveHash(${safeTxHash}). Re-run with --confirm ${chainId}.`); return; }
-    const receipt = await signer.sendTransaction({ to: safeAddr, data: new ethers.Interface(SAFE_ABI).encodeFunctionData("approveHash", [safeTxHash]) });
-    console.log(`\n  ✓ approveHash mined: ${receipt.hash ?? receipt.transactionHash}`);
+
+    // A FAILED WAIT IS NOT A FAILED TRANSACTION, and conflating them is the more dangerous mistake.
+    // Measured on Optimism: publicnode broadcast the approveHash fine and then answered the receipt
+    // poll with `403 Archive requests require a personal token`. The tool reported an error for an
+    // operation that had ALREADY SUCCEEDED — which sends an operator to re-run, or worse, to
+    // conclude the ceremony is stuck when it is one hardware signature from done. The chain's
+    // `approvedHashes` is the truth here, not the receipt, so ask it before believing the error.
+    try {
+      const receipt = await signer.sendTransaction({ to: safeAddr, data: new ethers.Interface(SAFE_ABI).encodeFunctionData("approveHash", [safeTxHash]) });
+      console.log(`\n  ✓ approveHash mined: ${receipt.hash ?? receipt.transactionHash}`);
+    } catch (err) {
+      process.stdout.write(`\n  send/wait reported: ${String(err.shortMessage || err.message).slice(0, 90)}\n`);
+      process.stdout.write("  checking the chain before concluding anything");
+      let approved = false;
+      for (let i = 0; i < 10 && !approved; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        process.stdout.write(".");
+        try { approved = (await safe.approvedHashes(signer.address, safeTxHash)) === 1n; } catch { /* keep polling */ }
+      }
+      console.log("");
+      if (!approved) {
+        throw new Error(
+          `approveHash did NOT land (approvedHashes still 0 after retries). The error above was real. `
+          + `Check the KMS owner's transaction count before re-running.`,
+        );
+      }
+      console.log("  ✓ approveHash DID land — the error was the receipt poll, not the transaction.");
+    }
     console.log(`\nNEXT: a second owner approves on hardware, then --mode execute --confirm ${chainId}.`);
     return;
   }
