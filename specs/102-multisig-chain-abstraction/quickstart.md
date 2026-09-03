@@ -12,8 +12,8 @@ the connected wallet lowercased:
 
 ```js
 localStorage.setItem('fw_user_<addr>_custody_vault_references', JSON.stringify([
-  { address: '0xcf76db7aa9Fb1BFe08E010468F3344bB458aBcDe', chainId: 137, label: 'Treasury', addedAt: 1, role: 'owner' },
-  { address: '0xcf76db7aa9Fb1BFe08E010468F3344bB458aBcDe', chainId: 8453, label: 'Treasury', addedAt: 1, role: 'owner' },
+  { address: '0xcf76db7aa9fb1bFE08e010468F3344bB458abCDe', chainId: 137, label: 'Treasury', addedAt: 1, role: 'owner' },
+  { address: '0xcf76db7aa9fb1bFE08e010468F3344bB458abCDe', chainId: 8453, label: 'Treasury', addedAt: 1, role: 'owner' },
 ]))
 ```
 
