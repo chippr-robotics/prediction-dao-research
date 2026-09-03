@@ -7,6 +7,11 @@ import { axe } from 'vitest-axe'
 import PolicyBadge from '../../components/custody/PolicyBadge'
 import VaultCardList from '../../components/custody/VaultCardList'
 
+// Spec 102 — the card's pending badge is a cross-chain read; this suite is about the POLICY badge.
+vi.mock('../../hooks/useVaultQueueAcrossChains', () => ({
+  useVaultQueueAcrossChains: () => ({ pending: 0, missing: [], loading: false }),
+}))
+
 vi.mock('../../components/ui/BlockiesAvatar', () => ({
   default: () => <div data-testid="blockies" />,
 }))
