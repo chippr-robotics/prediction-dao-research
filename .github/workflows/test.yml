@@ -849,10 +849,15 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3]
-    # Per-LEG bound, down from the serial job's 60. A leg that should take ~10 minutes must not
-    # occupy a runner for an hour before failing; the cap exists to catch a hang, not to
-    # accommodate one.
-    timeout-minutes: 25
+    # Per-LEG bound, down from the serial job's 60. The cap exists to catch a hang, not to
+    # accommodate one — but it has to sit above what a healthy leg actually costs, and the tier
+    # has roughly tripled since 25 was chosen against ~7-minute legs. MEASURED 2026-09-03
+    # (Actions run 33814290875): legs of 23:53 / 23:18 / 21:05 of job time, of which ~7:30 is
+    # checkout, install, compile and deploy before Cypress starts; the fourth leg was killed at
+    # the 25-minute cap mid-spec, having failed nothing. A cancelled leg is a leg whose specs
+    # went unreported, so a cap a healthy run brushes is not a safety margin — it is a coin flip
+    # on the merge gate.
+    timeout-minutes: 35
 
     steps:
       - name: Checkout code
