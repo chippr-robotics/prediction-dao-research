@@ -285,7 +285,16 @@ function openVaultCard(view = 'queue') {
       cy.get('[data-testid="vault-tab-' + view + '"]', { timeout: 20000 }).click()
     }
   })
-  cy.get('[data-testid="vault-panel-' + view + '"]', { timeout: 20000 }).should('be.visible')
+  /*
+   * Asserted by the TAB's own state, not the panel's visibility: the sheet is `position: fixed`
+   * with `max-height: 85vh; overflow-y: auto`, so a panel taller than that — Details, which
+   * carries a policy panel per network — is judged "not visible" by Cypress even though every
+   * part of it is reachable by scrolling (and Cypress scrolls to it before each click below).
+   * What this helper needs to establish is that the sheet is SHOWING this view.
+   */
+  cy.get('[data-testid="vault-tab-' + view + '"]', { timeout: 20000 })
+    .should('have.attr', 'aria-selected', 'true')
+  cy.get('[data-testid="vault-panel-' + view + '"]', { timeout: 20000 }).should('exist').scrollIntoView()
 }
 
 
@@ -483,7 +492,8 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
       fixture('fundVault', { address, amount: (10n * 10n ** 18n).toString() })
       openProtect()
       loadVault(address, 'Policy Vault')
-      openVaultCard()
+      // Spec 102 — the policy panel lives in the sheet's Details view, per network.
+      openVaultCard('details')
 
       /*
        * The rules come from the SHARED scenario table (src/test/fixtures/policyScenarios.js), the
@@ -506,6 +516,7 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
        * Asserted before executing anything, so "only one was created" fails here saying that,
        * rather than later as a vault that mysteriously ends up ungoverned.
        */
+      openVaultCard('queue')
       cy.get(PENDING_ROW, { timeout: 60000 }).should('have.length', 2)
 
       // 1-of-1: proposing already recorded the only approval the vault needs, so each step is
