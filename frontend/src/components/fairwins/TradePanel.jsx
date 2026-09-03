@@ -28,6 +28,7 @@ import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useSwapBalances } from '../../hooks/useSwapBalances'
 import SensitiveValue from '../common/SensitiveValue'
 import InfoTip from '../ui/InfoTip'
+import { formatDecimalForDisplay } from '../../lib/format/amount'
 import TradeTokenSelect from './TradeTokenSelect'
 import './TradePanel.css'
 
@@ -43,7 +44,10 @@ function impactSeverity(pct) {
   return 'low'
 }
 
-const fmtBalance = (value) =>
+// Quote figures only (minimum received / limit floor), NOT balances: a slippage floor is shown
+// to more digits than a balance would be, and the summary only renders once a quote exists, so
+// `value` is never an unread balance here. Balances go through `formatDecimalForDisplay` below.
+const fmtQuoteAmount = (value) =>
   Number(value || 0).toLocaleString(undefined, { maximumSignificantDigits: 8 })
 
 /**
@@ -172,7 +176,7 @@ function TradePanel() {
     return value == null ? (
       <span className="trade-balance-pending" aria-label="balance loading">…</span>
     ) : (
-      <SensitiveValue>{fmtBalance(value)}</SensitiveValue>
+      <SensitiveValue>{formatDecimalForDisplay(value) ?? '—'}</SensitiveValue>
     )
   }
 
@@ -705,8 +709,8 @@ function TradePanel() {
             <span className="trade-summary-val">
               <SensitiveValue>
                 {priceType === 'limit' && limitFloor
-                  ? fmtBalance(limitFloor.text)
-                  : fmtBalance(quote.minimumReceived)}
+                  ? fmtQuoteAmount(limitFloor.text)
+                  : fmtQuoteAmount(quote.minimumReceived)}
               </SensitiveValue>{' '}
               {quote.tokenOutSymbol}
             </span>

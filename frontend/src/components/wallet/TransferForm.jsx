@@ -25,6 +25,7 @@ import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
 import { useBitcoinWallet } from '../../hooks/useBitcoinWallet'
 import { getBitcoinNetwork } from '../../config/bitcoinNetworks'
 import BitcoinSendPanel from './BitcoinSendPanel'
+import { formatDecimalForDisplay } from '../../lib/format/amount'
 
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 const toNum = (v) => (v == null || v === '' ? null : Number(v))
@@ -533,7 +534,7 @@ export default function TransferForm({ onSent }) {
             </div>
             <span className="pt-hint" id="pt-amount-hint">
               {bal != null
-                ? <>Balance: <SensitiveValue>{bal}</SensitiveValue> {symbol}</>
+                ? <>Balance: <SensitiveValue>{formatDecimalForDisplay(bal)}</SensitiveValue> {symbol}</>
                 : 'Loading balance…'}
               {overBalance && ' · exceeds balance'}
             </span>
