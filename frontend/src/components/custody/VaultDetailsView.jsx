@@ -18,6 +18,7 @@ import { useClipboard } from '../../hooks/useClipboard'
 import { chainDisplayName, isTestnetChain, listChainNames } from '../../lib/custody/chainName'
 import VaultDetail from './VaultDetail'
 import VaultOwnerRow from './VaultOwnerRow'
+import OwnersThresholdPanel from './OwnersThresholdPanel'
 
 const lc = (a) => String(a || '').toLowerCase()
 
@@ -87,6 +88,25 @@ export default function VaultDetailsView({ group, onClose, onVaultsChanged }) {
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [removeError, setRemoveError] = useState(null)
+  const [govBusy, setGovBusy] = useState(false)
+  const [govError, setGovError] = useState(null)
+
+  // Spec 068 FR-004 — re-checked at SUBMIT time: the wallet may have left the vault's network while
+  // the sheet was open, and a governance change must never be sent to another chain.
+  const proposeOnConnected = async (...args) => {
+    setGovError(null)
+    setGovBusy(true)
+    try {
+      if (!connectedInstance || Number(walletChainId) !== Number(connectedInstance.chainId)) {
+        throw new Error('Your wallet is no longer on this vault\'s network. Switch back and try again.')
+      }
+      await proposals.propose(...args)
+    } catch (e) {
+      setGovError(e?.message || 'Could not propose the change.')
+    } finally {
+      setGovBusy(false)
+    }
+  }
 
   const instances = group.instances || []
   const chainIds = group.chainIds || instances.map((i) => Number(i.chainId))
@@ -197,6 +217,24 @@ export default function VaultDetailsView({ group, onClose, onVaultsChanged }) {
               <VaultOwnerRow key={lc(owner)} address={owner} chainIds={ownerChains(owner)} isYou={Boolean(me) && lc(owner) === me} />
             ))}
           </ul>
+        )}
+        {/* Governance (spec 043 US4) kept its home beside the owner list: adding/removing an owner or
+            changing the threshold is an ordinary proposal on the CONNECTED network's instance, so the
+            panel renders only where the wallet is on a network the member co-owns — the same
+            submit-time chain check VaultProposalsPanel applies, and the queue tab shows the result. */}
+        {connectedInstance?.isSafe === true && connectedInstance.owner && typeof proposals?.propose === 'function' && (
+          <div className="vault-details__governance" data-testid="vault-governance">
+            <p className="custody-hint" role="note">
+              Changes to owners or the threshold are proposed on {chainDisplayName(Number(connectedInstance.chainId))} and
+              wait in the queue for the other owners.
+            </p>
+            <OwnersThresholdPanel vault={connectedInstance} onPropose={proposeOnConnected} busy={govBusy} />
+            {govError && (
+              <p className="custody-error" role="alert">
+                {govError}
+              </p>
+            )}
+          </div>
         )}
       </section>
 

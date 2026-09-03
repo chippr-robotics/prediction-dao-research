@@ -252,6 +252,8 @@ const SHOTS = [
   { name: 'sheet-queue', route: 'custody', sheet: 'queue', note: 'Vault sheet ▸ Queue: rows from Polygon AND Base tagged with their network, Optimism named as unreadable, partial total' },
   { name: 'sheet-style', route: 'custody', sheet: 'style', note: 'Vault sheet ▸ Style: the spec-086 customize body against the vault address' },
   { name: 'sheet-details', route: 'custody', sheet: 'details', fullSheet: true, note: 'Vault sheet ▸ Details: networks, owners cross-referenced (You / address book / generated + add), acting account radiogroup, remove' },
+  { name: 'sheet-create', route: 'custody', action: 'create', note: 'Vault actions ▸ Create vault: the wizard inside the shared sheet, styled like the rest of the app' },
+  { name: 'sheet-load', route: 'custody', action: 'load', note: 'Vault actions ▸ Load vault: address field + label, no network picker' },
   { name: 'wrap-balance', route: 'wrap', note: 'Trade ▸ Wrap with an 18-decimal balance: the tile and Balance line fit the viewport' },
 ]
 
@@ -388,7 +390,18 @@ async function captureOnce(browser, baseOrigin, shot) {
         `[data-testid="vault-card-${VAULT.toLowerCase()}"]`,
         { timeout: 30_000 },
       )
-      if (shot.sheet) {
+      if (shot.action) {
+        // The four-action door (release 1.14.0) — photographed with one action open.
+        await page.locator('[data-testid="custody-open-vault-actions"]').click()
+        await page.locator(`[data-testid="vault-action-${shot.action}"]`).click()
+        await page.waitForSelector(shot.action === 'create' ? 'form.custody-create' : 'form.custody-load', { timeout: 20_000 })
+        await page.waitForTimeout(400)
+        await page.screenshot({ path: join(OUT, `${shot.name}.png`) })
+        const sheet = page.locator('.action-sheet')
+        await sheet.evaluate((el) => (el.style.maxHeight = 'none'))
+        await page.waitForTimeout(150)
+        await page.screenshot({ path: join(OUT, `${shot.name}-full.png`), fullPage: true })
+      } else if (shot.sheet) {
         await page.locator(`[data-testid="vault-menu-${VAULT.toLowerCase()}"]`).click()
         await page.waitForSelector('[data-testid="vault-panel-queue"]', { timeout: 20_000 })
         if (shot.sheet !== 'queue') {
