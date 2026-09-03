@@ -47,7 +47,7 @@ function RowRecipient({ address, chainId }) {
 
 RowRecipient.propTypes = { address: PropTypes.string.isRequired, chainId: PropTypes.number }
 
-function chainStatusText(chainId, entry) {
+function chainStatusText(chainId, entry, reading = false) {
   const name = chainDisplayName(chainId)
   const state = entry?.state
   if (state === 'read') {
@@ -58,7 +58,7 @@ function chainStatusText(chainId, entry) {
   if (state === 'unreadable') return `${name}: could not be read`
   if (state === 'not-configured') return `${name}: proposal history is not configured on this network`
   if (state === 'not-supported') return `${name}: not supported in this build`
-  return `${name}: reading…`
+  return entry || reading ? `${name}: reading…` : `${name}: not read`
 }
 
 export default function VaultQueueView({ group }) {
@@ -249,7 +249,7 @@ export default function VaultQueueView({ group }) {
           const state = entry?.state || (reading ? 'loading' : 'unreadable')
           return (
             <li key={id} data-testid="vault-queue-chain" data-chain-id={id} data-state={state}>
-              <span>{chainStatusText(id, entry)}</span>
+              <span>{chainStatusText(id, entry, reading)}</span>
               {state === 'unreadable' && (
                 <>
                   {entry?.error && <span className="sr-only">{entry.error}</span>}

@@ -208,7 +208,11 @@ describe('useVaultQueueAcrossChains', () => {
     const g = { key: VAULT.toLowerCase(), instances: [instance(137), { address: VAULT, chainId: 10, isSafe: undefined, reachable: false }] }
     const { result } = renderHook(() => useVaultQueueAcrossChains(g))
     await waitFor(() => expect(result.current.byChain[137]?.state).toBe('read'))
-    expect(result.current.byChain[10]).toBeUndefined()
+    // The list already found chain 10 unreachable: no RPC read is attempted there, but the queue
+    // still carries an honest entry for it — never a hole that a view could render as "reading".
+    expect(result.current.byChain[10]?.state).toBe('unreadable')
+    expect(result.current.byChain[10].error).toMatch(/could not be reached/)
+    expect(result.current.missing).toEqual([10])
 
     const empty = renderHook(() => useVaultQueueAcrossChains(null))
     expect(empty.result.current.byChain).toEqual({})

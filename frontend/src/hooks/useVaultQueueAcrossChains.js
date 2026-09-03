@@ -59,11 +59,34 @@ export function useVaultQueueAcrossChains(group) {
     () => (group?.instances || []).filter((i) => i?.isSafe === true && i.chainId != null),
     [group],
   )
+  // Instances the LIST already failed to read (unreachable chain, or no Safe there) still get an
+  // entry — `unreadable`, with the list's own reason — so the queue's per-network line states the
+  // fact rather than leaving a hole that renders as "reading…" (actor-critic round 3 finding).
+  const unread = useMemo(
+    () =>
+      (group?.instances || [])
+        .filter((i) => i?.chainId != null && i.isSafe !== true)
+        .map((i) => ({
+          chainId: Number(i.chainId),
+          state: 'unreadable',
+          proposals: [],
+          partial: false,
+          owner: false,
+          error:
+            i.reachable === false
+              ? `${NETWORKS[Number(i.chainId)]?.name || `Chain ${Number(i.chainId)}`} could not be reached`
+              : 'No Safe could be read at this address on this network',
+        })),
+    [group],
+  )
   // Declared BEFORE the read effect below: effects run in order, so it sees the current set.
   useEffect(() => {
     instancesRef.current = instances
   }, [instances])
-  const chainKey = instances.map((i) => Number(i.chainId)).join(',')
+  const chainKey = instances
+    .map((i) => Number(i.chainId))
+    .concat(unread.map((u) => `!${u.chainId}`))
+    .join(',')
 
   const readChain = useCallback(
     async (inst) => {
@@ -170,10 +193,11 @@ export function useVaultQueueAcrossChains(group) {
   // group no longer has are dropped rather than left as stale facts about another vault.
   useEffect(() => {
     groupKeyRef.current = key
-    setByChain(EMPTY)
+    setByChain(unread.length > 0 ? Object.fromEntries(unread.map((u) => [u.chainId, u])) : EMPTY)
     if (!key || instancesRef.current.length === 0) return
     refresh()
     // chainKey stands in for the instance set: instance objects change identity on every list refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, chainKey, refresh])
 
   const rows = useMemo(() => {
