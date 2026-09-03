@@ -124,6 +124,8 @@ keyboard reorder), `RuleComposer` (plain-language editor; members never see `ban
 
 ## One vault, every network (spec 102)
 
+The Queue reads when the sheet opens and does not poll: **Refresh** re-reads every network the vault is on. It is offered whatever each chain's state is — the per-chain **Retry** is for a chain that failed, Refresh is for time having passed — because a queue that is one block stale otherwise looks exactly like a settled one.
+
 - **A vault is an address; a network is a property of a transaction.** The reference store is still
   keyed `(chainId, address)` and every chain is still read through its own provider with per-row
   failure isolation — but the member sees ONE card per address. `useCustodyVaults().groups` is the

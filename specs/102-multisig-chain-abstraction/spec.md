@@ -240,6 +240,9 @@ formatter: up to 6 decimals below 1, 4 above, dust stated as "< 0.000001", an un
 - **FR-006** (chain log): Every queue row carries its network as a `NetworkPill`; the totals line
   states pending count and network count; a total missing any chain is labelled partial and names
   the chain(s).
+- **FR-006a** (re-read): The Queue reads when it opens and does not poll, so it offers a Refresh
+  that re-reads every network, whatever each chain's state is, and says while it is reading. A
+  queue one block stale must not be indistinguishable from a settled one.
 - **FR-007** (switch-at-action): Approve / Execute / Cancel on a row whose chain differs from the
   wallet's requests a network switch first; success proceeds on that chain; refusal produces a
   stated per-row error naming both chains and signs nothing.

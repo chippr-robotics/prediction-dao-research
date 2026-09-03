@@ -56,6 +56,17 @@ them, the Create/Load sheets sit in the app's own field chrome with one primary 
 in the disabled neutrals until the form is valid — the matched fill/label pair, spec 090), and the
 Wrap tile shows `2.0064` where staging showed an 18-decimal string.
 
+**Round 5 → one finding, from running the on-chain suite rather than looking at a picture.**
+Driving `full/29-protect-custody.cy.js` against a private chain surfaced two defects no screenshot
+could show. The hub scan is chunked and session-cached, so an overlapping range handed the same
+`Proposed` log back twice — one pending transaction rendered as two rows with two Approve buttons
+(React's duplicate-key warning was the tell). And the Queue reads when it opens without polling,
+so a proposal the chain accepted a moment later was simply absent with no way to re-read it: a
+queue one block stale looked exactly like a settled one. The queue now dedupes by
+(chain, safeTxHash) and carries a **Refresh** that re-reads every network whatever its state — the
+per-chain Retry is for a chain that failed, Refresh is for time having passed. Shots re-captured
+with the control in place; 11/11 on-chain tests pass locally.
+
 **Not photographed, deliberately:** an approve on another network (the wallet switch is a real
 wallet prompt — covered by the no-chain Cypress flow VS-04 with a scripted refusal and by the
 on-chain CV-08 on the private chain) and a vault-mode send (spec 088's deferred ceremony).
