@@ -26,10 +26,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 103 |
-| With a member-facing flow | 81 |
-| Member-facing flows | 160 |
-| 🟢 covered | 141 |
+| Spec directories | 104 |
+| With a member-facing flow | 82 |
+| Member-facing flows | 170 |
+| 🟢 covered | 151 |
 | 🟡 partial | 1 |
 | 🔴 absent | 12 |
 | ⚪ out of scope | 6 |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-62 flows — 🟢 48 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
+64 flows — 🟢 50 · 🟡 0 · 🔴 8 · ⚪ 6 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -284,6 +284,13 @@ establish the outcome. They are listed in full at the end of this document.
 | `purchase.acting-account` | A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required) | 🔴 absent | none | — (proposed: on-chain) | #1364 |  |
 | `purchase.acting-refusals` | Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain | 🔴 absent | none | — (proposed: no-chain) | #1364 |  |
 
+### `102-multisig-chain-abstraction` — Multisig chain abstraction — one vault, every network
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `custody.cross-chain-approve` | Approve a proposal on another network from the queue — the wallet is switched at tap time, a refusal is stated and nothing is signed | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-04) |  |
+| `custody.sheet-approve-execute` | Approve and execute a proposal from the vault sheet's queue (money path) | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-08) |  |
+
 ## Disclosure — a member consents to a cost
 
 13 flows — 🟢 13 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
@@ -348,7 +355,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-46 flows — 🟢 42 · 🟡 1 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
+47 flows — 🟢 43 · 🟡 1 · 🔴 3 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -506,9 +513,15 @@ establish the outcome. They are listed in full at the end of this document.
 | `api-access.revoke-key` | A signed revocation is registered without overstating what registration means | 🟢 covered | flow | `no-chain` | `39-api-access.cy.js` (API-02, API-03) |  |
 | `api-access.console` | The api-access developer console: OpenAPI explorer, token introspection and MCP setup | 🟡 partial | smoke | `no-chain` | `39-api-access.cy.js` (API-04) | Only the HOST card is exercised — the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them. |
 
+### `102-multisig-chain-abstraction` — Multisig chain abstraction — one vault, every network
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `custody.acting-from-sheet` | Choose the acting account from the vault sheet; the header follows and the switcher lists the vault once | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-07) |  |
+
 ## Information — read-only surfaces
 
-39 flows — 🟢 38 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
+46 flows — 🟢 45 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -708,6 +721,18 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01, MC-02) |  |
+
+### `102-multisig-chain-abstraction` — Multisig chain abstraction — one vault, every network
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `custody.vault-cards` | See one compact card per vault across every network it lives on | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-01) |  |
+| `custody.vault-sheet-queue` | Open the vault sheet and read the pending queue with each proposal's network tagged, an unreadable network named | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-02, VS-03) |  |
+| `custody.vault-style` | Style the vault card from the sheet; the card behind it updates | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-05) |  |
+| `custody.vault-details` | Read the vault's networks and owners, cross-referenced to the address book, and add an unknown owner in place | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-06) |  |
+| `custody.remove-all-networks` | Remove a vault from Protect on every network after confirmation | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-08) |  |
+| `custody.load-all-networks` | Load a vault address and have it added on every network it exists on, without picking one | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-09) |  |
+| `wallet.balance-display` | Balances in Wrap and Transfer fit the screen (display formatter) | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-10) |  |
 
 ## No member-facing flow
 
