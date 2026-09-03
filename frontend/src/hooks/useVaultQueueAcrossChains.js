@@ -138,8 +138,24 @@ export function useVaultQueueAcrossChains(group) {
           cid,
         )
 
+        /*
+         * ONE row per proposal. The hub scan is chunked and session-cached (lib/chain/logScan), so
+         * the same `Proposed` log can come back from two overlapping ranges — observed on a local
+         * chain as React's duplicate-key warning and, on a real vault, as the same pending
+         * transaction rendered twice with two Approve buttons. A proposal is identified by its
+         * safeTxHash on its chain; reading it twice is a scan artifact, never two proposals.
+         */
+        const unique = []
+        const seenHash = new Set()
+        for (const p of verified) {
+          const h = String(p.safeTxHash).toLowerCase()
+          if (seenHash.has(h)) continue
+          seenHash.add(h)
+          unique.push(p)
+        }
+
         const proposals = await Promise.all(
-          verified.map(async (p) => {
+          unique.map(async (p) => {
             const hashLc = String(p.safeTxHash).toLowerCase()
             const flags = await Promise.all(
               owners.map((o) => safe.approvedHashes(o, p.safeTxHash).then((n) => (n > 0n ? o : null))),

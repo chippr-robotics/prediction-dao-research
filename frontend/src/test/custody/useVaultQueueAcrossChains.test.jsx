@@ -204,6 +204,23 @@ describe('useVaultQueueAcrossChains', () => {
     }
   })
 
+  it('renders a proposal the chunked scan returned twice exactly once', async () => {
+    /*
+     * The hub scan is chunked and session-cached, so overlapping ranges can hand back the same
+     * `Proposed` log twice. Two rows for one proposal means two Approve buttons for one signature
+     * — and a duplicate React key, which is how this was first seen on a local chain.
+     */
+    hubProposals[137] = {
+      proposals: [proposal('0xp1', 5, 900), proposal('0xp1', 5, 900), proposal('0xold', 4, 800)],
+      complete: true,
+    }
+    const { result } = renderHook(() => useVaultQueueAcrossChains(group([137])))
+    await waitFor(() => expect(result.current.byChain[137]?.state).toBe('read'))
+    const onChain137 = result.current.byChain[137].proposals.filter((p) => p.safeTxHash === '0xp1')
+    expect(onChain137).toHaveLength(1)
+    expect(result.current.rows.filter((r) => r.safeTxHash === '0xp1')).toHaveLength(1)
+  })
+
   it('skips non-Safe / unreachable instances and reads nothing for an empty group', async () => {
     const g = { key: VAULT.toLowerCase(), instances: [instance(137), { address: VAULT, chainId: 10, isSafe: undefined, reachable: false }] }
     const { result } = renderHook(() => useVaultQueueAcrossChains(g))
