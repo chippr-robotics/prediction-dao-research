@@ -122,6 +122,37 @@ keyboard reorder), `RuleComposer` (plain-language editor; members never see `ban
   (`DEPLOYMENT_BLOCKS_BY_CHAIN`), or `useVaultProposals` refuses to scan and proposal discovery is
   silently dead on that chain.
 
+## One vault, every network (spec 102)
+
+- **A vault is an address; a network is a property of a transaction.** The reference store is still
+  keyed `(chainId, address)` and every chain is still read through its own provider with per-row
+  failure isolation — but the member sees ONE card per address. `useCustodyVaults().groups` is the
+  view (`lib/custody/vaultGroups.js#groupVaults`), `vaults` is still the per-instance list the
+  policy panels and `VaultActionSheet` consume.
+- **Loading adds every network.** `loadByAddress` upserts a reference for each chain the probe
+  finds a Safe on and names the chains it could not reach; nothing asks the member to pick.
+  `probeVault(address)` re-runs the probe for an existing card and adds only new instances.
+- **The vault sheet** (`components/custody/VaultSheet.jsx`, on the shared `ActionSheet`) has three
+  views. *Queue* reads proposals for EVERY instance through `hooks/useVaultQueueAcrossChains.js`
+  — each chain resolves `read | unreadable | not-configured | not-supported`, rows carry a
+  `NetworkPill`, and a total missing a chain is partial and names it. Approve / Execute / Cancel
+  on a row whose chain differs from the wallet's **switches the wallet at tap time** (spec 088's
+  `switchNetwork`, awaited) and runs the action once the connected-chain `useVaultProposals`
+  has rebound; a refused switch is a per-row alert naming both chains, and nothing is signed.
+  *Style* is the spec-086 customize body (one address-keyed profile — never per chain).
+  *Details* lists every network, cross-references owners (address book > callsign > ENS >
+  generated, "You" for the connected wallet, add-to-book in place) and holds the acting-account
+  radiogroup and "Remove from Protect" (all networks).
+- **The acting identity follows the wallet where it can.** `operateAsVault({ address, chainIds })`
+  resolves `active.chainId` to the wallet's chain when the vault exists there, else the pin; a
+  wallet chain change re-evaluates it with no prompt. A vault-mode `submit` on the wrong chain
+  switches first (settle loop mirrors `useEarnSend.sendOnChain`) and still never falls through to
+  the connected wallet's signer under the vault label.
+- **Never render a failed read as zero.** "0 of 0", "none pending" for an unreadable chain, and a
+  missing threshold as a number are all bugs; the card says "unreachable"/"varies by network".
+- Deep link: `/wallet?tab=custody&vault=<address>` opens the sheet (address only — by design there
+  is no chain in the URL).
+
 ## Deploying
 
 ```bash
