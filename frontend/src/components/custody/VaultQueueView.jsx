@@ -1,0 +1,253 @@
+// Spec 102 (US3, FR-005…FR-008) — the vault sheet's Queue view: every pending or ready proposal
+// across EVERY network the vault lives on, newest first, each row tagged with its network.
+//
+// Reads come from useVaultQueueAcrossChains (one provider per instance chain, four-state per
+// chain). Actions go through useVaultProposals bound to the CONNECTED chain's instance — a Safe
+// approval is chain-scoped, so a row on another network first asks the wallet to switch
+// (FR-007). The action then runs from an effect, once the wallet AND the hook are on that chain,
+// so it always executes with the REBOUND signer, never a stale one. A refused switch is a stated
+// per-row error naming both chains; nothing is signed.
+//
+// Honesty (FR-019): a chain that could not be read is named with a Retry, a chain with no hub
+// deploy block says so, an unknown chain says "not supported in this build" — none of them is
+// ever "none pending". While reading, the view says how many networks it is reading.
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import PropTypes from 'prop-types'
+import { useWallet } from '../../hooks'
+import { useVaultProposals } from '../../hooks/useVaultProposals'
+import { useVaultQueueAcrossChains } from '../../hooks/useVaultQueueAcrossChains'
+import { summarizeQueue } from '../../lib/custody/vaultGroups'
+import { STATUS, approvalsRemaining } from '../../lib/custody/proposalStatus'
+import { chainDisplayName } from '../../lib/custody/chainName'
+import NetworkPill from '../ui/NetworkPill'
+
+function shortHash(h) {
+  return h ? `${h.slice(0, 10)}…${h.slice(-6)}` : ''
+}
+
+const ACTION_LABEL = { approve: 'Approval', execute: 'Execution', cancel: 'Cancellation' }
+
+function chainStatusText(chainId, entry) {
+  const name = chainDisplayName(chainId)
+  const state = entry?.state
+  if (state === 'read') {
+    const n = (entry.proposals || []).filter((p) => p.status === STATUS.PENDING || p.status === STATUS.READY).length
+    const base = n > 0 ? `${name}: ${n} pending` : `${name}: none pending`
+    return entry.partial ? `${base} (still reading history)` : base
+  }
+  if (state === 'unreadable') return `${name}: could not be read`
+  if (state === 'not-configured') return `${name}: proposal history is not configured on this network`
+  if (state === 'not-supported') return `${name}: not supported in this build`
+  return `${name}: reading…`
+}
+
+export default function VaultQueueView({ group }) {
+  const { chainId: walletChainId, address: connectedAddress, switchNetwork } = useWallet()
+  const queue = useVaultQueueAcrossChains(group)
+  const { byChain = {}, rows = [], loading, refresh } = queue
+  const connectedInstance = group.connectedInstance || null
+  const proposals = useVaultProposals(connectedInstance)
+  // The hook is read through a ref by the deferred-action effect so the effect re-runs on the
+  // facts that matter (wallet chain, instance) and always calls the CURRENT hook binding.
+  const proposalsRef = useRef(proposals)
+  useEffect(() => {
+    proposalsRef.current = proposals
+  })
+
+  const [busy, setBusy] = useState(false)
+  const [rowErrors, setRowErrors] = useState({})
+  const [pendingAction, setPendingAction] = useState(null) // { chainId, kind, proposal }
+
+  const setRowError = useCallback((hash, message) => {
+    setRowErrors((prev) => {
+      const next = { ...prev }
+      if (message) next[hash] = message
+      else delete next[hash]
+      return next
+    })
+  }, [])
+
+  const runAction = useCallback(
+    async ({ kind, proposal, chainId }) => {
+      const api = proposalsRef.current
+      setBusy(true)
+      try {
+        if (kind === 'approve') await api.approve(proposal.safeTxHash)
+        else if (kind === 'execute') await api.execute(proposal)
+        else if (kind === 'cancel') await api.cancel(proposal.safeTxHash)
+        setRowError(proposal.safeTxHash, null)
+        await refresh?.(chainId)
+      } catch (e) {
+        setRowError(proposal.safeTxHash, e?.message || `${ACTION_LABEL[kind]} failed`)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [refresh, setRowError],
+  )
+
+  const handleAction = async (row, kind) => {
+    setRowError(row.safeTxHash, null)
+    if (Number(row.chainId) !== Number(walletChainId)) {
+      try {
+        if (!switchNetwork) throw new Error('This wallet cannot switch networks from here.')
+        await switchNetwork(row.chainId)
+      } catch {
+        setRowError(
+          row.safeTxHash,
+          `${ACTION_LABEL[kind]} not sent — this proposal is on ${chainDisplayName(row.chainId)}, and the wallet stayed on ${chainDisplayName(walletChainId)}.`,
+        )
+        return
+      }
+      // The wallet accepted; the effect below runs the action once the hook has re-bound.
+      setPendingAction({ chainId: Number(row.chainId), kind, proposal: row })
+      return
+    }
+    await runAction({ kind, proposal: row, chainId: Number(row.chainId) })
+  }
+
+  // Deferred action: run only when the wallet is on the row's chain AND the proposals hook is
+  // bound to that chain's instance (so approve/execute close over the rebound signer).
+  // `inFlightRef` makes the hand-off idempotent: a re-render while the action is running must
+  // not replay it, and the pending marker is cleared when the action settles (not synchronously
+  // here — the row keeps its "Switching…" state until the signature request has actually gone out).
+  const instanceChainId = connectedInstance?.chainId
+  const inFlightRef = useRef(null)
+  useEffect(() => {
+    if (!pendingAction || inFlightRef.current === pendingAction) return
+    if (Number(walletChainId) !== pendingAction.chainId) return
+    if (Number(instanceChainId) !== pendingAction.chainId) return
+    inFlightRef.current = pendingAction
+    runAction(pendingAction).finally(() => {
+      inFlightRef.current = null
+      setPendingAction((prev) => (prev === pendingAction ? null : prev))
+    })
+  }, [pendingAction, walletChainId, instanceChainId, runAction])
+
+  const summary = summarizeQueue(byChain)
+  const chainIds = group.chainIds || []
+  const readableCount = (group.readable || (group.instances || []).filter((i) => i.isSafe === true)).length
+  const entriesCount = Object.keys(byChain).length
+  // The hook commits its first `loading` entries from an effect, so the very first paint has no
+  // entries yet; that is "reading", not "nothing could be read".
+  const reading = loading || (entriesCount === 0 && readableCount > 0)
+  const readingCount = summary.loading?.length || readableCount || chainIds.length
+  const summaryText = reading
+    ? `Reading ${readingCount} network${readingCount === 1 ? '' : 's'}…`
+    : entriesCount === 0
+      ? 'No network could be read for this vault.'
+      : summary.line
+  const isMine = (p) =>
+    Boolean(connectedAddress) && (p.approvers || []).some((a) => String(a).toLowerCase() === String(connectedAddress).toLowerCase())
+
+  return (
+    <div className="vault-queue" role="region" aria-label="Vault queue">
+      <p
+        className={`vault-queue__summary${summary?.partial ? ' is-partial' : ''}`}
+        role="status"
+        data-testid="vault-queue-summary"
+        data-partial={summary?.partial ? 'true' : 'false'}
+      >
+        {summaryText}
+      </p>
+
+      {!reading && rows.length === 0 && entriesCount > 0 && (
+        <p className="custody-hint" role="status" data-testid="vault-queue-empty">
+          Nothing waiting for a signature.
+        </p>
+      )}
+
+      {rows.length > 0 && (
+        <ul className="vault-queue__rows" aria-label="Pending proposals">
+          {rows.map((p) => {
+            const chainEntry = byChain[p.chainId] || byChain[String(p.chainId)]
+            const owner = Boolean(chainEntry?.owner)
+            const remaining = approvalsRemaining(p.approvals, p.threshold)
+            const hasApproved = isMine(p)
+            const chainName = chainDisplayName(p.chainId)
+            const err = rowErrors[p.safeTxHash]
+            const waiting = pendingAction && pendingAction.proposal?.safeTxHash === p.safeTxHash
+            return (
+              <li
+                key={`${p.chainId}:${p.safeTxHash}`}
+                className="vault-queue__row"
+                data-testid="vault-queue-row"
+                data-chain-id={p.chainId}
+              >
+                <div className="vault-queue__row-head">
+                  <NetworkPill chainId={Number(p.chainId)} name={chainName} />
+                  <span className={`custody-status custody-status--${p.status}`}>{p.status}</span>
+                  <span className="custody-proposal-meta">
+                    {p.approvals}/{p.threshold} approvals
+                    {p.status === STATUS.PENDING && remaining > 0 ? ` · ${remaining} more needed` : ''}
+                  </span>
+                  <code className="custody-proposal-hash">{shortHash(p.safeTxHash)}</code>
+                </div>
+                <div className="vault-queue__facts">
+                  <span>
+                    to <code>{p.to}</code>
+                  </span>
+                  <span>nonce {String(p.nonce)}</span>
+                </div>
+                {owner ? (
+                  <div className="custody-actions">
+                    {p.status === STATUS.PENDING && (
+                      <button type="button" onClick={() => handleAction(p, 'approve')} disabled={busy || hasApproved || Boolean(waiting)}>
+                        {hasApproved ? 'Approved' : waiting ? 'Switching…' : 'Approve'}
+                      </button>
+                    )}
+                    {p.status === STATUS.READY && (
+                      <button type="button" onClick={() => handleAction(p, 'execute')} disabled={busy || Boolean(waiting)}>
+                        {waiting ? 'Switching…' : 'Execute'}
+                      </button>
+                    )}
+                    {(p.status === STATUS.PENDING || p.status === STATUS.READY) && (
+                      <button type="button" className="custody-link" onClick={() => handleAction(p, 'cancel')} disabled={busy || Boolean(waiting)}>
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="vault-queue__viewonly" data-testid="vault-queue-viewonly">
+                    view-only on {chainName}
+                  </p>
+                )}
+                {err && (
+                  <p className="vault-queue__row-error" role="alert">
+                    {err}
+                  </p>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      <ul className="vault-queue__chains" aria-label="Read status by network">
+        {chainIds.map((id) => {
+          const entry = byChain[id] || byChain[String(id)]
+          const state = entry?.state || (reading ? 'loading' : 'unreadable')
+          return (
+            <li key={id} data-testid="vault-queue-chain" data-chain-id={id} data-state={state}>
+              <span>{chainStatusText(id, entry)}</span>
+              {state === 'unreadable' && (
+                <>
+                  {entry?.error && <span className="sr-only">{entry.error}</span>}
+                  <button type="button" className="custody-link" onClick={() => refresh?.(id)} data-testid="vault-queue-retry">
+                    Retry
+                  </button>
+                </>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+VaultQueueView.propTypes = {
+  /** VaultGroup (lib/custody/vaultGroups). */
+  group: PropTypes.object.isRequired,
+}
