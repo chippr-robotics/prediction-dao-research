@@ -249,32 +249,11 @@ jobs:
           api-level: 34
           arch: x86_64
           disable-animations: true
-          script: |
-            cd frontend/android && ./gradlew --no-daemon assembleDebug && cd ../..
-            PKG=$(grep -oP '(?<=<string name="package_name">)[^<]+' frontend/android/app/src/main/res/values/strings.xml)
-            adb install -r frontend/android/app/build/outputs/apk/debug/app-debug.apk
-            adb logcat -c || true
-            adb shell am start -n "$PKG/.MainActivity"
-            MOUNTED=false
-            for i in $(seq 1 60); do
-              if adb logcat -d | grep -q 'fw-smoke.*shell-mounted'; then MOUNTED=true; break; fi
-              sleep 2
-            done
-            if [ "$MOUNTED" != "true" ]; then
-              echo "::error::The app shell never mounted in the WebView — dumping the tail of logcat."
-              adb logcat -d | tail -150
-              exit 1
-            fi
-            adb shell input keyevent KEYCODE_HOME
-            sleep 2
-            adb shell am start -n "$PKG/.MainActivity"
-            sleep 5
-            if adb logcat -d | grep -q 'FATAL EXCEPTION'; then
-              echo "::error::Fatal exception across the background/foreground cycle."
-              adb logcat -d | grep -A 30 'FATAL EXCEPTION'
-              exit 1
-            fi
-            echo "Smoke passed: installed, mounted, survived a lifecycle cycle."
+          # ONE LINE, deliberately. This action runs its `script:` line by line,
+          # each in its own `sh -c`, so shell variables do not survive between
+          # lines and a multi-line `for`/`if` is split mid-statement. The probe
+          # therefore lives in a file that a real shell reads whole.
+          script: bash scripts/native/android-smoke.sh
 
   native-smoke-ios:
     name: Native smoke (iOS simulator)
