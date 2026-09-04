@@ -97,7 +97,10 @@ export default function RecoverAccount({ outcome, reason, busy = false, onSubmit
             characters long.
           </p>
         )}
-        <button type="submit" className="connect-modal__option" disabled={busy || !valid}>
+        {/* Enabled whenever a value is present, even a malformed one. A disabled submit is a dead
+            control: the member gets no reason, only a button that does nothing — and "why can I not
+            press this?" is the question the form exists to answer. Pressing it explains instead. */}
+        <button type="submit" className="connect-modal__option" disabled={busy || trimmed.length === 0}>
           <span className="connect-modal__option-name">
             {busy ? 'Checking…' : 'Find my account'}
           </span>

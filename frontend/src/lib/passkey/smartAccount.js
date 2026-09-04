@@ -486,10 +486,26 @@ export function encodeRemoveOwner({ index, ownerBytes, ownerCount }) {
   return encodeFunctionData({ abi: ACCOUNT_ABI, functionName: 'removeOwnerAtIndex', args: [index, ownerBytes] })
 }
 
-/** Read the full on-chain controller list (AccountController projection, data-model). */
-export async function readControllers({ chainId, accountAddress, deps = {} }) {
+/**
+ * Read the full on-chain controller list (AccountController projection, data-model).
+ *
+ * `strict` decides what an UNREADABLE chain means, and the two answers are genuinely different
+ * facts. By default a failed `getCode` is swallowed and reported as `deployed: false`, which suits
+ * the callers that only want to know whether there is anything to sign against and treat "cannot
+ * tell" as "assume not deployed" (`resolveOwnerIndex` falls back to slot 0; `repairPublicKey` gives
+ * up).
+ *
+ * That default is wrong for anyone deciding whether an account EXISTS: it turns "the network did
+ * not answer" into "nothing is there", which is precisely the conflation spec 104 exists to
+ * prevent — one layer below where the resolver could see it. `strict: true` rethrows instead, so
+ * the caller can report `unverified` rather than a fabricated absence.
+ */
+export async function readControllers({ chainId, accountAddress, strict = false, deps = {} }) {
   const client = deps.publicClient ?? defaultPublicClient(chainId)
-  const code = await client.getCode({ address: accountAddress }).catch(() => null)
+  const code = await client.getCode({ address: accountAddress }).catch((err) => {
+    if (strict) throw err
+    return null
+  })
   if (!code || code === '0x') return { deployed: false, controllers: [] }
 
   const next = await client.readContract({

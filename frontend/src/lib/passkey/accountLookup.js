@@ -117,7 +117,10 @@ export async function verifyAccountForKey({ ownerBytes, address, chainId, deadli
   let result
   try {
     result = await withDeadline(
-      (deps.readControllers ?? readControllers)({ chainId, accountAddress: address, deps }),
+      // STRICT: an unreadable chain must reach the `unverified` branch below. The default
+      // behaviour reports a failed `getCode` as `deployed: false`, which would arrive here
+      // indistinguishable from a genuinely empty address and be reported as an absence.
+      (deps.readControllers ?? readControllers)({ chainId, accountAddress: address, strict: true, deps }),
       deadlineMs,
       deps
     )

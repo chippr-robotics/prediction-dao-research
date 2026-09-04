@@ -109,6 +109,23 @@ describe('verifyAccountForKey', () => {
     expect(out.reason).toMatch(/does not mean you have no account/i)
   })
 
+  it('reads STRICTLY, so a failed getCode reaches unverified instead of posing as "not deployed"', async () => {
+    // The conflation this feature prevents, one layer below where the resolver could see it:
+    // readControllers' default swallows a failed getCode and answers `deployed: false`, which is
+    // indistinguishable here from a genuinely empty address. Passing `strict` is what keeps an
+    // unreachable chain reportable as unreachable, so this asserts the flag is actually sent.
+    const readControllers = vi.fn(async ({ strict }) => {
+      if (strict) throw new Error('HTTP 503')
+      return { deployed: false, controllers: [] } // what the non-strict default would have said
+    })
+    const out = await verifyAccountForKey({
+      ownerBytes: OWNER, address: ACCOUNT, chainId: CHAIN, deps: { readControllers },
+    })
+    expect(readControllers).toHaveBeenCalledWith(expect.objectContaining({ strict: true }))
+    expect(out.outcome).toBe(OUTCOMES.UNVERIFIED)
+    expect(out.outcome).not.toBe(OUTCOMES.NOT_CONTROLLER)
+  })
+
   it('a chain that never answers expires into UNVERIFIED rather than hanging', async () => {
     // The direct lesson of v1.16.1: an unbounded wait on an external system is how a sign-in
     // becomes a lockout. A never-settling promise, not a rejecting one — a platform that never
