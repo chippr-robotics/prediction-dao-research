@@ -67,7 +67,7 @@ jobs:
 
       - name: Locate the reviewed plan
         id: locate
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             // Find the PR this commit merged, then its plan run. If the commit did not arrive via a
