@@ -14,7 +14,9 @@
  * (`.github/actions/native-prepare` selects the newest Xcode and prints it); no plugin needed
  * excluding, and excluding one would have dropped Ledger-over-BLE on iOS for a cause that was
  * never real. CONFIRMED on Xcode 26.6 / Swift 6.3.3: every plugin error disappeared with both
- * bluetooth-le and passkey present.
+ * bluetooth-le and passkey present, so Ledger over BLE works on iOS today and NOTHING here is
+ * excluded. Android-only would be a consequence of USING this script on the BLE plugin, not a
+ * description of the current state.
  *
  * It is kept because the mechanism is sound and a genuinely incompatible plugin is a normal thing
  * to hit. To use it, call it after `cap sync ios` — and only with evidence that the plugin, and not
@@ -29,7 +31,7 @@
  *
  * That failed the iOS archive on the v1.16.0 release attempt, and because `Publish release` is
  * gated on the native artifacts, it blocked the release itself. Ledger-over-BLE is therefore
- * ANDROID-ONLY until the plugin catches up; the existing capability seam
+ * Android-only IF THIS SCRIPT WERE USED on it; the existing capability seam
  * (`lib/native/runtime.js` → `NativeCapabilityNotice`) already reports an absent transport
  * honestly, so an iOS member is told rather than shown a control that cannot work.
  *
@@ -45,14 +47,16 @@ const path = require('path')
 const ROOT = path.join(__dirname, '..', '..')
 const PACKAGE_SWIFT = path.join(ROOT, 'frontend', 'ios', 'App', 'CapApp-SPM', 'Package.swift')
 
-/** node_modules paths whose plugins must NOT reach the iOS build, each with the reason. */
-const EXCLUDED = [
-  {
-    module: '@capacitor-community/bluetooth-le',
-    reason:
-      'bluetooth-le@8.3.0 (latest) does not compile against capacitor-swift-pm 8.5.0; Ledger BLE is Android-only',
-  },
-]
+/**
+ * node_modules paths whose plugins must NOT reach the iOS build, each with the reason.
+ *
+ * DELIBERATELY EMPTY. It held `@capacitor-community/bluetooth-le` for exactly as long as the
+ * toolchain was misdiagnosed as a plugin problem; leaving a populated entry behind a header that
+ * says the opposite is a trap — wire this script up and it would silently remove a capability that
+ * works. An entry belongs here only with fresh evidence that the PLUGIN, and not the compiler
+ * reading Capacitor's prebuilt XCFrameworks, is what fails.
+ */
+const EXCLUDED = []
 
 function stripPlugin(text, module) {
   // `.package(name: "<SwiftName>", path: "<…>/node_modules/<module>"…),` — the path is what
