@@ -62,7 +62,8 @@ const MULTISEND = '0x9641d764fc13c8B624c04430C7356C1C7C8102e2'
  * The PENDING queue only. History rows carry the same `custody-proposal-row` class, so an
  * unscoped count says "still queued" about a proposal that executed a minute ago.
  */
-const PENDING_ROW = '.custody-proposal-list:not(.custody-proposal-list--history) .custody-proposal-row'
+// Spec 102 — the queue is the vault sheet's Queue view.
+const PENDING_ROW = '[data-testid="vault-panel-queue"] [data-testid="vault-queue-row"]'
 
 const COIN = 10n ** 18n
 const TENTH = 10n ** 17n
@@ -133,17 +134,30 @@ function loadVault(address, label) {
     cy.get('#load-label').clear().type(label)
     cy.contains('button', /^Load/).click()
   })
-  cy.get('.custody-vault-card', { timeout: 30000 }).should('have.length.at.least', 1)
+  cy.get('[data-testid^="vault-card-"]', { timeout: 30000 }).should('have.length.at.least', 1)
 }
 
-/** Expand the one vault card, so its detail and proposal queue mount. */
+/**
+ * The full recipient of a queue row.
+ *
+ * Spec 102 — a row shows the recipient cross-referenced (address book > callsign > ENS) beside a
+ * SHORTENED address, so the row's text no longer contains the 42-character address these
+ * assertions are about. The full address is carried on the element itself, which is also what a
+ * member reads on hover, so that is what is asserted.
+ */
+function recipientOf(row) {
+  return row.find('[data-testid="vault-queue-to"]').invoke('attr', 'title')
+}
+
+/** Spec 102 — the card's "⋯" opens the vault sheet; the proposal queue is its Queue view. */
 function openVaultCard() {
-  cy.get('.custody-vault-card').first().then(($card) => {
-    if ($card.attr('data-open') !== 'true') {
-      cy.wrap($card).find('.acc__trigger').first().click()
+  cy.get('body').then(($b) => {
+    if ($b.find('[data-testid="vault-panel-queue"]').length === 0) {
+      if ($b.find('.vault-sheet').length === 0) cy.get('[data-testid^="vault-menu-"]', { timeout: 30000 }).first().click()
+      cy.get('[data-testid="vault-tab-queue"]', { timeout: 20000 }).click()
     }
   })
-  cy.get('.custody-vault-card').first().should('have.attr', 'data-open', 'true')
+  cy.get('[data-testid="vault-panel-queue"]', { timeout: 20000 }).should('be.visible')
 }
 
 /**
@@ -369,9 +383,9 @@ describe('Group settlement — how a group payment actually settles (spec 058)',
 
           // …and that one proposal is addressed to MultiSendCallOnly, which is what makes it a
           // batch rather than two payments that happen to be queued together.
-          cy.get(PENDING_ROW).first().invoke('text').then((text) => {
-            expect(text.toLowerCase(), 'the proposal delegatecalls MultiSendCallOnly')
-              .to.contain(MULTISEND.toLowerCase())
+          recipientOf(cy.get(PENDING_ROW).first()).then((to) => {
+            expect(String(to).toLowerCase(), 'the proposal delegatecalls MultiSendCallOnly')
+              .to.equal(MULTISEND.toLowerCase())
           })
 
           executeTop(address, 1)
@@ -468,14 +482,14 @@ describe('Group settlement — how a group payment actually settles (spec 058)',
            * nonce would leave exactly ONE of the two payments executable while looking identical
            * on screen.
            */
-          cy.contains(PENDING_ROW, 'nonce 0').invoke('text').then((text) => {
-            expect(text.toLowerCase(), 'the first proposal pays the first recipient directly')
-              .to.contain(PAYEE_ONE.toLowerCase())
-            expect(text.toLowerCase(), 'and is not a batch').to.not.contain(MULTISEND.toLowerCase())
+          recipientOf(cy.contains(PENDING_ROW, 'nonce 0')).then((to) => {
+            expect(String(to).toLowerCase(), 'the first proposal pays the first recipient directly')
+              .to.equal(PAYEE_ONE.toLowerCase())
+            expect(String(to).toLowerCase(), 'and is not a batch').to.not.equal(MULTISEND.toLowerCase())
           })
-          cy.contains(PENDING_ROW, 'nonce 1').invoke('text').then((text) => {
-            expect(text.toLowerCase(), 'the second proposal pays the second recipient directly')
-              .to.contain(PAYEE_TWO.toLowerCase())
+          recipientOf(cy.contains(PENDING_ROW, 'nonce 1')).then((to) => {
+            expect(String(to).toLowerCase(), 'the second proposal pays the second recipient directly')
+              .to.equal(PAYEE_TWO.toLowerCase())
           })
 
           // The second is HELD until the first lands — the ordering the confirm screen described

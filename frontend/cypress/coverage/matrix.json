@@ -2907,6 +2907,124 @@
           ]
         }
       ]
+    },
+    {
+      "id": "102-multisig-chain-abstraction",
+      "title": "Multisig chain abstraction \u2014 one vault, every network",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "custody.vault-cards",
+          "name": "See one compact card per vault across every network it lives on",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-01"
+          ]
+        },
+        {
+          "id": "custody.vault-sheet-queue",
+          "name": "Open the vault sheet and read the pending queue with each proposal's network tagged, an unreadable network named",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-02",
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-03"
+          ]
+        },
+        {
+          "id": "custody.cross-chain-approve",
+          "name": "Approve a proposal on another network from the queue \u2014 the wallet is switched at tap time, a refusal is stated and nothing is signed",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-04"
+          ]
+        },
+        {
+          "id": "custody.sheet-approve-execute",
+          "name": "Approve and execute a proposal from the vault sheet's queue (money path)",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-08"
+          ]
+        },
+        {
+          "id": "custody.vault-style",
+          "name": "Style the vault card from the sheet; the card behind it updates",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-05"
+          ]
+        },
+        {
+          "id": "custody.vault-details",
+          "name": "Read the vault's networks and owners, cross-referenced to the address book, and add an unknown owner in place",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-06"
+          ]
+        },
+        {
+          "id": "custody.acting-from-sheet",
+          "name": "Choose the acting account from the vault sheet; the header follows and the switcher lists the vault once",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-07"
+          ]
+        },
+        {
+          "id": "custody.remove-all-networks",
+          "name": "Remove a vault from Protect on every network after confirmation",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-08"
+          ]
+        },
+        {
+          "id": "custody.load-all-networks",
+          "name": "Load a vault address and have it added on every network it exists on, without picking one",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-09"
+          ]
+        },
+        {
+          "id": "wallet.balance-display",
+          "name": "Balances in Wrap and Transfer fit the screen (display formatter)",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-10"
+          ]
+        }
+      ]
     }
   ]
 }

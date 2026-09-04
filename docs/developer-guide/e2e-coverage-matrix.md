@@ -26,10 +26,10 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 105 |
-| With a member-facing flow | 83 |
-| Member-facing flows | 173 |
-| 🟢 covered | 160 |
+| Spec directories | 106 |
+| With a member-facing flow | 84 |
+| Member-facing flows | 183 |
+| 🟢 covered | 170 |
 | 🟡 partial | 3 |
 | 🔴 absent | 3 |
 | ⚪ out of scope | 7 |
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-70 flows — 🟢 59 · 🟡 3 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
+72 flows — 🟢 61 · 🟡 3 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -292,6 +292,13 @@ establish the outcome. They are listed in full at the end of this document.
 | `native.passkey-signin` | A member signs in on the native app with the platform passkey ceremony and lands on the SAME account they hold on the web channel, PRF-derived keys intact; an unsupported device refuses with a named reason (unit: src/test/native/passkeyBridge.test.js; device leg: staged manual protocol in docs/runbooks/native-release-operations.md) | 🔴 absent | none | — (proposed: account-native) | #1389 |  |
 | `native.ble-signing` | Ledger signing over the native Bluetooth rail with physical confirmation on the device screen | ⚪ out-of-scope | none | — (proposed: account-native) | — | Requires a physical Nano X and a human pressing its buttons - automation cannot confirm on a device screen. Protocol arithmetic and error normalization are unit-pinned (src/test/native/ledgerBleRung.test.js); the device run is the staged manual addendum in docs/runbooks/hardware-wallet-staging-validation.md, required before store submission. |
 
+### `102-multisig-chain-abstraction` — Multisig chain abstraction — one vault, every network
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `custody.cross-chain-approve` | Approve a proposal on another network from the queue — the wallet is switched at tap time, a refusal is stated and nothing is signed | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-04) |  |
+| `custody.sheet-approve-execute` | Approve and execute a proposal from the vault sheet's queue (money path) | 🟢 covered | settled | `on-chain` | `29-protect-custody.cy.js` (CV-08) |  |
+
 ### `103-funding-pools` — Funding pools (Request ▸ Pool)
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
@@ -366,7 +373,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-47 flows — 🟢 46 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
+48 flows — 🟢 47 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -530,9 +537,15 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `native.lifecycle-lock` | Backgrounding the native app past the lock threshold re-prompts before any wallet surface on foreground (unit: src/test/native/lifecycle.test.js + the native case in src/test/applock/AppLockOverlay.test.jsx; the release smoke jobs prove launch/render/lifecycle-survival but cannot reach a signed-in lock) | 🔴 absent | none | — (proposed: no-chain) | #1389 |  |
 
+### `102-multisig-chain-abstraction` — Multisig chain abstraction — one vault, every network
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `custody.acting-from-sheet` | Choose the acting account from the vault sheet; the header follows and the switcher lists the vault once | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-07) |  |
+
 ## Information — read-only surfaces
 
-39 flows — 🟢 39 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
+46 flows — 🟢 46 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -732,6 +745,18 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `activity.multi-chain-history` | See activity across chains, with an unreadable chain named rather than empty | 🟢 covered | flow | `no-chain` | `36-activity-and-oracle-gating.cy.js` (MC-01, MC-02) |  |
+
+### `102-multisig-chain-abstraction` — Multisig chain abstraction — one vault, every network
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `custody.vault-cards` | See one compact card per vault across every network it lives on | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-01) |  |
+| `custody.vault-sheet-queue` | Open the vault sheet and read the pending queue with each proposal's network tagged, an unreadable network named | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-02, VS-03) |  |
+| `custody.vault-style` | Style the vault card from the sheet; the card behind it updates | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-05) |  |
+| `custody.vault-details` | Read the vault's networks and owners, cross-referenced to the address book, and add an unknown owner in place | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-06) |  |
+| `custody.remove-all-networks` | Remove a vault from Protect on every network after confirmation | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-08) |  |
+| `custody.load-all-networks` | Load a vault address and have it added on every network it exists on, without picking one | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-09) |  |
+| `wallet.balance-display` | Balances in Wrap and Transfer fit the screen (display formatter) | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-10) |  |
 
 ## No member consequence
 

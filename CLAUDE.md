@@ -234,6 +234,22 @@ artifacts live under `specs/<feature>/`.
   lives in the **Tools** nav group (tab id `custody` unchanged). See
   `docs/developer-guide/protect-policies.md` + `docs/runbooks/protect-policy-operations.md` +
   `specs/068-protect-multi-chain-policies/`.
+- **A vault is an ADDRESS; a network is a property of a TRANSACTION (spec 102).** Protect ▸ On chain
+  renders ONE compact `AccountCard` per vault address (`useCustodyVaults().groups`, view over the
+  unchanged `(chainId,address)` reference store — never key the store by address), loading adds the
+  vault on EVERY network the probe finds it on (never a "pick a network" prompt), and every per-vault
+  action lives in the `VaultSheet` (Queue / Style / Details). The Queue reads every instance through
+  `useVaultQueueAcrossChains` — four-state per chain (`read`/`unreadable`/`not-configured`/
+  `not-supported`), each row tagged with its `NetworkPill`, a total missing a chain labelled partial
+  and NAMED. Approve/Execute/Cancel on another chain's row SWITCHES THE WALLET AT TAP TIME and runs
+  the action after the connected-chain `useVaultProposals` rebinds — never with a stale signer, never
+  silently on refusal (a per-row alert names both chains). `operateAsVault({ address, chainIds })`:
+  `active.chainId` follows the wallet's chain where the vault exists, else the pin; vault-mode
+  `submit` switches first (settle loop, `useEarnSend.sendOnChain` precedent) and keeps spec 088's
+  no-fall-through. Cosmetics stay ONE address-keyed profile. Balances in Wrap/Transfer/asset picker
+  render through `lib/format/amount.js#formatUnitsForDisplay` (null stays null, never `|| 0`; what is
+  SENT is never rounded). See `docs/developer-guide/protect-policies.md` § "One vault, every network"
+  + `specs/102-multisig-chain-abstraction/`.
 - **Protect ▸ Verify (message signing) is FRONTEND-ONLY and has THREE verdicts, never two.**
   Members sign an arbitrary message to prove control of an account and check other people's proofs
   (`frontend/src/lib/verify/`, surfaced by `components/custody/VerifySection.jsx`). Verification

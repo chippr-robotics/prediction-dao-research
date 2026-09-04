@@ -349,7 +349,7 @@ export default function CreateVaultWizard({ connectedAddress, chainId, onCreate,
         <button type="button" onClick={handlePreview} disabled={blocked || policyBlocked || busy}>
           Preview address
         </button>
-        <button type="button" onClick={handleCreate} disabled={blocked || policyBlocked || busy}>
+        <button className="btn btn-primary" type="button" onClick={handleCreate} disabled={blocked || policyBlocked || busy}>
           {busy ? 'Working…' : 'Create vault'}
         </button>
       </div>

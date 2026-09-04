@@ -146,6 +146,18 @@ describe('what the member is told', () => {
     expect(screen.getByText('3 WETC')).toBeInTheDocument() // received, same number
   })
 
+  it('rounds balances for display only — MAX still fills the full-precision amount (spec 102)', async () => {
+    const raw = 2006441459389172406n // 2.006441459389172406 ETC, the staging overflow
+    wrapper.current = { ...base(), nativeBalance: raw, maxWrappable: raw }
+    const { container } = render(<WrapView />)
+    const tiles = container.querySelectorAll('.pt-wrap-balance-val')
+    expect(tiles[0]).toHaveTextContent('2.0064')
+    expect(screen.getByText(/^Balance:/, { selector: '#pt-wrap-amount-hint' })).toHaveTextContent('Balance: 2.0064 ETC')
+    expect(document.body.textContent).not.toContain('2.006441459389172406')
+    await userEvent.click(screen.getByRole('button', { name: 'MAX' }))
+    expect(amountBox()).toHaveValue('2.006441459389172406')
+  })
+
   it('renders an unread balance as “—” and never as zero', () => {
     wrapper.current = { ...base(), nativeBalance: null, maxWrappable: null }
     render(<WrapView />)

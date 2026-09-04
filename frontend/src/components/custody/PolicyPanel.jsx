@@ -393,7 +393,9 @@ function PolicyConfigEditor({ currentPolicy, attach, threshold, busy, onSubmit, 
   )
 }
 
-export default function PolicyPanel({ vault, onPropose }) {
+// `ariaLabel` (spec 102): the vault sheet's Details view mounts one panel PER NETWORK, and two
+// landmarks with the same name are indistinguishable to a screen reader — the caller names each.
+export default function PolicyPanel({ vault, onPropose, ariaLabel = 'Vault policy' }) {
   const [status, setStatus] = useState(null) // null = loading
   const [policy, setPolicy] = useState(null)
   const [readError, setReadError] = useState(null)
@@ -468,7 +470,7 @@ export default function PolicyPanel({ vault, onPropose }) {
   const canManage = !!vault.owner && typeof onPropose === 'function'
 
   return (
-    <div className="custody-policy" role="region" aria-label="Vault policy">
+    <div className="custody-policy" role="region" aria-label={ariaLabel}>
       <h5>Policy</h5>
 
       {readError && (
