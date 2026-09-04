@@ -3025,6 +3025,46 @@
           ]
         }
       ]
+    },
+    {
+      "id": "104-passkey-account-recovery",
+      "title": "Passkey account recovery \u2014 find the account, never guess it",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "passkey.recover-account-by-lookup",
+          "name": "A member signing in on a new device reaches the account their passkey controls, including when that passkey was added to the account later rather than being the key that created it",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1429"
+        },
+        {
+          "id": "passkey.recover-never-wrong-account",
+          "name": "A passkey whose account cannot be verified never opens a session on an unverified address; the member is told what could not be confirmed, and an unreachable chain reads as unverified rather than as no account existing",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1429"
+        },
+        {
+          "id": "passkey.recover-by-address",
+          "name": "A member relinks by entering their account address, and is signed in only when the chain lists the recovered key among that account's current owners",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1429"
+        }
+      ]
     }
   ]
 }
