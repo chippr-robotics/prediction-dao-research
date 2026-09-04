@@ -556,7 +556,8 @@ artifacts live under `specs/<feature>/`.
   have dropped Ledger-over-BLE on iOS for a cause that was never real.
   `native-prepare` selects the newest Xcode and prints it with `swift --version`, so a log always
   says what built the app (confirmed on Xcode 26.6 / Swift 6.3.3: every plugin error vanished
-  with both plugins present). **Never name a simulator device** either — `name:iPhone 15` broke
+  with both plugins present, so Ledger over BLE works in the native iOS shell and
+  `exclude-ios-spm-plugins.js` excludes NOTHING — its list is deliberately empty). **Never name a simulator device** either — `name:iPhone 15` broke
   on an image whose newest are iPhone 17s; compile against `generic/platform=iOS Simulator` and
   let the smoke pick an available iPhone by UDID. **`native-build.yml` now compiles both shells BEFORE main** — on a path-filtered pull
   request and on every push to `staging` — and it plus all four release jobs prepare the shell

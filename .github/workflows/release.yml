@@ -167,8 +167,8 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      # Same shared preparation as the Android jobs and the pre-main check;
-      # the iOS branch of the action also runs the SPM plugin exclusion.
+      # Same shared preparation as the Android jobs and the pre-main check,
+      # including selecting the newest Xcode on the image.
       - uses: ./.github/actions/native-prepare
         with:
           platform: ios
@@ -286,8 +286,8 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      # Same shared preparation as the Android jobs and the pre-main check;
-      # the iOS branch of the action also runs the SPM plugin exclusion.
+      # Same shared preparation as the Android jobs and the pre-main check,
+      # including selecting the newest Xcode on the image.
       - uses: ./.github/actions/native-prepare
         with:
           platform: ios

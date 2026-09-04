@@ -126,7 +126,10 @@ Both it and the four release jobs prepare the shell through ONE composite action
 builds, stamps or syncs differently from the release would pass while the release fails, which is
 worse than having no check at all. Change the preparation in the action, never in a caller.
 
-The member-facing consequence is honest degradation, not a hidden gap: `lib/native/runtime.js`
-reports the BLE transport as unavailable on iOS and `NativeCapabilityNotice` renders the reason in
-place, the same as any other capability gap. Revisit when the plugin publishes a build against
-Capacitor 8.5 — the exclusion is one entry in one array.
+That paragraph is a leftover worth correcting rather than deleting, because the wrong version of it
+shipped for an hour: **Ledger over BLE works in the native iOS shell.** `nativeCapability('ble')`
+resolves `available` there once the BluetoothLe plugin registers itself, and it is the WEB build on
+iOS Safari that has no Bluetooth to offer — a browser limitation, not a shell one. Had the plugin
+been excluded, the seam would have reported the native shell unavailable too and
+`NativeCapabilityNotice` would have rendered that reason in place; honest, but a capability lost to
+a cause that was not real.
