@@ -29,9 +29,28 @@
  * ------------
  *   1. plan     read-only. What would be revoked, in what order, and what remains admin afterwards.
  *   2. build    compute the MultiSend batch and the safeTxHash. Writes a proposal file. No signing.
+ *   2b. propose PUBLISH THE PREIMAGE so a UI can show what the hash means (see below).
  *   3. approve  the KMS owner calls approveHash(safeTxHash) on-chain.  ← this tool, 1 of 2
  *   4. (you)    a second owner approves on a Ledger/Trezor.            ← hardware, 2 of 2
  *   5. execute  anyone sends execTransaction with the pre-validated signature bundle.
+ *
+ * WHY `propose` EXISTS, AND WHY THE SAFE APP CANNOT SEE THESE OTHERWISE
+ * --------------------------------------------------------------------
+ * This tool is entirely on-chain: it computes a safeTxHash and calls `approveHash`. The Safe web app
+ * reads PENDING transactions from Safe's off-chain Transaction Service, which never saw the
+ * proposal — so the approvals show up on a block explorer while the app shows nothing at all. The
+ * app is not broken and the approvals are not lost; the hash simply has no preimage anywhere it can
+ * look, so it cannot render `revokeRole(...) x12` or offer a signature button.
+ *
+ * Spec 043 already solved this for the same reason (this estate spans chains Safe's service does not
+ * cover, e.g. Mordor): `SafeProposalHub` is an on-chain, PERMISSIONLESS log of proposal preimages,
+ * and FairWins Protect reads it. `propose` publishes there, after which the batch appears in
+ * Protect ▸ On chain and can be approved with a hardware wallet like any other vault proposal.
+ * Publishing is safe precisely because it is untrusted: readers recompute the safeTxHash from the
+ * preimage and discard a mismatch (lib/custody/proposalHub.js), so a bogus proposal cannot
+ * impersonate a real one.
+ *
+ * Ethereum mainnet has NO hub deployed, so chain 1 cannot use this route.
  *
  * Usage:
  *   node scripts/ops/revoke-stale-admin.js --chain 63 --target superseded
@@ -71,6 +90,7 @@ const ACCESS_ABI = [
   "function revokeRole(bytes32,address)",
 ];
 const MULTISEND_ABI = ["function multiSend(bytes transactions)"];
+const HUB_ABI = ["function propose(address safe,address to,uint256 value,bytes data,uint8 operation,uint256 nonce,bytes32 safeTxHash)"];
 
 const MANAGED = [
   ["feeRouter", "FeeRouter"], ["bridgeRouter", "BridgeRouter"], ["liquidityRouter", "LiquidityRouter"],
@@ -296,6 +316,39 @@ async function main() {
   console.log(`\n  safeTxHash:  ${safeTxHash}  (nonce ${nonce})`);
   console.log(`  approvals:   ${approvals.length}/${threshold}  ${approvals.map((a) => a.slice(0, 10)).join(" ") || "(none)"}`);
 
+  // ---- propose: publish the preimage so a UI can resolve the hash ---------------------------
+  if (mode === "propose") {
+    const rp = path.join(ROOT, "deployments", CHAINS[chainId].file);
+    const hub = (JSON.parse(fs.readFileSync(rp, "utf8")).contracts ?? {}).safeProposalHub;
+    if (!hub) {
+      throw new Error(
+        `no safeProposalHub recorded on chain ${chainId}, so there is nowhere to publish the preimage. `
+        + `Approve this hash directly from the hardware wallet instead (approveHash on the Safe).`,
+      );
+    }
+    const keyName = process.env.KMS_ADMIN_KEY
+      || "projects/chippr-bots-site-wp/locations/us-central1/keyRings/fairwins-relayer/cryptoKeys/admin-signer-polygon/cryptoKeyVersions/1";
+    const { createKmsTransactionSigner } = require("./lib/kmsSigner");
+    const signer = await createKmsTransactionSigner({ keyName, provider });
+    const data = new ethers.Interface(HUB_ABI).encodeFunctionData("propose", [
+      safeAddr, params[0], params[1], params[2], params[3], params[9], safeTxHash,
+    ]);
+    console.log(`\n  hub:         ${hub}`);
+    if (!confirmed) { console.log(`  WOULD publish the preimage for ${safeTxHash}. Re-run with --confirm ${chainId}.`); return; }
+    try {
+      const r = await signer.sendTransaction({ to: hub, data });
+      console.log(`  ✓ preimage published: ${r.hash ?? r.transactionHash}`);
+    } catch (err) {
+      // Same reasoning as approve: the receipt poll is not the transaction. There is no cheap
+      // on-chain read-back for an event-only call, so this reports honestly rather than guessing.
+      console.log(`  send/wait reported: ${String(err.shortMessage || err.message).slice(0, 90)}`);
+      console.log("  This may still have landed — propose only emits an event, so there is no state");
+      console.log("  to read back. Check the KMS owner's recent transactions before re-sending.");
+    }
+    console.log("\n  It should now appear in FairWins Protect ▸ On chain for hardware approval.");
+    return;
+  }
+
   // ---- approve (KMS) ----------------------------------------------------------------------
   if (mode === "approve") {
     const keyName = process.env.KMS_ADMIN_KEY
@@ -382,7 +435,7 @@ async function main() {
     return;
   }
 
-  throw new Error(`unknown --mode ${mode} (plan | build | approve | execute)`);
+  throw new Error(`unknown --mode ${mode} (plan | build | propose | approve | execute)`);
 }
 
 main().catch((e) => { console.error("\n" + (e.message || e)); process.exitCode = 1; });
