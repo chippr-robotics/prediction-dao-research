@@ -157,6 +157,55 @@ export function hasExistingCredential(storage = globalThis.localStorage) {
   return knownCredentials(storage).length > 0
 }
 
+/**
+ * How a saved passkey should be labelled in the PLATFORM's own list (Google
+ * Password Manager, iCloud Keychain, a browser's passkey settings).
+ *
+ * Every FairWins passkey used to be created as "FairWins account", so a member
+ * with four of them saw four identical rows and had to guess. The account
+ * address is the only thing that tells them apart, and it is public, so it is
+ * what goes in the name.
+ */
+export function passkeyAccountNames(address) {
+  const short = `${address.slice(0, 6)}…${address.slice(-4)}`
+  // Platforms differ on which field they render as the row's title, so BOTH
+  // carry the address — whichever one is shown, the member can tell them apart.
+  return { name: short, displayName: `FairWins · ${short}` }
+}
+
+/**
+ * Ask the platform to rename a saved passkey to the account it actually signs
+ * for. Best-effort and COSMETIC: it never throws and never blocks sign-in, and
+ * it reports why when it could not run rather than pretending it did.
+ *
+ * Why it happens after the ceremony rather than during it: the address is
+ * derived from the public key the ceremony produces, so at `credentials.create`
+ * time there is nothing truthful to name the passkey. `signalCurrentUserDetails`
+ * exists for exactly this and is keyed by the user handle — which is why
+ * createCredential now keeps it, and why getAssertion surfaces it so a passkey
+ * created before any of this can still be healed on its next sign-in.
+ */
+export async function nameCredentialForAccount({ userId, address, deps = {} } = {}) {
+  if (!userId || !address) return { updated: false, reason: 'no user handle or address to name with' }
+
+  const PK = deps.PublicKeyCredential ?? globalThis.PublicKeyCredential
+  const signal = PK?.signalCurrentUserDetails
+  if (typeof signal !== 'function') {
+    return { updated: false, reason: 'this platform cannot rename a saved passkey' }
+  }
+
+  const rpId = deps.rpId ?? globalThis.location?.hostname
+  if (!rpId) return { updated: false, reason: 'no relying party id in this context' }
+
+  try {
+    await signal.call(PK, { rpId, userId, ...passkeyAccountNames(address) })
+    return { updated: true }
+  } catch (err) {
+    // A rename failing must never cost a member their sign-in.
+    return { updated: false, reason: err?.message || String(err) }
+  }
+}
+
 const b64url = (buf) => {
   const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf
   let s = ''
@@ -210,7 +259,17 @@ export async function createCredential({ label, userName = 'FairWins account', d
   const ext = cred.getClientExtensionResults?.() ?? {}
   const prfCapable = Boolean(ext.prf?.enabled ?? ext.prf?.results)
 
-  const entry = { credentialId: cred.id, publicKey, prfCapable, label: label || 'This device' }
+  // The user handle is KEPT, not discarded. It is the only key the platform
+  // accepts for renaming a saved passkey later (`signalCurrentUserDetails`),
+  // and the account address it will name does not exist yet — it is derived
+  // from the public key this ceremony just produced.
+  const entry = {
+    credentialId: cred.id,
+    publicKey,
+    prfCapable,
+    label: label || 'This device',
+    userId: b64url(userId),
+  }
   return entry
 }
 
@@ -276,6 +335,11 @@ export async function getAssertion({ challenge, credentialId, prfSalt, discovera
     authenticatorData: new Uint8Array(assertion.response.authenticatorData),
     clientDataJSON: new Uint8Array(assertion.response.clientDataJSON),
     prfOutput,
+    // Present for a discoverable credential; it is what names this passkey in
+    // the platform's own list (see nameCredentialForAccount). Passkeys created
+    // before that naming existed have no stored userId, so recovering it from
+    // the assertion is what lets them be healed on sign-in.
+    userHandle: assertion.response.userHandle ? b64url(assertion.response.userHandle) : undefined,
   }
 }
 

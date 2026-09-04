@@ -20,6 +20,7 @@ import {
   knownCredentials,
   isTransactComplete,
   hasExistingCredential,
+  nameCredentialForAccount,
 } from '../lib/passkey/credentials'
 import { deriveAddress, publicKeyToOwnerBytes, readControllers } from '../lib/passkey/smartAccount'
 import { getCurrentChainId } from '../config/networks'
@@ -218,6 +219,14 @@ export function passkeyConnector(options = {}) {
         const ownersBytes = [publicKeyToOwnerBytes(credential.publicKey)]
         address = await (deps.deriveAddress ?? deriveAddress)({ chainId: targetChain, ownersBytes, deps })
         rememberCredential({ ...credential, address }, deps.storage)
+        // The address exists only now — it is derived from the key the ceremony
+        // just produced — so this is the first moment the saved passkey can be
+        // named after the account it signs for. Cosmetic and non-throwing.
+        await (deps.nameCredential ?? nameCredentialForAccount)({
+          userId: credential.userId,
+          address,
+          deps,
+        })
       } else {
         // Sign-in: pinned to the account the user picked in the in-app chooser
         // when `credentialId` is set; otherwise getAssertion offers the whole
@@ -246,10 +255,19 @@ export function passkeyConnector(options = {}) {
         // Keep the book transact-complete (spec 045 FR-005): refresh the
         // record for the asserted credential. The key comes from cross-device
         // recovery when that ran, else from the chain when it is unambiguous.
+        // Heal the platform's label for a passkey created before it carried the
+        // account: the user handle comes back on the assertion even when this
+        // browser never stored it.
+        await (deps.nameCredential ?? nameCredentialForAccount)({
+          userId: assertion.userHandle,
+          address,
+          deps,
+        })
         const record = upsertCredential(
           {
             credentialId: assertion.credentialId,
             address,
+            userId: assertion.userHandle,
             publicKey:
               resolved.publicKey ??
               (await repairPublicKey({ credentialId: assertion.credentialId, address, chainId: targetChain, deps })),
