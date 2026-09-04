@@ -26,12 +26,12 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 106 |
-| With a member-facing flow | 84 |
-| Member-facing flows | 183 |
+| Spec directories | 107 |
+| With a member-facing flow | 85 |
+| Member-facing flows | 186 |
 | 🟢 covered | 170 |
 | 🟡 partial | 3 |
-| 🔴 absent | 3 |
+| 🔴 absent | 6 |
 | ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-72 flows — 🟢 61 · 🟡 3 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
+75 flows — 🟢 61 · 🟡 3 · 🔴 4 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -308,6 +308,14 @@ establish the outcome. They are listed in full at the end of this document.
 | `funding.majority-refund` | A strict majority of contributors votes to refund; each collects their own contribution | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-03) |  |
 | `funding.deadline-refund` | A pool nobody closes refunds after the settle deadline | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-04) |  |
 | `funding.organizer-refund` | The organizer refunds everyone from an open pool | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-05) |  |
+
+### `104-passkey-account-recovery` — Passkey account recovery — find the account, never guess it
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `passkey.recover-account-by-lookup` | A member signing in on a new device reaches the account their passkey controls, including when that passkey was added to the account later rather than being the key that created it | 🔴 absent | none | — (proposed: on-chain) | #1429 |  |
+| `passkey.recover-never-wrong-account` | A passkey whose account cannot be verified never opens a session on an unverified address; the member is told what could not be confirmed, and an unreachable chain reads as unverified rather than as no account existing | 🔴 absent | none | — (proposed: no-chain) | #1429 |  |
+| `passkey.recover-by-address` | A member relinks by entering their account address, and is signed in only when the chain lists the recovered key among that account's current owners | 🔴 absent | none | — (proposed: on-chain) | #1429 |  |
 
 ## Disclosure — a member consents to a cost
 
