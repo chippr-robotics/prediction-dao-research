@@ -14,6 +14,116 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.16.0 — 2026-09-04
+
+Promoted from: v1.16.0-rc.15
+Previous release: v1.15.2 · Range: `v1.15.2..v1.16.0` (93 commits)
+
+### 🚀 Features
+
+- feat(custody): the vault queue can be re-read, and says so (spec 102)
+- feat(custody): compact vault cards and the three-view vault sheet (spec 102)
+- feat(custody): vault groups, cross-chain queue reads, load-all, acting identity follows the wallet (spec 102)
+- feat(wallet): one display formatter for balances in Wrap, Transfer and the asset picker (spec 102 US7)
+- feat(funding-pools): pool money toward a goal from Request ▸ Pool (spec 102)
+- feat(097): provision per-chain QuickNode endpoints for the four EVM mainnets (#1403)
+- feat(061): light up Bitcoin on the production gateway (#1393)
+- feat(native): tenant native-identity proof and onboarding docs (spec 102, T029-T030)
+- feat(native): universal/app links land on the linked surface (spec 102, T027-T028)
+- feat(native): Ledger BLE rung behind the one hardware seam (spec 102, T024-T026)
+- feat(release): native channel artifacts in the release chain (spec 102, T019-T023)
+- feat(native): platform passkey bridge behind the credential seam (spec 102, T016-T018)
+- feat(native): US1+US2 seams — capability notices, support floor, lifecycle app-lock (spec 102, T010-T015)
+- feat(native): foundational seams — runtime, tenant identity, version sync, CSP parity (spec 102, T005-T009)
+- feat(native): add Capacitor platforms and shells for iOS/Android channels (spec 102, T001-T004)
+- feat(infra): adopt the numbered QuickNode multichain endpoints (#1378 E)
+
+### 🐛 Bug Fixes
+
+- fix(native): cold-start deep links, Android smoke as a file, and stale comments (#1421)
+- fix(release): unblock the native channel gate, and check it before main (#1419)
+- fix(custody): one queue row per proposal, whatever the scan returns (spec 102)
+- fix(custody): an instance the list could not read gets an honest queue entry (spec 102)
+- fix(custody): queue reads settle at a ceiling; cards carry a live pending count (spec 102)
+- fix(recovery): give the unlocked legacy signer its own nonce count
+- fix(e2e): passkey full-stack — lazy account reads, remove-by-index, testnet portfolio opt-in
+- fix(funding-pools): judge deadlines by the chain clock; order e2e chain reads after the page renders
+- fix(e2e): CORS front for alto, payment-token decimals in tier prices, RC-04 copy
+- fix: close #1405 #1407 #1408 by implementation, and drive the tranche-1 tiers to green
+- fix(e2e): fund the impersonated CREATE2 deployer by setBalance and cap the proxy tx gas
+- fix(frontend): four production defects reported from the live node (#1392)
+- fix: restore staging's gates — @solana-program/system 0.14.0 + native shells at v1.15.1 (#1396)
+- fix(e2e): settle finite animations before the a11y scan (spec 094/102)
+- fix(lint): repair the two errors the re-resolved eslint plugins surfaced (spec 102)
+- fix(native): drop unused import in passkeyBridge test (eslint)
+- fix(e2e): match the labels the rows actually render, and scroll the resolve control into view
+- fix(api-access): derive introspection invalidation instead of scheduling it per keystroke
+- fix(recovery): pin every sweep leg to one monotone fee schedule and stop trusting ethers' cached balance read
+- fix(backup): settle the pointer write on the passkey rail; pin the e2e pointer read to one block
+
+### 📚 Documentation
+
+- docs(spec-102): round 6 screenshots — the queue's Refresh, both themes and widths
+- docs(spec-102): record the queue re-read and what running the suite found
+- docs(spec-102): actor-critic screenshot record, four rounds
+- docs(097): correct the QuickNode endpoint facts against the Admin API
+- docs(native): honest matrix rows, CLAUDE.md guardrails, verify pass (spec 102, T031-T033)
+- docs(spec): task breakdown for native release channels (spec 102)
+- docs(spec): plan native release channels — research, data model, seam contracts (spec 102)
+- docs(spec): specify native release channels — iOS, Android, web (spec 102)
+
+### 🧪 Tests
+
+- test(custody): wait for the chain before reading CV-02's queue
+- test(e2e): repair the on-chain custody specs against the vault sheet (spec 102)
+- test(e2e): no-chain coverage for the vault sheet — VS-01…VS-10 + a11y (spec 102)
+- test(custody): PolicyBadge suite fakes the card's queue read (spec 102)
+- test(custody): drive the on-chain custody specs through the vault sheet; governance in Details (spec 102)
+- test(funding-pools): reload before asserting the refund count the page could only learn on load
+- test(e2e): compare BigInts explicitly in SU-01/SU-02 too
+- test(e2e): compare BigInts explicitly in CD-01
+- test(e2e): acting-account purchase and refusals (098), voucher send from portfolio (026)
+- test(e2e): passkey full-stack tier (bundler + paymaster), ClearPath, app lock, Bitcoin card, BLE
+- test(e2e): group settlement on chain (058), and every absent row now cites #1400
+- test(e2e): accept the clock-derived 'Pending Resolution' badge on Active wagers
+- test(e2e): match the creator's 'Under Consideration' row label in RES-12
+- test(e2e): api-access console through the real registry path, and the matrix rows for the batch (#1285)
+- test(e2e): establish money-path preconditions instead of snapshotting for them (#1250, #1327 lead 2, #1240)
+
+### 🏗️ Infrastructure
+
+- ci: re-measure the on-chain tier, and stop a timed-out leg reporting green
+- ci(e2e): gate absent matrix rows on an OPEN tracking issue; record the #1400 §B decision
+
+### 🧹 Maintenance
+
+- style(custody): the queue's Refresh stays with its summary on a phone (spec 102)
+- style(custody): sheet forms take the app's chrome; details and queue rows tightened (spec 102)
+- chore(spec): renumber funding pools to spec 103 (102 is capacitor channels on staging)
+- chore: refresh CI merge ref after #1396 (gates restore) landed on staging
+- chore(deps): bump @solana/kit from 7.1.1 to 8.1.0 (#1334)
+- chore(api-access): version 1.0.1 to pair with the introspection-fix bytes
+- chore(miniapps): re-record api-access build digests for the introspection fix
+
+### Artifacts
+
+Range: `v1.15.2..v1.16.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | moved | `amoy-chain80002-v2/membershipManagerImpl` → `0xb6499596703cEE6eA4BE5b5F01DEc4d7ccfe10bD`<br>`amoy-chain80002-v2/wagerRegistryImpl` → `0xa2176F5Fea39888cD1697Be4651415490C78905d`<br>`amoy-chain80002-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`arbitrum-chain42161-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`arbitrum-chain42161-v2/bridgeRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`arbitrum-chain42161-v2/liquidityRouterImpl` → `0x7Af46728e7C969b75723398e3F93b565E968A3ba`<br>`arbitrum-chain42161-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`base-chain8453-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`base-chain8453-v2/bridgeRouterImpl` → `0x41ba6bcA216bd6A4c5A0Bf8F9b2d682ec0a879D5`<br>`base-chain8453-v2/liquidityRouterImpl` → `0x7Af46728e7c969b75723398E3f93b565E968A3bA`<br>`base-chain8453-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`etc-chain61-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mainnet-chain1-v2/feeRouterImpl` → `0x5cCd55D62Ce7Df730c39543B332dD8d6054B5d00`<br>`mainnet-chain1-v2/bridgeRouterImpl` → `0xcA277Cc3485Da12771d6171a9D0A894B8DD159f8`<br>`mainnet-chain1-v2/liquidityRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`mainnet-chain1-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mordor-chain63-v2/membershipManagerImpl` → `0x7D38F7Ef26f7E2409d5C04a62c1d9A3Ec002A49e`<br>`mordor-chain63-v2/wagerRegistryImpl` → `0x9FfE701be18Ff033706f2df19cd8730F5CB884B2`<br>`mordor-chain63-v2/tokenFactoryImpl` → `0x135108EB6f81e361b6cF131d2Cb9A01E92Cd8ED9`<br>`mordor-chain63-v2/openERC20Impl` → `0xd8E67C6C058a6D35E69c691B44b8D5f858591971`<br>`mordor-chain63-v2/openERC721Impl` → `0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB`<br>`mordor-chain63-v2/restrictedERC20Impl` → `0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444`<br>`mordor-chain63-v2/openERC20V2Impl` → `0x92169007926fBc8Ac90cdD311dD3C2557158C395`<br>`mordor-chain63-v2/openERC721V2Impl` → `0xEeaBC05214FF0C42cbA42b365aB400b7ca4311cE`<br>`mordor-chain63-v2/restrictedERC20V2Impl` → `0x664d87bed13ea4D50Cd3da8e0aC5A8D70A302A0B`<br>`mordor-chain63-v2/externalDAORegistryImpl` → `0x28270cB71E87D2D6C662e61CFE6eD02d05d43B7A`<br>`mordor-chain63-v2/zkWagerPoolFactoryImpl` → `0xd3e851FDDa9D5796D503daFd34b2403D7336d9fD`<br>`mordor-chain63-v2/poolImpl` → `0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277`<br>`mordor-chain63-v2/wagerPoolFactoryImpl` → `0xfB6F9F7EfD86a220eE1aD7906278247051B25430`<br>`mordor-chain63-v2/feeRouterImpl` → `0x744b8E56d84bb8D7657b2Bb13426cB882c93B7E6`<br>`mordor-chain63-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mordor-chain63-v2/miniAppRegistryImpl` → `0xc8Dd8601b35aDa3AF367C9E41f24Fd0503Ced674`<br>`optimism-chain10-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`optimism-chain10-v2/bridgeRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`optimism-chain10-v2/liquidityRouterImpl` → `0x7Af46728e7C969b75723398e3F93b565E968A3ba`<br>`optimism-chain10-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`polygon-chain137-v2/membershipManagerImpl` → `0x7177470fE3c5D89CEf965A596540E57cE290C939`<br>`polygon-chain137-v2/wagerRegistryImpl` → `0x9c52C1ef4Bbe65CF19a5C26bebD4A22100964898`<br>`polygon-chain137-v2/tokenFactoryImpl` → `0xE819f7b672D81A8b78d40b1C99Fe5d646513D12C`<br>`polygon-chain137-v2/openERC20Impl` → `0xd8E67C6C058a6D35E69c691B44b8D5f858591971`<br>`polygon-chain137-v2/openERC721Impl` → `0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB`<br>`polygon-chain137-v2/restrictedERC20Impl` → `0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444`<br>`polygon-chain137-v2/wagerPoolFactoryImpl` → `0x754d8aa4785Ec4bEE7c921f8d032D5E3a78d9308`<br>`polygon-chain137-v2/poolImpl` → `0xB153e4456FaD1A7E96e35e14094Cf6964348BC40`<br>`polygon-chain137-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`polygon-chain137-v2/callsignRegistryImpl` → `0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49`<br>`polygon-chain137-v2/feeRouterImpl` → `0x40ee755246E60f66E7bA425F99C6d704859d38db`<br>`polygon-chain137-v2/bridgeRouterImpl` → `0x8F7A7e7437733326BD2F8045BFceD9B821aF1De1`<br>`polygon-chain137-v2/liquidityRouterImpl` → `0x33818052Ca8B5b8Bb9777Bf6eBbaFCD8Faae6e65`<br>`polygon-chain137-v2/miniAppRegistryImpl` → `0x41858006aD6dd0788b84F9fb17A28d8167C7b331` |
+| Mini-app packages | moved | `api-access` v1.0.1<br>`clearpath` v1.2.0<br>`token-mint` v1.0.2 |
+| Subgraph endpoint | moved | `v0.3.0` |
+
+### Native channel artifacts (v1.16.0)
+
+| Channel | Artifact | SHA-256 | Signed |
+|---|---|---|---|
+| android | `FairWins-v1.16.0.aab` | `33a19c9376412b20b57abf98d784ce86242abc7f58dc1f4a36611eb373166339` | no — operator signing ceremony (see docs/runbooks/native-release-operations.md) |
+| ios | `FairWins-v1.16.0-ios.xcarchive.zip` | `044f623e3e8cc5073194142c9950692b953cf7edfd237428a94b59f24d1703ec` | no — operator signing ceremony (see docs/runbooks/native-release-operations.md) |
+
 ## v1.15.2 — 2026-08-30
 
 Promoted from: none — released directly from main
