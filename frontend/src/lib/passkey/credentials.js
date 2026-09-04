@@ -75,6 +75,18 @@ export class CeremonyUnanswered extends Error {
 export const CEREMONY_TIMEOUT_MS = 120_000
 
 /**
+ * The deadline for a PINNED attempt that has a discoverable fallback behind it.
+ *
+ * Shorter than the full ceremony deadline on purpose: this attempt is only
+ * waiting to find out whether the platform will show anything at all, and a
+ * platform that is going to show its sheet shows it immediately. Long enough
+ * that a member who did get a sheet and is working through a biometric is not
+ * cut off; if they are slower than this the fallback simply reopens a chooser,
+ * which is a re-prompt rather than a failure.
+ */
+export const PINNED_CEREMONY_TIMEOUT_MS = 30_000
+
+/**
  * Run a credential ceremony with a deadline. The AbortController is what
  * actually ends it — the WebAuthn `timeout` field is only a hint the platform
  * may ignore, which is precisely the failure being guarded against — and the
@@ -83,16 +95,31 @@ export const CEREMONY_TIMEOUT_MS = 120_000
  */
 async function withCeremonyDeadline(run, { timeoutMs = CEREMONY_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   const controller = typeof AbortController === 'function' ? new AbortController() : undefined
-  let timedOut = false
-  const timer = setTimer(() => {
-    timedOut = true
-    controller?.abort()
-  }, timeoutMs)
+  let timer
+
+  // RACED, not merely aborted. Aborting asks the platform to stop and trusts it
+  // to reject — but a platform that never answered the ceremony is exactly one
+  // that may never answer the abort either, and then the promise is still
+  // pending and nothing has been fixed. The deadline therefore rejects on its
+  // own account; the abort is a courtesy sent alongside it.
+  const deadline = new Promise((_resolve, reject) => {
+    timer = setTimer(() => {
+      try {
+        controller?.abort()
+      } catch {
+        // An abort the platform refuses changes nothing — the race is already lost to us.
+      }
+      reject(new CeremonyUnanswered())
+    }, timeoutMs)
+  })
+
+  const running = run({ signal: controller?.signal, timeoutMs })
+  // The deadline may win while the ceremony rejects later; that late rejection
+  // is expected and must not surface as an unhandled one.
+  Promise.resolve(running).catch(() => {})
+
   try {
-    return await run({ signal: controller?.signal, timeoutMs })
-  } catch (err) {
-    if (timedOut) throw new CeremonyUnanswered()
-    throw err
+    return await Promise.race([running, deadline])
   } finally {
     clearTimer(timer)
   }
@@ -310,19 +337,54 @@ export async function getAssertion({ challenge, credentialId, prfSalt, discovera
     }
   }
 
-  const publicKey = {
-    challenge,
-    userVerification: 'required',
-    ...(allowCredentials.length ? { allowCredentials } : {}),
-    ...(prfSalt ? { extensions: { prf: { eval: { first: prfSalt } } } } : {}),
-  }
+  const request = (allow, ms) =>
+    withCeremonyDeadline(
+      ({ signal, timeoutMs: deadline }) =>
+        credentials.get({
+          signal,
+          publicKey: {
+            challenge,
+            userVerification: 'required',
+            timeout: deadline,
+            ...(allow.length ? { allowCredentials: allow } : {}),
+            ...(prfSalt ? { extensions: { prf: { eval: { first: prfSalt } } } } : {}),
+          },
+        }),
+      { timeoutMs: ms, ...(deps.timers || {}) }
+    )
 
+  // A PINNED REQUEST CAN GO UNANSWERED WHILE A DISCOVERABLE ONE WORKS, and the
+  // member cannot tell the difference from a dead button.
+  //
+  // `allowCredentials` narrows the request to specific credential ids, and the
+  // platform routes it only to a provider that holds one of them. On Android a
+  // device can have several passkey providers; a credential sitting in one the
+  // request is not dispatched to means NO provider claims it, so no sheet
+  // appears at all — no prompt, no rejection, nothing to cancel. Observed in
+  // the installed PWA, where `create` (never pinned) and "Use a different
+  // passkey…" (deliberately unpinned) both work while every pinned request
+  // shows nothing.
+  //
+  // So the pin is an OPTIMISATION, not a requirement: it re-authenticates the
+  // exact credential with no second chooser, which is the better experience
+  // where it works. When it goes unanswered we ask the platform for its own
+  // list instead, and then CHECK WHAT CAME BACK — the pin is what we lose, the
+  // guarantee is not.
   let assertion
   try {
-    assertion = await withCeremonyDeadline(
-      ({ signal, timeoutMs: ms }) => credentials.get({ signal, publicKey: { ...publicKey, timeout: ms } }),
-      { timeoutMs, ...(deps.timers || {}) }
-    )
+    const pinned = allowCredentials.length > 0
+    try {
+      assertion = await request(allowCredentials, pinned ? PINNED_CEREMONY_TIMEOUT_MS : timeoutMs)
+    } catch (err) {
+      if (!pinned || !(err instanceof CeremonyUnanswered)) throw err
+      assertion = await request([], timeoutMs)
+      if (credentialId && assertion?.id && assertion.id !== credentialId) {
+        // Only enforceable when the caller named ONE credential. An unpinned
+        // fallback from a whole-book request is answered by whichever passkey
+        // the member chose, which is exactly what was wanted.
+        throw new CeremonyCancelled('That is a different passkey from the one you picked. Choose it again, or use "Use a different passkey…".')
+      }
+    }
   } catch (err) {
     throw mapCeremonyError(err)
   }

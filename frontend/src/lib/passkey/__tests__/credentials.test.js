@@ -245,16 +245,8 @@ describe('a ceremony the platform never answers', () => {
 
   it('ends an assertion that never settles, and says the device did not answer', async () => {
     const { timers, expire } = fakeTimers()
-    const credentials = {
-      get: ({ signal }) =>
-        new Promise((_resolve, reject) => {
-          signal.addEventListener('abort', () => {
-            const err = new Error('aborted')
-            err.name = 'AbortError'
-            reject(err)
-          })
-        }),
-    }
+    // No sheet, no rejection, not even an answer to the abort — the reported behaviour.
+    const credentials = { get: () => new Promise(() => {}) }
     const promise = getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
     expire()
     await expect(promise).rejects.toBeInstanceOf(CeremonyUnanswered)
@@ -262,9 +254,7 @@ describe('a ceremony the platform never answers', () => {
 
   it('is NOT reported as a cancellation — the member never saw a prompt to cancel', async () => {
     const { timers, expire } = fakeTimers()
-    const credentials = { get: ({ signal }) => new Promise((_r, reject) => {
-      signal.addEventListener('abort', () => { const e = new Error('x'); e.name = 'AbortError'; reject(e) })
-    }) }
+    const credentials = { get: () => new Promise(() => {}) }
     const promise = getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
     expire()
     const err = await promise.catch((e) => e)
@@ -298,5 +288,61 @@ describe('a ceremony the platform never answers', () => {
     expect(seen.publicKey.timeout).toBe(120_000)
     expect(seen.signal).toBeDefined()
     expect(cleared).toEqual([7]) // the deadline never outlives the ceremony
+  })
+})
+
+// The report that started this: a pinned request gets no sheet on Android when
+// the credential sits in a provider the request is not dispatched to, while an
+// unpinned one works. The pin is an optimisation; the check after is the guarantee.
+describe('a pinned request the platform never answers falls back to the whole list', () => {
+  const unanswered = () => new Promise(() => {}) // no sheet, no rejection, ever
+  const ok = (id) => Promise.resolve({
+    id,
+    response: { signature: new Uint8Array(1), authenticatorData: new Uint8Array(1), clientDataJSON: new Uint8Array(1) },
+    getClientExtensionResults: () => ({}),
+  })
+  // Every deadline fires immediately, so the pinned attempt always goes unanswered.
+  const timers = { setTimer: (fn) => { fn(); return 1 }, clearTimer: () => {} }
+
+  it('retries WITHOUT allowCredentials and accepts the credential the member picked', async () => {
+    const seen = []
+    const credentials = {
+      get: ({ publicKey }) => {
+        seen.push(publicKey.allowCredentials?.length ?? 0)
+        return publicKey.allowCredentials ? unanswered() : ok('cred-1')
+      },
+    }
+    const out = await getAssertion({ challenge: new Uint8Array(32), credentialId: 'cred-1', deps: { credentials, timers } })
+    expect(seen).toEqual([1, 0]) // pinned first, then the platform's own list
+    expect(out.credentialId).toBe('cred-1')
+  })
+
+  it('REFUSES a different passkey than the one that was pinned', async () => {
+    const credentials = {
+      get: ({ publicKey }) => (publicKey.allowCredentials ? unanswered() : ok('someone-else')),
+    }
+    await expect(
+      getAssertion({ challenge: new Uint8Array(32), credentialId: 'cred-1', deps: { credentials, timers } })
+    ).rejects.toThrow(/different passkey/i)
+  })
+
+  it('does not fall back when there was nothing pinned to lose', async () => {
+    let calls = 0
+    const credentials = { get: () => { calls += 1; return unanswered() } }
+    await expect(
+      getAssertion({ challenge: new Uint8Array(32), discoverable: true, deps: { credentials, timers } })
+    ).rejects.toBeInstanceOf(CeremonyUnanswered)
+    expect(calls).toBe(1)
+  })
+
+  it('does not fall back on a real cancellation — the member said no', async () => {
+    let calls = 0
+    const credentials = {
+      get: () => { calls += 1; const e = new Error('no'); e.name = 'NotAllowedError'; return Promise.reject(e) },
+    }
+    await expect(
+      getAssertion({ challenge: new Uint8Array(32), credentialId: 'cred-1', deps: { credentials, timers } })
+    ).rejects.toBeInstanceOf(CeremonyCancelled)
+    expect(calls).toBe(1)
   })
 })
