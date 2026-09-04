@@ -84,6 +84,8 @@
     "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor",
     "check:deps": "node scripts/deps/check-dependency-hygiene.js",
     "check:iac": "node scripts/infra/check-iac-guardrails.js",
+    "audit:admin-roles": "node scripts/ops/audit-admin-roles.js",
+    "ops:revoke-stale-admin": "node scripts/ops/revoke-stale-admin.js",
     "check:finops": "node scripts/finops/check-finops-coverage.js",
     "e2e:matrix": "node scripts/e2e/generate-coverage-matrix.js",
     "check:e2e-matrix": "node scripts/e2e/generate-coverage-matrix.js --check",
