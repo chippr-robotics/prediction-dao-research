@@ -42,6 +42,62 @@ export class AuthenticatorUnavailable extends Error {
   }
 }
 
+/**
+ * Typed error: the platform never answered the ceremony.
+ *
+ * DISTINCT FROM CeremonyCancelled ON PURPOSE. A cancellation is the member
+ * saying no; this is the device saying nothing at all — no prompt, no
+ * rejection — and telling someone they cancelled a prompt they never saw is a
+ * lie that also hides the fault.
+ */
+export class CeremonyUnanswered extends Error {
+  constructor(message = 'The device never answered the passkey prompt — no sign-in sheet appeared. Try again, or use another sign-in method.') {
+    super(message)
+    this.name = 'CeremonyUnanswered'
+  }
+}
+
+/**
+ * How long to wait for the platform before giving the member back control.
+ *
+ * `navigator.credentials.get()` is NOT guaranteed to settle. When the platform
+ * declines to show its UI at all — observed in the installed PWA on Android,
+ * where the same code in a browser tab shows the sheet normally — the promise
+ * stays pending forever. Everything above it then hangs with it: the connector
+ * never returns, WalletContext's in-flight guard is never released by its
+ * `finally`, and every later attempt is refused with "a connection attempt is
+ * already in progress" until the app is restarted. One unanswered prompt
+ * becomes a permanent lockout.
+ *
+ * Two minutes is longer than any real ceremony (biometric prompts are seconds)
+ * and short enough that a member is not stuck staring at nothing.
+ */
+export const CEREMONY_TIMEOUT_MS = 120_000
+
+/**
+ * Run a credential ceremony with a deadline. The AbortController is what
+ * actually ends it — the WebAuthn `timeout` field is only a hint the platform
+ * may ignore, which is precisely the failure being guarded against — and the
+ * abort is distinguished from a member's own cancellation so the error can
+ * tell the truth about which happened.
+ */
+async function withCeremonyDeadline(run, { timeoutMs = CEREMONY_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+  const controller = typeof AbortController === 'function' ? new AbortController() : undefined
+  let timedOut = false
+  const timer = setTimer(() => {
+    timedOut = true
+    controller?.abort()
+  }, timeoutMs)
+  try {
+    return await run({ signal: controller?.signal, timeoutMs })
+  } catch (err) {
+    if (timedOut) throw new CeremonyUnanswered()
+    throw err
+  } finally {
+    clearTimer(timer)
+  }
+}
+
 /** Map raw WebAuthn/DOM exceptions onto the typed taxonomy. */
 function mapCeremonyError(err) {
   if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return new CeremonyCancelled()
@@ -171,7 +227,7 @@ const b64url = (buf) => {
  *
  * `deps` is injectable for tests: { credentials, rpId }.
  */
-export async function createCredential({ label, userName = 'FairWins account', deps = {} } = {}) {
+export async function createCredential({ label, userName = 'FairWins account', timeoutMs, deps = {} } = {}) {
   const credentials = deps.credentials ?? resolveCredentialManager()
   if (!credentials) throw new AuthenticatorUnavailable('no credential manager in this context')
 
@@ -180,8 +236,10 @@ export async function createCredential({ label, userName = 'FairWins account', d
 
   let cred
   try {
-    cred = await credentials.create({
+    cred = await withCeremonyDeadline(({ signal, timeoutMs: ms }) => credentials.create({
+      signal,
       publicKey: {
+        timeout: ms,
         rp: { name: RP_NAME, ...(deps.rpId ? { id: deps.rpId } : {}) },
         user: { id: userId, name: userName, displayName: userName },
         challenge,
@@ -192,7 +250,7 @@ export async function createCredential({ label, userName = 'FairWins account', d
         },
         extensions: { prf: { eval: { first: new Uint8Array(32) } } },
       },
-    })
+    }), { timeoutMs, ...(deps.timers || {}) })
   } catch (err) {
     throw mapCeremonyError(err)
   }
@@ -234,7 +292,7 @@ export async function createCredential({ label, userName = 'FairWins account', d
  * Returns the raw fields the signing layer needs:
  *   { credentialId, signature, authenticatorData, clientDataJSON, prfOutput? }
  */
-export async function getAssertion({ challenge, credentialId, prfSalt, discoverable = false, deps = {} }) {
+export async function getAssertion({ challenge, credentialId, prfSalt, discoverable = false, timeoutMs, deps = {} }) {
   const credentials = deps.credentials ?? resolveCredentialManager()
   if (!credentials) throw new AuthenticatorUnavailable('no credential manager in this context')
 
@@ -261,7 +319,10 @@ export async function getAssertion({ challenge, credentialId, prfSalt, discovera
 
   let assertion
   try {
-    assertion = await credentials.get({ publicKey })
+    assertion = await withCeremonyDeadline(
+      ({ signal, timeoutMs: ms }) => credentials.get({ signal, publicKey: { ...publicKey, timeout: ms } }),
+      { timeoutMs, ...(deps.timers || {}) }
+    )
   } catch (err) {
     throw mapCeremonyError(err)
   }
