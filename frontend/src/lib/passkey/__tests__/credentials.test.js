@@ -15,6 +15,7 @@ import {
   knownCredentials,
   CeremonyCancelled,
   CeremonyUnanswered,
+  CredentialMismatch,
   AuthenticatorUnavailable,
 } from '../credentials'
 
@@ -317,13 +318,33 @@ describe('a pinned request the platform never answers falls back to the whole li
     expect(out.credentialId).toBe('cred-1')
   })
 
-  it('REFUSES a different passkey than the one that was pinned', async () => {
+  it('REFUSES a different passkey than the one that was pinned, and says so out loud', async () => {
     const credentials = {
       get: ({ publicKey }) => (publicKey.allowCredentials ? unanswered() : ok('someone-else')),
     }
-    await expect(
-      getAssertion({ challenge: new Uint8Array(32), credentialId: 'cred-1', deps: { credentials, timers } })
-    ).rejects.toThrow(/different passkey/i)
+    const err = await getAssertion({
+      challenge: new Uint8Array(32), credentialId: 'cred-1', deps: { credentials, timers },
+    }).catch((e) => e)
+    expect(err).toBeInstanceOf(CredentialMismatch)
+    expect(err.message).toMatch(/different passkey/i)
+    // NOT a cancellation: ConnectModal resets the step for those WITHOUT showing
+    // the message, which would hide this entirely.
+    expect(err).not.toBeInstanceOf(CeremonyCancelled)
+    expect(err.name).not.toBe('CeremonyCancelled')
+  })
+
+  it('does not hand an AbortSignal to the native bridge', async () => {
+    let seen
+    const credentials = { get: (opts) => { seen = opts; return ok('cred-1') } }
+    await getAssertion({
+      challenge: new Uint8Array(32),
+      credentialId: 'cred-1',
+      // What the native runtime resolves to; the signal is not serializable
+      // across the Capacitor boundary and the race does not need it.
+      deps: { credentials, timers: { ...timers, abortable: false } },
+    })
+    expect('signal' in seen).toBe(false)
+    expect(seen.publicKey.timeout).toBeDefined() // the platform hint still goes
   })
 
   it('does not fall back when there was nothing pinned to lose', async () => {

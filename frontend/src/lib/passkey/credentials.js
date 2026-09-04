@@ -33,6 +33,22 @@ export class CeremonyCancelled extends Error {
   }
 }
 
+/**
+ * Typed error: the ceremony was answered by a DIFFERENT credential than the one
+ * the member picked.
+ *
+ * Deliberately not a CeremonyCancelled. `ConnectModal` treats that as a clean
+ * abort and resets the step WITHOUT surfacing the message, so classifying this
+ * as a cancellation would swallow the explanation entirely and leave the member
+ * looking at a chooser that silently reappeared.
+ */
+export class CredentialMismatch extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'CredentialMismatch'
+  }
+}
+
 /** Typed error: no usable authenticator/WebAuthn support in this context. */
 export class AuthenticatorUnavailable extends Error {
   constructor(reason) {
@@ -93,8 +109,19 @@ export const PINNED_CEREMONY_TIMEOUT_MS = 30_000
  * abort is distinguished from a member's own cancellation so the error can
  * tell the truth about which happened.
  */
-async function withCeremonyDeadline(run, { timeoutMs = CEREMONY_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
-  const controller = typeof AbortController === 'function' ? new AbortController() : undefined
+async function withCeremonyDeadline(run, {
+  timeoutMs = CEREMONY_TIMEOUT_MS,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+  // THE SIGNAL IS WEB-ONLY. The native adapter exists to absorb JSON-clone
+  // hazards across the Capacitor boundary (a Uint8Array PRF salt is mangled by
+  // the plugin's own `JSON.parse(JSON.stringify(...))`); an AbortSignal is not
+  // serializable at all and could fail the call outright. It is a courtesy in
+  // any case — the deadline is enforced by the race, not by the abort — so on
+  // native the key is omitted entirely rather than sent as undefined.
+  abortable = getRuntime() === RUNTIMES.WEB,
+} = {}) {
+  const controller = abortable && typeof AbortController === 'function' ? new AbortController() : undefined
   let timer
 
   // RACED, not merely aborted. Aborting asks the platform to stop and trusts it
@@ -264,7 +291,7 @@ export async function createCredential({ label, userName = 'FairWins account', t
   let cred
   try {
     cred = await withCeremonyDeadline(({ signal, timeoutMs: ms }) => credentials.create({
-      signal,
+      ...(signal ? { signal } : {}),
       publicKey: {
         timeout: ms,
         rp: { name: RP_NAME, ...(deps.rpId ? { id: deps.rpId } : {}) },
@@ -341,7 +368,7 @@ export async function getAssertion({ challenge, credentialId, prfSalt, discovera
     withCeremonyDeadline(
       ({ signal, timeoutMs: deadline }) =>
         credentials.get({
-          signal,
+          ...(signal ? { signal } : {}),
           publicKey: {
             challenge,
             userVerification: 'required',
@@ -382,7 +409,9 @@ export async function getAssertion({ challenge, credentialId, prfSalt, discovera
         // Only enforceable when the caller named ONE credential. An unpinned
         // fallback from a whole-book request is answered by whichever passkey
         // the member chose, which is exactly what was wanted.
-        throw new CeremonyCancelled('That is a different passkey from the one you picked. Choose it again, or use "Use a different passkey…".')
+        throw new CredentialMismatch(
+          'That is a different passkey from the one you picked. Choose it again, or use "Use a different passkey…".'
+        )
       }
     }
   } catch (err) {
