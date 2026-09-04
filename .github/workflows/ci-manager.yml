@@ -316,7 +316,12 @@ jobs:
       - frontend-tests
       - docs-build
       - security-analysis
-    if: always()
+    # `always()` alone would ALSO run this after the whole run is cancelled — which is what
+    # `cancel-in-progress` does to the previous run on every new push — and the cancelled-counts-as-
+    # failure rule below would then paint a superseded commit red for no reason. `!cancelled()`
+    # excludes exactly that: a cancelled RUN skips the summary, while a single leg killed by its own
+    # `timeout-minutes` (which does not cancel the run) still reaches it and still fails.
+    if: always() && !cancelled()
     
     steps:
       - name: Generate final summary
@@ -373,8 +378,9 @@ jobs:
       # `cancelled` counts as a failure, deliberately. A matrix leg killed by its own
       # `timeout-minutes` reports `cancelled`, not `failure` — so on 2026-09-03 the on-chain
       # tier's shard 2 was cut off mid-spec and this summary still reported success, which is a
-      # merge gate reporting on tests that never finished. A run a human cancels never reaches
-      # this step (the summary job is cancelled with it), so nothing legitimate is caught here.
+      # merge gate reporting on tests that never finished. A cancelled RUN is a different thing
+      # and is excluded by the job's `!cancelled()` condition, not here: this step only ever sees
+      # runs that were allowed to finish.
       - name: Check overall status
         run: |
           failed=""

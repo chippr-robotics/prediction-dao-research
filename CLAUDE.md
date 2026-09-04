@@ -542,7 +542,27 @@ artifacts live under `specs/<feature>/`.
   reason in place (`NativeCapabilityNotice`), the FR-015 stale-build floor renders NOTHING when
   unknowable (a network failure is not a fact about the member's build), and device-bound flows
   (BLE signing, real passkey PRF) are staged MANUAL protocols in the runbooks, never fake CI
-  coverage. Capacitor deps are pinned EXACT under the spec-075 lockfile rules. See
+  coverage. Capacitor deps are pinned EXACT under the spec-075 lockfile rules. **The native jobs
+  only ever run on a push to `main`** (release.yml's sole trigger), so they are unexercised by every
+  PR that precedes them — all four failed the first time they executed (v1.16.0, 2026-09-04) and
+  skipped `Publish release`, minting no version at all. Two toolchain facts hold them up:
+  **Java 21** (`capacitor-android` compiles at 21; an older JDK says `invalid source release: 21`)
+  and **the newest Xcode on the image** — Capacitor 8 ships its Swift API as prebuilt XCFrameworks,
+  and an older compiler reads a binary Swift module through its `.swiftinterface`, SILENTLY DROPPING
+  declarations it cannot parse. That does not present as "Xcode too old": it presents as
+  `CAPPluginCall has no member 'reject'` in EVERY third-party plugin at once, each looking
+  independently stale. Excluding the first one (bluetooth-le) just moved the failure to the second
+  (passkey) — **two current plugins failing identically is the host, not the guests** — and would
+  have dropped Ledger-over-BLE on iOS for a cause that was never real.
+  `native-prepare` selects the newest Xcode and prints it with `swift --version`, so a log always
+  says what built the app (confirmed on Xcode 26.6 / Swift 6.3.3: every plugin error vanished
+  with both plugins present). **Never name a simulator device** either — `name:iPhone 15` broke
+  on an image whose newest are iPhone 17s; compile against `generic/platform=iOS Simulator` and
+  let the smoke pick an available iPhone by UDID. **`native-build.yml` now compiles both shells BEFORE main** — on a path-filtered pull
+  request and on every push to `staging` — and it plus all four release jobs prepare the shell
+  through the ONE composite `.github/actions/native-prepare`: an early check that prepares
+  differently from the release would pass while the release fails, so change the preparation in the
+  action, never in a caller. See
   `docs/developer-guide/native-channels.md` + `docs/runbooks/native-release-operations.md` +
   `specs/103-capacitor-channels/`.
 - **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
