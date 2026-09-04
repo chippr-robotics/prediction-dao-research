@@ -50,10 +50,28 @@ runs:
           node scripts/native/sync-native-config.js
         fi
         cd frontend && npx cap sync "${{ inputs.platform }}"
-    # Capacitor has no per-platform plugin exclusion, so this runs after the sync
-    # that generates Package.swift and removes what must not reach an iOS build.
-    # It fails loudly rather than no-opping — see the script's header.
-    - name: Exclude iOS-incompatible plugins
+    # Select the newest Xcode on the image, and SAY WHICH. Capacitor 8 ships its
+    # Swift API as prebuilt XCFrameworks (`capacitor-swift-pm` resolves
+    # Capacitor.xcframework / Cordova.xcframework, not source), and a binary
+    # Swift module is read through its `.swiftinterface` by an older compiler —
+    # which silently DROPS every declaration that compiler cannot parse. The
+    # symptom is not "too old, upgrade": it is `CAPPluginCall has no member
+    # 'reject'` and `getString` resolving to the wrong overload, in EVERY
+    # third-party plugin at once, as if each were independently stale. That cost
+    # a wrong diagnosis on 2026-09-04. `@capacitor/ios`'s own test script targets
+    # iPhone 17 / iOS 26, so the toolchain floor is far above the macos-14
+    # image's default Xcode 15.4.
+    - name: Select the newest Xcode
       if: inputs.platform == 'ios'
       shell: bash
-      run: node scripts/native/exclude-ios-spm-plugins.js
+      run: |
+        set -euo pipefail
+        NEWEST=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+        if [ -z "$NEWEST" ]; then
+          echo "::error::No Xcode found on this image."
+          exit 1
+        fi
+        sudo xcode-select -s "$NEWEST/Contents/Developer"
+        echo "Selected $NEWEST"
+        xcodebuild -version
+        swift --version

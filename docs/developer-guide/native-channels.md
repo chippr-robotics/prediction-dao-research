@@ -81,15 +81,28 @@ An older JDK answers with `error: invalid source release: 21` at
 `:capacitor-android:compileReleaseJavaWithJavac`, which reads like a project misconfiguration and
 is not one. Both the artifact job and the emulator smoke job set `java-version: '21'`.
 
-**Ledger over Bluetooth is ANDROID-ONLY.** `@capacitor-community/bluetooth-le@8.3.0` — the newest
-published — does not compile against the Capacitor Swift API this app pins
-(`capacitor-swift-pm exact 8.5.0`): `CAPPluginCall has no member 'reject'`, and `getString(_:)`
-resolving to a two-argument overload. Capacitor has no per-platform plugin exclusion — a plugin in
-`package.json` is a plugin on both platforms — so `scripts/native/exclude-ios-spm-plugins.js` runs
-after `cap sync ios` and removes exactly that plugin's `.package`/`.product` pair from the
-generated `CapApp-SPM/Package.swift`. It **fails loudly** when the entry is not found: either the
-plugin left the tree (drop it from `EXCLUDED`) or the CLI changed its output shape (revisit the
-script). Both are for a person to decide; neither is a no-op.
+**The macOS toolchain is a floor, not a preference — and it lies when it is too low.** Capacitor 8
+ships its Swift API as prebuilt XCFrameworks (`capacitor-swift-pm` resolves `Capacitor.xcframework`
+and `Cordova.xcframework`, not source). An older Swift compiler reads a binary module through its
+`.swiftinterface` and **silently drops every declaration it cannot parse**. What that looks like is
+not "your Xcode is too old": it is
+
+```
+BluetoothLe/Plugin.swift:719: value of type 'CAPPluginCall' has no member 'reject'
+CapacitorPasskeyPlugin.swift:410: value of type 'CAPPluginCall' has no member 'reject'
+```
+
+— every third-party plugin failing at once, each looking independently stale. The first reading here
+was exactly that: bluetooth-le was blamed and excluded from the iOS package, whereupon passkey failed
+identically. **Two current plugins failing the same way is the host, not the guests.**
+`@capacitor/ios`'s own test script targets iPhone 17 / iOS 26, so the floor sits far above the
+`macos-14` image's default Xcode 15.4. `native-prepare` therefore selects the newest Xcode on the
+image and PRINTS it with `swift --version`, so a log always says what built the app.
+
+`scripts/native/exclude-ios-spm-plugins.js` survives that episode, unwired, for the case where a
+plugin genuinely is incompatible. Reach for it only with evidence that the plugin and not the
+toolchain is what fails — excluding one costs a real capability (Ledger over BLE) and the first time
+it was reached for, the cause was not real.
 
 **A check now runs before `main`.** `native-build.yml` compiles both shells on any pull request
 touching what a native build reads — dependencies, either shell, the Capacitor config, the native

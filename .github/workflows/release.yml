@@ -159,7 +159,7 @@ jobs:
 
   ios-artifact:
     name: iOS artifact (unsigned archive)
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: native-gate
     if: needs.native-gate.outputs.proceed == 'true'
     steps:
@@ -278,7 +278,7 @@ jobs:
 
   native-smoke-ios:
     name: Native smoke (iOS simulator)
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: native-gate
     if: needs.native-gate.outputs.proceed == 'true'
     steps:

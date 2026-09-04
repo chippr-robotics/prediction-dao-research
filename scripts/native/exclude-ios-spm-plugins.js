@@ -2,10 +2,26 @@
 /**
  * Remove plugins from the generated iOS SPM package (spec 103).
  *
- * WHY THIS EXISTS. `cap sync ios` regenerates `CapApp-SPM/Package.swift` from every installed
+ * NOT CURRENTLY WIRED INTO ANY BUILD — and the reason is worth keeping.
+ *
+ * This was written on 2026-09-04 to unblock the iOS archive, on the reading that
+ * `@capacitor-community/bluetooth-le` was simply behind Capacitor. Excluding it moved the failure
+ * to `@capgo/capacitor-passkey`, which failed IDENTICALLY — and two independent, current plugins
+ * failing the same way is not two stale plugins, it is the host. Capacitor 8 ships its Swift API as
+ * prebuilt XCFrameworks, and an older compiler reads a binary Swift module through its
+ * `.swiftinterface`, silently dropping declarations it cannot parse. The runner was on Xcode 15.4
+ * against a Capacitor built for the Xcode 26 era. The fix is the toolchain
+ * (`.github/actions/native-prepare` selects the newest Xcode and prints it); no plugin needed
+ * excluding, and excluding one would have dropped Ledger-over-BLE on iOS for a cause that was
+ * never real.
+ *
+ * It is kept because the mechanism is sound and a genuinely incompatible plugin is a normal thing
+ * to hit. To use it, call it after `cap sync ios` — and only with evidence that the plugin, and not
+ * the toolchain, is what does not compile.
+ *
+ * HOW IT WORKS. `cap sync ios` regenerates `CapApp-SPM/Package.swift` from every installed
  * Capacitor plugin, and Capacitor offers no per-platform exclusion — a plugin in package.json is a
- * plugin on both platforms. `@capacitor-community/bluetooth-le@8.3.0` (the newest published) does
- * not compile against the Capacitor Swift API the app pins (`capacitor-swift-pm exact 8.5.0`):
+ * plugin on both platforms. The original report, for the record:
  *
  *     Plugin.swift:719: value of type 'CAPPluginCall' has no member 'reject'
  *     Plugin.swift:730: missing argument for parameter #2 in call   (getString)

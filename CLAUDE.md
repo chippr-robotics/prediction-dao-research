@@ -547,11 +547,15 @@ artifacts live under `specs/<feature>/`.
   PR that precedes them — all four failed the first time they executed (v1.16.0, 2026-09-04) and
   skipped `Publish release`, minting no version at all. Two toolchain facts hold them up:
   **Java 21** (`capacitor-android` compiles at 21; an older JDK says `invalid source release: 21`)
-  and **Ledger BLE is ANDROID-ONLY** — `@capacitor-community/bluetooth-le@8.3.0`, the newest
-  published, does not compile against `capacitor-swift-pm 8.5.0`, and since Capacitor has no
-  per-platform plugin exclusion, `scripts/native/exclude-ios-spm-plugins.js` strips it from the
-  generated `CapApp-SPM/Package.swift` after `cap sync ios` and FAILS LOUDLY if the entry is
-  missing. **`native-build.yml` now compiles both shells BEFORE main** — on a path-filtered pull
+  and **the newest Xcode on the image** — Capacitor 8 ships its Swift API as prebuilt XCFrameworks,
+  and an older compiler reads a binary Swift module through its `.swiftinterface`, SILENTLY DROPPING
+  declarations it cannot parse. That does not present as "Xcode too old": it presents as
+  `CAPPluginCall has no member 'reject'` in EVERY third-party plugin at once, each looking
+  independently stale. Excluding the first one (bluetooth-le) just moved the failure to the second
+  (passkey) — **two current plugins failing identically is the host, not the guests** — and would
+  have dropped Ledger-over-BLE on iOS for a cause that was never real.
+  `native-prepare` selects the newest Xcode and prints it with `swift --version`, so a log always
+  says what built the app. **`native-build.yml` now compiles both shells BEFORE main** — on a path-filtered pull
   request and on every push to `staging` — and it plus all four release jobs prepare the shell
   through the ONE composite `.github/actions/native-prepare`: an early check that prepares
   differently from the release would pass while the release fails, so change the preparation in the
