@@ -292,22 +292,37 @@ jobs:
         with:
           platform: ios
           version: ${{ needs.native-gate.outputs.version }}
+      # The simulator is CHOSEN FROM THE IMAGE, never named in advance: a hardcoded
+      # `iPhone 15` broke the moment the runner moved to an Xcode 26 image whose
+      # newest simulators are iPhone 17s. Pick the last available iPhone by UDID
+      # and build for exactly that device, so the thing built and the thing booted
+      # cannot disagree.
       - name: Build for the simulator and probe the app
         run: |
           set -euo pipefail
+          UDID=$(xcrun simctl list devices available --json \
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; \
+                p=[x for r in d.values() for x in r if x['name'].startswith('iPhone')]; \
+                print(p[-1]['udid'] if p else '')")
+          if [ -z "$UDID" ]; then
+            echo "::error::No iPhone simulator is available on this image."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Using simulator $UDID"
           xcodebuild \
             -project frontend/ios/App/App.xcodeproj \
             -scheme App \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -destination "id=$UDID" \
             -derivedDataPath "$RUNNER_TEMP/dd" \
             build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
           BUNDLE_ID=$(grep -oE 'PRODUCT_BUNDLE_IDENTIFIER = [^;]+' frontend/ios/App/App.xcodeproj/project.pbxproj | head -1 | sed 's/.*= //')
-          xcrun simctl boot 'iPhone 15' || true
-          xcrun simctl bootstatus 'iPhone 15' -b
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
           APP_PATH=$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name 'App.app' | head -1)
-          xcrun simctl install booted "$APP_PATH"
-          xcrun simctl launch --console-pty booted "$BUNDLE_ID" > console.log 2>&1 &
+          xcrun simctl install "$UDID" "$APP_PATH"
+          xcrun simctl launch --console-pty "$UDID" "$BUNDLE_ID" > console.log 2>&1 &
           MOUNTED=false
           for i in $(seq 1 60); do
             if grep -q 'fw-smoke.*shell-mounted' console.log; then MOUNTED=true; break; fi

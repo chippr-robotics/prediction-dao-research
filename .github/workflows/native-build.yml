@@ -90,6 +90,10 @@ jobs:
           platform: ios
       # A simulator build compiles every Swift target the archive does, including each Capacitor
       # plugin's sources — which is where bluetooth-le failed — and needs no signing identity.
+      # `generic/platform=iOS Simulator`, never a device NAME. A compile needs no
+      # particular device, and naming one couples the check to whatever the image
+      # happens to ship — `name:iPhone 15` failed here the moment the runner moved
+      # to an Xcode 26 image whose newest simulators are iPhone 17s.
       - name: Compile the iOS shell
         run: |
           set -euo pipefail
@@ -97,6 +101,6 @@ jobs:
             -project frontend/ios/App/App.xcodeproj \
             -scheme App \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/dd" \
             build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO

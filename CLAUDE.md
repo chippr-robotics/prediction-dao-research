@@ -555,7 +555,10 @@ artifacts live under `specs/<feature>/`.
   (passkey) — **two current plugins failing identically is the host, not the guests** — and would
   have dropped Ledger-over-BLE on iOS for a cause that was never real.
   `native-prepare` selects the newest Xcode and prints it with `swift --version`, so a log always
-  says what built the app. **`native-build.yml` now compiles both shells BEFORE main** — on a path-filtered pull
+  says what built the app (confirmed on Xcode 26.6 / Swift 6.3.3: every plugin error vanished
+  with both plugins present). **Never name a simulator device** either — `name:iPhone 15` broke
+  on an image whose newest are iPhone 17s; compile against `generic/platform=iOS Simulator` and
+  let the smoke pick an available iPhone by UDID. **`native-build.yml` now compiles both shells BEFORE main** — on a path-filtered pull
   request and on every push to `staging` — and it plus all four release jobs prepare the shell
   through the ONE composite `.github/actions/native-prepare`: an early check that prepares
   differently from the release would pass while the release fails, so change the preparation in the

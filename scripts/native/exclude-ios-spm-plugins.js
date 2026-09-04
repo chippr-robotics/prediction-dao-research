@@ -13,7 +13,8 @@
  * against a Capacitor built for the Xcode 26 era. The fix is the toolchain
  * (`.github/actions/native-prepare` selects the newest Xcode and prints it); no plugin needed
  * excluding, and excluding one would have dropped Ledger-over-BLE on iOS for a cause that was
- * never real.
+ * never real. CONFIRMED on Xcode 26.6 / Swift 6.3.3: every plugin error disappeared with both
+ * bluetooth-le and passkey present.
  *
  * It is kept because the mechanism is sound and a genuinely incompatible plugin is a normal thing
  * to hit. To use it, call it after `cap sync ios` — and only with evidence that the plugin, and not

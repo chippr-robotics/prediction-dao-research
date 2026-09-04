@@ -99,6 +99,16 @@ identically. **Two current plugins failing the same way is the host, not the gue
 `macos-14` image's default Xcode 15.4. `native-prepare` therefore selects the newest Xcode on the
 image and PRINTS it with `swift --version`, so a log always says what built the app.
 
+**Confirmed, not inferred**: on Xcode 26.6 / Swift 6.3.3 every plugin Swift error disappeared with
+BOTH bluetooth-le and passkey present in the package. Ledger over BLE works on iOS; nothing needed
+excluding.
+
+**Never name a simulator device.** The same run then failed on `name:iPhone 15`, which the Xcode 26
+image does not have (its newest are iPhone 17s). A compile takes
+`generic/platform=iOS Simulator`; the smoke picks the last available iPhone by UDID from
+`simctl list devices available` and builds for THAT device, so the thing built and the thing booted
+cannot disagree.
+
 `scripts/native/exclude-ios-spm-plugins.js` survives that episode, unwired, for the case where a
 plugin genuinely is incompatible. Reach for it only with evidence that the plugin and not the
 toolchain is what fails — excluding one costs a real capability (Ledger over BLE) and the first time
