@@ -14,6 +14,7 @@ import {
   forgetCredential,
   knownCredentials,
   CeremonyCancelled,
+  CeremonyUnanswered,
   AuthenticatorUnavailable,
 } from '../credentials'
 
@@ -227,5 +228,75 @@ describe('upsertCredential + isTransactComplete (spec 045 FR-005/FR-006)', () =>
     expect(isTransactComplete({ credentialId: 'c1', publicKey: { x: '0x1' } })).toBe(false)
     expect(isTransactComplete({ publicKey: { x: '0x1', y: '0x2' } })).toBe(false)
     expect(isTransactComplete(undefined)).toBe(false)
+  })
+})
+
+// The installed PWA on Android showed no sheet at all and never rejected, so
+// every later attempt hit WalletContext's in-flight guard: one unanswered
+// prompt became a permanent lockout.
+describe('a ceremony the platform never answers', () => {
+  const fakeTimers = () => {
+    let fire
+    return {
+      timers: { setTimer: (fn) => { fire = fn; return 1 }, clearTimer: () => {} },
+      expire: () => fire(),
+    }
+  }
+
+  it('ends an assertion that never settles, and says the device did not answer', async () => {
+    const { timers, expire } = fakeTimers()
+    const credentials = {
+      get: ({ signal }) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            const err = new Error('aborted')
+            err.name = 'AbortError'
+            reject(err)
+          })
+        }),
+    }
+    const promise = getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
+    expire()
+    await expect(promise).rejects.toBeInstanceOf(CeremonyUnanswered)
+  })
+
+  it('is NOT reported as a cancellation — the member never saw a prompt to cancel', async () => {
+    const { timers, expire } = fakeTimers()
+    const credentials = { get: ({ signal }) => new Promise((_r, reject) => {
+      signal.addEventListener('abort', () => { const e = new Error('x'); e.name = 'AbortError'; reject(e) })
+    }) }
+    const promise = getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
+    expire()
+    const err = await promise.catch((e) => e)
+    expect(err).not.toBeInstanceOf(CeremonyCancelled)
+    expect(err.message).toMatch(/never answered/i)
+  })
+
+  it('still reports a real cancellation as a cancellation', async () => {
+    const { timers } = fakeTimers()
+    const credentials = { get: () => { const e = new Error('no'); e.name = 'NotAllowedError'; return Promise.reject(e) } }
+    await expect(
+      getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
+    ).rejects.toBeInstanceOf(CeremonyCancelled)
+  })
+
+  it('passes a deadline to the platform as well, and clears it on success', async () => {
+    const cleared = []
+    const timers = { setTimer: () => 7, clearTimer: (id) => cleared.push(id) }
+    let seen
+    const credentials = {
+      get: (opts) => {
+        seen = opts
+        return Promise.resolve({
+          id: 'c1',
+          response: { signature: new Uint8Array(1), authenticatorData: new Uint8Array(1), clientDataJSON: new Uint8Array(1) },
+          getClientExtensionResults: () => ({}),
+        })
+      },
+    }
+    await getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
+    expect(seen.publicKey.timeout).toBe(120_000)
+    expect(seen.signal).toBeDefined()
+    expect(cleared).toEqual([7]) // the deadline never outlives the ceremony
   })
 })
