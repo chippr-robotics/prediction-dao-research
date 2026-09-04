@@ -461,6 +461,12 @@ describe('cross-device sign-in (fresh browser, synced passkey)', () => {
       getAssertion,
       deriveAddress: undefined, // use the real local derivation
       resolveAddress: undefined,
+      // Spec 104: the derived address is a CANDIDATE now, so this path only yields a session
+      // when the chain agrees the key owns it. The double answers as the deployed account does.
+      readControllers: vi.fn().mockResolvedValue({
+        deployed: true,
+        controllers: [{ index: 0n, kind: 'passkey', ownerBytes: xy }],
+      }),
     })
     const out = await connector.connect({ chainId: 80002, mode: 'sign-in' })
 
@@ -517,6 +523,12 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
     // The passkey was added as a SECOND controller to a pre-existing account, so its own key does
     // not derive that account's address. Handing back the derived address would show the member an
     // account that is not theirs.
+    //
+    // Spec 104 changed what the refusal SAYS. It used to read "this passkey controls an account
+    // that this browser cannot identify" — which asserts a fact the app does not have: it does not
+    // know the passkey controls anything. The honest statement is that nothing found on this chain
+    // lists the key, plus the reason the search could miss one (a passkey added after creation),
+    // plus the way out (name the account).
     const priv = p256.utils.randomSecretKey()
     let n = 0
     const { connector } = makeConnector({
@@ -528,11 +540,25 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
         controllers: [{ index: 0n, kind: 'passkey', ownerBytes: `0x${'9'.repeat(128)}` }],
       }),
     })
-    await expect(connector.connect({ chainId: 80002, mode: 'sign-in' })).rejects.toThrow(/cannot identify/i)
+    await expect(connector.connect({ chainId: 80002, mode: 'sign-in' })).rejects.toThrow(
+      /no account on this network lists this passkey/i
+    )
     expect(readSession()).toBeNull()
   })
 
-  it('still signs in when the chain is unreachable (sign-in never requires an RPC)', async () => {
+  it('an unreachable chain refuses as UNVERIFIED, and says so in words that are not "no account"', async () => {
+    // DELIBERATE INVERSION (spec 104, US2). This used to sign in on the derived address, on the
+    // reasoning that sign-in must never require a working RPC. That reasoning still holds for the
+    // paths it was written for — a returning member on their own browser resolves from the local
+    // record with no chain read at all, and that test sits above unchanged. It does NOT hold here,
+    // because this is precisely the case where the app does not know the answer: no local record,
+    // an address computed from an assumption, and no way to check it. Proceeding anyway is how a
+    // member whose passkey was added to an existing account got signed into an empty new one and
+    // read it as their money being gone.
+    //
+    // So the chain read is required exactly where its absence would mean guessing, and the refusal
+    // stays retryable and honest: an unreachable network is not evidence of an absent account, and
+    // the message must never let a member conclude they have none.
     const priv = p256.utils.randomSecretKey()
     let n = 0
     const { connector } = makeConnector({
@@ -541,7 +567,81 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
       resolveAddress: undefined,
       readControllers: vi.fn().mockRejectedValue(new Error('RPC down')),
     })
-    const out = await connector.connect({ chainId: 80002, mode: 'sign-in' })
-    expect(out.accounts).toHaveLength(1)
+    const err = await connector.connect({ chainId: 80002, mode: 'sign-in' }).catch((e) => e)
+    expect(err.name).toBe('AccountUnresolved')
+    expect(err.outcome).toBe('unverified')
+    expect(err.message).toMatch(/does not mean you have no account/i)
+    expect(readSession()).toBeNull()
+  })
+
+  it('an UNDEPLOYED derived address never becomes the session — the regression this feature exists for', async () => {
+    // Before spec 104 this signed the member in on a brand-new empty account, silently. It is the
+    // quietest of the failure shapes and the one a member reads as "my money is gone", so the
+    // assertion is not merely that it throws: the address must not appear anywhere in the outcome.
+    const priv = p256.utils.randomSecretKey()
+    let n = 0
+    const { connector } = makeConnector({
+      getAssertion: vi.fn(async () => makeAssertion(priv, `c-${n++}`)),
+      deriveAddress: undefined,
+      resolveAddress: undefined,
+      readControllers: vi.fn().mockResolvedValue({ deployed: false, controllers: [] }),
+    })
+    const err = await connector.connect({ chainId: 80002, mode: 'sign-in' }).catch((e) => e)
+    expect(err.name).toBe('AccountUnresolved')
+    expect(err.outcome).toBe('none-found')
+    expect(err.address).toBeNull()
+    expect(readSession()).toBeNull()
+  })
+
+  it('recovers on an address the MEMBER supplies, once the chain confirms the key owns it', async () => {
+    // US3. The address is a hint that reaches the same confirmation a searched candidate does —
+    // which is what stops "type any address" from being a way into somebody else's account.
+    const priv = p256.utils.randomSecretKey()
+    const xy = `0x${Array.from(p256.getPublicKey(priv, false).subarray(1), (b) => b.toString(16).padStart(2, '0')).join('')}`
+    const NAMED = '0x00000000000000000000000000000000000BEEF1'
+    let n = 0
+    const readControllers = vi.fn(async ({ accountAddress }) => {
+      // Only the named account lists the key; the derived one does not exist. That is the whole
+      // point of this path — it reaches an account no derivation could have found.
+      if (accountAddress.toLowerCase() === NAMED.toLowerCase()) {
+        return { deployed: true, controllers: [{ index: 2n, kind: 'passkey', ownerBytes: xy }] }
+      }
+      return { deployed: false, controllers: [] }
+    })
+    const { connector } = makeConnector({
+      getAssertion: vi.fn(async () => makeAssertion(priv, `c-${n++}`)),
+      deriveAddress: undefined,
+      resolveAddress: undefined,
+      readControllers,
+    })
+    const out = await connector.connect({ chainId: 80002, mode: 'sign-in', accountAddress: NAMED })
+    expect(out.accounts[0].toLowerCase()).toBe(NAMED.toLowerCase())
+    // The slot the CHAIN reported is what gets recorded — never 0 by assumption (spec 045 FR-009).
+    expect(knownCredentials().find((c) => c.credentialId === 'cred-phone').ownerIndex).toBe(2)
+  })
+
+  it('refuses an address the member supplies that the key does not control', async () => {
+    // The security property of US3 is this NEGATIVE. A test suite that only proves the happy path
+    // has not tested the feature.
+    const priv = p256.utils.randomSecretKey()
+    let n = 0
+    const { connector } = makeConnector({
+      getAssertion: vi.fn(async () => makeAssertion(priv, `c-${n++}`)),
+      deriveAddress: undefined,
+      resolveAddress: undefined,
+      readControllers: vi.fn().mockResolvedValue({
+        deployed: true,
+        controllers: [{ index: 0n, kind: 'passkey', ownerBytes: `0x${'9'.repeat(128)}` }],
+      }),
+    })
+    const err = await connector
+      .connect({ chainId: 80002, mode: 'sign-in', accountAddress: '0x00000000000000000000000000000000000BEEF1' })
+      .catch((e) => e)
+    expect(err.name).toBe('AccountUnresolved')
+    expect(err.outcome).toBe('not-controller')
+    // Named back to the member: "that account exists, this passkey does not control it" is a
+    // legible refusal where a bare no is not.
+    expect(err.address).toBe('0x00000000000000000000000000000000000BEEF1')
+    expect(readSession()).toBeNull()
   })
 })

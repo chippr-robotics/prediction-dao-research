@@ -838,6 +838,34 @@ artifacts live under `specs/<feature>/`.
   `specs/095-member-api-agentic-access/` + `specs/096-x402-agentic-payments/`.
 
 <!-- SPECKIT START -->
+- **A passkey's account is LOOKED UP, never derived (spec 104).** `lib/passkey/accountLookup.js` is
+  the one seam that answers "which account does this key control?", and its `Resolution` type has
+  four shapes of which **only `resolved` carries an address** — three of its four constructors take
+  no address at all, so "return the derived one anyway" has nowhere to live (the spec-089
+  `reading.js` device). That is the whole point: `resolveAccountForCredential` used to derive an
+  address assuming the key was the account's **sole initial owner at nonce 0** and return it even
+  when the chain said nothing was deployed there, which signed a member whose passkey had been
+  ADDED to an existing account into a brand-new empty one, silently — a zero balance they read as
+  their money being gone. Five rules: (1) **a session opens only on `resolved`** — everything else
+  raises `AccountUnresolved` carrying the outcome, so the surface offers recovery instead of a dead
+  end; (2) **`unverified` is NEVER `none-found`** — an unreachable chain is not evidence of
+  absence, and the two lead to different member actions (retry vs. recover), exactly as spec 095
+  keeps `auth_unverifiable` out of the denial path and spec 084 keeps a third verdict; (3)
+  **verification is against the CURRENT owner set** and `ownerIndex` is whatever the chain reported,
+  never 0 by assumption (spec 045 FR-009); (4) **an address is a HINT, never a claim** — a member's
+  typed address takes the identical confirmation a searched candidate takes, which is what stops
+  "type any address" being a way into someone else's account; (5) **every leg is deadline-bounded
+  and expires to `unverified`** — the direct lesson of v1.16.1, where an unbounded wait on an
+  external system turned one failure into a permanent lockout. Derivation survives ONLY for
+  `mode: 'sign-up'`, where the member asked to create an account. Reads go through the spec-069 seam
+  (`defaultPublicClient` no longer builds a transport from `NETWORKS[chainId].rpcUrl`). Discovery
+  (nonce enumeration + an `AccountCreated` scan) is Release 2 and is **blocked on recording
+  `deployBlocks.accountFactory`** — absent on every chain today, and `deployBlocks?.X || 0` makes
+  that a silent scan from block 0, not a loud failure. Keys added to an account after creation are
+  undiscoverable by design (`AddOwner` has no address to filter on, the subgraph indexes no account
+  entities) and are covered by the address path. See
+  `docs/developer-guide/passkey-account-recovery.md` + `specs/104-passkey-account-recovery/`.
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
 at specs/104-passkey-account-recovery/plan.md

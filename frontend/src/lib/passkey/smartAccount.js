@@ -13,6 +13,7 @@
 
 import {
   http,
+  fallback,
   createPublicClient,
   encodeFunctionData,
   encodeAbiParameters,
@@ -28,6 +29,7 @@ import {
   createPaymasterClient,
 } from 'viem/account-abstraction'
 import { getNetwork } from '../../config/networks'
+import { resolveRpcEndpoints } from '../network/rpcEndpoints'
 import { getContractAddressForChain } from '../../config/contracts'
 import { CeremonyCancelled, isTransactComplete } from './credentials'
 
@@ -283,9 +285,39 @@ function toViemChain(net) {
   }
 }
 
+/**
+ * Read client for a chain, honouring the MEMBER's own endpoint (spec 069, spec 104 FR-012).
+ *
+ * This used to build a transport straight from `getNetwork(chainId).rpcUrl`, which spec 069
+ * forbids in as many words: a member who configured their own endpoint had it honoured everywhere
+ * except the passkey read path. That matters most in account recovery, which is read-heavy and so
+ * the flow most likely to be rate-limited off a shared default — and where the cost is not a slow
+ * screen but an `unverified` verdict, i.e. a member turned away from their own account for want of
+ * a request their configured endpoint would have served.
+ *
+ * A member endpoint yields real failover with the build default behind it, so a custom endpoint
+ * going dark degrades rather than taking the chain down.
+ */
 export function defaultPublicClient(chainId) {
   const net = getNetwork(chainId)
-  return createPublicClient({ chain: toViemChain(net), transport: http(net.rpcUrl) })
+  const route = resolveRpcEndpoints(chainId)
+  const primary = route.primary?.url || net.rpcUrl
+  const options = Object.keys(route.primary?.headers || {}).length
+    ? { fetchOptions: { headers: route.primary.headers } }
+    : undefined
+
+  // The member's failover, then the build default behind both. Deduped on the URL rather than on
+  // the transport object: a member on default settings has all three resolve to the same string,
+  // and viem's transport is an opaque callable whose url is not reliably introspectable.
+  const urls = [route.failover?.url, route.defaultUrl].filter((u) => u && u !== primary)
+  const transports = [http(primary, options), ...new Set(urls)].map((t) =>
+    typeof t === 'string' ? http(t) : t
+  )
+
+  return createPublicClient({
+    chain: toViemChain(net),
+    transport: transports.length > 1 ? fallback(transports) : transports[0],
+  })
 }
 
 /**

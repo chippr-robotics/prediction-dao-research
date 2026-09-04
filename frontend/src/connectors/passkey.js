@@ -176,7 +176,7 @@ export function passkeyConnector(options = {}) {
       this.capability = await (deps.detectCapability ?? detectCapability)()
     },
 
-    async connect({ chainId, isReconnecting, credentialId, discoverable, mode: requestedMode } = {}) {
+    async connect({ chainId, isReconnecting, credentialId, discoverable, accountAddress, mode: requestedMode } = {}) {
       const targetChain = chainId ?? buildDefaultChainId(config)
       // NO network gate here, deliberately. Signing in is a WebAuthn ceremony plus a local address
       // derivation — it needs no bundler, no EntryPoint and no RPC. Gating it on submission support
@@ -249,6 +249,9 @@ export function passkeyConnector(options = {}) {
           credentialId: assertion.credentialId,
           chainId: targetChain,
           assertion,
+          // Spec 104: set when the member is recovering by naming their account. It is a hint the
+          // chain still has to agree with — it never becomes the session address on its own.
+          accountAddress,
           deps,
         })
         address = resolved.address
@@ -271,6 +274,10 @@ export function passkeyConnector(options = {}) {
             publicKey:
               resolved.publicKey ??
               (await repairPublicKey({ credentialId: assertion.credentialId, address, chainId: targetChain, deps })),
+            // The slot the CHAIN reported, when a resolution confirmed one. Signatures need the
+            // real index (spec 045 FR-009); recording it here saves the next sign-in the read and
+            // keeps a rotated account from being signed for at a stale slot.
+            ownerIndex: resolved.ownerIndex,
           },
           deps.storage
         )
@@ -381,15 +388,54 @@ async function repairPublicKey({ credentialId, address, chainId, deps }) {
 }
 
 /**
- * Resolve a credential to its account address. Order: local mapping (fast),
- * then the on-chain owner lookup rebuild (survives cleared browser data —
- * the address book of last resort is the chain itself).
+ * Raised when a passkey's account could NOT be confirmed on chain (spec 104).
+ *
+ * Deliberately not a `CeremonyCancelled`: ConnectModal resets the step for those without showing
+ * the message, which would swallow the one thing the member needs to read. Carries the resolver's
+ * outcome so the surface can offer the right next step — retry for `unverified`, recover by
+ * address for `none-found` — instead of rendering one dead end for both.
  */
-export async function resolveAccountForCredential({ credentialId, chainId, assertion, deps = {} }) {
+export class AccountUnresolved extends Error {
+  constructor(resolution, { credentialId } = {}) {
+    super(resolution?.reason || 'We could not confirm which account this passkey controls.')
+    this.name = 'AccountUnresolved'
+    this.outcome = resolution?.outcome
+    this.reason = resolution?.reason
+    this.address = resolution?.address ?? null
+    this.credentialId = credentialId ?? null
+  }
+}
+
+/**
+ * Resolve a credential to its account address.
+ *
+ * Order: this browser's own record (fast, and already verified once), then — for a passkey this
+ * browser has never seen — the CHAIN.
+ *
+ * What changed in spec 104 is the last step. This function used to derive an address from the
+ * recovered key on the assumption that the key was the account's sole initial owner, read the
+ * chain to sanity-check it, and return the derived address anyway when the chain said nothing was
+ * deployed there. For a member whose passkey was added to an existing account — or who simply had
+ * a second account — that signed them into a brand-new empty one, with no error and no clue: the
+ * app showed them a zero balance and called it their wallet.
+ *
+ * So derivation now produces a CANDIDATE that must be confirmed, and an address leaves this
+ * function only when the chain agreed. Where an address cannot be confirmed the caller gets an
+ * {@link AccountUnresolved} carrying the outcome, and the member gets a recovery path — never a
+ * session on an account nobody verified.
+ *
+ * Derivation survives untouched where it is truthful: creating a NEW account (`mode: 'sign-up'`),
+ * which the member asked for explicitly.
+ */
+export async function resolveAccountForCredential({ credentialId, chainId, assertion, accountAddress, deps = {} }) {
   const { knownCredentials } = await import('../lib/passkey/credentials')
   const local = knownCredentials(deps.storage).find((c) => c.credentialId === credentialId)
   if (local?.address) return { address: local.address, publicKey: local.publicKey }
   if (local?.publicKey) {
+    // A record this browser wrote is a remembered fact, not a guess: it was written when the
+    // account was created here, so the sole-initial-owner assumption genuinely holds. Kept LOCAL
+    // and chain-free on purpose — sign-in must not require a working RPC, which is the lockout
+    // this path was built to fix.
     const address = await deriveAddress({
       chainId,
       ownersBytes: [publicKeyToOwnerBytes(local.publicKey)],
@@ -400,10 +446,10 @@ export async function resolveAccountForCredential({ credentialId, chainId, asser
 
   // Nothing local — the CROSS-DEVICE case: the passkey is synced from another device (iCloud
   // Keychain / Google Password Manager) so the ceremony succeeds, but this browser has never seen
-  // the account. Recover the public key from the signature the member just produced; that is
-  // enough to derive the address, and it also leaves the session able to transact without a
-  // further ceremony. Needs one extra confirmation because a single signature cannot identify a
-  // key unambiguously — see lib/passkey/crossDevice.js — and only on first use on this device.
+  // the account. Recover the public key from the signature the member just produced; that is the
+  // only identity the chain can be asked about, and it also leaves the session able to transact
+  // without a further ceremony. Needs one extra confirmation because a single signature cannot
+  // identify a key unambiguously — see lib/passkey/crossDevice.js.
   if (assertion) {
     const { recoverPublicKey } = await import('../lib/passkey/crossDevice')
     const { publicKey, ownerBytes } = await (deps.recoverPublicKey ?? recoverPublicKey)({
@@ -411,46 +457,46 @@ export async function resolveAccountForCredential({ credentialId, chainId, asser
       credentialId,
       deps,
     })
-    const address = await deriveAddress({ chainId, ownersBytes: [ownerBytes], deps })
 
-    // The derivation assumes this passkey is the account's INITIAL owner, which is true for a
-    // passkey created at sign-up but NOT for one added later as an extra controller to a
-    // pre-existing account — that account's address came from a different initial key and is not
-    // recoverable from this one. Confirm against the chain when we can reach it: an undeployed
-    // address is the canonical account this key owns (nothing to contradict), and a deployed one
-    // must actually list the key. A deployed account that does NOT list it means this passkey
-    // belongs to some other account we cannot find offline — refuse rather than hand back an
-    // address that is not theirs.
-    //
-    // Soft-fails on an unreachable RPC by design: sign-in must not require a working chain (that
-    // is the lockout fix), and the derived address is still the correct self-owned account.
-    try {
-      const { deployed, controllers } = await (deps.readControllers ?? readControllers)({
-        chainId,
-        accountAddress: address,
-        deps,
-      })
-      const listed = controllers.some((c) => c.ownerBytes?.toLowerCase() === ownerBytes.toLowerCase())
-      if (deployed && !listed) {
-        throw new Error(
-          'This passkey controls an account that this browser cannot identify. Sign in on the device ' +
-            'where it was set up, or use a linked wallet to recover access.'
-        )
-      }
-    } catch (err) {
-      if (err?.message?.includes('cannot identify')) throw err
-      // Unreachable chain — proceed on the derivation (see above).
+    const { resolveAccounts, verifyAccountForKey, isResolved } = await import('../lib/passkey/accountLookup')
+
+    // An address the MEMBER typed is a hint like any other: it takes the same confirmation a
+    // searched candidate takes, and where it came from never shortens the check. Its distinct
+    // value is that it can name an account no derivation could reach — one this passkey was added
+    // to after creation.
+    const resolution = accountAddress
+      ? await (deps.verifyAccountForKey ?? verifyAccountForKey)({
+          ownerBytes, address: accountAddress, chainId, deps,
+        })
+      : await (deps.resolveAccounts ?? resolveAccounts)({ ownerBytes, chainId, deps })
+
+    if (!isResolved(resolution)) throw new AccountUnresolved(resolution, { credentialId })
+
+    // Release 1 confirms at most one account. When discovery lands (spec 104 Release 2) more than
+    // one is possible and the MEMBER picks — the connector must not, which is why this asserts
+    // rather than taking [0] silently.
+    if (resolution.accounts.length > 1) {
+      throw new AccountUnresolved(
+        { outcome: 'resolved', reason: 'Several accounts list this passkey. Choose the one to open.' },
+        { credentialId }
+      )
     }
-    return { address, publicKey }
+    const account = resolution.accounts[0]
+    return { address: account.address, publicKey, ownerIndex: account.ownerIndex }
   }
 
-  throw new Error(
-    'This passkey is not yet linked to an account on this browser. Enter your account address to relink.'
+  throw new AccountUnresolved(
+    {
+      outcome: 'none-found',
+      reason:
+        'This passkey is not yet linked to an account on this browser. Enter your account address to relink.',
+    },
+    { credentialId }
   )
 }
 
 /** Address-only form of {@link resolveAccountForCredential}. */
-export async function resolveAddressForCredential({ credentialId, chainId, assertion, deps = {} }) {
-  const { address } = await resolveAccountForCredential({ credentialId, chainId, assertion, deps })
+export async function resolveAddressForCredential({ credentialId, chainId, assertion, accountAddress, deps = {} }) {
+  const { address } = await resolveAccountForCredential({ credentialId, chainId, assertion, accountAddress, deps })
   return address
 }
