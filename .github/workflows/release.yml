@@ -87,21 +87,13 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-node@v7
+      # The SAME preparation `native-build.yml` runs on every pull request and
+      # push to staging — one definition, so an early check can never pass while
+      # the release it protects fails.
+      - uses: ./.github/actions/native-prepare
         with:
-          node-version: 22
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Build the web bundle for the native shell
-        run: |
-          set -euo pipefail
-          npm run build --workspace frontend
-          node scripts/native/inject-native-csp.js
-          node scripts/native/sync-native-config.js --version "${{ needs.native-gate.outputs.version }}"
-          cd frontend && npx cap sync android
+          platform: android
+          version: ${{ needs.native-gate.outputs.version }}
       # JAVA 21, not 17: `capacitor-android` (Capacitor 8) declares source/target
       # compatibility 21, and javac answers an older toolchain with
       # `invalid source release: 21` — which is what failed every Android job on
@@ -175,22 +167,12 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-node@v7
+      # Same shared preparation as the Android jobs and the pre-main check;
+      # the iOS branch of the action also runs the SPM plugin exclusion.
+      - uses: ./.github/actions/native-prepare
         with:
-          node-version: 22
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Build the web bundle for the native shell
-        run: |
-          set -euo pipefail
-          npm run build --workspace frontend
-          node scripts/native/inject-native-csp.js
-          node scripts/native/sync-native-config.js --version "${{ needs.native-gate.outputs.version }}"
-          cd frontend && npx cap sync ios
-          cd .. && node scripts/native/exclude-ios-spm-plugins.js
+          platform: ios
+          version: ${{ needs.native-gate.outputs.version }}
       # Unsigned by design: the Apple distribution identity is operator-held
       # and never enters CI (research R8). The archive's digest still pins the
       # released bytes; signing rewrites the bundle at the operator ceremony.
@@ -234,21 +216,13 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-node@v7
+      # The SAME preparation `native-build.yml` runs on every pull request and
+      # push to staging — one definition, so an early check can never pass while
+      # the release it protects fails.
+      - uses: ./.github/actions/native-prepare
         with:
-          node-version: 22
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Build the web bundle for the native shell
-        run: |
-          set -euo pipefail
-          npm run build --workspace frontend
-          node scripts/native/inject-native-csp.js
-          node scripts/native/sync-native-config.js --version "${{ needs.native-gate.outputs.version }}"
-          cd frontend && npx cap sync android
+          platform: android
+          version: ${{ needs.native-gate.outputs.version }}
       # JAVA 21, not 17: `capacitor-android` (Capacitor 8) declares source/target
       # compatibility 21, and javac answers an older toolchain with
       # `invalid source release: 21` — which is what failed every Android job on
@@ -312,22 +286,12 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-node@v7
+      # Same shared preparation as the Android jobs and the pre-main check;
+      # the iOS branch of the action also runs the SPM plugin exclusion.
+      - uses: ./.github/actions/native-prepare
         with:
-          node-version: 22
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Build the web bundle for the native shell
-        run: |
-          set -euo pipefail
-          npm run build --workspace frontend
-          node scripts/native/inject-native-csp.js
-          node scripts/native/sync-native-config.js --version "${{ needs.native-gate.outputs.version }}"
-          cd frontend && npx cap sync ios
-          cd .. && node scripts/native/exclude-ios-spm-plugins.js
+          platform: ios
+          version: ${{ needs.native-gate.outputs.version }}
       - name: Build for the simulator and probe the app
         run: |
           set -euo pipefail

@@ -551,7 +551,11 @@ artifacts live under `specs/<feature>/`.
   published, does not compile against `capacitor-swift-pm 8.5.0`, and since Capacitor has no
   per-platform plugin exclusion, `scripts/native/exclude-ios-spm-plugins.js` strips it from the
   generated `CapApp-SPM/Package.swift` after `cap sync ios` and FAILS LOUDLY if the entry is
-  missing. See
+  missing. **`native-build.yml` now compiles both shells BEFORE main** — on a path-filtered pull
+  request and on every push to `staging` — and it plus all four release jobs prepare the shell
+  through the ONE composite `.github/actions/native-prepare`: an early check that prepares
+  differently from the release would pass while the release fails, so change the preparation in the
+  action, never in a caller. See
   `docs/developer-guide/native-channels.md` + `docs/runbooks/native-release-operations.md` +
   `specs/103-capacitor-channels/`.
 - **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform

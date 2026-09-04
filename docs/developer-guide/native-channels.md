@@ -91,6 +91,18 @@ generated `CapApp-SPM/Package.swift`. It **fails loudly** when the entry is not 
 plugin left the tree (drop it from `EXCLUDED`) or the CLI changed its output shape (revisit the
 script). Both are for a person to decide; neither is a no-op.
 
+**A check now runs before `main`.** `native-build.yml` compiles both shells on any pull request
+touching what a native build reads — dependencies, either shell, the Capacitor config, the native
+scripts, these workflows — and on EVERY push to `staging`, unfiltered, as the backstop for a break
+no path filter predicted. It builds only: no smoke, no signing, no archive, no digest, all of which
+stay in `release.yml` as the sole authority for what a release record may claim. Both compiles are
+where the 2026-09-04 failures actually landed, at a fraction of the cost.
+
+Both it and the four release jobs prepare the shell through ONE composite action,
+`.github/actions/native-prepare`. That is the load-bearing part: an early check that installs,
+builds, stamps or syncs differently from the release would pass while the release fails, which is
+worse than having no check at all. Change the preparation in the action, never in a caller.
+
 The member-facing consequence is honest degradation, not a hidden gap: `lib/native/runtime.js`
 reports the BLE transport as unavailable on iOS and `NativeCapabilityNotice` renders the reason in
 place, the same as any other capability gap. Revisit when the plugin publishes a build against
