@@ -14,6 +14,37 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.16.1 — 2026-09-04
+
+Promoted from: none — released directly from main
+Previous release: v1.16.0 · Range: `v1.16.0..v1.16.1` (8 commits)
+
+### 🐛 Bug Fixes
+
+- fix(passkey): report a credential mismatch out loud, and keep the signal off the bridge
+- fix(passkey): fall back to the platform's own list when a pinned request goes unanswered
+- fix(release): sync the native shells into the release record
+- fix(passkey): never let an unanswered prompt lock a member out
+
+### Artifacts
+
+Range: `v1.16.0..v1.16.1`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
+### Native channel artifacts (v1.16.1)
+
+| Channel | Artifact | SHA-256 | Signed |
+|---|---|---|---|
+| android | `FairWins-v1.16.1.aab` | `3c0f9c219e78678374b93e233fc7c922e30f9ef51870a4e099f4cabb53966fce` | no — operator signing ceremony (see docs/runbooks/native-release-operations.md) |
+| ios | `FairWins-v1.16.1-ios.xcarchive.zip` | `2baafb8aa55aa67611f26c8f1050ff3c31c1b6810adb480a6824b7d5aae309cd` | no — operator signing ceremony (see docs/runbooks/native-release-operations.md) |
+
 ## v1.16.0 — 2026-09-04
 
 Promoted from: v1.16.0-rc.15

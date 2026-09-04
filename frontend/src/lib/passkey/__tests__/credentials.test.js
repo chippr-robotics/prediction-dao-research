@@ -14,6 +14,8 @@ import {
   forgetCredential,
   knownCredentials,
   CeremonyCancelled,
+  CeremonyUnanswered,
+  CredentialMismatch,
   AuthenticatorUnavailable,
   passkeyAccountNames,
   nameCredentialForAccount,
@@ -280,5 +282,141 @@ describe('naming a saved passkey after its account', () => {
       deps: { PublicKeyCredential: { signalCurrentUserDetails }, rpId: 'fairwins.app' },
     })
     expect(result).toEqual({ updated: false, reason: 'platform said no' })
+  })
+})
+
+// The installed PWA on Android showed no sheet at all and never rejected, so
+// every later attempt hit WalletContext's in-flight guard: one unanswered
+// prompt became a permanent lockout.
+describe('a ceremony the platform never answers', () => {
+  const fakeTimers = () => {
+    let fire
+    return {
+      timers: { setTimer: (fn) => { fire = fn; return 1 }, clearTimer: () => {} },
+      expire: () => fire(),
+    }
+  }
+
+  it('ends an assertion that never settles, and says the device did not answer', async () => {
+    const { timers, expire } = fakeTimers()
+    // No sheet, no rejection, not even an answer to the abort — the reported behaviour.
+    const credentials = { get: () => new Promise(() => {}) }
+    const promise = getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
+    expire()
+    await expect(promise).rejects.toBeInstanceOf(CeremonyUnanswered)
+  })
+
+  it('is NOT reported as a cancellation — the member never saw a prompt to cancel', async () => {
+    const { timers, expire } = fakeTimers()
+    const credentials = { get: () => new Promise(() => {}) }
+    const promise = getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
+    expire()
+    const err = await promise.catch((e) => e)
+    expect(err).not.toBeInstanceOf(CeremonyCancelled)
+    expect(err.message).toMatch(/never answered/i)
+  })
+
+  it('still reports a real cancellation as a cancellation', async () => {
+    const { timers } = fakeTimers()
+    const credentials = { get: () => { const e = new Error('no'); e.name = 'NotAllowedError'; return Promise.reject(e) } }
+    await expect(
+      getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
+    ).rejects.toBeInstanceOf(CeremonyCancelled)
+  })
+
+  it('passes a deadline to the platform as well, and clears it on success', async () => {
+    const cleared = []
+    const timers = { setTimer: () => 7, clearTimer: (id) => cleared.push(id) }
+    let seen
+    const credentials = {
+      get: (opts) => {
+        seen = opts
+        return Promise.resolve({
+          id: 'c1',
+          response: { signature: new Uint8Array(1), authenticatorData: new Uint8Array(1), clientDataJSON: new Uint8Array(1) },
+          getClientExtensionResults: () => ({}),
+        })
+      },
+    }
+    await getAssertion({ challenge: new Uint8Array(32), deps: { credentials, timers } })
+    expect(seen.publicKey.timeout).toBe(120_000)
+    expect(seen.signal).toBeDefined()
+    expect(cleared).toEqual([7]) // the deadline never outlives the ceremony
+  })
+})
+
+// The report that started this: a pinned request gets no sheet on Android when
+// the credential sits in a provider the request is not dispatched to, while an
+// unpinned one works. The pin is an optimisation; the check after is the guarantee.
+describe('a pinned request the platform never answers falls back to the whole list', () => {
+  const unanswered = () => new Promise(() => {}) // no sheet, no rejection, ever
+  const ok = (id) => Promise.resolve({
+    id,
+    response: { signature: new Uint8Array(1), authenticatorData: new Uint8Array(1), clientDataJSON: new Uint8Array(1) },
+    getClientExtensionResults: () => ({}),
+  })
+  // Every deadline fires immediately, so the pinned attempt always goes unanswered.
+  const timers = { setTimer: (fn) => { fn(); return 1 }, clearTimer: () => {} }
+
+  it('retries WITHOUT allowCredentials and accepts the credential the member picked', async () => {
+    const seen = []
+    const credentials = {
+      get: ({ publicKey }) => {
+        seen.push(publicKey.allowCredentials?.length ?? 0)
+        return publicKey.allowCredentials ? unanswered() : ok('cred-1')
+      },
+    }
+    const out = await getAssertion({ challenge: new Uint8Array(32), credentialId: 'cred-1', deps: { credentials, timers } })
+    expect(seen).toEqual([1, 0]) // pinned first, then the platform's own list
+    expect(out.credentialId).toBe('cred-1')
+  })
+
+  it('REFUSES a different passkey than the one that was pinned, and says so out loud', async () => {
+    const credentials = {
+      get: ({ publicKey }) => (publicKey.allowCredentials ? unanswered() : ok('someone-else')),
+    }
+    const err = await getAssertion({
+      challenge: new Uint8Array(32), credentialId: 'cred-1', deps: { credentials, timers },
+    }).catch((e) => e)
+    expect(err).toBeInstanceOf(CredentialMismatch)
+    expect(err.message).toMatch(/different passkey/i)
+    // NOT a cancellation: ConnectModal resets the step for those WITHOUT showing
+    // the message, which would hide this entirely.
+    expect(err).not.toBeInstanceOf(CeremonyCancelled)
+    expect(err.name).not.toBe('CeremonyCancelled')
+  })
+
+  it('does not hand an AbortSignal to the native bridge', async () => {
+    let seen
+    const credentials = { get: (opts) => { seen = opts; return ok('cred-1') } }
+    await getAssertion({
+      challenge: new Uint8Array(32),
+      credentialId: 'cred-1',
+      // What the native runtime resolves to; the signal is not serializable
+      // across the Capacitor boundary and the race does not need it.
+      deps: { credentials, timers: { ...timers, abortable: false } },
+    })
+    expect('signal' in seen).toBe(false)
+    expect(seen.publicKey.timeout).toBeDefined() // the platform hint still goes
+  })
+
+  it('does not fall back when there was nothing pinned to lose', async () => {
+    let calls = 0
+    const credentials = { get: () => { calls += 1; return unanswered() } }
+    await expect(
+      getAssertion({ challenge: new Uint8Array(32), discoverable: true, deps: { credentials, timers } })
+    ).rejects.toBeInstanceOf(CeremonyUnanswered)
+    expect(calls).toBe(1)
+  })
+
+  it('does not fall back on a real cancellation — the member said no', async () => {
+    let calls = 0
+    const credentials = {
+      get: () => { calls += 1; const e = new Error('no'); e.name = 'NotAllowedError'; return Promise.reject(e) },
+    }
+    await expect(
+      getAssertion({ challenge: new Uint8Array(32), credentialId: 'cred-1', deps: { credentials, timers } })
+    ).rejects.toBeInstanceOf(CeremonyCancelled)
+    expect(calls).toBe(1)
   })
 })

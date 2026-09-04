@@ -1,98 +1,13 @@
-previous: v1.15.2
-commits:  93
-  [unclassified] Merge pull request #1422 from chippr-robotics/staging
-  [fix -> patch] cold-start deep links, Android smoke as a file, and stale comments (#1421)
-  [unclassified] Merge pull request #1420 from chippr-robotics/staging
-  [fix -> patch] unblock the native channel gate, and check it before main (#1419)
-  [unclassified] Merge pull request #1418 from chippr-robotics/staging
-  [unclassified] Merge pull request #1416 from chippr-robotics/claude/multichain-experience-improvements-7z3wti
-  [ci -> patch] re-measure the on-chain tier, and stop a timed-out leg reporting green
-  [test -> patch] wait for the chain before reading CV-02's queue
-  [docs -> patch] round 6 screenshots — the queue's Refresh, both themes and widths
-  [style -> patch] the queue's Refresh stays with its summary on a phone (spec 102)
-  [docs -> patch] record the queue re-read and what running the suite found
-  [feat -> minor] the vault queue can be re-read, and says so (spec 102)
-  [fix -> patch] one queue row per proposal, whatever the scan returns (spec 102)
-  [test -> patch] repair the on-chain custody specs against the vault sheet (spec 102)
-  [test -> patch] no-chain coverage for the vault sheet — VS-01…VS-10 + a11y (spec 102)
-  [test -> patch] PolicyBadge suite fakes the card's queue read (spec 102)
-  [docs -> patch] actor-critic screenshot record, four rounds
-  [fix -> patch] an instance the list could not read gets an honest queue entry (spec 102)
-  [style -> patch] sheet forms take the app's chrome; details and queue rows tightened (spec 102)
-  [fix -> patch] queue reads settle at a ceiling; cards carry a live pending count (spec 102)
-  [test -> patch] drive the on-chain custody specs through the vault sheet; governance in Details (spec 102)
-  [unclassified] spec 102: checksum the fixture vault address in the capture harness
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/multichain-experience-improvements-7z3wti
-  [feat -> minor] compact vault cards and the three-view vault sheet (spec 102)
-  [feat -> minor] vault groups, cross-chain queue reads, load-all, acting identity follows the wallet (spec 102)
-  [feat -> minor] one display formatter for balances in Wrap, Transfer and the asset picker (spec 102 US7)
-  [unclassified] spec 102: regenerate e2e coverage matrix doc
-  [unclassified] spec 102: multisig chain abstraction — spec, plan, tasks, docs, matrix row, capture harness
-  [unclassified] Merge pull request #1406 from chippr-robotics/fix/097-quicknode-endpoint-facts
-  [unclassified] Merge pull request #1410 from chippr-robotics/claude/pool-funding-receive-view-n074t7
-  [fix -> patch] give the unlocked legacy signer its own nonce count
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/pool-funding-receive-view-n074t7
-  [unclassified] Merge pull request #1404 from chippr-robotics/claude/fairwins-issues-triage-5um5vp
-  [test -> patch] reload before asserting the refund count the page could only learn on load
-  [fix -> patch] passkey full-stack — lazy account reads, remove-by-index, testnet portfolio opt-in
-  [fix -> patch] judge deadlines by the chain clock; order e2e chain reads after the page renders
-  [fix -> patch] CORS front for alto, payment-token decimals in tier prices, RC-04 copy
-  [test -> patch] compare BigInts explicitly in SU-01/SU-02 too
-  [test -> patch] compare BigInts explicitly in CD-01
-  [fix -> patch] close #1405 #1407 #1408 by implementation, and drive the tranche-1 tiers to green
-  [chore -> patch] renumber funding pools to spec 103 (102 is capacitor channels on staging)
-  [unclassified] Merge origin/staging into claude/pool-funding-receive-view-n074t7
-  [feat -> minor] pool money toward a goal from Request ▸ Pool (spec 102)
-  [fix -> patch] fund the impersonated CREATE2 deployer by setBalance and cap the proxy tx gas
-  [test -> patch] acting-account purchase and refusals (098), voucher send from portfolio (026)
-  [docs -> patch] correct the QuickNode endpoint facts against the Admin API
-  [test -> patch] passkey full-stack tier (bundler + paymaster), ClearPath, app lock, Bitcoin card, BLE
-  [test -> patch] group settlement on chain (058), and every absent row now cites #1400
-  [feat -> minor] provision per-chain QuickNode endpoints for the four EVM mainnets (#1403)
-  [ci -> patch] gate absent matrix rows on an OPEN tracking issue; record the #1400 §B decision
-  [skipped] Merge pull request #1398 from chippr-robotics/chore/auto-backmerge-main-into-staging
-  [unclassified] Merge remote-tracking branch 'origin/main' into chore/auto-backmerge-main-into-staging
-  [unclassified] Merge remote-tracking branch 'origin/staging' into chore/auto-backmerge-main-into-staging
-  [unclassified] Merge pull request #1399 from chippr-robotics/release/v1.15.2-changelog
-  [unclassified] Merge pull request #1397 from chippr-robotics/chore/backmerge-v1.15.1
-  [feat -> minor] light up Bitcoin on the production gateway (#1393)
-  [chore -> patch] refresh CI merge ref after #1396 (gates restore) landed on staging
-  [fix -> patch] four production defects reported from the live node (#1392)
-  [fix -> patch] restore staging's gates — @solana-program/system 0.14.0 + native shells at v1.15.1 (#1396)
-  [skipped] chore(release): v1.15.2 [skip release]
-  [unclassified] Merge remote-tracking branch 'origin/main' into chore/auto-backmerge-main-into-staging
-  [unclassified] Merge remote-tracking branch 'origin/main' into chore/backmerge-v1.15.1
-  [chore -> patch] bump @solana/kit from 7.1.1 to 8.1.0 (#1334)
-  [unclassified] Merge pull request #1388 from chippr-robotics/claude/release-1-14-0-tasks-av87yu
-  [fix -> patch] settle finite animations before the a11y scan (spec 094/102)
-  [fix -> patch] repair the two errors the re-resolved eslint plugins surfaced (spec 102)
-  [docs -> patch] honest matrix rows, CLAUDE.md guardrails, verify pass (spec 102, T031-T033)
-  [feat -> minor] tenant native-identity proof and onboarding docs (spec 102, T029-T030)
-  [feat -> minor] universal/app links land on the linked surface (spec 102, T027-T028)
-  [feat -> minor] Ledger BLE rung behind the one hardware seam (spec 102, T024-T026)
-  [feat -> minor] native channel artifacts in the release chain (spec 102, T019-T023)
-  [fix -> patch] drop unused import in passkeyBridge test (eslint)
-  [feat -> minor] platform passkey bridge behind the credential seam (spec 102, T016-T018)
-  [feat -> minor] US1+US2 seams — capability notices, support floor, lifecycle app-lock (spec 102, T010-T015)
-  [feat -> minor] foundational seams — runtime, tenant identity, version sync, CSP parity (spec 102, T005-T009)
-  [feat -> minor] add Capacitor platforms and shells for iOS/Android channels (spec 102, T001-T004)
-  [docs -> patch] task breakdown for native release channels (spec 102)
-  [docs -> patch] plan native release channels — research, data model, seam contracts (spec 102)
-  [docs -> patch] specify native release channels — iOS, Android, web (spec 102)
-  [unclassified] Merge pull request #1386 from chippr-robotics/claude/release-1-14-0-tasks-av87yu
-  [test -> patch] accept the clock-derived 'Pending Resolution' badge on Active wagers
-  [test -> patch] match the creator's 'Under Consideration' row label in RES-12
-  [chore -> patch] version 1.0.1 to pair with the introspection-fix bytes
-  [chore -> patch] re-record api-access build digests for the introspection fix
-  [fix -> patch] match the labels the rows actually render, and scroll the resolve control into view
-  [fix -> patch] derive introspection invalidation instead of scheduling it per keystroke
-  [test -> patch] api-access console through the real registry path, and the matrix rows for the batch (#1285)
-  [test -> patch] establish money-path preconditions instead of snapshotting for them (#1250, #1327 lead 2, #1240)
-  [feat -> minor] adopt the numbered QuickNode multichain endpoints (#1378 E)
-  [unclassified] Merge pull request #1385 from chippr-robotics/claude/release-1-14-0-tasks-av87yu
-  [fix -> patch] pin every sweep leg to one monotone fee schedule and stop trusting ethers' cached balance read
-  [fix -> patch] settle the pointer write on the passkey rail; pin the e2e pointer read to one block
-  [unclassified] Merge pull request #1381 from chippr-robotics/chore/auto-backmerge-main-into-staging
-bump:     minor
+previous: v1.16.0
+commits:  8
+  [unclassified] Merge pull request #1427 from chippr-robotics/hotfix/passkey-signin-stranded
+  [fix -> patch] report a credential mismatch out loud, and keep the signal off the bridge
+  [fix -> patch] fall back to the platform's own list when a pinned request goes unanswered
+  [fix -> patch] sync the native shells into the release record
+  [fix -> patch] never let an unanswered prompt lock a member out
+  [skipped] Merge pull request #1423 from chippr-robotics/release/v1.16.0-changelog
+  [skipped] chore(release): sync the native shells to v1.16.0 [skip release]
+  [skipped] chore(release): v1.16.0 [skip release]
+bump:     patch
 reason:   computed
-next:     v1.16.0
+next:     v1.16.1
