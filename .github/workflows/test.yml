@@ -85,6 +85,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # check:native-versions resolves the current release from git tags
+          # (version.js --current); a shallow, tagless checkout would read
+          # "none" and fail every run.
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -93,6 +99,17 @@ jobs:
 
       - name: Check dependency hygiene
         run: npm run check:deps
+
+      # Spec 102: the native shells' version and identity fields are sync-only
+      # (sync-native-config.js writes them from the tenant manifest + the one
+      # version source); a hand edit fails here with the file named. The tenant
+      # `native` block rules are proven by must-fail fixtures in test:tenants.
+      # Both are dependency-free, matching this job's no-install design.
+      - name: Check native config sync (spec 102)
+        run: npm run check:native-versions
+
+      - name: Tenant manifest gate tests
+        run: npm run test:tenants
 
   # Gate (spec 089, FR-019…FR-023): a revenue or cost source that reaches production without a
   # dashboard entry is money moving that nobody is watching. The brief stated updating the dashboard
@@ -634,8 +651,16 @@ jobs:
           cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci --workspace frontend --include-workspace-root=false
+        run: npm ci --workspace frontend --workspace tools/miniapp-build --workspace @fairwins/miniapp-clearpath --include-workspace-root=false
         working-directory: .  # root install; the child has no lockfile (spec 075)
+
+      # Spec 030 pillar A — fast/46-clearpath-unavailable.cy.js serves the REAL ClearPath package
+      # bytes (the loader verifies them), so this leg needs the package built. It needs no chain:
+      # the registry read is stubbed and the gateway fetches are intercepted. Measured ~0.3s.
+      # One `npm ci` invocation above, not a second one — a second `npm ci` would wipe the first.
+      - name: Build the ClearPath mini-app package
+        run: npm run build --workspace @fairwins/miniapp-clearpath
+        working-directory: .
 
       # Constitution IV: this step MUST fail the pipeline on error. Do NOT reintroduce
       # `continue-on-error` here (spec 075, FR-007/FR-008).
@@ -824,10 +849,15 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3]
-    # Per-LEG bound, down from the serial job's 60. A leg that should take ~10 minutes must not
-    # occupy a runner for an hour before failing; the cap exists to catch a hang, not to
-    # accommodate one.
-    timeout-minutes: 25
+    # Per-LEG bound, down from the serial job's 60. The cap exists to catch a hang, not to
+    # accommodate one — but it has to sit above what a healthy leg actually costs, and the tier
+    # has roughly tripled since 25 was chosen against ~7-minute legs. MEASURED 2026-09-03
+    # (Actions run 33814290875): legs of 23:53 / 23:18 / 21:05 of job time, of which ~7:30 is
+    # checkout, install, compile and deploy before Cypress starts; the fourth leg was killed at
+    # the 25-minute cap mid-spec, having failed nothing. A cancelled leg is a leg whose specs
+    # went unreported, so a cap a healthy run brushes is not a safety margin — it is a coin flip
+    # on the merge gate.
+    timeout-minutes: 35
 
     steps:
       - name: Checkout code
@@ -885,7 +915,8 @@ jobs:
       # production bundle).
       - name: Start local chain
         run: |
-          HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node > /tmp/hardhat-node.log 2>&1 &
+          # HARDHAT_HARDFORK=prague: Amoy has no EIP-7825 per-tx gas cap; see hardhat.config.js.
+          HARDHAT_HARDFORK=prague HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node > /tmp/hardhat-node.log 2>&1 &
           ready=""
           for i in $(seq 1 60); do
             if curl -s -X POST http://127.0.0.1:8545 \
@@ -1021,4 +1052,264 @@ jobs:
         with:
           name: cypress-full-results-${{ matrix.shard }}
           path: frontend/cypress-full-output.txt
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────────────────────
+  # Cypress Passkey Full Stack — the ERC-4337 tier (specs 041 + 050, issue #1400 §B).
+  #
+  # The three flows here (`passkey.controllers`, `passkey.recover-account`,
+  # `paymaster.sponsored-userop`) were recorded ABSENT for one reason: they need a bundler, and
+  # nothing in CI had one. Their specs were gated on `PASSKEY_FULL_STACK`, which nothing ever set,
+  # so they reported as pending forever while the matrix showed the flows as covered (#1271). This
+  # job is that missing stack — a real EntryPoint v0.6, a real alto bundler, the real verifying
+  # paymaster and the real relay gateway signing sponsorships — because there is no honest way to
+  # prove "FairWins paid the gas" without something that could have failed to pay it.
+  #
+  # WHY A SEPARATE JOB, and not more specs in cypress-full-e2e: the SPA resolves the bundler and
+  # sponsor-paymaster URLs at BUILD time (`networks.js#passkeyConfig`), so this tier needs a
+  # DIFFERENT dev-server build from the one the full tier runs. `paymaster-disclosure.cy.js` on the
+  # fast tier asserts the opposite build — that with no paymaster configured nothing claims to be
+  # sponsored — and both claims are true of their own deployment. That is also why the spec list
+  # below is explicit rather than `passkey/**`: running the disclosure spec against a build that
+  # DOES configure a paymaster would fail it for being right.
+  #
+  # Not sharded: three specs, one chain, one bundler. Sharding would pay four bootstraps to save
+  # nothing.
+  cypress-passkey-full-stack:
+    name: Cypress Passkey Full Stack (bundler + paymaster)
+    runs-on: ubuntu-latest
+    # Generous, because a real UserOperation round trip (estimate → sponsor → bundle → mine →
+    # receipt) is seconds, not milliseconds, and there are several per spec. Still a cap: it exists
+    # to catch a hang, not to accommodate one.
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
+
+      # Restored BEFORE the install, for the reason documented on the full tier: cypress's
+      # postinstall skips the ~250 MB download when the binary is already in ~/.cache/Cypress.
+      - name: Cache Cypress binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: cypress-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure Cypress binary
+        run: npx cypress install
+
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      # AMOY-SHAPED for the same spec-071 reason the full tier documents: membership and the E2E
+      # address seam are pinned to 80002, and `VITE_E2E_AMOY_LOCAL` maps that chain id onto the
+      # local deployment. Readiness is polled on eth_chainId, never slept on.
+      - name: Start local chain
+        run: |
+          HARDHAT_LOCAL_CHAIN_ID=80002 npx hardhat node > /tmp/hardhat-node.log 2>&1 &
+          ready=""
+          for i in $(seq 1 60); do
+            if curl -s -X POST http://127.0.0.1:8545 \
+                 -H 'content-type: application/json' \
+                 --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+                 | grep -q result; then
+              ready="$i"
+              break
+            fi
+            sleep 1
+          done
+          if [ -z "$ready" ]; then
+            echo "::error::Local chain never answered eth_chainId — see the log below."
+            cat /tmp/hardhat-node.log
+            exit 1
+          fi
+          echo "chain up after ${ready}s"
+
+      - name: Deploy and seed the local chain
+        run: npm run setup:e2e
+
+      # The 4337 prerequisites AND the account stack at its canonical addresses. The current
+      # compile does not reproduce the live factory's CREATE2 address (the first run proved it —
+      # FR-023 refused), so the bootstrap installs the current runtime AT the canonical addresses
+      # with hardhat_setCode and records them; see the script header for why that is the honest
+      # shape. The verifying paymaster then deploys through its SHIPPED script unmodified.
+      - name: Bootstrap the ERC-4337 prerequisites and the account stack
+        run: npx hardhat run scripts/e2e/passkey-stack/deploy-passkey-stack.js --network localhost
+
+      # PM_SIGNER_PRIVATE_KEY is HARDHAT'S PUBLISHED TEST ACCOUNT #9 — printed by `npx hardhat node`
+      # on every start, worthless on every real network, and deliberately NOT a secret: a workflow
+      # that needed a credential to run its tests would be one nobody could run on a fork. Production
+      # signs with Cloud KMS (PM_SIGNER_KMS_KEY) and this variable is unset there. The paymaster
+      # contract is deployed with the SAME key's address as its verifying signer, which is what makes
+      # the gateway's signature verify on chain — derived here rather than written down twice.
+      - name: Deploy the verifying paymaster and fund its deposit
+        env:
+          PM_SIGNER_PRIVATE_KEY: '0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6'
+        run: |
+          SIGNER=$(node -e "const {Wallet}=require('ethers');console.log(new Wallet(process.env.PM_SIGNER_PRIVATE_KEY).address)")
+          echo "sponsorship signer: $SIGNER"
+          # 5 native into the EntryPoint deposit: enough for every op these specs send, and small
+          # enough that a runaway would still exhaust it rather than look infinite.
+          PM_VERIFYING_SIGNER="$SIGNER" PM_INITIAL_DEPOSIT=5 \
+            npx hardhat run scripts/deploy/deploy-verifying-paymaster.js --network localhost
+
+      # Publishes the addresses to later steps AND copies the local deployment record into a
+      # directory of its own. The gateway's loadDeployment takes the FIRST *-chain80002-v2.json it
+      # finds, and the repo holds the real Amoy record under that pattern too — pointed at
+      # `deployments/` it would boot on mainnet-testnet addresses, screen against a SanctionsGuard
+      # with no code here, fail closed, and refuse every sponsorship while looking healthy.
+      - name: Publish stack addresses
+        run: node scripts/e2e/passkey-stack/stack-env.js >> "$GITHUB_ENV"
+
+      - name: Start the alto bundler
+        run: bash scripts/e2e/passkey-stack/start-alto.sh
+
+      - name: Start the relay gateway
+        env:
+          PORT: '8788'
+          ENABLED_CHAIN_IDS: '80002'
+          RPC_URLS_80002: 'http://127.0.0.1:8545'
+          # The SPA is a different origin from the gateway, so the browser's POST /v1/paymaster is
+          # cross-origin and dies at CORS without this — while the server-side call in the readiness
+          # check would have succeeded, which is exactly the shape of failure that looks like a
+          # broken feature and is a missing header.
+          ALLOWED_ORIGINS: 'http://localhost:5173'
+          # Hardhat's published test account #9 — see the note on the deploy step above. Never a real key.
+          PM_SIGNER_PRIVATE_KEY: '0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6'
+        run: |
+          mkdir -p /tmp/fairwins-passkey-stack
+          export DEPLOYMENTS_DIR="$PASSKEY_DEPLOYMENTS_DIR"
+          export PAYMASTER_ADDRESS_80002="$PASSKEY_PAYMASTER"
+          export ENTRYPOINT_V06_80002="$PASSKEY_ENTRYPOINT"
+          node services/relay-gateway/src/server.js > /tmp/relay-gateway.log 2>&1 &
+          echo $! > /tmp/fairwins-passkey-stack/gateway.pid
+          echo "gateway pid $(cat /tmp/fairwins-passkey-stack/gateway.pid)"
+
+      # CONTENT, not status codes. A 200 from a bundler proves only that something is listening —
+      # the origin-lock nginx in front of production alto serves its own 200 that never reaches
+      # alto, and that is the check that stayed green through the 2026-07-12 stall. Every assertion
+      # here is documented in the script.
+      - name: Wait for the passkey stack
+        env:
+          CHAIN_ID: '80002'
+          ENTRYPOINT: ${{ env.PASSKEY_ENTRYPOINT }}
+          ACCOUNT_FACTORY: ${{ env.PASSKEY_ACCOUNT_FACTORY }}
+          PAYMASTER: ${{ env.PASSKEY_PAYMASTER }}
+          ALTO_URL: 'http://127.0.0.1:4337'
+          GATEWAY_URL: 'http://127.0.0.1:8788'
+        run: node scripts/e2e/passkey-stack/wait-for-stack.js
+
+      # `dev:e2e:passkey`, not `dev:e2e`: the bundler and sponsor-paymaster URLs are compiled in.
+      # No --browser flag, matching the other two tiers — the default Electron runner is
+      # chromium-family, which is what the CDP virtual-authenticator ceremonies require.
+      - name: Run passkey full-stack E2E tests
+        working-directory: frontend
+        env:
+          CYPRESS_NETWORK_ID: '80002'
+          CYPRESS_PASSKEY_ENABLED: '1'
+          CYPRESS_PASSKEY_FULL_STACK: '1'
+          CYPRESS_GATEWAY_URL: 'http://127.0.0.1:8788'
+          CYPRESS_GATEWAY_PID_FILE: '/tmp/fairwins-passkey-stack/gateway.pid'
+        run: |
+          set -o pipefail
+          npx start-server-and-test dev:e2e:passkey http://localhost:5173 \
+            'cypress run --spec "cypress/e2e/passkey/controllers.cy.js,cypress/e2e/passkey/recovery.cy.js,cypress/e2e/passkey/sponsored-userop.cy.js,cypress/e2e/passkey/membership-purchase.cy.js"' \
+            2>&1 | tee cypress-passkey-output.txt
+
+      - name: Summarize passkey E2E results
+        if: always()
+        working-directory: frontend
+        run: |
+          echo "### Cypress Passkey Full Stack (bundler + paymaster)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-passkey-output.txt > cypress-passkey-plain.txt
+          TOTALS=$(grep -E "(All specs passed!|[0-9]+ of [0-9]+ failed)" cypress-passkey-plain.txt | tail -1)
+          if [ -n "$TOTALS" ]; then
+            echo "\`$(echo "$TOTALS" | tr -d '│' | xargs)\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Cypress produced no run-total row — see the job log." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # Two-part gate, as on both other tiers: the run step's exit code is authoritative for
+      # pass/fail but cannot tell us the run never started. Both matches read the DE-COLOURED copy,
+      # because cypress wraps these lines in escape codes and grepping the raw file cannot fire.
+      - name: Check passkey E2E results
+        if: always()
+        working-directory: frontend
+        run: |
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-passkey-output.txt > cypress-passkey-plain.txt
+
+          if ! grep -qE "Run Finished" cypress-passkey-plain.txt; then
+            echo "::error::Cypress never reached 'Run Finished' — the run died before completing. Failing rather than assuming success."
+            exit 1
+          fi
+
+          if grep -qE "[0-9]+ of [0-9]+ failed" cypress-passkey-plain.txt; then
+            echo "::error::Cypress reported failing specs in the passkey full-stack tier."
+            grep -E "[0-9]+ of [0-9]+ failed" cypress-passkey-plain.txt
+            exit 1
+          fi
+
+          # A PENDING test in THIS tier is a failure of the tier's purpose: every spec here is
+          # gated on PASSKEY_FULL_STACK, which this job sets, so anything still skipping means the
+          # stack did not come up in a way the spec recognised — which is precisely the state
+          # (#1271) this job exists to end. Reported loudly rather than as a green run of nothing.
+          if grep -qE "^ *│ *Pending: *[1-9]" cypress-passkey-plain.txt; then
+            echo "::error::Tests were PENDING in the passkey full-stack tier — the stack is up but specs skipped themselves."
+            grep -E "Pending:" cypress-passkey-plain.txt
+            exit 1
+          fi
+
+      - name: Capture service logs
+        if: always()
+        run: |
+          docker logs fairwins-e2e-alto > /tmp/alto.log 2>&1 || echo "no alto container" > /tmp/alto.log
+
+      - name: Upload stack logs
+        uses: actions/upload-artifact@v7
+        # Only interesting when something broke — and then they are the whole diagnosis: which of
+        # the four services refused, and why.
+        if: failure()
+        with:
+          name: cypress-passkey-stack-logs
+          path: |
+            /tmp/hardhat-node.log
+            /tmp/alto.log
+            /tmp/alto-proxy.log
+            /tmp/relay-gateway.log
+          retention-days: 7
+
+      - name: Upload Cypress screenshots
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: cypress-passkey-screenshots
+          path: frontend/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload Cypress videos
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: cypress-passkey-videos
+          path: frontend/cypress/videos
+          retention-days: 7
+
+      - name: Upload Cypress output
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cypress-passkey-results
+          path: frontend/cypress-passkey-output.txt
           retention-days: 7

@@ -44,7 +44,7 @@
           "name": "Decline an offer, or cancel one you created before it is accepted",
           "status": "covered",
           "tier": "on-chain",
-          "depth": "flow",
+          "depth": "settled",
           "risk": "custody",
           "tests": [
             "frontend/cypress/e2e/full/06-decline-cancel.cy.js::DEC-01",
@@ -646,13 +646,15 @@
         {
           "id": "membership.send-voucher-from-portfolio",
           "name": "Send/Gift a held FWMV voucher from the Portfolio asset sheet, voucher preselected",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1364"
+          "tests": [
+            "frontend/cypress/e2e/full/43-voucher-send-from-portfolio.cy.js::VSP-01"
+          ],
+          "issue": "#1400",
+          "note": "Proposed no-chain, placed on-chain: the preselection is a claim about a HOLDING, and without a chain the holding would be invented by the test (a stubbed balanceOf plus Transfer scan), so the no-chain version could only assert that the app preselects the voucher the fixture made up. The transfer half moves value (admission rule 2). One test drives the deep link on the way to the transfer and settles every claim by ownerOf, including that the recipient's tier is still 0."
         }
       ]
     },
@@ -702,26 +704,28 @@
         {
           "id": "miniapp.clearpath-create-native-dao",
           "name": "Create a native standard DAO through ClearPath (spec 030 pillar A)",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1268",
-          "missing": "The member surface and contracts now exist (StandardDAOFactory, Cancun chains only per the 2026-08-30 amendment); what is absent is E2E coverage. Creation costs the member ~6.34M gas, so the admission rule puts it in the on-chain tier - it needs a full-tier spec that deploys the factory locally, launches a DAO and asserts the timelock's roles on chain. Unit coverage: test/clearpath/StandardDAOFactory.test.js (24) + CreateStandardDao.test.jsx (17)."
+          "tests": [
+            "frontend/cypress/e2e/full/42-clearpath-native-dao.cy.js::CD-01"
+          ],
+          "issue": "#1400"
         },
         {
           "id": "miniapp.clearpath-create-dao-unavailable",
           "name": "ClearPath Launch tab states why a DAO cannot be created on this chain",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "information",
-          "tests": [],
-          "issue": "#1268",
-          "missing": "Pre-Cancun (ETC/Mordor, permanent) vs not-deployed must render as different messages; covered by package unit tests, not yet by a no-chain spec."
+          "tests": [
+            "frontend/cypress/e2e/fast/46-clearpath-unavailable.cy.js::CDU-01",
+            "frontend/cypress/e2e/fast/46-clearpath-unavailable.cy.js::CDU-02"
+          ],
+          "issue": "#1400",
+          "note": "Serves the real ClearPath package bytes, so the fast CI leg builds frontend/miniapps/clearpath (one ~0.3s step)."
         }
       ]
     },
@@ -761,7 +765,7 @@
             "frontend/cypress/e2e/full/37-backup-roundtrip.cy.js::BKC-01",
             "frontend/cypress/e2e/full/37-backup-roundtrip.cy.js::BKC-02"
           ],
-          "note": "The no-chain half pins the honest-state rules (no secret material rendered; an unsettled pointer read is never reported as \"no backup\"). The on-chain half is the round trip itself: recording the pointer is a transaction the member pays gas for, so admission rule 2 puts it there \u2014 BKC-01 reads the pointer back from chain and checks it names the blob that was pinned (and that the pinned bytes are ciphertext), BKC-02 wipes the device and restores from that pointer."
+          "note": "The no-chain half pins the honest-state rules (no secret material rendered; an unsettled pointer read is never reported as \"no backup\"). The on-chain half is the round trip itself: recording the pointer is a transaction the member pays gas for, so admission rule 2 puts it there \u2014 BKC-01 reads the pointer back from chain and checks it names the blob that was pinned (and that the pinned bytes are ciphertext), BKC-02 wipes the device and restores from that pointer. Both tiers drive the classic signer rail; the passkey sendCalls pointer path is covered by frontend/src/test/backup/useDataBackup.backup.test.jsx only."
         }
       ]
     },
@@ -987,7 +991,7 @@
             "frontend/cypress/e2e/passkey/onboarding-journey.cy.js::PK-02"
           ],
           "issue": "#1271",
-          "note": "PK-01 and PK-03 remain pending (#1019 / PASSKEY_FULL_STACK); PK-02 runs and is the flow"
+          "note": "PK-01 remains pending (#1019); PK-03 (membership purchase from a passkey account) moved to membership-purchase.cy.js as MP-01/MP-02 on the full-stack job (#1407). PK-02 runs and is the flow"
         },
         {
           "id": "passkey.return-and-sign-in",
@@ -1019,43 +1023,60 @@
         {
           "id": "passkey.controllers",
           "name": "Add and remove the controllers that may act for the account",
-          "status": "absent",
+          "status": "covered",
           "tier": "account-native",
-          "depth": "skipped",
+          "depth": "settled",
           "risk": "access",
           "tests": [
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-01",
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-02",
             "frontend/cypress/e2e/passkey/controllers.cy.js::CT-03"
           ],
-          "issue": "#1271",
-          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)"
+          "issue": "#1400"
         },
         {
           "id": "passkey.recover-account",
           "name": "Recover the account on a new device",
-          "status": "absent",
+          "status": "covered",
           "tier": "account-native",
-          "depth": "skipped",
+          "depth": "settled",
           "risk": "custody",
           "tests": [
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-01",
             "frontend/cypress/e2e/passkey/recovery.cy.js::RC-04"
           ],
-          "missing": "these tests do not execute. They are gated on `PASSKEY_FULL_STACK`, and the Cypress tasks they call (`seedUsdcForActiveSession`, `flagAddress`) are not registered in cypress.config.js \u2014 so the flag alone would not run them; the local-stack harness behind it was never built (#1271)",
-          "issue": "#1271"
+          "issue": "#1400",
+          "note": "RC-01 unplugs the authenticator, clears storage, hands the synced credential to a new authenticator and proves the recovered session can still SPEND (recipient balance read off chain). RC-04 drives FR-021's three device-loss warning moments through the real UI \u2014 creation (HomeScreen), first funding (MyAccountView once the portfolio has read a non-zero holding), membership purchase (the Review step) \u2014 each by its own testid (#1405), plus the controllers card's standing disclosure."
         },
         {
           "id": "passkey.app-lock",
           "name": "Lock the screen after idle or on leaving, and unlock with a passkey",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "settled",
           "risk": "access",
-          "tests": [],
-          "issue": "#1364",
-          "missing": "no Cypress spec exists yet. The flow is validatable without a chain (WebAuthn virtual authenticator, no transaction), so it belongs in the no-chain tier under the admission rule. Unit coverage: frontend/src/test/applock/ (31 assertions across the store, overlay and Settings card)."
+          "tests": [
+            "frontend/cypress/e2e/passkey/app-lock.cy.js::AL-01",
+            "frontend/cypress/e2e/passkey/app-lock.cy.js::AL-02",
+            "frontend/cypress/e2e/passkey/app-lock.cy.js::AL-03",
+            "frontend/cypress/e2e/passkey/app-lock.cy.js::AL-04",
+            "frontend/cypress/e2e/passkey/app-lock.cy.js::AL-05"
+          ],
+          "issue": "#1400"
+        },
+        {
+          "id": "membership.purchase-from-passkey",
+          "name": "Buy a membership from a passkey account in one ceremony: sponsored when the paymaster offers it, self-funded (never stranded) when it does not",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/passkey/membership-purchase.cy.js::MP-01",
+            "frontend/cypress/e2e/passkey/membership-purchase.cy.js::MP-02"
+          ],
+          "issue": "#1400",
+          "note": "Runs only on the cypress-passkey-full-stack job. MP-01: a zero-native, still-counterfactual account buys Bronze; getActiveTier reads 1, exactly the quoted price left the account, native stayed 0 while the paymaster deposit fell, and the first-use deployment rode the same batch. MP-02: with sponsorship paused at the real gateway the same purchase lands self-funded and the deposit is untouched. Was PK-03 (#1407)."
         }
       ]
     },
@@ -1307,14 +1328,16 @@
         {
           "id": "paymaster.sponsored-userop",
           "name": "Send a passkey transaction with the fee sponsored",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "account-native",
-          "depth": "none",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1240",
-          "missing": "the NEGATIVE half is covered (PM-01/PM-02: nothing claims a sponsorship this deployment cannot deliver). Actually sending a sponsored UserOp needs a live ERC-4337 bundler and the KMS-signed /v1/paymaster endpoint, neither of which any test tier runs \u2014 and a stub would assert that the stub was called, not that a member paid nothing"
+          "tests": [
+            "frontend/cypress/e2e/passkey/sponsored-userop.cy.js::SU-01",
+            "frontend/cypress/e2e/passkey/sponsored-userop.cy.js::SU-02"
+          ],
+          "issue": "#1400",
+          "note": "Runs only on the cypress-passkey-full-stack job (local chain + canonical EntryPoint v0.6 + account stack + FairWinsVerifyingPaymaster + pinned alto + relay-gateway paymaster endpoint on a hardhat test key). SU-01: zero native before AND after while the recipient is paid and the paymaster deposit falls. SU-02: sponsorship refused at the real gateway (kill switch) still lands self-funded with the fee disclosed as member-paid. PM-01/PM-02 in paymaster-disclosure.cy.js keep the opposite build honest."
         },
         {
           "id": "paymaster.fallback-disclosed",
@@ -1326,7 +1349,8 @@
           "tests": [
             "frontend/cypress/e2e/passkey/paymaster-disclosure.cy.js::PM-01",
             "frontend/cypress/e2e/passkey/paymaster-disclosure.cy.js::PM-02"
-          ]
+          ],
+          "note": "both tests now assert the fee badge EXACTLY ('Network fee applies') rather than matching a disjunction that included the unsupported-network note. That note always renders in this build (no bundler => passkeyReady false), so the old assertion was satisfied without ever examining the fee line"
         }
       ]
     },
@@ -1573,13 +1597,17 @@
         {
           "id": "pay.group-settlement",
           "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1366"
+          "tests": [
+            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-01",
+            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-02",
+            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-03"
+          ],
+          "issue": "#1400",
+          "missing": "the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain."
         }
       ]
     },
@@ -1686,13 +1714,16 @@
         {
           "id": "bitcoin.network-card-activates",
           "name": "Open the Bitcoin wallet surface from its network card without touching the EVM chain",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "access",
-          "tests": [],
-          "issue": "#1364"
+          "tests": [
+            "frontend/cypress/e2e/fast/44-bitcoin-network-card.cy.js::BC-01",
+            "frontend/cypress/e2e/fast/44-bitcoin-network-card.cy.js::BC-02",
+            "frontend/cypress/e2e/fast/44-bitcoin-network-card.cy.js::BC-03"
+          ],
+          "issue": "#1400"
         }
       ]
     },
@@ -2388,14 +2419,16 @@
         {
           "id": "hardware.bluetooth-transport",
           "name": "Connect a Ledger over Bluetooth on a phone (BLE rail, transport-aware copy)",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1370",
-          "missing": "The rail is unit-covered (src/test/hardware/transports.test.js); a browser-level check would stub navigator (delete hid, plant bluetooth) in cy.visit onBeforeLoad and assert the phone-profile copy pairs rather than plugs."
+          "tests": [
+            "frontend/cypress/e2e/fast/45-hardware-ble-transport.cy.js::BLE-01",
+            "frontend/cypress/e2e/fast/45-hardware-ble-transport.cy.js::BLE-02"
+          ],
+          "issue": "#1400",
+          "note": "The BLE signing leg needs a real device over a real OS Bluetooth stack and stays a staged manual protocol (hardware.physical-confirmation, out-of-scope). BLE-02 reads the persisted record back and asserts its key set is exactly {address, vendor, path, label, addedAt}."
         }
       ]
     },
@@ -2636,16 +2669,20 @@
         },
         {
           "id": "api-access.console",
-          "name": "The api-access developer console: OpenAPI explorer, token introspection and MCP setup",
-          "status": "partial",
-          "tier": "no-chain",
-          "depth": "smoke",
+          "name": "The api-access developer console: OpenAPI explorer, token introspection, try-it, and the key-ceremony deep link into the host",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "flow",
           "risk": "access",
           "tests": [
-            "frontend/cypress/e2e/fast/39-api-access.cy.js::API-04"
+            "frontend/cypress/e2e/fast/39-api-access.cy.js::API-04",
+            "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-06",
+            "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-07",
+            "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-08",
+            "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-09",
+            "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-10"
           ],
-          "missing": "Only the HOST card is exercised \u2014 the generated MCP snippet carries a placeholder rather than a credential, and the card links to the packaged console. The console itself is a spec-073 registry package, and no catalogue serves it in the no-chain tier (the registry read is stubbed there, and the package bytes are not published). Its OpenAPI explorer, /v1/member/me introspection and try-it panel need the on-chain tier, where `npm run setup:e2e` publishes packages and the local registry can list them.",
-          "issue": "#1285"
+          "note": "The console is a spec-073 registry package, so its surface only exists where a registry can be written to and package bytes can be served: the on-chain tier publishes api-access through publish:local:miniapps and launches it through the real submit/approve/launchable path, with only the IPFS transport and the member API stubbed (bodies copied from services/relay-gateway/src/memberApi/). API-06 reads the permission set out of the manifest the chain committed to \u2014 no wallet:submit, no contracts \u2014 and API-10 asserts the key ceremony lands on the HOST Settings card, because a package cannot sign. API-08 reads the app's store namespace back out of localStorage to prove the bearer token was never persisted. The unconfigured-gateway branch of the host card is NOT reachable from any e2e build (no dev server produces relayerBaseUrl() === ''), so it is held at unit level in frontend/src/test/ApiAccessPanel.test.jsx instead."
         }
       ]
     },
@@ -2671,24 +2708,32 @@
         {
           "id": "purchase.acting-account",
           "name": "A member operating as another account purchases membership that lands on the acting account, on every submit rail - including the split approve/purchase proposals on a policy-guarded vault (money path: on-chain tier required)",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1364"
+          "tests": [
+            "frontend/cypress/e2e/full/40-acting-account-purchase.cy.js::AAP-01",
+            "frontend/cypress/e2e/full/40-acting-account-purchase.cy.js::AAP-02",
+            "frontend/cypress/e2e/full/40-acting-account-purchase.cy.js::AAP-03"
+          ],
+          "issue": "#1400",
+          "missing": "The vault rail (batched and policy-split) and the acting-signer rail are covered end to end. Three rails are not reachable in this tier and are not faked: the HARDWARE rail (the dev-only adapter seam cannot sign or broadcast - hardware takes the identical acting-signer branch AAP-03 drives), the PASSKEY-batch negative of FR-006 (belongs to the cypress-passkey-full-stack job), and the RELAYED-intent rail of FR-007 (dev:e2e configures no relayer, so every gasless path self-submits - which is the never-stranded fallback AAP-03 exercises)."
         },
         {
           "id": "purchase.acting-refusals",
           "name": "Purchase still refuses, with the reason, when the acting account cannot be msg.sender on the membership chain",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1364"
+          "tests": [
+            "frontend/cypress/e2e/fast/42-acting-purchase-refusals.cy.js::APR-01",
+            "frontend/cypress/e2e/fast/42-acting-purchase-refusals.cy.js::APR-02",
+            "frontend/cypress/e2e/fast/42-acting-purchase-refusals.cy.js::APR-03"
+          ],
+          "issue": "#1400",
+          "missing": "FR-003 names two refusal reasons. The chain-mismatch reason is covered (APR-01), as is the negative that the refusal no longer applies to eligible kinds (APR-02 hardware, APR-03 same-chain vault). The second reason - '<account> has no sending identity on <chain>' - is reachable only for acting kind `derived`, and CustodyContext exposes no way to enter that state (personal/vault/legacy/hardware only), so there is no member-facing route to drive."
         }
       ]
     },
@@ -2712,6 +2757,274 @@
       "memberFacing": false,
       "reason": "Spec + plan landed in release 1.14.0; no member surface exists yet. Implementation follows the constitution-checked plan (#1364).",
       "flows": []
+    },
+    {
+      "id": "102-capacitor-channels",
+      "title": "Native release channels (iOS + Android + web)",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "native.passkey-signin",
+          "name": "A member signs in on the native app with the platform passkey ceremony and lands on the SAME account they hold on the web channel, PRF-derived keys intact; an unsupported device refuses with a named reason (unit: src/test/native/passkeyBridge.test.js; device leg: staged manual protocol in docs/runbooks/native-release-operations.md)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "account-native",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.lifecycle-lock",
+          "name": "Backgrounding the native app past the lock threshold re-prompts before any wallet surface on foreground (unit: src/test/native/lifecycle.test.js + the native case in src/test/applock/AppLockOverlay.test.jsx; the release smoke jobs prove launch/render/lifecycle-survival but cannot reach a signed-in lock)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "access",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.deep-link-entry",
+          "name": "A share link opened with the app installed lands on the linked surface in-app through any due gate; foreign-origin URLs through the link channel are ignored (unit: src/test/native/deepLinks.test.js)",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "none",
+          "tests": [],
+          "issue": "#1389"
+        },
+        {
+          "id": "native.ble-signing",
+          "name": "Ledger signing over the native Bluetooth rail with physical confirmation on the device screen",
+          "status": "out-of-scope",
+          "reason": "Requires a physical Nano X and a human pressing its buttons - automation cannot confirm on a device screen. Protocol arithmetic and error normalization are unit-pinned (src/test/native/ledgerBleRung.test.js); the device run is the staged manual addendum in docs/runbooks/hardware-wallet-staging-validation.md, required before store submission.",
+          "tier": "none",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "proposedTier": "account-native"
+        }
+      ]
+    },
+    {
+      "id": "103-funding-pools",
+      "title": "Funding pools (Request \u25b8 Pool)",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "funding.request-pool-form",
+          "name": "Switch the Request view from Direct to Pool, validate the form, see the public-purpose disclosure",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "none",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-01",
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-02",
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-03",
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-04",
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-07"
+          ]
+        },
+        {
+          "id": "funding.my-pools-sheet",
+          "name": "Open My Pools, see the honest empty state, find a pool by words or link",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "none",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-05"
+          ]
+        },
+        {
+          "id": "funding.unreadable-link",
+          "name": "A pool link the chain cannot answer renders as unreadable, never as zeros",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "none",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-funding-pools.cy.js::FP-FAST-06"
+          ]
+        },
+        {
+          "id": "funding.create-and-contribute",
+          "name": "Create a pool from Request \u25b8 Pool; a contributor opens the link and contributes",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-01"
+          ]
+        },
+        {
+          "id": "funding.organizer-close",
+          "name": "The organizer closes below the goal and collects the whole pot",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-02"
+          ]
+        },
+        {
+          "id": "funding.majority-refund",
+          "name": "A strict majority of contributors votes to refund; each collects their own contribution",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-03"
+          ]
+        },
+        {
+          "id": "funding.deadline-refund",
+          "name": "A pool nobody closes refunds after the settle deadline",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-04"
+          ]
+        },
+        {
+          "id": "funding.organizer-refund",
+          "name": "The organizer refunds everyone from an open pool",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/39-funding-pools.cy.js::FP-05"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "102-multisig-chain-abstraction",
+      "title": "Multisig chain abstraction \u2014 one vault, every network",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "custody.vault-cards",
+          "name": "See one compact card per vault across every network it lives on",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-01"
+          ]
+        },
+        {
+          "id": "custody.vault-sheet-queue",
+          "name": "Open the vault sheet and read the pending queue with each proposal's network tagged, an unreadable network named",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-02",
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-03"
+          ]
+        },
+        {
+          "id": "custody.cross-chain-approve",
+          "name": "Approve a proposal on another network from the queue \u2014 the wallet is switched at tap time, a refusal is stated and nothing is signed",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-04"
+          ]
+        },
+        {
+          "id": "custody.sheet-approve-execute",
+          "name": "Approve and execute a proposal from the vault sheet's queue (money path)",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-08"
+          ]
+        },
+        {
+          "id": "custody.vault-style",
+          "name": "Style the vault card from the sheet; the card behind it updates",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-05"
+          ]
+        },
+        {
+          "id": "custody.vault-details",
+          "name": "Read the vault's networks and owners, cross-referenced to the address book, and add an unknown owner in place",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-06"
+          ]
+        },
+        {
+          "id": "custody.acting-from-sheet",
+          "name": "Choose the acting account from the vault sheet; the header follows and the switcher lists the vault once",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-07"
+          ]
+        },
+        {
+          "id": "custody.remove-all-networks",
+          "name": "Remove a vault from Protect on every network after confirmation",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-08"
+          ]
+        },
+        {
+          "id": "custody.load-all-networks",
+          "name": "Load a vault address and have it added on every network it exists on, without picking one",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-09"
+          ]
+        },
+        {
+          "id": "wallet.balance-display",
+          "name": "Balances in Wrap and Transfer fit the screen (display formatter)",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-10"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -435,6 +435,15 @@ jobs:
           echo "WagerPoolFactory deployment completed"
         continue-on-error: false
 
+      # Spec 102 funding pools: the sibling factory, appended AFTER every other deploy in `setup:e2e` so
+      # no earlier nonce-derived address moves (#1289). Required for the full-tier funding-pools spec.
+      - name: Deploy funding-pool factory to local network
+        run: |
+          echo "Deploying FundingPoolFactory to local Hardhat network..."
+          npx hardhat run scripts/deploy/deploy-funding-pool-factory.js --network localhost
+          echo "FundingPoolFactory deployment completed"
+        continue-on-error: false
+
       # Spec 060 platform fees, AFTER the pools factory and in exactly the order `setup:e2e` uses:
       # both are nonce-derived plain-CREATE deploys, so the sequence is what fixes the addresses
       # hardcoded in HARDHAT_CONTRACTS. The mock ERC-4626 vault is what `depositToVaultWithFee`

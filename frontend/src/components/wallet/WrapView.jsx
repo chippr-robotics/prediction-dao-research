@@ -4,6 +4,7 @@ import SensitiveValue from '../common/SensitiveValue'
 import { useWrapNative, WRAP_DIRECTION } from '../../hooks/useWrapNative'
 import { useNotification } from '../../hooks/useUI'
 import { getNetwork } from '../../config/networks'
+import { formatUnitsForDisplay } from '../../lib/format/amount'
 // The view is built on the Transfer section's `pt-*` vocabulary. It used to inherit this
 // stylesheet from PayTransferPanel; now that it also mounts under Trade (release 1.14.0) it
 // carries its own import so its styles never depend on which section mounted first.
@@ -48,8 +49,11 @@ export default function WrapView() {
   // which is a different balance from the one being spent.
   const spendable = wrapping ? maxWrappable : wrappedBalance
 
+  // Display only (spec 102 FR-018): the tiles, the Balance line and the fee hint show a rounded
+  // figure so an 18-decimal balance fits a phone. MAX below still fills the full-precision
+  // amount — what is SENT is never rounded here.
   const fmt = useCallback(
-    (v) => (v == null ? null : ethers.formatUnits(v, decimals)),
+    (v) => formatUnitsForDisplay(v, decimals),
     [decimals],
   )
 

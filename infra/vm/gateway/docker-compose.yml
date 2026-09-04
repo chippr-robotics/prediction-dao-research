@@ -113,6 +113,18 @@ services:
       # separate Safe transaction (setTreasury), tracked independently — this repins x402 to where
       # revenue is MOVING, not where one specific router still happens to point today.
       X402_PAY_TO: "0xcf76db7aa9Fb1BFe08E010468F3344bB45830447"
+      # ---- Bitcoin read/broadcast proxy (spec 061) ----
+      # ENABLED 2026-08-30. The upstream is Esplora REST (public mempool.space — the config
+      # default, stated explicitly so the choice is reviewable), NOT the QuickNode BTC endpoint:
+      # QuickNode serves Bitcoin Core JSON-RPC/Blockbook, which this module's Esplora client does
+      # not speak — swapping upstreams means an adapter, not a URL change. No money path and no
+      # C2b impact: the platform takes no fee on BTC, sends are member-paid network fees, and the
+      # module holds no credential (both upstreams are public/tokenless). The stamps indexer makes
+      # Stamps VERIFY rather than fail-safe to protected-but-unspendable; if stampchain.io is
+      # down, /stamps answers degraded:true and the client protects unverified coins (FR-019).
+      BTC_ENABLED: "true"
+      BTC_ESPLORA_URL: "https://mempool.space/api"
+      BTC_STAMPS_URL: "https://stampchain.io"
       # ---- Perps read proxy (specs 082 + 083) ----
       # READ-ONLY BY CONSTRUCTION: this module has no write route at all. It proxies three PUBLIC
       # venue APIs (Gains, GMX, Hyperliquid) for market data and a member's own positions, and holds

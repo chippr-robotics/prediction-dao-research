@@ -158,6 +158,72 @@ import {
   id = "projects/chippr-bots-site-wp/secrets/finops-quicknode-key"
 }
 
+# ── the QuickNode MULTICHAIN endpoints (2026-08-30) ───────────────────────────────────────────
+#
+# All nine were hand-created at the console on 2026-08-30 (numbered multichain endpoints 001–005
+# plus the account admin key — the scheme is documented on `managed_secret_ids` in
+# terraform.tfvars). They EXIST, so like QUICKNODE_POLYGON_API above they are adopted by importing
+# the CONTAINER ONLY; without these blocks the next apply tries to create them and fails
+# ALREADY_EXISTS. Console-created secrets replicate `automatic`, matching what
+# `google_secret_manager_secret.managed` declares — if a plan shows a REPLACEMENT here instead of
+# a clean adoption, one of them was created with a user-managed replication policy: STOP (replacing
+# a container destroys its versions; prevent_destroy will refuse) and fix the secret, not the plan.
+# No accessor bindings exist or are created — nothing reads these yet (least privilege, same
+# reasoning as the WSS/AMOY family).
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_ADMIN_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_ADMIN_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_001_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_001_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_001_WSS"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_001_WSS"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_002_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_002_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_002_WSS"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_002_WSS"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_003_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_003_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_003_WSS"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_003_WSS"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_004_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_004_API"
+}
+import {
+  to = google_secret_manager_secret.managed["QUICKNODE_RPC_005_API"]
+  id = "projects/chippr-bots-site-wp/secrets/QUICKNODE_RPC_005_API"
+}
+
+# ── the PER-CHAIN QuickNode endpoints — CREATES, deliberately not imports ─────────────────────
+#
+# `fairwins-quicknode-{ethereum,optimism,base,arbitrum}-url` (chains 1 / 10 / 8453 / 42161) have
+# NO import block, and that absence is the correct declaration rather than an omission: unlike
+# every secret above, they were never hand-created at the console. The apply that adds them to
+# `managed_secret_ids` CREATES the empty containers, and only then does
+# `node scripts/secrets/quicknode-chains.js --provision 1,10,8453,42161` add the first version.
+# An import block for a secret that does not exist fails the plan outright.
+#
+# THAT ORDER IS LOAD-BEARING. The provisioning step derives each URL from the QUICKNODE_RPC_001
+# multichain endpoint by swapping a hostname infix and verifies `eth_chainId` before writing —
+# and a container that does not exist yet cannot receive a verified version, so provisioning
+# first simply fails. Creating them here, empty, is what makes the write target exist.
+#
+# The accessor bindings are creates too: these are granted to the WORKSTATION identity only
+# (`workstation_secret_ids`), never to a node — the gateway does not define those chains.
+
 # import {
 #   to = google_artifact_registry_repository.cloud_run_source_deploy
 #   id = "projects/chippr-bots-site-wp/locations/us-central1/repositories/cloud-run-source-deploy"

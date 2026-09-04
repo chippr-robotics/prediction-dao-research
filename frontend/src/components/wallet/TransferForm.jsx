@@ -25,6 +25,7 @@ import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
 import { useBitcoinWallet } from '../../hooks/useBitcoinWallet'
 import { getBitcoinNetwork } from '../../config/bitcoinNetworks'
 import BitcoinSendPanel from './BitcoinSendPanel'
+import { formatDecimalForDisplay } from '../../lib/format/amount'
 
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 const toNum = (v) => (v == null || v === '' ? null : Number(v))
@@ -455,7 +456,21 @@ export default function TransferForm({ onSent }) {
 
           {/* To — the standard address entry (ENS resolution + address book + QR scan) */}
           <div className="pt-field">
-            <label className="pt-label" htmlFor="pt-to">To</label>
+            <div className="pt-label-row">
+              <label className="pt-label" htmlFor="pt-to">To</label>
+              {/* The To field is recipient ONE of a group, not the only recipient (spec 058:
+                  `allRecipients` puts this form's own address first, then rows 2..N). Without a
+                  marker the field reads as the whole destination while the money goes to several
+                  people, so the count is stated where the address is entered. */}
+              {isGroup && (
+                <span
+                  className="pt-badge pt-badge-multi"
+                  aria-label={`Multiple recipients: ${allRecipients.length}`}
+                >
+                  Multi · {allRecipients.length}
+                </span>
+              )}
+            </div>
             <div className="pt-input-with-action">
               <div className="pt-address-input-wrap">
                 <AddressInput
@@ -533,7 +548,7 @@ export default function TransferForm({ onSent }) {
             </div>
             <span className="pt-hint" id="pt-amount-hint">
               {bal != null
-                ? <>Balance: <SensitiveValue>{bal}</SensitiveValue> {symbol}</>
+                ? <>Balance: <SensitiveValue>{formatDecimalForDisplay(bal)}</SensitiveValue> {symbol}</>
                 : 'Loading balance…'}
               {overBalance && ' · exceeds balance'}
             </span>

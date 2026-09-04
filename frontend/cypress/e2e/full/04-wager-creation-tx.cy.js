@@ -420,13 +420,29 @@ describe('Wager Creation with Real Transactions', () => {
 
       cy.enterAmountViaKeypad('fm-stake', '10')
 
-      // Set odds to 5x (500)
-      cy.get('.fm-odds-presets button').then(($buttons) => {
-        const fiveXBtn = $buttons.filter(':contains("5x")')
-        if (fiveXBtn.length > 0) {
-          cy.wrap(fiveXBtn.first()).click()
-        }
-      })
+      /*
+       * SET THE ODDS TO 5x — the asymmetry this test is named for, so the preset is a
+       * PRECONDITION, not a probe.
+       *
+       * The old `$buttons.filter(':contains("5x")')` was a one-shot DOM snapshot inside
+       * `.then()` (anti-pattern 3): it read the preset row once, and when the row had not
+       * rendered yet the `if` silently did nothing (anti-pattern 6). The form then kept its
+       * 2x default and the test CREATED A SYMMETRIC WAGER while still passing, because the
+       * only thing asserted afterwards — that `.fm-odds-summary` exists — is true at every
+       * multiplier. A retryable `cy.contains` fails here, naming the missing control.
+       *
+       * `/^5x$/` rather than `5x`, so the preset row's 50x button cannot satisfy it.
+       */
+      cy.contains('.fm-odds-presets button', /^5x$/, { timeout: 10000 })
+        .should('not.be.disabled')
+        .click()
+
+      /*
+       * The form agreeing the selection landed: FriendMarketsModal puts `active` on the preset
+       * only while `formData.oddsMultiplier === 500`, which is the value the create actually
+       * submits. Without this the click could miss and the summary would still render.
+       */
+      cy.contains('.fm-odds-presets button', /^5x$/).should('have.class', 'active')
     })
 
 

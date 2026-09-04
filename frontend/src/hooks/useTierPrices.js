@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../config/contracts'
-import { membershipChainId } from '../config/networks'
+import { membershipChainId, NETWORKS } from '../config/networks'
 import { getProvider } from '../utils/blockchainService'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 
@@ -14,7 +14,15 @@ import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
  * `maxConcurrentMarkets`; everything else is UI-side presentation.
  */
 
-const USDC_DECIMALS = 6
+// The payment token's decimals come from the MEMBERSHIP chain's own config, never a literal 6:
+// `getTierConfig` prices in the token's base units, and the full-E2E tier points the reference
+// chain's stablecoin at an 18-decimal mock (see `VITE_AMOY_USDC_DECIMALS` in config/networks.js).
+// A hardcoded 6 quoted that $2 tier as "$2,000,000,000,000.00" — the same 10^12 error the
+// network config comment warns about, on the one surface that names a price before a purchase.
+// Strict `NETWORKS[chainId]` lookup (never `getNetwork()`, which falls back to the default network).
+function paymentTokenDecimals(chainId) {
+  return NETWORKS[chainId]?.stablecoin?.decimals ?? 6
+}
 
 const ROLE_HASHES = {
   WAGER_PARTICIPANT: ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE')),
@@ -90,7 +98,7 @@ export function useTierPrices() {
         for (const [tierName, tierId] of Object.entries(TIER_IDS)) {
           try {
             const cfg = await contract.getTierConfig(roleHash, tierId)
-            prices[tierName][roleKey] = parseFloat(ethers.formatUnits(cfg.priceUSDC, USDC_DECIMALS))
+            prices[tierName][roleKey] = parseFloat(ethers.formatUnits(cfg.priceUSDC, paymentTokenDecimals(referenceChainId)))
             limits[tierName][roleKey] = {
               monthlyMarketCreation: Number(cfg.limits.monthlyMarketCreation),
               maxConcurrentMarkets: Number(cfg.limits.maxConcurrentMarkets),
@@ -113,7 +121,7 @@ export function useTierPrices() {
     } finally {
       setIsLoading(false)
     }
-  }, [contract])
+  }, [contract, referenceChainId])
 
   useEffect(() => {
     fetchPrices()

@@ -7,7 +7,9 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   // 'dist' alone matches only the top-level build; each mini-app package emits its own
   // (spec 073), and linting generated bundles reports errors nobody can fix at source.
-  globalIgnores(['dist', 'miniapps/*/dist']),
+  // The native shells (spec 102) are generated projects whose assets/ tree is a COPY of
+  // dist made by `cap sync` — same reasoning, plus their own template JS.
+  globalIgnores(['dist', 'miniapps/*/dist', 'miniapps/dist/**', 'android/**', 'ios/**']),
   {
     files: ['**/*.{js,jsx}'],
     ignores: ['cypress/**', 'src/test/**'],
