@@ -538,6 +538,16 @@ jobs:
           # version independently and are deliberately untouched (FR-007).
           node scripts/release/sync-manifest-versions.js --version "$VERSION"
 
+          # ...and into the native shells (spec 103). Those version fields are SYNC-ONLY —
+          # `check:native-versions` fails on any value the sync would not have written — so a
+          # record that bumps the manifests without also running this is born unmergeable. It
+          # was: v1.16.0's record failed the gate with drift in build.gradle and project.pbxproj,
+          # because this step predates the native channels and was never extended when they
+          # landed. The shipped artifacts were never affected (`native-prepare` runs the same
+          # sync before building), which is exactly why nothing caught it earlier: the only
+          # place the omission shows up is the committed record.
+          node scripts/native/sync-native-config.js --version "$VERSION"
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
