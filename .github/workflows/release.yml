@@ -102,10 +102,14 @@ jobs:
           node scripts/native/inject-native-csp.js
           node scripts/native/sync-native-config.js --version "${{ needs.native-gate.outputs.version }}"
           cd frontend && npx cap sync android
+      # JAVA 21, not 17: `capacitor-android` (Capacitor 8) declares source/target
+      # compatibility 21, and javac answers an older toolchain with
+      # `invalid source release: 21` — which is what failed every Android job on
+      # the v1.16.0 attempt, the first time this chain ever ran.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       # Signing is enabled by setting the ANDROID_SIGNING_SERVICE_ACCOUNT repo
       # variable (one-time operator setup — docs/runbooks/native-release-operations.md).
       # Once enabled, a missing or unreadable secret FAILS this job naming it;
@@ -186,6 +190,7 @@ jobs:
           node scripts/native/inject-native-csp.js
           node scripts/native/sync-native-config.js --version "${{ needs.native-gate.outputs.version }}"
           cd frontend && npx cap sync ios
+          cd .. && node scripts/native/exclude-ios-spm-plugins.js
       # Unsigned by design: the Apple distribution identity is operator-held
       # and never enters CI (research R8). The archive's digest still pins the
       # released bytes; signing rewrites the bundle at the operator ceremony.
@@ -244,10 +249,14 @@ jobs:
           node scripts/native/inject-native-csp.js
           node scripts/native/sync-native-config.js --version "${{ needs.native-gate.outputs.version }}"
           cd frontend && npx cap sync android
+      # JAVA 21, not 17: `capacitor-android` (Capacitor 8) declares source/target
+      # compatibility 21, and javac answers an older toolchain with
+      # `invalid source release: 21` — which is what failed every Android job on
+      # the v1.16.0 attempt, the first time this chain ever ran.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - name: Enable KVM for the emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -318,6 +327,7 @@ jobs:
           node scripts/native/inject-native-csp.js
           node scripts/native/sync-native-config.js --version "${{ needs.native-gate.outputs.version }}"
           cd frontend && npx cap sync ios
+          cd .. && node scripts/native/exclude-ios-spm-plugins.js
       - name: Build for the simulator and probe the app
         run: |
           set -euo pipefail

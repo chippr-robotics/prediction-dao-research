@@ -68,3 +68,30 @@ recorded here as they land, each with its reasoning.
 The spec-076 release workflow builds and digest-records the `.aab`, the iOS
 archive, and the web bundle per tag; store publication is an operator
 ceremony — `docs/runbooks/native-release-operations.md`.
+
+### What the CI toolchain must be (learned the hard way)
+
+The native jobs run for the first time on a **push to `main`**, because that is the only trigger
+`release.yml` has. So the first time they ever executed — the v1.16.0 attempt on 2026-09-04 — all
+four failed, `Publish release` was skipped, and no version could be minted at all. Neither failure
+was in product code; both were toolchain facts nothing else in CI exercises.
+
+**Java 21, not 17.** `capacitor-android` (Capacitor 8) declares source/target compatibility 21.
+An older JDK answers with `error: invalid source release: 21` at
+`:capacitor-android:compileReleaseJavaWithJavac`, which reads like a project misconfiguration and
+is not one. Both the artifact job and the emulator smoke job set `java-version: '21'`.
+
+**Ledger over Bluetooth is ANDROID-ONLY.** `@capacitor-community/bluetooth-le@8.3.0` — the newest
+published — does not compile against the Capacitor Swift API this app pins
+(`capacitor-swift-pm exact 8.5.0`): `CAPPluginCall has no member 'reject'`, and `getString(_:)`
+resolving to a two-argument overload. Capacitor has no per-platform plugin exclusion — a plugin in
+`package.json` is a plugin on both platforms — so `scripts/native/exclude-ios-spm-plugins.js` runs
+after `cap sync ios` and removes exactly that plugin's `.package`/`.product` pair from the
+generated `CapApp-SPM/Package.swift`. It **fails loudly** when the entry is not found: either the
+plugin left the tree (drop it from `EXCLUDED`) or the CLI changed its output shape (revisit the
+script). Both are for a person to decide; neither is a no-op.
+
+The member-facing consequence is honest degradation, not a hidden gap: `lib/native/runtime.js`
+reports the BLE transport as unavailable on iOS and `NativeCapabilityNotice` renders the reason in
+place, the same as any other capability gap. Revisit when the plugin publishes a build against
+Capacitor 8.5 — the exclusion is one entry in one array.

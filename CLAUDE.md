@@ -542,7 +542,16 @@ artifacts live under `specs/<feature>/`.
   reason in place (`NativeCapabilityNotice`), the FR-015 stale-build floor renders NOTHING when
   unknowable (a network failure is not a fact about the member's build), and device-bound flows
   (BLE signing, real passkey PRF) are staged MANUAL protocols in the runbooks, never fake CI
-  coverage. Capacitor deps are pinned EXACT under the spec-075 lockfile rules. See
+  coverage. Capacitor deps are pinned EXACT under the spec-075 lockfile rules. **The native jobs
+  only ever run on a push to `main`** (release.yml's sole trigger), so they are unexercised by every
+  PR that precedes them — all four failed the first time they executed (v1.16.0, 2026-09-04) and
+  skipped `Publish release`, minting no version at all. Two toolchain facts hold them up:
+  **Java 21** (`capacitor-android` compiles at 21; an older JDK says `invalid source release: 21`)
+  and **Ledger BLE is ANDROID-ONLY** — `@capacitor-community/bluetooth-le@8.3.0`, the newest
+  published, does not compile against `capacitor-swift-pm 8.5.0`, and since Capacitor has no
+  per-platform plugin exclusion, `scripts/native/exclude-ios-spm-plugins.js` strips it from the
+  generated `CapApp-SPM/Package.swift` after `cap sync ios` and FAILS LOUDLY if the entry is
+  missing. See
   `docs/developer-guide/native-channels.md` + `docs/runbooks/native-release-operations.md` +
   `specs/103-capacitor-channels/`.
 - **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
