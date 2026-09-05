@@ -60,7 +60,7 @@ The resolved outcome of examining one request. Request-scoped; never persisted.
 | Field | Type | Notes |
 |---|---|---|
 | `tier` | AssuranceTier | the highest tier actually proven |
-| `subject` | string \| null | the **non-rotatable** identifier metering keys on (§5). Account address at `member`; challenge-token digest at `human`; `null` at `anonymous` |
+| `subject` | string \| null | the **non-rotatable** identifier metering keys on (§5). Account address at `address`/`member`; challenge-token digest at `human`; `null` at `anonymous` |
 | `evidence` | Evidence[] | every credential examined and its outcome — for audit, never for authorisation |
 | `verificationState` | `verified` \| `unverifiable` | **load-bearing**, see below |
 | `reason` | string \| null | present only when a credential was rejected or unverifiable |
@@ -195,65 +195,20 @@ the spend has already happened. This is the difference between a budget and a re
 
 ---
 
-## 7. IssuedAccess
+## 7–9. Keyed data access — moved to spec 106
 
-The credential handed to a client so it can read directly from the data provider. §7 and §8 are the
-keyed-data-access half of the feature.
+`IssuedAccess`, `ProviderEndpoint` and `AccessIssuanceRecord` moved with the requirements they
+served. One rule from them is worth keeping visible here, because it is a general principle this
+feature relies on and not a detail of that provider:
 
-| Field | Type | Notes |
-|---|---|---|
-| `endpoint` | string | the provider address the client will call |
-| `credential` | string | the expiring token |
-| `expiresAt` | timestamp | absolute, not a duration |
-| `permits` | string[] | the operations allowed — read-only (FR-023) |
-| `issuedToTier` | AssuranceTier | shapes lifetime, rate and permitted operations |
-| `keyId` | string | which signing key produced it — the rotation handle (FR-025) |
+**`unverifiable` does not always mean "retry".** Everywhere in *this* feature it does — failing
+closed on an unreachable dependency would deny a legitimate member, so `auth_unverifiable` and
+`membership_unreadable` are retryable and never denials. But at a check whose whole purpose is to
+confirm that a credential about to be transmitted is *not* sufficient on its own, failing open
+transmits an unprotected credential, so "could not tell" must be treated as "no".
 
-### Rules
-
-- **Both fields reach the browser and both are readable there.** This is the accepted residual, stated
-  in the spec rather than hidden. The design bounds theft; it does not prevent it.
-- **`endpoint` alone must never be sufficient.** The entire safety of transmitting it rests on the
-  provider rejecting a request that lacks a valid `credential`. §8 is what makes that checkable rather
-  than assumed.
-- **`expiresAt` is absolute.** A duration would be interpreted against the client's clock.
-- **Never logged.** `credential` is key material for its lifetime and is excluded from every emitted
-  field (FR-028 of the secrets rules, FR-037 here).
-
----
-
-## 8. ProviderEndpoint
-
-Configuration plus a **verified** enforcement state. The subject of FR-026.
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` / `chains` | string / number[] | which chains it serves |
-| `address` | string | held server-side; reaches a client only inside an IssuedAccess |
-| `enforcement` | `verified` \| `absent` \| `unverifiable` | **three states, deliberately** |
-| `checkedAt` | timestamp | staleness of the last check |
-
-### Why enforcement has three states and why two of them refuse
-
-An endpoint with second-factor enforcement switched off is **identical in every log** to one with it
-on — until the address turns out to have been sufficient by itself. There is no observable difference
-until the moment it matters.
-
-So `absent` refuses, and **`unverifiable` refuses too**. This is the one place in the feature where
-"we could not tell" is treated as "no" rather than as a retryable condition, and it inverts FR-009
-deliberately: everywhere else, failing closed would deny a legitimate member, so unverifiable is
-retryable; here, failing open transmits an unprotected credential. **The asymmetry is the design.**
-
----
-
-## 9. AccessIssuanceRecord
-
-Audit, per FR-031: which endpoint was served, to which tier, under which enforcement, when.
-
-**Records the decision, never the credential.** Sufficient to answer "what did we hand out, to whom,
-under what protection" after the fact, and useless to anyone who steals the log.
-
----
+The direction of failure is chosen per check, from what the failure would cost. It is not a
+house style, and a future reader should not "fix" the inconsistency.
 
 ## Relationships
 
@@ -271,10 +226,8 @@ Request
   │                          │
   ├── UpstreamCredential.ceiling  ──►  checked BEFORE the upstream call
   │
-  └── (issuance route only)
-           ProviderEndpoint.enforcement ──► verified? ──► IssuedAccess ──► AccessIssuanceRecord
-                                             │
-                                       absent | unverifiable ──► refuse
+  └── (keyed issuance — spec 106)
+           (issuance entities moved to spec 106)
 ```
 
 ## What is deliberately absent
@@ -284,6 +237,5 @@ Request
   members, which is the property the no-backend exception is bounded by.
 - **No credential persistence.** Issued credentials are minted and forgotten; the audit record holds
   the decision, not the secret.
-- **No revocation list for issued access.** Lifetime is the bound. Revocation at scale is retiring a
-  signing key (`keyId`), which invalidates everything it signed at once — cheaper and more certain
-  than tracking individual credentials, and honest about what it does.
+- **No credential minting of any kind.** Runtime issuance of keyed provider credentials is spec 106;
+  this feature only ever *examines* credentials a caller already holds.
