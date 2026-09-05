@@ -28,8 +28,9 @@ and two of its rules change what you do on step 2:
 - **A spec number is claimed by MERGING a reservation PR to `staging`**, never by
   computing it. `create-new-feature.sh` answers `max(existing) + 1`, which is right
   exactly once per merge — two agents who ask before either has merged both get the
-  same number and both checked. That is how `017`, `041`, `050` and `102` each came
-  to name two unrelated features. Open a PR into `staging` containing ONLY the
+  same number and both checked. That is how `017`, `041`, `050`, `102` and `104`
+  each came to name two unrelated features — `104` twice over on 2026-09-04/05,
+  *while this gate was in review*. Open a PR into `staging` containing ONLY the
   reservation — `specs/<NNN>-<slug>/spec.md` plus its `matrix.json` row and the
   regenerated `e2e-coverage-matrix.md` (`npm run e2e:matrix`; `check:e2e-matrix`
   fails a spec dir with no row) — label it `spec-reservation`, merge it, then plan.
@@ -79,9 +80,11 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   (`scripts/specs/check-spec-registry.js`, CI job *Spec Registry*) fails a second
   claimant, enforces `NNN-kebab-case`, and requires a reserved number to carry a
   `spec.md` (a reservation with no spec is indistinguishable from an abandoned one).
-  The four pre-gate collisions are frozen in `LEGACY_COLLISIONS` under rule S-04,
-  which fails if an entry outlives the collision it excuses — the list can shrink and
-  cannot grow. `create-new-feature.sh` now numbers against `origin/staging` and
+  The five pre-gate collisions are frozen in `LEGACY_COLLISIONS` under rule S-04,
+  which fails if an entry outlives the collision it excuses, so the list shrinks when
+  a pair is renumbered. **Adding to it is not a way to get green**: once the gate is
+  on `staging`, S-01 fails before a second claimant can merge, so a new entry could
+  only describe a collision the gate was never able to see. `create-new-feature.sh` now numbers against `origin/staging` and
   `origin/main`, not just the local checkout, because each agent's container was
   cloned at a different moment. (2) **`specs/**` is its own change-detection filter**
   in `ci-manager.yml`: it had none, so a PR that only reserved a number ran ZERO

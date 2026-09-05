@@ -106,9 +106,9 @@ The frontend is the trust surface for non-technical users.
    - A spec number is claimed by **merging** a reservation PR into `staging` that
      contains only the new `specs/<NNN>-<slug>/spec.md` and its e2e coverage-matrix
      row. Computing a number claims nothing:
-     `max(existing) + 1` is correct exactly once per merge, which is how four
-     numbers on `main` came to name two features each. `npm run check:specs` gates
-     this.
+     `max(existing) + 1` is correct exactly once per merge, which is how five
+     numbers came to name two features each — the most recent while the gate that
+     catches it was in review. `npm run check:specs` gates this.
    - Feature work branches from `staging`. Only a promotion or a declared hotfix
      reaches `main`.
    - An issue's state is its `status:*` label, set by whoever is doing the work, at

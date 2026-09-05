@@ -62,8 +62,8 @@ protocol is `docs/developer-guide/multi-agent-workflow.md`; three rules bind thi
 1. **A spec number is claimed by MERGING a reservation PR into `staging`, not by computing one.**
    The number this command derives is a *proposal*. `max(existing) + 1` is correct exactly once per
    merge — another agent asking the same question before you merge gets the same answer and is
-   equally entitled to it. That is how `017`, `041`, `050` and `102` each came to name two
-   unrelated features on `main`.
+   equally entitled to it. That is how `017`, `041`, `050`, `102` and `104` each came to name two
+   unrelated features — `104` on 2026-09-04/05, while the gate that catches this was in review.
 
    So: as soon as the spec directory and its skeleton exist, open a PR into `staging` containing
    **only the reservation** — `specs/<NNN>-<slug>/spec.md`, its row in

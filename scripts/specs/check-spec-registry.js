@@ -3,9 +3,12 @@
  * Spec registry gate (issue #1460).
  *
  * `specs/` is the shared namespace that several agents write into at the same time, and until this
- * gate existed nothing noticed when two of them claimed the same number. Four collisions reached
- * `main` that way — 017, 041, 050 and 102 — each a pair of unrelated features whose documents,
- * branches and cross-references now disagree about what "spec 041" means.
+ * gate existed nothing noticed when two of them claimed the same number. Five collisions reached an
+ * integration branch that way — 017, 041, 050, 102 and 104 — each a pair of unrelated features
+ * whose documents, branches and cross-references now disagree about what "spec 041" means.
+ *
+ * 104 is worth pausing on: it landed on `staging` on 2026-09-04 and 2026-09-05, i.e. WHILE this
+ * gate was being written, from two agents neither of whom did anything wrong. That is the rate.
  *
  * The failure is structural, not careless. `create-new-feature.sh` answers "what is the next
  * number?" with `max(existing) + 1`, which is correct exactly once per merge: two agents who ask
@@ -40,14 +43,23 @@ const path = require('path');
 const NON_NUMBERED = new Set(['design-prompts']);
 
 /**
- * The four collisions that predate this gate, frozen.
+ * The collisions that predate this gate, frozen.
+ *
+ * "Predate" means the gate had not yet run on them, not that they are old: 104 was created while
+ * this file was being written and was found by the gate's first CI run, on this very PR. Both 104
+ * specs were already merged to `staging` with complete artifact sets, by two agents each of whom
+ * had computed a correct next-number.
  *
  * These are NOT forgiven — they are recorded so the gate can go green on the tree as it stands
- * while still failing on the next one. Renumbering them is a separate, deliberate change: the
- * numbers appear in CLAUDE.md, in docs/, in branch names and in merged PR titles, and 102 in
- * particular cannot simply be bumped to 103 because 103 is taken. Whoever renumbers a pair deletes
- * its entry here, and S-04 fails if an entry is left behind that no longer collides — so the list
- * shrinks and never silently rots.
+ * while still failing on the next one. Renumbering them is a separate, deliberate change owned by
+ * whoever owns those specs: the numbers appear in CLAUDE.md, in docs/, in branch names and in
+ * merged PR titles, and 102 in particular cannot simply be bumped to 103 because 103 is taken.
+ * Whoever renumbers a pair deletes its entry here, and S-04 fails if an entry is left behind that
+ * no longer collides — so the list shrinks and never silently rots.
+ *
+ * ADDING to this list is not a way to get CI green. Once this gate is on `staging`, S-01 fails
+ * before a second claimant can merge, so a new entry could only ever describe a collision the gate
+ * was never able to see — which, after it lands, is none.
  *
  * Each key is the shared number; the value is the exact set of directories that share it.
  */
@@ -56,6 +68,8 @@ const LEGACY_COLLISIONS = {
   '041': ['041-oracle-open-challenges', '041-passkey-wallet-login'],
   '050': ['050-earn-lending-rewards', '050-sponsored-paymaster'],
   '102': ['102-capacitor-channels', '102-multisig-chain-abstraction'],
+  // Landed on `staging` 2026-09-04 / 2026-09-05, while this gate was in review (issue #1460).
+  '104': ['104-guttertoken-assistant-rail', '104-passkey-account-recovery'],
 };
 
 const DIR_SHAPE = /^(\d{3,})-[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -73,7 +87,7 @@ function listSpecDirs(specsDir) {
  * Collect violations for a specs/ tree. Pure over the filesystem so the self-test can drive it.
  *
  * `checkBaseline` is off by default because S-04 is a statement about THIS repository's tree, not
- * about spec trees in general: a fixture that does not contain the four frozen collisions is not
+ * about spec trees in general: a fixture that does not contain the frozen collisions is not
  * drifting from the baseline, it simply is not the baseline. Leaving it on by default made every
  * unrelated fixture fail with four S-04 violations, which is the classic gate-that-cries-wolf.
  */

@@ -95,7 +95,7 @@ test('S-03 rejects a reserved number with no spec.md', () => {
 });
 
 test('S-04 is off unless the caller says it is checking the repo tree', () => {
-  // The four frozen collisions are a fact about specs/, not about every tree. Asserting them
+  // The frozen collisions are a fact about specs/, not about every tree. Asserting them
   // by default made unrelated fixtures fail four times over for nothing.
   const root = makeSpecsTree({ '001-first-thing': true });
   assert.deepStrictEqual(checkSpecRegistry(root), []);

@@ -3,10 +3,16 @@
 **Issue #1460.** Several agents work this repository at the same time, and the Spec Kit flow was
 written for one. Two things broke as a result, and this document is the fix for both:
 
-- **Spec numbers get claimed twice.** `017`, `041`, `050` and `102` each name two unrelated
-  features on `main`. Not carelessness: `create-new-feature.sh` answers "what is the next number?"
-  with `max(existing) + 1`, which is correct exactly once per merge. Two agents who ask before
-  either has merged get the same answer, and *both of them checked*.
+- **Spec numbers get claimed twice.** `017`, `041`, `050`, `102` and `104` each name two unrelated
+  features. Not carelessness: `create-new-feature.sh` answers "what is the next number?" with
+  `max(existing) + 1`, which is correct exactly once per merge. Two agents who ask before either
+  has merged get the same answer, and *both of them checked*.
+
+  `104` is the one to look at. Both halves of it — `104-passkey-account-recovery` and
+  `104-guttertoken-assistant-rail` — were written, implemented and merged to `staging` on
+  2026-09-04 and 2026-09-05, i.e. **while the gate below was being written**, and were caught by
+  its first CI run. Neither agent did anything wrong. That is the rate at which this happens, and
+  it is why the rule is a gate rather than a paragraph.
 - **Nobody can see what is being worked.** An issue's state lived in whichever agent's context
   window was working it. A second agent picking up the "next" issue had no way to know the first
   one had started ten minutes earlier.
@@ -125,8 +131,13 @@ Only then do the design work — `/speckit-plan`, `/speckit-tasks` — in the no
 **The gate.** `npm run check:specs` (`scripts/specs/check-spec-registry.js`, CI job *Spec Registry*)
 fails when two directories claim one number. It also enforces `NNN-kebab-case` naming and that a
 reserved number has a `spec.md` — a reservation with no spec is indistinguishable from an abandoned
-one. The four pre-existing collisions are frozen in `LEGACY_COLLISIONS` with their own rule (S-04)
-that deletes the exemption if anyone renumbers them; the list can shrink and cannot grow.
+one. The five pre-gate collisions are frozen in `LEGACY_COLLISIONS` with their own rule (S-04) that
+fails if an entry outlives the collision it excuses — so the list shrinks when someone renumbers a
+pair, and cannot silently rot. Renumbering is owned by whoever owns those specs, not by this gate.
+
+Adding to that list is not a way to get CI green. Once the gate is on `staging`, S-01 fails before a
+second claimant can merge, so a new entry could only describe a collision the gate was never able to
+see — which, from that point, is none.
 
 **And the gate has to be able to see the PR.** `specs/**` is now its own change-detection filter in
 `ci-manager.yml`. It had none, so a PR touching only `specs/` matched no filter and ran zero jobs —
