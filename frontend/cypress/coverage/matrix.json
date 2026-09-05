@@ -3072,6 +3072,89 @@
           "missing": "The chain agreeing. This tier reaches no RPC, so what is proven is the form, the refusal of a malformed address, and that the address is handed on to be CHECKED \u2014 never that a verified address opens a session on the account it names. That needs a deployed account whose owner set includes a key this browser has no record of, i.e. the full-stack passkey tier."
         }
       ]
+    },
+    {
+      "id": "105-multichain-vault-creation",
+      "title": "Guided Multichain Vault Creation \u2014 One Vault, Chosen Networks",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "custody.create-flow-guided",
+          "name": "A non-technical member walks the four-sheet flow (type presets, rules tile grid with live summary, cohort network multi-select) with every refusal stated in plain language and no network question before a signature needs one",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-02",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-03",
+            "frontend/cypress/e2e/fast/41-protect-vault-actions.cy.js::VA-04",
+            "frontend/cypress/e2e/fast/43-vault-create-flow.cy.js::CF-01",
+            "frontend/cypress/e2e/fast/43-vault-create-flow.cy.js::CF-02",
+            "frontend/cypress/e2e/fast/43-vault-create-flow.cy.js::CF-03"
+          ]
+        },
+        {
+          "id": "custody.create-vault-multichain",
+          "name": "The flow deploys the vault and the deployed address IS the predicted one, with per-network status reaching Live from a real receipt",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-01"
+          ],
+          "issue": "#1453",
+          "missing": "deployment to a SECOND network in the same run (identical address, wallet switch mid-orchestration, per-network failure isolation) \u2014 the on-chain tier runs one private chain per leg, so the multi-network half is a staged manual protocol (#1453); the state machine and CREATE2 identity across chainIds are Vitest-proven"
+        },
+        {
+          "id": "custody.create-rules-install",
+          "name": "The chosen rules install on each network after deployment \u2014 directly where the creator alone meets the threshold, queued as awaiting-approval where co-owners must sign \u2014 and an over-cap send is refused by the realized policy",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1452",
+          "note": "CV-01 deliberately creates with rules OFF (it asserts the no-rules initializer). The realization (banded lane matching in matchPreview) and install-plan modes are Vitest-proven; the chain leg is #1452."
+        },
+        {
+          "id": "custody.deploy-later",
+          "name": "From Details, a vault with a creation record deploys to a cohort network it is not on yet at the SAME address; a drifted owner set is disclosed as the original arrangement first; a vault without a record gets the honest reason, never a dead control",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1452",
+          "note": "Gating, disclosure and orchestrator handoff are Vitest/component-proven (VaultDetailsView.test.jsx); the on-chain already-live + no-record legs are #1452."
+        },
+        {
+          "id": "custody.vault-details-one-card",
+          "name": "Details renders ONE card \u2014 compact network status rows, shared facts stated once with drift naming the differing network and coverage naming the unread one \u2014 never a repeated per-network card or an up-front switch gate",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-06",
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-12"
+          ]
+        },
+        {
+          "id": "custody.queue-readability",
+          "name": "Queue chips (All / Needs you / per-network) filter the rows without touching the four-state per-chain read disclosure; recognised proposals read in plain language and unknown calldata keeps the honest raw row",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-11"
+          ]
+        }
+      ]
     }
   ]
 }
