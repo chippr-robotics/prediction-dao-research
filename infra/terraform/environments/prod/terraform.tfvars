@@ -50,6 +50,15 @@ gateway_secret_ids = [
   # gateway does not define those chains at all — CHAIN_DEFS covers 61, 63, 137 and 80002, and
   # ENABLED_CHAIN_IDS is "63,137". They are workstation-only until a node actually reads one.
   "QUICKNODE_POLYGON_API",
+  # Keyed RPC issuance signing key (spec 107, #1469). KEY MATERIAL: the ES256 private half whose
+  # public twin is registered at the provider (endpoint 657013, kid k1 — the #1468 ceremony).
+  # OPTIONAL by the same never-stranded rule as everything above: absent => POST /v1/access/rpc
+  # answers 503 access_unconfigured and the SPA reads public capacity exactly as it does today.
+  # The ONLY new grant this feature needs: RPC_ACCESS_ADMIN_KEY deliberately delivers from
+  # finops-quicknode-key, which this node already holds for the exporter — verified live to read
+  # per-endpoint security state, so granting QUICKNODE_ADMIN_API to the public-facing gateway
+  # would widen its blast radius for nothing.
+  "fairwins-rpc-access-signing-key",
 ]
 
 # Secret CONTAINERS under management. Versions and payloads are never declared (guardrail G-04).
@@ -145,6 +154,14 @@ managed_secret_ids = [
   # ANDROID_SIGNING_SERVICE_ACCOUNT repo variable is set.
   "fairwins-android-upload-keystore",
   "fairwins-android-upload-keystore-password",
+
+  # Keyed RPC issuance signing key (spec 107). Created BY THE OPERATOR during the #1468 ceremony —
+  # generated and piped straight into Secret Manager, never on disk — and adopted here via an
+  # import block (imports.tf, spec-107 stanza), the audit-visible path spec 087 prescribes for
+  # resources that already exist. Container only, as everything here is (G-04); prevent_destroy
+  # protects the one credential in this feature that cannot be re-derived. Granted to the gateway
+  # node alone (gateway_secret_ids above).
+  "fairwins-rpc-access-signing-key",
 
 
   # Workstation secrets (spec 097). Mirrors scripts/secrets/registry.js — the parity test keeps

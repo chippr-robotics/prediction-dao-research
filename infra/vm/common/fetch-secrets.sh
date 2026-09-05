@@ -143,6 +143,25 @@ case "$ROLE" in
     emit "$GW" RPC_URL_PRIMARY_137       QUICKNODE_POLYGON_API       latest optional \
       "chain 137 reads fall back to the public endpoints in RPC_URLS_137"
 
+    # ── Keyed RPC issuance (spec 107, #1469) ─────────────────────────────────────────────────
+    # Both OPTIONAL by the never-stranded rule: either absent => POST /v1/access/rpc answers 503
+    # access_unconfigured and the SPA keeps reading public capacity exactly as it does today.
+    #
+    # RPC_ACCESS_SIGNING_KEY is KEY MATERIAL (an ES256 private key, PEM). It signs the short-lived
+    # read-only JWTs browsers present at the provider; its public twin lives on issuance endpoint
+    # 657013 under kid k1. Never echoed, never in a URL, never logged — the gateway loads it at
+    # boot and fails the deploy loudly if it is present but unusable.
+    emit "$GW" RPC_ACCESS_SIGNING_KEY    fairwins-rpc-access-signing-key latest optional \
+      "keyed RPC issuance answers 503 access_unconfigured; the SPA reads public capacity"
+    # The FR-026 enforcement check (is the endpoint ACTUALLY demanding the credential, with the
+    # read-only whitelist switched ON?) reads the provider's admin API. Delivered from
+    # finops-quicknode-key — ALREADY granted to this node for the exporter, and verified live to
+    # read per-endpoint security state — rather than granting the account-wide QUICKNODE_ADMIN_API
+    # to the public-facing container for nothing. Note this response carries live endpoint tokens
+    # in plaintext; the gateway's verifier destructures the flags it needs and drops the body.
+    emit "$GW" RPC_ACCESS_ADMIN_KEY      finops-quicknode-key        latest optional \
+      "enforcement reads become unverifiable, which REFUSES issuance; SPA falls back to public capacity"
+
     log "engine container:"
     emit "$EN" API_KEY                   relay-engine-api-key        2      required
     emit "$EN" WEBHOOK_SIGNING_KEY       relay-webhook-secret        2      required
