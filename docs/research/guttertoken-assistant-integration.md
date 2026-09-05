@@ -359,11 +359,28 @@ once. Ship the seam provider-shaped (`providers/guttertoken.js`) with a fixed ba
 
 ## 7. Open questions (answer before `/speckit-plan`)
 
-1. **Does GutterToken's wallet login accept ERC-1271?** The signup says "your wallet will ask you to
-   sign a short message". A passkey member's account is a contract with no key; if GutterToken
-   verifies with `ecrecover` only, passkey members must sign up by e-mail (fine) — but then a
-   crypto top-up from their FairWins account is "from a wallet you can sign for" only if GutterToken
-   can attribute the deposit to them, which the docs tie to an *enrolled* wallet. Manual test.
+1. **Does GutterToken's wallet login accept ERC-1271, and can FairWins sign it in-app?** ANSWERED
+   2026-09-05 by reading the signup page and its bundles (`/build/assets/app-*.js`, `eth-*.js`) and
+   probing the endpoints. The flow is: `window.ethereum` ONLY (no EIP-6963, no WalletConnect — with
+   no injected provider the wallet button is *removed* and signup is e-mail only) →
+   `eth_requestAccounts` → `POST /login/wallet/challenge {address}` (Laravel: `X-XSRF-TOKEN`
+   double-submit from a cookie we cannot read, session cookie `gt_customer_session`
+   `SameSite=Lax; HttpOnly`, **no CORS headers at all** — the preflight from our origin fails) →
+   returns a SIWE message with a per-session nonce, `Chain ID: 1` and a 5-minute expiry →
+   `personal_sign` → form POST to `/signup/wallet` gated by the CSRF `_token`, the terms box and
+   an **Altcha proof-of-work** captcha. Consequences: (a) FairWins cannot perform the sign-in from
+   its own origin — not headless, and not by pre-signing and redirecting, because the nonce is
+   minted inside their session and nothing accepts an externally produced message; (b) a passkey
+   member cannot use wallet signup at all: there is no provider to inject on the web, and the
+   verification is pinned to chain 1 with wording ("prove you control this wallet") that indicates
+   `ecrecover`, so an ERC-1271/6492 envelope from a Polygon smart account would not verify even
+   through a native-shell WebView bridge; (c) classic-wallet members already have the path — their
+   extension or wallet app signs on GutterToken's page directly. What FairWins *can* do: deep-link
+   `https://app.guttertokens.com/signup?ref=<code>` (verified: `ref` prefills), tell classic-wallet
+   members to sign with the same address they use here, and steer passkey members to e-mail signup
+   with an honest note that crypto deposits must come from a wallet GutterToken can attribute.
+   The unlock is on GutterToken's side (ERC-1271 + 6492 verification, an EIP-6963/WalletConnect
+   path, or a key-provisioning API); it is a partnership ask, not code here.
 2. **Is `x-api-key` honoured?** Only matters for P3. Manual test with a real key.
 3. **Plaintext at rest, or PRF-wrapped?** § 4.3 recommends plaintext with the RPC precedent; a
    product decision.
