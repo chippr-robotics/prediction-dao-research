@@ -3185,31 +3185,47 @@
             "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-01"
           ],
           "issue": "#1453",
-          "missing": "deployment to a SECOND network in the same run (identical address, wallet switch mid-orchestration, per-network failure isolation) \u2014 the on-chain tier runs one private chain per leg, so the multi-network half is a staged manual protocol (#1453); the state machine and CREATE2 identity across chainIds are Vitest-proven"
+          "missing": "deployment to a SECOND network in the same run (identical address, wallet switch mid-orchestration, per-network failure isolation) \u2014 the on-chain tier runs one private chain per leg, so the multi-network half is the staged manual protocol in docs/runbooks/multichain-vault-staging-validation.md (#1453); the state machine and CREATE2 identity across chainIds are Vitest-proven"
         },
         {
           "id": "custody.create-rules-install",
           "name": "The chosen rules install on each network after deployment \u2014 directly where the creator alone meets the threshold, queued as awaiting-approval where co-owners must sign \u2014 and an over-cap send is refused by the realized policy",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1452",
-          "note": "CV-01 deliberately creates with rules OFF (it asserts the no-rules initializer). The realization (banded lane matching in matchPreview) and install-plan modes are Vitest-proven; the chain leg is #1452."
+          "tests": [
+            "frontend/cypress/e2e/full/44-vault-rules-lanes.cy.js::RL-01",
+            "frontend/cypress/e2e/full/44-vault-rules-lanes.cy.js::RL-02"
+          ],
+          "note": "CV-01 deliberately creates with rules OFF (it asserts the no-rules initializer stays byte-identical to spec 043); RL-01/RL-02 are the rules-ON legs \u2014 direct and queued installs read back from the guard's own getRules, and the lanes govern real transfers (banded-lane allow, big-send refusal on one approval, full-vote completion by the executing co-owner)."
+        },
+        {
+          "id": "custody.create-passkey-batch",
+          "name": "A passkey member creates a governed vault in ONE sendCalls batch (deploy + both rule installs), landing at the predicted address with the record written from it \u2014 and a chain with no bundler states the write-rail reason on its chip instead of attempting the batch",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/passkey/vault-create-batch.cy.js::PVC-01"
+          ],
+          "issue": "#1454",
+          "note": "Runs only on the cypress-passkey-full-stack job (bundler + gateway). The batch is possible because the CREATE2 address is known before deployment; the vault, its guard slot and the realized lanes are read back from the chain, and the reference + creation record are asserted to carry the PREDICTED address, never one parsed from a receipt. The batch composition itself (every call addressed, one sendCalls) is pinned by useVaultDeployment.test.jsx."
         },
         {
           "id": "custody.deploy-later",
           "name": "From Details, a vault with a creation record deploys to a cohort network it is not on yet at the SAME address; a drifted owner set is disclosed as the original arrangement first; a vault without a record gets the honest reason, never a dead control",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "partial",
+          "tier": "on-chain",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1452",
-          "note": "Gating, disclosure and orchestrator handoff are Vitest/component-proven (VaultDetailsView.test.jsx); the on-chain already-live + no-record legs are #1452."
+          "tests": [
+            "frontend/cypress/e2e/full/44-vault-rules-lanes.cy.js::RL-01",
+            "frontend/cypress/e2e/full/44-vault-rules-lanes.cy.js::RL-02"
+          ],
+          "issue": "#1453",
+          "missing": "the replay deployment itself and FR-019 already-live need a SECOND custody network, which the one-chain full tier cannot host — staged manual protocol (docs/runbooks/multichain-vault-staging-validation.md, #1453). The record gate is chain-proven: the record holder is OFFERED Deploy for the missing cohort network (RL-01) and the no-record co-owner gets the honest FR-018 reason (RL-02); gating, disclosure and orchestrator handoff stay Vitest/component-proven (VaultDetailsView.test.jsx)."
         },
         {
           "id": "custody.vault-details-one-card",
