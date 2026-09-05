@@ -416,10 +416,115 @@ export function loadConfig(env = process.env, opts = {}) {
     // Browser origins allowed to call the gateway cross-origin (CORS). The SPA lives on a different
     // host than the relay subdomain (fairwins.app -> relay.fairwins.app), so it needs an explicit
     // allow-list. Comma-separated; unset => no CORS headers (same-origin / server-to-server only).
-    allowedOrigins: opt(env, 'ALLOWED_ORIGINS', '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
+    allowedOrigins: (() => {
+      const configured = opt(env, 'ALLOWED_ORIGINS', '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      // The native shells (spec 102/103) are NOT on https://fairwins.app. Capacitor serves the
+      // bundle from `capacitor://localhost` (iOS) and `https://localhost` (Android), and the
+      // WebView's fetch is subject to CORS like any browser's. Without these, the CORS middleware
+      // emits no Access-Control-Allow-* at all for a shell, so a native caller cannot send the
+      // Authorization header — which would put spec 106's member-grant requirement on Bitcoin
+      // broadcast (a passkey-only, native-bridged flow) onto a channel physically unable to carry
+      // a credential. They are appended rather than defaulted so an explicit ALLOWED_ORIGINS still
+      // gets them; an operator who genuinely wants web-only must remove them here, deliberately.
+      const NATIVE_SHELL_ORIGINS = ['capacitor://localhost', 'https://localhost']
+      return [...new Set([...configured, ...(configured.length ? NATIVE_SHELL_ORIGINS : [])])]
+    })(),
+    // --- Caller identity (spec 106) ---
+    // Unset/false => the layer is INERT: every caller resolves anonymous, no status changes, and
+    // the state is disclosed at boot and in the gated /status. FR-015 — a disabled control must
+    // never be indistinguishable from an enforcing one.
+    identity: {
+      enabled: opt(env, 'IDENTITY_ENABLED', 'false').toLowerCase() === 'true',
+      // SEPARATE from `enabled`, deliberately. `enabled` without `enforce` is OBSERVE mode: the
+      // tier resolves and is reported, and no status code changes — so the model can be validated
+      // against real traffic before anything depends on it. A safety layer that starts refusing the
+      // moment it deploys fails in the shape "the product is broken", which is the worst way for
+      // this particular change to be wrong.
+      enforce: opt(env, 'IDENTITY_ENFORCE', 'false').toLowerCase() === 'true',
+      killswitch: opt(env, 'IDENTITY_KILLSWITCH', 'false').toLowerCase() === 'true',
+      // Per-upstream ceilings (FR-013), checked BEFORE the outbound call. UNSET = UNLIMITED, and
+      // that absence is honest rather than a hidden default: inventing a cap an operator did not
+      // choose would refuse traffic in the name of a budget nobody set.
+      upstreamCeilings: {
+        opensea: int(env, 'UPSTREAM_CEILING_OPENSEA', 0),
+        polymarket: int(env, 'UPSTREAM_CEILING_POLYMARKET', 0),
+        bitcoin: int(env, 'UPSTREAM_CEILING_BITCOIN', 0),
+        perps: int(env, 'UPSTREAM_CEILING_PERPS', 0),
+        bridge: int(env, 'UPSTREAM_CEILING_BRIDGE', 0),
+      },
+      upstreamCeilingWindowMs: int(env, 'UPSTREAM_CEILING_WINDOW_MS', 60_000),
+      challenge: {
+        // Unset => the challenge verifier ABSTAINS (returns `absent`), never rejects. An
+        // unconfigured bot-check must not deny every anonymous caller.
+        secret: (() => {
+          const secret = opt(env, 'CHALLENGE_SECRET', null)
+          // Cloudflare's PUBLISHED test secrets always pass (1x…) or always fail (2x…/3x…).
+          // In development they are the right tool; in production the always-pass one turns the
+          // human tier into a stamp anyone can print — a mock in a shipped path (constitution
+          // III), invisible in every log. Boot refuses rather than warns: a warning here is a
+          // production incident someone reads later (T014).
+          const TEST_SECRETS = [
+            '1x0000000000000000000000000000000AA',
+            '2x0000000000000000000000000000000AA',
+            '3x0000000000000000000000000000000AA',
+          ]
+          if (secret && TEST_SECRETS.includes(secret) && env.NODE_ENV === 'production') {
+            throw new Error(
+              'CHALLENGE_SECRET is a published Turnstile TEST secret; in production this makes the human tier a mock. Configure a real secret or unset it.'
+            )
+          }
+          return secret
+        })(),
+        verifyUrl: opt(env, 'CHALLENGE_VERIFY_URL', 'https://challenges.cloudflare.com/turnstile/v0/siteverify'),
+        ttlSec: int(env, 'CHALLENGE_TTL_SEC', 900),
+        timeoutMs: int(env, 'CHALLENGE_TIMEOUT_MS', 3000),
+      },
+    },
+    // --- Keyed RPC access issuance (spec 107) ---
+    // DORMANT until an endpoint pair, a signing key and the admin credential are all present; the
+    // module mounts regardless and answers 503 access_unconfigured, so absence stays honest.
+    // RPC_ACCESS_SIGNING_KEY is KEY MATERIAL (spec 097 rule 3): it arrives from Secret Manager via
+    // fetch-secrets.sh and must never be committed, logged, or echoed.
+    rpcAccess: (() => {
+      const endpoints = {}
+      for (const key of Object.keys(env)) {
+        const m = key.match(/^RPC_ACCESS_ENDPOINT_URL_(\d+)$/)
+        if (!m) continue
+        const chainId = Number(m[1])
+        const url = String(env[key]).trim()
+        const id = opt(env, `RPC_ACCESS_ENDPOINT_ID_${chainId}`, null)
+        // A URL without its admin-API id is refused AS A PAIR: without the id the FR-026
+        // enforcement check cannot run, and serving that endpoint would mean transmitting a
+        // credential whose protection was never confirmed.
+        if (url && id) endpoints[chainId] = { url, id: String(id).trim() }
+      }
+      return {
+        enabled: opt(env, 'RPC_ACCESS_ENABLED', 'false').toLowerCase() === 'true',
+        killswitch: opt(env, 'RPC_ACCESS_KILLSWITCH', 'false').toLowerCase() === 'true',
+        signingKeyPem: opt(env, 'RPC_ACCESS_SIGNING_KEY', null),
+        kid: opt(env, 'RPC_ACCESS_SIGNING_KID', null),
+        adminKey: opt(env, 'RPC_ACCESS_ADMIN_KEY', null),
+        adminBaseUrl: opt(env, 'RPC_ACCESS_ADMIN_URL', 'https://api.quicknode.com'),
+        endpoints,
+        // Tier shapes LIFETIME, never whether (FR-022): anonymous mints short and re-mints often,
+        // which is itself the metering pressure that makes proving something worthwhile.
+        ttlSecByTier: {
+          anonymous: int(env, 'RPC_ACCESS_TTL_ANONYMOUS_SEC', 300),
+          human: int(env, 'RPC_ACCESS_TTL_HUMAN_SEC', 900),
+          address: int(env, 'RPC_ACCESS_TTL_ADDRESS_SEC', 900),
+          member: int(env, 'RPC_ACCESS_TTL_MEMBER_SEC', 1800),
+        },
+        maxTtlSec: int(env, 'RPC_ACCESS_MAX_TTL_SEC', 3600),
+        mintQuotaPerSubject: int(env, 'RPC_ACCESS_MINT_QUOTA_PER_SUBJECT', 12),
+        mintQuotaGlobal: int(env, 'RPC_ACCESS_MINT_QUOTA_GLOBAL', 600),
+        mintQuotaWindowMs: int(env, 'RPC_ACCESS_MINT_QUOTA_WINDOW_MS', 60_000),
+        enforcementCacheTtlMs: int(env, 'RPC_ACCESS_ENFORCEMENT_CACHE_MS', 60_000),
+        adminTimeoutMs: int(env, 'RPC_ACCESS_ADMIN_TIMEOUT_MS', 5000),
+      }
+    })(),
     engine: {
       url: opt(env, 'ENGINE_URL', 'http://localhost:8080'),
       apiKey: opt(env, 'ENGINE_API_KEY', null),
@@ -427,6 +532,13 @@ export function loadConfig(env = process.env, opts = {}) {
       retries: int(env, 'ENGINE_RETRIES', 2),
     },
     killSwitch: opt(env, 'KILL_SWITCH', 'false').toLowerCase() === 'true',
+    // SIGHUP re-reads allowlisted operational switches from this file (spec 106 FR-014, #1446).
+    // Unset => SIGHUP answers honestly that nothing can reload. The process env is frozen at
+    // exec, which is why the source is a FILE — the same mounted env file the deploy delivers.
+    reloadEnvFile: opt(env, 'RELOAD_ENV_FILE', null),
+    // Counters endpoint for the FinOps exporter (spec 106/#1447). 0/unset = off. The compose file
+    // must NEVER publish this port to the host — it is compose-network-internal by design.
+    metricsPort: int(env, 'METRICS_PORT', 0),
     quotas: {
       signerPerWindow: int(env, 'SIGNER_QUOTA_PER_MIN', 12),
       globalPerWindow: int(env, 'GLOBAL_QUOTA_PER_MIN', 120),

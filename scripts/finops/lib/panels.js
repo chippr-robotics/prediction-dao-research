@@ -68,7 +68,7 @@ export function statPanel({ title, expr, unit = 'currencyUSD', gridPos, descript
 export function partialTotalPanel({ kind, gridPos }) {
   return panel({
     type: 'table',
-    title: `${kind === 'revenue' ? 'Revenue' : 'Cost'} totals — sources currently MISSING`,
+    title: `${kind === 'revenue' ? 'Revenue' : kind === 'usage' ? 'Usage' : 'Cost'} totals — sources currently MISSING`,
     description:
       `Any row here means the ${kind} total above is PARTIAL and understated. An empty table means every live ` +
       `${kind} source was read. Sources that are merely not-configured are excluded on purpose: they are unwired ` +
@@ -108,6 +108,34 @@ export function sourcePanel({ source, gridPos }) {
           `anywhere, and one that is built but switched off — and the text below says which this is.` +
           `\n\n${source.meaning}`,
       },
+    })
+  }
+
+  // A usage source is a COUNTER consumed as a rate, and its interesting axes are its bounded
+  // labels (tier, upstream) — never a currency. Rendering it through the money branch below would
+  // legend by a unit it does not have and plot a cumulative ramp nobody can read.
+  if (source.kind === 'usage') {
+    return panel({
+      type: 'timeseries',
+      title: source.label,
+      description: source.meaning,
+      gridPos,
+      fieldConfig: moneyFieldConfig('short'),
+      options: { legend: { displayMode: 'list', placement: 'bottom' }, tooltip: { mode: 'multi' } },
+      targets: [
+        {
+          refId: 'A',
+          datasource: DATASOURCE,
+          expr: `sum by (tier) (rate(${source.metric}{source="${source.id}",metric="tier_requests"}[10m]))`,
+          legendFormat: 'tier {{tier}}',
+        },
+        {
+          refId: 'B',
+          datasource: DATASOURCE,
+          expr: `sum by (upstream) (rate(${source.metric}{source="${source.id}",metric="upstream_calls"}[10m]))`,
+          legendFormat: 'upstream {{upstream}}',
+        },
+      ],
     })
   }
 

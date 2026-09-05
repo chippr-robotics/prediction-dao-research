@@ -160,7 +160,7 @@ function buildDetail(kind) {
   resetIds()
   const L = layout()
   const panels = []
-  const label = kind === 'revenue' ? 'Revenue' : 'Cost'
+  const label = kind === 'revenue' ? 'Revenue' : kind === 'usage' ? 'Usage' : 'Cost'
 
   panels.push(
     headerPanel({
@@ -226,6 +226,7 @@ const artifacts = [
   ['dashboards/finops-overview.json', buildOverview()],
   ['dashboards/finops-revenue.json', buildDetail('revenue')],
   ['dashboards/finops-cost.json', buildDetail('cost')],
+  ['dashboards/finops-usage.json', buildDetail('usage')],
   ['alerts/finops-alerts.json', buildAlertRules(SOURCES)],
 ]
 

@@ -508,6 +508,24 @@ const vendors = [
       'plan the modelled figure is the flat subscription and credit usage is informational only.',
   },
   {
+    id: 'gateway-upstream-usage',
+    kind: 'usage',
+    status: 'live',
+    label: 'Gateway upstream usage',
+    metric: 'fairwins_finops_vendor_usage',
+    collector: 'gateway',
+    interval: VENDOR,
+    docs: 'finops-operations.md#gateway-upstream-usage',
+    meaning:
+      'MEASURED request counts from the relay-gateway, per assurance tier and per upstream (spec 106, #1447): ' +
+      'who is consuming the platform-held vendor credentials, in whose name. It is context for the vendor cost ' +
+      'sources beside it — the QuickNode account is capped at 50 req/s shared with the gasless bundler, so this ' +
+      'is the series that says WHERE that budget went. It is NOT a dollar and never joins a money total; counters ' +
+      'are cumulative-since-boot on the gateway (rate() over them survives restarts the way any Prometheus ' +
+      'counter does), and the labels are bounded by construction: tiers come from the fixed ladder, upstreams ' +
+      'from the route table.',
+  },
+  {
     id: 'grafana-cloud',
     kind: 'cost',
     status: 'live',
