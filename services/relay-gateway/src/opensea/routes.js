@@ -54,7 +54,7 @@ export function createOpenSeaRouter(config, { client, cache, quotas, writeQuotas
   }
 
   /**
-   * Read pre-flight: live check + read quota, keyed on the CALLER (spec 105, FR-011).
+   * Read pre-flight: live check + read quota, keyed on the CALLER (spec 106, FR-011).
    *
    * This used to key on values out of the request — the account address, the collection slug, the
    * search terms. All caller-chosen, so walking any of them minted a fresh bucket per request and
@@ -75,7 +75,7 @@ export function createOpenSeaRouter(config, { client, cache, quotas, writeQuotas
    * Write pre-flight (spec 056): live check + the tighter write quota, keyed on the CALLER.
    *
    * Formerly keyed by the seller address FROM THE BODY — which the caller writes, so it metered
-   * nothing. These routes now also require proof of control (spec 105 route table), so the caller
+   * nothing. These routes now also require proof of control (spec 106 route table), so the caller
    * subject is an account we verified rather than one they asserted.
    */
   function guardWrite(req) {

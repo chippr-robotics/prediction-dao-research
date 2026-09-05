@@ -61,7 +61,7 @@ export function createBridgeRouter(config, { client, cache, quotas, killSwitch }
 
   // No signature to recover on a GET, so quotas are keyed per caller IP like the Bitcoin proxy;
   // the global window is the real backstop for the shared upstream.
-  // Keyed on the resolved caller (spec 105, FR-011) rather than on `req.ip` alone — see
+  // Keyed on the resolved caller (spec 106, FR-011) rather than on `req.ip` alone — see
   // identity/quotaKey.js for why the network address is a fallback and not the default.
   const quotaKey = callerQuotaKey
 

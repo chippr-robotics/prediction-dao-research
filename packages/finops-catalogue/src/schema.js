@@ -13,7 +13,7 @@
 
 /** Metric label enumerations. Adding a value is cheap; adding a LABEL needs a cardinality argument. */
 export const UNITS = ['USDC', 'USD', 'POL', 'ETH', 'ETC']
-// 'usage' (spec 105/#1447): a MEASURED consumption fact with no dollar of its own — the gateway's
+// 'usage' (spec 106/#1447): a MEASURED consumption fact with no dollar of its own — the gateway's
 // per-tier / per-upstream call counts that contextualise the vendor bills beside it. It exists as
 // a kind because the alternative was an emitted `source` label with no catalogue entry, which
 // breaks the bounded-label promise and is invisible to every coverage gate. A usage source never

@@ -1,5 +1,5 @@
 /**
- * Identity wiring, end to end through the real app (spec 105).
+ * Identity wiring, end to end through the real app (spec 106).
  *
  * The unit tests prove each piece behaves. This proves the pieces are actually CONNECTED — that the
  * middleware is mounted where the plan says, that the grant verifier is registered into the live

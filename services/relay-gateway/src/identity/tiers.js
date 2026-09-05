@@ -1,5 +1,5 @@
 /**
- * Assurance tiers (spec 105, data-model §1) — what was actually PROVEN about a caller.
+ * Assurance tiers (spec 106, data-model §1) — what was actually PROVEN about a caller.
  *
  * The central idea of the feature, and the reason it exists: the gateway holds every third-party
  * credential the platform owns and, before this, authenticated no caller at all. The origin lock

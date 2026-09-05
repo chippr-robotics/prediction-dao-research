@@ -5,7 +5,7 @@
  * right now?" Precedence, highest first:
  *
  *   1. the member's override for that chain (Network settings, `endpointStore`)
- *   2. platform-ISSUED keyed access for that chain (spec 106, `issuedAccess` — module memory,
+ *   2. platform-ISSUED keyed access for that chain (spec 107, `issuedAccess` — module memory,
  *      acquired in the background; the route carries the URL only, never the credential)
  *   3. the build default for that chain (`NETWORKS[chainId].rpcUrl`, itself
  *      `VITE_RPC_URL_*` or a curated public endpoint)
@@ -66,7 +66,7 @@ export function resolveRpcEndpoints(chainId) {
   const entry = getEndpointSettings(id)
 
   if (!entry?.url) {
-    // Platform-issued keyed access (spec 106) slots between the member's choice and the build
+    // Platform-issued keyed access (spec 107) slots between the member's choice and the build
     // default. THE ROUTE CARRIES NO CREDENTIAL: headers stay empty, and the token reaches the
     // wire per request via the provider's preflight hook — which is what lets it rotate without
     // rebuilding providers, and what keeps the failover leg (a different host) from ever seeing

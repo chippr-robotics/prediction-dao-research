@@ -1,5 +1,5 @@
 /**
- * Enforcement (spec 105, T025) — the slice that actually refuses.
+ * Enforcement (spec 106, T025) — the slice that actually refuses.
  *
  * Three properties matter more than the refusal codes themselves, and each is a way this could be
  * shipped wrong while looking correct:

@@ -1,5 +1,5 @@
 /**
- * Status disclosure (spec 105 slice 5c, #1448 / T037).
+ * Status disclosure (spec 106 slice 5c, #1448 / T037).
  *
  * Two rules, both already violated once in this feature's own drafts:
  *

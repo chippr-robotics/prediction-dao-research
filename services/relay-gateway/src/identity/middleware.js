@@ -1,5 +1,5 @@
 /**
- * Caller-identity middleware (spec 105, contracts/gateway-api.md Part 1).
+ * Caller-identity middleware (spec 106, contracts/gateway-api.md Part 1).
  *
  * TWO SWITCHES, NOT ONE, AND THE SECOND IS THE POINT.
  *
@@ -72,7 +72,7 @@ export function createIdentityMiddleware(options = {}, verifiers = []) {
   const resolve = createResolver(verifiers)
 
   return async function identityMiddleware(req, res, next) {
-    // Read PER REQUEST, not destructured at construction: SIGHUP reload (spec 105 FR-014) flips
+    // Read PER REQUEST, not destructured at construction: SIGHUP reload (spec 106 FR-014) flips
     // these on the live options object, and a captured boolean would make the reload a silent
     // no-op for this middleware while /status truthfully reported the new value — the exact
     // "disabled looks enforcing" split FR-015 forbids.

@@ -1,5 +1,5 @@
 /**
- * Challenge verifier (spec 105 slice 2, #1444 / T013).
+ * Challenge verifier (spec 106 slice 2, #1444 / T013).
  *
  * The tests that matter most, in order:
  *

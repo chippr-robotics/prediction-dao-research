@@ -1,5 +1,5 @@
 /**
- * Usage counters (spec 105/#1447, T033).
+ * Usage counters (spec 106/#1447, T033).
  *
  * The property that outranks the rest: LABELS ARE BOUNDED BY CONSTRUCTION. The tier map is
  * pre-seeded from the ladder and CLOSED — an unknown value is dropped, never added — because a

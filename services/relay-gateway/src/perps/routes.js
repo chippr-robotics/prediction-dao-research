@@ -132,7 +132,7 @@ export function createPerpsRouter(config, { clients, cache, quotas, killSwitch, 
     }
   }
 
-  // Keyed on the resolved caller (spec 105, FR-011) rather than on `req.ip` alone. An identified
+  // Keyed on the resolved caller (spec 106, FR-011) rather than on `req.ip` alone. An identified
   // caller gets their own bucket and a higher ceiling; an anonymous one still falls back to the
   // network address, which is the weakest key available and the only one left when nothing has
   // been proven.

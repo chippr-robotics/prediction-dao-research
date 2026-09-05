@@ -1,5 +1,5 @@
 /**
- * Signal-driven config reload (spec 105 FR-014 as amended, #1446 / T032).
+ * Signal-driven config reload (spec 106 FR-014 as amended, #1446 / T032).
  *
  * Three properties carry the file:
  *

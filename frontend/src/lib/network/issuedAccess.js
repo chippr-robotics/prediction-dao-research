@@ -1,5 +1,5 @@
 /**
- * Issued RPC access — the client half of spec 106.
+ * Issued RPC access — the client half of spec 107.
  *
  * The gateway's `POST /v1/access/rpc` mints a short-lived, read-only credential for a dedicated
  * keyed endpoint; this module holds it and renews it. The SPA then reads DIRECTLY from the

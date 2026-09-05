@@ -204,7 +204,7 @@ If the plan includes the enterprise `/exporter/prometheus` endpoint, set `QUICKN
 
 ### gateway-upstream-usage
 
-Measured request counts from the relay-gateway (spec 105, #1447): per assurance tier and per
+Measured request counts from the relay-gateway (spec 106, #1447): per assurance tier and per
 platform-credentialed upstream. **Not a dollar** — it is the attribution series beside the vendor
 cost panels, and the one that says where the QuickNode account's shared 50 req/s went.
 

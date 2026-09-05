@@ -1,5 +1,5 @@
 /**
- * Caller-identity resolution (spec 105, T005).
+ * Caller-identity resolution (spec 106, T005).
  *
  * THE LOAD-BEARING TEST OF THE FEATURE is `an acceptance settles it`: a member holding a valid grant
  * must not be downgraded, or handed a 503, because an unrelated challenge service was unreachable.

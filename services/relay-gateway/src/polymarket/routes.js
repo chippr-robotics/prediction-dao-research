@@ -64,7 +64,7 @@ export function createPolymarketRouter(config, { client, gammaClient, dataClient
     }
   }
 
-  // Keyed on the CALLER, not on request content (spec 105, FR-011). It formerly keyed on the
+  // Keyed on the CALLER, not on request content (spec 106, FR-011). It formerly keyed on the
   // search terms, the condition id or an address out of the path — all caller-chosen, so varying
   // any of them minted a fresh bucket and the ceiling was never approached.
   function guard(req) {
@@ -76,7 +76,7 @@ export function createPolymarketRouter(config, { client, gammaClient, dataClient
   }
 
   /**
-   * Write pre-flight: live check + the tighter write quota, keyed on the CALLER (spec 105, FR-011).
+   * Write pre-flight: live check + the tighter write quota, keyed on the CALLER (spec 106, FR-011).
    *
    * This formerly used the CONSTANT key `'builder-sign'`, which is the same defect in a different
    * shape: one bucket shared by everyone means no caller is individually limited, and one script

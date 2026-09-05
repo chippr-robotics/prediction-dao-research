@@ -1,5 +1,5 @@
 /**
- * Signal-driven configuration reload (spec 105 FR-014 as amended, #1446).
+ * Signal-driven configuration reload (spec 106 FR-014 as amended, #1446).
  *
  * ── WHY A SIGNAL, AND WHY NOT AN ADMIN ROUTE ─────────────────────────────────────────────────
  *

@@ -1,10 +1,10 @@
 /**
- * Keyed RPC access issuance (spec 106) — `POST /v1/access/rpc`.
+ * Keyed RPC access issuance (spec 107) — `POST /v1/access/rpc`.
  *
  * Hands a client a short-lived, read-only credential for a dedicated provider endpoint, so keyed
  * read capacity never has to be compiled into a build. The client then reads DIRECTLY from the
  * provider: this route issues, it never carries traffic (FR-030) — the gateway must not become an
- * RPC passthrough, which is the surface spec 105 exists to prevent.
+ * RPC passthrough, which is the surface spec 106 exists to prevent.
  *
  * ── TIER SHAPES WHAT IS ISSUED, NEVER WHETHER (FR-022) ───────────────────────────────────────
  *

@@ -1,5 +1,5 @@
 /**
- * Caller-identity middleware (spec 105, T011).
+ * Caller-identity middleware (spec 106, T011).
  *
  * Slice 1 resolves and does NOT enforce, so the most valuable assertion in this file is the boring
  * one: **no status code changed**. A safety layer that quietly starts refusing traffic the moment

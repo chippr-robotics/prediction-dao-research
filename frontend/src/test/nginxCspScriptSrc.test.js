@@ -116,23 +116,23 @@ describe('nginx CSP script-src mini-app package grant (spec 073)', () => {
   })
 })
 
-// Spec 105 (FR-018) — script-src is a PINNED ALLOWLIST, and this block is the pin.
+// Spec 106 (FR-018) — script-src is a PINNED ALLOWLIST, and this block is the pin.
 //
 // Before this gate existed, the assertions above were purely NEGATIVE: no scheme-wide grants, no
-// eval, no wasm. Verified during spec 105's research: a change adding one more NAMED host to
+// eval, no wasm. Verified during spec 106's research: a change adding one more NAMED host to
 // script-src broke none of them — the invariant everyone believed ("script-src never widens
 // silently") was unguarded against exactly the kind of change most likely to happen. So every
 // source in script-src is now enumerated, WITH ITS REASON, and any addition fails this test until
 // it is added here deliberately, reason attached. The exception stays countable, which is the
 // difference between an allowlist and an accumulation.
-describe('nginx CSP script-src pinned allowlist (spec 105, FR-018)', () => {
+describe('nginx CSP script-src pinned allowlist (spec 106, FR-018)', () => {
   const PINNED_SCRIPT_SOURCES = {
     "'self'": 'the application bundle itself',
     "'unsafe-inline'": 'legacy inline bootstrapping; predates this gate, tracked by the brand/CSP work',
     'blob:': 'verified mini-app packages, imported from Blob URLs AFTER hash verification (spec 073)',
     'https://*.cloudflareinsights.com': 'Cloudflare Web Analytics beacon',
     'https://challenges.cloudflare.com':
-      'Turnstile — proof-of-human for the caller-identity tiers (spec 105). ONE named host, ' +
+      'Turnstile — proof-of-human for the caller-identity tiers (spec 106). ONE named host, ' +
       'operated by the edge provider already fronting the app; the opposite of a scheme grant.',
   }
 

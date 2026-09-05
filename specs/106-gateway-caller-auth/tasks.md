@@ -1,9 +1,9 @@
 # Tasks: Gateway Caller Authentication and Abuse Prevention
 
-**Input**: `specs/105-gateway-caller-auth/` — plan.md, spec.md, research.md, data-model.md, contracts/
+**Input**: `specs/106-gateway-caller-auth/` — plan.md, spec.md, research.md, data-model.md, contracts/
 
 **Tracking**: parent #1443, with sub-issues #1444 (slice 2), #1445 (slice 4b), #1446 (slice 5a),
-#1447 (slice 5b), #1448 (slice 5c), #1449 (attestation, deferred). Spec 106 is tracked on #1438.
+#1447 (slice 5b), #1448 (slice 5c), #1449 (attestation, deferred). Spec 107 is tracked on #1438.
 
 **Organization**: five slices, each independently reviewable, testable and shippable. Slice 1 changes
 no observable behaviour on purpose: identity resolves and nothing enforces, so the risky part

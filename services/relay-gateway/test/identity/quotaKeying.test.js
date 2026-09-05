@@ -1,5 +1,5 @@
 /**
- * Quota keying (spec 105, T028 / SC-004) — the defect at the centre of the feature.
+ * Quota keying (spec 106, T028 / SC-004) — the defect at the centre of the feature.
  *
  * Quotas keyed on values taken from the request: an account address out of the path, a collection
  * slug, a search term, and in one case the literal constant `'builder-sign'`. Every one of those is

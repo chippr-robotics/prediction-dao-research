@@ -48,7 +48,7 @@ function pinataSecretGuard() {
   }
 }
 
-// Spec 105 (T014): refuse a production build carrying one of Cloudflare's PUBLISHED Turnstile
+// Spec 106 (T014): refuse a production build carrying one of Cloudflare's PUBLISHED Turnstile
 // TEST sitekeys. They always pass (or always block) regardless of who is calling — the right tool
 // in development, and in production a mock in a shipped path (constitution III): the always-pass
 // key silently turns the human tier into a stamp anyone can print, and nothing at runtime would

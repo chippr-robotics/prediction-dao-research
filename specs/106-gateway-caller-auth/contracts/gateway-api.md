@@ -1,6 +1,6 @@
 # Contract: Caller Identity and Keyed Access
 
-**Feature**: `specs/105-gateway-caller-auth` | **Phase**: 1 | **Date**: 2026-09-04
+**Feature**: `specs/106-gateway-caller-auth` | **Phase**: 1 | **Date**: 2026-09-04
 
 Interface contract for what this feature adds to the relay-gateway. Error envelopes follow the
 existing shape (`{ error: { code, reason } }`) and new codes extend the existing vocabulary
@@ -79,7 +79,7 @@ application, because the web cannot prove one (FR-005).
 
 ---
 
-## Part 2 — Keyed-access issuance moved to spec 106
+## Part 2 — Keyed-access issuance moved to spec 107
 
 `POST /v1/access/rpc` and its refusal contract moved with the requirements. Nothing in this feature
 mints a credential.

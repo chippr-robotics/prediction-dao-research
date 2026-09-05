@@ -1,6 +1,6 @@
 # Feature Specification: Gateway Caller Authentication and Abuse Prevention
 
-**Feature Branch**: `spec/105-gateway-caller-auth`
+**Feature Branch**: `spec/106-gateway-caller-auth`
 
 **Created**: 2026-09-04
 
@@ -37,7 +37,7 @@ and close nothing:
 - **A second/new routing appliance.** Another proxy adds a network hop, an operational surface, and a
   second home for every credential, while leaving the caller just as anonymous.
 
-### The second problem: keyed data access — split to spec 106
+### The second problem: keyed data access — split to spec 107
 
 There is a related exposure running the other way, and this spec no longer carries it.
 
@@ -52,7 +52,7 @@ non-browser client.
 The replacement — runtime issuance of expiring, read-only credentials — is sound, and research
 showed it cannot be hosted on infrastructure the platform currently owns. Enforcement cannot be
 enabled on any endpoint we hold without locking out the alto bundler, which has **no failover**. It
-needs a dedicated endpoint, so it ships as `specs/106-keyed-rpc-access/` with its own procurement.
+needs a dedicated endpoint, so it ships as `specs/107-keyed-rpc-access/` with its own procurement.
 
 One piece stays here, because it is not about that provider at all. **A credential-injecting route
 must not be an unrestricted passthrough** (FR-021). The clearest instance in the estate was the SPA
@@ -166,11 +166,11 @@ tier and upstream, exercise the disable control, and confirm traffic stops witho
 
 ---
 
-> **User Stories 4–6 moved to spec 106.** They covered rotating a keyed credential without a
+> **User Stories 4–6 moved to spec 107.** They covered rotating a keyed credential without a
 > frontend release, keyed capacity for data-heavy screens, and never publishing an unprotected
 > credential. Research showed that half needs a dedicated data-provider endpoint that does not exist
 > yet (enabling enforcement on any endpoint the platform owns would lock out the gasless bundler,
-> which has no failover), so it ships separately. See `specs/106-keyed-rpc-access/`.
+> which has no failover), so it ships separately. See `specs/107-keyed-rpc-access/`.
 
 ### Edge Cases
 
@@ -268,7 +268,7 @@ tier and upstream, exercise the disable control, and confirm traffic stops witho
 - **FR-019**: Every client content policy in the estate — each served policy and every policy derived
   from them for other channels — MUST remain in agreement, enforced by the existing parity check.
 
-**Keyed data access — FR-020 through FR-031 moved to spec 106**
+**Keyed data access — FR-020 through FR-031 moved to spec 107**
 
 These numbers are deliberately not reused. They covered runtime issuance of expiring, read-only
 data-provider credentials so nothing keyed is ever compiled into a client build. Research found the
@@ -359,7 +359,7 @@ feature, and it is restated as FR-021 below because it binds the `/api/pinata` p
   end-to-end at least once without a member-visible outage.
 - **SC-012**: No credential material appears anywhere in logs, metrics, alerts, or operator displays,
   verified by scanning all emitted output during an exercise of every route.
-> **SC-013 through SC-018 moved to spec 106** along with the requirements they measured.
+> **SC-013 through SC-018 moved to spec 107** along with the requirements they measured.
 
 ---
 
@@ -386,7 +386,7 @@ feature, and it is restated as FR-021 below because it binds the `/api/pinata` p
 
 The decision record for that half — the three mechanisms compared, why publishing a restricted
 endpoint loses on rotation cost, why proxying every read through platform infrastructure was
-rejected, and the accepted residual — moved with it to `specs/106-keyed-rpc-access/`. It is
+rejected, and the accepted residual — moved with it to `specs/107-keyed-rpc-access/`. It is
 recorded there rather than discarded, because the rejected proxy alternative becomes the design if
 the dedicated endpoint is never procured.
 
@@ -412,7 +412,7 @@ tier ladder in this spec is what makes that expressible.
 
 - Any new or additional routing appliance, proxy layer, or gateway deployment.
 - Relocating credentials already held server-side; those consumers are unchanged.
-- **Runtime issuance of keyed data-provider credentials** — spec 106.
+- **Runtime issuance of keyed data-provider credentials** — spec 107.
 - **An authenticated operator write channel into the gateway.** FR-014 is satisfied by a signal-driven
   configuration reload precisely so this surface is not created here.
 - Device attestation verification for either mobile platform (designed for; deferred to a follow-up).

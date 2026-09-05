@@ -1,5 +1,5 @@
 /**
- * The metering key (spec 105, FR-011) — ONE helper, so every module keys the same way.
+ * The metering key (spec 106, FR-011) — ONE helper, so every module keys the same way.
  *
  * ── THE DEFECT THIS REPAIRS ──────────────────────────────────────────────────────────────────
  *

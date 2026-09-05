@@ -114,7 +114,7 @@ nav:
     - Funding Pools (spec 103): developer-guide/funding-pools.md
     - Mini-Apps (spec 073): developer-guide/miniapps.md
     - Member API (spec 095): developer-guide/member-api.md
-    - Caller identity (specs 105/106): developer-guide/caller-identity.md
+    - Caller identity (specs 106/107): developer-guide/caller-identity.md
     - MCP Server (spec 095): developer-guide/mcp-server.md
     - Agentic Assistant (spec 095): developer-guide/agentic-chat.md
     - Agentic Payments (spec 096): developer-guide/agentic-payments.md

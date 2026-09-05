@@ -1,10 +1,10 @@
-# Caller Identity (spec 105) and Issued RPC Access (spec 106)
+# Caller Identity (spec 106) and Issued RPC Access (spec 107)
 
-The relay-gateway holds every third-party credential the platform owns. Before spec 105 it
+The relay-gateway holds every third-party credential the platform owns. Before spec 106 it
 authenticated **no caller**: the origin lock proves a request transited Cloudflare (the edge injects
 that header for everyone, an attacker's `curl` included), CORS is a browser-only control, and quotas
-keyed on values callers supplied about themselves. Spec 105 gives the gateway an answer to *"who is
-calling?"* and keys everything on that answer. Spec 106 uses it to hand browsers keyed RPC read
+keyed on values callers supplied about themselves. Spec 106 gives the gateway an answer to *"who is
+calling?"* and keys everything on that answer. Spec 107 uses it to hand browsers keyed RPC read
 capacity without ever compiling a credential into a build.
 
 ## The ladder
@@ -45,7 +45,7 @@ services/relay-gateway/src/identity/
   quotaKey.js         metering keys the caller cannot rotate
   upstreamCeiling.js  per-upstream budgets, charged BEFORE the outbound call, wrapping the client
   verifiers/          challenge.js · grant.js · attestation.js (the seam)
-services/relay-gateway/src/access/    spec 106: jwt.js · enforcement.js · routes.js
+services/relay-gateway/src/access/    spec 107: jwt.js · enforcement.js · routes.js
 frontend/src/lib/identity/challenge.js   Turnstile client: off-screen, silent degradation
 frontend/src/lib/network/issuedAccess.js  issued RPC access: module memory, per-request injection
 ```
@@ -59,7 +59,7 @@ frontend/src/lib/network/issuedAccess.js  issued RPC access: module memory, per-
 | `IDENTITY_KILLSWITCH` | back to inert, without touching the global kill switch |
 | `CHALLENGE_SECRET` | Turnstile siteverify secret. Unset ⇒ the verifier **abstains**. Published test secrets are **boot-fatal in production** |
 | `UPSTREAM_CEILING_<ID>` | per-upstream calls/window, unset = unlimited (an absent cap, stated) |
-| `RPC_ACCESS_*` | spec 106 issuance — see the switch-on runbook on #1438 |
+| `RPC_ACCESS_*` | spec 107 issuance — see the switch-on runbook on #1438 |
 
 Deploy sequence is deliberately two-step: run `IDENTITY_ENABLED` alone first and watch the tier
 header on real traffic; turn `IDENTITY_ENFORCE` on once the model is validated. A safety layer that
@@ -78,7 +78,7 @@ starts refusing the moment it deploys fails in the shape "the product is broken"
   the live config so a reload shows on the next poll, and attestation reports `"not-built"` — not
   `false`, which would imply a switch exists.
 
-## Issued RPC access (spec 106), briefly
+## Issued RPC access (spec 107), briefly
 
 `POST /v1/access/rpc` mints a short-lived **read-only** JWT for a dedicated provider endpoint; the
 client then reads **directly** from the provider (the gateway never proxies read traffic, FR-030).
@@ -112,4 +112,4 @@ Two hard rules on the gateway side:
 
 Related: `docs/runbooks/credential-rotation.md` (the three new rows), the switch-on runbook on
 [#1438](https://github.com/chippr-robotics/prediction-dao-research/issues/1438),
-`specs/105-gateway-caller-auth/` and `specs/106-keyed-rpc-access/`.
+`specs/106-gateway-caller-auth/` and `specs/107-keyed-rpc-access/`.

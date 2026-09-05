@@ -1,5 +1,5 @@
 /**
- * Device-attestation verifier (spec 105, FR-004) — A REGISTRATION SEAM THAT ALWAYS ABSTAINS.
+ * Device-attestation verifier (spec 106, FR-004) — A REGISTRATION SEAM THAT ALWAYS ABSTAINS.
  *
  * This file deliberately verifies nothing. It exists so that FR-004's extension point is REAL
  * rather than promised: adding hardware-rooted attestation later must be a verifier registration,

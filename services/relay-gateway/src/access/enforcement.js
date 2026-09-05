@@ -1,5 +1,5 @@
 /**
- * Per-endpoint enforcement verification (spec 106, FR-026/FR-032/FR-033).
+ * Per-endpoint enforcement verification (spec 107, FR-026/FR-032/FR-033).
  *
  * Before ANY access is served for an endpoint, the provider is asked — per endpoint, from its
  * admin API — whether that endpoint actually enforces the expiring credential and actually

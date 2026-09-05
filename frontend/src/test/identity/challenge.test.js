@@ -1,5 +1,5 @@
 /**
- * Client challenge lib (spec 105 slice 2, #1444 / T019).
+ * Client challenge lib (spec 106 slice 2, #1444 / T019).
  *
  * The property this file guards hardest: EVERY failure mode is silent (FR-017). An unreachable
  * challenge service, a script that will not load, a widget that errors — each leaves the visitor

@@ -76,7 +76,7 @@ function buildProvider(url, headers, chainId, { staticNetwork = false, preflight
     const request = new ethers.FetchRequest(url)
     for (const [name, value] of Object.entries(headers || {})) request.setHeader(name, value)
     // Issued-access tokens attach here, per request, so a rotation needs no rebuild and no
-    // credential ever sits in a provider cache key or a URL (spec 106; spec 069's header rule).
+    // credential ever sits in a provider cache key or a URL (spec 107; spec 069's header rule).
     if (preflight) request.preflightFunc = preflight
     target = request
   }
@@ -110,14 +110,14 @@ function buildProvider(url, headers, chainId, { staticNetwork = false, preflight
 export function makeReadProvider(rpcUrl, chainId = null) {
   const route = chainId != null ? resolveRpcEndpoints(chainId) : null
 
-  // Keep issued access warm (spec 106): fire-and-forget, single-flight, cooldown-guarded — the
+  // Keep issued access warm (spec 107): fire-and-forget, single-flight, cooldown-guarded — the
   // synchronous path never waits on it. Until the first mint lands this call is what causes it
   // to land; afterwards it renews ahead of expiry. On a chain the gateway declines (404) the
   // store cools down and reads simply stay on the public default.
   if (chainId != null && route?.source !== 'member') ensureIssuedAccess(chainId)
 
   // A member endpoint replaces the caller's URL outright. Without one, platform-ISSUED keyed
-  // access (spec 106) takes the primary with the build default as failover. Without either, the
+  // access (spec 107) takes the primary with the build default as failover. Without either, the
   // caller's URL stays the primary (pre-069 behavior) and only picks up the build's curated
   // failover where the chain defines one — so a community-run default going dark degrades to a
   // slower route instead of leaving the chain with no route at all.

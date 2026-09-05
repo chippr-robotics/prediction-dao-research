@@ -1,5 +1,5 @@
 /**
- * Issued RPC access — the client half of spec 106.
+ * Issued RPC access — the client half of spec 107.
  *
  * The properties under test, in the order a regression would hurt:
  *

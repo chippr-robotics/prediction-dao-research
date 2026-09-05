@@ -307,7 +307,7 @@ export function endpointsRevision() {
 }
 
 /**
- * Bump the revision WITHOUT persisting anything (spec 106).
+ * Bump the revision WITHOUT persisting anything (spec 107).
  *
  * Exists for state that affects route resolution but must never touch storage — issued RPC
  * access, whose credential living in `fw_global_prefs` would be a stored secret riding the

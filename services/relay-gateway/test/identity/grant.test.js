@@ -1,5 +1,5 @@
 /**
- * Grant verifier (spec 105, T021 + T023).
+ * Grant verifier (spec 106, T021 + T023).
  *
  * Two groups here, and both exist because of a specific way this could go wrong.
  *
@@ -11,7 +11,7 @@
  * it through a stricter caller.
  *
  * THE REGRESSION THIS RUNG EXISTS TO PREVENT. `authenticate` refuses without an ACTIVE PAID
- * membership. If spec 105 had gated order signing, Bitcoin broadcast and marketplace writes on that
+ * membership. If spec 106 had gated order signing, Bitcoin broadcast and marketplace writes on that
  * verifier as-is, a member with a wallet but no paid tier would have stopped being able to trade —
  * silently, and framed as a security improvement. `an account with no paid membership is ACCEPTED`
  * is the test that keeps that from coming back.

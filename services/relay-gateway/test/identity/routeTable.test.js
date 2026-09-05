@@ -1,5 +1,5 @@
 /**
- * Protected-route table (spec 105, T007).
+ * Protected-route table (spec 106, T007).
  *
  * The important test here is `every mounted route is declared`, and it deliberately enumerates the
  * REAL Express app rather than comparing against a list written by hand. A hand-copied list drifts

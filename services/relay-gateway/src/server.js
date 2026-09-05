@@ -257,7 +257,7 @@ export function createApp(config, deps = {}) {
     next()
   })
 
-  // ---- Caller identity (spec 105) ---------------------------------------------------------
+  // ---- Caller identity (spec 106) ---------------------------------------------------------
   // Placed HERE on purpose: after the origin lock, before route dispatch.
   //
   //   After the lock, because the lock is a string comparison that rejects non-edge traffic while
@@ -293,7 +293,7 @@ export function createApp(config, deps = {}) {
       nowMs
     )
 
-  // ---- Keyed RPC access issuance (spec 106) — mounted unconditionally, dormant until config ----
+  // ---- Keyed RPC access issuance (spec 107) — mounted unconditionally, dormant until config ----
   // The signing key loads at BOOT, not per request: a malformed key must fail the deploy loudly
   // rather than fail the first member quietly. Load failure with the module enabled is fatal —
   // an enabled issuer that cannot sign is a misconfiguration, not a degraded mode.
@@ -509,7 +509,7 @@ export function createApp(config, deps = {}) {
     // the assistant has a credential. No member data, no key material, nothing about any token.
     // `memberApiAssistant` is declared further down; this closure only runs at request time.
     const memberApi = memberApiStatus(config, { killSwitch, assistantConfigured: memberApiAssistant.configured })
-    // ---- Caller identity + keyed access (specs 105/106) — GATED, deliberately -----------------
+    // ---- Caller identity + keyed access (specs 106/107) — GATED, deliberately -----------------
     // /status is origin-lock EXEMPT (see above), so anything in the public body is world-readable
     // on the raw origin URL. These blocks are operator telemetry and sit behind `disclose`, next
     // to gasWalletRunwayHrs, for the same reason. Inside them, honesty rules bind:
@@ -1052,7 +1052,7 @@ export function createApp(config, deps = {}) {
     })
   const memberApiMembership =
     deps.memberApiMembership ?? createMembershipReader(config, providers, { now: nowMs })
-  // ---- Register the grant verifier (spec 105) ----------------------------------------------
+  // ---- Register the grant verifier (spec 106) ----------------------------------------------
   // Deliberately AFTER the revocation store and membership reader exist, and deliberately sharing
   // them: a second revocation store would let a key revoked on one path keep working on the other.
   //
@@ -1186,7 +1186,7 @@ if (isMain) {
   }
 
   const { app, killSwitch, identityCounters, upstreamCeilings } = createApp(config)
-  // Usage counters endpoint (spec 105/#1447): an UNPUBLISHED compose-network port the FinOps
+  // Usage counters endpoint (spec 106/#1447): an UNPUBLISHED compose-network port the FinOps
   // exporter scrapes. Unset => not started; the exporter's source reads not-configured, honestly.
   if (config.metricsPort) {
     startCountersServer({ port: config.metricsPort, counters: identityCounters, upstreamCeilings })
@@ -1196,7 +1196,7 @@ if (isMain) {
     const active = killSwitch.toggle()
     console.warn(`[relay-gateway] kill switch ${active ? 'ACTIVATED' : 'cleared'} via SIGUSR2`)
   })
-  // Runtime config reload (spec 105 FR-014, #1446): `kill -HUP <pid>` re-reads the allowlisted
+  // Runtime config reload (spec 106 FR-014, #1446): `kill -HUP <pid>` re-reads the allowlisted
   // operational switches from RELOAD_ENV_FILE. A reload, not a remote control — and deliberately
   // a DIFFERENT signal from the kill switch: changing a gesture operators use during incidents
   // is how an incident gets worse.

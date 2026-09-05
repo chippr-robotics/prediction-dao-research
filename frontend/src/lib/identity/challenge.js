@@ -1,5 +1,5 @@
 /**
- * Proof-of-human challenge, client half (spec 105 slice 2, #1444 / T018).
+ * Proof-of-human challenge, client half (spec 106 slice 2, #1444 / T018).
  *
  * Runs the Turnstile widget, holds the resulting token in module memory, and hands callers a
  * header to attach. What a token buys is THROUGHPUT — the gateway's `human` tier carries higher

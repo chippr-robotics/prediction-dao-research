@@ -1,5 +1,5 @@
 /**
- * Grant verifier (spec 105, FR-003) — proof of control, and separately proof of membership.
+ * Grant verifier (spec 106, FR-003) — proof of control, and separately proof of membership.
  *
  * Wraps the EXTRACTED credential core from `memberApi/auth.js` rather than reimplementing it. A
  * second signature path would be exactly the drift this repo's type-parity gates exist to prevent,

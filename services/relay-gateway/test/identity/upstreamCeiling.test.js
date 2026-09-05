@@ -1,5 +1,5 @@
 /**
- * Per-upstream ceilings (spec 105, T030 / FR-013).
+ * Per-upstream ceilings (spec 106, T030 / FR-013).
  *
  * The requirement says the ceiling is enforced BEFORE the upstream is called, and the whole file
  * turns on proving that literally. **Asserting a 429 would not be enough**: a cap applied after the

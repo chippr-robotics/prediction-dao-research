@@ -1,12 +1,12 @@
 /**
- * Keyed RPC access issuance (spec 106).
+ * Keyed RPC access issuance (spec 107).
  *
  * The assertions that carry this file, in order of how expensive their absence would be:
  *
  *   1. `unverifiable` REFUSES here. Everywhere else in the gateway "could not tell" is a
  *      retryable 503 that must never read as a denial; at this route it refuses identically to
  *      "not enforcing", because failing open transmits a credential that may be sufficient by
- *      itself. The asymmetry is the design (spec 106 US3), and a future reader normalising it
+ *      itself. The asymmetry is the design (spec 107 US3), and a future reader normalising it
  *      to match FR-009 would reopen the exact hole FR-026 closes.
  *
  *   2. The issuer is STRUCTURALLY incapable of minting a non-expiring credential. The provider

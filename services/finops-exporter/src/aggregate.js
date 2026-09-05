@@ -43,7 +43,7 @@ export function aggregate(readings, { rateFor = () => null } = {}) {
     if (reading.state !== READ) continue
 
     // Usage never joins a money total: a request count summed into a dollar figure would be a
-    // category error wearing a currency label (spec 105/#1447). Its per-series values flow through
+    // category error wearing a currency label (spec 106/#1447). Its per-series values flow through
     // the vendor_usage family; only its three-state health is tracked above.
     if (source.kind === 'usage') continue
 

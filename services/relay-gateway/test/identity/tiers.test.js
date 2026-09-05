@@ -1,5 +1,5 @@
 /**
- * Assurance-tier ladder (spec 105, T002).
+ * Assurance-tier ladder (spec 106, T002).
  *
  * These are cheap tests over pure functions, and they are here because the ladder is the one thing
  * every other part of the feature compares against. Two properties matter more than the rest:

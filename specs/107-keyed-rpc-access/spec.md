@@ -1,12 +1,12 @@
 # Feature Specification: Keyed RPC Access Without a Published Credential
 
-**Feature Branch**: `spec/106-keyed-rpc-access`
+**Feature Branch**: `spec/107-keyed-rpc-access`
 
 **Created**: 2026-09-05
 
 **Status**: Draft — capacity blocker likely dissolves once #1459 lands (see P2a)
 
-**Input**: Split out of `specs/105-gateway-caller-auth/` after Phase 0 research. Spec 105 originally
+**Input**: Split out of `specs/106-gateway-caller-auth/` after Phase 0 research. Spec 106 originally
 carried both caller authentication and keyed data access; research established that the second half
 cannot be hosted on infrastructure the platform currently owns, so it ships separately with its own
 procurement and lifecycle.
@@ -88,7 +88,7 @@ consume the whole account allowance and starve the bundler.
 
 1. **Raise the plan** — a real purchase, sized for browser traffic, after measuring the per-screen
    call count. Keeps the browser-direct design and its zero added latency.
-2. **Adopt the proxy alternative** recorded in spec 105's research as rejected. It was rejected on
+2. **Adopt the proxy alternative** recorded in spec 106's research as rejected. It was rejected on
    latency and on putting platform infrastructure in the read path — neither of which outweighs a
    capacity ceiling the design cannot fit under.
 
@@ -129,9 +129,9 @@ per-user reads collapse the shared reads are no longer the minority.
 > runtime. The order of magnitude is solid; the exact count is not measured, and should be before
 > anything is bought.
 
-### P3. Spec 105's tier ladder
+### P3. Spec 106's tier ladder
 
-Issuance is gated by assurance tier. Spec 105 establishes the ladder and the resolution layer.
+Issuance is gated by assurance tier. Spec 106 establishes the ladder and the resolution layer.
 
 ---
 
@@ -229,7 +229,7 @@ verification unreachable. Confirm both refuse and alert.
 
 ## Requirements *(mandatory)*
 
-Numbered to match the FR-020…FR-031 block they were split from in spec 105, so cross-references written
+Numbered to match the FR-020…FR-031 block they were split from in spec 106, so cross-references written
 against those numbers remain valid.
 
 - **FR-020**: Keyed access credentials MUST NOT be embedded in client-visible build configuration.
@@ -307,7 +307,7 @@ against those numbers remain valid.
 
 ## Assumptions
 
-### Verified during spec 105 research
+### Verified during spec 106 research
 
 - **Plan tier is sufficient.** Expiring-credential auth, operation restriction and the administrative
   read-back are all available on the platform's tier. Operator-confirmed.
@@ -317,7 +317,7 @@ against those numbers remain valid.
   one. This is not a gap to close — it means the credential is the only real control, which is the
   design's premise.
 - **Stand-alone mode exists and is the target.** The weaker URL-borne factor can be disabled entirely,
-  so the endpoint address carries no credential at all. This **removes** the residual that spec 105
+  so the endpoint address carries no credential at all. This **removes** the residual that spec 106
   originally accepted, and is why FR-032's ordering rule exists.
 - **Rotation by succession is supported**, unlimited simultaneous keys.
 - **Enforcement is readable per endpoint**, which is what makes FR-026 implementable rather than
@@ -342,8 +342,8 @@ prevent it. FR-026 is what keeps the address alone insufficient.
 
 ## Out of Scope
 
-- Caller identity and the tier ladder — spec 105.
-- Proxying read traffic through platform infrastructure. Recorded in spec 105's research as the
+- Caller identity and the tier ladder — spec 106.
+- Proxying read traffic through platform infrastructure. Recorded in spec 106's research as the
   rejected alternative, and it **becomes the design** if P1 is never satisfied.
 - Changing which chains the product supports.
 - Server-side consumers, which continue to read the credential directly from the secret store.

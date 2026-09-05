@@ -223,11 +223,11 @@ export async function verifyRevocation({ provider, body, now = () => Math.floor(
  */
 /**
  * Steps 1-3 of `authenticate`, extracted so a caller can establish CONTROL OF AN ACCOUNT without
- * also demanding a paid membership (spec 105, FR-003).
+ * also demanding a paid membership (spec 106, FR-003).
  *
  * WHY THIS EXISTS. `authenticate` answers one question — "may this key call this member-API route?"
  * — and its answer includes an active paid tier (step 4, 403 `membership_required`). That is right
- * for the member API. It is wrong as a general test of who is calling: spec 105 gates order
+ * for the member API. It is wrong as a general test of who is calling: spec 106 gates order
  * signing, Bitcoin broadcast and marketplace writes, and those need an ANSWERABLE PARTY, not a
  * customer. Reusing `authenticate` there would have made trading require a purchase, silently.
  *

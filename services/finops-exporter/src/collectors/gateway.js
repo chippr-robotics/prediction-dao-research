@@ -1,5 +1,5 @@
 /**
- * Gateway usage collector (spec 105/#1447) — WHO is spending the platform-held credentials.
+ * Gateway usage collector (spec 106/#1447) — WHO is spending the platform-held credentials.
  *
  * Scrapes the relay-gateway's counters endpoint (an UNPUBLISHED compose-network port — reachable
  * from this exporter, invisible from outside the VM) and emits per-tier and per-upstream request

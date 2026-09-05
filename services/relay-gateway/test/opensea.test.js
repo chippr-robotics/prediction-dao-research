@@ -342,7 +342,7 @@ describe('GET /v1/opensea/* cross-cutting policy', () => {
     expect(Number(res.headers['retry-after'])).toBeGreaterThan(0)
   })
 
-  it('does NOT give a different requested address its own window (spec 105, FR-011)', async () => {
+  it('does NOT give a different requested address its own window (spec 106, FR-011)', async () => {
     // This assertion is INVERTED from what it was, and the inversion is the fix.
     //
     // The quota used to key on the address in the PATH, so this test asserted that asking about a

@@ -1,5 +1,5 @@
 /**
- * Caller-identity resolution (spec 105, data-model §2/§3).
+ * Caller-identity resolution (spec 106, data-model §2/§3).
  *
  * Runs every registered verifier over one request and folds their verdicts into a single
  * `CallerIdentity`. This is where the feature's two most load-bearing rules live.

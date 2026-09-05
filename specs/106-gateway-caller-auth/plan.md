@@ -1,8 +1,8 @@
 # Implementation Plan: Gateway Caller Authentication and Abuse Prevention
 
-**Branch**: `spec/105-gateway-caller-auth` | **Date**: 2026-09-05 | **Spec**: [spec.md](./spec.md)
+**Branch**: `spec/106-gateway-caller-auth` | **Date**: 2026-09-05 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `specs/105-gateway-caller-auth/spec.md`
+**Input**: Feature specification from `specs/106-gateway-caller-auth/spec.md`
 
 ## Summary
 
@@ -19,7 +19,7 @@ This ships a **credential-verifier registry** resolving each request to an assur
 **tier-scoped metering** keyed on non-rotatable subjects. Reads stay open to everyone and a challenge
 buys throughput rather than access; routes that sign or broadcast require a proven, answerable account.
 
-Keyed data access split to **spec 106** — its mechanism cannot be hosted on any endpoint the platform
+Keyed data access split to **spec 107** — its mechanism cannot be hosted on any endpoint the platform
 currently owns without locking out the gasless bundler.
 
 ## Technical Context
@@ -100,7 +100,7 @@ are themselves gates and must fail rather than warn.
 
 **A live gap this feature closes rather than inherits:** `check-env-hygiene.js` emits a non-failing
 NOTE for credential-shaped `VITE_` values. That was right when every such value was public-safe. It is
-not right for an RPC substitution once spec 106 establishes those must never be build-time constants —
+not right for an RPC substitution once spec 107 establishes those must never be build-time constants —
 and it is cheap to make that one case fail now.
 
 ### V. Accessible, Consistent Frontend — ENGAGED
@@ -129,7 +129,7 @@ onto platform infrastructure.**
 ### Documentation (this feature)
 
 ```text
-specs/105-gateway-caller-auth/
+specs/106-gateway-caller-auth/
 ├── plan.md              # this file
 ├── spec.md              # rescoped after research
 ├── research.md          # Phase 0 — 11-agent sweep + adversarial critic

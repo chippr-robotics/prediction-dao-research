@@ -1,5 +1,5 @@
 /**
- * Gateway usage collector (spec 105/#1447).
+ * Gateway usage collector (spec 106/#1447).
  *
  * The two assertions that matter: an unreachable gateway is UNREADABLE and never a zero (a
  * gateway that cannot be scraped is not a gateway serving no traffic), and the emitted labels are

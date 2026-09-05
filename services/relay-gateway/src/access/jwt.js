@@ -1,5 +1,5 @@
 /**
- * Minimal JWT minting for issued RPC access (spec 106, FR-021/FR-025/FR-027).
+ * Minimal JWT minting for issued RPC access (spec 107, FR-021/FR-025/FR-027).
  *
  * ── WHY THIS IS HAND-ROLLED ──────────────────────────────────────────────────────────────────
  *

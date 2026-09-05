@@ -1,5 +1,5 @@
 /**
- * Protected-route declarations (spec 105, data-model §4) — THE ONE TABLE.
+ * Protected-route declarations (spec 106, data-model §4) — THE ONE TABLE.
  *
  * The middleware, the operator disclosure, the metering attribution and the least-privilege tests
  * all read this file. Two rules govern it, and both are the point rather than decoration.
@@ -59,7 +59,7 @@ export const ROUTE_TABLE = Object.freeze([
   r('POST', '/v1/paymaster', TIERS.ANONYMOUS, 'ops'),
   r('POST', '/v1/engine/webhook', TIERS.ANONYMOUS, 'ops'), // own shared secret; lock-exempt
 
-  // Keyed-access issuance (spec 106). ANONYMOUS on purpose — FR-022: tier shapes what is issued
+  // Keyed-access issuance (spec 107). ANONYMOUS on purpose — FR-022: tier shapes what is issued
   // (lifetime), never WHETHER. Gating it higher would make keyed reads a member benefit, which is
   // the product regression that spec's US1 exists to forbid. It meters itself per subject and
   // consumes no data-plane upstream; the admin-API check behind it is cache-bounded.

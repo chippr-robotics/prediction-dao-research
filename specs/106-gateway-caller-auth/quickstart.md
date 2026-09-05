@@ -1,6 +1,6 @@
 # Quickstart: Caller Identity
 
-**Feature**: `specs/105-gateway-caller-auth` | **Phase**: 1
+**Feature**: `specs/106-gateway-caller-auth` | **Phase**: 1
 
 How to run, exercise and verify this feature locally.
 

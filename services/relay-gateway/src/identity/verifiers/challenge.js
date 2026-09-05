@@ -1,5 +1,5 @@
 /**
- * Challenge verifier (spec 105 slice 2, #1444) — proof of HUMAN, and only that.
+ * Challenge verifier (spec 106 slice 2, #1444) — proof of HUMAN, and only that.
  *
  * Verifies a Cloudflare Turnstile token against siteverify and answers with the standard verifier
  * contract. What a passing challenge proves is "a real browser on a real device, recently" —

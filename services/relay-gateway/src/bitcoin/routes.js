@@ -69,7 +69,7 @@ export function createBitcoinRouter(config, { esploraClients, stampsClient, cach
     return client
   }
 
-  // Keyed on the resolved caller (spec 105, FR-011) rather than on `req.ip` alone — see
+  // Keyed on the resolved caller (spec 106, FR-011) rather than on `req.ip` alone — see
   // identity/quotaKey.js for why the network address is a fallback and not the default.
   const quotaKey = callerQuotaKey
 

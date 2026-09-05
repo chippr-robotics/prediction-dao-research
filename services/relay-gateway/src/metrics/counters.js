@@ -1,5 +1,5 @@
 /**
- * Identity counters + the counters endpoint (spec 105/#1447, T033).
+ * Identity counters + the counters endpoint (spec 106/#1447, T033).
  *
  * Cumulative-since-boot request counts, per resolved assurance tier — the gateway's half of the
  * FinOps `gateway-upstream-usage` source. Served on an UNPUBLISHED compose-network port that the

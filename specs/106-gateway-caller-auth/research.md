@@ -1,6 +1,6 @@
 # Phase 0 Research: Gateway Caller Authentication and Abuse Prevention
 
-**Feature**: `specs/105-gateway-caller-auth` | **Date**: 2026-09-04
+**Feature**: `specs/106-gateway-caller-auth` | **Date**: 2026-09-04
 
 Method: eleven independent agents — nine reading the repository, two researching vendors — followed by
 an adversarial completeness critic that walked all 37 functional requirements looking for requirements

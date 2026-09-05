@@ -132,7 +132,7 @@ export function loadConfig(env = process.env) {
       planMonthlyUsd: num(env.FINOPS_CLOUDFLARE_PLAN_USD, null),
     },
 
-    // Spec 105/#1447: the relay-gateway's counters endpoint — an UNPUBLISHED compose-network
+    // Spec 106/#1447: the relay-gateway's counters endpoint — an UNPUBLISHED compose-network
     // port (e.g. http://gateway:9091/counters). Unset => the gateway-upstream-usage source reads
     // not-configured, which is the honest state for a deployment that has not wired it.
     gateway: {

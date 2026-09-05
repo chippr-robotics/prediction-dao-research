@@ -1,6 +1,6 @@
 # Data Model: Gateway Caller Authentication and Abuse Prevention
 
-**Feature**: `specs/105-gateway-caller-auth` | **Phase**: 1 | **Date**: 2026-09-04
+**Feature**: `specs/106-gateway-caller-auth` | **Phase**: 1 | **Date**: 2026-09-04
 
 This document fixes the vocabulary the implementation uses. Nothing here is persisted to a member's
 device or to a chain; every entity is either request-scoped, held in process memory, or read from
@@ -195,7 +195,7 @@ the spend has already happened. This is the difference between a budget and a re
 
 ---
 
-## 7–9. Keyed data access — moved to spec 106
+## 7–9. Keyed data access — moved to spec 107
 
 `IssuedAccess`, `ProviderEndpoint` and `AccessIssuanceRecord` moved with the requirements they
 served. One rule from them is worth keeping visible here, because it is a general principle this
@@ -226,8 +226,8 @@ Request
   │                          │
   ├── UpstreamCredential.ceiling  ──►  checked BEFORE the upstream call
   │
-  └── (keyed issuance — spec 106)
-           (issuance entities moved to spec 106)
+  └── (keyed issuance — spec 107)
+           (issuance entities moved to spec 107)
 ```
 
 ## What is deliberately absent
@@ -237,5 +237,5 @@ Request
   members, which is the property the no-backend exception is bounded by.
 - **No credential persistence.** Issued credentials are minted and forgotten; the audit record holds
   the decision, not the secret.
-- **No credential minting of any kind.** Runtime issuance of keyed provider credentials is spec 106;
+- **No credential minting of any kind.** Runtime issuance of keyed provider credentials is spec 107;
   this feature only ever *examines* credentials a caller already holds.

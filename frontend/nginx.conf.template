@@ -143,7 +143,7 @@ server {
     # potentially trustworthy. A LAN address like http://192.168.1.5:8545 is still blocked by the
     # browser as mixed content — the endpoint form says so instead of letting it fail silently.
     #
-    # `https://challenges.cloudflare.com` (spec 105, FR-018) is the Turnstile widget — the ONE
+    # `https://challenges.cloudflare.com` (spec 106, FR-018) is the Turnstile widget — the ONE
     # named script host granted for proof-of-human, in script-src (the api.js loader) and
     # frame-src (the challenge iframe). A single named host is the opposite of the scheme-wide
     # `https:` grant the rule above forbids: it names exactly one origin, operated by the edge

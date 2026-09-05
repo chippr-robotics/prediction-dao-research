@@ -425,14 +425,14 @@ export function loadConfig(env = process.env, opts = {}) {
       // bundle from `capacitor://localhost` (iOS) and `https://localhost` (Android), and the
       // WebView's fetch is subject to CORS like any browser's. Without these, the CORS middleware
       // emits no Access-Control-Allow-* at all for a shell, so a native caller cannot send the
-      // Authorization header — which would put spec 105's member-grant requirement on Bitcoin
+      // Authorization header — which would put spec 106's member-grant requirement on Bitcoin
       // broadcast (a passkey-only, native-bridged flow) onto a channel physically unable to carry
       // a credential. They are appended rather than defaulted so an explicit ALLOWED_ORIGINS still
       // gets them; an operator who genuinely wants web-only must remove them here, deliberately.
       const NATIVE_SHELL_ORIGINS = ['capacitor://localhost', 'https://localhost']
       return [...new Set([...configured, ...(configured.length ? NATIVE_SHELL_ORIGINS : [])])]
     })(),
-    // --- Caller identity (spec 105) ---
+    // --- Caller identity (spec 106) ---
     // Unset/false => the layer is INERT: every caller resolves anonymous, no status changes, and
     // the state is disclosed at boot and in the gated /status. FR-015 — a disabled control must
     // never be indistinguishable from an enforcing one.
@@ -483,7 +483,7 @@ export function loadConfig(env = process.env, opts = {}) {
         timeoutMs: int(env, 'CHALLENGE_TIMEOUT_MS', 3000),
       },
     },
-    // --- Keyed RPC access issuance (spec 106) ---
+    // --- Keyed RPC access issuance (spec 107) ---
     // DORMANT until an endpoint pair, a signing key and the admin credential are all present; the
     // module mounts regardless and answers 503 access_unconfigured, so absence stays honest.
     // RPC_ACCESS_SIGNING_KEY is KEY MATERIAL (spec 097 rule 3): it arrives from Secret Manager via
@@ -532,11 +532,11 @@ export function loadConfig(env = process.env, opts = {}) {
       retries: int(env, 'ENGINE_RETRIES', 2),
     },
     killSwitch: opt(env, 'KILL_SWITCH', 'false').toLowerCase() === 'true',
-    // SIGHUP re-reads allowlisted operational switches from this file (spec 105 FR-014, #1446).
+    // SIGHUP re-reads allowlisted operational switches from this file (spec 106 FR-014, #1446).
     // Unset => SIGHUP answers honestly that nothing can reload. The process env is frozen at
     // exec, which is why the source is a FILE — the same mounted env file the deploy delivers.
     reloadEnvFile: opt(env, 'RELOAD_ENV_FILE', null),
-    // Counters endpoint for the FinOps exporter (spec 105/#1447). 0/unset = off. The compose file
+    // Counters endpoint for the FinOps exporter (spec 106/#1447). 0/unset = off. The compose file
     // must NEVER publish this port to the host — it is compose-network-internal by design.
     metricsPort: int(env, 'METRICS_PORT', 0),
     quotas: {

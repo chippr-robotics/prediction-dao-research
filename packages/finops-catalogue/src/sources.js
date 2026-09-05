@@ -517,7 +517,7 @@ const vendors = [
     interval: VENDOR,
     docs: 'finops-operations.md#gateway-upstream-usage',
     meaning:
-      'MEASURED request counts from the relay-gateway, per assurance tier and per upstream (spec 105, #1447): ' +
+      'MEASURED request counts from the relay-gateway, per assurance tier and per upstream (spec 106, #1447): ' +
       'who is consuming the platform-held vendor credentials, in whose name. It is context for the vendor cost ' +
       'sources beside it — the QuickNode account is capped at 50 req/s shared with the gasless bundler, so this ' +
       'is the series that says WHERE that budget went. It is NOT a dollar and never joins a money total; counters ' +

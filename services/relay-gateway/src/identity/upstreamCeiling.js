@@ -1,5 +1,5 @@
 /**
- * Per-upstream spend ceilings (spec 105, FR-013).
+ * Per-upstream spend ceilings (spec 106, FR-013).
  *
  * ── A CAP CHECKED AFTER THE CALL BOUNDS NOTHING ──────────────────────────────────────────────
  *
