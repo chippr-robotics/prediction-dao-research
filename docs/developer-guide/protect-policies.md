@@ -83,6 +83,45 @@ signature bundles) — no signature-format change was needed.
 - Changing the rule set clears live window accounting (rule identity is positional). The UI says so
   before the change is proposed.
 
+## The write rail is a property of the signer, not the login
+
+A custody action needs something that can sign it on the chain it lands on. Until this change the
+code asked a different question — `loginMethod === 'passkey'` — and that is the one thing
+`WalletContext` says not to ask:
+
+> `loginMethod` is INFORMATIONAL ONLY (signing ceremony differs); identity, gating, and screening
+> always key off `address` — no feature may branch on it for authorization.
+
+It produced a real refusal. Ethereum Classic and Mordor have no bundler, so the passkey UserOp rail
+cannot submit there; every approve / execute / cancel on those networks died inside
+`sendPasskeyBatch` with a chain-support error the member had asked no question to receive. A wallet
+that holds a key has no such problem: an injected wallet, a Ledger, or an unlocked recovered
+account signs `approveHash` natively and pays the fee in ETC.
+
+`lib/custody/writeRail.js#resolveWriteRail` answers it once, for every custody surface:
+
+| condition | rail | offered? |
+|---|---|---|
+| a signer is present | `signer` | yes — on every EVM chain the vault lives on |
+| no signer, passkey session, `isPasskeySupported(chain)` | `passkey` | yes |
+| no signer, passkey session, chain has no bundler | `passkey` | **no** — reason names the chain and the way out |
+| no signer, no passkey session | `none` | no — "connect a wallet" |
+
+Three rules:
+
+1. **A signer wins, and is checked first.** Routing by login would take a working key away from a
+   member on a chain the passkey rail has never reached.
+2. **The refusal is knowable before the tap, so it is said before the tap.** `useVaultProposals`
+   returns `writeRail`, and the Queue renders the reason in place of buttons that would throw.
+   That state is *not* "view-only" — the member IS an owner, which is a different fact and reads
+   differently.
+3. **The reason names the way out**, not only the obstacle. "Connect a wallet that can sign there"
+   is actionable; `ChainNotSupportedError` is not.
+
+`requireWriteRail` is the throwing form used inside the action callbacks, so a caller that reaches
+them anyway fails with the same sentence the surface would have shown.
+
+
 ## Client integration
 
 `frontend/src/lib/custody/policyV2.js` is the single seam:

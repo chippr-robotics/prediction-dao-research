@@ -3105,6 +3105,53 @@
           "note": "SC-005. Both halves are asserted, because a tab that renders the cards while Settings still renders them too is two homes for one control: the redirect is read off the resolved URL, and the card lands OPEN rather than at a closed heading."
         }
       ]
+    },
+    {
+      "id": "104-passkey-account-recovery",
+      "title": "Passkey account recovery \u2014 find the account, never guess it",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "passkey.recover-account-by-lookup",
+          "name": "A member signing in on a new device reaches the account their passkey controls, including when that passkey was added to the account later rather than being the key that created it",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1432",
+          "note": "Blocked on T-101: accountFactory has no recorded deploy block on any chain, so a log scan has no floor -- and this repo degrades that silently (deployBlocks?.X || 0 starts at block 0) rather than loudly. Release 1 confirms a single derived candidate and reports none-found honestly for every other shape."
+        },
+        {
+          "id": "passkey.recover-never-wrong-account",
+          "name": "A passkey whose account cannot be verified never opens a session on an unverified address; the member is told what could not be confirmed, and an unreachable chain reads as unverified rather than as no account existing",
+          "status": "covered",
+          "tier": "account-native",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/passkey/account-recovery.cy.js::REC-01",
+            "frontend/cypress/e2e/passkey/account-recovery.cy.js::REC-02"
+          ],
+          "note": "The no-chain tier is the right home AND the natural one: it runs with no RPC reachable, which is exactly the condition that produces the unverified verdict, so the environment generates the state rather than a stub asserting it does. REC-01 pins the regression (no session row, header still offering connection); REC-02 pins that an unreachable network never reads as \"you have no account\"."
+        },
+        {
+          "id": "passkey.recover-by-address",
+          "name": "A member relinks by entering their account address, and is signed in only when the chain lists the recovered key among that account's current owners",
+          "status": "partial",
+          "tier": "account-native",
+          "proposedTier": "on-chain",
+          "depth": "smoke",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/passkey/account-recovery.cy.js::REC-03"
+          ],
+          "issue": "#1432",
+          "note": "The member-facing half is covered without a chain: the form, the refusal of a malformed address in words rather than colour, and the address being handed on to be CHECKED rather than trusted. The half that needs a chain -- a real deployed account confirming the key and a session opening on it -- belongs to the full-stack passkey tier.",
+          "missing": "The chain agreeing. This tier reaches no RPC, so what is proven is the form, the refusal of a malformed address, and that the address is handed on to be CHECKED \u2014 never that a verified address opens a session on the account it names. That needs a deployed account whose owner set includes a key this browser has no record of, i.e. the full-stack passkey tier."
+        }
+      ]
     }
   ]
 }

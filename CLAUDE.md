@@ -888,9 +888,59 @@ artifacts live under `specs/<feature>/`.
   `docs/research/guttertoken-assistant-integration.md` + `specs/104-guttertoken-assistant-rail/`.
 
 <!-- SPECKIT START -->
+- **A custody write's RAIL is a property of the SIGNER, not the login.**
+  `lib/custody/writeRail.js#resolveWriteRail` is the one answer to "can this session sign a vault
+  action on this chain?", and it checks for a signer FIRST. Branching on `loginMethod === 'passkey'`
+  — which `WalletContext` itself documents as "INFORMATIONAL ONLY … no feature may branch on it" —
+  refused members who could perfectly well act: **ETC 61 and Mordor 63 have no bundler**, so the
+  passkey UserOp rail cannot submit there, and every approve/execute/cancel died inside
+  `sendPasskeyBatch` with a chain-support error the member had asked no question to receive — while
+  an injected wallet, a Ledger, or an unlocked recovered account signs `approveHash` natively and
+  pays the fee in ETC. Rules: (1) a signer, if present, is used, on every EVM chain the vault lives
+  on; (2) the passkey rail is the fallback and is offered ONLY where `isPasskeySupported(chainId)`;
+  (3) an unavailable rail is stated BEFORE the tap — `useVaultProposals` returns `writeRail` and the
+  Queue renders the reason in place of buttons that would throw — and that state is **not**
+  "view-only", which means *not an owner* and is a different fact; (4) the reason NAMES the way out
+  ("connect a wallet that can sign there"), never just the obstacle. `requireWriteRail` is the
+  throwing form inside the action callbacks, so any caller that gets past the UI fails with the same
+  sentence. See `docs/developer-guide/protect-policies.md` § "The write rail is a property of the
+  signer".
+- **A passkey's account is LOOKED UP, never derived (spec 104).** `lib/passkey/accountLookup.js` is
+  the one seam that answers "which account does this key control?", and its `Resolution` type has
+  four shapes of which **only `resolved` carries an address** — three of its four constructors take
+  no address at all, so "return the derived one anyway" has nowhere to live (the spec-089
+  `reading.js` device). That is the whole point: `resolveAccountForCredential` used to derive an
+  address assuming the key was the account's **sole initial owner at nonce 0** and return it even
+  when the chain said nothing was deployed there, which signed a member whose passkey had been
+  ADDED to an existing account into a brand-new empty one, silently — a zero balance they read as
+  their money being gone. Five rules: (1) **a session opens only on `resolved`, or on a counterfactual the
+  MEMBER accepted** — everything else raises `AccountUnresolved` carrying the outcome, so the
+  surface offers recovery instead of a dead end. The exception is not a loophole, it is the case the
+  blunt rule broke: `none-found` also describes a member who signed up on another device and has not
+  spent, whose account is real and simply holds no code, so the derived address is OFFERED, labelled
+  not-yet-used, and opened only on `acceptCounterfactual` — safe because it is a deterministic
+  function of the key (the same address their first device showed). `unverified` gets no such offer:
+  an unreachable chain says nothing about whether an account exists; (2) **`unverified` is NEVER `none-found`** — an unreachable chain is not evidence of
+  absence, and the two lead to different member actions (retry vs. recover), exactly as spec 095
+  keeps `auth_unverifiable` out of the denial path and spec 084 keeps a third verdict; (3)
+  **verification is against the CURRENT owner set** and `ownerIndex` is whatever the chain reported,
+  never 0 by assumption (spec 045 FR-009); (4) **an address is a HINT, never a claim** — a member's
+  typed address takes the identical confirmation a searched candidate takes, which is what stops
+  "type any address" being a way into someone else's account; (5) **every leg is deadline-bounded
+  and expires to `unverified`** — the direct lesson of v1.16.1, where an unbounded wait on an
+  external system turned one failure into a permanent lockout. Derivation survives ONLY for
+  `mode: 'sign-up'`, where the member asked to create an account. Reads go through the spec-069 seam
+  (`defaultPublicClient` no longer builds a transport from `NETWORKS[chainId].rpcUrl`). Discovery
+  (nonce enumeration + an `AccountCreated` scan) is Release 2 and is **blocked on recording
+  `deployBlocks.accountFactory`** — absent on every chain today, and `deployBlocks?.X || 0` makes
+  that a silent scan from block 0, not a loud failure. Keys added to an account after creation are
+  undiscoverable by design (`AddOwner` has no address to filter on, the subgraph indexes no account
+  entities) and are covered by the address path. See
+  `docs/developer-guide/passkey-account-recovery.md` + `specs/104-passkey-account-recovery/`.
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/103-capacitor-channels/plan.md
+at specs/104-passkey-account-recovery/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also
