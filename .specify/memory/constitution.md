@@ -111,9 +111,12 @@ The frontend is the trust surface for non-technical users.
      catches it was in review. `npm run check:specs` gates this.
    - Feature work branches from `staging`. Only a promotion or a declared hotfix
      reaches `main`.
-   - An issue's state is its `status:*` label, set by whoever is doing the work, at
-     the moment the state changes. Delegated work gets a **sub-issue** — the only
-     representation the board, the parent issue and the next agent can all read.
+   - An issue's state is read from state GitHub already keeps exactly once — its
+     assignee, its linked pull requests, and whether it is closed — never from a
+     mirrored status label, which is a second copy and therefore drifts. Claiming is
+     assigning; closing is `Closes #N` in the PR body. Delegated work gets a
+     **sub-issue**, the only representation the parent issue and the next agent can
+     both read.
    - A subagent's report is a claim. The diff is read and the affected gates are run
      before the work is accepted; work that was not reviewed is not done.
 

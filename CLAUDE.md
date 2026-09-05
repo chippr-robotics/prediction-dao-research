@@ -35,12 +35,15 @@ and two of its rules change what you do on step 2:
   regenerated `e2e-coverage-matrix.md` (`npm run e2e:matrix`; `check:e2e-matrix`
   fails a spec dir with no row) — label it `spec-reservation`, merge it, then plan.
   `npm run check:specs` (CI job *Spec Registry*) fails the second claimant.
-- **An issue's state is its `status:*` label**, and you set it. There is no Projects
-  v2 write tool — `issue_write` reaches Type, Priority, Effort and the dates (all
-  org-level ISSUE fields), but Status lives on the project item. Claim with
-  `status:in-progress` + an assignee before working; `project-status-sync.yml`
-  mirrors the label onto the board when a token is configured, and says so when it
-  is not. Never block on the board.
+- **An issue's state is its ASSIGNEE, its linked PRs and whether it is closed** —
+  never a status label. There is no Projects v2 write tool (`issue_write` reaches
+  Type, Priority, Effort and the dates; Status lives on the project item), and this
+  repo deliberately does NOT paper over that with a mirrored `status:*` label: that
+  is a second copy of state GitHub already holds, and it reads as "in progress"
+  forever once an agent stops mid-task. Claim by **assigning yourself**, release it
+  by unassigning if you walk away, and close by putting **`Closes #N`** in the PR
+  body — then verify the issue actually closed. Moving the board card is a human
+  task; do not claim you moved it.
 
 Branch from `staging`, never from `main`. Delegated work gets a **sub-issue**, and a
 subagent's report is a claim — read the diff and run the gates before accepting it.
@@ -90,13 +93,18 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   in `ci-manager.yml`: it had none, so a PR that only reserved a number ran ZERO
   jobs — and with required checks in force `skipped` satisfies them, so the one PR
   type whose entire purpose is claiming a number was the one type the gate could
-  never see. **Status is a label, not a field an agent can write**: the GitHub MCP
-  server has no Projects v2 write tool, so `.github/labels.json`'s `status:*` set is
-  the record and `project-status-sync.yml` mirrors it onto the board — warning and
-  exiting 0 when `PROJECT_URL`/`PROJECTS_TOKEN` are unset, because an agent must
-  never be blocked on infrastructure it can neither see nor fix. Sizing and priority
-  are set at triage on the **Effort** and **Priority** issue fields (the `size:*`
-  label is the t-shirt shorthand; the field is what the board reads).
+  never see. **There is NO status mirror, on purpose.** An agent cannot
+  write the project's Status field, and the fix is not a `status:*` label copied onto
+  the board by a workflow — that was built for this feature and deliberately removed.
+  A mirror is a second copy of state the repo already holds and it drifts the instant
+  an agent stops mid-task, leaving the board confidently wrong. State is read from
+  the **assignee** (the claim — release it if you abandon the work), the **linked
+  PRs**, and **open/closed**; closure comes from `Closes #N` in the PR body, verified
+  after the merge. `blocked` is the one label, because an open assigned issue that is
+  stuck has no other representation — and it is meaningless without a comment naming
+  the blocker. Board columns are moved by a human. Sizing and priority are set at
+  triage on the **Effort** and **Priority** issue fields (the `size:*` label is the
+  t-shirt shorthand; the field is what the board reads).
 - **Upgradeable contracts (UUPS, specs 025 + 027):** both `WagerRegistry` (spec 025)
   and `MembershipManager` (spec 027) are **UUPS proxies at stable addresses** — logic
   is swappable, state is preserved. New upgradeable

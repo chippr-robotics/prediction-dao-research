@@ -29,7 +29,7 @@ This is the first thing to get straight, because half the flow is shaped by it.
 
 | Field | Where it lives | Writable by an agent? |
 |---|---|---|
-| Title, body, state, labels, assignees, milestone | Issue | Yes — `issue_write` |
+| Title, body, open/closed, labels, assignees, milestone | Issue | Yes — `issue_write` |
 | **Type** (Task / Bug / Feature) | Issue | Yes — `issue_write` `type` |
 | **Priority** (Urgent / High / Medium / Low) | Org-level issue field | Yes — `issue_write` `issue_fields` |
 | **Effort** (High / Medium / Low) | Org-level issue field | Yes — `issue_write` `issue_fields` |
@@ -37,13 +37,35 @@ This is the first thing to get straight, because half the flow is shaped by it.
 | Parent / sub-issue links | Issue hierarchy | Yes — `sub_issue_write`, or `parent_issue_number` on create |
 | **Status** (Todo / In progress / …) | **Project item** | **No.** There is no Projects v2 write tool. |
 
-That last row is the whole reason the `status:*` labels exist. **The label is the record of state.**
-`.github/workflows/project-status-sync.yml` mirrors it onto the board when `PROJECT_URL` and
-`PROJECTS_TOKEN` are configured; when they are not, it warns and the label still says what is true.
-Never wait on the board, and never report a status you only set on the board.
-
 Run `list_issue_fields` before writing a field for the first time — the option names are validated
 against the live field, and a wrong one fails the call rather than silently doing nothing.
+
+### The board is a human task, and there is deliberately no mirror
+
+An agent cannot write the project's Status field, and **this repository does not paper over that
+with a status label.** It could: a `status:*` label is writable, and a workflow could copy it onto
+the board. That was built for this feature and then deliberately removed, because it is a *second
+copy of state the repository already holds*, and a second copy drifts. An agent that sets
+`status:in-progress` and then stops — context exhausted, session ended, task abandoned — leaves an
+issue that reads as actively worked forever, and nothing in the system can notice. The board would
+faithfully mirror the wrong answer.
+
+So **status is derived from state GitHub already tracks exactly once**:
+
+| Question | Answered by | Why it cannot drift |
+|---|---|---|
+| Is anyone working this? | The **assignee** | One field, set by the agent that claimed it |
+| Has work started? | A **linked PR** (`Closes #N`) | GitHub links it; the PR exists or it does not |
+| Is it done? | The issue is **closed** | Closed by the merge, not by a separate write |
+| What is it part of? | Its **parent / sub-issues** | Real hierarchy, not a naming convention |
+| Is it stuck? | The `blocked` label **plus a comment** | The one state nothing else records — see below |
+
+`blocked` is the single exception, and it is not a mirror: an issue can be open, assigned and stuck,
+and GitHub has no other representation of that. It is only meaningful next to a comment naming the
+blocker, so **never apply it without one** — and remove it when the blocker clears.
+
+Moving cards on the board is a **human task for now**. Do not report a status you did not put into
+one of the rows above.
 
 ---
 
@@ -51,10 +73,10 @@ against the live field, and a wrong one fails the call rather than silently doin
 
 ### 1. Claim the issue before doing anything else
 
-Claiming is what stops two agents starting the same work. In one `issue_write` update:
+Claiming is what stops two agents starting the same work, and **the assignee is the claim** — one
+field, no second copy. In one `issue_write` update:
 
-- assign yourself (or the human operator, if you have no bot identity),
-- set `status:in-progress` and remove any other `status:*` label,
+- **assign yourself** (or the human operator, if you have no bot identity),
 - set **Type** if it is unset (`Feature`, `Bug` or `Task`),
 - set **Priority** and **Effort** if unset (see the sizing table below),
 - add `agent-coordinated`.
@@ -62,8 +84,12 @@ Claiming is what stops two agents starting the same work. In one `issue_write` u
 Then comment once, saying what you are about to do and on which branch. That comment is how a human
 — or the next agent, after your context is gone — reconstructs where the work went.
 
-**If the issue already carries `status:in-progress` and an assignee that is not you, stop.** Say so
-and pick something else. Overlapping work is more expensive than idle capacity.
+**If the issue already has an assignee who is not you, stop.** Say so and pick something else.
+Overlapping work is more expensive than idle capacity.
+
+**And release the claim if you abandon it**: unassign yourself and say why in a comment. An
+assignee is only a useful signal while it is true, and an agent that walks away silently is exactly
+the drift that a status label would have made permanent.
 
 ### 2. Triage before planning
 
@@ -160,21 +186,23 @@ existing issue with `sub_issue_write`. Each sub-issue gets, at creation:
 
 - a **Type** (almost always `Task`),
 - a **Priority** — inherit the parent's unless the sub-task is genuinely on a different critical path,
-- an **Effort** / `size:*` label,
-- `status:triage` until a subagent picks it up.
+- an **Effort** and its `size:*` label,
+- **no assignee** — unassigned *is* "available".
 
 Then, for each one:
 
-| Moment | What you set |
+| Moment | What you do |
 |---|---|
-| You hand the task to a subagent | `status:in-progress` |
-| The subagent reports back | leave it — **you have not reviewed it yet** |
-| You have reviewed and accepted the work | `status:in-review` once the PR is open |
-| The PR merges | `status:done`, and close with `state_reason: completed` |
-| The subagent is stuck on something outside the task | `status:blocked` + a comment naming the blocker |
+| You hand the task to a subagent | **Assign it** (to yourself if the subagent has no identity) |
+| The subagent reports back | Nothing yet — **you have not reviewed it** |
+| You reviewed and accepted it | Open the PR with `Closes #<sub-issue>` in its body |
+| The PR merges | The issue closes **itself**; confirm it did |
+| The subagent is stuck outside the task | `blocked` **+ a comment naming the blocker** |
+| You abandon the task | **Unassign**, remove `blocked`, say why |
 
-Update the sub-issue at the moment the state changes, not in a batch at the end. A batch update is a
-status field that was wrong for the entire time anyone might have read it.
+Every row is either a field with one copy or a link GitHub maintains. There is nothing here to
+update "at the end", because there is nothing here that can be stale while the underlying fact has
+moved on — which is precisely why a `status:*` label is not in this table.
 
 ### 7. Review subagent work before accepting it
 
@@ -195,13 +223,23 @@ it yourself — the next identical task will be delegated with the same instruct
 
 ### 8. Close the loop
 
+**The PR body is what closes the issue, so get it right.** This is the whole closure mechanism now
+that there is no status mirror.
+
 - Open the PR into `staging` as **ready for review**, not draft (draft PRs run no CI here).
-- Set the parent issue to `status:in-review`.
-- When it merges: `status:done` on the parent and every sub-issue, close each with
-  `state_reason: completed`, and drop `status:in-progress` everywhere.
+- Put **`Closes #<issue>`** in the body — one line per issue the PR finishes, including every
+  sub-issue it completes. GitHub then links them, shows them on the PR, and closes them **on merge**.
+  A PR that says "fixes the thing in #123" without a closing keyword links nothing and closes
+  nothing.
+- If a PR only *advances* an issue, reference it (`Part of #123`) and do **not** use a closing
+  keyword — a closing keyword on partial work closes an issue that is not done.
+- After the merge, **verify the issues actually closed**. A closing keyword in a comment rather than
+  the PR body does nothing, and a sub-issue nobody named stays open forever. This is a read, not a
+  write: if they are open, the PR body was wrong, so close them by hand and say so.
 - If part of the scope was left out, say so in the closing comment and open a follow-up issue for
   it. Scaling the work down is the operator's call, not yours — but silently scaling it down is
   nobody's.
+- Moving the board card is a **human task**. Do not claim you moved it.
 
 ---
 
@@ -230,55 +268,55 @@ issue still has to write them onto the **fields**, which is what the board reads
 
 ---
 
-## Status vocabulary
+## Reading an issue's state
 
-Declared in `.github/labels.json`, applied by `labels-sync.yml`. **Exactly one at a time.**
+There is no status field to read, so read the four facts that are actually recorded:
 
-| Label | Means | Board |
-|---|---|---|
-| `status:triage` | Accepted, unclaimed. Free to pick up. | Todo |
-| `status:in-progress` | Claimed by its assignee, actively worked. **Do not pick up.** | In progress |
-| `status:blocked` | Stopped on something outside this issue, named in a comment. | Blocked |
-| `status:in-review` | Pushed, PR open, waiting on review — not on more code. | In review |
-| `status:done` | Merged and verified. Set *alongside* closing, never instead of it. | Done |
+| You want to know | Look at |
+|---|---|
+| Is someone on it? | **Assignee.** Empty means available. |
+| Has work started? | **Linked PRs**, shown on the issue by GitHub itself. |
+| Is it finished? | **Open or closed.** Closed by a merged PR means done and merged. |
+| Is it stuck? | The **`blocked`** label, and the comment beside it saying why. |
 
-A closed issue with no `status:*` label mirrors to **Done**: closing is itself a statement. An
-**open** issue with no status label mirrors to nothing — "no opinion" moves no card, which is what
-keeps the first run of the mirror from stampeding the whole backlog into one column.
+Each of those has exactly one copy, and three of the four are maintained by GitHub rather than by an
+agent remembering to. That is the entire point: a state an agent has to *remember to update* is a
+state that is wrong as soon as the agent stops.
+
+Where an issue sits on the project board is a **human task** and is not authoritative here. If it
+disagrees with the issue, the issue is right.
 
 ---
 
 ## Rules that hold regardless
 
-- **One agent per issue.** The assignee plus `status:in-progress` is the claim. Respect it.
+- **One agent per issue.** The assignee is the claim. Respect it, and release it if you walk away.
 - **One number per spec, claimed by a merge.** Not by a branch, not by a draft PR.
 - **Branch from `staging`.** Only promotions and declared hotfixes touch `main`.
-- **The label is the state; the board is a mirror.** Never block on the board.
+- **`Closes #N` in the PR body is how an issue closes.** Verify it actually did after the merge.
+- **Never introduce a second copy of a state GitHub already keeps.** It will drift, and a drifted
+  record is worse than no record — it is read with the same confidence as a true one.
 - **A subagent's report is a claim.** Review the diff and run the gates before accepting.
-- **Never mark a sub-issue done for work you have not seen merged.**
+- **Never close a sub-issue for work you have not seen merged.**
 - **Say what you did not do.** A closed issue with unfinished scope and no follow-up is the one
   outcome that costs more than not starting.
 
 ---
 
-## One-time setup
+## Setup
 
-Done once per repository, by a human — an agent has neither the token nor the permission.
+Only one thing, and it is optional:
 
-1. **Labels** — merge `.github/labels.json` to `main` or `staging`, or run the *Sync Coordination
-   Labels* workflow manually. `GITHUB_TOKEN` is sufficient. Applying a label that does not exist
-   yet still works — GitHub creates it, grey and undescribed — so an agent is never blocked on this
-   step; the sync is what gives the label its colour and its meaning.
-2. **`PROJECT_URL`** — a repo or org **variable** holding the project URL, e.g.
-   `https://github.com/orgs/chippr-robotics/projects/7`.
-3. **`PROJECTS_TOKEN`** — a **secret** holding a fine-grained PAT with the `project` scope.
-   `GITHUB_TOKEN` cannot write Projects v2; this is not a permissions setting you can adjust.
-4. **Board columns** — the Status field needs options matching the table above. The mirror matches
-   case- and separator-insensitively (`In Progress` = `in-progress`) but will not invent a column:
-   a missing one is reported, and those cards stay where they are.
+**Labels** — merge `.github/labels.json` to `main` or `staging`, or run the *Sync Coordination
+Labels* workflow manually. `GITHUB_TOKEN` is sufficient; no PAT, no secret, no variable. Applying a
+label that does not exist yet works anyway — GitHub creates it, grey and undescribed — so an agent
+is never blocked on this; the sync is what gives each label its colour and its description.
 
-Until 2 and 3 exist, everything above still works. The board is just stale, and the workflow says so
-on every run instead of pretending otherwise.
+**There is nothing else to configure**, and that is deliberate. An earlier draft of this feature
+also shipped a `status:*` label set and a workflow that mirrored it onto the project board's Status
+field, which needed a repo variable and a fine-grained PAT. It was removed: a mirror is a second
+copy of state the repository already holds, it drifts the moment an agent stops mid-task, and the
+board would then show the wrong answer with full confidence. Board columns are moved by a human.
 
 ---
 

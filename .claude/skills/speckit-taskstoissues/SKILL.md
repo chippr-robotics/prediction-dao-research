@@ -91,22 +91,32 @@ Set all of the following at creation — retrofitting them is work someone else 
 | **Priority** | `issue_fields` → `Priority`: `Urgent` / `High` / `Medium` / `Low`. Inherit the parent's unless the task is genuinely on a different critical path. |
 | **Effort** | `issue_fields` → `Effort`: `High` / `Medium` / `Low` |
 | **Size label** | `size:xs` … `size:xl` (XS/S → Effort Low, M → Medium, L/XL → High) |
-| **Status label** | `status:triage` — unclaimed, free for any agent to pick up |
+| **Assignee** | **None.** Unassigned *is* "available" — do not invent a label that says so. |
 | **Body** | The task text, its `tasks.md` id, the spec path, and what would prove it done |
 
 Run `list_issue_fields` first if you have not this session: option names are validated against the
 live field, and a wrong one fails the call rather than silently doing nothing.
 
-**Status is a label, not a field.** The GitHub MCP server has no Projects v2 write tool — Status
-lives on the project item and is unreachable from here. `.github/labels.json`'s `status:*` set is the
-record; `project-status-sync.yml` mirrors it onto the board. Never report a status you did not put
-on a label.
+**There is no status label, deliberately.** The GitHub MCP server has no Projects v2 write tool, and
+this repo does not paper over that with a mirrored `status:*` label — a second copy of state GitHub
+already holds drifts the instant an agent stops mid-task, and then reads as "in progress" forever.
+Moving cards on the board is a human task; never report a status you did not write into one of the
+fields below.
 
-**Then keep them current.** `status:in-progress` when a subagent picks the task up, `status:blocked`
-with a comment naming the blocker when it stalls, `status:in-review` once its PR is open,
-`status:done` + close with `state_reason: completed` when it merges. At the moment the state
-changes, not in a batch at the end — a batch update is a status that was wrong for the whole time
-anyone might have read it.
+**Then keep them current, using state that has exactly one copy:**
+
+| Moment | What you do |
+|---|---|
+| A subagent picks the task up | **Assign** the issue |
+| It stalls on something outside the task | `blocked` **+ a comment naming the blocker** |
+| The blocker clears | Remove `blocked` |
+| Its work is reviewed and pushed | Put **`Closes #<sub-issue>`** in the PR body |
+| The PR merges | The issue closes **itself** — confirm it did |
+| The task is abandoned | **Unassign** and say why |
+
+Every row is a field with one copy or a link GitHub maintains, so none of it can be stale while the
+underlying fact has moved on. Use a closing keyword only for work the PR actually finishes;
+`Part of #N` for work it merely advances.
 
 **Do not mark a sub-issue done on a subagent's say-so.** Its report is a claim: read the diff, run
 the gates the change touched (`monorepo-verify` skill), and check that it did not quietly widen the

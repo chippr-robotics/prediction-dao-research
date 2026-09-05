@@ -50,8 +50,10 @@ binding on humans too — most of all the two rules that exist because they were
 
 - **A spec number is claimed by MERGING a reservation PR to `staging`**, not by computing it or by
   opening a draft. `npm run check:specs` fails a PR that claims a number already taken.
-- **An issue's state is its `status:*` label.** Set `status:in-progress` and assign yourself before
-  starting, so an agent scanning for work does not start the same thing.
+- **Assign yourself before starting.** The assignee is the claim — it is how an agent scanning for
+  work knows not to start the same thing. There is deliberately no status label to set: state is
+  read from the assignee, the linked PRs and whether the issue is closed, and closure comes from
+  `Closes #N` in the PR body.
 
 The full protocol — triage, sizing, sub-issues, reviewing delegated work — is in
 [Multi-Agent Development Flow](multi-agent-workflow.md).
