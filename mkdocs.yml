@@ -131,6 +131,7 @@ nav:
     - Singleton Deployment Patterns: developer-guide/singleton-deployment-patterns.md
     - Testing: developer-guide/testing.md
     - Coverage & Audit Gates: developer-guide/coverage-and-audit-gates.md
+    - Multi-Agent Development Flow: developer-guide/multi-agent-workflow.md
     - Contributing: developer-guide/contributing.md
   - Security Testing:
     - Overview: security/index.md
@@ -178,6 +179,7 @@ nav:
   - Research:
     - Dex v3 Integration Analysis: research/dex-v3-integration-analysis.md
     - Alternative Approaches (Appendix): research/dex-v3-alternative-approaches.md
+    - GutterToken Assistant Integration: research/guttertoken-assistant-integration.md
   - Reference:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md

@@ -218,8 +218,22 @@ exist to prevent.
 
 Four sources are declared and **not live**. They render as *not yet live*, contribute nothing to any
 total, and emit no metric — a `planned` source showing `$0` would be indistinguishable from a shipped
-source earning nothing (FR-014). They fall into two groups, and the difference decides how each is
+source earning nothing (FR-014). They fall into three groups, and the difference decides how each is
 watched.
+
+**Readable by nobody, and not cash.** `referral-guttertoken` (spec 104): when a member funds a
+GutterToken account through the referral-coded signup link on the Assistant tab, GutterToken credits
+FairWins' own GutterToken account with prepaid usage credit — in-kind, non-cashable, spendable only on
+model calls from that account. It is catalogued `planned` rather than `live` + `not-configured` like
+the other referrals for a reason that will not change with configuration: GutterToken exposes no
+balance, usage or referral endpoint, so **no collector could ever read the figure**; it is visible
+only on GutterToken's billing page. The referral code lives in the tenant manifest
+(`settings.assistant.guttertokenReferralCode`) and ships in the frontend, which is also why C2b cannot
+see it — the gateway reads no env var for it, so the entry carries `moneyPath: { namespace:
+'guttertoken' }` with no `payeeEnv`. Do not promote it to a USD revenue line: if P3 (a FairWins-owned
+GutterToken account as the FairWins rail's upstream) is adopted, this credit accrues on the same
+account `assistant-model-api` would be billed to and is an **offset against that cost**, to be noted
+on the cost entry, never summed with cash revenue. No code is registered yet.
 
 **Does not exist anywhere.** `miniapp-licenses` and `wager-platform-fee`: `MiniAppRegistry` has no
 fee or `payable` function, and `WagerRegistry` takes no platform cut. There is nothing that could

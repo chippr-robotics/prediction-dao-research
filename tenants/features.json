@@ -1,5 +1,5 @@
 {
-  "description": "Catalog of feature ids a tenant manifest may enable. Consumed by scripts/tenants/validate-tenant-manifest.js and frontend/src/config/tenant.js. Adding a feature here requires the corresponding surface to honor isFeatureEnabled().",
+  "description": "Catalog of feature ids a tenant manifest may enable. Consumed by scripts/tenants/validate-tenant-manifest.js and frontend/src/config/tenant.js. Adding a feature here requires the corresponding surface to honor isFeatureEnabled(). `notes` documents a feature whose meaning is not obvious from its id; the validator reads `features` only.",
   "features": [
     "wagers",
     "pools",
@@ -16,6 +16,11 @@
     "token-mint",
     "bitcoin",
     "recovery",
-    "assistant"
-  ]
+    "assistant",
+    "assistant-byok"
+  ],
+  "notes": {
+    "assistant": "The in-app assistant (spec 095) and the Tools > Assistant tab that hosts its preferences and API access. Off per member until opted in.",
+    "assistant-byok": "Spec 104: offers the GutterToken bring-your-own-key rail as an assistant provider. The member pastes their own GutterToken sk- key (stored on the device only, wallet-scoped, never backed up) and the browser calls api.guttertokens.com directly; the tenant is not in the request path, sees no message content, and charges nothing. Requires `assistant`. Without it a tenant keeps the assistant on the membership-funded rail only. The signup link may carry settings.assistant.guttertokenReferralCode."
+  }
 }

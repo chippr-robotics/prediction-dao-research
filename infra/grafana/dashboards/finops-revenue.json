@@ -934,7 +934,7 @@
         "uid": "${datasource}"
       },
       "type": "text",
-      "title": "Mini-app licenses — NOT YET LIVE",
+      "title": "Assistant — GutterToken referral credit — NOT YET LIVE",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -943,7 +943,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nPLANNED, NOT LIVE. contracts/apps/MiniAppRegistry.sol has no fee, price or payable function as of spec 089, so there is no licensing revenue to read. Shown as not-yet-live and excluded from every total."
+        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nPLANNED, NOT LIVE — and NOT CASH. When a member opens and funds a GutterToken account through the referral-coded signup link on the Assistant tab (spec 104), GutterToken credits FairWins’ own GutterToken account with prepaid usage credit (docs: 15% of the referee’s FIRST deposit, capped at $50; non-refundable, non-cashable, self-referral void). It is in-kind credit that can only be spent on model calls from that account, so it is never revenue in USD and must never be summed with the cash sources. No referral code is registered yet and, more fundamentally, nothing can read the figure: GutterToken publishes no balance or referral endpoint, so no collector could ever report it — the honest state is not-yet-live with no metric, and it is excluded from every total. If P3 (a FairWins-owned GutterToken account as the FairWins rail’s upstream) is adopted, this credit accrues on the same account that assistant-model-api would then be billed to, and offsets that cost; the two entries should be promoted together, with this one staying an in-kind offset rather than becoming a revenue line."
       }
     },
     {
@@ -953,7 +953,7 @@
         "uid": "${datasource}"
       },
       "type": "text",
-      "title": "Wager platform fee — NOT YET LIVE",
+      "title": "Mini-app licenses — NOT YET LIVE",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -962,11 +962,30 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nPLANNED, NOT LIVE. WagerRegistry escrows stakes and takes no platform cut, so wagers currently generate volume but no direct revenue. Shown as not-yet-live and excluded from every total."
+        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nPLANNED, NOT LIVE. contracts/apps/MiniAppRegistry.sol has no fee, price or payable function as of spec 089, so there is no licensing revenue to read. Shown as not-yet-live and excluded from every total."
       }
     },
     {
       "id": 20,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "type": "text",
+      "title": "Wager platform fee — NOT YET LIVE",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 73
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Not yet live.** This source is declared, and produces no value on any current deployment, so it is excluded from every total. That covers two different situations — a path that does not exist anywhere, and one that is built but switched off — and the text below says which this is.\n\nPLANNED, NOT LIVE. WagerRegistry escrows stakes and takes no platform cut, so wagers currently generate volume but no direct revenue. Shown as not-yet-live and excluded from every total."
+      }
+    },
+    {
+      "id": 21,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -977,8 +996,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 73
+        "x": 0,
+        "y": 81
       },
       "fieldConfig": {
         "defaults": {

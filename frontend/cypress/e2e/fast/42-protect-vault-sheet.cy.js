@@ -26,6 +26,8 @@
 //   VS-08 custody.remove-all-networks   — Remove from Protect forgets every network after confirmation
 //   VS-09 custody.load-all-networks     — load an address onto every network it exists on
 //   VS-10 wallet.balance-display        — Wrap shows an 18-decimal balance as a figure that fits
+//   VS-11 custody.queue-chips           — spec 105: chips filter; read honesty untouched
+//   VS-12 custody.vault-details         — spec 105: shared facts once, coverage named
 //   VS-A11Y                             — each of the three sheet views scans clean
 //
 // Checklist: VS-01..VS-10, VS-A11Y
@@ -277,7 +279,7 @@ describe('Protect — vault cards and the vault sheet (spec 102)', () => {
     cy.get(`${DIALOG} [data-testid="vault-network"]`).should('have.length', 3)
     cy.get(`${DIALOG} [data-testid="vault-network"][data-chain-id="137"]`).should('contain.text', 'Polygon').and('contain.text', '2 of 3')
     cy.get(`${DIALOG} [data-testid="vault-network"][data-chain-id="8453"]`).should('contain.text', 'Base').and('contain.text', '2 of 3')
-    cy.get(`${DIALOG} [data-testid="vault-network"][data-chain-id="10"]`).should('contain.text', 'could not be reached')
+    cy.get(`${DIALOG} [data-testid="vault-network"][data-chain-id="10"]`).should('contain.text', 'Could not be read')
 
     cy.get(`${DIALOG} [data-testid="vault-owner-row"]`).should('have.length', 3)
     cy.get(`${DIALOG} ${ownerRow(TEST_ACCOUNT)}`).should('have.attr', 'data-source', 'you').and('contain.text', 'You')
@@ -426,6 +428,44 @@ describe('Protect — vault cards and the vault sheet (spec 102)', () => {
   // Accessibility — the sheet is a modal dialog the app portals over the page, so each scan is
   // scoped to its own root (spec 094), once per view.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // VS-11 (spec 105 US5) — queue chips filter without touching the read honesty
+  // ---------------------------------------------------------------------------
+  it('[VS-11] chips filter the queue per network and by "Needs you" — the per-chain disclosure stays', () => {
+    openProtect()
+    openSheet(VAULT)
+    queueSettled()
+
+    cy.get(`${DIALOG} [data-testid="vault-queue-row"]`).should('have.length', 3)
+    // One chip per network with items, plus All and Needs you.
+    cy.get(`${DIALOG} [data-testid="vault-queue-chip-8453"]`).click()
+    cy.get(`${DIALOG} [data-testid="vault-queue-row"]`).should('have.length', 1)
+    cy.get(`${DIALOG} ${rowOn(8453)}`).should('have.length', 1)
+    // Filtering must never hide what could and could not be read (constitution III).
+    cy.get(`${DIALOG} [data-testid="vault-queue-chain"]`).should('have.length', 3)
+    cy.get(`${DIALOG} [data-testid="vault-queue-chip-needs-you"]`).click()
+    // Every visible row now needs THIS member's signature.
+    cy.get(`${DIALOG} [data-testid="vault-queue-row"] [data-testid="vault-queue-signed"]`).each(($line) => {
+      expect($line.text()).to.match(/needs you/i)
+    })
+    cy.get(`${DIALOG} .vault-queue__chip`).contains('All').click()
+    cy.get(`${DIALOG} [data-testid="vault-queue-row"]`).should('have.length', 3)
+    // The honest footer states the abstraction.
+    cy.get(`${DIALOG} .vault-queue__footer`).should('contain.text', 'stay on their own chain')
+  })
+
+  // ---------------------------------------------------------------------------
+  // VS-12 (spec 105 US2) — shared facts stated once, coverage named
+  // ---------------------------------------------------------------------------
+  it('[VS-12] Details states the shared arrangement once and NAMES the network it could not cover', () => {
+    openProtect()
+    openSheet(VAULT, 'details')
+    cy.get(`${DIALOG} [data-testid="vault-fact-approvals"]`).should('contain.text', '2 of 3 owners')
+    // Optimism is seeded and never answers, so the shared facts claim only what was read.
+    cy.get(`${DIALOG} [data-testid="vault-facts-coverage"]`).should('contain.text', 'Optimism')
+    cy.get(`${DIALOG} [data-testid="vault-same-address"]`).should('exist')
+  })
+
   it('[VS-A11Y] each of the three sheet views has no serious or critical violations', () => {
     openProtect()
     openSheet(VAULT)

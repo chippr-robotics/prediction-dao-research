@@ -250,3 +250,118 @@ describe('VaultQueueView', () => {
     expect(line).toHaveAttribute('title', queueCtx.rows[0].to)
   })
 })
+
+/**
+ * A member who IS an owner but whose session cannot sign on the connected network.
+ *
+ * Ethereum Classic and Mordor have no bundler, so a keyless passkey session cannot submit there —
+ * but the buttons still rendered, and the refusal arrived from inside the batch sender after the
+ * tap. The rail is knowable beforehand (lib/custody/writeRail.js), so it is said beforehand.
+ */
+describe('VaultQueueView — a network this session cannot sign on', () => {
+  const RAIL_REASON =
+    'Passkey transactions are not available on Ethereum Classic. Connect a wallet that can sign there ' +
+    '— a browser wallet, a hardware wallet, or a recovered account — to act on this network.'
+
+  it('states WHY instead of offering an action that would throw', () => {
+    proposalsCtx = () => ({
+      approve,
+      execute,
+      cancel,
+      queue: [],
+      history: [],
+      writeRail: { rail: 'passkey', available: false, reason: RAIL_REASON },
+    })
+    render(<VaultQueueView group={group(137)} />)
+
+    const notice = screen.getAllByTestId('vault-queue-norail')[0]
+    expect(notice).toHaveTextContent(/not available on Ethereum Classic/i)
+    // The way out, not just the obstacle.
+    expect(notice).toHaveTextContent(/hardware wallet/i)
+    expect(screen.queryByRole('button', { name: /^approve$/i })).not.toBeInTheDocument()
+    // …and it is NOT relabelled "view-only": the member IS an owner, which is a different fact.
+    expect(screen.queryByTestId('vault-queue-viewonly')).not.toBeInTheDocument()
+  })
+
+  it('offers the actions when a SIGNER can sign there, whatever the login was', () => {
+    // The regression that motivated the change: a hardware wallet signs and pays gas on ETC
+    // natively, so nothing about a passkey login should withhold these controls.
+    proposalsCtx = () => ({
+      approve,
+      execute,
+      cancel,
+      queue: [],
+      history: [],
+      writeRail: { rail: 'signer', available: true, reason: null },
+    })
+    render(<VaultQueueView group={group(137)} />)
+
+    expect(screen.getAllByRole('button', { name: /^approve$/i }).length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('vault-queue-norail')).not.toBeInTheDocument()
+  })
+
+  it('keeps behaving as before when a surface supplies no rail at all', () => {
+    // Back-compat: the hook is mocked in several suites that predate `writeRail`.
+    proposalsCtx = () => ({ approve, execute, cancel, queue: [], history: [] })
+    render(<VaultQueueView group={group(137)} />)
+    expect(screen.getAllByRole('button', { name: /^approve$/i }).length).toBeGreaterThan(0)
+  })
+
+  // ---------------------------------------------------------------------------
+  // Spec 105 (US5) — chips, needs-you, decoded rows
+  // ---------------------------------------------------------------------------
+  it('chips filter the rows without touching the per-chain read disclosure (FR-021)', () => {
+    render(<VaultQueueView group={group(137)} />)
+    expect(screen.getAllByTestId('vault-queue-row')).toHaveLength(2)
+    fireEvent.click(screen.getByTestId('vault-queue-chip-8453'))
+    const rows = screen.getAllByTestId('vault-queue-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveAttribute('data-chain-id', '8453')
+    // The four-state per-chain disclosure is untouched by the chip.
+    expect(screen.getAllByTestId('vault-queue-chain')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    expect(screen.getAllByTestId('vault-queue-row')).toHaveLength(2)
+  })
+
+  it('"Needs you" counts pending items awaiting THIS member and filters to them (FR-023)', () => {
+    // H1: not yet approved by ME (needs me). H2: already approved by ME (waits on the other owner).
+    queueCtx.byChain[8453].proposals = [proposal(8453, H2, { approvers: [ME] })]
+    queueCtx.rows = [proposal(137, H1), proposal(8453, H2, { approvers: [ME] })]
+    render(<VaultQueueView group={group(137)} />)
+    const chip = screen.getByTestId('vault-queue-chip-needs-you')
+    expect(chip).toHaveTextContent('Needs you (1)')
+    fireEvent.click(chip)
+    const rows = screen.getAllByTestId('vault-queue-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveAttribute('data-chain-id', '137')
+    expect(within(rows[0]).getByTestId('vault-queue-signed')).toHaveTextContent('1 of 2 signed · needs you')
+  })
+
+  it('an approved item says whom it waits on, not "needs you"', () => {
+    queueCtx.rows = [proposal(137, H1, { approvers: [ME] })]
+    queueCtx.byChain[137].proposals = queueCtx.rows
+    render(<VaultQueueView group={group(137)} />)
+    expect(screen.getByTestId('vault-queue-signed')).toHaveTextContent(/waiting on other owners/i)
+  })
+
+  it('a recognised native send is described in plain language; unknown calldata keeps the raw row (FR-022)', () => {
+    queueCtx.rows = [
+      proposal(137, H1, { value: '1500000000000000000', data: '0x' }),
+      proposal(8453, H2, { data: '0xdeadbeef' }),
+    ]
+    queueCtx.byChain[137].proposals = [queueCtx.rows[0]]
+    queueCtx.byChain[8453].proposals = [queueCtx.rows[1]]
+    render(<VaultQueueView group={group(137)} />)
+    const titles = screen.getAllByTestId('vault-queue-title')
+    expect(titles).toHaveLength(1)
+    expect(titles[0]).toHaveTextContent(/Send 1\.5 POL on Polygon/)
+    // The undecoded row still renders honestly (hash + recipient), with no guessed title.
+    expect(screen.getAllByTestId('vault-queue-row')).toHaveLength(2)
+  })
+
+  it('states the honest footer: queued items stay on their own chain', () => {
+    render(<VaultQueueView group={group(137)} />)
+    expect(screen.getByText(/queued items stay on their own chain/i)).toBeInTheDocument()
+  })
+})
+
