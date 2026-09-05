@@ -234,7 +234,7 @@ describe('result wording', () => {
   })
 })
 
-describe('what the package must never import', () => {
+describe('imports the package must never make', () => {
   it('reaches nothing outside itself — plain-Node resolvable, no frontend, no services', () => {
     const pkgDir = path.join(here, '..', '..', '..', 'packages', 'assistant-contract', 'src')
     for (const f of ['index.js', 'prompt.js', 'tools.js', 'results.js']) {
