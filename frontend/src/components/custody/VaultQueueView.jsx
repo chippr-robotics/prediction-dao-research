@@ -74,6 +74,16 @@ export default function VaultQueueView({ group }) {
     proposalsRef.current = proposals
   })
 
+  /*
+   * Can this session sign a custody write on the chain it is CONNECTED to? The queue's actions all
+   * run through `useVaultProposals`, which is bound to the connected instance, so this is the fact
+   * that decides whether a row's buttons can do anything — and it is a property of the signer, not
+   * of how the member logged in (lib/custody/writeRail.js).
+   */
+  const writeRail = proposals?.writeRail
+  const canAct = writeRail ? writeRail.available : true
+  const railReason = writeRail?.reason || ''
+
   const [busy, setBusy] = useState(false)
   const [rowErrors, setRowErrors] = useState({})
   const [pendingAction, setPendingAction] = useState(null) // { chainId, kind, proposal }
@@ -226,7 +236,18 @@ export default function VaultQueueView({ group }) {
                   <RowRecipient address={p.to} chainId={Number(p.chainId)} />
                   <span>nonce {String(p.nonce)}</span>
                 </div>
-                {owner ? (
+                {owner && !canAct ? (
+                  /*
+                   * An owner whose session cannot sign on THIS network. Before this, the buttons
+                   * rendered and the failure arrived from inside the batch sender — a member on
+                   * Ethereum Classic tapped Approve and got a chain-support error they had asked
+                   * no question to receive. The rail is knowable before the tap, so it is said
+                   * before the tap, and it names the way out rather than only the obstacle.
+                   */
+                  <p className="vault-queue__viewonly" data-testid="vault-queue-norail">
+                    {railReason}
+                  </p>
+                ) : owner ? (
                   <div className="custody-actions">
                     {p.status === STATUS.PENDING && (
                       <button type="button" onClick={() => handleAction(p, 'approve')} disabled={busy || hasApproved || Boolean(waiting)}>

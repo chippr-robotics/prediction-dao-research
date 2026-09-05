@@ -36,6 +36,25 @@ beforeEach(() => {
   cy.viewport(width, height)
 
   /*
+   * NO SUITE DEPENDS ON A LIVE MAINNET RPC (#1431).
+   *
+   * `useEnsReverseLookup` fires a real `useEnsName({ chainId: mainnet.id })` for ANY address the
+   * app displays or a member pastes, routed by wagmi.js at a third-party public endpoint. Nothing
+   * in this suite runs against Ethereum mainnet, so every one of those calls is a request the
+   * tests neither need nor control — and one of them was load-bearing: the "Valid address" tick
+   * used to wait on it, which made CLM-01 fail whenever the runner's path to that host was slow.
+   *
+   * Answering "no ENS name" is the truthful answer for this environment (these addresses have
+   * none), and it makes the answer a constant instead of a property of the runner's internet.
+   * Scoped to the ENS resolver chain only — the app's own chains are untouched, and a spec that
+   * wants a name stubs its own.
+   */
+  cy.intercept({ method: 'POST', hostname: /ethereum-rpc\.publicnode\.com$|eth\.drpc\.org$|cloudflare-eth\.com$/ }, {
+    statusCode: 200,
+    body: { jsonrpc: '2.0', id: 1, result: '0x' },
+  })
+
+  /*
    * Dismiss the DEV-ONLY development warning banner before every test.
    *
    * It is `position: fixed` at the top of the page and reserves space through a HARDCODED

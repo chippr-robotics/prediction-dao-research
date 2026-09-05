@@ -3,7 +3,7 @@
 // only supplies (verified) preimages. Guards: execute only when ready and nonce-current; approvals counted
 // once per owner on-chain (idempotent); non-owners get read-only.
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Contract, Interface, getAddress } from 'ethers'
 import { useWallet } from '.'
 import { SAFE_ABI } from '../abis/Safe'
@@ -23,12 +23,26 @@ import {
 } from '../lib/custody/proposalHub'
 import { readExecutionOutcomes } from '../lib/custody/vaultProposalReads'
 import { deriveProposalStatus, isQueued, STATUS } from '../lib/custody/proposalStatus'
+import { resolveWriteRail, requireWriteRail, RAILS } from '../lib/custody/writeRail'
+import { chainDisplayName } from '../lib/custody/chainName'
 
 const safeIface = new Interface(SAFE_ABI)
 
 export function useVaultProposals(vault) {
   const { chainId, signer, provider, sendCalls, loginMethod } = useWallet()
-  const isPasskey = loginMethod === 'passkey'
+  /*
+   * The rail is a property of the SIGNER, not the login (lib/custody/writeRail.js).
+   *
+   * This used to be `loginMethod === 'passkey'`, which meant a member holding a key that signs
+   * perfectly well on Ethereum Classic was routed down a rail that has no bundler there — and got
+   * a chain-support error from inside the batch sender rather than an answer they could act on.
+   */
+  const railArgs = useMemo(
+    () => ({ chainId, signer, loginMethod, chainName: chainId != null ? chainDisplayName(chainId) : null }),
+    [chainId, signer, loginMethod],
+  )
+  const writeRail = useMemo(() => resolveWriteRail(railArgs), [railArgs])
+  const isPasskey = writeRail.rail === RAILS.PASSKEY
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -136,7 +150,7 @@ export function useVaultProposals(vault) {
    *  attach flow: configureRules at N, setGuard at N+1 — the chain then enforces the order). */
   const propose = useCallback(
     async ({ to, value = 0n, data = '0x', operation = 0, nonce: nonceOverride }) => {
-      if (!isPasskey && !signer) throw new Error('Connect a wallet to propose')
+      requireWriteRail(railArgs)
       if (!hubAddress) throw new Error('Custody proposals are not configured on this network')
       // Nonce is a read: use the signer when present, else the session read provider (passkey).
       const safe = new Contract(vaultAddress, SAFE_ABI, signer || provider)
@@ -159,13 +173,13 @@ export function useVaultProposals(vault) {
       await refresh()
       return { safeTxHash, nonce: Number(nonce) }
     },
-    [isPasskey, signer, sendCalls, provider, vaultAddress, hubAddress, chainId, refresh],
+    [isPasskey, signer, railArgs, sendCalls, provider, vaultAddress, hubAddress, chainId, refresh],
   )
 
   /** Record the connected owner's approval for a proposal (idempotent on-chain). */
   const approve = useCallback(
     async (safeTxHash) => {
-      if (!isPasskey && !signer) throw new Error('Connect a wallet to approve')
+      requireWriteRail(railArgs)
       if (isPasskey) {
         await sendCalls([
           { target: vaultAddress, data: safeIface.encodeFunctionData('approveHash', [safeTxHash]), value: 0n },
@@ -177,13 +191,13 @@ export function useVaultProposals(vault) {
       }
       await refresh()
     },
-    [isPasskey, signer, sendCalls, vaultAddress, refresh],
+    [isPasskey, signer, railArgs, sendCalls, vaultAddress, refresh],
   )
 
   /** Execute a proposal that has reached threshold, using pre-validated (on-chain approval) signatures. */
   const execute = useCallback(
     async (proposal) => {
-      if (!isPasskey && !signer) throw new Error('Connect a wallet to execute')
+      requireWriteRail(railArgs)
       if (proposal.status !== STATUS.READY) throw new Error('Proposal is not ready to execute')
       const signatures = buildPrevalidatedSignatures(proposal.approvers)
       const args = encodeExecTransaction(proposal.safeTx, signatures)
@@ -200,12 +214,12 @@ export function useVaultProposals(vault) {
       await refresh()
       return { txHash: receipt.hash }
     },
-    [isPasskey, signer, sendCalls, vaultAddress, refresh],
+    [isPasskey, signer, railArgs, sendCalls, vaultAddress, refresh],
   )
 
   const cancel = useCallback(
     async (safeTxHash) => {
-      if (!isPasskey && !signer) throw new Error('Connect a wallet to cancel')
+      requireWriteRail(railArgs)
       if (!hubAddress) throw new Error('Custody proposals are not configured on this network')
       if (isPasskey) {
         await sendCalls([cancelProposalCall({ hubAddress, safe: vaultAddress, safeTxHash })])
@@ -214,13 +228,15 @@ export function useVaultProposals(vault) {
       }
       await refresh()
     },
-    [isPasskey, signer, sendCalls, hubAddress, vaultAddress, refresh],
+    [isPasskey, signer, railArgs, sendCalls, hubAddress, vaultAddress, refresh],
   )
 
   const queue = proposals.filter((p) => isQueued(p.status))
   const history = proposals.filter((p) => !isQueued(p.status))
 
-  return { proposals, queue, history, loading, error, partial, refresh, propose, approve, execute, cancel }
+  // `writeRail` is returned so a surface can say WHY an action is unavailable before the member
+  // taps it, rather than offering a button that throws.
+  return { proposals, queue, history, loading, error, partial, writeRail, refresh, propose, approve, execute, cancel }
 }
 
 export default useVaultProposals

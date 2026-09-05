@@ -838,6 +838,23 @@ artifacts live under `specs/<feature>/`.
   `specs/095-member-api-agentic-access/` + `specs/096-x402-agentic-payments/`.
 
 <!-- SPECKIT START -->
+- **A custody write's RAIL is a property of the SIGNER, not the login.**
+  `lib/custody/writeRail.js#resolveWriteRail` is the one answer to "can this session sign a vault
+  action on this chain?", and it checks for a signer FIRST. Branching on `loginMethod === 'passkey'`
+  — which `WalletContext` itself documents as "INFORMATIONAL ONLY … no feature may branch on it" —
+  refused members who could perfectly well act: **ETC 61 and Mordor 63 have no bundler**, so the
+  passkey UserOp rail cannot submit there, and every approve/execute/cancel died inside
+  `sendPasskeyBatch` with a chain-support error the member had asked no question to receive — while
+  an injected wallet, a Ledger, or an unlocked recovered account signs `approveHash` natively and
+  pays the fee in ETC. Rules: (1) a signer, if present, is used, on every EVM chain the vault lives
+  on; (2) the passkey rail is the fallback and is offered ONLY where `isPasskeySupported(chainId)`;
+  (3) an unavailable rail is stated BEFORE the tap — `useVaultProposals` returns `writeRail` and the
+  Queue renders the reason in place of buttons that would throw — and that state is **not**
+  "view-only", which means *not an owner* and is a different fact; (4) the reason NAMES the way out
+  ("connect a wallet that can sign there"), never just the obstacle. `requireWriteRail` is the
+  throwing form inside the action callbacks, so any caller that gets past the UI fails with the same
+  sentence. See `docs/developer-guide/protect-policies.md` § "The write rail is a property of the
+  signer".
 - **A passkey's account is LOOKED UP, never derived (spec 104).** `lib/passkey/accountLookup.js` is
   the one seam that answers "which account does this key control?", and its `Resolution` type has
   four shapes of which **only `resolved` carries an address** — three of its four constructors take
