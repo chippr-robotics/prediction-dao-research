@@ -19,6 +19,9 @@ COPY services/relay-gateway/package.json ./services/relay-gateway/
 # or not its target exists — so omitting it produced a DANGLING link, a build that succeeded,
 # and a container that died at boot on ERR_MODULE_NOT_FOUND. The install cannot tell you.
 COPY packages/intent-types/package.json ./packages/intent-types/
+# Same rule for @fairwins/assistant-contract (spec 104): the assistant's prompt + tool table.
+# Forgetting a new linked package here reproduces the exact dangling-symlink boot death above.
+COPY packages/assistant-contract/package.json ./packages/assistant-contract/
 RUN npm ci --omit=dev --no-audit --no-fund \
       --workspace fairwins-relay-gateway --include-workspace-root=false
 
@@ -34,6 +37,9 @@ COPY services/relay-gateway/src ./src
 # src/server.js at boot, so every gateway surface (035/036 intents, the 050 paymaster endpoint,
 # the 057 Polymarket proxy, 060 fee reads, 061 Bitcoin) fails together.
 COPY packages/intent-types ./packages/intent-types
+# spec 104: src/memberApi/routes.js imports @fairwins/assistant-contract at module load, reached
+# from src/server.js at boot — the runtime stage needs the real files behind that symlink too.
+COPY packages/assistant-contract ./packages/assistant-contract
 # Version-pinned target set (FR-025): the deployments records are baked into the image so the
 # startup consistency check validates against the exact addresses this build was shipped with.
 COPY deployments ./deployments
