@@ -23,7 +23,10 @@ function build({ identity = 'true', membershipTier = 3 } = {}) {
   const config = testConfig({
     ...MEMBER_API_ENV,
     MEMBER_API_ENABLED: 'true',
-    PERPS_ENABLED: 'true',
+    // Perps is deliberately left UNCONFIGURED. These tests are about the tier the middleware
+    // resolves, which it sets before the route runs — so the route's own 503 is not only harmless
+    // but preferable: enabling perps makes the handler fan out to three real venue APIs, which is
+    // slow, flaky and completely irrelevant to what is being asserted here.
     IDENTITY_ENABLED: identity,
   })
   const { app } = createApp(config, {
@@ -44,6 +47,8 @@ describe('identity wiring', () => {
   it('resolves a caller with no credential as anonymous, and still serves the read', async () => {
     const res = await get(build(), '/v1/perps/pairs')
     expect(res.headers[TIER_HEADER.toLowerCase()]).toBe(TIERS.ANONYMOUS)
+    // Not 403: the read is not gated. (It is 503 here because perps is unconfigured, which is the
+    // module answering honestly — a different thing entirely from being refused.)
     expect(res.status).not.toBe(403)
   })
 

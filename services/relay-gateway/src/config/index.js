@@ -434,6 +434,12 @@ export function loadConfig(env = process.env, opts = {}) {
     // never be indistinguishable from an enforcing one.
     identity: {
       enabled: opt(env, 'IDENTITY_ENABLED', 'false').toLowerCase() === 'true',
+      // SEPARATE from `enabled`, deliberately. `enabled` without `enforce` is OBSERVE mode: the
+      // tier resolves and is reported, and no status code changes — so the model can be validated
+      // against real traffic before anything depends on it. A safety layer that starts refusing the
+      // moment it deploys fails in the shape "the product is broken", which is the worst way for
+      // this particular change to be wrong.
+      enforce: opt(env, 'IDENTITY_ENFORCE', 'false').toLowerCase() === 'true',
       killswitch: opt(env, 'IDENTITY_KILLSWITCH', 'false').toLowerCase() === 'true',
       challenge: {
         // Unset => the challenge verifier ABSTAINS (returns `absent`), never rejects. An

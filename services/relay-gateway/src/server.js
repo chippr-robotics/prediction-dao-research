@@ -278,7 +278,12 @@ export function createApp(config, deps = {}) {
   // which is why the middleware is installed here and populated later rather than moved.
   const identityVerifiers = [createAttestationVerifier()]
   const identityEnabled = config.identity?.enabled === true && config.identity?.killswitch !== true
-  app.use(createIdentityMiddleware({ enabled: identityEnabled }, identityVerifiers))
+  app.use(
+    createIdentityMiddleware(
+      { enabled: identityEnabled, enforce: identityEnabled && config.identity?.enforce === true },
+      identityVerifiers
+    )
+  )
 
   // ---- GET /healthz + /status (origin-lock exempt) ----------------------------------------
   // Google's GFE intercepts the literal `/healthz` on *.run.app (it never reaches the container),

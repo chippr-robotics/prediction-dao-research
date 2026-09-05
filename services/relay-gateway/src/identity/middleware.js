@@ -1,11 +1,16 @@
 /**
  * Caller-identity middleware (spec 105, contracts/gateway-api.md Part 1).
  *
- * SLICE 1 RESOLVES AND DELIBERATELY DOES NOT ENFORCE. Every request gains `req.caller` and an
- * `X-FairWins-Tier` response header; no status code changes. That is the point: the tier model can
- * be validated against real traffic before anything depends on it, so if the model is wrong the
- * cost is a wrong header rather than refused members. Enforcement arrives in a later slice, behind
- * its own switch, once resolution is proven.
+ * TWO SWITCHES, NOT ONE, AND THE SECOND IS THE POINT.
+ *
+ *   enabled: false            inert. Every caller resolves anonymous; no verifier runs.
+ *   enabled, enforce: false   OBSERVE. Identity resolves and is reported; no status code changes.
+ *   enabled, enforce: true    refuse a route whose declared minimum is not met.
+ *
+ * Observe exists so the tier model can be validated against real traffic before anything depends on
+ * it. If the model is wrong, the cost is a wrong header rather than refused members — and a safety
+ * layer that starts refusing the moment it is deployed fails in the shape "the product is broken",
+ * which is the worst way for this particular change to be wrong.
  *
  * ── ORDERING, AND WHY EACH POSITION IS LOAD-BEARING ───────────────────────────────────────────
  *
@@ -29,16 +34,41 @@
  * names no application, because the web cannot prove one (FR-005). A caller sending it is ignored.
  */
 
-import { createResolver, subjectFor, ANONYMOUS_IDENTITY } from './resolve.js'
+import { createResolver, subjectFor, satisfies, ANONYMOUS_IDENTITY } from './resolve.js'
 import { lookupRoute } from './routeTable.js'
+import { TIERS } from './tiers.js'
+import { GatewayError } from '../errors.js'
 
 export const TIER_HEADER = 'X-FairWins-Tier'
 
 /**
- * @param {{enabled: boolean, killSwitch?: {isActive: () => boolean}}} options
+ * The refusal for a route whose minimum was not met.
+ *
+ * Each code names WHAT IS MISSING, not merely that something is (FR-008). "Forbidden" tells a
+ * caller nothing they can act on; "this action needs a member session, authorise one in Settings"
+ * tells them exactly what to do next.
+ */
+const REFUSALS = Object.freeze({
+  [TIERS.HUMAN]: {
+    code: 'challenge_required',
+    reason: 'this request needs a completed verification challenge; reload the page and try again',
+  },
+  [TIERS.ADDRESS]: {
+    code: 'account_proof_required',
+    reason:
+      'this action signs or broadcasts on your behalf and needs a session proving control of your account; authorise one in Settings ▸ API access',
+  },
+  [TIERS.MEMBER]: {
+    code: 'member_grant_required',
+    reason: 'this action needs an active FairWins membership session; authorise one in Settings ▸ API access',
+  },
+})
+
+/**
+ * @param {{enabled: boolean, enforce?: boolean}} options
  * @param {Array<{kind: string, verify: Function}>} verifiers
  */
-export function createIdentityMiddleware({ enabled, killSwitch = null } = {}, verifiers = []) {
+export function createIdentityMiddleware({ enabled, enforce = false } = {}, verifiers = []) {
   const resolve = createResolver(verifiers)
 
   return async function identityMiddleware(req, res, next) {
@@ -46,7 +76,7 @@ export function createIdentityMiddleware({ enabled, killSwitch = null } = {}, ve
     // downstream code never has to branch on "is identity configured" — it reads one shape always.
     // FR-015: the disabled state is disclosed loudly at boot and in the gated /status, never
     // inferred from behaviour that happens to look the same.
-    if (!enabled || (killSwitch && killSwitch.isActive())) {
+    if (!enabled) {
       req.caller = { ...ANONYMOUS_IDENTITY, evidence: [], enforcement: 'off' }
       req.callerSubject = subjectFor(req.caller, req)
       res.setHeader(TIER_HEADER, req.caller.tier)
@@ -55,21 +85,78 @@ export function createIdentityMiddleware({ enabled, killSwitch = null } = {}, ve
 
     try {
       const identity = await resolve(req)
-      req.caller = { ...identity, enforcement: 'observe' }
+      req.caller = { ...identity, enforcement: enforce ? 'enforce' : 'observe' }
       req.callerSubject = subjectFor(identity, req)
-      // Attach the route declaration so quota attribution and (later) enforcement read the SAME
-      // lookup this middleware did. Two lookups is two chances to disagree.
-      req.callerRoute = lookupRoute(req.method, req.path)
+      // Attach the route declaration so quota attribution and enforcement read the SAME lookup
+      // this middleware did. Two lookups is two chances to disagree.
+      const route = lookupRoute(req.method, req.path)
+      req.callerRoute = route
       res.setHeader(TIER_HEADER, identity.tier)
-      return next()
+
+      if (!enforce) return next()
+
+      // `/v1/member/*` runs its own verifier and answers its own error codes, including the
+      // three-verdict split. A second minimum in front of it would produce two refusals for one
+      // condition, and the outer one would be the less informative.
+      if (!route || route.delegated) {
+        // An UNLISTED path is deliberately NOT refused here, and this is a design decision rather
+        // than an oversight. This middleware runs before route dispatch, so it cannot know whether
+        // a path is mounted; refusing everything unlisted would turn every 404 into a 403 and hand
+        // an unauthenticated prober a map of which paths exist. The guarantee that no MOUNTED route
+        // is missing from the table comes from CI — routeTable.test.js enumerates the real app and
+        // fails on any gap — not from a runtime refusal that cannot tell the two cases apart.
+        return next()
+      }
+
+      if (satisfies(identity, route.minimumTier)) return next()
+
+      // UNVERIFIABLE IS NOT A DENIAL. If a dependency was unreachable we do not know whether this
+      // caller qualifies, and answering 403 would tell a member their credential is bad because our
+      // RPC was slow. 503 says "ask again", which is the truth (FR-009).
+      if (identity.verificationState === 'unverifiable') {
+        throw new GatewayError(
+          503,
+          'auth_unverifiable',
+          'your credential could not be checked right now; this is not a decision that it is invalid — try again shortly'
+        )
+      }
+
+      const refusal = REFUSALS[route.minimumTier] || REFUSALS[TIERS.ADDRESS]
+      const err = new GatewayError(403, refusal.code, refusal.reason)
+      // Additive, and safe for an older client to ignore.
+      err.required = { tier: route.minimumTier }
+      throw err
     } catch (err) {
-      // Resolution itself failing is a bug in this layer, and a bug here must not take down the
-      // gateway. Degrade to anonymous and continue: in slice 1 nothing depends on the answer, and
-      // when enforcement lands, an anonymous verdict refuses gated routes and still serves reads —
-      // which is the correct direction for a fault in the identity layer itself.
+      if (err instanceof GatewayError) {
+        const body = err.toBody()
+        if (err.required) body.error.required = err.required
+        return res.status(err.status).json(body)
+      }
+
+      // Resolution ITSELF failing is a bug in this layer (a verifier fault is contained by the
+      // resolver and never reaches here). A bug must not take down the gateway — but it must also
+      // not silently open a gated route.
       req.caller = { ...ANONYMOUS_IDENTITY, evidence: [], enforcement: 'degraded' }
       req.callerSubject = subjectFor(req.caller, req)
       res.setHeader(TIER_HEADER, req.caller.tier)
+
+      // Reads carry an anonymous minimum, so they keep serving — which is the whole reason the
+      // ladder puts them there. A gated route, though, must NOT fall open just because the code
+      // that decides who may use it crashed: signing with the platform's credentials is exactly
+      // what an attacker would want a bug here to unlock. It answers 503, not 403, because we
+      // genuinely do not know who is calling — the same reason `unverifiable` is retryable.
+      if (enforce) {
+        const route = lookupRoute(req.method, req.path)
+        if (route && !route.delegated && route.minimumTier !== TIERS.ANONYMOUS) {
+          return res.status(503).json({
+            error: {
+              code: 'auth_unverifiable',
+              reason:
+                'caller identity could not be determined right now; this is not a decision about your credential — try again shortly',
+            },
+          })
+        }
+      }
       return next()
     }
   }
