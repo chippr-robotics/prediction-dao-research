@@ -42,8 +42,11 @@ and two of its rules change what you do on step 2:
   is a second copy of state GitHub already holds, and it reads as "in progress"
   forever once an agent stops mid-task. Claim by **assigning yourself**, release it
   by unassigning if you walk away, and close by putting **`Closes #N`** in the PR
-  body — then verify the issue actually closed. Moving the board card is a human
-  task; do not claim you moved it.
+  body. GitHub itself honours closing keywords only on the DEFAULT branch (`main`)
+  and every feature PR here targets `staging`, so `close-linked-issues.yml` does it
+  on the staging merge instead — **read the issue back afterwards** to confirm it
+  actually closed. The project board moves itself — GitHub's built-in *item closed* /
+  *PR merged* workflows set Done — so never claim you moved a card.
 
 Branch from `staging`, never from `main`. Delegated work gets a **sub-issue**, and a
 subagent's report is a claim — read the diff and run the gates before accepting it.
@@ -66,6 +69,7 @@ subagent's report is a claim — read the diff and run the gates before acceptin
 - `npm run frontend` — run the frontend dev server
 - `npm run sync:frontend-contracts` — regenerate frontend contract artifacts
 - `npm run check:specs` — spec-number registry gate (run before opening a reservation PR)
+- `npm run check:ci-gating` — guards the E2E shard bypass (see the multi-agent guardrail)
 - Only run the **full** frontend suite (`vitest run` with no filter) in CI — locally it
   OOMs this environment. Scope local runs to specific files/dirs
   (`npx vitest run src/test/foo.test.js`).
@@ -99,8 +103,30 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   A mirror is a second copy of state the repo already holds and it drifts the instant
   an agent stops mid-task, leaving the board confidently wrong. State is read from
   the **assignee** (the claim — release it if you abandon the work), the **linked
-  PRs**, and **open/closed**; closure comes from `Closes #N` in the PR body, verified
-  after the merge. `blocked` is the one label, because an open assigned issue that is
+  PRs**, and **open/closed**. Note the MCP server exposes no Projects v2 tool, but the
+  GraphQL API does (`updateProjectV2ItemFieldValue`, `project` scope, **classic PAT or
+  GitHub App token — never `GITHUB_TOKEN`**); we deliberately drive nothing with it,
+  because GitHub's own built-in project workflows already set Todo/Done for free and
+  store nothing in this repo. Only "In Progress" has no built-in, and it is left
+  manual rather than bought with a PAT. **GitHub closes nothing on a feature merge
+  here**: it
+  honours closing keywords only on the default branch (`main`), and PR #1461 merged
+  with `Closes #1460` while the issue stayed open with `closed_by_pull_requests: 0`.
+  `.github/workflows/close-linked-issues.yml` does it on the `staging` merge instead
+  (parser: `scripts/ci/parse-closing-keywords.js`, mirrors GitHub's own rules, tested
+  against fixtures it must refuse). Keep writing `Closes #N`, use `Part of #N` for
+  work a PR only advances, and READ THE ISSUE BACK after the merge — an automation
+  nobody verifies is a second thing that can be quietly wrong.
+  (3) **The Cypress tiers SKIP for a change that cannot reach the running app** —
+  ci-manager's `app` path filter, consumed by `test.yml` as `run_e2e`. A docs-only PR
+  was spending 12 fast legs + 4 on-chain shards + the passkey full stack to prove
+  markdown changes no pixels. **`app` is a NEGATIVE list** (`'**'` minus known-inert
+  paths) and that shape IS the safety: an unrecognised path matches `**` and RUNS the
+  suite. Inverting it to a positive allowlist is a one-line, tidier-looking edit that
+  makes every unlisted path skip — and a skipped job SATISFIES a required check, so
+  it would merge green having tested nothing. `npm run check:ci-gating` (C-01…C-05,
+  own must-fail fixtures) is what stops that; a skipped tier is also NAMED in the run
+  summary, because "passed" and "never ran" must not look alike. `blocked` is the one label, because an open assigned issue that is
   stuck has no other representation — and it is meaningless without a comment naming
   the blocker. Board columns are moved by a human. Sizing and priority are set at
   triage on the **Effort** and **Priority** issue fields (the `size:*` label is the
