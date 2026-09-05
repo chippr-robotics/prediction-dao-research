@@ -111,6 +111,36 @@ jobs:
       - name: Tenant manifest gate tests
         run: npm run test:tenants
 
+  # Gate (issue #1460): the spec namespace is shared, and four numbers on `main` are claimed twice
+  # (017, 041, 050, 102) because nothing checked. `create-new-feature.sh` computes max+1, which is
+  # correct exactly once per merge — two agents who ask before either has merged both get the same
+  # answer and both are right. The convention cannot fix that; merging the reservation PR is what
+  # claims a number, and this job is what makes the claim binding.
+  #
+  # Dependency-free (directory names plus one file per spec), so no npm ci — same reasoning as the
+  # jobs above. Must fail loudly; do NOT add continue-on-error (Constitution IV).
+  spec-registry:
+    name: Spec Registry
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # Each rule is driven against a tree that must be REJECTED. Without these the gate could
+      # enforce nothing and still print "clean" on every green run, which is exactly how the
+      # namespace drifted unobserved for four collisions.
+      - name: Test the spec registry gate's own rules
+        run: npm run test:specs
+
+      - name: Check the spec registry
+        run: npm run check:specs
+
   # Gate (spec 089, FR-019…FR-023): a revenue or cost source that reaches production without a
   # dashboard entry is money moving that nobody is watching. The brief stated updating the dashboard
   # as a MUST; every comparable invariant in this repo that survived was made a gate, because a prose

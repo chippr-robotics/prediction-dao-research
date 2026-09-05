@@ -21,6 +21,33 @@ The binding standards live in `.specify/memory/constitution.md`. Every plan must
 pass a constitution check; read it before planning or implementing. Per-feature
 artifacts live under `specs/<feature>/`.
 
+**Several agents work this repo at once. Before you start any of the above, read
+`docs/developer-guide/multi-agent-workflow.md`** — it is the coordination protocol,
+and two of its rules change what you do on step 2:
+
+- **A spec number is claimed by MERGING a reservation PR to `staging`**, never by
+  computing it. `create-new-feature.sh` answers `max(existing) + 1`, which is right
+  exactly once per merge — two agents who ask before either has merged both get the
+  same number and both checked. That is how `017`, `041`, `050`, `102` and `104`
+  each came to name two unrelated features — `104` twice over on 2026-09-04/05,
+  *while this gate was in review*. Open a PR into `staging` containing ONLY the
+  reservation — `specs/<NNN>-<slug>/spec.md` plus its `matrix.json` row and the
+  regenerated `e2e-coverage-matrix.md` (`npm run e2e:matrix`; `check:e2e-matrix`
+  fails a spec dir with no row) — label it `spec-reservation`, merge it, then plan.
+  `npm run check:specs` (CI job *Spec Registry*) fails the second claimant.
+- **An issue's state is its ASSIGNEE, its linked PRs and whether it is closed** —
+  never a status label. There is no Projects v2 write tool (`issue_write` reaches
+  Type, Priority, Effort and the dates; Status lives on the project item), and this
+  repo deliberately does NOT paper over that with a mirrored `status:*` label: that
+  is a second copy of state GitHub already holds, and it reads as "in progress"
+  forever once an agent stops mid-task. Claim by **assigning yourself**, release it
+  by unassigning if you walk away, and close by putting **`Closes #N`** in the PR
+  body — then verify the issue actually closed. Moving the board card is a human
+  task; do not claim you moved it.
+
+Branch from `staging`, never from `main`. Delegated work gets a **sub-issue**, and a
+subagent's report is a claim — read the diff and run the gates before accepting it.
+
 ## Repository map
 
 - `contracts/` — active Solidity (wagers, oracles, access, privacy). `mocks/` is
@@ -38,6 +65,7 @@ artifacts live under `specs/<feature>/`.
 - `npm run test:frontend` — frontend tests
 - `npm run frontend` — run the frontend dev server
 - `npm run sync:frontend-contracts` — regenerate frontend contract artifacts
+- `npm run check:specs` — spec-number registry gate (run before opening a reservation PR)
 - Only run the **full** frontend suite (`vitest run` with no filter) in CI — locally it
   OOMs this environment. Scope local runs to specific files/dirs
   (`npx vitest run src/test/foo.test.js`).
@@ -48,6 +76,35 @@ artifacts live under `specs/<feature>/`.
   Slither/Medusa, and get a security review (`.github/agents/`).
 - Never commit secrets or private keys; admin keys use the floppy keystore flow.
 - CI fails loudly — don't add `continue-on-error` to lint/test/build/security.
+- **Multi-agent coordination (issue #1460) has one document and two gates.**
+  `docs/developer-guide/multi-agent-workflow.md` is the protocol; everything below is
+  the part that is enforced rather than agreed. (1) **`specs/` is a shared namespace
+  and a number is claimed by a MERGE, not a calculation** — `check:specs`
+  (`scripts/specs/check-spec-registry.js`, CI job *Spec Registry*) fails a second
+  claimant, enforces `NNN-kebab-case`, and requires a reserved number to carry a
+  `spec.md` (a reservation with no spec is indistinguishable from an abandoned one).
+  The five pre-gate collisions are frozen in `LEGACY_COLLISIONS` under rule S-04,
+  which fails if an entry outlives the collision it excuses, so the list shrinks when
+  a pair is renumbered. **Adding to it is not a way to get green**: once the gate is
+  on `staging`, S-01 fails before a second claimant can merge, so a new entry could
+  only describe a collision the gate was never able to see. `create-new-feature.sh` now numbers against `origin/staging` and
+  `origin/main`, not just the local checkout, because each agent's container was
+  cloned at a different moment. (2) **`specs/**` is its own change-detection filter**
+  in `ci-manager.yml`: it had none, so a PR that only reserved a number ran ZERO
+  jobs — and with required checks in force `skipped` satisfies them, so the one PR
+  type whose entire purpose is claiming a number was the one type the gate could
+  never see. **There is NO status mirror, on purpose.** An agent cannot
+  write the project's Status field, and the fix is not a `status:*` label copied onto
+  the board by a workflow — that was built for this feature and deliberately removed.
+  A mirror is a second copy of state the repo already holds and it drifts the instant
+  an agent stops mid-task, leaving the board confidently wrong. State is read from
+  the **assignee** (the claim — release it if you abandon the work), the **linked
+  PRs**, and **open/closed**; closure comes from `Closes #N` in the PR body, verified
+  after the merge. `blocked` is the one label, because an open assigned issue that is
+  stuck has no other representation — and it is meaningless without a comment naming
+  the blocker. Board columns are moved by a human. Sizing and priority are set at
+  triage on the **Effort** and **Priority** issue fields (the `size:*` label is the
+  t-shirt shorthand; the field is what the board reads).
 - **Upgradeable contracts (UUPS, specs 025 + 027):** both `WagerRegistry` (spec 025)
   and `MembershipManager` (spec 027) are **UUPS proxies at stable addresses** — logic
   is swappable, state is preserved. New upgradeable

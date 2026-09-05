@@ -57,6 +57,7 @@ jobs:
       tenants: ${{ steps.filter.outputs.tenants }}
       tooling: ${{ steps.filter.outputs.tooling }}
       subgraph: ${{ steps.filter.outputs.subgraph }}
+      specs: ${{ steps.filter.outputs.specs }}
       ops: ${{ steps.filter.outputs.ops }}
       any_code_changed: ${{ steps.check.outputs.any_code_changed }}
     
@@ -118,6 +119,14 @@ jobs:
               - 'test/**'
             subgraph:
               - 'subgraph/**'
+            # Issue #1460: `specs/**` matched NO filter, so a PR that only reserved a spec number
+            # ran zero jobs — and with required checks in force `skipped` SATISFIES them. The one
+            # PR type whose entire purpose is to claim a number was the one type the number gate
+            # could never see.
+            specs:
+              - 'specs/**'
+              - '.specify/**'
+              - '.claude/skills/**'
             ops:
               - 'deployments/**'
               - 'infra/**'
@@ -228,7 +237,8 @@ jobs:
       needs.detect-changes.outputs.tenants == 'true' ||
       needs.detect-changes.outputs.tooling == 'true' ||
       needs.detect-changes.outputs.subgraph == 'true' ||
-      needs.detect-changes.outputs.ops == 'true'
+      needs.detect-changes.outputs.ops == 'true' ||
+      needs.detect-changes.outputs.specs == 'true'
     uses: ./.github/workflows/test.yml
 
   frontend-tests:
