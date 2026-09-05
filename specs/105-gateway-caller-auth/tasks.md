@@ -109,9 +109,9 @@ silently require a purchase.
       caller-asserted address. ~28 sites; **a missed one is a hole in the feature**.
 - [x] **T028** [P] `test/identity/quotaKeying.test.js` — 40 requests each naming a **different** address
       must hit one ceiling (SC-004).
-- [ ] **T029** Per-upstream ceilings checked **before** the upstream call (FR-013). A cap enforced on the
+- [x] **T029** Per-upstream ceilings checked **before** the upstream call (FR-013). A cap enforced on the
       response bounds nothing.
-- [ ] **T030** [P] `test/identity/upstreamCeiling.test.js` — assert the upstream client is **not
+- [x] **T030** [P] `test/identity/upstreamCeiling.test.js` — assert the upstream client is **not
       invoked** past the ceiling, not merely that the response is 429.
 
 ---

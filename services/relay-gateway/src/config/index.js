@@ -441,6 +441,17 @@ export function loadConfig(env = process.env, opts = {}) {
       // this particular change to be wrong.
       enforce: opt(env, 'IDENTITY_ENFORCE', 'false').toLowerCase() === 'true',
       killswitch: opt(env, 'IDENTITY_KILLSWITCH', 'false').toLowerCase() === 'true',
+      // Per-upstream ceilings (FR-013), checked BEFORE the outbound call. UNSET = UNLIMITED, and
+      // that absence is honest rather than a hidden default: inventing a cap an operator did not
+      // choose would refuse traffic in the name of a budget nobody set.
+      upstreamCeilings: {
+        opensea: int(env, 'UPSTREAM_CEILING_OPENSEA', 0),
+        polymarket: int(env, 'UPSTREAM_CEILING_POLYMARKET', 0),
+        bitcoin: int(env, 'UPSTREAM_CEILING_BITCOIN', 0),
+        perps: int(env, 'UPSTREAM_CEILING_PERPS', 0),
+        bridge: int(env, 'UPSTREAM_CEILING_BRIDGE', 0),
+      },
+      upstreamCeilingWindowMs: int(env, 'UPSTREAM_CEILING_WINDOW_MS', 60_000),
       challenge: {
         // Unset => the challenge verifier ABSTAINS (returns `absent`), never rejects. An
         // unconfigured bot-check must not deny every anonymous caller.
