@@ -4,6 +4,17 @@ This directory contains in-depth research and analysis documents for proposed en
 
 ## Available Research
 
+### [GutterToken Assistant Integration](guttertoken-assistant-integration.md)
+
+**Status**: Evaluation - Input to a feature spec  
+**Date**: September 5, 2026
+
+Evaluates how FairWins members could run the spec-095 assistant on their own GutterToken prepaid
+credits, as an alternative to the members-only FairWins-funded rail. Measures what the GutterToken
+API actually offers (open CORS, bearer keys, no account or balance endpoint, no delegated auth),
+compares bring-your-own-key browser-direct, gateway passthrough, a FairWins-owned account, and a
+mini-app, and recommends the browser-direct pattern surfaced through the existing bottom sheets.
+
 ### [Dex v3 Integration Analysis](dex-v3-integration-analysis.md)
 
 **Status**: Final - Ready for Review  
