@@ -98,9 +98,9 @@ export default function TypeSheet({
         </p>
       )}
 
-      <label className="create-flow__label-field">
+      <label className="create-flow__label-field" htmlFor="create-vault-label">
         Label (private, on this device)
-        <input value={label} onChange={(e) => onLabel(e.target.value)} />
+        <input id="create-vault-label" value={label} onChange={(e) => onLabel(e.target.value)} />
       </label>
 
       <p className="create-flow__note">You can add owners and change this later.</p>
