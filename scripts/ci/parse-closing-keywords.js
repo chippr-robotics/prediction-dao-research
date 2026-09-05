@@ -12,12 +12,32 @@
  * with logic in it, so it is separated out and tested against fixtures rather than living as a
  * regex inside a workflow step where nothing can exercise it.
  *
- * IT DELIBERATELY MIRRORS GITHUB'S OWN RULES rather than improving on them:
- *   · the nine keywords GitHub accepts, case-insensitive;
- *   · `#123`, `owner/repo#123`, and full issue URLs;
- *   · code spans and fenced blocks are ignored, as GitHub ignores them;
- *   · no attempt to understand negation — GitHub closes on "this does not fix #123" too, and a
- *     parser that is cleverer than the platform is a parser whose behaviour nobody can predict.
+ * It follows GitHub's rules — the nine keywords case-insensitive, `#123` / `owner/repo#123` /
+ * full issue URLs, code spans and fenced blocks ignored — with ONE deliberate narrowing:
+ *
+ *   **A CLOSING KEYWORD ONLY COUNTS AT THE START OF A LINE.**
+ *
+ * GitHub matches a keyword anywhere in the body. That is safe for GitHub because its UI shows you
+ * the linked issues BEFORE you merge; nothing shows you what this workflow will do. Combined with
+ * a repository whose pull-request bodies discuss closing keywords in prose, anywhere-matching is
+ * a loaded gun.
+ *
+ * It went off on the very first run (PR #1462, 2026-09-05). That body explained, in prose, that
+ * the parser does not interpret negation — using the words `does not fix #123` — and the parser
+ * dutifully extracted 123. Nothing was harmed only because issue #123 happened to already be
+ * closed and the caller skips those. Had it been open, an unrelated issue would have been closed
+ * by a documentation change.
+ *
+ * The asymmetry decides it: an issue that fails to close is VISIBLE and one command from fixed,
+ * while an issue closed by mistake is silent and looks like a decision somebody made. So the
+ * narrowing costs a mid-sentence "this closes #12" — which nobody writes when they mean it,
+ * because every PR template puts `Closes #N` on its own line — and buys the removal of a whole
+ * class of accident.
+ *
+ * Negation is still NOT interpreted, on an anchored line: "Closes #12" and "Does not close #12"
+ * both close, exactly as GitHub does. A parser cleverer than the platform about ENGLISH is one
+ * whose behaviour nobody can predict; a parser stricter than the platform about WHERE it looks is
+ * merely a narrower, statable rule.
  *
  * Cross-repository references are dropped: this runs with a token scoped to one repository, and
  * closing an issue somewhere else on the strength of a PR body is not a power this should have.
@@ -56,23 +76,44 @@ function stripCode(markdown) {
 }
 
 /**
+ * True when a line OPENS with a closing keyword, allowing the markdown that normally precedes one:
+ * a list marker, and/or bold/italic emphasis. `- **Closes** #12` is somebody closing an issue;
+ * `because GitHub closes on "does not fix #123"` is somebody writing a sentence.
+ */
+const ANCHORED = new RegExp(
+  `^\\s{0,3}(?:[-*+]\\s+|\\d+[.)]\\s+)?[*_]{0,2}(?:${KEYWORDS.join('|')})\\b`,
+  'i',
+);
+
+/**
  * Issue numbers the body closes, for `repoFullName` only.
+ *
+ * Only lines that OPEN with a closing keyword are considered — see the header. Within such a line
+ * every keyword+reference pair is taken, so `Closes #1, closes #2` works; the anchor is about
+ * whether the line is a closing statement at all, not about how many it may name.
  *
  * @param {string} body PR body markdown
  * @param {string} repoFullName "owner/name"
  * @returns {number[]} ascending, deduplicated
  */
 function parseClosingKeywords(body, repoFullName) {
-  const text = stripCode(body);
   const [owner, repo] = String(repoFullName || '').split('/');
   if (!owner || !repo) return [];
+
+  const text = stripCode(body)
+    .split('\n')
+    .filter((line) => ANCHORED.test(line))
+    .join('\n');
 
   const found = new Set();
   const kw = KEYWORDS.join('|');
 
   // `Closes #123` / `Closes owner/repo#123`
+  // `[*_]{0,2}` after the keyword: `**Closes** #12` is a shape people write, and without it the
+  // line anchors but the reference never extracts — a silent no-op, which is the worst outcome for
+  // something whose whole job is to be predictable.
   const shortForm = new RegExp(
-    `\\b(?:${kw})\\b\\s*:?\\s+(?:([\\w.-]+)\\/([\\w.-]+))?#(\\d+)`,
+    `\\b(?:${kw})\\b[*_]{0,2}\\s*:?\\s+(?:([\\w.-]+)\\/([\\w.-]+))?#(\\d+)`,
     'gi',
   );
   for (const m of text.matchAll(shortForm)) {
@@ -86,7 +127,7 @@ function parseClosingKeywords(body, repoFullName) {
 
   // `Closes https://github.com/owner/repo/issues/123`
   const urlForm = new RegExp(
-    `\\b(?:${kw})\\b\\s*:?\\s+https?:\\/\\/github\\.com\\/([\\w.-]+)\\/([\\w.-]+)\\/issues\\/(\\d+)`,
+    `\\b(?:${kw})\\b[*_]{0,2}\\s*:?\\s+https?:\\/\\/github\\.com\\/([\\w.-]+)\\/([\\w.-]+)\\/issues\\/(\\d+)`,
     'gi',
   );
   for (const m of text.matchAll(urlForm)) {
@@ -121,7 +162,7 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { parseClosingKeywords, stripCode, KEYWORDS };
+module.exports = { parseClosingKeywords, stripCode, KEYWORDS, ANCHORED };
 
 if (require.main === module) {
   process.exit(main(process.argv.slice(2)));

@@ -24,6 +24,42 @@ test('every keyword GitHub accepts is accepted here', () => {
   }
 });
 
+test('THE REGRESSION: a keyword mid-sentence is prose, not an instruction', () => {
+  /*
+   * This exact string is from PR #1462's own body, explaining that the parser does not interpret
+   * negation. On the workflow's first live run it extracted 123, and nothing was closed only
+   * because issue #123 happened already to be closed. Had it been open, a documentation change
+   * would have closed an unrelated issue.
+   */
+  const body =
+    'the nine keywords, code spans and fences ignored, cross-repo dropped — and negation ' +
+    'deliberately *not* interpreted, because GitHub closes on "this does not fix #123" too, and ' +
+    'a parser cleverer than the platform is one whose behaviour nobody can predict.'
+  assert.deepStrictEqual(parse(body), [], 'a keyword mid-sentence must close nothing')
+
+  for (const prose of [
+    'This PR does not fix #123.',
+    'Related work that closes #99 is tracked elsewhere.',
+    'See the note about how GitHub resolves #7 on merge.',
+    'A body that says "fixes #5" in passing should not fix #5.',
+  ]) {
+    assert.deepStrictEqual(parse(prose), [], `${prose} must close nothing`)
+  }
+})
+
+test('a closing line still closes, in the shapes people actually write', () => {
+  assert.deepStrictEqual(parse('Closes #1460.'), [1460])
+  assert.deepStrictEqual(parse('Closes #1460.\n\nSome prose that does not fix #123.'), [1460])
+  assert.deepStrictEqual(parse('- Closes #12'), [12])
+  assert.deepStrictEqual(parse('* Fixes #12'), [12])
+  assert.deepStrictEqual(parse('1. Resolves #12'), [12])
+  assert.deepStrictEqual(parse('**Closes** #12'), [12])
+  assert.deepStrictEqual(parse('  Closes #12'), [12], 'light indentation is still a closing line')
+  // Several on one anchored line: the anchor decides whether the LINE is a closing statement,
+  // not how many issues it may name.
+  assert.deepStrictEqual(parse('Closes #1, closes #2'), [1, 2])
+})
+
 test('a reference without a keyword closes nothing', () => {
   // `Part of #N` is the documented way to say "this advances but does not finish".
   assert.deepStrictEqual(parse('Part of #1460. See also #99.'), []);
@@ -74,8 +110,10 @@ test('a repo name that is not owner/name yields nothing', () => {
   assert.deepStrictEqual(parseClosingKeywords('Closes #1', ''), []);
 });
 
-test('negation is NOT interpreted, matching GitHub', () => {
-  // GitHub closes on "this does not fix #123" too. A parser cleverer than the platform is one
-  // whose behaviour nobody can predict from the docs they already know.
-  assert.deepStrictEqual(parse('This does not fix #123'), [123]);
+test('negation is still NOT interpreted ON AN ANCHORED LINE, matching GitHub', () => {
+  // The narrowing is about WHERE the parser looks, not about understanding English. A line that
+  // opens with a closing keyword closes, whatever the sentence goes on to say — exactly as GitHub
+  // does. Being cleverer than the platform about meaning is what makes behaviour unpredictable.
+  assert.deepStrictEqual(parse('Closes #12, though arguably it does not'), [12]);
+  assert.deepStrictEqual(parse('Fixes #12 partially'), [12]);
 });

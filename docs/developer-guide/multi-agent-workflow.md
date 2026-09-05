@@ -275,13 +275,35 @@ names, with a comment saying which PR did it.
 - The board looks after itself here — GitHub's built-in *item closed* / *pull request merged*
   workflows move the card to **Done**. You did not do that; do not claim you did.
 
-The parser mirrors GitHub's own rules rather than improving on them — the nine keywords, `#123` /
-`owner/repo#123` / issue URLs, code spans and fenced blocks ignored, cross-repo references dropped.
-It deliberately does not interpret negation, because GitHub does not either, and a parser cleverer
-than the platform is one whose behaviour nobody can predict. Its rules are driven against fixtures
-it must **refuse** (`scripts/ci/__tests__/parse-closing-keywords.test.js`) — chiefly a number inside
-a code span, which is how a PR *documenting this feature* would otherwise close whatever issue its
-example named.
+### Put the keyword at the start of a line
+
+The parser follows GitHub's rules — the nine keywords, `#123` / `owner/repo#123` / issue URLs, code
+spans and fences ignored, cross-repo references dropped — with **one deliberate narrowing: a closing
+keyword only counts at the start of a line.** A list marker or bold is fine (`- Closes #12`,
+`**Closes** #12`); a keyword mid-sentence is prose and closes nothing.
+
+That narrowing was bought, not designed. On the workflow's **first live run** (PR #1462), the body
+explained in prose that the parser does not interpret negation — using the words *"does not fix
+#123"* — and the parser extracted `123`. Nothing was harmed only because issue #123 happened to be
+closed already and the caller skips those. Had it been open, a documentation change would have
+closed an unrelated issue.
+
+GitHub can afford to match anywhere because its UI shows you the linked issues **before** you merge.
+Nothing shows you what this workflow will do. And the costs are not symmetric: an issue that fails
+to close is visible and one command from fixed, while an issue closed by mistake is silent and looks
+like a decision somebody made. So the rule is narrower than the platform's, and statable in one
+line.
+
+Negation is still *not* interpreted on an anchored line — `Closes #12` and `Does not close #12` both
+close, exactly as GitHub does. Being stricter than the platform about **where** it looks is a
+narrower rule; being cleverer than it about **English** is unpredictable behaviour.
+
+The parser also never closes a pull request: `gh issue view` happily resolves a PR number, so the
+caller asks the REST issues endpoint and skips anything carrying a `pull_request` key.
+
+Its rules are driven against fixtures it must **refuse**
+(`scripts/ci/__tests__/parse-closing-keywords.test.js`), including the exact sentence from #1462
+that caused the near-miss.
 
 ---
 
