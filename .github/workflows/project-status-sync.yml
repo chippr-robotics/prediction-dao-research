@@ -1,0 +1,85 @@
+name: Sync Issue Status to Project
+
+# Issue #1460. An agent's only status write path is a `status:*` label — the GitHub MCP server has
+# issue Type, Priority, Effort and the date fields, but Status is a PROJECT ITEM field and there is
+# no Projects v2 write tool. This workflow closes that gap from the other side: the agent labels,
+# this moves the card.
+#
+# The label is the source of truth, not the board. If PROJECT_URL or PROJECTS_TOKEN is unset this
+# warns and exits 0 — an agent must never be blocked on infrastructure it can neither see nor fix,
+# and a stale board is visibly stale where a red X on every issue event is just noise. A REAL
+# failure (bad token, API error) still fails: claiming to have moved a card it did not move is the
+# one outcome worse than not running.
+#
+# Setup (one time, by a human): create a fine-grained PAT with the `project` scope, store it as the
+# PROJECTS_TOKEN secret, and set PROJECT_URL as a repo or org variable. GITHUB_TOKEN cannot do this
+# — Projects v2 is outside its permission model.
+
+on:
+  issues:
+    types: [labeled, unlabeled, closed, reopened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to re-sync'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  # Serialised per issue: two label events in quick succession must not race to set the field.
+  group: project-status-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Mirror status:* onto the board
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # A mirror that silently mis-files cards is worse than none, so its decisions carry
+      # must-fail fixtures — including the one that would have stampeded every issue in the repo
+      # onto Todo on the first run. Dependency-free (node:test), so no npm ci.
+      - name: Test the mirror's decisions
+        run: node --test "scripts/ops/__tests__/*.test.js"
+
+      # workflow_dispatch has no event payload, so the issue is read back through the API. Bare
+      # `gh` output, not a shell-interpolated body — issue titles are attacker-controlled text.
+      - name: Resolve the issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+        run: |
+          set -euo pipefail
+          gh issue view "$NUMBER" --repo "$REPO" --json state,labels > /tmp/issue.json
+          {
+            echo "state=$(node -e 'process.stdout.write(require("/tmp/issue.json").state.toLowerCase())')"
+            echo "labels<<__EOF__"
+            node -e 'process.stdout.write(JSON.stringify(require("/tmp/issue.json").labels))'
+            echo ""
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Mirror the status label onto the project
+        env:
+          PROJECT_URL: ${{ vars.PROJECT_URL }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          ISSUE_STATE: ${{ steps.issue.outputs.state }}
+          LABELS: ${{ steps.issue.outputs.labels }}
+        run: node scripts/ops/sync-project-status.js

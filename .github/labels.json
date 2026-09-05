@@ -1,0 +1,79 @@
+{
+  "$comment": [
+    "Issue #1460 — the coordination vocabulary for multi-agent work.",
+    "",
+    "JSON, not YAML, deliberately: labels-sync.yml reads this with plain `node -e`, and the",
+    "alternative was either a marketplace action (a supply-chain dependency for label names) or",
+    "adding js-yaml to a workflow that must not touch the root lockfile (spec 075).",
+    "",
+    "The `status:*` set is the ONLY status signal an agent can write with the tools it has. The",
+    "GitHub MCP server exposes no Projects v2 write tool — it can set Priority, Effort, Start date,",
+    "Target date and issue Type, all of which are ORG-LEVEL ISSUE FIELDS, but Status lives on the",
+    "project item and is unreachable from there. So the label is the record, and",
+    "project-status-sync.yml mirrors it onto the board when a token is configured.",
+    "",
+    "Exactly one status:* label at a time. See docs/developer-guide/multi-agent-workflow.md."
+  ],
+  "labels": [
+    {
+      "name": "status:triage",
+      "color": "BFD4F2",
+      "description": "Accepted, not yet claimed. Free for any agent to pick up."
+    },
+    {
+      "name": "status:in-progress",
+      "color": "0E8A16",
+      "description": "Claimed by an assignee and actively being worked. Do not pick up."
+    },
+    {
+      "name": "status:blocked",
+      "color": "D93F0B",
+      "description": "Work stopped on something outside this issue. The blocker is named in a comment."
+    },
+    {
+      "name": "status:in-review",
+      "color": "FBCA04",
+      "description": "Work is pushed and a PR is open; waiting on review, not on more code."
+    },
+    {
+      "name": "status:done",
+      "color": "5319E7",
+      "description": "Merged and verified. Set alongside closing, never instead of it."
+    },
+    {
+      "name": "size:xs",
+      "color": "C2E0C6",
+      "description": "T-shirt size XS — under an hour. Maps to the Effort field: Low."
+    },
+    {
+      "name": "size:s",
+      "color": "C2E0C6",
+      "description": "T-shirt size S — a few hours, one surface. Maps to the Effort field: Low."
+    },
+    {
+      "name": "size:m",
+      "color": "FEF2C0",
+      "description": "T-shirt size M — a day or two, or more than one surface. Effort: Medium."
+    },
+    {
+      "name": "size:l",
+      "color": "F9D0C4",
+      "description": "T-shirt size L — multi-day, needs a spec. Effort: High."
+    },
+    {
+      "name": "size:xl",
+      "color": "E99695",
+      "description": "T-shirt size XL — too big to deliver as one issue; split it into sub-issues. Effort: High."
+    },
+    {
+      "name": "spec-reservation",
+      "color": "1D76DB",
+      "description": "PR that only claims a spec number on staging. Review for the number, not the design."
+    },
+    {
+      "name": "agent-coordinated",
+      "color": "5319E7",
+      "description": "Worked by an agent following docs/developer-guide/multi-agent-workflow.md."
+    }
+  ]
+}

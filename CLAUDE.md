@@ -21,6 +21,29 @@ The binding standards live in `.specify/memory/constitution.md`. Every plan must
 pass a constitution check; read it before planning or implementing. Per-feature
 artifacts live under `specs/<feature>/`.
 
+**Several agents work this repo at once. Before you start any of the above, read
+`docs/developer-guide/multi-agent-workflow.md`** — it is the coordination protocol,
+and two of its rules change what you do on step 2:
+
+- **A spec number is claimed by MERGING a reservation PR to `staging`**, never by
+  computing it. `create-new-feature.sh` answers `max(existing) + 1`, which is right
+  exactly once per merge — two agents who ask before either has merged both get the
+  same number and both checked. That is how `017`, `041`, `050` and `102` each came
+  to name two unrelated features. Open a PR into `staging` containing ONLY the
+  reservation — `specs/<NNN>-<slug>/spec.md` plus its `matrix.json` row and the
+  regenerated `e2e-coverage-matrix.md` (`npm run e2e:matrix`; `check:e2e-matrix`
+  fails a spec dir with no row) — label it `spec-reservation`, merge it, then plan.
+  `npm run check:specs` (CI job *Spec Registry*) fails the second claimant.
+- **An issue's state is its `status:*` label**, and you set it. There is no Projects
+  v2 write tool — `issue_write` reaches Type, Priority, Effort and the dates (all
+  org-level ISSUE fields), but Status lives on the project item. Claim with
+  `status:in-progress` + an assignee before working; `project-status-sync.yml`
+  mirrors the label onto the board when a token is configured, and says so when it
+  is not. Never block on the board.
+
+Branch from `staging`, never from `main`. Delegated work gets a **sub-issue**, and a
+subagent's report is a claim — read the diff and run the gates before accepting it.
+
 ## Repository map
 
 - `contracts/` — active Solidity (wagers, oracles, access, privacy). `mocks/` is
@@ -38,6 +61,7 @@ artifacts live under `specs/<feature>/`.
 - `npm run test:frontend` — frontend tests
 - `npm run frontend` — run the frontend dev server
 - `npm run sync:frontend-contracts` — regenerate frontend contract artifacts
+- `npm run check:specs` — spec-number registry gate (run before opening a reservation PR)
 - Only run the **full** frontend suite (`vitest run` with no filter) in CI — locally it
   OOMs this environment. Scope local runs to specific files/dirs
   (`npx vitest run src/test/foo.test.js`).
@@ -48,6 +72,28 @@ artifacts live under `specs/<feature>/`.
   Slither/Medusa, and get a security review (`.github/agents/`).
 - Never commit secrets or private keys; admin keys use the floppy keystore flow.
 - CI fails loudly — don't add `continue-on-error` to lint/test/build/security.
+- **Multi-agent coordination (issue #1460) has one document and two gates.**
+  `docs/developer-guide/multi-agent-workflow.md` is the protocol; everything below is
+  the part that is enforced rather than agreed. (1) **`specs/` is a shared namespace
+  and a number is claimed by a MERGE, not a calculation** — `check:specs`
+  (`scripts/specs/check-spec-registry.js`, CI job *Spec Registry*) fails a second
+  claimant, enforces `NNN-kebab-case`, and requires a reserved number to carry a
+  `spec.md` (a reservation with no spec is indistinguishable from an abandoned one).
+  The four pre-gate collisions are frozen in `LEGACY_COLLISIONS` under rule S-04,
+  which fails if an entry outlives the collision it excuses — the list can shrink and
+  cannot grow. `create-new-feature.sh` now numbers against `origin/staging` and
+  `origin/main`, not just the local checkout, because each agent's container was
+  cloned at a different moment. (2) **`specs/**` is its own change-detection filter**
+  in `ci-manager.yml`: it had none, so a PR that only reserved a number ran ZERO
+  jobs — and with required checks in force `skipped` satisfies them, so the one PR
+  type whose entire purpose is claiming a number was the one type the gate could
+  never see. **Status is a label, not a field an agent can write**: the GitHub MCP
+  server has no Projects v2 write tool, so `.github/labels.json`'s `status:*` set is
+  the record and `project-status-sync.yml` mirrors it onto the board — warning and
+  exiting 0 when `PROJECT_URL`/`PROJECTS_TOKEN` are unset, because an agent must
+  never be blocked on infrastructure it can neither see nor fix. Sizing and priority
+  are set at triage on the **Effort** and **Priority** issue fields (the `size:*`
+  label is the t-shirt shorthand; the field is what the board reads).
 - **Upgradeable contracts (UUPS, specs 025 + 027):** both `WagerRegistry` (spec 025)
   and `MembershipManager` (spec 027) are **UUPS proxies at stable addresses** — logic
   is swappable, state is preserved. New upgradeable

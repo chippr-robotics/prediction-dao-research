@@ -131,6 +131,7 @@ nav:
     - Singleton Deployment Patterns: developer-guide/singleton-deployment-patterns.md
     - Testing: developer-guide/testing.md
     - Coverage & Audit Gates: developer-guide/coverage-and-audit-gates.md
+    - Multi-Agent Development Flow: developer-guide/multi-agent-workflow.md
     - Contributing: developer-guide/contributing.md
   - Security Testing:
     - Overview: security/index.md

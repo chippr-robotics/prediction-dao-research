@@ -100,6 +100,22 @@ The frontend is the trust surface for non-technical users.
    docs/specs affected by the change.
 4. **Simplicity** — prefer the smallest change that satisfies the spec (YAGNI).
    Added complexity must earn its place in the plan.
+5. **Coordinated multi-agent work** — this repository is worked by several agents
+   concurrently, and the coordination protocol is binding, not advisory
+   (`docs/developer-guide/multi-agent-workflow.md`):
+   - A spec number is claimed by **merging** a reservation PR into `staging` that
+     contains only the new `specs/<NNN>-<slug>/spec.md` and its e2e coverage-matrix
+     row. Computing a number claims nothing:
+     `max(existing) + 1` is correct exactly once per merge, which is how four
+     numbers on `main` came to name two features each. `npm run check:specs` gates
+     this.
+   - Feature work branches from `staging`. Only a promotion or a declared hotfix
+     reaches `main`.
+   - An issue's state is its `status:*` label, set by whoever is doing the work, at
+     the moment the state changes. Delegated work gets a **sub-issue** — the only
+     representation the board, the parent issue and the next agent can all read.
+   - A subagent's report is a claim. The diff is read and the affected gates are run
+     before the work is accepted; work that was not reviewed is not done.
 
 ## Governance
 
@@ -115,4 +131,4 @@ This constitution supersedes other practices and conventions in the repository.
 - Runtime, day-to-day agent guidance lives in `CLAUDE.md` and the relevant Spec
   Kit plan; this document holds the durable, repeatable standards.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-05 | **Last Amended**: 2026-06-05
+**Version**: 1.1.0 | **Ratified**: 2026-06-05 | **Last Amended**: 2026-09-05
