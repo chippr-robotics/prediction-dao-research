@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-05
 
-**Status**: Draft — blocked on procurement (see Prerequisites)
+**Status**: Draft — blocked on a capacity decision, not a lockout (see Prerequisites)
 
 **Input**: Split out of `specs/105-gateway-caller-auth/` after Phase 0 research. Spec 105 originally
 carried both caller authentication and keyed data access; research established that the second half
@@ -40,26 +40,60 @@ platform-controlled issuing point — and reads **directly** from the provider a
 
 ## Prerequisites — this feature cannot start without them
 
-### P1. A dedicated provider endpoint (procurement)
+### P1. A dedicated issuance endpoint — **NOT a procurement** (corrected 2026-09-05)
 
-**Enforcement cannot be enabled on any endpoint the platform currently owns.** The Polygon endpoint is
-read by the alto bundler as its **only** RPC, marked required with *"no failover and no default"*; by
-the relay-gateway; and by the cost exporter. The four mainnet URLs are all derived from **one**
-multichain endpoint that the contract toolchain requires for deploys and fork tests.
+An earlier draft called this a purchase. **That was wrong**, and the correction came from the
+observation that the bundler is our own software: we control what it connects to and what it sends,
+so "enabling enforcement locks out the bundler" was never a fact about the vendor — it was a fact
+about a configuration we are free to change.
 
-The provider's rule is AND — with expiring-credential auth enabled, *every* client must present one.
-Turning it on for any of these locks out four URL-token-only consumers, one of which executes gasless
-user operations with nothing behind it.
+Verified against the account's admin API:
 
-A **new, dedicated client-issuance endpoint** is therefore a hard prerequisite, not an implementation
-detail. It also cleanly separates browser traffic from the bundler's.
+- **Five endpoints already exist**, including **two `matic` multichain** endpoints. Adding or
+  repurposing one is a dashboard/API action inside the current plan.
+- All five currently report `jwts: false`, `tokens: true`, `requestFilters: false` — so no endpoint
+  is enforcing anything today, and one can be configured without touching the others.
+- The vendor states plainly that **"JWTs can be sent through a URL, POST parameter, or inside an HTTP
+  header"**, so even a client that cannot set headers can carry one.
 
-### P2. Rate headroom
+So the lockout dissolves two independent ways: give browsers their **own** endpoint and leave the
+server-side one alone, or teach the server-side consumers to present a credential. The first is
+simpler and is the plan.
 
-The account carries a **50 req/s cap shared across all three existing consumers**, and the bundler is
-the one with no failover behind it. This feature proposes handing keyed capacity to every anonymous
-visitor's browser for a multi-chain fan-out. The dedicated endpoint must come with headroom sized for
-browser traffic, and issuance must be metered against a ceiling that protects the bundler's share.
+### P2. Rate headroom — **THIS is the real blocker**
+
+Read from the admin API, identically on every one of the five endpoints:
+
+```
+rate_limits: { "account": 50, "rps": 50, "rpd": -1, "rpm": -1 }
+```
+
+The cap is **account-wide**, surfaced per endpoint. **Adding endpoints adds no capacity at all.**
+Fifty requests per second is shared by the gateway, the cost exporter and alto — and alto is the one
+with no failover behind it.
+
+That reframes the feature's central choice, because the two designs scale differently in kind:
+
+| | Upstream load |
+|---|---|
+| **Browser reads direct** | proportional to **visitor count** — every visitor's fan-out is upstream traffic |
+| **Platform proxies with a cache** | proportional to **cache misses** — visitor count is decoupled from upstream load |
+
+Against a hard 50 req/s shared with a bundler that cannot fail over, that decoupling stops being an
+architectural preference and becomes the difference between viable and not. A single multi-chain
+portfolio screen fans out across every supported chain; a handful of concurrent visitors can plausibly
+consume the whole account allowance and starve the bundler.
+
+**Two ways forward, and they are a genuine choice rather than a formality:**
+
+1. **Raise the plan** — a real purchase, sized for browser traffic, after measuring the per-screen
+   call count. Keeps the browser-direct design and its zero added latency.
+2. **Adopt the proxy alternative** recorded in spec 105's research as rejected. It was rejected on
+   latency and on putting platform infrastructure in the read path — neither of which outweighs a
+   capacity ceiling the design cannot fit under.
+
+**Measure first**: the per-screen upstream call count for the heaviest multi-chain surface is the
+number that decides this, and it has not been measured. Do that before choosing.
 
 ### P3. Spec 105's tier ladder
 

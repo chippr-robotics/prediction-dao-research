@@ -56,10 +56,20 @@ The vendor rule is AND: with `jwts` enabled, *every* client must present a valid
 on for FR-026 therefore locks out four URL-token-only consumers, one of which has no failover and
 executes gasless UserOps.
 
-**Resolution: the feature requires a NEW, dedicated client-issuance endpoint.** It is the only
-configuration in which `jwts: enabled` is safe, and it also cleanly separates browser traffic from the
-bundler's. This is a **procurement decision with a FinOps consequence**, and it appears nowhere in the
-spec. Existing endpoints keep `tokens`-only auth and are untouched.
+**CORRECTED 2026-09-05 — this was overstated, and the correction matters.**
+
+"Locks out the bundler" was never a fact about the vendor. Alto is *our* software: we choose what it
+connects to and what it sends. Verified against the account's admin API:
+
+- **Five endpoints already exist**, two of them `matic` multichain. Configuring one for browsers is a
+  dashboard action inside the current plan, **not a purchase**.
+- All five report `jwts: false, tokens: true, requestFilters: false` — nothing is enforcing today, and
+  one endpoint can be changed without touching the others.
+- The vendor allows a JWT **in a URL**, so even a client that cannot set headers can carry one.
+
+So the lockout dissolves. **The binding constraint is capacity instead**, and it is worse than a
+lockout because no amount of configuration fixes it — see §1.7, which is now the blocker this feature
+actually turns on.
 
 ### 1.2 CRITICAL — "JWT stand-alone" exists and is strictly better than what the spec assumed
 
@@ -141,9 +151,22 @@ prerequisite, not a nicety.
 one with no failover behind it."** US5/SC-015 hands keyed capacity to every anonymous visitor's browser
 for a multi-chain fan-out. On the current account that contends directly with the bundler.
 
-This is the same finding as §1.1 from the other end: the dedicated issuance endpoint must come with
-headroom sized for browser traffic, and issuance must be metered against a ceiling that protects the
-bundler's share.
+**Measured 2026-09-05 via the admin API, identically on all five endpoints:**
+
+```
+rate_limits: { "account": 50, "rps": 50, "rpd": -1, "rpm": -1 }
+```
+
+The cap is **account-wide**, surfaced per endpoint — so **adding endpoints adds no capacity**. This is
+now the feature's real blocker, and it discriminates between the two designs in kind rather than in
+degree: browser-direct makes upstream load proportional to **visitor count**, while a caching proxy
+makes it proportional to **cache misses**. Against a hard 50 req/s shared with a bundler that has no
+failover, that decoupling is the difference between viable and not.
+
+The choice is therefore a bigger plan (a genuine purchase) or the proxy alternative recorded in §4 as
+rejected — and it was rejected on latency, which does not outweigh a ceiling the design cannot fit
+under. **Measure the per-screen upstream call count first**; that number decides it, and it has not
+been measured.
 
 ---
 
