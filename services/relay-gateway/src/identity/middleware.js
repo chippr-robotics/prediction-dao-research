@@ -68,10 +68,16 @@ const REFUSALS = Object.freeze({
  * @param {{enabled: boolean, enforce?: boolean}} options
  * @param {Array<{kind: string, verify: Function}>} verifiers
  */
-export function createIdentityMiddleware({ enabled, enforce = false } = {}, verifiers = []) {
+export function createIdentityMiddleware(options = {}, verifiers = []) {
   const resolve = createResolver(verifiers)
 
   return async function identityMiddleware(req, res, next) {
+    // Read PER REQUEST, not destructured at construction: SIGHUP reload (spec 105 FR-014) flips
+    // these on the live options object, and a captured boolean would make the reload a silent
+    // no-op for this middleware while /status truthfully reported the new value — the exact
+    // "disabled looks enforcing" split FR-015 forbids.
+    const enabled = options.enabled === true
+    const enforce = enabled && options.enforce === true
     // A disabled layer must be INERT, not permissive-looking. `req.caller` is still populated, so
     // downstream code never has to branch on "is identity configured" — it reads one shape always.
     // FR-015: the disabled state is disclosed loudly at boot and in the gated /status, never
