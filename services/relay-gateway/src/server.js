@@ -32,6 +32,7 @@ import { createDedupStore } from './policy/dedup.js'
 import { createQuotas, createSpendTracker, createTokenBudget } from './policy/quotas.js'
 import { createIdentityMiddleware } from './identity/middleware.js'
 import { createAttestationVerifier } from './identity/verifiers/attestation.js'
+import { createGrantVerifier } from './identity/verifiers/grant.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createEngineClient } from './engine/client.js'
@@ -270,6 +271,11 @@ export function createApp(config, deps = {}) {
   // Deliberately NOT wired to the global kill switch. That one stops the relayer during an
   // incident; identity is a safety layer, and turning it off mid-incident is the wrong direction.
   // IDENTITY_KILLSWITCH is its own switch, for the case where this layer itself misbehaves.
+  //
+  // The verifier list is a LIVE ARRAY, registered into below once the member-API dependencies it
+  // needs (the revocation store, the membership reader) have been constructed further down. The
+  // resolver reads it per request, so registration order does not matter — but MOUNT order does,
+  // which is why the middleware is installed here and populated later rather than moved.
   const identityVerifiers = [createAttestationVerifier()]
   const identityEnabled = config.identity?.enabled === true && config.identity?.killswitch !== true
   app.use(createIdentityMiddleware({ enabled: identityEnabled }, identityVerifiers))
@@ -915,6 +921,24 @@ export function createApp(config, deps = {}) {
     })
   const memberApiMembership =
     deps.memberApiMembership ?? createMembershipReader(config, providers, { now: nowMs })
+  // ---- Register the grant verifier (spec 105) ----------------------------------------------
+  // Deliberately AFTER the revocation store and membership reader exist, and deliberately sharing
+  // them: a second revocation store would let a key revoked on one path keep working on the other.
+  //
+  // `membership` is passed so the verifier can OFFER the `member` upgrade, never to require it. A
+  // valid signature alone is accepted at `address` — which is what keeps trading from silently
+  // requiring a paid membership (see verifiers/grant.js).
+  identityVerifiers.push(
+    createGrantVerifier({
+      referenceProvider: providers?.[config.memberApi.referenceChainId] ?? null,
+      revocations: memberApiRevocations,
+      membership: memberApiMembership,
+      clockSkewSec: config.memberApi.clockSkewSec,
+      maxTtlDays: config.memberApi.maxTtlDays,
+      now: () => Math.floor(nowMs() / 1000),
+    })
+  )
+
   const memberApiWagers =
     deps.memberApiWagers ??
     createWagerReader(config, deps.memberApiFetch ? { fetchImpl: deps.memberApiFetch } : {})
