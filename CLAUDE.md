@@ -890,7 +890,7 @@ artifacts live under `specs/<feature>/`.
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/104-passkey-account-recovery/plan.md
+at specs/105-multichain-vault-creation/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also
