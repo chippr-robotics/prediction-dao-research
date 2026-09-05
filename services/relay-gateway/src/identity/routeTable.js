@@ -59,6 +59,12 @@ export const ROUTE_TABLE = Object.freeze([
   r('POST', '/v1/paymaster', TIERS.ANONYMOUS, 'ops'),
   r('POST', '/v1/engine/webhook', TIERS.ANONYMOUS, 'ops'), // own shared secret; lock-exempt
 
+  // Keyed-access issuance (spec 106). ANONYMOUS on purpose — FR-022: tier shapes what is issued
+  // (lifetime), never WHETHER. Gating it higher would make keyed reads a member benefit, which is
+  // the product regression that spec's US1 exists to forbid. It meters itself per subject and
+  // consumes no data-plane upstream; the admin-API check behind it is cache-bounded.
+  r('POST', '/v1/access/rpc', TIERS.ANONYMOUS, 'ops'),
+
   // ── Reads. All anonymous: a challenge buys throughput, not entry. ──────────────────────────
   r('GET', '/v1/opensea/collections/:slug/stats', TIERS.ANONYMOUS, 'read', 'opensea'),
   r('GET', '/v1/opensea/:chainId/account/:address/nfts', TIERS.ANONYMOUS, 'read', 'opensea'),

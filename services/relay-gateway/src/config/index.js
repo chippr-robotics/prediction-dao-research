@@ -465,6 +465,48 @@ export function loadConfig(env = process.env, opts = {}) {
         timeoutMs: int(env, 'CHALLENGE_TIMEOUT_MS', 3000),
       },
     },
+    // --- Keyed RPC access issuance (spec 106) ---
+    // DORMANT until an endpoint pair, a signing key and the admin credential are all present; the
+    // module mounts regardless and answers 503 access_unconfigured, so absence stays honest.
+    // RPC_ACCESS_SIGNING_KEY is KEY MATERIAL (spec 097 rule 3): it arrives from Secret Manager via
+    // fetch-secrets.sh and must never be committed, logged, or echoed.
+    rpcAccess: (() => {
+      const endpoints = {}
+      for (const key of Object.keys(env)) {
+        const m = key.match(/^RPC_ACCESS_ENDPOINT_URL_(\d+)$/)
+        if (!m) continue
+        const chainId = Number(m[1])
+        const url = String(env[key]).trim()
+        const id = opt(env, `RPC_ACCESS_ENDPOINT_ID_${chainId}`, null)
+        // A URL without its admin-API id is refused AS A PAIR: without the id the FR-026
+        // enforcement check cannot run, and serving that endpoint would mean transmitting a
+        // credential whose protection was never confirmed.
+        if (url && id) endpoints[chainId] = { url, id: String(id).trim() }
+      }
+      return {
+        enabled: opt(env, 'RPC_ACCESS_ENABLED', 'false').toLowerCase() === 'true',
+        killswitch: opt(env, 'RPC_ACCESS_KILLSWITCH', 'false').toLowerCase() === 'true',
+        signingKeyPem: opt(env, 'RPC_ACCESS_SIGNING_KEY', null),
+        kid: opt(env, 'RPC_ACCESS_SIGNING_KID', null),
+        adminKey: opt(env, 'RPC_ACCESS_ADMIN_KEY', null),
+        adminBaseUrl: opt(env, 'RPC_ACCESS_ADMIN_URL', 'https://api.quicknode.com'),
+        endpoints,
+        // Tier shapes LIFETIME, never whether (FR-022): anonymous mints short and re-mints often,
+        // which is itself the metering pressure that makes proving something worthwhile.
+        ttlSecByTier: {
+          anonymous: int(env, 'RPC_ACCESS_TTL_ANONYMOUS_SEC', 300),
+          human: int(env, 'RPC_ACCESS_TTL_HUMAN_SEC', 900),
+          address: int(env, 'RPC_ACCESS_TTL_ADDRESS_SEC', 900),
+          member: int(env, 'RPC_ACCESS_TTL_MEMBER_SEC', 1800),
+        },
+        maxTtlSec: int(env, 'RPC_ACCESS_MAX_TTL_SEC', 3600),
+        mintQuotaPerSubject: int(env, 'RPC_ACCESS_MINT_QUOTA_PER_SUBJECT', 12),
+        mintQuotaGlobal: int(env, 'RPC_ACCESS_MINT_QUOTA_GLOBAL', 600),
+        mintQuotaWindowMs: int(env, 'RPC_ACCESS_MINT_QUOTA_WINDOW_MS', 60_000),
+        enforcementCacheTtlMs: int(env, 'RPC_ACCESS_ENFORCEMENT_CACHE_MS', 60_000),
+        adminTimeoutMs: int(env, 'RPC_ACCESS_ADMIN_TIMEOUT_MS', 5000),
+      }
+    })(),
     engine: {
       url: opt(env, 'ENGINE_URL', 'http://localhost:8080'),
       apiKey: opt(env, 'ENGINE_API_KEY', null),

@@ -34,6 +34,9 @@ import { createIdentityMiddleware } from './identity/middleware.js'
 import { createAttestationVerifier } from './identity/verifiers/attestation.js'
 import { createGrantVerifier } from './identity/verifiers/grant.js'
 import { createUpstreamCeilings, withUpstreamCeiling } from './identity/upstreamCeiling.js'
+import { createAccessRouter } from './access/routes.js'
+import { createEnforcementVerifier } from './access/enforcement.js'
+import { loadSigningKey } from './access/jwt.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createEngineClient } from './engine/client.js'
@@ -287,6 +290,44 @@ export function createApp(config, deps = {}) {
       nowMs
     )
 
+  // ---- Keyed RPC access issuance (spec 106) — mounted unconditionally, dormant until config ----
+  // The signing key loads at BOOT, not per request: a malformed key must fail the deploy loudly
+  // rather than fail the first member quietly. Load failure with the module enabled is fatal —
+  // an enabled issuer that cannot sign is a misconfiguration, not a degraded mode.
+  let accessSigningKey = null
+  if (config.rpcAccess?.signingKeyPem) {
+    try {
+      accessSigningKey = loadSigningKey(config.rpcAccess.signingKeyPem)
+    } catch (err) {
+      if (config.rpcAccess.enabled) {
+        throw new Error(`RPC_ACCESS_SIGNING_KEY is present but unusable: ${err.message}`)
+      }
+      // Disabled module + broken key: boot continues, the route answers unconfigured, and the
+      // warning names the problem instead of hiding it behind a healthy-looking start.
+      console.warn('[relay-gateway] WARN: RPC_ACCESS_SIGNING_KEY present but unusable while module disabled:', err.message)
+    }
+  }
+  const accessEnforcement =
+    deps.accessEnforcement ??
+    (config.rpcAccess?.adminKey
+      ? createEnforcementVerifier({
+          adminBaseUrl: config.rpcAccess.adminBaseUrl,
+          adminKey: config.rpcAccess.adminKey,
+          cacheTtlMs: config.rpcAccess.enforcementCacheTtlMs,
+          timeoutMs: config.rpcAccess.adminTimeoutMs,
+          now: nowMs,
+          ...(deps.accessFetch ? { fetchImpl: deps.accessFetch } : {}),
+        })
+      : null)
+  const accessMintQuotas =
+    deps.accessMintQuotas ??
+    createQuotas({
+      signerPerWindow: config.rpcAccess?.mintQuotaPerSubject ?? 12,
+      globalPerWindow: config.rpcAccess?.mintQuotaGlobal ?? 600,
+      windowMs: config.rpcAccess?.mintQuotaWindowMs ?? 60_000,
+      now: nowMs,
+    })
+
   const identityVerifiers = [createAttestationVerifier()]
   const identityEnabled = config.identity?.enabled === true && config.identity?.killswitch !== true
   app.use(
@@ -294,6 +335,17 @@ export function createApp(config, deps = {}) {
       { enabled: identityEnabled, enforce: identityEnabled && config.identity?.enforce === true },
       identityVerifiers
     )
+  )
+
+  // Issuance sits AFTER identity resolution (it reads req.caller for tier and metering subject)
+  // and before the module routers, like everything client-facing.
+  app.use(
+    createAccessRouter(config, {
+      signingKey: accessSigningKey,
+      enforcement: accessEnforcement,
+      mintQuotas: accessMintQuotas,
+      now,
+    })
   )
 
   // ---- GET /healthz + /status (origin-lock exempt) ----------------------------------------
