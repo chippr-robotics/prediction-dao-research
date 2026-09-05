@@ -113,10 +113,18 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   honours closing keywords only on the default branch (`main`), and PR #1461 merged
   with `Closes #1460` while the issue stayed open with `closed_by_pull_requests: 0`.
   `.github/workflows/close-linked-issues.yml` does it on the `staging` merge instead
-  (parser: `scripts/ci/parse-closing-keywords.js`, mirrors GitHub's own rules, tested
-  against fixtures it must refuse). Keep writing `Closes #N`, use `Part of #N` for
-  work a PR only advances, and READ THE ISSUE BACK after the merge — an automation
-  nobody verifies is a second thing that can be quietly wrong.
+  (parser: `scripts/ci/parse-closing-keywords.js`). **PUT THE KEYWORD AT THE START OF
+  A LINE** — the parser follows GitHub's rules except that a keyword only counts
+  line-anchored (a list marker or bold is fine). That narrowing was bought on the
+  first live run: #1462's body said in PROSE that negation is not interpreted, using
+  the words "does not fix #123", and the parser extracted 123 — harmless only because
+  #123 was already closed. GitHub can match anywhere because its UI shows linked
+  issues before you merge; nothing shows you what this does, and the costs are not
+  symmetric (an unclosed issue is visible, a wrongly-closed one is silent). It also
+  never closes a PR — `gh issue view` resolves PR numbers, so the caller checks the
+  REST issues endpoint for a `pull_request` key. Keep writing `Closes #N`, use
+  `Part of #N` for work a PR only advances, and READ THE ISSUE BACK after the merge —
+  an automation nobody verifies is a second thing that can be quietly wrong.
   (3) **The Cypress tiers SKIP for a change that cannot reach the running app** —
   ci-manager's `app` path filter, consumed by `test.yml` as `run_e2e`. A docs-only PR
   was spending 12 fast legs + 4 on-chain shards + the passkey full stack to prove
