@@ -250,3 +250,61 @@ describe('VaultQueueView', () => {
     expect(line).toHaveAttribute('title', queueCtx.rows[0].to)
   })
 })
+
+/**
+ * A member who IS an owner but whose session cannot sign on the connected network.
+ *
+ * Ethereum Classic and Mordor have no bundler, so a keyless passkey session cannot submit there —
+ * but the buttons still rendered, and the refusal arrived from inside the batch sender after the
+ * tap. The rail is knowable beforehand (lib/custody/writeRail.js), so it is said beforehand.
+ */
+describe('VaultQueueView — a network this session cannot sign on', () => {
+  const RAIL_REASON =
+    'Passkey transactions are not available on Ethereum Classic. Connect a wallet that can sign there ' +
+    '— a browser wallet, a hardware wallet, or a recovered account — to act on this network.'
+
+  it('states WHY instead of offering an action that would throw', () => {
+    proposalsCtx = () => ({
+      approve,
+      execute,
+      cancel,
+      queue: [],
+      history: [],
+      writeRail: { rail: 'passkey', available: false, reason: RAIL_REASON },
+    })
+    render(<VaultQueueView group={group(137)} />)
+
+    const notice = screen.getAllByTestId('vault-queue-norail')[0]
+    expect(notice).toHaveTextContent(/not available on Ethereum Classic/i)
+    // The way out, not just the obstacle.
+    expect(notice).toHaveTextContent(/hardware wallet/i)
+    expect(screen.queryByRole('button', { name: /^approve$/i })).not.toBeInTheDocument()
+    // …and it is NOT relabelled "view-only": the member IS an owner, which is a different fact.
+    expect(screen.queryByTestId('vault-queue-viewonly')).not.toBeInTheDocument()
+  })
+
+  it('offers the actions when a SIGNER can sign there, whatever the login was', () => {
+    // The regression that motivated the change: a hardware wallet signs and pays gas on ETC
+    // natively, so nothing about a passkey login should withhold these controls.
+    proposalsCtx = () => ({
+      approve,
+      execute,
+      cancel,
+      queue: [],
+      history: [],
+      writeRail: { rail: 'signer', available: true, reason: null },
+    })
+    render(<VaultQueueView group={group(137)} />)
+
+    expect(screen.getAllByRole('button', { name: /^approve$/i }).length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('vault-queue-norail')).not.toBeInTheDocument()
+  })
+
+  it('keeps behaving as before when a surface supplies no rail at all', () => {
+    // Back-compat: the hook is mocked in several suites that predate `writeRail`.
+    proposalsCtx = () => ({ approve, execute, cancel, queue: [], history: [] })
+    render(<VaultQueueView group={group(137)} />)
+    expect(screen.getAllByRole('button', { name: /^approve$/i }).length).toBeGreaterThan(0)
+  })
+})
+

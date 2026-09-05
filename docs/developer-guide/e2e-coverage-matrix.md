@@ -26,12 +26,12 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 106 |
-| With a member-facing flow | 84 |
-| Member-facing flows | 183 |
-| 🟢 covered | 170 |
-| 🟡 partial | 3 |
-| 🔴 absent | 3 |
+| Spec directories | 108 |
+| With a member-facing flow | 86 |
+| Member-facing flows | 192 |
+| 🟢 covered | 177 |
+| 🟡 partial | 4 |
+| 🔴 absent | 4 |
 | ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-72 flows — 🟢 61 · 🟡 3 · 🔴 1 · ⚪ 7 · covered-but-not-proven 0
+75 flows — 🟢 62 · 🟡 4 · 🔴 2 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -309,9 +309,17 @@ establish the outcome. They are listed in full at the end of this document.
 | `funding.deadline-refund` | A pool nobody closes refunds after the settle deadline | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-04) |  |
 | `funding.organizer-refund` | The organizer refunds everyone from an open pool | 🟢 covered | settled | `on-chain` | `39-funding-pools.cy.js` (FP-05) |  |
 
+### `104-passkey-account-recovery` — Passkey account recovery — find the account, never guess it
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `passkey.recover-account-by-lookup` | A member signing in on a new device reaches the account their passkey controls, including when that passkey was added to the account later rather than being the key that created it | 🔴 absent | none | — (proposed: on-chain) | #1432 |  |
+| `passkey.recover-never-wrong-account` | A passkey whose account cannot be verified never opens a session on an unverified address; the member is told what could not be confirmed, and an unreachable chain reads as unverified rather than as no account existing | 🟢 covered | flow | `account-native` | `account-recovery.cy.js` (REC-01, REC-02) |  |
+| `passkey.recover-by-address` | A member relinks by entering their account address, and is signed in only when the chain lists the recovered key among that account's current owners | 🟡 partial | smoke | `account-native` | `account-recovery.cy.js` (REC-03) | The chain agreeing. This tier reaches no RPC, so what is proven is the form, the refusal of a malformed address, and that the address is handed on to be CHECKED — never that a verified address opens a session on the account it names. That needs a deployed account whose owner set includes a key this browser has no record of, i.e. the full-stack passkey tier. |
+
 ## Disclosure — a member consents to a cost
 
-13 flows — 🟢 13 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
+17 flows — 🟢 17 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -367,13 +375,22 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `assistant.opt-in` | The assistant does not exist until Settings turns it on, and stops existing when it is turned off | 🟢 covered | flow | `no-chain` | `38-assistant.cy.js` (AS-01) |  |
+| `assistant.opt-in` | The assistant does not exist until Tools ▸ Assistant turns it on, and stops existing when it is turned off | 🟢 covered | flow | `no-chain` | `38-assistant.cy.js` (AS-01) |  |
 | `assistant.honest-unreachable` | An unreachable assistant service is named and retryable, and never answered for | 🟢 covered | flow | `no-chain` | `38-assistant.cy.js` (AS-02) |  |
-| `assistant.memory-clear` | Conversation memory is device-local, counted in Settings, and clearable to nothing | 🟢 covered | settled | `no-chain` | `38-assistant.cy.js` (AS-03) |  |
+| `assistant.memory-clear` | Conversation memory is device-local, counted on the Assistant tab, and clearable to nothing | 🟢 covered | settled | `no-chain` | `38-assistant.cy.js` (AS-03) |  |
+
+### `104-guttertoken-assistant-rail` — GutterToken assistant rail and client-side tools
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `byok.key-lifecycle` | Save a GutterToken key only when GutterToken accepts it, keep it when GutterToken cannot be reached, and remove it | 🟢 covered | settled | `no-chain` | `47-assistant-rails.cy.js` (GT-01, GT-02) |  |
+| `byok.non-member-chat` | A non-member with a saved key gets an answer straight from GutterToken, with no request to the FairWins chat route | 🟢 covered | settled | `no-chain` | `47-assistant-rails.cy.js` (GT-03) |  |
+| `byok.honest-failures` | GutterToken's 403 and 429 each get their own sentence and action, and neither produces a reply bubble | 🟢 covered | flow | `no-chain` | `47-assistant-rails.cy.js` (GT-04) |  |
+| `provider.choice` | A paid member switches rails, and the badge and the transport agree about which one answered | 🟢 covered | flow | `no-chain` | `47-assistant-rails.cy.js` (GT-05) |  |
 
 ## Access — gating, identity and permission
 
-48 flows — 🟢 47 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
+49 flows — 🟢 48 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -543,9 +560,15 @@ establish the outcome. They are listed in full at the end of this document.
 |---|---|---|---|---|---|---|
 | `custody.acting-from-sheet` | Choose the acting account from the vault sheet; the header follows and the switcher lists the vault once | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-07) |  |
 
+### `104-guttertoken-assistant-rail` — GutterToken assistant rail and client-side tools
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `controls.moved-to-tools` | The agent controls live on Tools ▸ Assistant, Settings no longer carries them, and the old Settings hashes redirect | 🟢 covered | flow | `no-chain` | `47-assistant-rails.cy.js` (GT-07) |  |
+
 ## Information — read-only surfaces
 
-46 flows — 🟢 46 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
+47 flows — 🟢 47 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -757,6 +780,12 @@ establish the outcome. They are listed in full at the end of this document.
 | `custody.remove-all-networks` | Remove a vault from Protect on every network after confirmation | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-08) |  |
 | `custody.load-all-networks` | Load a vault address and have it added on every network it exists on, without picking one | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-09) |  |
 | `wallet.balance-display` | Balances in Wrap and Transfer fit the screen (display formatter) | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-10) |  |
+
+### `104-guttertoken-assistant-rail` — GutterToken assistant rail and client-side tools
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `tools.honest-progress` | A tool round shows what is being read and reports a failed read as could not be read, never as zero | 🟢 covered | flow | `no-chain` | `47-assistant-rails.cy.js` (GT-06) |  |
 
 ## No member consequence
 

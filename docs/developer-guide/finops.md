@@ -171,18 +171,27 @@ A planned source declares **no metric**, emits no value, and is excluded from ev
 as *NOT YET LIVE*. The alternative — showing `$0` — is indistinguishable from a shipped source
 earning nothing, and would quietly close a question that is still open.
 
-Four sources are `status: 'planned'`, in two groups:
+Four sources are `status: 'planned'`, in three groups:
 
 **Does not exist anywhere.** `miniapp-licenses` and `wager-platform-fee` were named in the brief as
 revenue streams and neither exists on chain: `MiniAppRegistry` has no fee, price or `payable`
 function, and `WagerRegistry` takes no platform cut.
 
-**Built, offered nowhere.** `x402-agent-payments` (revenue) and `assistant-model-api` (cost) are
-complete, tested code behind flags that are commented out in the only production deployment, so not
-one payment and not one billed token exists. `planned` is still the honest status — reporting `$0`
-would say "offered, and nobody used it" — but because enabling them is a *config* change rather than
-a code change, each declares a `moneyPath` and C2b turns that enable into a build failure. That is
-the point: switching on a revenue rail is precisely the moment nobody remembers the dashboard.
+**Built, offered nowhere.** `assistant-model-api` (cost) is complete, tested code behind a flag that
+is commented out in the only production deployment, so not one billed token exists. `planned` is
+still the honest status — reporting `$0` would say "offered, and nobody used it" — but because
+enabling it is a *config* change rather than a code change, it declares a `moneyPath` and C2b turns
+that enable into a build failure. That is the point: switching on a revenue rail is precisely the
+moment nobody remembers the dashboard. (`x402-agent-payments` was in this group until it was promoted
+to `live` together with the deployment that switched it on — the sequence C2b exists to force.)
+
+**Readable by nobody, and not cash.** `referral-guttertoken` (spec 104) is GutterToken's referral
+credit on FairWins' own GutterToken account when a member funds one through the Assistant tab's
+signup link — in-kind, non-cashable, spendable only on model calls. Unlike the other referral
+entries it can never move to `read` by setting an env var: GutterToken exposes no balance, usage or
+referral endpoint, so no collector could read it, and the code lives in the tenant manifest rather
+than in gateway config, so C2b cannot see it either. It is catalogued on purpose, to be visible, and
+if P3 is adopted it is an offset against `assistant-model-api`, never a revenue line.
 
 `assistant-model-api` declares `basis: 'modelled'` now, while nothing is at stake. This exporter
 holds no Anthropic billing credential, so any dollar figure it ever publishes will be token counts
