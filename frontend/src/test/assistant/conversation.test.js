@@ -15,6 +15,16 @@ import { __resetGutterTokenKeyForTests, saveGutterTokenKey } from '../../lib/ass
 import { buildBaseMessages, runAssistantTurn } from '../../lib/assistant/conversation'
 import { response } from './helpers/http'
 
+/**
+ * Whether a mock-fetch URL targets GutterToken. CodeQL is right that a bare
+ * `startsWith('https://api.guttertokens.com')` admits hosts like
+ * api.guttertokens.com.evil.example even in a test double, so compare the
+ * parsed ORIGIN — the same discipline the shipped transport gets for free by
+ * only ever building its own URL.
+ */
+const isGutterTokenUrl = (url) => new URL(url).origin === 'https://api.guttertokens.com'
+
+
 const BASE = 'https://relay.example'
 const KEY = 'sk-gt-0123456789abcdefghijklmnopqrstuvwxyz'
 const THREAD = [
@@ -180,7 +190,7 @@ describe('GutterToken rail', () => {
   it('answers a member-data tool_use without a grant as an is_error result naming the grant, then returns the model’s text', async () => {
     saveGutterTokenKey(account, KEY)
     const fetchImpl = vi.fn(async (url) => {
-      if (!url.startsWith('https://api.guttertokens.com')) throw new Error(`unexpected ${url}`)
+      if (!isGutterTokenUrl(url)) throw new Error(`unexpected ${url}`)
       return fetchImpl.mock.calls.length === 1
         ? gt([use('t1', 'get_wagers', { first: 2 })], 'tool_use')
         : gt([text('I could not read your wagers without the read grant.')])
@@ -193,7 +203,7 @@ describe('GutterToken rail', () => {
     expect(second.messages[4].content[0]).toMatchObject({ type: 'tool_result', tool_use_id: 't1', is_error: true })
     expect(second.messages[4].content[0].content).toContain('sign the 24-hour read grant')
     // The gateway was never contacted: no grant, no request.
-    expect(fetchImpl.mock.calls.every((c) => c[0].startsWith('https://api.guttertokens.com'))).toBe(true)
+    expect(fetchImpl.mock.calls.every((c) => isGutterTokenUrl(c[0]))).toBe(true)
   })
 
   it('maps upstream failures to the shared error contract', async () => {
@@ -218,7 +228,7 @@ describe('honesty at the end of the turn', () => {
     saveGutterTokenKey(account, KEY)
     const fetchImpl = vi.fn().mockResolvedValue(gt([text('still looking…'), use('t', 'get_gateway_status')], 'tool_use'))
     const gateway = vi.fn().mockResolvedValue(response(200, { status: 'ok' }))
-    const both = (url, opts) => (url.startsWith('https://api.guttertokens.com') ? fetchImpl(url, opts) : gateway(url, opts))
+    const both = (url, opts) => (isGutterTokenUrl(url) ? fetchImpl(url, opts) : gateway(url, opts))
     const result = await runAssistantTurn({ account, provider: 'guttertoken', thread: THREAD, relayerBase: BASE, fetchImpl: both, maxRounds: 2 })
     expect(result).toMatchObject({ reply: 'still looking…', roundsExhausted: true })
     expect(fetchImpl).toHaveBeenCalledTimes(3)
@@ -242,8 +252,8 @@ describe('retention', () => {
     const before = new Set(Object.keys(localStorage))
     const gateway = vi.fn().mockResolvedValue(response(200, { status: 'ok', memberApi: { enabled: true } }))
     const fetchImpl = vi.fn(async (url, opts) => {
-      if (!url.startsWith('https://api.guttertokens.com')) return gateway(url, opts)
-      return fetchImpl.mock.calls.filter((c) => c[0].startsWith('https://api.guttertokens.com')).length === 1
+      if (!isGutterTokenUrl(url)) return gateway(url, opts)
+      return fetchImpl.mock.calls.filter((c) => isGutterTokenUrl(c[0])).length === 1
         ? gt([use('t1', 'get_gateway_status')], 'tool_use')
         : gt([text('The gateway is answering.')])
     })
