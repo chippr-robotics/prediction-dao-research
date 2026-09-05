@@ -590,3 +590,61 @@
   padding: 0.6rem 0.8rem;
   margin: 0.5rem 0;
 }
+
+/* Spec 105 — queue readability: chips, decoded titles, needs-you. */
+.vault-queue__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.vault-queue .vault-queue__chip {
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  min-height: 36px;
+}
+
+.vault-queue .vault-queue__chip.is-active {
+  background: var(--primary-button);
+  color: var(--primary-button-text);
+  border-color: var(--primary-button);
+}
+
+.vault-queue__title {
+  flex-basis: 100%;
+  font-weight: 600;
+}
+
+.vault-queue__title-on {
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.vault-queue__signed {
+  margin: 0.15rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.vault-queue__signed[data-needs-you='true'] {
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.vault-queue .vault-queue__primary-action {
+  background: var(--primary-button);
+  color: var(--primary-button-text);
+  border: none;
+  border-radius: 10px;
+  width: 100%;
+}
+
+.vault-queue__footer {
+  margin-top: 0.6rem;
+  text-align: center;
+}

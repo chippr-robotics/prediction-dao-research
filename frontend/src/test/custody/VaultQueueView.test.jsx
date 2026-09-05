@@ -306,5 +306,62 @@ describe('VaultQueueView — a network this session cannot sign on', () => {
     render(<VaultQueueView group={group(137)} />)
     expect(screen.getAllByRole('button', { name: /^approve$/i }).length).toBeGreaterThan(0)
   })
+
+  // ---------------------------------------------------------------------------
+  // Spec 105 (US5) — chips, needs-you, decoded rows
+  // ---------------------------------------------------------------------------
+  it('chips filter the rows without touching the per-chain read disclosure (FR-021)', () => {
+    render(<VaultQueueView group={group(137)} />)
+    expect(screen.getAllByTestId('vault-queue-row')).toHaveLength(2)
+    fireEvent.click(screen.getByTestId('vault-queue-chip-8453'))
+    const rows = screen.getAllByTestId('vault-queue-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveAttribute('data-chain-id', '8453')
+    // The four-state per-chain disclosure is untouched by the chip.
+    expect(screen.getAllByTestId('vault-queue-chain')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    expect(screen.getAllByTestId('vault-queue-row')).toHaveLength(2)
+  })
+
+  it('"Needs you" counts pending items awaiting THIS member and filters to them (FR-023)', () => {
+    // H1: not yet approved by ME (needs me). H2: already approved by ME (waits on the other owner).
+    queueCtx.byChain[8453].proposals = [proposal(8453, H2, { approvers: [ME] })]
+    queueCtx.rows = [proposal(137, H1), proposal(8453, H2, { approvers: [ME] })]
+    render(<VaultQueueView group={group(137)} />)
+    const chip = screen.getByTestId('vault-queue-chip-needs-you')
+    expect(chip).toHaveTextContent('Needs you (1)')
+    fireEvent.click(chip)
+    const rows = screen.getAllByTestId('vault-queue-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveAttribute('data-chain-id', '137')
+    expect(within(rows[0]).getByTestId('vault-queue-signed')).toHaveTextContent('1 of 2 signed · needs you')
+  })
+
+  it('an approved item says whom it waits on, not "needs you"', () => {
+    queueCtx.rows = [proposal(137, H1, { approvers: [ME] })]
+    queueCtx.byChain[137].proposals = queueCtx.rows
+    render(<VaultQueueView group={group(137)} />)
+    expect(screen.getByTestId('vault-queue-signed')).toHaveTextContent(/waiting on other owners/i)
+  })
+
+  it('a recognised native send is described in plain language; unknown calldata keeps the raw row (FR-022)', () => {
+    queueCtx.rows = [
+      proposal(137, H1, { value: '1500000000000000000', data: '0x' }),
+      proposal(8453, H2, { data: '0xdeadbeef' }),
+    ]
+    queueCtx.byChain[137].proposals = [queueCtx.rows[0]]
+    queueCtx.byChain[8453].proposals = [queueCtx.rows[1]]
+    render(<VaultQueueView group={group(137)} />)
+    const titles = screen.getAllByTestId('vault-queue-title')
+    expect(titles).toHaveLength(1)
+    expect(titles[0]).toHaveTextContent(/Send 1\.5 POL on Polygon/)
+    // The undecoded row still renders honestly (hash + recipient), with no guessed title.
+    expect(screen.getAllByTestId('vault-queue-row')).toHaveLength(2)
+  })
+
+  it('states the honest footer: queued items stay on their own chain', () => {
+    render(<VaultQueueView group={group(137)} />)
+    expect(screen.getByText(/queued items stay on their own chain/i)).toBeInTheDocument()
+  })
 })
 

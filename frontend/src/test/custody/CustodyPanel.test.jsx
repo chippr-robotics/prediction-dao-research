@@ -120,11 +120,13 @@ describe('CustodyPanel', () => {
   // Spec 068 (FR-005) — an unsupported connected network withdraws vault CREATION only. The vault
   // list keeps rendering, because a member's vaults live on their own chains and must not vanish
   // because the wallet happens to be pointed somewhere else.
-  it('withdraws vault creation on an unsupported chain but keeps the vault list', () => {
+  it('keeps the vault door open on ANY connected chain — creation is chain-abstracted (spec 105)', () => {
     walletCtx = { chainId: 1 }
     renderPanel()
-    expect(screen.getByText(/cannot be created on this network/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^create vault$/i })).not.toBeInTheDocument()
+    // No "cannot be created here" banner: the guided flow deploys to the networks the member
+    // picks, switching the wallet only when a signature needs it.
+    expect(screen.queryByText(/cannot be created on this network/i)).not.toBeInTheDocument()
+    expect(screen.getByTestId('custody-open-vault-actions')).toBeEnabled()
     expect(screen.getByText(/no vaults yet/i)).toBeInTheDocument()
   })
 
@@ -135,12 +137,6 @@ describe('CustodyPanel', () => {
     renderPanel()
     fireEvent.click(trigger(/Verify/i))
     expect(screen.getByRole('button', { name: /check a signature/i })).toBeInTheDocument()
-  })
-
-  it('names the custody chains a member can switch to (FR-005)', () => {
-    walletCtx = { chainId: 1 }
-    renderPanel()
-    expect(screen.getByText(/custody is available on/i)).toBeInTheDocument()
   })
 
   it('has no axe violations', async () => {
@@ -162,12 +158,12 @@ describe('CustodyPanel', () => {
     }
   })
 
-  it('offers the sheet on an unsupported chain, with creation closed and the reason stated', () => {
+  it('offers the sheet on an unsupported chain with creation still OPEN (spec 105)', () => {
     walletCtx = { chainId: 1 }
     renderPanel()
     fireEvent.click(screen.getByTestId('custody-open-vault-actions'))
-    expect(screen.getByTestId('vault-action-create')).toBeDisabled()
-    expect(screen.getByTestId('vault-action-create')).toHaveTextContent(/not available on/i)
+    expect(screen.getByTestId('vault-action-create')).toBeEnabled()
+    expect(screen.getByTestId('vault-action-load')).toBeEnabled()
   })
 
   it('closes propose and approve while no vault is open', () => {

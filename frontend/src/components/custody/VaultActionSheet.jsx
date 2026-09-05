@@ -2,7 +2,7 @@
  * VaultActionSheet (release 1.14.0) — the four things a member does with a multisig vault, behind
  * one bottom sheet instead of scattered across the Protect card.
  *
- *   Create vault          → CreateVaultWizard   (spec 043/049/068)
+ *   Create vault          → CreateVaultFlow     (spec 105 guided multichain flow)
  *   Load a vault          → LoadVaultForm       (spec 068 cross-chain search)
  *   Propose a transaction → ProposeTransactionForm (spec 043 US2 / 049 FR-012 pre-flight)
  *   Approve or execute    → VaultProposalsPanel (spec 043 US2 queue + governance)

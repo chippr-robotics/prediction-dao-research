@@ -121,6 +121,11 @@ export default function CreateVaultFlow({ connectedAddress, chainId, onDone, onC
 
   return (
     <div className="create-flow" aria-label="Create a vault">
+      {error && step !== 'type' && (
+        <p className="create-flow__error" role="alert">
+          {error}
+        </p>
+      )}
       {step === 'type' && (
         <TypeSheet
           presetType={presetType}
@@ -154,11 +159,6 @@ export default function CreateVaultFlow({ connectedAddress, chainId, onDone, onC
       )}
       {step === 'networks' && (
         <>
-          {error && (
-            <p className="create-flow__error" role="alert">
-              {error}
-            </p>
-          )}
           <NetworksSheet
             availableChainIds={available}
             selected={selected}

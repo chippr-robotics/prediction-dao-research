@@ -49,6 +49,7 @@ export function describeProposal(proposal, opts = {}) {
       kind: 'transfer-native',
       title: `Send ${trimAmount(formatUnits(value, 18))} ${nativeSymbol}`,
       detail: `to ${name(proposal.to)}`,
+      counterparty: getAddress(proposal.to),
     }
   }
 
@@ -62,6 +63,7 @@ export function describeProposal(proposal, opts = {}) {
       kind: 'transfer-erc20',
       title: `Send ${trimAmount(formatUnits(amount, meta.decimals))} ${meta.symbol}`,
       detail: `to ${name(to)}`,
+      counterparty: getAddress(to),
     }
   } catch {
     /* not an ERC-20 transfer */
