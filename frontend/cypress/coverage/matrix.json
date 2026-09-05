@@ -2607,7 +2607,7 @@
       "flows": [
         {
           "id": "assistant.opt-in",
-          "name": "The assistant does not exist until Settings turns it on, and stops existing when it is turned off",
+          "name": "The assistant does not exist until Tools ▸ Assistant turns it on, and stops existing when it is turned off",
           "status": "covered",
           "tier": "no-chain",
           "depth": "flow",
@@ -2631,7 +2631,7 @@
         },
         {
           "id": "assistant.memory-clear",
-          "name": "Conversation memory is device-local, counted in Settings, and clearable to nothing",
+          "name": "Conversation memory is device-local, counted on the Assistant tab, and clearable to nothing",
           "status": "covered",
           "tier": "no-chain",
           "depth": "settled",
@@ -2682,7 +2682,7 @@
             "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-09",
             "frontend/cypress/e2e/full/39-api-access-console.cy.js::API-10"
           ],
-          "note": "The console is a spec-073 registry package, so its surface only exists where a registry can be written to and package bytes can be served: the on-chain tier publishes api-access through publish:local:miniapps and launches it through the real submit/approve/launchable path, with only the IPFS transport and the member API stubbed (bodies copied from services/relay-gateway/src/memberApi/). API-06 reads the permission set out of the manifest the chain committed to \u2014 no wallet:submit, no contracts \u2014 and API-10 asserts the key ceremony lands on the HOST Settings card, because a package cannot sign. API-08 reads the app's store namespace back out of localStorage to prove the bearer token was never persisted. The unconfigured-gateway branch of the host card is NOT reachable from any e2e build (no dev server produces relayerBaseUrl() === ''), so it is held at unit level in frontend/src/test/ApiAccessPanel.test.jsx instead."
+          "note": "The console is a spec-073 registry package, so its surface only exists where a registry can be written to and package bytes can be served: the on-chain tier publishes api-access through publish:local:miniapps and launches it through the real submit/approve/launchable path, with only the IPFS transport and the member API stubbed (bodies copied from services/relay-gateway/src/memberApi/). API-06 reads the permission set out of the manifest the chain committed to \u2014 no wallet:submit, no contracts \u2014 and API-10 asserts the key ceremony lands on the HOST's api-access card — on Tools ▸ Assistant since spec 104, card id unchanged — because a package cannot sign. API-08 reads the app's store namespace back out of localStorage to prove the bearer token was never persisted. The unconfigured-gateway branch of the host card is NOT reachable from any e2e build (no dev server produces relayerBaseUrl() === ''), so it is held at unit level in frontend/src/test/ApiAccessPanel.test.jsx instead."
         }
       ]
     },
@@ -3023,6 +3023,86 @@
           "tests": [
             "frontend/cypress/e2e/fast/42-protect-vault-sheet.cy.js::VS-10"
           ]
+        }
+      ]
+    },
+    {
+      "id": "104-guttertoken-assistant-rail",
+      "title": "GutterToken assistant rail and client-side tools",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "byok.key-lifecycle",
+          "name": "Save a GutterToken key only when GutterToken accepts it, keep it when GutterToken cannot be reached, and remove it",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/47-assistant-rails.cy.js::GT-01",
+            "frontend/cypress/e2e/fast/47-assistant-rails.cy.js::GT-02"
+          ],
+          "note": "The key spends the member's OWN prepaid GutterToken credit, so the two save outcomes are asserted apart: a 401 refuses the save and stores nothing, while an unreachable GutterToken saves WITH the failure shown (spec 069's rule — a timeout is a fact about the network, not about the key). GT-01 then sweeps the DOM for the raw key and proves the only storage entry holding it is the wallet-scoped assistant_guttertoken_key_v1; GT-02 removes it and reads the absence back from storage, not from the card's own state."
+        },
+        {
+          "id": "byok.non-member-chat",
+          "name": "A non-member with a saved key gets an answer straight from GutterToken, with no request to the FairWins chat route",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/47-assistant-rails.cy.js::GT-03"
+          ],
+          "note": "SC-001, and the absence is the assertion: the gateway chat route is intercepted only so the spec can prove it received nothing, while the reply is served from the intercepted api.guttertokens.com POST. Membership answers tier 0 at the RPC transport, so the launcher is reached by the key alone."
+        },
+        {
+          "id": "byok.honest-failures",
+          "name": "GutterToken's 403 and 429 each get their own sentence and action, and neither produces a reply bubble",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/47-assistant-rails.cy.js::GT-04"
+          ],
+          "note": "SC-002. An empty balance is the member's own money running out, so it names the balance and links to GutterToken billing; a 429 is GutterToken's per-network rate limit and carries the Retry-After it sent. Both are asserted with .assistant-panel__message--assistant absent — an invented reply is the one failure a member cannot detect."
+        },
+        {
+          "id": "provider.choice",
+          "name": "A paid member switches rails, and the badge and the transport agree about which one answered",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "disclosure",
+          "tests": [
+            "frontend/cypress/e2e/fast/47-assistant-rails.cy.js::GT-05"
+          ],
+          "note": "The badge is a claim about where the member's words went and who paid, so it is checked against the request counters on both endpoints rather than against itself: on GutterToken the gateway chat route stays at zero calls, and on FairWins api.guttertokens.com does."
+        },
+        {
+          "id": "tools.honest-progress",
+          "name": "A tool round shows what is being read and reports a failed read as could not be read, never as zero",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/47-assistant-rails.cy.js::GT-06"
+          ],
+          "note": "The model asks for two reads in one round; the member API answers one and refuses the other. The refused one must render as 'could not be read' in both the live progress row and the Sources line — an unreadable chain is not an empty one, and the panel never gets to fill the gap with a zero."
+        },
+        {
+          "id": "controls.moved-to-tools",
+          "name": "The agent controls live on Tools ▸ Assistant, Settings no longer carries them, and the old Settings hashes redirect",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/47-assistant-rails.cy.js::GT-07"
+          ],
+          "note": "SC-005. Both halves are asserted, because a tab that renders the cards while Settings still renders them too is two homes for one control: the redirect is read off the resolved URL, and the card lands OPEN rather than at a closed heading."
         }
       ]
     },

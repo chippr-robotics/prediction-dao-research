@@ -178,6 +178,7 @@ nav:
   - Research:
     - Dex v3 Integration Analysis: research/dex-v3-integration-analysis.md
     - Alternative Approaches (Appendix): research/dex-v3-alternative-approaches.md
+    - GutterToken Assistant Integration: research/guttertoken-assistant-integration.md
   - Reference:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md

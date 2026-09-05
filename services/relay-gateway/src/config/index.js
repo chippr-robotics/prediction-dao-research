@@ -153,6 +153,10 @@
  *   ASSISTANT_MAX_TOKENS       per-turn output ceiling (default 1024). HARD-CAPPED at 4096 in code —
  *                              boot fails above it. This is the only bound on what one request can
  *                              cost, so it is not something an env file may raise without limit
+ *   ASSISTANT_MAX_ROUNDS       tool rounds per member turn (default 4; spec 104). HARD-CAPPED at 8 in
+ *                              code — the browser runs the tool loop and each round is its own
+ *                              request here, so this multiplies what one question can cost. Exported
+ *                              on /status as memberApi.assistant.maxRounds
  *   ASSISTANT_TIMEOUT_MS       upstream request timeout (default 30000)
  *   ASSISTANT_QUOTA_PER_ACCOUNT / _GLOBAL   model calls/window, in a class of their own, tighter than
  *                              the module's general read quota (defaults 20/60). A read and a model
@@ -203,7 +207,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CHAIN_DEFS } from './chains.js'
 import { actionsForContract } from '../intent/intentTypes.js'
-import { MAX_TOKENS_CEILING, maxTurnTokens } from '../memberApi/assistant.js'
+import { MAX_ROUNDS_CEILING, MAX_TOKENS_CEILING, MAX_TOOL_ROUNDS, maxTurnTokens } from '../memberApi/assistant.js'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/
@@ -769,6 +773,10 @@ export function loadConfig(env = process.env, opts = {}) {
       const assistantEnabled = opt(env, 'ASSISTANT_ENABLED', 'false').toLowerCase() === 'true'
       const assistantBaseUrl = opt(env, 'ASSISTANT_BASE_URL', 'https://api.anthropic.com')
       const assistantMaxTokens = int(env, 'ASSISTANT_MAX_TOKENS', 1024)
+      // Tool rounds per member turn (spec 104). The browser runs the loop and each round is its own
+      // request here, so this is the multiplier on everything the per-turn ceiling bounds; capped
+      // in code by MAX_ROUNDS_CEILING for the same reason ASSISTANT_MAX_TOKENS is.
+      const assistantMaxRounds = int(env, 'ASSISTANT_MAX_ROUNDS', MAX_TOOL_ROUNDS)
       // Model spend. The per-turn output ceiling is capped by MAX_TOKENS_CEILING (imported rather
       // than restated — a duplicated ceiling is two ceilings that agree today), and the rest of this
       // block bounds what SPEND may accumulate. The request quotas above bound TRAFFIC; only these
@@ -836,6 +844,13 @@ export function loadConfig(env = process.env, opts = {}) {
               `[relay-gateway] ASSISTANT_MAX_TOKENS=${assistantMaxTokens} must be between 1 and ` +
                 `${MAX_TOKENS_CEILING}. This is the per-turn output ceiling — the only bound on what a ` +
                 'SINGLE request can cost — so it is capped in code rather than left to the env file.'
+            )
+          }
+          if (assistantMaxRounds < 1 || assistantMaxRounds > MAX_ROUNDS_CEILING) {
+            throw new Error(
+              `[relay-gateway] ASSISTANT_MAX_ROUNDS=${assistantMaxRounds} must be between 1 and ` +
+                `${MAX_ROUNDS_CEILING}. Each tool round is a separate model call, so this multiplies what ` +
+                'one member question can cost; it is capped in code rather than left to the env file.'
             )
           }
           if (assistantQuotaPerAccount < 1 || assistantQuotaGlobal < 1) {
@@ -911,6 +926,9 @@ export function loadConfig(env = process.env, opts = {}) {
           baseUrl: assistantBaseUrl,
           model: opt(env, 'ASSISTANT_MODEL', 'claude-sonnet-5'),
           maxTokens: assistantMaxTokens,
+          // Public config, exported on /status as `maxRounds` so the browser loop reads its ceiling
+          // from the gateway it is talking to rather than assuming the package default.
+          maxRounds: assistantMaxRounds,
           timeoutMs: int(env, 'ASSISTANT_TIMEOUT_MS', 30_000),
           // A tighter request class than the module's general read quota: an assistant turn costs
           // real money, so 120 reads/min and 120 model calls/min are not the same permission.

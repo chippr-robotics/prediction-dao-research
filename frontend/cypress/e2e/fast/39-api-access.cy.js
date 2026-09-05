@@ -39,7 +39,12 @@
 
 const ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 
-/** Settings card ids double as `data-attention` markers and as deep-link hashes (spec 081). */
+/**
+ * Card ids double as `data-attention` markers and as deep-link hashes (spec 081). The id survived
+ * spec 104's move of this card off Settings onto the Assistant tab in Tools, so the OLD link below
+ * still lands on it — by redirect, which is why every assertion here names the card and none names
+ * the tab. The redirect itself is held once, in 47-assistant-rails.cy.js [GT-07].
+ */
 const API_ACCESS_URL = '/wallet?tab=settings#api-access'
 
 /** Wallet-scoped metadata store — `lib/apiAccess/apiKeys.js` + `utils/userStorage.js`. */
