@@ -536,6 +536,9 @@ export function loadConfig(env = process.env, opts = {}) {
     // Unset => SIGHUP answers honestly that nothing can reload. The process env is frozen at
     // exec, which is why the source is a FILE — the same mounted env file the deploy delivers.
     reloadEnvFile: opt(env, 'RELOAD_ENV_FILE', null),
+    // Counters endpoint for the FinOps exporter (spec 105/#1447). 0/unset = off. The compose file
+    // must NEVER publish this port to the host — it is compose-network-internal by design.
+    metricsPort: int(env, 'METRICS_PORT', 0),
     quotas: {
       signerPerWindow: int(env, 'SIGNER_QUOTA_PER_MIN', 12),
       globalPerWindow: int(env, 'GLOBAL_QUOTA_PER_MIN', 120),

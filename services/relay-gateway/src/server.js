@@ -41,6 +41,7 @@ import { loadSigningKey } from './access/jwt.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createReloadHandler } from './policy/reload.js'
+import { createIdentityCounters, startCountersServer } from './metrics/counters.js'
 import { createEngineClient } from './engine/client.js'
 import { applyEngineEvent } from './engine/webhook.js'
 import { createOpenSeaClient } from './opensea/client.js'
@@ -333,6 +334,7 @@ export function createApp(config, deps = {}) {
   // The challenge verifier registers unconditionally and ABSTAINS when unconfigured — the
   // registered-but-abstaining shape is what keeps /status able to say "not-configured" honestly
   // instead of omitting a tier the ladder declares.
+  const identityCounters = deps.identityCounters ?? createIdentityCounters()
   const identityVerifiers = [
     createAttestationVerifier(),
     createChallengeVerifier(config.identity?.challenge ?? {}, {
@@ -352,6 +354,7 @@ export function createApp(config, deps = {}) {
         get enforce() {
           return config.identity?.enforce === true
         },
+        counters: identityCounters,
       },
       identityVerifiers
     )
@@ -531,8 +534,10 @@ export function createApp(config, deps = {}) {
           upstreams: {
             state: 'read', // in-process counters: readable by construction, volatile by design
             windowCalls: upstreamCeilings.snapshot(),
+            cumulativeCalls: upstreamCeilings.cumulative(),
             ceilings: config.identity?.upstreamCeilings ?? {},
           },
+          tierRequests: identityCounters.snapshot(),
           access: accessStatus(config, { signingKey: accessSigningKey, enforcement: accessEnforcement }),
         }
       : {}
@@ -1146,7 +1151,7 @@ export function createApp(config, deps = {}) {
     res.status(400).json({ error: { code: 'bad_request', reason: 'invalid request body' } })
   })
 
-  return { app, killSwitch, store, dedup }
+  return { app, killSwitch, identityCounters, upstreamCeilings, store, dedup }
 }
 
 // ---- boot (only when run directly; tests import createApp) -----------------------------------
@@ -1180,7 +1185,12 @@ if (isMain) {
     process.exit(1)
   }
 
-  const { app, killSwitch } = createApp(config)
+  const { app, killSwitch, identityCounters, upstreamCeilings } = createApp(config)
+  // Usage counters endpoint (spec 105/#1447): an UNPUBLISHED compose-network port the FinOps
+  // exporter scrapes. Unset => not started; the exporter's source reads not-configured, honestly.
+  if (config.metricsPort) {
+    startCountersServer({ port: config.metricsPort, counters: identityCounters, upstreamCeilings })
+  }
   // Runtime kill switch: `kill -USR2 <pid>` toggles accept/refuse (FR-015).
   process.on('SIGUSR2', () => {
     const active = killSwitch.toggle()

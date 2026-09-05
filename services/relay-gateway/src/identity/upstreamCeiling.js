@@ -45,6 +45,10 @@ import { GatewayError } from '../errors.js'
 export function createUpstreamCeilings(limits = {}, windowMs = 60_000, now = () => Date.now()) {
   /** @type {Map<string, number[]>} upstreamId -> call timestamps */
   const calls = new Map()
+  /** Cumulative since boot, counted for EVERY outbound call — unlimited upstreams included —
+   * because the FinOps usage series (#1447) is attribution, not enforcement, and an uncapped
+   * upstream is exactly the one whose consumption most needs to be visible. */
+  const cumulative = Object.create(null)
 
   const prune = (arr, cutoff) => {
     let i = 0
@@ -61,6 +65,7 @@ export function createUpstreamCeilings(limits = {}, windowMs = 60_000, now = () 
      * prevent. There is no way to use this and still spend past the cap.
      */
     take(upstreamId) {
+      cumulative[upstreamId] = (cumulative[upstreamId] ?? 0) + 1
       const limit = limits[upstreamId]
       if (!limit || limit <= 0) return // unset means unlimited — an ABSENT cap, stated as such
 
@@ -78,6 +83,12 @@ export function createUpstreamCeilings(limits = {}, windowMs = 60_000, now = () 
       }
       live.push(t)
       calls.set(upstreamId, live)
+    },
+
+    /** Cumulative outbound calls since boot, per upstream — the counter the FinOps exporter
+     * scrapes (rate() over it survives restarts like any Prometheus counter). */
+    cumulative() {
+      return { ...cumulative }
     },
 
     /** Operator telemetry: calls made in the current window, per upstream. Never a member label. */

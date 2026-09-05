@@ -202,6 +202,27 @@ The usage is real and is exported separately as `vendor_usage`. Token needs Zone
 If the plan includes the enterprise `/exporter/prometheus` endpoint, set `QUICKNODE_PROMETHEUS_URL`
 — it is the vendor's own metrics and is preferred over parsing the usage JSON.
 
+### gateway-upstream-usage
+
+Measured request counts from the relay-gateway (spec 105, #1447): per assurance tier and per
+platform-credentialed upstream. **Not a dollar** — it is the attribution series beside the vendor
+cost panels, and the one that says where the QuickNode account's shared 50 req/s went.
+
+- **Enable**: set `METRICS_PORT` on the gateway (compose-network internal — **never publish this
+  port to the host**) and `FINOPS_GATEWAY_METRICS_URL` on the exporter (e.g.
+  `http://gateway:9091/counters`). Unset ⇒ the source reads `not-configured`, which is the honest
+  state, not a failure.
+- **Unreadable** means the exporter cannot reach the gateway's counters port — a scrape problem,
+  never "no traffic". Check the compose network and that the gateway logged the counters listener
+  at boot (a bind failure logs and stands down; it never takes the gateway with it).
+- **Counters are cumulative-since-boot.** A restart is an ordinary Prometheus counter reset:
+  `rate()` shows a moment of zero slope, never a negative and never a phantom level. This is why
+  in-process counters are admissible here when the catalogue rejects them for revenue LEVELS — the
+  reasoning lives at `services/finops-exporter/src/collectors/gateway.js`.
+- **Labels are bounded by construction** (tiers from the fixed ladder, upstreams from the route
+  table) and re-bounded by the collector, which drops anything outside the expected sets rather
+  than trusting the scrape target with a cardinality promise.
+
 ### self-cost
 
 What this system costs: the Grafana Cloud plan plus the BigQuery query spend the exporter incurs.

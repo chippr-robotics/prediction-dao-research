@@ -86,6 +86,7 @@ export function createIdentityMiddleware(options = {}, verifiers = []) {
       req.caller = { ...ANONYMOUS_IDENTITY, evidence: [], enforcement: 'off' }
       req.callerSubject = subjectFor(req.caller, req)
       res.setHeader(TIER_HEADER, req.caller.tier)
+      options.counters?.hitTier(req.caller.tier)
       return next()
     }
 
@@ -98,6 +99,10 @@ export function createIdentityMiddleware(options = {}, verifiers = []) {
       const route = lookupRoute(req.method, req.path)
       req.callerRoute = route
       res.setHeader(TIER_HEADER, identity.tier)
+      // Usage attribution (#1447): counted at RESOLUTION, refusals included — a refused request
+      // still consumed identity work, and an attribution series that only counts successes would
+      // understate exactly the traffic an operator is trying to see.
+      options.counters?.hitTier(identity.tier)
 
       if (!enforce) return next()
 
@@ -145,6 +150,7 @@ export function createIdentityMiddleware(options = {}, verifiers = []) {
       req.caller = { ...ANONYMOUS_IDENTITY, evidence: [], enforcement: 'degraded' }
       req.callerSubject = subjectFor(req.caller, req)
       res.setHeader(TIER_HEADER, req.caller.tier)
+      options.counters?.hitTier(req.caller.tier)
 
       // Reads carry an anonymous minimum, so they keep serving — which is the whole reason the
       // ladder puts them there. A gated route, though, must NOT fall open just because the code
