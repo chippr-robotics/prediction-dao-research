@@ -229,9 +229,11 @@ and the sub-issue is where its state lives — not in your context, which the ne
   two things, one of which nobody reviewed.
 - **If it is wrong**: say what is wrong on the sub-issue and hand it back. Silently fixing it means
   the next identical task is delegated with the same instructions.
-- **When it is right**: put **`Closes #<sub-issue>`** in the PR body — that is what links and closes
-  it, on merge, without anyone remembering to. After the merge, **verify it actually closed**; a
-  closing keyword in a comment rather than the body does nothing.
+- **When it is right**: put **`Closes #<sub-issue>`** in the PR body — that LINKS the PR to the
+  issue, which is how the next reader finds the work. It does **not** close it: GitHub honours
+  closing keywords only on the repo's default branch (`main`), and feature PRs here target
+  `staging`. After the merge, **close it yourself** (`state: closed`, `state_reason: completed`)
+  and read it back to confirm.
 - **If it stalls**: `blocked` **plus a comment naming the blocker**, removed when it clears.
 - **If you abandon it**: **unassign** and say why. An assignee is only useful while it is true.
 
@@ -250,6 +252,8 @@ Report final status with summary of completed work.
 - [ ] Implementation validated against specification, plan, and test coverage
 - [ ] Every sub-issue reviewed against its diff (not its report), and assigned/unassigned truthfully
 - [ ] The PR body carries `Closes #N` for the parent and every sub-issue it finishes
+- [ ] After the merge, each of those issues was CLOSED by hand and read back (a `staging` merge
+      closes nothing — see the note above)
 - [ ] Anything stuck carries `blocked` and a comment naming the blocker
 - [ ] Scope left undone is stated explicitly and has a follow-up issue
 - [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above

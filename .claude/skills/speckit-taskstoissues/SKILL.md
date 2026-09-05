@@ -111,12 +111,17 @@ fields below.
 | It stalls on something outside the task | `blocked` **+ a comment naming the blocker** |
 | The blocker clears | Remove `blocked` |
 | Its work is reviewed and pushed | Put **`Closes #<sub-issue>`** in the PR body |
-| The PR merges | The issue closes **itself** — confirm it did |
+| The PR merges | **Close it yourself**, `state_reason: completed`, then read it back |
 | The task is abandoned | **Unassign** and say why |
 
 Every row is a field with one copy or a link GitHub maintains, so none of it can be stale while the
 underlying fact has moved on. Use a closing keyword only for work the PR actually finishes;
 `Part of #N` for work it merely advances.
+
+**`Closes #N` LINKS; it does not close.** GitHub honours closing keywords only when a PR merges into
+the repository's default branch (`main`), and every feature PR here targets `staging` — so nothing
+auto-closes, and the later promotion will not close it either. Keep the keyword for the link, and
+close the issue deliberately after the merge.
 
 **Do not mark a sub-issue done on a subagent's say-so.** Its report is a claim: read the diff, run
 the gates the change touched (`monorepo-verify` skill), and check that it did not quietly widen the

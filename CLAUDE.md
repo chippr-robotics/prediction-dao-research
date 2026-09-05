@@ -41,9 +41,11 @@ and two of its rules change what you do on step 2:
   repo deliberately does NOT paper over that with a mirrored `status:*` label: that
   is a second copy of state GitHub already holds, and it reads as "in progress"
   forever once an agent stops mid-task. Claim by **assigning yourself**, release it
-  by unassigning if you walk away, and close by putting **`Closes #N`** in the PR
-  body — then verify the issue actually closed. Moving the board card is a human
-  task; do not claim you moved it.
+  by unassigning if you walk away. **`Closes #N` in the PR body LINKS but does not
+  close** — GitHub honours closing keywords only on the DEFAULT branch (`main`) and
+  every feature PR here targets `staging`, so closing is a deliberate `issue_write`
+  after the merge, read back to confirm. Moving the board card is a human task; do
+  not claim you moved it.
 
 Branch from `staging`, never from `main`. Delegated work gets a **sub-issue**, and a
 subagent's report is a claim — read the diff and run the gates before accepting it.
@@ -99,8 +101,11 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   A mirror is a second copy of state the repo already holds and it drifts the instant
   an agent stops mid-task, leaving the board confidently wrong. State is read from
   the **assignee** (the claim — release it if you abandon the work), the **linked
-  PRs**, and **open/closed**; closure comes from `Closes #N` in the PR body, verified
-  after the merge. `blocked` is the one label, because an open assigned issue that is
+  PRs**, and **open/closed**. **Closing is deliberate, not a side effect**: a merge
+  into `staging` closes nothing, because GitHub honours closing keywords only on the
+  default branch (`main`) — PR #1461 merged with `Closes #1460` and #1460 stayed open
+  with `closed_by_pull_requests: 0`. Keep the keyword (it links the PR to the issue),
+  then close it yourself with `state_reason: completed` and read it back. `blocked` is the one label, because an open assigned issue that is
   stuck has no other representation — and it is meaningless without a comment naming
   the blocker. Board columns are moved by a human. Sizing and priority are set at
   triage on the **Effort** and **Priority** issue fields (the `size:*` label is the

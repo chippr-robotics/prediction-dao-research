@@ -114,7 +114,9 @@ The frontend is the trust surface for non-technical users.
    - An issue's state is read from state GitHub already keeps exactly once — its
      assignee, its linked pull requests, and whether it is closed — never from a
      mirrored status label, which is a second copy and therefore drifts. Claiming is
-     assigning; closing is `Closes #N` in the PR body. Delegated work gets a
+     assigning; closing is a deliberate act after the merge (`Closes #N` links the
+     PR but does not close it — GitHub honours closing keywords only on the default
+     branch, and feature PRs target `staging`). Delegated work gets a
      **sub-issue**, the only representation the parent issue and the next agent can
      both read.
    - A subagent's report is a claim. The diff is read and the affected gates are run

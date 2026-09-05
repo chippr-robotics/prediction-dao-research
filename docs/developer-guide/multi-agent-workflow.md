@@ -56,7 +56,7 @@ So **status is derived from state GitHub already tracks exactly once**:
 |---|---|---|
 | Is anyone working this? | The **assignee** | One field, set by the agent that claimed it |
 | Has work started? | A **linked PR** (`Closes #N`) | GitHub links it; the PR exists or it does not |
-| Is it done? | The issue is **closed** | Closed by the merge, not by a separate write |
+| Is it done? | The issue is **closed** | Closed deliberately at merge — see the warning in step 8 |
 | What is it part of? | Its **parent / sub-issues** | Real hierarchy, not a naming convention |
 | Is it stuck? | The `blocked` label **plus a comment** | The one state nothing else records — see below |
 
@@ -196,7 +196,7 @@ Then, for each one:
 | You hand the task to a subagent | **Assign it** (to yourself if the subagent has no identity) |
 | The subagent reports back | Nothing yet — **you have not reviewed it** |
 | You reviewed and accepted it | Open the PR with `Closes #<sub-issue>` in its body |
-| The PR merges | The issue closes **itself**; confirm it did |
+| The PR merges | **Close it yourself** (`state_reason: completed`) — step 8's warning |
 | The subagent is stuck outside the task | `blocked` **+ a comment naming the blocker** |
 | You abandon the task | **Unassign**, remove `blocked`, say why |
 
@@ -223,19 +223,27 @@ it yourself — the next identical task will be delegated with the same instruct
 
 ### 8. Close the loop
 
-**The PR body is what closes the issue, so get it right.** This is the whole closure mechanism now
-that there is no status mirror.
+> [!IMPORTANT]
+> **A merge into `staging` does NOT close an issue.** GitHub honours closing keywords only when a PR
+> merges into the repository's **default branch**, which here is `main`. Every feature PR targets
+> `staging` by design (step 3), so no feature PR in this repo auto-closes anything — and the later
+> `staging` → `main` promotion will not close it either, because GitHub reads *that* PR's body, and
+> it does not name your issue.
+>
+> Found the only way it could be: PR #1461 merged with `Closes #1460` in its body, and #1460 stayed
+> open with `closed_by_pull_requests: 0`. **Closing is a deliberate act here. Do it.**
 
 - Open the PR into `staging` as **ready for review**, not draft (draft PRs run no CI here).
-- Put **`Closes #<issue>`** in the body — one line per issue the PR finishes, including every
-  sub-issue it completes. GitHub then links them, shows them on the PR, and closes them **on merge**.
-  A PR that says "fixes the thing in #123" without a closing keyword links nothing and closes
-  nothing.
+- Put **`Closes #<issue>`** in the body anyway — one line per issue the PR finishes, including every
+  sub-issue. It will not close them, but it is what puts the PR on the issue as a linked reference,
+  which is how the next reader finds the work. A PR that says "fixes the thing in #123" without the
+  keyword links nothing.
 - If a PR only *advances* an issue, reference it (`Part of #123`) and do **not** use a closing
-  keyword — a closing keyword on partial work closes an issue that is not done.
-- After the merge, **verify the issues actually closed**. A closing keyword in a comment rather than
-  the PR body does nothing, and a sub-issue nobody named stays open forever. This is a read, not a
-  write: if they are open, the PR body was wrong, so close them by hand and say so.
+  keyword — even here, where it would not fire, it tells a reader the issue is finished when it is
+  not.
+- **After the merge, close each finished issue yourself**: `issue_write`, `state: closed`,
+  `state_reason: completed`, plus a comment naming the PR that delivered it. Then read it back and
+  confirm the state actually changed — a write you did not verify is a claim, not a fact.
 - If part of the scope was left out, say so in the closing comment and open a follow-up issue for
   it. Scaling the work down is the operator's call, not yours — but silently scaling it down is
   nobody's.
@@ -293,7 +301,9 @@ disagrees with the issue, the issue is right.
 - **One agent per issue.** The assignee is the claim. Respect it, and release it if you walk away.
 - **One number per spec, claimed by a merge.** Not by a branch, not by a draft PR.
 - **Branch from `staging`.** Only promotions and declared hotfixes touch `main`.
-- **`Closes #N` in the PR body is how an issue closes.** Verify it actually did after the merge.
+- **Closing is a deliberate act, not a side effect.** `Closes #N` links the PR but does not close
+  the issue — the merge lands on `staging`, and GitHub honours closing keywords only on the default
+  branch. Close it yourself after the merge, then read it back.
 - **Never introduce a second copy of a state GitHub already keeps.** It will drift, and a drifted
   record is worse than no record — it is read with the same confidence as a true one.
 - **A subagent's report is a claim.** Review the diff and run the gates before accepting.
