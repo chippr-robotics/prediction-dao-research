@@ -72,7 +72,7 @@ describe('issuedFetchFor — the wagmi rail (#1470)', () => {
     const impl = vi.fn(async () => ok({ expiresAt: new Date(Date.now() - 1000).toISOString() }))
     await mint(137, impl)
     const rpcCalls = []
-    const fetchFn = issuedFetchFor(137, { fetchImpl: vi.fn(async (url, init) => { rpcCalls.push(url); return ok() }) })
+    const fetchFn = issuedFetchFor(137, { fetchImpl: vi.fn(async (url) => { rpcCalls.push(url); return ok() }) })
     await fetchFn('https://public.example/rpc', {})
     expect(rpcCalls[0]).toBe('https://public.example/rpc') // expired reads as absent, honestly
   })
