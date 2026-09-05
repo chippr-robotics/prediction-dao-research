@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-05
 
-**Status**: Draft — blocked on a capacity decision, not a lockout (see Prerequisites)
+**Status**: Draft — capacity blocker likely dissolves once #1459 lands (see P2a)
 
 **Input**: Split out of `specs/105-gateway-caller-auth/` after Phase 0 research. Spec 105 originally
 carried both caller authentication and keyed data access; research established that the second half
@@ -92,8 +92,42 @@ consume the whole account allowance and starve the bundler.
    latency and on putting platform infrastructure in the read path — neither of which outweighs a
    capacity ceiling the design cannot fit under.
 
-**Measure first**: the per-screen upstream call count for the heaviest multi-chain surface is the
-number that decides this, and it has not been measured. Do that before choosing.
+### P2a. Measured 2026-09-05 — and it changes the answer again
+
+The per-screen call count is now known well enough to decide, and it points at a third option that
+neither of the two above considered.
+
+`hooks/useAccountAssets.js:42-47` issues **one RPC request per asset, per chain**, via
+`Promise.allSettled` over the registry. There is no batching anywhere in the read path. With 16
+curated tokens on chain 1, 8 on chain 137, plus native and wrapped-native entries on each, a
+portfolio spanning the five EVM mainnets is on the order of **50–70 requests per load**.
+
+Against a 50 req/s account cap, **one portfolio load by one user is about one second of the entire
+account's capacity**. Two concurrent loads saturate it and starve the bundler. That is why the
+ceiling bites at current usage despite a small user base — the fan-out, not the user count, is what
+consumes it.
+
+**The cache helps less than it first appears, and it is worth being precise about why.** A shared
+read cache collapses identical requests. Balances are `balanceOf(<user address>)` — unique per user,
+so there is **no cross-user hit rate on the traffic that dominates the volume**. A cache genuinely
+helps the same user reloading inside the TTL, and it helps truly shared reads (block number, gas
+price, price feeds, pool state) — real, but the minority.
+
+**Batching is the bigger and more certain lever.** Multicall3 is deployed at the canonical address
+`0xcA11bde05977b3631167028862bE2a173976CA11` on all five EVM mainnets — verified by `eth_getCode`,
+identical bytecode. Aggregating per-chain balance reads takes a portfolio load from ~50–70 requests
+to **~5–10**: roughly 10×, on exactly the traffic the cache cannot touch, and it works whether reads
+go direct or through a proxy.
+
+**So the sequencing changes.** Batching (#1459) lands first. At ~5–10 requests per load, 50 req/s
+supports a comfortable number of concurrent loads at current usage, and the choice between "raise the
+plan" and "proxy with a cache" is made against a baseline an order of magnitude smaller — quite
+possibly making both unnecessary. The cache then becomes a proportionally larger win, because once
+per-user reads collapse the shared reads are no longer the minority.
+
+> The 50–70 figure is estimated from static reading of the registry assembly, not instrumented at
+> runtime. The order of magnitude is solid; the exact count is not measured, and should be before
+> anything is bought.
 
 ### P3. Spec 105's tier ladder
 
