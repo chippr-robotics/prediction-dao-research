@@ -103,11 +103,11 @@ silently require a purchase.
       403 with a `required` field; **503 for `unverifiable`, never a denial**.
 - [x] **T025** [P] `test/identity/enforcement.test.js` — each refusal code; and the inverse: a read
       route still serves at `anonymous` with the challenge service down.
-- [ ] **T026** `src/policy/quotas.js` — tier-scoped windows keyed on `CallerIdentity.subject`. Tiers
+- [x] **T026** `src/policy/quotas.js` — tier-scoped windows keyed on `CallerIdentity.subject`. Tiers
       never share a window (FR-012).
-- [ ] **T027** Re-key every call site in `{opensea,polymarket,perps,bitcoin}/routes.js` off the
+- [x] **T027** Re-key every call site in `{opensea,polymarket,perps,bitcoin}/routes.js` off the
       caller-asserted address. ~28 sites; **a missed one is a hole in the feature**.
-- [ ] **T028** [P] `test/identity/quotaKeying.test.js` — 40 requests each naming a **different** address
+- [x] **T028** [P] `test/identity/quotaKeying.test.js` — 40 requests each naming a **different** address
       must hit one ceiling (SC-004).
 - [ ] **T029** Per-upstream ceilings checked **before** the upstream call (FR-013). A cap enforced on the
       response bounds nothing.
