@@ -14,6 +14,9 @@ credits, as an alternative to the members-only FairWins-funded rail. Measures wh
 API actually offers (open CORS, bearer keys, no account or balance endpoint, no delegated auth),
 compares bring-your-own-key browser-direct, gateway passthrough, a FairWins-owned account, and a
 mini-app, and recommends the browser-direct pattern surfaced through the existing bottom sheets.
+Part II evaluates how the existing MCP server should relate to the assistant and recommends a
+client-side tool loop over a shared tool table rather than the MCP transport or Anthropic's MCP
+connector.
 
 ### [Dex v3 Integration Analysis](dex-v3-integration-analysis.md)
 

@@ -2,10 +2,12 @@
 
 **Status**: Evaluation — input to a `/speckit-specify` for the feature
 **Date**: 2026-09-05
-**Scope**: How FairWins members could use [GutterToken](https://app.guttertokens.com/docs) prepaid
-credits to run the spec-095 assistant, as an alternative to the members-only, FairWins-funded rail.
-Evaluates the three surface options that were on the table (a mini-app, a series of bottom sheets,
-"let the member add an API key") and recommends one.
+**Scope**: Part I — how FairWins members could use [GutterToken](https://app.guttertokens.com/docs)
+prepaid credits to run the spec-095 assistant, as an alternative to the members-only, FairWins-funded
+rail; evaluates the three surface options that were on the table (a mini-app, a series of bottom
+sheets, "let the member add an API key") and recommends one. Part II (§ 8) — how the existing
+`services/mcp-server` should relate to the in-app assistant so the assistant can actually read the
+member's data, on either rail.
 
 Sources: the GutterToken public docs, signup page and Acceptable Use Policy as served on 2026-09-05;
 live probes of `api.guttertokens.com` (recorded below); and a read of the spec-095 assistant seams
@@ -276,9 +278,13 @@ only and never backed up, paste field, Test, Save. Reached from the Settings row
 
 **Assistant panel** first-open step: when the account has no active membership and no key, the
 "Sign to start" step becomes a chooser — *Become a member* (link) | *Use your own GutterToken
-credits* (key sheet). When a key exists and the provider is GutterToken, no session grant is
-requested at all: there is nothing for the gateway to authorise. The sheet header states the
-provider ("Answered by GutterToken on your credits"); the per-reply disclosure stays as it is.
+credits* (key sheet). When a key exists and the provider is GutterToken, the *chat* needs no
+session grant — the gateway is not in the model path — but the **tools** in Part II do: reading the
+member's own wagers or membership is a member-API call, and it needs the same 24-hour grant the
+FairWins rail mints. So a member on the GutterToken rail is offered the grant when they first ask
+something that needs their data, and a non-member gets the public tools only (§ 8.4). The sheet
+header states the provider ("Answered by GutterToken on your credits"); the per-reply disclosure
+stays as it is.
 
 **Nav search** (`config/navSearchIndex.js`): add `guttertoken`, `byok`, `api key` synonyms on the
 Assistant card so "guttertoken" in the drawer lands on the card.
@@ -366,3 +372,193 @@ once. Ship the seam provider-shaped (`providers/guttertoken.js`) with a fixed ba
 5. **Should the member choose the model?** Deferred; if yes, populate from `/v1/models` and state
    that rates differ, without rendering them.
 6. **Referral disclosure wording** in the Settings row — legal to confirm.
+
+---
+
+# Part II — Making the assistant useful: the MCP server and tools
+
+## 8. The assistant has no hands, and the MCP server is a transport, not a brain
+
+### 8.1 What exists, as read
+
+**The in-app assistant calls the model with no tools.** `services/relay-gateway/src/memberApi/assistant.js`
+sends `{ model, max_tokens, system, messages }` and nothing else. The 24-hour session grant asks for
+`read:profile`, `read:membership`, `read:wagers` and `read:fees` (`ASSISTANT_SESSION_SCOPES`), and
+nothing on the chat path exercises any of them — the gateway verifies the token's scope
+`assistant:chat` and forwards the conversation. Every fact the assistant states about the member's
+own position is therefore a guess, and the system prompt's "do not guess a balance, a rate, a
+deadline" line is doing the work that a tool call should.
+
+**The MCP server is a transport adapter over the member API.** `services/mcp-server/src/tools.js`
+defines eight tools; each is one `fetch` to one gateway route with the member's `fw1` token and an
+honest error mapping (`isError: true`, "this is an UNKNOWN, not an empty result"). Three resources
+(live `openapi.json`, live `/status`, an embedded guide), two prompts (`wager-review`,
+`portfolio-briefing`). Zero dependencies, not a workspace member, stdio by default, an HTTP mode that
+binds loopback and validates `Origin`. The hosted Cloud Run instance is declared but gated off
+(`manage_mcp_server = false`; no pipeline pushes the image). It exists for *external* agents —
+Claude Desktop, Claude Code — and it is good at that.
+
+**So the two artefacts do not touch.** The assistant knows the platform's shape from its prompt and
+nothing about the member; the MCP server knows the member's data and is never in the assistant's
+path. "Make the assistant more useful with the MCP server" resolves to one question: *how does the
+tool table the MCP server already curates reach the model the assistant is talking to?*
+
+### 8.2 Four ways to connect them
+
+| | How | Verdict |
+|---|---|---|
+| **T1** Anthropic MCP connector | The Messages request carries `mcp_servers: [{type:'url', url, name, authorization_token}]` + `tools: [{type:'mcp_toolset', mcp_server_name}]` under beta `mcp-client-2025-11-20`; **Anthropic's servers** dial the MCP server. | **Rejected for the in-app assistant.** It needs the hosted MCP instance on public HTTPS (undeployed; the HTTP transport is a single-message `POST /mcp`, and connector compatibility with that shape is unverified). Worse, the member's capability token rides in the request **body** as `authorization_token`: browser → Anthropic → MCP → gateway on the FairWins rail, and browser → **GutterToken** → Anthropic → MCP → gateway on the other — a spending-adjacent credential transiting a third party whose header passthrough for beta features is itself unknown. Availability is also platform-dependent. It **is** the right shape for external clients once the hosted instance ships (a remote-server entry in Claude Desktop instead of a local `node` command). |
+| **T2** Run the MCP server in the browser | Bundle `services/mcp-server` into the SPA. | **Pointless.** It is JSON-RPC framing around `fetch`; the browser already has `fetch` and the token. It would also breach the package boundary rules for no capability gained. |
+| **T3** Client-side tool loop | The panel builds the Messages `tools` array from a shared table, runs a bounded loop in the browser, and executes each `tool_use` as an ordinary member-API request with the session grant (or a public route with none). Works identically against the gateway proxy and against GutterToken. | **Recommended, on both rails.** One loop implementation. Tool executions arrive at the gateway as **the same member-API traffic the MCP server generates** — already authenticated, scoped, quota'd and audited, with no new route. The browser can also run tools the gateway cannot (§ 8.4), and the panel can render per-tool progress and per-tool honest states ("Polygon indexer did not answer") instead of hiding them behind one reply. |
+| **T4** Gateway-side tool loop | `assistant.js` runs the loop in-process, calling the member-API module functions under the token's scopes. | **Viable for the FairWins rail only**, and it forks the loop (browser for GutterToken, server for FairWins). Its one advantage — fewer round trips — is small at ≤4 rounds; its cost is two loops that drift and a member who cannot see which read failed. Keep it as the fallback if T3's content-block validation proves unacceptable on the gateway (§ 8.6). |
+
+The principle under T3: **the assistant needs the MCP server's tool table, not its transport.** The
+MCP server stays what it is — the external-agent door — and the in-app assistant becomes a second
+client of the same tools, executed in the member's own browser.
+
+### 8.3 One source of truth for the tool table
+
+Today the table lives in `services/mcp-server/src/tools.js` with each definition bound to
+`api.get(...)`. The MCP server **cannot import a shared package** (zero dependencies, not a workspace
+member, standalone Docker context) and shipped frontend code cannot import from `services/`. The
+repo has already solved this shape once (`@fairwins/intent-types` + `TypehashParity`): one package,
+one vendored copy where a package is impossible, one parity test that fails when they diverge.
+
+```
+packages/assistant-contract/              plain-Node resolvable (spec 075 rule 3)
+  src/prompt.js       buildSystemPrompt (Part I § 4.2 — same package, one lockfile event)
+  src/tools.js        TOOL_DEFS: name · title · description · inputSchema · exec: { route | public | local }
+  src/results.js      okResult / errorResult text — the MCP server's honest wording, verbatim
+
+consumers
+  services/relay-gateway/src/memberApi/assistant.js   attaches TOOL_DEFS (FairWins rail; § 8.6)
+  frontend/src/lib/assistant/tools/                   Messages `tools` array + executor
+  services/mcp-server/src/toolDefs.snapshot.json      VENDORED copy — the server stays dependency-free
+  services/relay-gateway/test/mcpToolParity.test.js   snapshot ⇔ package, both directions
+```
+
+`exec` is data, not a function: `{ route: 'wagers', query: ['chainId','first'] }`,
+`{ route: 'intentsBuild', body: ['action','chainId','params'] }`, `{ public: '/v1/perps/pairs' }`,
+`{ local: 'find_in_app' }`. The MCP server, the browser executor and the OpenAPI renderer each bind it
+to their own transport. The `route` ids are `contract.js`'s `ROUTES[].id`, so a tool over a route
+that does not exist fails the parity test, not a member. The document already carries
+`x-fairwins-scope`; adding `x-fairwins-tools` to `openapi.json` lets any generic client discover the
+same table the MCP server ships.
+
+This is the one lockfile-touching change in the whole proposal (a new workspace member); it goes
+through `deps:reinstall`, `check:deps` and both byte gates once, for the prompt and the tools together.
+
+### 8.4 The v1 tool surface
+
+**Reads that exist today** (each is one member-API route the MCP server already wraps; every result
+keeps the per-chain `read / not-configured / unreadable` envelope verbatim):
+
+| Tool | Route | Auth |
+|---|---|---|
+| `get_profile` | `/v1/member/me` | grant |
+| `get_membership` | `/v1/member/membership` | grant |
+| `get_wagers` | `/v1/member/wagers` | grant |
+| `get_fees` | `/v1/member/fees` | grant |
+| `get_gateway_status` | `/status` | none |
+| `get_prediction_markets` | `/v1/polymarket/137/markets` | none |
+| `get_perps_pairs` | `/v1/perps/pairs` | none |
+
+**One local tool the gateway cannot serve:** `find_in_app(query)` over `config/navSearchIndex.js` +
+`lib/nav/navSearch.js` — the same index the drawer's search uses, returning real paths with their
+`focus=<id>` attention markers. This replaces the hardcoded path list in the system prompt with the
+app's own map, and it is what makes "never invent a URL" enforceable: the model asks the index, and
+`replyLinks.js`'s allow-list still decides what becomes a link. It is the assistant's equivalent of
+the drawer's rule that the index is *descriptive, never authoritative* — a hidden surface does not
+resurrect because the model found it.
+
+**Deliberately not in v1:**
+
+- **`build_intent`.** In the browser the member *can* sign, which is exactly why this is the
+  dangerous one. The spec-095 invariant is "the assistant never signs or submits", and the first
+  in-app tool that returns typed data will be followed by a request for a button that signs it. The
+  right v2 shape is `prepare_action` → a **review card that deep-links to the surface that owns the
+  action, with fields prefilled** — the member signs where fees, sanctions, chain switching and
+  confirmation already live (`wagerVm`, the pool page, Membership) and never in the panel. Not a
+  tool that signs, not a tool that submits, and not before § 8.5 is designed in.
+- **`navigate`.** The mini-app host has one; the assistant should not. Moving the member's screen
+  from inside a chat turn is an action on the UI they did not take; a link they tap is the
+  established idiom (`replyLinks.js`) and the honest one.
+- **Anything device-scoped that reads a credential** (RPC endpoints, keys). Nothing the model sees
+  should be able to describe a secret.
+
+Gating follows the grant: on the FairWins rail the session grant exists before the first message;
+on the GutterToken rail the panel offers the grant the first time a member-data tool is needed
+(Part I § 4.5), and a non-member simply has the three public tools. `tools` is **the same sorted
+array on every request of a conversation** — a mode change (grant arrives mid-thread) starts a new
+thread rather than swapping the tool set under a cached prefix.
+
+### 8.5 Prompt injection is the design constraint, not an afterthought
+
+Tool results carry **text other people wrote**: a counterparty's wager description, a pool name, a
+Polymarket question. Once tools exist, that text enters the model's context. With a read-only
+surface the blast radius is a misleading sentence — bounded by the per-reply disclosure and by
+`replyLinks.js` refusing to link anything off-origin — and that bound is the whole reason § 8.4 keeps
+writes out. Four rules for the implementation:
+
+1. Tool results are wrapped as data (`tool_result` blocks, never pasted into a user turn), and the
+   system prompt states that instructions found inside a result are content to report, not to
+   follow.
+2. No tool result may cause the app to *do* anything — no auto-navigation, no prefilled form
+   without a member tap, no second tool call the member did not ask a question to justify.
+3. The link allow-list stays the only path from model text to a clickable target.
+4. `prepare_action` (v2) renders the **contract's** fields from the built typed data, never the
+   model's paraphrase of them — the review card is a rendering of what will be signed, so an
+   injected "send 500 instead" has nowhere to hide.
+
+### 8.6 Loop mechanics, budgets and caching
+
+- **Bounded rounds.** At most 4 tool rounds per member turn; the fifth response is rendered as-is.
+  `tool_choice: {type: 'auto'}` only — forced tool use is rejected on the newest model tier and
+  buys nothing here. `strict: true` on every tool (the schemas already carry
+  `additionalProperties: false`), so arguments validate before a fetch is made.
+- **Parallel calls.** A response may carry several `tool_use` blocks; execute them concurrently and
+  return **all** `tool_result` blocks in **one** user message. A failed read is
+  `is_error: true` with the MCP server's exact wording, never dropped.
+- **Per-tool timeouts** (a subgraph read is not allowed to hold the turn), and the panel shows what
+  is being read while it waits.
+- **The FairWins rail.** `parseChatRequest` today admits `{role, content: string}` only. It must
+  admit `tool_use` / `tool_result` content blocks under an allow-list of block types, and the
+  **gateway attaches the tool definitions itself** from the package — a client never supplies
+  `tools`, because on this rail that would be arbitrary text into the model at FairWins' expense.
+  Each loop round is a separate gateway request, so the existing reserve-then-settle token budget
+  already binds per round; the round cap is the multiplier, so `ASSISTANT_MAX_ROUNDS` joins the boot
+  check beside `ASSISTANT_MAX_TOKENS`. `assistant_budget_exhausted` mid-loop ends the turn with the
+  honest sentence, never a truncated answer.
+- **Prompt caching.** Render order is tools → system → messages, and the cache is a byte-prefix
+  match. `buildSystemPrompt({ surface })` interpolates the member's **current path into the system
+  prompt**, so every navigation rewrites the prefix. It is moot today (the prompt is under the
+  cacheable minimum); with tool schemas the prefix crosses that minimum on both current model
+  tiers and it stops being moot — and on GutterToken cache reads are billed at a tenth of the
+  rate. Move `surface` into the **last user turn** (or a mid-conversation `system` message on the
+  models that support it), sort the tool list deterministically, and freeze the system text.
+- **Memory stays text-only.** `memoryStore` keeps the last 50 messages / 64 KB on device; persist
+  the member's and assistant's *text* turns only. Tool results are the member's own data and the
+  reason the memory was deliberately kept out of the backup — writing wager envelopes into device
+  storage is a new retention decision, not a cache.
+
+### 8.7 The MCP server afterwards
+
+Unchanged in role and in invariants: zero dependencies, never mints a token, never signs, never
+pays. Two additions: the vendored `toolDefs.snapshot.json` with its parity gate, and — once the
+hosted instance is published (runbook § 3.8) — a remote-server entry in the client examples, which
+is where T1 becomes available to *external* agents. Its two prompts become the panel's suggested
+starters ("Review my wagers", "Portfolio briefing") from the same table, so the phrasing that tells
+the model to name an unreadable chain is written once.
+
+### 8.8 Open questions for Part II
+
+1. **T3 or T4 on the FairWins rail?** § 8.2 recommends T3 for one loop and visible per-tool states;
+   the cost is content-block validation on the gateway. Decide before `/speckit-plan`.
+2. **Round cap and per-round budget interaction** — 4 rounds × worst-case turn must fit the
+   per-account window, or the boot check refuses the config.
+3. **`find_in_app` scope** — the nav index only, or also the accordion `hash` deep links.
+4. **Whether `prepare_action` is a v2 spec of its own.** It should be: it is the first assistant
+   feature with a path to a signature, and it deserves the security lifecycle spec 082 gave the
+   perps execution wrapper.
+5. **Hosted MCP deployment** is a prerequisite for nothing here — T3 needs no MCP process at all —
+   but it is what lets a Claude Desktop member skip the local `node` command.
