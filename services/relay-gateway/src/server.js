@@ -30,6 +30,8 @@ import { createIntentStore } from './intent/store.js'
 import { createSanctionsScreen } from './policy/sanctions.js'
 import { createDedupStore } from './policy/dedup.js'
 import { createQuotas, createSpendTracker, createTokenBudget } from './policy/quotas.js'
+import { createIdentityMiddleware } from './identity/middleware.js'
+import { createAttestationVerifier } from './identity/verifiers/attestation.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createEngineClient } from './engine/client.js'
@@ -246,6 +248,31 @@ export function createApp(config, deps = {}) {
     }
     next()
   })
+
+  // ---- Caller identity (spec 105) ---------------------------------------------------------
+  // Placed HERE on purpose: after the origin lock, before route dispatch.
+  //
+  //   After the lock, because the lock is a string comparison that rejects non-edge traffic while
+  //   resolution may make a network call — resolving first would let an off-edge caller cost us an
+  //   upstream round trip per request, turning an identity layer into an amplifier.
+  //
+  //   Before dispatch, because identity must resolve for a route that does not exist. Otherwise an
+  //   unauthenticated prober could enumerate the route surface from the difference between a 404
+  //   and a 403, which is a map of which paths are worth attacking.
+  //
+  // Preflight never reaches this: OPTIONS short-circuits at the CORS middleware above, because a
+  // browser cannot attach credentials to a preflight. If resolution saw one it would resolve
+  // anonymous every time and pollute the metering it exists to make honest.
+  //
+  // This slice RESOLVES ONLY — it attaches req.caller and the X-FairWins-Tier header and changes
+  // no status code, so the tier model can be validated against real traffic before anything depends
+  // on it. Enforcement lands in a later slice.
+  // Deliberately NOT wired to the global kill switch. That one stops the relayer during an
+  // incident; identity is a safety layer, and turning it off mid-incident is the wrong direction.
+  // IDENTITY_KILLSWITCH is its own switch, for the case where this layer itself misbehaves.
+  const identityVerifiers = [createAttestationVerifier()]
+  const identityEnabled = config.identity?.enabled === true && config.identity?.killswitch !== true
+  app.use(createIdentityMiddleware({ enabled: identityEnabled }, identityVerifiers))
 
   // ---- GET /healthz + /status (origin-lock exempt) ----------------------------------------
   // Google's GFE intercepts the literal `/healthz` on *.run.app (it never reaches the container),
