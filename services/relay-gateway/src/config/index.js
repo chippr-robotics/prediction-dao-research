@@ -416,10 +416,55 @@ export function loadConfig(env = process.env, opts = {}) {
     // Browser origins allowed to call the gateway cross-origin (CORS). The SPA lives on a different
     // host than the relay subdomain (fairwins.app -> relay.fairwins.app), so it needs an explicit
     // allow-list. Comma-separated; unset => no CORS headers (same-origin / server-to-server only).
-    allowedOrigins: opt(env, 'ALLOWED_ORIGINS', '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
+    allowedOrigins: (() => {
+      const configured = opt(env, 'ALLOWED_ORIGINS', '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      // The native shells (spec 102/103) are NOT on https://fairwins.app. Capacitor serves the
+      // bundle from `capacitor://localhost` (iOS) and `https://localhost` (Android), and the
+      // WebView's fetch is subject to CORS like any browser's. Without these, the CORS middleware
+      // emits no Access-Control-Allow-* at all for a shell, so a native caller cannot send the
+      // Authorization header — which would put spec 105's member-grant requirement on Bitcoin
+      // broadcast (a passkey-only, native-bridged flow) onto a channel physically unable to carry
+      // a credential. They are appended rather than defaulted so an explicit ALLOWED_ORIGINS still
+      // gets them; an operator who genuinely wants web-only must remove them here, deliberately.
+      const NATIVE_SHELL_ORIGINS = ['capacitor://localhost', 'https://localhost']
+      return [...new Set([...configured, ...(configured.length ? NATIVE_SHELL_ORIGINS : [])])]
+    })(),
+    // --- Caller identity (spec 105) ---
+    // Unset/false => the layer is INERT: every caller resolves anonymous, no status changes, and
+    // the state is disclosed at boot and in the gated /status. FR-015 — a disabled control must
+    // never be indistinguishable from an enforcing one.
+    identity: {
+      enabled: opt(env, 'IDENTITY_ENABLED', 'false').toLowerCase() === 'true',
+      // SEPARATE from `enabled`, deliberately. `enabled` without `enforce` is OBSERVE mode: the
+      // tier resolves and is reported, and no status code changes — so the model can be validated
+      // against real traffic before anything depends on it. A safety layer that starts refusing the
+      // moment it deploys fails in the shape "the product is broken", which is the worst way for
+      // this particular change to be wrong.
+      enforce: opt(env, 'IDENTITY_ENFORCE', 'false').toLowerCase() === 'true',
+      killswitch: opt(env, 'IDENTITY_KILLSWITCH', 'false').toLowerCase() === 'true',
+      // Per-upstream ceilings (FR-013), checked BEFORE the outbound call. UNSET = UNLIMITED, and
+      // that absence is honest rather than a hidden default: inventing a cap an operator did not
+      // choose would refuse traffic in the name of a budget nobody set.
+      upstreamCeilings: {
+        opensea: int(env, 'UPSTREAM_CEILING_OPENSEA', 0),
+        polymarket: int(env, 'UPSTREAM_CEILING_POLYMARKET', 0),
+        bitcoin: int(env, 'UPSTREAM_CEILING_BITCOIN', 0),
+        perps: int(env, 'UPSTREAM_CEILING_PERPS', 0),
+        bridge: int(env, 'UPSTREAM_CEILING_BRIDGE', 0),
+      },
+      upstreamCeilingWindowMs: int(env, 'UPSTREAM_CEILING_WINDOW_MS', 60_000),
+      challenge: {
+        // Unset => the challenge verifier ABSTAINS (returns `absent`), never rejects. An
+        // unconfigured bot-check must not deny every anonymous caller.
+        secret: opt(env, 'CHALLENGE_SECRET', null),
+        verifyUrl: opt(env, 'CHALLENGE_VERIFY_URL', 'https://challenges.cloudflare.com/turnstile/v0/siteverify'),
+        ttlSec: int(env, 'CHALLENGE_TTL_SEC', 900),
+        timeoutMs: int(env, 'CHALLENGE_TIMEOUT_MS', 3000),
+      },
+    },
     engine: {
       url: opt(env, 'ENGINE_URL', 'http://localhost:8080'),
       apiKey: opt(env, 'ENGINE_API_KEY', null),
