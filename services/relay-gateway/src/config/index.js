@@ -459,7 +459,25 @@ export function loadConfig(env = process.env, opts = {}) {
       challenge: {
         // Unset => the challenge verifier ABSTAINS (returns `absent`), never rejects. An
         // unconfigured bot-check must not deny every anonymous caller.
-        secret: opt(env, 'CHALLENGE_SECRET', null),
+        secret: (() => {
+          const secret = opt(env, 'CHALLENGE_SECRET', null)
+          // Cloudflare's PUBLISHED test secrets always pass (1x…) or always fail (2x…/3x…).
+          // In development they are the right tool; in production the always-pass one turns the
+          // human tier into a stamp anyone can print — a mock in a shipped path (constitution
+          // III), invisible in every log. Boot refuses rather than warns: a warning here is a
+          // production incident someone reads later (T014).
+          const TEST_SECRETS = [
+            '1x0000000000000000000000000000000AA',
+            '2x0000000000000000000000000000000AA',
+            '3x0000000000000000000000000000000AA',
+          ]
+          if (secret && TEST_SECRETS.includes(secret) && env.NODE_ENV === 'production') {
+            throw new Error(
+              'CHALLENGE_SECRET is a published Turnstile TEST secret; in production this makes the human tier a mock. Configure a real secret or unset it.'
+            )
+          }
+          return secret
+        })(),
         verifyUrl: opt(env, 'CHALLENGE_VERIFY_URL', 'https://challenges.cloudflare.com/turnstile/v0/siteverify'),
         ttlSec: int(env, 'CHALLENGE_TTL_SEC', 900),
         timeoutMs: int(env, 'CHALLENGE_TIMEOUT_MS', 3000),
@@ -514,6 +532,10 @@ export function loadConfig(env = process.env, opts = {}) {
       retries: int(env, 'ENGINE_RETRIES', 2),
     },
     killSwitch: opt(env, 'KILL_SWITCH', 'false').toLowerCase() === 'true',
+    // SIGHUP re-reads allowlisted operational switches from this file (spec 105 FR-014, #1446).
+    // Unset => SIGHUP answers honestly that nothing can reload. The process env is frozen at
+    // exec, which is why the source is a FILE — the same mounted env file the deploy delivers.
+    reloadEnvFile: opt(env, 'RELOAD_ENV_FILE', null),
     quotas: {
       signerPerWindow: int(env, 'SIGNER_QUOTA_PER_MIN', 12),
       globalPerWindow: int(env, 'GLOBAL_QUOTA_PER_MIN', 120),

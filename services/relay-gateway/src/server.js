@@ -32,6 +32,7 @@ import { createDedupStore } from './policy/dedup.js'
 import { createQuotas, createSpendTracker, createTokenBudget } from './policy/quotas.js'
 import { createIdentityMiddleware } from './identity/middleware.js'
 import { createAttestationVerifier } from './identity/verifiers/attestation.js'
+import { createChallengeVerifier } from './identity/verifiers/challenge.js'
 import { createGrantVerifier } from './identity/verifiers/grant.js'
 import { createUpstreamCeilings, withUpstreamCeiling } from './identity/upstreamCeiling.js'
 import { createAccessRouter } from './access/routes.js'
@@ -39,6 +40,7 @@ import { createEnforcementVerifier } from './access/enforcement.js'
 import { loadSigningKey } from './access/jwt.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
+import { createReloadHandler } from './policy/reload.js'
 import { createEngineClient } from './engine/client.js'
 import { applyEngineEvent } from './engine/webhook.js'
 import { createOpenSeaClient } from './opensea/client.js'
@@ -328,11 +330,29 @@ export function createApp(config, deps = {}) {
       now: nowMs,
     })
 
-  const identityVerifiers = [createAttestationVerifier()]
-  const identityEnabled = config.identity?.enabled === true && config.identity?.killswitch !== true
+  // The challenge verifier registers unconditionally and ABSTAINS when unconfigured — the
+  // registered-but-abstaining shape is what keeps /status able to say "not-configured" honestly
+  // instead of omitting a tier the ladder declares.
+  const identityVerifiers = [
+    createAttestationVerifier(),
+    createChallengeVerifier(config.identity?.challenge ?? {}, {
+      now: nowMs,
+      ...(deps.challengeFetch ? { fetchImpl: deps.challengeFetch } : {}),
+    }),
+  ]
+  // Live getters, not captured booleans: SIGHUP reload (policy/reload.js) mutates config in
+  // place, and the middleware reads these per request so a reload takes effect on the next
+  // request without a restart.
   app.use(
     createIdentityMiddleware(
-      { enabled: identityEnabled, enforce: identityEnabled && config.identity?.enforce === true },
+      {
+        get enabled() {
+          return config.identity?.enabled === true && config.identity?.killswitch !== true
+        },
+        get enforce() {
+          return config.identity?.enforce === true
+        },
+      },
       identityVerifiers
     )
   )
@@ -1136,6 +1156,11 @@ if (isMain) {
     const active = killSwitch.toggle()
     console.warn(`[relay-gateway] kill switch ${active ? 'ACTIVATED' : 'cleared'} via SIGUSR2`)
   })
+  // Runtime config reload (spec 105 FR-014, #1446): `kill -HUP <pid>` re-reads the allowlisted
+  // operational switches from RELOAD_ENV_FILE. A reload, not a remote control — and deliberately
+  // a DIFFERENT signal from the kill switch: changing a gesture operators use during incidents
+  // is how an incident gets worse.
+  process.on('SIGHUP', createReloadHandler(config, killSwitch))
   app.listen(config.port, () => {
     console.log(
       `[relay-gateway] listening on :${config.port} | chains=${config.enabledChainIds.join(',')} | ` +
