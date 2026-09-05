@@ -45,7 +45,8 @@ and two of its rules change what you do on step 2:
   body. GitHub itself honours closing keywords only on the DEFAULT branch (`main`)
   and every feature PR here targets `staging`, so `close-linked-issues.yml` does it
   on the staging merge instead — **read the issue back afterwards** to confirm it
-  actually closed. Moving the board card is a human task; do not claim you moved it.
+  actually closed. The project board moves itself — GitHub's built-in *item closed* /
+  *PR merged* workflows set Done — so never claim you moved a card.
 
 Branch from `staging`, never from `main`. Delegated work gets a **sub-issue**, and a
 subagent's report is a claim — read the diff and run the gates before accepting it.
@@ -102,7 +103,13 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   A mirror is a second copy of state the repo already holds and it drifts the instant
   an agent stops mid-task, leaving the board confidently wrong. State is read from
   the **assignee** (the claim — release it if you abandon the work), the **linked
-  PRs**, and **open/closed**. **GitHub closes nothing on a feature merge here**: it
+  PRs**, and **open/closed**. Note the MCP server exposes no Projects v2 tool, but the
+  GraphQL API does (`updateProjectV2ItemFieldValue`, `project` scope, **classic PAT or
+  GitHub App token — never `GITHUB_TOKEN`**); we deliberately drive nothing with it,
+  because GitHub's own built-in project workflows already set Todo/Done for free and
+  store nothing in this repo. Only "In Progress" has no built-in, and it is left
+  manual rather than bought with a PAT. **GitHub closes nothing on a feature merge
+  here**: it
   honours closing keywords only on the default branch (`main`), and PR #1461 merged
   with `Closes #1460` while the issue stayed open with `closed_by_pull_requests: 0`.
   `.github/workflows/close-linked-issues.yml` does it on the `staging` merge instead

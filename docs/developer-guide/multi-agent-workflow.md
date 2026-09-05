@@ -40,17 +40,38 @@ This is the first thing to get straight, because half the flow is shaped by it.
 Run `list_issue_fields` before writing a field for the first time — the option names are validated
 against the live field, and a wrong one fails the call rather than silently doing nothing.
 
-### The board is a human task, and there is deliberately no mirror
+### The board moves itself; this repo keeps no copy of what it says
 
-An agent cannot write the project's Status field, and **this repository does not paper over that
-with a status label.** It could: a `status:*` label is writable, and a workflow could copy it onto
-the board. That was built for this feature and then deliberately removed, because it is a *second
-copy of state the repository already holds*, and a second copy drifts. An agent that sets
-`status:in-progress` and then stops — context exhausted, session ended, task abandoned — leaves an
-issue that reads as actively worked forever, and nothing in the system can notice. The board would
-faithfully mirror the wrong answer.
+Two separate facts, often confused:
 
-So **status is derived from state GitHub already tracks exactly once**:
+- **An agent cannot write Status from here.** The GitHub MCP server exposes no Projects v2 tool at
+  all — `issue_write` reaches Type, Priority, Effort and the dates, all of which are org-level
+  *issue* fields, while Status lives on the *project item*.
+- **The Projects v2 GraphQL API can write it**, and is current and undeprecated:
+  `updateProjectV2ItemFieldValue` and `addProjectV2ItemById`, under the `project` scope. What it
+  needs is a **classic PAT or a GitHub App installation token** — `GITHUB_TOKEN` cannot do it, and
+  fine-grained PATs have a poor record here.
+
+So the board *can* be driven by code. It mostly should not be, because **GitHub already drives it
+for free**. Projects ships built-in workflows that need no token, no code and nothing in this
+repository: *item closed → Done* and *pull request merged → Done* are **on by default**, and
+*item added → Todo*, *item reopened*, and *auto-add matching items* are one toggle each in the
+project's own settings.
+
+Those are not the mirror this repo rejected, and the distinction is the whole point. The rejected
+design stored a `status:*` label **here** and copied it onto the board: two copies, both ours, both
+able to drift — an agent that set `status:in-progress` and then stopped left an issue reading as
+actively worked forever, and nothing could notice. GitHub's built-ins store nothing here; they
+derive the column from the item's own closed/merged/added state, at the moment it changes.
+
+**What the built-ins do not cover is "In Progress".** Nothing GitHub ships watches for work
+starting, so that column is either moved by hand or driven by a small workflow holding a classic
+PAT. This repo does neither today, because the two rows below already answer it without a
+credential. If the board's In Progress column is wanted badly enough to be worth a PAT, that is a
+deliberate decision to take, not a gap to fill quietly.
+
+Either way, **nothing in this repository asserts a status**, so status is still read from state
+GitHub tracks exactly once:
 
 | Question | Answered by | Why it cannot drift |
 |---|---|---|
@@ -64,8 +85,9 @@ So **status is derived from state GitHub already tracks exactly once**:
 and GitHub has no other representation of that. It is only meaningful next to a comment naming the
 blocker, so **never apply it without one** — and remove it when the blocker clears.
 
-Moving cards on the board is a **human task for now**. Do not report a status you did not put into
-one of the rows above.
+The board is a **view of that**, maintained by GitHub's own automations plus whatever a human moves.
+It is never authoritative here: if it disagrees with the issue, the issue is right. Do not report a
+status you did not put into one of the rows above, and never report having moved a card.
 
 ---
 
@@ -250,7 +272,8 @@ names, with a comment saying which PR did it.
 - If part of the scope was left out, say so in the closing comment and open a follow-up issue for
   it. Scaling the work down is the operator's call, not yours — but silently scaling it down is
   nobody's.
-- Moving the board card is a **human task**. Do not claim you moved it.
+- The board looks after itself here — GitHub's built-in *item closed* / *pull request merged*
+  workflows move the card to **Done**. You did not do that; do not claim you did.
 
 The parser mirrors GitHub's own rules rather than improving on them — the nine keywords, `#123` /
 `owner/repo#123` / issue URLs, code spans and fenced blocks ignored, cross-repo references dropped.
@@ -362,8 +385,9 @@ Each of those has exactly one copy, and three of the four are maintained by GitH
 agent remembering to. That is the entire point: a state an agent has to *remember to update* is a
 state that is wrong as soon as the agent stops.
 
-Where an issue sits on the project board is a **human task** and is not authoritative here. If it
-disagrees with the issue, the issue is right.
+Where an issue sits on the project board follows from those facts — GitHub's built-in workflows move
+it on close, merge and reopen — but the board is **not authoritative here**. If it disagrees with
+the issue, the issue is right.
 
 ---
 
@@ -394,11 +418,27 @@ Labels* workflow manually. `GITHUB_TOKEN` is sufficient; no PAT, no secret, no v
 label that does not exist yet works anyway — GitHub creates it, grey and undescribed — so an agent
 is never blocked on this; the sync is what gives each label its colour and its description.
 
-**There is nothing else to configure**, and that is deliberate. An earlier draft of this feature
-also shipped a `status:*` label set and a workflow that mirrored it onto the project board's Status
-field, which needed a repo variable and a fine-grained PAT. It was removed: a mirror is a second
-copy of state the repository already holds, it drifts the moment an agent stops mid-task, and the
-board would then show the wrong answer with full confidence. Board columns are moved by a human.
+**Project board automations** — worth turning on, and free. In the project's own settings
+(⋯ → Workflows), no token and no code:
+
+| Built-in workflow | Effect | Default |
+|---|---|---|
+| *Item closed* | → **Done** | on |
+| *Pull request merged* | → **Done** | on |
+| *Item reopened* | → back off Done | on |
+| *Item added to project* | → **Todo** | off — turn it on |
+| *Auto-add to project* | pulls matching new issues/PRs onto the board (`is:issue is:open`) | off — turn it on |
+
+With those, the board tracks itself for everything except **In Progress**, which GitHub ships no
+built-in for. Leave it manual, or drive it from a workflow holding a **classic PAT** with the
+`project` scope (`GITHUB_TOKEN` cannot write Projects v2, and fine-grained PATs have a poor record
+with it). That is a real decision about a real credential — take it deliberately or not at all.
+
+**Nothing else is required**, and that is deliberate. An earlier draft of this feature stored a
+`status:*` label *in this repository* and copied it onto the board. That was removed: it is a second
+copy of state we already hold, it drifts the moment an agent stops mid-task, and the board then
+shows the wrong answer with full confidence. GitHub's built-ins are not that — they store nothing
+here and derive the column from the item's own state.
 
 ---
 
