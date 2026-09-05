@@ -118,6 +118,35 @@ describe('useVaultDeployment', () => {
     expect(walletCtx.signer.sendTransaction).not.toHaveBeenCalled()
   })
 
+  it('the passkey rail sends ONE batch — deploy + every install call, each ADDRESSED (issue #1452)', async () => {
+    railImpl = () => ({ available: true, rail: 'passkey' })
+    walletCtx.loginMethod = 'passkey'
+    walletCtx.signer = null
+    walletCtx.sendCalls = vi.fn().mockResolvedValue({ txHash: '0xbatch' })
+    const { result } = renderHook(() => useVaultDeployment())
+    await act(async () => {
+      await result.current.start(
+        startArgs({
+          threshold: 2,
+          semanticRules: { dailyCapAmount: '500', cooldownSeconds: 3600, allowedMoney: 'stable', bigSends: 'everyone' },
+        }),
+      )
+    })
+    expect(walletCtx.sendCalls).toHaveBeenCalledTimes(1)
+    const [calls, opts] = walletCtx.sendCalls.mock.calls[0]
+    expect(opts).toMatchObject({ chainId: 137 })
+    // create + (hub emit + approveHash) × 2 install steps — the CREATE2 address is known before
+    // deployment, which is what makes one batch possible at all.
+    expect(calls).toHaveLength(5)
+    for (const call of calls) {
+      // The propose-mode plan once leaked {target:undefined} into this batch (emitProposalCall's
+      // own shape vs the plan's) — every entry must be a real address, on this rail too.
+      expect(call.target).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    }
+    expect(result.current.byChain[137].status).toBe(DEPLOY_STATUS.LIVE)
+    expect(result.current.byChain[137].rulesStatus).toBe('awaiting-approval')
+  })
+
   it('refreshStatuses derives truth from the chain; a failed read is UNREADABLE, never absence', async () => {
     providers[137] = fakeProvider({ code: '0x6080' })
     providers[8453] = fakeProvider({ codeError: true })

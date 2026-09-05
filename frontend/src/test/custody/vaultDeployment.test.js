@@ -76,6 +76,18 @@ describe('buildInstallPlan', () => {
     const plan = buildInstallPlan({ ...base, threshold: 2, creator: O1 })
     expect(plan.mode).toBe('propose')
     expect(plan.calls).toHaveLength(4) // (emit + approve) × 2
+    // EVERY call carries `to` — the shape both rails consume. emitProposalCall's own shape is
+    // {target,...} (passkey sendCalls); leaking it here sent the hub call as a contract
+    // DEPLOYMENT (`to: undefined`) and the rules never queued — full/44 RL-02, issue #1452.
+    for (const call of plan.calls) {
+      expect(call.to, 'every install call is addressed').toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(call.target).toBeUndefined()
+    }
+    // Alternating: hub emit (discoverability), then the creator's approveHash on the vault.
+    expect(plan.calls[1].to).toBe(VAULT)
+    expect(plan.calls[3].to).toBe(VAULT)
+    expect(plan.calls[0].to).toBe(plan.calls[2].to)
+    expect(plan.calls[0].to).not.toBe(VAULT)
   })
   it('no hub on the chain ⇒ honest unavailable, nothing queued invisibly', () => {
     const plan = buildInstallPlan({ ...base, chainId: 61, threshold: 2, creator: O1 })
