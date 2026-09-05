@@ -7,6 +7,15 @@ on:
   # ever ADDED work instead of reducing it.
   workflow_dispatch:
   workflow_call:
+    inputs:
+      run_e2e:
+        description: >-
+          Whether this change can affect the running app, and therefore whether the Cypress tiers
+          need to run. Computed by ci-manager's `app` path filter, which is a NEGATIVE list — see
+          the comment on the Cypress jobs below before changing anything about this.
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: read
@@ -119,6 +128,10 @@ jobs:
   #
   # Dependency-free (directory names plus one file per spec), so no npm ci — same reasoning as the
   # jobs above. Must fail loudly; do NOT add continue-on-error (Constitution IV).
+  # NOTE: the job now also guards the E2E shard bypass and the closing-keyword parser, but its
+  # display NAME stays `Spec Registry` on purpose — the check name is what branch protection
+  # matches on, and renaming a required check makes the requirement permanently unsatisfiable
+  # rather than merely renamed.
   spec-registry:
     name: Spec Registry
     runs-on: ubuntu-latest
@@ -140,6 +153,23 @@ jobs:
 
       - name: Check the spec registry
         run: npm run check:specs
+
+      # Gate (issue #1460): the E2E shard bypass. The Cypress tiers skip for a change that cannot
+      # reach the running app, which is safe ONLY because ci-manager's `app` filter is a negative
+      # list — anything unrecognised runs the suite. Inverting it to an allowlist is a one-line,
+      # tidier-looking edit that makes every unlisted path skip; since a skipped job satisfies a
+      # required check, such a change merges green having tested nothing. Fixtures first, for the
+      # same reason as above.
+      - name: Test the CI-gating guard's own rules
+        run: npm run test:ci
+
+      - name: Check the E2E bypass is still safe
+        run: npm run check:ci-gating
+
+      # The parser that decides which issues a `staging` merge closes. Same job because it is the
+      # same shape of thing: dependency-free, must-refuse fixtures, no npm ci.
+      - name: Test the closing-keyword parser
+        run: node --test "scripts/ci/__tests__/parse-closing-keywords.test.js"
 
   # Gate (spec 089, FR-019…FR-023): a revenue or cost source that reaches production without a
   # dashboard entry is money moving that nobody is watching. The brief stated updating the dashboard
@@ -639,6 +669,22 @@ jobs:
       # 2.5 MB of unread bytes on every push is pure quota burn on a private repo.
 
   cypress-fast-e2e:
+    # SHARD BYPASS (issue #1460). `run_e2e` is false only when the diff touches nothing that can
+    # reach the running app — docs, specs, agent config, markdown. A docs-only pull request was
+    # spending 12 fast legs + 4 on-chain shards + the passkey full stack on bytes that cannot
+    # change a single pixel.
+    #
+    # READ THIS BEFORE WIDENING IT. A skipped job SATISFIES a required status check, which is the
+    # exact hole spec 075 documented: work that runs zero jobs merges green. The only thing that
+    # makes this safe is that ci-manager's `app` filter is a NEGATIVE list — it starts at `'**'`
+    # and subtracts known-inert paths — so a directory nobody has thought about matches `**`, sets
+    # `app` true, and RUNS the suite. Converting it to a positive allowlist would invert that:
+    # every unlisted path would silently skip. `npm run check:ci-gating` fails on that inversion,
+    # and on this `if:` being dropped.
+    #
+    # Default is `true`, so `workflow_dispatch` and any future caller that forgets the input runs
+    # everything.
+    if: inputs.run_e2e
     # Spec 094: one leg per viewport profile. Responsive behaviour needs no chain, so this is where
     # it belongs — admission rule 1 forbids spending on-chain-tier wall clock proving a control is
     # reachable at 390px. `desktop` is 1280×720, exactly what every existing spec was written
@@ -855,6 +901,22 @@ jobs:
   # Keeping them separate also keeps the failure legible — a red here means the money path broke,
   # not that a button moved.
   cypress-full-e2e:
+    # SHARD BYPASS (issue #1460). `run_e2e` is false only when the diff touches nothing that can
+    # reach the running app — docs, specs, agent config, markdown. A docs-only pull request was
+    # spending 12 fast legs + 4 on-chain shards + the passkey full stack on bytes that cannot
+    # change a single pixel.
+    #
+    # READ THIS BEFORE WIDENING IT. A skipped job SATISFIES a required status check, which is the
+    # exact hole spec 075 documented: work that runs zero jobs merges green. The only thing that
+    # makes this safe is that ci-manager's `app` filter is a NEGATIVE list — it starts at `'**'`
+    # and subtracts known-inert paths — so a directory nobody has thought about matches `**`, sets
+    # `app` true, and RUNS the suite. Converting it to a positive allowlist would invert that:
+    # every unlisted path would silently skip. `npm run check:ci-gating` fails on that inversion,
+    # and on this `if:` being dropped.
+    #
+    # Default is `true`, so `workflow_dispatch` and any future caller that forgets the input runs
+    # everything.
+    if: inputs.run_e2e
     # SHARDED, 4 legs, one private chain each (spec 094). Legal only because per-spec chain
     # isolation (#1222) made specs order-independent — before that, run order decided which specs
     # passed and splitting the list would have changed results, not just wall clock.
@@ -1106,6 +1168,22 @@ jobs:
   # Not sharded: three specs, one chain, one bundler. Sharding would pay four bootstraps to save
   # nothing.
   cypress-passkey-full-stack:
+    # SHARD BYPASS (issue #1460). `run_e2e` is false only when the diff touches nothing that can
+    # reach the running app — docs, specs, agent config, markdown. A docs-only pull request was
+    # spending 12 fast legs + 4 on-chain shards + the passkey full stack on bytes that cannot
+    # change a single pixel.
+    #
+    # READ THIS BEFORE WIDENING IT. A skipped job SATISFIES a required status check, which is the
+    # exact hole spec 075 documented: work that runs zero jobs merges green. The only thing that
+    # makes this safe is that ci-manager's `app` filter is a NEGATIVE list — it starts at `'**'`
+    # and subtracts known-inert paths — so a directory nobody has thought about matches `**`, sets
+    # `app` true, and RUNS the suite. Converting it to a positive allowlist would invert that:
+    # every unlisted path would silently skip. `npm run check:ci-gating` fails on that inversion,
+    # and on this `if:` being dropped.
+    #
+    # Default is `true`, so `workflow_dispatch` and any future caller that forgets the input runs
+    # everything.
+    if: inputs.run_e2e
     name: Cypress Passkey Full Stack (bundler + paymaster)
     runs-on: ubuntu-latest
     # Generous, because a real UserOperation round trip (estimate → sponsor → bundle → mine →

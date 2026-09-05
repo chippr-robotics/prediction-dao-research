@@ -56,7 +56,7 @@ So **status is derived from state GitHub already tracks exactly once**:
 |---|---|---|
 | Is anyone working this? | The **assignee** | One field, set by the agent that claimed it |
 | Has work started? | A **linked PR** (`Closes #N`) | GitHub links it; the PR exists or it does not |
-| Is it done? | The issue is **closed** | Closed deliberately at merge — see the warning in step 8 |
+| Is it done? | The issue is **closed** | Closed from the PR body on merge; verified after |
 | What is it part of? | Its **parent / sub-issues** | Real hierarchy, not a naming convention |
 | Is it stuck? | The `blocked` label **plus a comment** | The one state nothing else records — see below |
 
@@ -196,7 +196,7 @@ Then, for each one:
 | You hand the task to a subagent | **Assign it** (to yourself if the subagent has no identity) |
 | The subagent reports back | Nothing yet — **you have not reviewed it** |
 | You reviewed and accepted it | Open the PR with `Closes #<sub-issue>` in its body |
-| The PR merges | **Close it yourself** (`state_reason: completed`) — step 8's warning |
+| The PR merges | `close-linked-issues.yml` closes it — **read it back and confirm** |
 | The subagent is stuck outside the task | `blocked` **+ a comment naming the blocker** |
 | You abandon the task | **Unassign**, remove `blocked`, say why |
 
@@ -223,31 +223,102 @@ it yourself — the next identical task will be delegated with the same instruct
 
 ### 8. Close the loop
 
-> [!IMPORTANT]
-> **A merge into `staging` does NOT close an issue.** GitHub honours closing keywords only when a PR
-> merges into the repository's **default branch**, which here is `main`. Every feature PR targets
-> `staging` by design (step 3), so no feature PR in this repo auto-closes anything — and the later
-> `staging` → `main` promotion will not close it either, because GitHub reads *that* PR's body, and
-> it does not name your issue.
->
-> Found the only way it could be: PR #1461 merged with `Closes #1460` in its body, and #1460 stayed
-> open with `closed_by_pull_requests: 0`. **Closing is a deliberate act here. Do it.**
+**`Closes #N` in the PR body is what closes the issue** — but not the way you may expect, and the
+difference matters if it ever stops working.
+
+GitHub honours closing keywords only when a PR merges into the repository's **default branch**,
+which here is `main`. Every feature PR targets `staging` (step 3), so **GitHub closes nothing on a
+feature merge in this repo** — and the later `staging` → `main` promotion does not rescue it either,
+because GitHub reads *that* PR's body, which does not name your issue. This was found the only way
+it could be: PR #1461 merged with `Closes #1460` in its body and #1460 stayed open, with
+`closed_by_pull_requests: 0`.
+
+`.github/workflows/close-linked-issues.yml` restores the behaviour on the branch the work actually
+merges into. On a **merged** PR whose base is `staging`, it parses the body and closes what it
+names, with a comment saying which PR did it.
 
 - Open the PR into `staging` as **ready for review**, not draft (draft PRs run no CI here).
-- Put **`Closes #<issue>`** in the body anyway — one line per issue the PR finishes, including every
-  sub-issue. It will not close them, but it is what puts the PR on the issue as a linked reference,
-  which is how the next reader finds the work. A PR that says "fixes the thing in #123" without the
-  keyword links nothing.
-- If a PR only *advances* an issue, reference it (`Part of #123`) and do **not** use a closing
-  keyword — even here, where it would not fire, it tells a reader the issue is finished when it is
-  not.
-- **After the merge, close each finished issue yourself**: `issue_write`, `state: closed`,
-  `state_reason: completed`, plus a comment naming the PR that delivered it. Then read it back and
-  confirm the state actually changed — a write you did not verify is a claim, not a fact.
+- Put **`Closes #<issue>`** in the body — one line per issue the PR finishes, including every
+  sub-issue. A PR that says "fixes the thing in #123" without the keyword links nothing and closes
+  nothing.
+- If a PR only *advances* an issue, write **`Part of #123`** and no closing keyword. A closing
+  keyword on partial work closes an issue that is not done.
+- **After the merge, read the issues back and confirm they closed.** This is not ceremony: the
+  automation is a workflow, workflows fail, and the whole point of deriving state from the repo is
+  that you can check it. If they are open, close them by hand and say why. A write nobody verified
+  is a claim, not a fact.
 - If part of the scope was left out, say so in the closing comment and open a follow-up issue for
   it. Scaling the work down is the operator's call, not yours — but silently scaling it down is
   nobody's.
 - Moving the board card is a **human task**. Do not claim you moved it.
+
+The parser mirrors GitHub's own rules rather than improving on them — the nine keywords, `#123` /
+`owner/repo#123` / issue URLs, code spans and fenced blocks ignored, cross-repo references dropped.
+It deliberately does not interpret negation, because GitHub does not either, and a parser cleverer
+than the platform is one whose behaviour nobody can predict. Its rules are driven against fixtures
+it must **refuse** (`scripts/ci/__tests__/parse-closing-keywords.test.js`) — chiefly a number inside
+a code span, which is how a PR *documenting this feature* would otherwise close whatever issue its
+example named.
+
+---
+
+## Skipping the end-to-end tiers
+
+A documentation change used to run the whole Cypress estate: **12 fast legs** (6 shards × 2 viewport
+profiles), **4 on-chain shards** at ~20–25 minutes each, and the passkey full stack. That is roughly
+two hours of runner time to prove that markdown does not change a pixel.
+
+It is now skipped automatically when the diff cannot reach the running app. Nothing to opt into, no
+label to remember, no judgement call: `ci-manager.yml`'s **`app`** path filter decides, and
+`test.yml` gates the three Cypress jobs on it.
+
+### Why this is safe, and the one edit that would make it dangerous
+
+**A skipped job SATISFIES a required status check.** That is not a quirk to work around — it is the
+hole spec 075 documented, where a PR touching only unfiltered paths merged green having run nothing.
+A bypass built carelessly recreates it exactly.
+
+What makes this one safe is the *shape* of the filter. `app` is a **negative list**:
+
+```yaml
+app:
+  - '**'          # everything…
+  - '!**/*.md'    # …minus what provably cannot reach the app
+  - '!docs/**'
+  - '!specs/**'
+  …
+```
+
+A path nobody has thought about — a new top-level directory, a new config file — matches `**`, makes
+`app` true, and **runs the suite**. The default is to test.
+
+Rewrite it as a positive allowlist (`- 'frontend/**'`, `- 'contracts/**'`, …) and it looks tidier
+while behaving as the opposite: every unlisted path skips, silently, and merges green. That edit is
+small, plausible, and catastrophic, so it is gated rather than merely commented —
+`npm run check:ci-gating` (`scripts/ci/check-ci-gating.js`, in the *Spec Registry* CI job) enforces:
+
+| Rule | What it stops |
+|---|---|
+| **C-01** | `app` missing, or not starting at `'**'` — i.e. converted to an allowlist |
+| **C-02** | a positive entry smuggled in after the negative head |
+| **C-03** | `app` not exported, or not passed to `test.yml` as `run_e2e` |
+| **C-04** | any Cypress tier losing its `if: inputs.run_e2e` guard |
+| **C-05** | `run_e2e` defaulting to anything but `true` — a manual `workflow_dispatch` run, the thing you reach for when you distrust a result, must not quietly test nothing |
+
+Each rule is driven against a workflow pair it must **reject**, including the inverted-allowlist
+case, because a guard that enforces nothing prints the same line as one that enforces everything.
+
+### Adding an exclusion
+
+Adding a path to `app`'s exclusion list is a real assertion: *these bytes cannot affect the built
+app, the local chain, the gateway, or a Cypress run.* Make it deliberately, and keep the list short —
+every entry is a place the suite can stop looking. When in doubt, leave it out: the cost of running
+the suite unnecessarily is runner minutes, and the cost of skipping it wrongly is a regression that
+merges green.
+
+A skipped tier is also **announced** in the run's change summary, naming what did not run. A skipped
+job and a passing job look identical on a PR otherwise, and "the suite passed" and "the suite never
+ran" must never be the same sentence.
 
 ---
 
@@ -301,9 +372,10 @@ disagrees with the issue, the issue is right.
 - **One agent per issue.** The assignee is the claim. Respect it, and release it if you walk away.
 - **One number per spec, claimed by a merge.** Not by a branch, not by a draft PR.
 - **Branch from `staging`.** Only promotions and declared hotfixes touch `main`.
-- **Closing is a deliberate act, not a side effect.** `Closes #N` links the PR but does not close
-  the issue — the merge lands on `staging`, and GitHub honours closing keywords only on the default
-  branch. Close it yourself after the merge, then read it back.
+- **`Closes #N` closes the issue — via a workflow, not GitHub.** GitHub ignores closing keywords
+  outside the default branch, so `close-linked-issues.yml` does it on the `staging` merge. Read the
+  issue back afterwards: an automation you never verify is a second thing that can be quietly
+  wrong.
 - **Never introduce a second copy of a state GitHub already keeps.** It will drift, and a drifted
   record is worse than no record — it is read with the same confidence as a true one.
 - **A subagent's report is a claim.** Review the diff and run the gates before accepting.

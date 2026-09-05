@@ -53,9 +53,8 @@ binding on humans too — most of all the two rules that exist because they were
 - **Assign yourself before starting.** The assignee is the claim — it is how an agent scanning for
   work knows not to start the same thing. There is deliberately no status label to set: state is
   read from the assignee, the linked PRs and whether the issue is closed, and closure comes from
-  `Closes #N` in the PR body — which LINKS the PR to the issue but does not close it, because
-  GitHub honours closing keywords only on the default branch and feature PRs target `staging`.
-  Close finished issues deliberately after the merge.
+  `Closes #N` in the PR body. GitHub only honours closing keywords on the default branch, so
+  `close-linked-issues.yml` applies them on the `staging` merge — check the issue actually closed.
 
 The full protocol — triage, sizing, sub-issues, reviewing delegated work — is in
 [Multi-Agent Development Flow](multi-agent-workflow.md).

@@ -58,6 +58,7 @@ jobs:
       tooling: ${{ steps.filter.outputs.tooling }}
       subgraph: ${{ steps.filter.outputs.subgraph }}
       specs: ${{ steps.filter.outputs.specs }}
+      app: ${{ steps.filter.outputs.app }}
       ops: ${{ steps.filter.outputs.ops }}
       any_code_changed: ${{ steps.check.outputs.any_code_changed }}
     
@@ -127,6 +128,35 @@ jobs:
               - 'specs/**'
               - '.specify/**'
               - '.claude/skills/**'
+            # THE E2E BYPASS (issue #1460). True when the diff touches anything that can reach the
+            # running app; false only for changes that provably cannot. `test.yml` skips the
+            # Cypress tiers — 12 fast legs, 4 on-chain shards, the passkey full stack — when this
+            # is false, because a docs-only pull request was paying all of that to prove that
+            # markdown does not change a pixel.
+            #
+            # THE SHAPE IS THE SAFETY, AND IT IS NOT NEGOTIABLE. This is a NEGATIVE list: it
+            # starts at `'**'` and subtracts. A path nobody has thought about — a new top-level
+            # directory, a new config file — matches `**`, makes this true, and RUNS the suite.
+            #
+            # A positive allowlist would look equivalent and behave as the opposite: everything
+            # unlisted would skip, and a SKIPPED job satisfies a required status check, so the
+            # change would merge green having tested nothing. That is spec 075's hole exactly, and
+            # `npm run check:ci-gating` fails the build if this is ever inverted.
+            #
+            # Adding an exclusion is therefore a real decision: it asserts those bytes cannot
+            # affect the built app, the local chain, the gateway, or a Cypress run.
+            app:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!specs/**'
+              - '!.specify/**'
+              - '!.claude/**'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/agents/**'
+              - '!.github/labels.json'
+              - '!.github/CODEOWNERS'
+              - '!LICENSE'
             ops:
               - 'deployments/**'
               - 'infra/**'
@@ -217,6 +247,20 @@ jobs:
           if [[ $test_count -eq 0 ]]; then
             echo "- None (Documentation-only changes)" >> $GITHUB_STEP_SUMMARY
           fi
+
+          # A skipped E2E tier must be VISIBLE. A skipped job satisfies a required check, so the
+          # difference between "the suite passed" and "the suite did not run" is otherwise
+          # invisible on the PR — which is the failure mode this bypass would otherwise create.
+          app="${{ steps.filter.outputs.app }}"
+          app="${app:-true}"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "$app" == "true" ]]; then
+            echo "🧪 **End-to-end suites will run** — this change can reach the running app." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **End-to-end suites SKIPPED** — nothing in this diff can reach the running app" >> $GITHUB_STEP_SUMMARY
+            echo "(docs, specs, agent config, markdown only). 12 fast legs + 4 on-chain shards +" >> $GITHUB_STEP_SUMMARY
+            echo "the passkey full stack were not run. See \`app\` in .github/workflows/ci-manager.yml." >> $GITHUB_STEP_SUMMARY
+          fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Total test suites to run:** $test_count" >> $GITHUB_STEP_SUMMARY
@@ -240,6 +284,11 @@ jobs:
       needs.detect-changes.outputs.ops == 'true' ||
       needs.detect-changes.outputs.specs == 'true'
     uses: ./.github/workflows/test.yml
+    with:
+      # Skips the Cypress tiers for a change that cannot reach the running app (issue #1460).
+      # `app` is a NEGATIVE path filter, so anything unrecognised runs the suite — see its
+      # definition above before touching this.
+      run_e2e: ${{ needs.detect-changes.outputs.app == 'true' }}
 
   frontend-tests:
     name: Frontend Tests
