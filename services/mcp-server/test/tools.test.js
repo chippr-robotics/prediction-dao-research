@@ -222,3 +222,40 @@ test('a bounded timeout ends a hung read rather than hanging the agent', async (
     await gateway.close()
   }
 })
+
+// ── spec 104: the shared definitions come from the vendored snapshot ─────────────────────────
+
+test('every shared tool is served EXACTLY as the snapshot defines it, and the local one is not served', async () => {
+  const { TOOL_SNAPSHOT } = await import('../src/tools.js')
+  const { handler } = buildServer({ env: {} })
+  const { tools } = (await handler.handle(rpc(1, 'tools/list'))).result
+  const byName = new Map(tools.map((t) => [t.name, t]))
+
+  for (const def of TOOL_SNAPSHOT) {
+    if (def.auth === 'local') {
+      // find_in_app searches the SPA's navigation index in the browser; there is no gateway route
+      // behind it, so this server must not advertise it.
+      assert.equal(byName.has(def.name), false, `${def.name} is browser-local and must not be served here`)
+      const res = await call(handler, def.name)
+      assert.equal(res.error.code, -32602)
+      continue
+    }
+    const served = byName.get(def.name)
+    assert.ok(served, `${def.name} is in the snapshot but not served`)
+    assert.equal(served.title, def.title)
+    assert.equal(served.description, def.description)
+    assert.deepEqual(served.inputSchema, def.inputSchema)
+  }
+  // build_intent is the one MCP-only tool: defined in tools.js, deliberately absent from the
+  // snapshot (the in-app assistant must not carry a tool that returns something signable).
+  assert.ok(byName.has('build_intent'))
+  assert.equal(TOOL_SNAPSHOT.some((d) => d.name === 'build_intent'), false)
+  assert.equal(tools.length, TOOL_SNAPSHOT.filter((d) => d.auth !== 'local').length + 1)
+})
+
+test('a snapshot tool bound to a route this server cannot map fails at boot, not in a call', async () => {
+  const { ROUTE_PATHS, TOOL_SNAPSHOT } = await import('../src/tools.js')
+  for (const def of TOOL_SNAPSHOT) {
+    if (def.exec.kind === 'route') assert.ok(ROUTE_PATHS[def.exec.route], `${def.name} names route "${def.exec.route}" with no path here`)
+  }
+})

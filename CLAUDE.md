@@ -674,9 +674,13 @@ artifacts live under `specs/<feature>/`.
   (5) **`infra/grafana/` IS GENERATED AND COMMITTED** — never hand-edit it (C5 regenerate-and-diff),
   and a dashboard edited in the Grafana UI is drift that the next provision overwrites. Four sources
   are catalogued `planned` — they show as NOT YET LIVE, declare no metric, and contribute nothing to
-  any total — and they split two ways: `miniapp licenses` / `wager platform fee` exist NOWHERE (no
-  contract has a fee), while `x402-agent-payments` / `assistant-model-api` are **built and offered on
-  no deployment** (specs 096/095, flags commented out in `infra/vm/gateway/docker-compose.yml`).
+  any total — and they split three ways: `miniapp licenses` / `wager platform fee` exist NOWHERE (no
+  contract has a fee); `assistant-model-api` is **built and offered on no deployment** (spec 095, flag
+  commented out in `infra/vm/gateway/docker-compose.yml`; `x402-agent-payments` sat beside it until
+  its deployment switched it on and promoted it to `live` in the same change); and
+  `referral-guttertoken` (spec 104) is **readable by nobody and not cash** — in-kind GutterToken credit
+  on FairWins' own account, no balance/referral endpoint exists to collect it, and its code lives in
+  the tenant manifest where C2b cannot see it, so it is catalogued on purpose and never a USD line.
   **A gate that cannot see the source is not protection**, and the second group is why: C2's only
   discovery route was a FeeRouter `keccakId('x.y')` over two files, so the x402 rail — which takes
   USDC straight to the treasury and registers no `serviceId` — was invisible BY CONSTRUCTION and sat
@@ -798,7 +802,7 @@ artifacts live under `specs/<feature>/`.
   not lines in a document. See `specs/094-e2e-coverage-expansion/`.
 - **The member API (spec 095) authenticates with member-SIGNED capability tokens, and nothing on it
   signs or moves value.** A "private API key" is an off-chain EIP-712 `ApiKeyGrant` the member signs
-  in-app (Settings ▸ API access) — the gateway stores nothing to issue one; the struct/domain have
+  in-app (Tools ▸ Assistant ▸ API access since spec 104) — the gateway stores nothing to issue one; the struct/domain have
   ONE source, `@fairwins/intent-types/offchain` (deliberately OUTSIDE `CONTRACT_VERIFIED_TYPES`: the
   parity gate would demand Solidity that must not exist; `services/relay-gateway/test/memberApiAuth.test.js`
   is their gate instead). The gateway module (`services/relay-gateway/src/memberApi/`,
@@ -814,7 +818,7 @@ artifacts live under `specs/<feature>/`.
   (`services/mcp-server/`) is DEPENDENCY-FREE and deliberately NOT a workspace member (lockfile
   hazard, spec 075) — do not add it to `workspaces` or give it dependencies; it consumes the API
   with the member's own token and cannot sign. Mini-app packages still cannot sign — the api-access
-  console deep-links to the host Settings card for every key ceremony.
+  console deep-links to the host's Assistant-tab card for every key ceremony.
   **Spec 096 adds a SECOND rail on those same operations — x402 pay-per-request
   (`services/relay-gateway/src/x402/`, `X402_ENABLED`, default off) — and it NEVER applies to a
   member: the bearer token is checked first, so a valid `fw1` token never reaches the paywall even
@@ -836,6 +840,52 @@ artifacts live under `specs/<feature>/`.
   a tool argument. See `docs/developer-guide/member-api.md` + `docs/developer-guide/mcp-server.md` +
   `docs/developer-guide/agentic-chat.md` + `docs/developer-guide/agentic-payments.md` +
   `specs/095-member-api-agentic-access/` + `specs/096-x402-agentic-payments/`.
+- **The assistant has TWO rails and ONE tool table (spec 104), and it lives on a Tools tab.** The
+  Assistant and API access cards moved from Settings to **Tools ▸ Assistant** (`/wallet?tab=assistant`;
+  card ids `assistant-prefs`/`api-access` unchanged, the old `?tab=settings#…` links redirect). A
+  member picks who answers: **FairWins assistant (membership)** — the spec-095 gateway rail, paid
+  member only, FairWins pays Anthropic under the token budget — or **GutterToken (your credits)** —
+  bring-your-own-key: the member pastes an `sk-…` key from `app.guttertokens.com` and the BROWSER calls
+  `https://api.guttertokens.com/v1/messages` directly (open CORS; `connect-src https:` already admits
+  it). On that rail **FairWins is not in the path**: it never holds, forwards or sees the key or a
+  message, charges nothing, cannot read the balance, and therefore **never renders a rate or a
+  "credits remaining" figure** (the link out is the disclosure; token counts a reply reported may be
+  shown, a dollar figure may not). Non-members get the GutterToken rail only; the launcher gate is
+  `feature ∧ wallet ∧ opted-in ∧ (key present ∨ membership active-paid)` IN THAT ORDER, so a member
+  with a key never pays the membership read and `unreadable` still renders nothing. Honest states,
+  never a fabricated reply: `401` ⇒ `key_invalid` (re-enter), `403 insufficient_quota` ⇒
+  `out_of_credit` (link to top up), `429` ⇒ GutterToken's per-source-IP limit, `503`/transport ⇒
+  unreachable. **Key store rules are absolute** (spec-069 RPC-credential precedent, NOT the spec-062
+  vault): wallet-scoped `userStorage` key `assistant_guttertoken_key_v1`, device-only, **deliberately
+  absent from `lib/backup/syncedObjects.js`** (a test asserts it), redacted to `sk-…` + 4 chars at
+  EVERY display/log/audit boundary, never in a URL or an error message; save = `^sk-` shape + one
+  `GET /v1/models` (401 refuses, unreachable saves with the failure shown). The tenant feature
+  `assistant-byok` (on for `fairwins`, requires `assistant`) gates the option; the signup link is
+  `https://app.guttertokens.com/signup`, `?ref=<code>` from `settings.assistant.guttertokenReferralCode`
+  in the manifest (optional, validator-gated, none registered yet), disclosed in words; signup itself
+  is GutterToken's (SIWE `personal_sign` inside ITS session, `window.ethereum` only) — FairWins can
+  never sign a member in there, passkey members sign up by E-MAIL, and GutterToken's own passkey login
+  is unrelated to ours; the credit is
+  catalogued as FinOps `referral-guttertoken`, `planned` because no collector can read it. **Both rails
+  carry TOOLS, executed in the browser** (client-side loop, ≤ `MAX_TOOL_ROUNDS` = 4 rounds/turn;
+  gateway ceiling `ASSISTANT_MAX_ROUNDS`, default 4, max 8): `get_profile`/`get_membership`/
+  `get_wagers`/`get_fees` are ordinary member-API reads under the 24 h grant (OPTIONAL on the
+  GutterToken rail — offered from the panel; without it only the public tools), `get_gateway_status`/
+  `get_prediction_markets`/`get_perps_pairs` are public, `find_in_app` is a local lookup over the nav
+  index (descriptive, never authoritative). **`@fairwins/assistant-contract` is the ONE source** of
+  prompt + tool defs + honest result wording, consumed by the gateway (which attaches tools
+  SERVER-SIDE on the FairWins rail and REFUSES client-supplied `tools`), the frontend, and — as the
+  vendored `services/mcp-server/src/toolDefs.snapshot.json`, gated both directions by
+  `services/relay-gateway/test/mcpToolParity.test.js` — the dependency-free MCP server, which keeps
+  `build_intent` as its own MCP-ONLY tool. **No `build_intent` and no `navigate` in the in-app
+  assistant** — tool results carry counterparty-authored text (prompt injection), a result never makes
+  the app DO anything, and `replyLinks.js` stays the only path from model text to a click. **The
+  member's surface is never in the system prompt** — the prompt is frozen per thread (cache prefix)
+  and the path rides as a trailing text block on the last user message; a grant arriving mid-thread
+  starts a new thread. Memory stays text-only and device-local. Legal was AMENDED in place (privacy
+  §2/§5: GutterToken is NOT our processor; terms §4.3(5)/§4.6; risk §13) — the document hash is the
+  version. See `docs/developer-guide/agentic-chat.md` § Providers/Tools +
+  `docs/research/guttertoken-assistant-integration.md` + `specs/104-guttertoken-assistant-rail/`.
 
 <!-- SPECKIT START -->
 - **A custody write's RAIL is a property of the SIGNER, not the login.**

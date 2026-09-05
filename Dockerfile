@@ -13,6 +13,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY packages/intent-types/package.json ./packages/intent-types/
+# spec 104: frontend/src/lib/assistant imports @fairwins/assistant-contract — same dangling-
+# symlink hazard the gateway Dockerfile documents; omit this and vite dies at resolve time.
+COPY packages/assistant-contract/package.json ./packages/assistant-contract/
 COPY tools/miniapp-build/package.json ./tools/miniapp-build/
 
 # Native-module toolchain (spec 085): @trezor/connect-web transitively pulls `usb`, whose install
@@ -26,6 +29,7 @@ RUN npm ci --workspace frontend --include-workspace-root=false
 # directory exists — a missing one yields a DANGLING symlink and an install that looks clean,
 # which is exactly how the relay-gateway image built successfully and then crashed on boot.
 COPY packages/intent-types/ ./packages/intent-types/
+COPY packages/assistant-contract/ ./packages/assistant-contract/
 COPY tools/miniapp-build/ ./tools/miniapp-build/
 
 # Source + tenant manifests (spec 072 — the tenant-branding plugin resolves tenants/ as a
