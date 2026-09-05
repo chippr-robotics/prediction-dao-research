@@ -404,6 +404,67 @@ describe('ConnectModal — recovery when the account cannot be confirmed (spec 1
     )
   })
 
+  it('offers a not-yet-deployed account as its own labelled choice, and takes it only when pressed', async () => {
+    // The member this protects is the one who signed up on another device and has not spent yet:
+    // their account is real and simply holds no code. It is offered rather than opened, because
+    // US2's rule is that an unverified address is never presented as though the app confirmed it —
+    // and offered rather than refused, because they cannot type an address nobody has shown them.
+    const CF = '0x' + 'c'.repeat(40)
+    mockWallet.connectWallet = vi
+      .fn()
+      .mockRejectedValue(
+        unresolved('none-found', 'No account on this network lists this passkey as an owner.', {
+          credentialId: 'cred-phone',
+          counterfactualAddress: CF,
+        })
+      )
+    markExplainerSeen()
+    const user = userEvent.setup()
+    render(<ConnectModal />)
+
+    await user.click(screen.getByText('Passkey').closest('button'))
+    await user.click(screen.getByText('I already have a passkey'))
+    await waitFor(() => expect(screen.getByTestId('recover-account')).toBeInTheDocument())
+
+    // Shown, with what it is stated — not opened behind the member's back.
+    expect(screen.getByText(CF)).toBeInTheDocument()
+    expect(screen.getByText(/has not been used on the network/i)).toBeInTheDocument()
+
+    mockWallet.connectWallet.mockClear()
+    await user.click(screen.getByText('Continue to that account').closest('button'))
+    await waitFor(() =>
+      expect(mockWallet.connectWallet).toHaveBeenLastCalledWith('fairwinsPasskey', {
+        mode: 'sign-in',
+        credentialId: 'cred-phone',
+        discoverable: undefined,
+        acceptCounterfactual: true,
+      })
+    )
+  })
+
+  it('offers NO such choice when the chain was merely unreadable', async () => {
+    // An unreachable network says nothing about whether an account exists, so inviting the member
+    // to "continue to a new one" here would be inviting them to walk away from a real one.
+    mockWallet.connectWallet = vi
+      .fn()
+      .mockRejectedValue(
+        unresolved('unverified', 'We could not reach the network to check.', {
+          credentialId: 'cred-phone',
+          counterfactualAddress: null,
+        })
+      )
+    markExplainerSeen()
+    const user = userEvent.setup()
+    render(<ConnectModal />)
+
+    await user.click(screen.getByText('Passkey').closest('button'))
+    await user.click(screen.getByText('I already have a passkey'))
+    await waitFor(() => expect(screen.getByTestId('recover-account')).toBeInTheDocument())
+
+    expect(screen.queryByText(/continue to that account/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Try again')).toBeInTheDocument()
+  })
+
   it('refuses to submit a malformed address, in words rather than colour alone', async () => {
     mockWallet.connectWallet = vi
       .fn()

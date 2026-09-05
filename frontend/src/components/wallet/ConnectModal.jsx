@@ -133,6 +133,7 @@ function ConnectModalDialog() {
             outcome: err.outcome,
             reason: err.message,
             credentialId: err.credentialId ?? opts?.credentialId ?? null,
+            counterfactualAddress: err.counterfactualAddress ?? null,
           })
           setStep('recover')
         } else {
@@ -162,6 +163,13 @@ function ConnectModalDialog() {
   // The address is only ever a hint: the connector checks it against the chain.
   const recoverWithAddress = useCallback(
     (accountAddress) => retrySignIn({ accountAddress }),
+    [retrySignIn]
+  )
+
+  // The member accepting their own not-yet-deployed account, having been shown its address and
+  // told what it is. Never inferred — it exists as a flag precisely so the app cannot assume it.
+  const acceptCounterfactual = useCallback(
+    () => retrySignIn({ acceptCounterfactual: true }),
     [retrySignIn]
   )
 
@@ -328,8 +336,10 @@ function ConnectModalDialog() {
             outcome={unresolved?.outcome}
             reason={unresolved?.reason}
             busy={pendingId !== null}
+            counterfactualAddress={unresolved?.counterfactualAddress}
             onSubmit={recoverWithAddress}
             onRetry={retrySignIn}
+            onAcceptCounterfactual={acceptCounterfactual}
             onBack={() => {
               setUnresolved(null)
               setStep(unlockFirst ? 'picker' : 'methods')

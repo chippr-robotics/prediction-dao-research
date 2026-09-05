@@ -26,9 +26,20 @@ import { isValidEthereumAddress } from '../../utils/validation'
  * @param {boolean} props.busy       a connect attempt is in flight
  * @param {(address: string) => void} props.onSubmit
  * @param {() => void} props.onRetry  re-attempt the sign-in unchanged (the answer to `unverified`)
+ * @param {string|null} props.counterfactualAddress  where this key's OWN account would live
+ * @param {() => void} props.onAcceptCounterfactual
  * @param {() => void} props.onBack
  */
-export default function RecoverAccount({ outcome, reason, busy = false, onSubmit, onRetry, onBack }) {
+export default function RecoverAccount({
+  outcome,
+  reason,
+  busy = false,
+  counterfactualAddress = null,
+  onSubmit,
+  onRetry,
+  onAcceptCounterfactual,
+  onBack,
+}) {
   const [address, setAddress] = useState('')
   const [touched, setTouched] = useState(false)
 
@@ -65,6 +76,31 @@ export default function RecoverAccount({ outcome, reason, busy = false, onSubmit
         >
           <span className="connect-modal__option-name">Try again</span>
         </button>
+      )}
+
+      {/*
+        A member who signed up on another device and has not spent yet is HERE, and their account is
+        legitimately not deployed. The address is a deterministic function of the passkey, so it is
+        the very address their first device showed them — continuing to it opens no second account.
+        Shown as its own choice, with what it is stated plainly, because US2's rule is that an
+        unverified address must never be presented as though the app had confirmed it.
+      */}
+      {counterfactualAddress && (
+        <div className="connect-modal__recover-new">
+          <p className="connect-modal__recover-help">
+            If you have just created this passkey and not yet sent anything, your account exists but
+            has not been used on the network. It is always at this address:
+          </p>
+          <code className="connect-modal__address">{counterfactualAddress}</code>
+          <button
+            type="button"
+            className="connect-modal__option"
+            disabled={busy}
+            onClick={onAcceptCounterfactual}
+          >
+            <span className="connect-modal__option-name">Continue to that account</span>
+          </button>
+        </div>
       )}
 
       <form onSubmit={submit} className="connect-modal__recover-form">

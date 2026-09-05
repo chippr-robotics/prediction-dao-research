@@ -593,6 +593,63 @@ describe('cross-device: the passkey belongs to a DIFFERENT account', () => {
     expect(readSession()).toBeNull()
   })
 
+  it('offers the COUNTERFACTUAL address rather than refusing a member whose account is simply not deployed yet', async () => {
+    // The case the blunt version of this rule would have broken, and it is not rare: a member who
+    // signed up on another device and has not spent yet has a perfectly good account that holds no
+    // code. Refusing them locks out every new member syncing a second device — and they cannot type
+    // an address they have never been shown. So the address is OFFERED, labelled as not-yet-used,
+    // never silently opened.
+    const priv = p256.utils.randomSecretKey()
+    const xy = `0x${Array.from(p256.getPublicKey(priv, false).subarray(1), (b) => b.toString(16).padStart(2, '0')).join('')}`
+    let n = 0
+    const { connector } = makeConnector({
+      getAssertion: vi.fn(async () => makeAssertion(priv, `c-${n++}`)),
+      deriveAddress: undefined,
+      resolveAddress: undefined,
+      readControllers: vi.fn().mockResolvedValue({ deployed: false, controllers: [] }),
+    })
+    const err = await connector.connect({ chainId: 80002, mode: 'sign-in' }).catch((e) => e)
+    expect(err.name).toBe('AccountUnresolved')
+    // It is the same deterministic address their first device showed them — continuing to it opens
+    // no second account, which is what makes offering it safe.
+    expect(err.counterfactualAddress.toLowerCase()).toBe(
+      computeAccountAddress({ ownersBytes: [xy], nonce: 0n }).toLowerCase()
+    )
+    expect(readSession()).toBeNull() // offered, NOT taken
+  })
+
+  it('opens the counterfactual account only when the member accepted it', async () => {
+    const priv = p256.utils.randomSecretKey()
+    const xy = `0x${Array.from(p256.getPublicKey(priv, false).subarray(1), (b) => b.toString(16).padStart(2, '0')).join('')}`
+    let n = 0
+    const { connector } = makeConnector({
+      getAssertion: vi.fn(async () => makeAssertion(priv, `c-${n++}`)),
+      deriveAddress: undefined,
+      resolveAddress: undefined,
+      readControllers: vi.fn().mockResolvedValue({ deployed: false, controllers: [] }),
+    })
+    const out = await connector.connect({ chainId: 80002, mode: 'sign-in', acceptCounterfactual: true })
+    expect(out.accounts[0].toLowerCase()).toBe(
+      computeAccountAddress({ ownersBytes: [xy], nonce: 0n }).toLowerCase()
+    )
+  })
+
+  it('does NOT offer a counterfactual when the chain was unreadable — that is not a new account', async () => {
+    // An unreachable chain says nothing about whether an account exists, so offering "continue to a
+    // new one" here would invite a member with a real account to walk away from it.
+    const priv = p256.utils.randomSecretKey()
+    let n = 0
+    const { connector } = makeConnector({
+      getAssertion: vi.fn(async () => makeAssertion(priv, `c-${n++}`)),
+      deriveAddress: undefined,
+      resolveAddress: undefined,
+      readControllers: vi.fn().mockRejectedValue(new Error('RPC down')),
+    })
+    const err = await connector.connect({ chainId: 80002, mode: 'sign-in' }).catch((e) => e)
+    expect(err.outcome).toBe('unverified')
+    expect(err.counterfactualAddress).toBeNull()
+  })
+
   it('recovers on an address the MEMBER supplies, once the chain confirms the key owns it', async () => {
     // US3. The address is a hint that reaches the same confirmation a searched candidate does —
     // which is what stops "type any address" from being a way into somebody else's account.

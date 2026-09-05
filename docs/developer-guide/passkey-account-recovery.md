@@ -49,9 +49,21 @@ recovery screen leads with "Try again" for one and the address field for the oth
 
 ## The rules
 
-1. **A session opens only on `resolved`.** The connector may return an address only when the chain
-   confirmed it. Everything else raises `AccountUnresolved`, which carries the outcome so the
-   surface can offer the right next step.
+1. **A session opens only on `resolved`, or on a counterfactual the member accepted.** The
+   connector returns a confirmed address only when the chain confirmed it; everything else raises
+   `AccountUnresolved`, which carries the outcome so the surface can offer the right next step.
+
+   The one deliberate exception is worth stating in full, because the blunt version of this rule
+   was wrong. `none-found` also describes a member who signed up on another device and has not yet
+   spent: their account is real and simply holds no code. Refusing them locks out every member who
+   signs up and does not immediately transact, and they cannot type an address nobody has shown
+   them. So the derived address is **offered, labelled as not-yet-used, and opened only when they
+   press it** (`acceptCounterfactual`). That is safe because the address is a deterministic
+   function of the key — the same address their first device showed — and it satisfies US2, whose
+   rule is that an unverified address is never presented *as though the app had confirmed it*.
+
+   `unverified` gets no such offer: an unreachable chain says nothing about whether an account
+   exists, so inviting the member onward would invite them to walk away from a real one.
 2. **Verification is against the CURRENT owner set, not history.** A key that once owned an account
    and was rotated off does not control it; offering it would send the member somewhere they can no
    longer sign for.

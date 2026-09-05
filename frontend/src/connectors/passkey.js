@@ -176,7 +176,7 @@ export function passkeyConnector(options = {}) {
       this.capability = await (deps.detectCapability ?? detectCapability)()
     },
 
-    async connect({ chainId, isReconnecting, credentialId, discoverable, accountAddress, mode: requestedMode } = {}) {
+    async connect({ chainId, isReconnecting, credentialId, discoverable, accountAddress, acceptCounterfactual, mode: requestedMode } = {}) {
       const targetChain = chainId ?? buildDefaultChainId(config)
       // NO network gate here, deliberately. Signing in is a WebAuthn ceremony plus a local address
       // derivation — it needs no bundler, no EntryPoint and no RPC. Gating it on submission support
@@ -252,6 +252,9 @@ export function passkeyConnector(options = {}) {
           // Spec 104: set when the member is recovering by naming their account. It is a hint the
           // chain still has to agree with — it never becomes the session address on its own.
           accountAddress,
+          // …and this is the member accepting a not-yet-deployed account of their own, after being
+          // shown what it is. Never defaulted on.
+          acceptCounterfactual,
           deps,
         })
         address = resolved.address
@@ -396,13 +399,25 @@ async function repairPublicKey({ credentialId, address, chainId, deps }) {
  * address for `none-found` — instead of rendering one dead end for both.
  */
 export class AccountUnresolved extends Error {
-  constructor(resolution, { credentialId } = {}) {
+  constructor(resolution, { credentialId, counterfactualAddress } = {}) {
     super(resolution?.reason || 'We could not confirm which account this passkey controls.')
     this.name = 'AccountUnresolved'
     this.outcome = resolution?.outcome
     this.reason = resolution?.reason
     this.address = resolution?.address ?? null
     this.credentialId = credentialId ?? null
+    /**
+     * The address this key's OWN account would have, present only on `none-found`.
+     *
+     * Not an account the app found — nothing is deployed there. It is offered because a member who
+     * signed up on another device and has not yet transacted is in exactly this state, and their
+     * account is legitimately counterfactual: the address is a deterministic function of the key,
+     * so it is the same address their first device showed them. Refusing them outright would lock
+     * out every member who signs up and does not immediately spend, which is not what US2 asks for
+     * — US2 forbids presenting an unverified address *as though it were theirs*, and the fix for
+     * that is saying what it is, not withholding it.
+     */
+    this.counterfactualAddress = counterfactualAddress ?? null
   }
 }
 
@@ -427,7 +442,7 @@ export class AccountUnresolved extends Error {
  * Derivation survives untouched where it is truthful: creating a NEW account (`mode: 'sign-up'`),
  * which the member asked for explicitly.
  */
-export async function resolveAccountForCredential({ credentialId, chainId, assertion, accountAddress, deps = {} }) {
+export async function resolveAccountForCredential({ credentialId, chainId, assertion, accountAddress, acceptCounterfactual = false, deps = {} }) {
   const { knownCredentials } = await import('../lib/passkey/credentials')
   const local = knownCredentials(deps.storage).find((c) => c.credentialId === credentialId)
   if (local?.address) return { address: local.address, publicKey: local.publicKey }
@@ -470,7 +485,19 @@ export async function resolveAccountForCredential({ credentialId, chainId, asser
         })
       : await (deps.resolveAccounts ?? resolveAccounts)({ ownerBytes, chainId, deps })
 
-    if (!isResolved(resolution)) throw new AccountUnresolved(resolution, { credentialId })
+    if (!isResolved(resolution)) {
+      // `none-found` means no DEPLOYED account lists this key — which is also the honest reading of
+      // a brand-new account that has never been used on chain. The member is told which it is and
+      // chooses; `acceptCounterfactual` is that choice coming back, never an app-side assumption.
+      const counterfactualAddress =
+        resolution.outcome === 'none-found'
+          ? await deriveAddress({ chainId, ownersBytes: [ownerBytes], deps })
+          : null
+      if (acceptCounterfactual && counterfactualAddress) {
+        return { address: counterfactualAddress, publicKey, counterfactual: true }
+      }
+      throw new AccountUnresolved(resolution, { credentialId, counterfactualAddress })
+    }
 
     // Release 1 confirms at most one account. When discovery lands (spec 104 Release 2) more than
     // one is possible and the MEMBER picks — the connector must not, which is why this asserts
@@ -496,7 +523,9 @@ export async function resolveAccountForCredential({ credentialId, chainId, asser
 }
 
 /** Address-only form of {@link resolveAccountForCredential}. */
-export async function resolveAddressForCredential({ credentialId, chainId, assertion, accountAddress, deps = {} }) {
-  const { address } = await resolveAccountForCredential({ credentialId, chainId, assertion, accountAddress, deps })
+export async function resolveAddressForCredential({ credentialId, chainId, assertion, accountAddress, acceptCounterfactual, deps = {} }) {
+  const { address } = await resolveAccountForCredential({
+    credentialId, chainId, assertion, accountAddress, acceptCounterfactual, deps,
+  })
   return address
 }

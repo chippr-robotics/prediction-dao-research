@@ -846,9 +846,14 @@ artifacts live under `specs/<feature>/`.
   address assuming the key was the account's **sole initial owner at nonce 0** and return it even
   when the chain said nothing was deployed there, which signed a member whose passkey had been
   ADDED to an existing account into a brand-new empty one, silently — a zero balance they read as
-  their money being gone. Five rules: (1) **a session opens only on `resolved`** — everything else
-  raises `AccountUnresolved` carrying the outcome, so the surface offers recovery instead of a dead
-  end; (2) **`unverified` is NEVER `none-found`** — an unreachable chain is not evidence of
+  their money being gone. Five rules: (1) **a session opens only on `resolved`, or on a counterfactual the
+  MEMBER accepted** — everything else raises `AccountUnresolved` carrying the outcome, so the
+  surface offers recovery instead of a dead end. The exception is not a loophole, it is the case the
+  blunt rule broke: `none-found` also describes a member who signed up on another device and has not
+  spent, whose account is real and simply holds no code, so the derived address is OFFERED, labelled
+  not-yet-used, and opened only on `acceptCounterfactual` — safe because it is a deterministic
+  function of the key (the same address their first device showed). `unverified` gets no such offer:
+  an unreachable chain says nothing about whether an account exists; (2) **`unverified` is NEVER `none-found`** — an unreachable chain is not evidence of
   absence, and the two lead to different member actions (retry vs. recover), exactly as spec 095
   keeps `auth_unverifiable` out of the denial path and spec 084 keeps a third verdict; (3)
   **verification is against the CURRENT owner set** and `ownerIndex` is whatever the chain reported,

@@ -300,3 +300,16 @@
   font-size: 0.8rem;
   color: var(--danger-text);
 }
+
+.connect-modal__recover-new {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.75rem;
+}
+
+.connect-modal__recover-new .connect-modal__address {
+  overflow-wrap: anywhere;
+}
