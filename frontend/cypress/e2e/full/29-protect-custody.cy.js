@@ -326,51 +326,66 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
   // ---------------------------------------------------------------------------
   // CV-01 — create a vault and its owner set, judged by the deployed Safe
   // ---------------------------------------------------------------------------
-  it('[CV-01] creates a 2-of-2 vault on chain and lists it', () => {
+  it('[CV-01] creates a 2-of-2 vault on chain through the guided flow and lists it', () => {
     openProtect()
 
-    // Custody must be OFFERED here at all — without the Safe estate this reads as "New vaults
-    // cannot be created on this network" and everything below is moot.
     cy.get('.custody-onchain').should('be.visible')
     openVaultAction('create')
 
-    cy.get('form.custody-create').within(() => {
-      cy.get('#owner-0').clear().type(OWNER_A)
-      cy.contains('button', 'Add owner').click()
-      cy.get('#owner-1').clear().type(OWNER_B)
-      /*
-       * Replace the selection in ONE action. The field's onChange runs the value through
-       * `Number(...)`, so an empty intermediate state becomes 0 and the next keystroke lands
-       * beside it ("2" after a clear reads as "20"). Asserted, because the wizard silently
-       * disables Create when threshold > owners.
-       */
-      cy.get('#vault-threshold').type('{selectall}2').should('have.value', '2')
-      cy.get('#vault-label').type('E2E Vault')
-      /*
-       * Release 1.14.0 preselects a starter policy for every new vault, so this test — which is
-       * about the SAFE the wizard deploys, not about policy — opts out explicitly. The guard
-       * assertion below is what that choice means on chain. (A 1-of-1 could not opt out at all;
-       * this vault has two owners.)
-       */
-      cy.get('#vault-policy-none').click().should('be.checked')
-      cy.contains('button', 'Create vault').click()
-    })
+    // Sheet 1 — "Controlled": everyone must approve (2 owners ⇒ 2-of-2). No bare threshold typed.
+    cy.get('[data-testid="create-step-type"]').as('typeSheet')
+    cy.get('@typeSheet').contains('[role="radio"]', 'Controlled').click()
+    cy.get('#create-owner-0').clear().type(OWNER_A)
+    cy.get('#create-owner-1').clear().type(OWNER_B)
+    cy.get('@typeSheet').contains(/all 2 owners must sign/i).should('exist')
+    cy.get('#create-vault-label').type('E2E Vault')
+    cy.contains('button', 'Next: set rules').click()
 
-    cy.get(CARD, { timeout: 60000 }).should('have.length.at.least', 1)
-    cy.get(`${CARD} .account-card-label`).should('contain.text', 'E2E Vault')
+    /*
+     * Sheet 2 — switch every rule OFF. This test judges the SAFE the flow deploys; with rules on,
+     * a 2-of-2 would queue their installation for the co-owner (spec 105 FR-010), and the guard
+     * assertion below is about the no-rules path staying byte-identical to spec 043.
+     */
+    cy.get('[data-testid="create-step-rules"]').should('be.visible')
+    cy.get('[data-testid="rule-tile-cap"]').click()
+    cy.get('input[aria-label="Daily cap amount"]').clear()
+    cy.get('[data-testid="rule-tile-wait"]').click()
+    cy.contains('[role="radio"]', 'No wait').click()
+    cy.get('[data-testid="rule-tile-allowed"]').click()
+    cy.contains('[role="radio"]', /Everything — one set of rules/).click()
+    cy.contains('button', 'Next: pick networks').click()
 
-    // The card is a claim; the chain is the fact. Read the deployed Safe back. The card's test id
-    // carries the (lowercased) address — a vault is an address (spec 102).
-    cy.get(CARD).first().invoke('attr', 'data-testid').then((id) => {
-      const address = id.replace('vault-card-', '')
-      fixture('vaultInfo', { address }).then((info) => {
-        expect(info.version, 'a real Safe v1.4.1').to.equal('1.4.1')
-        expect(info.threshold, 'threshold as entered').to.equal(2)
-        expect(info.owners.map((o) => o.toLowerCase()), 'both owners').to.have.members([
-          OWNER_A.toLowerCase(), OWNER_B.toLowerCase(),
-        ])
-        expect(info.guard, 'a vault created with "No policy" carries no guard')
-          .to.equal('0x0000000000000000000000000000000000000000')
+    // Sheet 3 — the local chain is preselected; the app orchestrates and reports live status.
+    cy.get('[data-testid="create-step-networks"]').should('be.visible')
+    cy.get('[data-testid="deploy-button"]').click()
+    // The predicted address renders before any signature lands (FR-007)…
+    cy.get('[data-testid="predicted-address"] code', { timeout: 30000 }).should('contain.text', '0x')
+    // …and the network row reaches LIVE from a real receipt, never a timer.
+    cy.get('[data-testid^="deploy-status-"]', { timeout: 60000 }).should('contain.text', 'Live')
+    cy.contains('button', 'Continue').click()
+
+    // Sheet 4 — done: one address, one badge.
+    cy.get('[data-testid="create-step-done"]').should('be.visible')
+    cy.get('[data-testid="create-step-done"] code').invoke('text').then((predicted) => {
+      cy.contains('button', 'Done').click()
+
+      cy.get(CARD, { timeout: 60000 }).should('have.length.at.least', 1)
+      cy.get(`${CARD} .account-card-label`).should('contain.text', 'E2E Vault')
+
+      // The card is a claim; the chain is the fact — and the deployed address must BE the
+      // predicted one (same-address determinism is the whole feature).
+      cy.get(CARD).first().invoke('attr', 'data-testid').then((id) => {
+        const address = id.replace('vault-card-', '')
+        expect(address.toLowerCase(), 'deployed at the predicted address').to.equal(predicted.trim().toLowerCase())
+        fixture('vaultInfo', { address }).then((info) => {
+          expect(info.version, 'a real Safe v1.4.1').to.equal('1.4.1')
+          expect(info.threshold, 'Controlled ⇒ everyone signs').to.equal(2)
+          expect(info.owners.map((o) => o.toLowerCase()), 'both owners').to.have.members([
+            OWNER_A.toLowerCase(), OWNER_B.toLowerCase(),
+          ])
+          expect(info.guard, 'a vault created with rules OFF carries no guard')
+            .to.equal('0x0000000000000000000000000000000000000000')
+        })
       })
     })
   })
@@ -467,6 +482,8 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
         expect(info.guard, 'no guard before the owners adopt one').to.equal(NO_GUARD)
       })
 
+      // Spec 105 — the policy panel sits behind the one "Manage rules" disclosure in Details.
+      cy.get('[data-testid="vault-manage-rules"] > summary', { timeout: 20000 }).click()
       cy.get('.custody-policy', { timeout: 20000 }).within(() => {
         cy.contains('button', /Add rules|Upgrade to ordered rules/).click()
         cy.contains('button', 'Add a rule').click()
@@ -532,6 +549,8 @@ describe('Protect — Safe custody (specs 043 / 049 / 068)', () => {
        * every coin transfer and rule 002 is unreachable for them. That is what separates this
        * engine from a best-match or last-match one.
        */
+      // Spec 105 — the policy panel sits behind the one "Manage rules" disclosure in Details.
+      cy.get('[data-testid="vault-manage-rules"] > summary', { timeout: 20000 }).click()
       cy.get('.custody-policy', { timeout: 20000 }).within(() => {
         cy.contains('button', /Add rules|Upgrade to ordered rules|Change rules/).click()
         SCENARIO.rules.forEach((r) => addCoinRule(r.perTx))

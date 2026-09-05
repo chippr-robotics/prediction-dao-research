@@ -20,6 +20,9 @@ import { useVaultQueueAcrossChains } from '../../hooks/useVaultQueueAcrossChains
 import { summarizeQueue } from '../../lib/custody/vaultGroups'
 import { STATUS, approvalsRemaining } from '../../lib/custody/proposalStatus'
 import { chainDisplayName } from '../../lib/custody/chainName'
+import { describeProposal } from '../../lib/custody/describeProposal'
+import { NETWORKS } from '../../config/networks'
+import { getContractAddressForChain } from '../../config/contracts'
 import NetworkPill from '../ui/NetworkPill'
 import { useOpponentName } from '../../hooks/useOpponentName'
 import { shortAccountAddr } from '../../hooks/useAccountSwitcher'
@@ -29,6 +32,20 @@ function shortHash(h) {
 }
 
 const ACTION_LABEL = { approve: 'Approval', execute: 'Execution', cancel: 'Cancellation' }
+
+/**
+ * Spec 105 (US5) — the decoder's per-chain vocabulary: the chain's everyday stable token and its
+ * native symbol. Only POSITIVELY known meta goes in; an unknown token stays undecoded (raw row).
+ */
+function decodeContext(chainId, vaultAddress) {
+  const net = NETWORKS[Number(chainId)]
+  const assetMeta = {}
+  const stableAddr = getContractAddressForChain('paymentToken', chainId)
+  if (stableAddr && net?.stablecoin) {
+    assetMeta[stableAddr] = { symbol: net.stablecoin.symbol, decimals: net.stablecoin.decimals ?? 6 }
+  }
+  return { chainId: Number(chainId), vaultAddress, assetMeta, nativeSymbol: net?.nativeCurrency?.symbol || null }
+}
 
 /**
  * The recipient, cross-referenced the way every address in the app is (spec 054 priority:
@@ -85,6 +102,9 @@ export default function VaultQueueView({ group }) {
   const railReason = writeRail?.reason || ''
 
   const [busy, setBusy] = useState(false)
+  // Spec 105 (US5) — chip filter over the rendered rows. Pure view state: the cross-chain read,
+  // its four-state honesty and the partial-total naming are untouched by any chip.
+  const [filter, setFilter] = useState('all')
   const [rowErrors, setRowErrors] = useState({})
   const [pendingAction, setPendingAction] = useState(null) // { chainId, kind, proposal }
 
@@ -170,6 +190,16 @@ export default function VaultQueueView({ group }) {
   const isMine = (p) =>
     Boolean(connectedAddress) && (p.approvers || []).some((a) => String(a).toLowerCase() === String(connectedAddress).toLowerCase())
 
+  // "Needs you": pending, the member is an owner on that row's chain, and they have not approved.
+  const rowNeedsYou = (p) => {
+    const entry = byChain[p.chainId] || byChain[String(p.chainId)]
+    return Boolean(entry?.owner) && p.status === STATUS.PENDING && !isMine(p)
+  }
+  const needsYouCount = rows.filter(rowNeedsYou).length
+  const rowChainIds = [...new Set(rows.map((p) => Number(p.chainId)))]
+  const visibleRows =
+    filter === 'all' ? rows : filter === 'needs-you' ? rows.filter(rowNeedsYou) : rows.filter((p) => Number(p.chainId) === Number(filter))
+
   return (
     <div className="vault-queue" role="region" aria-label="Vault queue">
       <div className="vault-queue__head">
@@ -198,6 +228,40 @@ export default function VaultQueueView({ group }) {
         </button>
       </div>
 
+      {rows.length > 0 && (
+        <div className="vault-queue__chips" role="group" aria-label="Filter the queue">
+          <button
+            type="button"
+            className={`vault-queue__chip${filter === 'all' ? ' is-active' : ''}`}
+            aria-pressed={filter === 'all'}
+            onClick={() => setFilter('all')}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`vault-queue__chip${filter === 'needs-you' ? ' is-active' : ''}`}
+            aria-pressed={filter === 'needs-you'}
+            onClick={() => setFilter('needs-you')}
+            data-testid="vault-queue-chip-needs-you"
+          >
+            Needs you{needsYouCount > 0 ? ` (${needsYouCount})` : ''}
+          </button>
+          {rowChainIds.map((cid) => (
+            <button
+              key={cid}
+              type="button"
+              className={`vault-queue__chip${Number(filter) === cid ? ' is-active' : ''}`}
+              aria-pressed={Number(filter) === cid}
+              onClick={() => setFilter(cid)}
+              data-testid={`vault-queue-chip-${cid}`}
+            >
+              {chainDisplayName(cid)}
+            </button>
+          ))}
+        </div>
+      )}
+
       {!reading && rows.length === 0 && entriesCount > 0 && (
         <p className="custody-hint" role="status" data-testid="vault-queue-empty">
           Nothing waiting for a signature.
@@ -206,7 +270,7 @@ export default function VaultQueueView({ group }) {
 
       {rows.length > 0 && (
         <ul className="vault-queue__rows" aria-label="Pending proposals">
-          {rows.map((p) => {
+          {visibleRows.map((p) => {
             const chainEntry = byChain[p.chainId] || byChain[String(p.chainId)]
             const owner = Boolean(chainEntry?.owner)
             const remaining = approvalsRemaining(p.approvals, p.threshold)
@@ -214,6 +278,9 @@ export default function VaultQueueView({ group }) {
             const chainName = chainDisplayName(p.chainId)
             const err = rowErrors[p.safeTxHash]
             const waiting = pendingAction && pendingAction.proposal?.safeTxHash === p.safeTxHash
+            // Decoded ONLY when positively recognised; anything else keeps the raw presentation.
+            const described = describeProposal(p, decodeContext(p.chainId, group.address))
+            const needsMe = rowNeedsYou(p)
             return (
               <li
                 key={`${p.chainId}:${p.safeTxHash}`}
@@ -222,6 +289,11 @@ export default function VaultQueueView({ group }) {
                 data-chain-id={p.chainId}
               >
                 <div className="vault-queue__row-head">
+                  {described && (
+                    <span className="vault-queue__title" data-testid="vault-queue-title">
+                      {described.title} <span className="vault-queue__title-on">on {chainName}</span>
+                    </span>
+                  )}
                   <NetworkPill chainId={Number(p.chainId)} name={chainName} />
                   <span className={`custody-status custody-status--${p.status}`}>{p.status}</span>
                   <span className="custody-proposal-meta">
@@ -233,9 +305,13 @@ export default function VaultQueueView({ group }) {
                   </code>
                 </div>
                 <div className="vault-queue__facts">
-                  <RowRecipient address={p.to} chainId={Number(p.chainId)} />
+                  <RowRecipient address={described?.counterparty || p.to} chainId={Number(p.chainId)} />
                   <span>nonce {String(p.nonce)}</span>
                 </div>
+                <p className="vault-queue__signed" data-testid="vault-queue-signed" data-needs-you={needsMe ? 'true' : 'false'}>
+                  {p.approvals} of {p.threshold} signed
+                  {needsMe ? ' · needs you' : hasApproved && p.status === STATUS.PENDING ? ' · waiting on other owners' : ''}
+                </p>
                 {owner && !canAct ? (
                   /*
                    * An owner whose session cannot sign on THIS network. Before this, the buttons
@@ -250,7 +326,12 @@ export default function VaultQueueView({ group }) {
                 ) : owner ? (
                   <div className="custody-actions">
                     {p.status === STATUS.PENDING && (
-                      <button type="button" onClick={() => handleAction(p, 'approve')} disabled={busy || hasApproved || Boolean(waiting)}>
+                      <button
+                        type="button"
+                        className={needsMe ? 'vault-queue__primary-action' : undefined}
+                        onClick={() => handleAction(p, 'approve')}
+                        disabled={busy || hasApproved || Boolean(waiting)}
+                      >
                         {hasApproved ? 'Approved' : waiting ? 'Switching…' : 'Approve'}
                       </button>
                     )}
@@ -300,6 +381,10 @@ export default function VaultQueueView({ group }) {
           )
         })}
       </ul>
+
+      <p className="vault-queue__footer custody-hint" role="note">
+        Queued items stay on their own chain. This list is all of them.
+      </p>
     </div>
   )
 }

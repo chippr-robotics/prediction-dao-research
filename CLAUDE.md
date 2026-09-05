@@ -888,6 +888,25 @@ artifacts live under `specs/<feature>/`.
   `docs/research/guttertoken-assistant-integration.md` + `specs/104-guttertoken-assistant-rail/`.
 
 <!-- SPECKIT START -->
+- **A vault is CREATED everywhere it will live, from one flow (spec 105).** Creation is the
+  guided four-sheet flow (`components/custody/createflow/`), and the connected chain gates neither
+  Create nor Load. Same-address multichain rests on ONE rule: the deployment initializer is the
+  chain-independent spec-043 encoding (owners + threshold + canonical fallback handler) with a
+  per-vault saltNonce — **never put a policy setup in a multichain initializer** (realized rules
+  embed the chain's own stable address; byte-different initializer ⇒ different CREATE2 address).
+  Rules are ONE semantic config (`vaultRulesConfig.realizeRules`: banded everyday lane +
+  identical-scope full-vote big-send lane + catch-all) installed POST-deploy per network through
+  the vault's own threshold machinery — direct where the creator alone meets threshold, queued
+  "awaiting approval" (never shown active) where co-owners must sign. The creation record
+  (`vaultCreationRecords`, synced, IMMUTABLE — the replay input for "Add a network") is what makes
+  deploy-later possible; absence gets the honest FR-018 reason, owner drift gets the
+  original-arrangement disclosure. Deployment status is re-derived from the chain on reopen
+  (`deriveNetworkStatus`): a failed probe is `unreadable`, an occupied predicted address is
+  `already-live` (success). Details is ONE card (network status rows + shared facts with drift
+  NAMED + coverage labelled); the Queue's chips/decoded rows (`describeProposal` — null over a
+  guess) never touch the four-state read honesty. See
+  `docs/developer-guide/protect-policies.md` § "One vault, created everywhere" +
+  `specs/105-multichain-vault-creation/`.
 - **A custody write's RAIL is a property of the SIGNER, not the login.**
   `lib/custody/writeRail.js#resolveWriteRail` is the one answer to "can this session sign a vault
   action on this chain?", and it checks for a signer FIRST. Branching on `loginMethod === 'passkey'`
@@ -940,7 +959,7 @@ artifacts live under `specs/<feature>/`.
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/104-passkey-account-recovery/plan.md
+at specs/105-multichain-vault-creation/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also

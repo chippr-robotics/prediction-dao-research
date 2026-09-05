@@ -258,3 +258,47 @@ from memory: a guessed `Proposed` event hashes to a different topic0 and matches
 exactly like an app that proposed nothing), and `configureRules` takes `uint128` limits, so a
 `uint256` guess selects a different function and the Safe's setup delegatecall reverts with no data
 to explain it. Both cost a debugging round.
+
+## One vault, created everywhere (spec 105)
+
+Creation is a guided four-sheet flow (`components/custody/createflow/`): **type** (Joint 1-of-2 /
+Controlled n-of-n / Complex m-of-n — presets resolve owners + threshold; nobody types a bare
+threshold unless they chose Complex), **rules** (a tile grid over ONE semantic config —
+`lib/custody/vaultRulesConfig.js`), **networks** (cohort custody multi-select + orchestrated
+per-network deployment status), **done**. The connected chain gates nothing: the orchestrator
+(`hooks/useVaultDeployment.js`) switches the wallet per network at signature time (the spec-102
+settle-loop), resolves the write rail FIRST, and isolates every failure to its own row with the
+stage and a member-facing reason.
+
+Four invariants:
+
+1. **Same address on every network** — the deployment uses the chain-independent spec-043
+   initializer (owners + threshold + canonical fallback handler, NO policy setup) plus a per-vault
+   `saltNonce`. `buildDeploymentPlan` refuses any chain whose canonical Safe set would produce a
+   different address. **Never put a policy setup in a multichain initializer**: the realized rules
+   embed the chain's own stable-token address, so the bytes differ per chain and the address
+   identity breaks.
+2. **Rules are ONE semantic config, realized per chain** — `realizeRules` builds the banded
+   everyday lane (over-cap amounts skip it), the identical-scope full-vote big-send lane (the
+   engine's one fall-through), and the catch-all; installation happens POST-deploy through the
+   vault's own machinery (`buildInstallPlan`): directly where the creator alone meets the
+   threshold, queued as hub proposals ("awaiting approval", never shown active) where co-owners
+   must sign. A chain with no configured stable realizes cooldown + catch-all and DISCLOSES the
+   inapplicable tiles.
+3. **The creation record is the replay input** — `lib/custody/vaultCreationRecords.js` (synced
+   object `vaultCreationRecords`, non-network-scoped) holds owners-at-creation / threshold /
+   saltNonce / the semantic rules. Records are immutable (a differing overwrite throws; a
+   conflicting backup merge is reported, existing wins). "Add a network" on Details exists only
+   with a record; without one the row states the honest reason (FR-018). Owner drift since
+   creation ⇒ the original-arrangement disclosure before any signature (FR-017).
+4. **Status truth is the chain's** — in-flight states are session-local; reopen re-derives via
+   `getCode` + policy reads (`deriveNetworkStatus`), a failed probe is `unreadable` (never
+   "not deployed"), and an occupied predicted address is `already-live` — success, not failure.
+
+Details renders ONE card: network status rows (per-row Switch; Not-deployed rows carry the inline
+Deploy), shared facts stated once with drift NAMING the differing network and coverage naming
+unread chains (`sharedFact`), owners once. The Queue adds chips (All / Needs you / per-network)
+and plain-language rows via `lib/custody/describeProposal.js` — which describes ONLY what it
+positively recognises and returns null otherwise, because a guessed money movement is worse than
+calldata.
+
