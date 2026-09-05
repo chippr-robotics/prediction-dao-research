@@ -2,6 +2,9 @@
 
 **Input**: `specs/105-gateway-caller-auth/` — plan.md, spec.md, research.md, data-model.md, contracts/
 
+**Tracking**: parent #1443, with sub-issues #1444 (slice 2), #1445 (slice 4b), #1446 (slice 5a),
+#1447 (slice 5b), #1448 (slice 5c), #1449 (attestation, deferred). Spec 106 is tracked on #1438.
+
 **Organization**: five slices, each independently reviewable, testable and shippable. Slice 1 changes
 no observable behaviour on purpose: identity resolves and nothing enforces, so the risky part
 (enforcement) lands only once resolution is proven.
@@ -19,30 +22,30 @@ observable, so the tier model can be validated in production before anything dep
 **Independent test**: hit every client route with and without credentials; assert the header reports the
 expected tier and that **no response status changes** versus the previous build.
 
-- [ ] **T001** `src/identity/tiers.js` — the ladder, `atLeast()`, and `TIER_ORDER`. Pure, no I/O.
+- [x] **T001** `src/identity/tiers.js` — the ladder, `atLeast()`, and `TIER_ORDER`. Pure, no I/O.
       Ordinals never serialised. Include `address` between `human` and `member` (data-model §1).
-- [ ] **T002** [P] `test/identity/tiers.test.js` — ordering, comparison, and that `app` is unreachable
+- [x] **T002** [P] `test/identity/tiers.test.js` — ordering, comparison, and that `app` is unreachable
       from any web credential.
-- [ ] **T003** `src/identity/verifiers/attestation.js` — registration seam only. **Always returns
+- [x] **T003** `src/identity/verifiers/attestation.js` — registration seam only. **Always returns
       `absent`.** Exists so FR-004's extension point is real rather than promised.
-- [ ] **T004** `src/identity/resolve.js` — run every configured verifier, take the highest accepted
+- [x] **T004** `src/identity/resolve.js` — run every configured verifier, take the highest accepted
       tier. Precedence: any acceptance ⇒ `verified`; else any `unverifiable` ⇒ `unverifiable` at
       `anonymous`; else `verified` at `anonymous`.
-- [ ] **T005** [P] `test/identity/resolve.test.js` — **the load-bearing test.** A valid grant plus an
+- [x] **T005** [P] `test/identity/resolve.test.js` — **the load-bearing test.** A valid grant plus an
       unreachable challenge service must resolve `verified`, not `unverifiable`. A verifier that throws
       must not take down resolution. An unconfigured verifier returns `absent`, never `rejected`.
-- [ ] **T006** `src/identity/routeTable.js` — `ProtectedRoute` declarations for **every** client route.
+- [x] **T006** `src/identity/routeTable.js` — `ProtectedRoute` declarations for **every** client route.
       Deny-by-default: a route absent from the table is a configuration error, not a public route.
-- [ ] **T007** [P] `test/identity/routeTable.test.js` — assert every route the gateway actually mounts
+- [x] **T007** [P] `test/identity/routeTable.test.js` — assert every route the gateway actually mounts
       appears in the table (enumerate from the app), and that reads are `anonymous`.
-- [ ] **T008** `src/identity/middleware.js` — attach `req.caller`; set `X-FairWins-Tier`. Mounted
+- [x] **T008** `src/identity/middleware.js` — attach `req.caller`; set `X-FairWins-Tier`. Mounted
       **after** the origin lock and **before** route dispatch. Never sees `OPTIONS`.
-- [ ] **T009** `src/config/index.js` — `IDENTITY_*` config, boot-time validation, loud disclosure when
+- [x] **T009** `src/config/index.js` — `IDENTITY_*` config, boot-time validation, loud disclosure when
       disabled.
-- [ ] **T010** `src/server.js` — mount the middleware; add `capacitor://localhost` and
+- [x] **T010** `src/server.js` — mount the middleware; add `capacitor://localhost` and
       `https://localhost` to `ALLOWED_ORIGINS` **defaults** (research §1.6 — without this the native
       shells cannot send a credential at all).
-- [ ] **T011** [P] `test/identity/middleware.test.js` — ordering: preflight short-circuits before
+- [x] **T011** [P] `test/identity/middleware.test.js` — ordering: preflight short-circuits before
       resolution; a request to an unmounted path still resolves.
 
 **Checkpoint**: resolution proven, nothing enforced.
@@ -78,15 +81,15 @@ expected tier and that **no response status changes** versus the previous build.
 **Goal**: reuse the member verifier by **extracting** it, and add the `address` rung so trading does not
 silently require a purchase.
 
-- [ ] **T020** `src/memberApi/auth.js` — extract the signature-verification core into a reusable export.
+- [x] **T020** `src/memberApi/auth.js` — extract the signature-verification core into a reusable export.
       Add a mode that stops **before** the membership read. Do not change the existing
       `authenticate(req, scope)` contract — spec 095 and the MCP server both consume it.
-- [ ] **T021** [P] `test/identity/grantExtraction.test.js` — the extracted path returns identical
+- [x] **T021** [P] `test/identity/grant.test.js` (extraction group) — the extracted path returns identical
       verdicts to the original on the existing fixtures. **This is a refactor-safety test and must be
       written first.**
-- [ ] **T022** `src/identity/verifiers/grant.js` — map verdicts to tiers: valid signature ⇒ `address`;
+- [x] **T022** `src/identity/verifiers/grant.js` — map verdicts to tiers: valid signature ⇒ `address`;
       plus active membership ⇒ `member`; unreachable ⇒ `unverifiable`.
-- [ ] **T023** [P] `test/identity/grant.test.js` — an account with a valid grant and **no paid
+- [x] **T023** [P] `test/identity/grant.test.js` — an account with a valid grant and **no paid
       membership** resolves `address` and is **not refused** (the regression this rung exists to
       prevent).
 
@@ -96,9 +99,9 @@ silently require a purchase.
 
 **Goal**: routes demand their minimum; quotas stop keying on values callers supply.
 
-- [ ] **T024** Enforcement in `middleware.js` — refusal contract per `contracts/gateway-api.md`:
+- [x] **T024** Enforcement in `middleware.js` — refusal contract per `contracts/gateway-api.md`:
       403 with a `required` field; **503 for `unverifiable`, never a denial**.
-- [ ] **T025** [P] `test/identity/enforcement.test.js` — each refusal code; and the inverse: a read
+- [x] **T025** [P] `test/identity/enforcement.test.js` — each refusal code; and the inverse: a read
       route still serves at `anonymous` with the challenge service down.
 - [ ] **T026** `src/policy/quotas.js` — tier-scoped windows keyed on `CallerIdentity.subject`. Tiers
       never share a window (FR-012).
