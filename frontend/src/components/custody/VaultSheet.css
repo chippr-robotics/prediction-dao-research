@@ -519,3 +519,74 @@
   flex: none;
   padding-inline: 0;
 }
+
+/* Spec 105 — Details: one card, compact network rows, shared facts with drift disclosure. */
+.vault-details__net-rows {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.vault-details__net-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.45rem 0.65rem;
+}
+
+.vault-details__net-status {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.vault-details__net-status.is-unreadable {
+  color: var(--error-color);
+}
+
+.vault-details__net-action {
+  margin-left: auto;
+}
+
+.vault-details__net-here {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--accent-color);
+}
+
+.vault-details__net-deploy {
+  background: var(--primary-button);
+  color: var(--primary-button-text);
+  border: none;
+  border-radius: 8px;
+}
+
+.vault-details__fact {
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.vault-details__fact-drift {
+  color: var(--warning-text);
+}
+
+.vault-details__manage-rules {
+  margin-top: 0.6rem;
+}
+
+.vault-details__manage-rules > summary {
+  cursor: pointer;
+  color: var(--accent-color);
+  font-size: 0.9rem;
+}
+
+.vault-details__deploy {
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  margin: 0.5rem 0;
+}
