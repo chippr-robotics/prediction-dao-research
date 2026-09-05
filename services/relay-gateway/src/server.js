@@ -35,7 +35,7 @@ import { createAttestationVerifier } from './identity/verifiers/attestation.js'
 import { createChallengeVerifier } from './identity/verifiers/challenge.js'
 import { createGrantVerifier } from './identity/verifiers/grant.js'
 import { createUpstreamCeilings, withUpstreamCeiling } from './identity/upstreamCeiling.js'
-import { createAccessRouter } from './access/routes.js'
+import { createAccessRouter, accessStatus } from './access/routes.js'
 import { createEnforcementVerifier } from './access/enforcement.js'
 import { loadSigningKey } from './access/jwt.js'
 import { createBackpressure } from './policy/backpressure.js'
@@ -506,7 +506,37 @@ export function createApp(config, deps = {}) {
     // the assistant has a credential. No member data, no key material, nothing about any token.
     // `memberApiAssistant` is declared further down; this closure only runs at request time.
     const memberApi = memberApiStatus(config, { killSwitch, assistantConfigured: memberApiAssistant.configured })
-    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi })
+    // ---- Caller identity + keyed access (specs 105/106) — GATED, deliberately -----------------
+    // /status is origin-lock EXEMPT (see above), so anything in the public body is world-readable
+    // on the raw origin URL. These blocks are operator telemetry and sit behind `disclose`, next
+    // to gasWalletRunwayHrs, for the same reason. Inside them, honesty rules bind:
+    //   - `enforcing` is EXPLICIT either way (FR-015): a layer running with checks off must never
+    //     be indistinguishable from one enforcing them, and both flags read the LIVE config so a
+    //     SIGHUP reload is reflected on the next poll.
+    //   - attestation reports "not-built" — not `false`, not "disabled", which would imply a
+    //     switch exists that could turn it on.
+    //   - upstream labels come from the bounded table (FR-036), never from request content.
+    const identityGated = disclose
+      ? {
+          callerIdentity: {
+            enabled: config.identity?.enabled === true && config.identity?.killswitch !== true,
+            enforcing:
+              config.identity?.enabled === true &&
+              config.identity?.killswitch !== true &&
+              config.identity?.enforce === true,
+            verifiers: Object.fromEntries(
+              identityVerifiers.map((v) => [v.kind, v.state ?? 'configured'])
+            ),
+          },
+          upstreams: {
+            state: 'read', // in-process counters: readable by construction, volatile by design
+            windowCalls: upstreamCeilings.snapshot(),
+            ceilings: config.identity?.upstreamCeilings ?? {},
+          },
+          access: accessStatus(config, { signingKey: accessSigningKey, enforcement: accessEnforcement }),
+        }
+      : {}
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi, ...identityGated })
   }
   app.get('/healthz', healthLimiter, healthHandler)
   app.get('/status', healthLimiter, healthHandler)
