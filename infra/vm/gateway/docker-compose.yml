@@ -35,7 +35,7 @@ services:
     # `x402-agent-payments` to a live FinOps source — shipping a revenue path and the thing that
     # watches it together is what the C2b gate exists to force. ASSISTANT_ENABLED is still off;
     # see the flag block below for why that one is not a flag flip.
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:agentic-096
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:spec107-1ac148bf
     restart: unless-stopped
     pull_policy: missing
     ports:
@@ -255,7 +255,7 @@ services:
   # key material ever lands there.
   finops:
     container_name: fairwins-gateway-finops
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:finops-089
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:spec107-1ac148bf
     restart: unless-stopped
     pull_policy: missing
     network_mode: "service:gateway"
