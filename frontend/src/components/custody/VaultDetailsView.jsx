@@ -297,7 +297,8 @@ export default function VaultDetailsView({ group, onClose, onVaultsChanged }) {
               <p className="custody-hint" role="note" data-testid="vault-deploy-original-owners">
                 This vault&rsquo;s owners have changed since it was created. {chainDisplayName(deployTarget)} will start
                 from the ORIGINAL arrangement — {creationRecord.threshold} of {creationRecord.owners.length}:{' '}
-                {creationRecord.owners.join(', ')} — and can be brought in line through the queue afterwards.
+                {creationRecord.owners.map((o) => shortAccountAddr(o)).join(', ')} — and can be brought in line
+                through the queue afterwards.
               </p>
             )}
             {!deployStarted ? (

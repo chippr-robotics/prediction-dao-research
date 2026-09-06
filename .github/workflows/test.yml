@@ -1332,7 +1332,7 @@ jobs:
         run: |
           set -o pipefail
           npx start-server-and-test dev:e2e:passkey http://localhost:5173 \
-            'cypress run --spec "cypress/e2e/passkey/controllers.cy.js,cypress/e2e/passkey/recovery.cy.js,cypress/e2e/passkey/sponsored-userop.cy.js,cypress/e2e/passkey/membership-purchase.cy.js"' \
+            'cypress run --spec "cypress/e2e/passkey/controllers.cy.js,cypress/e2e/passkey/recovery.cy.js,cypress/e2e/passkey/sponsored-userop.cy.js,cypress/e2e/passkey/membership-purchase.cy.js,cypress/e2e/passkey/vault-create-batch.cy.js"' \
             2>&1 | tee cypress-passkey-output.txt
 
       - name: Summarize passkey E2E results

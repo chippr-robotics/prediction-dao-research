@@ -271,7 +271,12 @@ function loadVault(address, label = 'E2E Vault') {
     cy.get('#load-label').clear().type(label)
     cy.contains('button', /^Load/).click()
   })
-  cy.get(CARD, { timeout: 30000 }).should('have.length.at.least', 1)
+  /*
+   * 60s, matching CV-01's card wait: loading probes the vault on every custody network before a
+   * card can list, and on a loaded runner that read burst has exceeded 30s (CV-02, 2026-09-06)
+   * while the same machinery passed in the same run — the deadline was the flake, not the load.
+   */
+  cy.get(CARD, { timeout: 60000 }).should('have.length.at.least', 1)
 }
 
 /**

@@ -134,10 +134,17 @@ export function buildInstallPlan({ vaultAddress, chainId, semanticRules, owners,
     // invisibly. Honest refusal — the vault still deploys, the rules state says why they did not.
     return { mode: 'unavailable', realized, safeTxs, hashes, calls: [], reason: `Rule proposals cannot be published on chain ${chainId}` }
   }
-  const calls = safeTxs.flatMap((tx, i) => [
-    emitProposalCall({ hubAddress, safe: getAddress(vaultAddress), safeTx: tx, safeTxHash: hashes[i] }),
-    { to: getAddress(vaultAddress), value: 0n, data: safeIface.encodeFunctionData('approveHash', [hashes[i]]) },
-  ])
+  const calls = safeTxs.flatMap((tx, i) => {
+    // emitProposalCall returns the passkey sendCalls shape ({target,...}); every call in THIS
+    // plan is `{to,value,data}` — the shape both rails consume. Mixing them sent the hub call
+    // with `to: undefined`, which ethers treats as a CONTRACT DEPLOYMENT of propose calldata
+    // (invalid opcode, rules never queued) — caught on chain by full/44 RL-02 (issue #1452).
+    const emit = emitProposalCall({ hubAddress, safe: getAddress(vaultAddress), safeTx: tx, safeTxHash: hashes[i] })
+    return [
+      { to: emit.target, value: emit.value ?? 0n, data: emit.data },
+      { to: getAddress(vaultAddress), value: 0n, data: safeIface.encodeFunctionData('approveHash', [hashes[i]]) },
+    ]
+  })
   return { mode: 'propose', realized, safeTxs, hashes, calls }
 }
 

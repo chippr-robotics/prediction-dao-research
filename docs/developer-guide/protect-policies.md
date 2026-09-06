@@ -302,3 +302,10 @@ and plain-language rows via `lib/custody/describeProposal.js` — which describe
 positively recognises and returns null otherwise, because a guessed money movement is worse than
 calldata.
 
+Multi-NETWORK deployment (two real chains, wallet switches mid-orchestration) is structurally
+untestable in CI (one private chain per full-tier leg) and is validated by the staged manual
+protocol in [the multichain vault staging runbook](../runbooks/multichain-vault-staging-validation.md)
+(issue #1453). The single-network chain truth — including rules realization governing real money —
+is CI-covered by `cypress/e2e/full/29-protect-custody.cy.js` CV-01 and
+`cypress/e2e/full/44-vault-rules-lanes.cy.js` RL-01/RL-02 (issue #1452).
+
