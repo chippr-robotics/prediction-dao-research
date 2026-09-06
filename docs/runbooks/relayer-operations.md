@@ -177,5 +177,14 @@ user-signed UserOps; it can never alter or originate them).
   fund inaccessibility (FR-013).
 - **Fee-in-USDC (optional)**: `VITE_ERC20_PAYMASTER_<NET>` may point at a
   third-party ERC-20 paymaster; unset ⇒ UserOp fees fall back to the
-  account's native balance (spec 041 clarification Q3). FairWins operates no
-  paymaster and sponsors nothing.
+  account's native balance (spec 041 clarification Q3).
+- **Sponsorship (spec 050), POLYGON 137 + AMOY 80002 ONLY.** This page previously
+  said "FairWins operates no paymaster and sponsors nothing". That was true when
+  written and has been false since spec 050: FairWins runs a verifying paymaster
+  (`contracts/account/FairWinsVerifyingPaymaster.sol`) on those two chains, and
+  the relay-gateway's `POST /v1/paymaster` authorizes per-op.
+  **On every other chain a passkey member pays their own gas** — a supported path
+  (spec 041), and the normal state off Polygon, not a degraded one. The confirm
+  surfaces derive the fee line from `sponsorPaymasterUrl` being absent, so they
+  already say so honestly; do not "fix" them to imply sponsorship. The bundler
+  rollout (#1501) does NOT extend sponsorship.
