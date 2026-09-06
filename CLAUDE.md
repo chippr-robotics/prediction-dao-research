@@ -21,6 +21,36 @@ The binding standards live in `.specify/memory/constitution.md`. Every plan must
 pass a constitution check; read it before planning or implementing. Per-feature
 artifacts live under `specs/<feature>/`.
 
+**Several agents work this repo at once. Before you start any of the above, read
+`docs/developer-guide/multi-agent-workflow.md`** — it is the coordination protocol,
+and two of its rules change what you do on step 2:
+
+- **A spec number is claimed by MERGING a reservation PR to `staging`**, never by
+  computing it. `create-new-feature.sh` answers `max(existing) + 1`, which is right
+  exactly once per merge — two agents who ask before either has merged both get the
+  same number and both checked. That is how `017`, `041`, `050`, `102` and `104`
+  each came to name two unrelated features — `104` twice over on 2026-09-04/05,
+  *while this gate was in review*. Open a PR into `staging` containing ONLY the
+  reservation — `specs/<NNN>-<slug>/spec.md` plus its `matrix.json` row and the
+  regenerated `e2e-coverage-matrix.md` (`npm run e2e:matrix`; `check:e2e-matrix`
+  fails a spec dir with no row) — label it `spec-reservation`, merge it, then plan.
+  `npm run check:specs` (CI job *Spec Registry*) fails the second claimant.
+- **An issue's state is its ASSIGNEE, its linked PRs and whether it is closed** —
+  never a status label. There is no Projects v2 write tool (`issue_write` reaches
+  Type, Priority, Effort and the dates; Status lives on the project item), and this
+  repo deliberately does NOT paper over that with a mirrored `status:*` label: that
+  is a second copy of state GitHub already holds, and it reads as "in progress"
+  forever once an agent stops mid-task. Claim by **assigning yourself**, release it
+  by unassigning if you walk away, and close by putting **`Closes #N`** in the PR
+  body. GitHub itself honours closing keywords only on the DEFAULT branch (`main`)
+  and every feature PR here targets `staging`, so `close-linked-issues.yml` does it
+  on the staging merge instead — **read the issue back afterwards** to confirm it
+  actually closed. The project board moves itself — GitHub's built-in *item closed* /
+  *PR merged* workflows set Done — so never claim you moved a card.
+
+Branch from `staging`, never from `main`. Delegated work gets a **sub-issue**, and a
+subagent's report is a claim — read the diff and run the gates before accepting it.
+
 ## Repository map
 
 - `contracts/` — active Solidity (wagers, oracles, access, privacy). `mocks/` is
@@ -38,6 +68,8 @@ artifacts live under `specs/<feature>/`.
 - `npm run test:frontend` — frontend tests
 - `npm run frontend` — run the frontend dev server
 - `npm run sync:frontend-contracts` — regenerate frontend contract artifacts
+- `npm run check:specs` — spec-number registry gate (run before opening a reservation PR)
+- `npm run check:ci-gating` — guards the E2E shard bypass (see the multi-agent guardrail)
 - Only run the **full** frontend suite (`vitest run` with no filter) in CI — locally it
   OOMs this environment. Scope local runs to specific files/dirs
   (`npx vitest run src/test/foo.test.js`).
@@ -48,6 +80,65 @@ artifacts live under `specs/<feature>/`.
   Slither/Medusa, and get a security review (`.github/agents/`).
 - Never commit secrets or private keys; admin keys use the floppy keystore flow.
 - CI fails loudly — don't add `continue-on-error` to lint/test/build/security.
+- **Multi-agent coordination (issue #1460) has one document and two gates.**
+  `docs/developer-guide/multi-agent-workflow.md` is the protocol; everything below is
+  the part that is enforced rather than agreed. (1) **`specs/` is a shared namespace
+  and a number is claimed by a MERGE, not a calculation** — `check:specs`
+  (`scripts/specs/check-spec-registry.js`, CI job *Spec Registry*) fails a second
+  claimant, enforces `NNN-kebab-case`, and requires a reserved number to carry a
+  `spec.md` (a reservation with no spec is indistinguishable from an abandoned one).
+  The five pre-gate collisions are frozen in `LEGACY_COLLISIONS` under rule S-04,
+  which fails if an entry outlives the collision it excuses, so the list shrinks when
+  a pair is renumbered. **Adding to it is not a way to get green**: once the gate is
+  on `staging`, S-01 fails before a second claimant can merge, so a new entry could
+  only describe a collision the gate was never able to see. `create-new-feature.sh` now numbers against `origin/staging` and
+  `origin/main`, not just the local checkout, because each agent's container was
+  cloned at a different moment. (2) **`specs/**` is its own change-detection filter**
+  in `ci-manager.yml`: it had none, so a PR that only reserved a number ran ZERO
+  jobs — and with required checks in force `skipped` satisfies them, so the one PR
+  type whose entire purpose is claiming a number was the one type the gate could
+  never see. **There is NO status mirror, on purpose.** An agent cannot
+  write the project's Status field, and the fix is not a `status:*` label copied onto
+  the board by a workflow — that was built for this feature and deliberately removed.
+  A mirror is a second copy of state the repo already holds and it drifts the instant
+  an agent stops mid-task, leaving the board confidently wrong. State is read from
+  the **assignee** (the claim — release it if you abandon the work), the **linked
+  PRs**, and **open/closed**. Note the MCP server exposes no Projects v2 tool, but the
+  GraphQL API does (`updateProjectV2ItemFieldValue`, `project` scope, **classic PAT or
+  GitHub App token — never `GITHUB_TOKEN`**); we deliberately drive nothing with it,
+  because GitHub's own built-in project workflows already set Todo/Done for free and
+  store nothing in this repo. Only "In Progress" has no built-in, and it is left
+  manual rather than bought with a PAT. **GitHub closes nothing on a feature merge
+  here**: it
+  honours closing keywords only on the default branch (`main`), and PR #1461 merged
+  with `Closes #1460` while the issue stayed open with `closed_by_pull_requests: 0`.
+  `.github/workflows/close-linked-issues.yml` does it on the `staging` merge instead
+  (parser: `scripts/ci/parse-closing-keywords.js`). **PUT THE KEYWORD AT THE START OF
+  A LINE** — the parser follows GitHub's rules except that a keyword only counts
+  line-anchored (a list marker or bold is fine). That narrowing was bought on the
+  first live run: #1462's body said in PROSE that negation is not interpreted, using
+  the words "does not fix #123", and the parser extracted 123 — harmless only because
+  #123 was already closed. GitHub can match anywhere because its UI shows linked
+  issues before you merge; nothing shows you what this does, and the costs are not
+  symmetric (an unclosed issue is visible, a wrongly-closed one is silent). It also
+  never closes a PR — `gh issue view` resolves PR numbers, so the caller checks the
+  REST issues endpoint for a `pull_request` key. Keep writing `Closes #N`, use
+  `Part of #N` for work a PR only advances, and READ THE ISSUE BACK after the merge —
+  an automation nobody verifies is a second thing that can be quietly wrong.
+  (3) **The Cypress tiers SKIP for a change that cannot reach the running app** —
+  ci-manager's `app` path filter, consumed by `test.yml` as `run_e2e`. A docs-only PR
+  was spending 12 fast legs + 4 on-chain shards + the passkey full stack to prove
+  markdown changes no pixels. **`app` is a NEGATIVE list** (`'**'` minus known-inert
+  paths) and that shape IS the safety: an unrecognised path matches `**` and RUNS the
+  suite. Inverting it to a positive allowlist is a one-line, tidier-looking edit that
+  makes every unlisted path skip — and a skipped job SATISFIES a required check, so
+  it would merge green having tested nothing. `npm run check:ci-gating` (C-01…C-05,
+  own must-fail fixtures) is what stops that; a skipped tier is also NAMED in the run
+  summary, because "passed" and "never ran" must not look alike. `blocked` is the one label, because an open assigned issue that is
+  stuck has no other representation — and it is meaningless without a comment naming
+  the blocker. Board columns are moved by a human. Sizing and priority are set at
+  triage on the **Effort** and **Priority** issue fields (the `size:*` label is the
+  t-shirt shorthand; the field is what the board reads).
 - **Upgradeable contracts (UUPS, specs 025 + 027):** both `WagerRegistry` (spec 025)
   and `MembershipManager` (spec 027) are **UUPS proxies at stable addresses** — logic
   is swappable, state is preserved. New upgradeable
@@ -674,9 +765,13 @@ artifacts live under `specs/<feature>/`.
   (5) **`infra/grafana/` IS GENERATED AND COMMITTED** — never hand-edit it (C5 regenerate-and-diff),
   and a dashboard edited in the Grafana UI is drift that the next provision overwrites. Four sources
   are catalogued `planned` — they show as NOT YET LIVE, declare no metric, and contribute nothing to
-  any total — and they split two ways: `miniapp licenses` / `wager platform fee` exist NOWHERE (no
-  contract has a fee), while `x402-agent-payments` / `assistant-model-api` are **built and offered on
-  no deployment** (specs 096/095, flags commented out in `infra/vm/gateway/docker-compose.yml`).
+  any total — and they split three ways: `miniapp licenses` / `wager platform fee` exist NOWHERE (no
+  contract has a fee); `assistant-model-api` is **built and offered on no deployment** (spec 095, flag
+  commented out in `infra/vm/gateway/docker-compose.yml`; `x402-agent-payments` sat beside it until
+  its deployment switched it on and promoted it to `live` in the same change); and
+  `referral-guttertoken` (spec 104) is **readable by nobody and not cash** — in-kind GutterToken credit
+  on FairWins' own account, no balance/referral endpoint exists to collect it, and its code lives in
+  the tenant manifest where C2b cannot see it, so it is catalogued on purpose and never a USD line.
   **A gate that cannot see the source is not protection**, and the second group is why: C2's only
   discovery route was a FeeRouter `keccakId('x.y')` over two files, so the x402 rail — which takes
   USDC straight to the treasury and registers no `serviceId` — was invisible BY CONSTRUCTION and sat
@@ -798,7 +893,7 @@ artifacts live under `specs/<feature>/`.
   not lines in a document. See `specs/094-e2e-coverage-expansion/`.
 - **The member API (spec 095) authenticates with member-SIGNED capability tokens, and nothing on it
   signs or moves value.** A "private API key" is an off-chain EIP-712 `ApiKeyGrant` the member signs
-  in-app (Settings ▸ API access) — the gateway stores nothing to issue one; the struct/domain have
+  in-app (Tools ▸ Assistant ▸ API access since spec 104) — the gateway stores nothing to issue one; the struct/domain have
   ONE source, `@fairwins/intent-types/offchain` (deliberately OUTSIDE `CONTRACT_VERIFIED_TYPES`: the
   parity gate would demand Solidity that must not exist; `services/relay-gateway/test/memberApiAuth.test.js`
   is their gate instead). The gateway module (`services/relay-gateway/src/memberApi/`,
@@ -814,7 +909,7 @@ artifacts live under `specs/<feature>/`.
   (`services/mcp-server/`) is DEPENDENCY-FREE and deliberately NOT a workspace member (lockfile
   hazard, spec 075) — do not add it to `workspaces` or give it dependencies; it consumes the API
   with the member's own token and cannot sign. Mini-app packages still cannot sign — the api-access
-  console deep-links to the host Settings card for every key ceremony.
+  console deep-links to the host's Assistant-tab card for every key ceremony.
   **Spec 096 adds a SECOND rail on those same operations — x402 pay-per-request
   (`services/relay-gateway/src/x402/`, `X402_ENABLED`, default off) — and it NEVER applies to a
   member: the bearer token is checked first, so a valid `fw1` token never reaches the paywall even
@@ -836,11 +931,126 @@ artifacts live under `specs/<feature>/`.
   a tool argument. See `docs/developer-guide/member-api.md` + `docs/developer-guide/mcp-server.md` +
   `docs/developer-guide/agentic-chat.md` + `docs/developer-guide/agentic-payments.md` +
   `specs/095-member-api-agentic-access/` + `specs/096-x402-agentic-payments/`.
+- **The assistant has TWO rails and ONE tool table (spec 104), and it lives on a Tools tab.** The
+  Assistant and API access cards moved from Settings to **Tools ▸ Assistant** (`/wallet?tab=assistant`;
+  card ids `assistant-prefs`/`api-access` unchanged, the old `?tab=settings#…` links redirect). A
+  member picks who answers: **FairWins assistant (membership)** — the spec-095 gateway rail, paid
+  member only, FairWins pays Anthropic under the token budget — or **GutterToken (your credits)** —
+  bring-your-own-key: the member pastes an `sk-…` key from `app.guttertokens.com` and the BROWSER calls
+  `https://api.guttertokens.com/v1/messages` directly (open CORS; `connect-src https:` already admits
+  it). On that rail **FairWins is not in the path**: it never holds, forwards or sees the key or a
+  message, charges nothing, cannot read the balance, and therefore **never renders a rate or a
+  "credits remaining" figure** (the link out is the disclosure; token counts a reply reported may be
+  shown, a dollar figure may not). Non-members get the GutterToken rail only; the launcher gate is
+  `feature ∧ wallet ∧ opted-in ∧ (key present ∨ membership active-paid)` IN THAT ORDER, so a member
+  with a key never pays the membership read and `unreadable` still renders nothing. Honest states,
+  never a fabricated reply: `401` ⇒ `key_invalid` (re-enter), `403 insufficient_quota` ⇒
+  `out_of_credit` (link to top up), `429` ⇒ GutterToken's per-source-IP limit, `503`/transport ⇒
+  unreachable. **Key store rules are absolute** (spec-069 RPC-credential precedent, NOT the spec-062
+  vault): wallet-scoped `userStorage` key `assistant_guttertoken_key_v1`, device-only, **deliberately
+  absent from `lib/backup/syncedObjects.js`** (a test asserts it), redacted to `sk-…` + 4 chars at
+  EVERY display/log/audit boundary, never in a URL or an error message; save = `^sk-` shape + one
+  `GET /v1/models` (401 refuses, unreachable saves with the failure shown). The tenant feature
+  `assistant-byok` (on for `fairwins`, requires `assistant`) gates the option; the signup link is
+  `https://app.guttertokens.com/signup`, `?ref=<code>` from `settings.assistant.guttertokenReferralCode`
+  in the manifest (optional, validator-gated, none registered yet), disclosed in words; signup itself
+  is GutterToken's (SIWE `personal_sign` inside ITS session, `window.ethereum` only) — FairWins can
+  never sign a member in there, passkey members sign up by E-MAIL, and GutterToken's own passkey login
+  is unrelated to ours; the credit is
+  catalogued as FinOps `referral-guttertoken`, `planned` because no collector can read it. **Both rails
+  carry TOOLS, executed in the browser** (client-side loop, ≤ `MAX_TOOL_ROUNDS` = 4 rounds/turn;
+  gateway ceiling `ASSISTANT_MAX_ROUNDS`, default 4, max 8): `get_profile`/`get_membership`/
+  `get_wagers`/`get_fees` are ordinary member-API reads under the 24 h grant (OPTIONAL on the
+  GutterToken rail — offered from the panel; without it only the public tools), `get_gateway_status`/
+  `get_prediction_markets`/`get_perps_pairs` are public, `find_in_app` is a local lookup over the nav
+  index (descriptive, never authoritative). **`@fairwins/assistant-contract` is the ONE source** of
+  prompt + tool defs + honest result wording, consumed by the gateway (which attaches tools
+  SERVER-SIDE on the FairWins rail and REFUSES client-supplied `tools`), the frontend, and — as the
+  vendored `services/mcp-server/src/toolDefs.snapshot.json`, gated both directions by
+  `services/relay-gateway/test/mcpToolParity.test.js` — the dependency-free MCP server, which keeps
+  `build_intent` as its own MCP-ONLY tool. **No `build_intent` and no `navigate` in the in-app
+  assistant** — tool results carry counterparty-authored text (prompt injection), a result never makes
+  the app DO anything, and `replyLinks.js` stays the only path from model text to a click. **The
+  member's surface is never in the system prompt** — the prompt is frozen per thread (cache prefix)
+  and the path rides as a trailing text block on the last user message; a grant arriving mid-thread
+  starts a new thread. Memory stays text-only and device-local. Legal was AMENDED in place (privacy
+  §2/§5: GutterToken is NOT our processor; terms §4.3(5)/§4.6; risk §13) — the document hash is the
+  version. See `docs/developer-guide/agentic-chat.md` § Providers/Tools +
+  `docs/research/guttertoken-assistant-integration.md` + `specs/104-guttertoken-assistant-rail/`.
 
 <!-- SPECKIT START -->
+- **A vault is CREATED everywhere it will live, from one flow (spec 105).** Creation is the
+  guided four-sheet flow (`components/custody/createflow/`), and the connected chain gates neither
+  Create nor Load. Same-address multichain rests on ONE rule: the deployment initializer is the
+  chain-independent spec-043 encoding (owners + threshold + canonical fallback handler) with a
+  per-vault saltNonce — **never put a policy setup in a multichain initializer** (realized rules
+  embed the chain's own stable address; byte-different initializer ⇒ different CREATE2 address).
+  Rules are ONE semantic config (`vaultRulesConfig.realizeRules`: banded everyday lane +
+  identical-scope full-vote big-send lane + catch-all) installed POST-deploy per network through
+  the vault's own threshold machinery — direct where the creator alone meets threshold, queued
+  "awaiting approval" (never shown active) where co-owners must sign. The creation record
+  (`vaultCreationRecords`, synced, IMMUTABLE — the replay input for "Add a network") is what makes
+  deploy-later possible; absence gets the honest FR-018 reason, owner drift gets the
+  original-arrangement disclosure. Deployment status is re-derived from the chain on reopen
+  (`deriveNetworkStatus`): a failed probe is `unreadable`, an occupied predicted address is
+  `already-live` (success). Details is ONE card (network status rows + shared facts with drift
+  NAMED + coverage labelled); the Queue's chips/decoded rows (`describeProposal` — null over a
+  guess) never touch the four-state read honesty. See
+  `docs/developer-guide/protect-policies.md` § "One vault, created everywhere" +
+  `specs/105-multichain-vault-creation/`.
+- **A custody write's RAIL is a property of the SIGNER, not the login.**
+  `lib/custody/writeRail.js#resolveWriteRail` is the one answer to "can this session sign a vault
+  action on this chain?", and it checks for a signer FIRST. Branching on `loginMethod === 'passkey'`
+  — which `WalletContext` itself documents as "INFORMATIONAL ONLY … no feature may branch on it" —
+  refused members who could perfectly well act: **ETC 61 and Mordor 63 have no bundler**, so the
+  passkey UserOp rail cannot submit there, and every approve/execute/cancel died inside
+  `sendPasskeyBatch` with a chain-support error the member had asked no question to receive — while
+  an injected wallet, a Ledger, or an unlocked recovered account signs `approveHash` natively and
+  pays the fee in ETC. Rules: (1) a signer, if present, is used, on every EVM chain the vault lives
+  on; (2) the passkey rail is the fallback and is offered ONLY where `isPasskeySupported(chainId)`;
+  (3) an unavailable rail is stated BEFORE the tap — `useVaultProposals` returns `writeRail` and the
+  Queue renders the reason in place of buttons that would throw — and that state is **not**
+  "view-only", which means *not an owner* and is a different fact; (4) the reason NAMES the way out
+  ("connect a wallet that can sign there"), never just the obstacle. `requireWriteRail` is the
+  throwing form inside the action callbacks, so any caller that gets past the UI fails with the same
+  sentence. See `docs/developer-guide/protect-policies.md` § "The write rail is a property of the
+  signer".
+- **A passkey's account is LOOKED UP, never derived (spec 104).** `lib/passkey/accountLookup.js` is
+  the one seam that answers "which account does this key control?", and its `Resolution` type has
+  four shapes of which **only `resolved` carries an address** — three of its four constructors take
+  no address at all, so "return the derived one anyway" has nowhere to live (the spec-089
+  `reading.js` device). That is the whole point: `resolveAccountForCredential` used to derive an
+  address assuming the key was the account's **sole initial owner at nonce 0** and return it even
+  when the chain said nothing was deployed there, which signed a member whose passkey had been
+  ADDED to an existing account into a brand-new empty one, silently — a zero balance they read as
+  their money being gone. Five rules: (1) **a session opens only on `resolved`, or on a counterfactual the
+  MEMBER accepted** — everything else raises `AccountUnresolved` carrying the outcome, so the
+  surface offers recovery instead of a dead end. The exception is not a loophole, it is the case the
+  blunt rule broke: `none-found` also describes a member who signed up on another device and has not
+  spent, whose account is real and simply holds no code, so the derived address is OFFERED, labelled
+  not-yet-used, and opened only on `acceptCounterfactual` — safe because it is a deterministic
+  function of the key (the same address their first device showed). `unverified` gets no such offer:
+  an unreachable chain says nothing about whether an account exists; (2) **`unverified` is NEVER `none-found`** — an unreachable chain is not evidence of
+  absence, and the two lead to different member actions (retry vs. recover), exactly as spec 095
+  keeps `auth_unverifiable` out of the denial path and spec 084 keeps a third verdict; (3)
+  **verification is against the CURRENT owner set** and `ownerIndex` is whatever the chain reported,
+  never 0 by assumption (spec 045 FR-009); (4) **an address is a HINT, never a claim** — a member's
+  typed address takes the identical confirmation a searched candidate takes, which is what stops
+  "type any address" being a way into someone else's account; (5) **every leg is deadline-bounded
+  and expires to `unverified`** — the direct lesson of v1.16.1, where an unbounded wait on an
+  external system turned one failure into a permanent lockout. Derivation survives ONLY for
+  `mode: 'sign-up'`, where the member asked to create an account. Reads go through the spec-069 seam
+  (`defaultPublicClient` no longer builds a transport from `NETWORKS[chainId].rpcUrl`). Discovery
+  (nonce enumeration + an `AccountCreated` scan) is Release 2 and is **blocked on recording
+  `deployBlocks.accountFactory`** — absent on every chain today, and `deployBlocks?.X || 0` makes
+  that a silent scan from block 0, not a loud failure. Keys added to an account after creation are
+  undiscoverable by design (`AddOwner` has no address to filter on, the subgraph indexes no account
+  entities) and are covered by the address path. See
+  `docs/developer-guide/passkey-account-recovery.md` + `specs/104-passkey-account-recovery/`.
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/103-capacitor-channels/plan.md
+at specs/105-multichain-vault-creation/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also

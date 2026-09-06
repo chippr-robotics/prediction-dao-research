@@ -114,6 +114,7 @@ nav:
     - Funding Pools (spec 103): developer-guide/funding-pools.md
     - Mini-Apps (spec 073): developer-guide/miniapps.md
     - Member API (spec 095): developer-guide/member-api.md
+    - Caller identity (specs 106/107): developer-guide/caller-identity.md
     - MCP Server (spec 095): developer-guide/mcp-server.md
     - Agentic Assistant (spec 095): developer-guide/agentic-chat.md
     - Agentic Payments (spec 096): developer-guide/agentic-payments.md
@@ -131,6 +132,7 @@ nav:
     - Singleton Deployment Patterns: developer-guide/singleton-deployment-patterns.md
     - Testing: developer-guide/testing.md
     - Coverage & Audit Gates: developer-guide/coverage-and-audit-gates.md
+    - Multi-Agent Development Flow: developer-guide/multi-agent-workflow.md
     - Contributing: developer-guide/contributing.md
   - Security Testing:
     - Overview: security/index.md
@@ -178,6 +180,7 @@ nav:
   - Research:
     - Dex v3 Integration Analysis: research/dex-v3-integration-analysis.md
     - Alternative Approaches (Appendix): research/dex-v3-alternative-approaches.md
+    - GutterToken Assistant Integration: research/guttertoken-assistant-integration.md
   - Reference:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md

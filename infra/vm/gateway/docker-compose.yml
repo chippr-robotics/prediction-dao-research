@@ -35,13 +35,18 @@ services:
     # `x402-agent-payments` to a live FinOps source — shipping a revenue path and the thing that
     # watches it together is what the C2b gate exists to force. ASSISTANT_ENABLED is still off;
     # see the flag block below for why that one is not a flag flip.
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:agentic-096
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:spec107-1ac148bf
     restart: unless-stopped
     pull_policy: missing
     ports:
       - "127.0.0.1:8788:8788"
     env_file:
       - /run/fairwins/gateway.env   # gateway credentials only. MUST NOT contain GCP_PRIVATE_KEY.
+    volumes:
+      # The SIGHUP reload source (spec 106 FR-014): env_file above is read by compose ON THE HOST
+      # at container create; this read-only mount is what lets the RUNNING process re-read the
+      # same file. ro on purpose — the gateway consumes configuration, it never writes it.
+      - /run/fairwins/gateway.env:/run/fairwins/gateway.env:ro
     environment:
       PORT: "8788"
       ENABLED_CHAIN_IDS: "63,137"
@@ -125,6 +130,47 @@ services:
       BTC_ENABLED: "true"
       BTC_ESPLORA_URL: "https://mempool.space/api"
       BTC_STAMPS_URL: "https://stampchain.io"
+      # ---- Caller identity (spec 106) — OBSERVE MODE ----
+      # Two switches, deliberately (the spec's staged deploy): ENABLED resolves every caller's tier
+      # and reports it (X-FairWins-Tier + the gated /status block) while changing NO status code;
+      # ENFORCE is the second, separate step, taken only after the tier model has been watched
+      # against real traffic. A safety layer that starts refusing the moment it deploys fails in
+      # the shape "the product is broken" — so ENFORCE stays commented until observe-mode data
+      # says otherwise. Both reload via SIGHUP (RELOAD_ENV_FILE below), no container replacement.
+      IDENTITY_ENABLED: "true"
+      # IDENTITY_ENFORCE: "true"
+      # ---- Keyed RPC issuance (spec 107, #1469) ----
+      # POST /v1/access/rpc mints short-lived READ-ONLY ES256 JWTs for the dedicated issuance
+      # endpoint (657013 — provisioned and live-fire verified on #1468: one token spans all five
+      # EVM mainnets, bare URL answers 401, eth_sendRawTransaction answers -32611 WITH a valid
+      # token, expiry enforced). Credentials arrive via fetch-secrets (RPC_ACCESS_SIGNING_KEY +
+      # RPC_ACCESS_ADMIN_KEY in gateway.env); with either absent this whole block is inert and the
+      # route answers 503 access_unconfigured. The URLs below are PUBLIC information by design —
+      # stand-alone mode means the URL carries no credential and only a valid JWT is served.
+      # One endpoint id everywhere => the FR-026 enforcement verdict is checked once and its cache
+      # serves all five chains.
+      RPC_ACCESS_ENABLED: "true"
+      RPC_ACCESS_SIGNING_KID: "k1"
+      RPC_ACCESS_ENDPOINT_ID_1: "657013"
+      RPC_ACCESS_ENDPOINT_URL_1: "https://small-white-general.quiknode.pro/"
+      RPC_ACCESS_ENDPOINT_ID_10: "657013"
+      RPC_ACCESS_ENDPOINT_URL_10: "https://small-white-general.optimism.quiknode.pro/"
+      RPC_ACCESS_ENDPOINT_ID_137: "657013"
+      RPC_ACCESS_ENDPOINT_URL_137: "https://small-white-general.matic.quiknode.pro/"
+      RPC_ACCESS_ENDPOINT_ID_8453: "657013"
+      RPC_ACCESS_ENDPOINT_URL_8453: "https://small-white-general.base-mainnet.quiknode.pro/"
+      RPC_ACCESS_ENDPOINT_ID_42161: "657013"
+      RPC_ACCESS_ENDPOINT_URL_42161: "https://small-white-general.arbitrum-mainnet.quiknode.pro/"
+      # ---- Operability (specs 106/107) ----
+      # SIGHUP re-reads the allowlisted operational switches from this file — which is the SAME
+      # file env_file: reads at container create, mounted read-only below so the running process
+      # can re-read it. Kill switches, enable flags and ceilings only; fund-path config
+      # deliberately never reloads (policy/reload.js is the allowlist).
+      RELOAD_ENV_FILE: "/run/fairwins/gateway.env"
+      # Usage counters for the FinOps gateway-upstream-usage source (#1447): per-tier and
+      # per-upstream request counts as JSON. Compose-network internal — this port is deliberately
+      # NOT in ports: above and must never be published to the host.
+      METRICS_PORT: "9091"
       # ---- Perps read proxy (specs 082 + 083) ----
       # READ-ONLY BY CONSTRUCTION: this module has no write route at all. It proxies three PUBLIC
       # venue APIs (Gains, GMX, Hyperliquid) for market data and a member's own positions, and holds
@@ -209,7 +255,7 @@ services:
   # key material ever lands there.
   finops:
     container_name: fairwins-gateway-finops
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:finops-089
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:spec107-1ac148bf
     restart: unless-stopped
     pull_policy: missing
     network_mode: "service:gateway"
@@ -218,6 +264,10 @@ services:
     environment:
       PORT: "9464"
       FINOPS_BIND_HOST: "127.0.0.1"
+      # Gateway usage counters (spec 106/#1447): the gateway-upstream-usage source. Reaches the
+      # gateway's compose-internal counters port by service name; unset would read not-configured,
+      # which is honest, but this node runs both halves so it is wired on.
+      FINOPS_GATEWAY_METRICS_URL: "http://gateway:9091/counters"
       # The build's cohort. Reads never cross the testnet/mainnet boundary (constitution III).
       FINOPS_COHORT_CHAIN_IDS: "63,137"
       RPC_URLS_63: "https://rpc.mordor.etccooperative.org,https://geth-mordor.etc-network.info"

@@ -103,7 +103,8 @@
       "token-mint",
       "bitcoin",
       "recovery",
-      "assistant"
+      "assistant",
+      "assistant-byok"
     ],
     "chains": {
       "mainnet": [

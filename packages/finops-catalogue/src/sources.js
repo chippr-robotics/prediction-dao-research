@@ -211,6 +211,47 @@ const referral = [
       'captured by fee-polymarket-taker/maker. The builder code IS registered, so unlike the other referral ' +
       'sources this one is expected to report a real value once the credential is provisioned.',
   },
+  /**
+   * GutterToken referral (spec 104). Catalogued ON PURPOSE, not because a gate demanded it: C2b
+   * enumerates payee env reads in `services/relay-gateway/src/**` only, and this referral code lives
+   * in the TENANT MANIFEST (`settings.assistant.guttertokenReferralCode`) and ships in the frontend's
+   * signup link — the gateway never reads it, so the gate is structurally blind to this one. That is
+   * exactly the "a gate that cannot see the source is not protection" case the x402 rail taught, and
+   * the remedy is the same: name it here so it is visible.
+   *
+   * `planned` and NOT `live`+`not-configured`, unlike the other referral entries, because there is a
+   * real difference: those have a collector that CAN read a value once an env var is set. This one
+   * has no collector that could ever read one — GutterToken exposes no balance, usage, or referral
+   * endpoint (research §1, verified negative), and the credit lands on FairWins' own GutterToken
+   * account, visible only on GutterToken's billing page. `moneyPath` carries the namespace alone:
+   * there is no `payeeEnv` because no gateway variable holds the code (declaring one the gateway
+   * does not read would trip the stale-claim rule), and no `enableEnv` because the rail is switched
+   * by the tenant feature flag `assistant-byok`, not by deployment config.
+   */
+  {
+    id: 'referral-guttertoken',
+    kind: 'revenue',
+    status: 'planned',
+    label: 'Assistant — GutterToken referral credit',
+    metric: null,
+    collector: 'none',
+    interval: VENDOR,
+    credential: null,
+    docs: 'finops-operations.md#planned-sources',
+    moneyPath: { namespace: 'guttertoken' },
+    meaning:
+      'PLANNED, NOT LIVE — and NOT CASH. When a member opens and funds a GutterToken account through the ' +
+      'referral-coded signup link on the Assistant tab (spec 104), GutterToken credits FairWins’ own ' +
+      'GutterToken account with prepaid usage credit (docs: 15% of the referee’s FIRST deposit, capped at $50; ' +
+      'non-refundable, non-cashable, self-referral void). It is in-kind credit that can only be spent on model ' +
+      'calls from that account, so it is never revenue in USD and must never be summed with the cash sources. ' +
+      'No referral code is registered yet and, more fundamentally, nothing can read the figure: GutterToken ' +
+      'publishes no balance or referral endpoint, so no collector could ever report it — the honest state is ' +
+      'not-yet-live with no metric, and it is excluded from every total. If P3 (a FairWins-owned GutterToken ' +
+      'account as the FairWins rail’s upstream) is adopted, this credit accrues on the same account that ' +
+      'assistant-model-api would then be billed to, and offsets that cost; the two entries should be promoted ' +
+      'together, with this one staying an in-kind offset rather than becoming a revenue line.',
+  },
 ]
 
 /**
@@ -465,6 +506,24 @@ const vendors = [
       'QuickNode spend MODELLED from API-credit consumption times the declared plan rate. Research R1: the Admin ' +
       'API reports credits, not dollars, and a Flat Rate RPS plan decouples spend from usage entirely — under that ' +
       'plan the modelled figure is the flat subscription and credit usage is informational only.',
+  },
+  {
+    id: 'gateway-upstream-usage',
+    kind: 'usage',
+    status: 'live',
+    label: 'Gateway upstream usage',
+    metric: 'fairwins_finops_vendor_usage',
+    collector: 'gateway',
+    interval: VENDOR,
+    docs: 'finops-operations.md#gateway-upstream-usage',
+    meaning:
+      'MEASURED request counts from the relay-gateway, per assurance tier and per upstream (spec 106, #1447): ' +
+      'who is consuming the platform-held vendor credentials, in whose name. It is context for the vendor cost ' +
+      'sources beside it — the QuickNode account is capped at 50 req/s shared with the gasless bundler, so this ' +
+      'is the series that says WHERE that budget went. It is NOT a dollar and never joins a money total; counters ' +
+      'are cumulative-since-boot on the gateway (rate() over them survives restarts the way any Prometheus ' +
+      'counter does), and the labels are bounded by construction: tiers come from the fixed ladder, upstreams ' +
+      'from the route table.',
   },
   {
     id: 'grafana-cloud',

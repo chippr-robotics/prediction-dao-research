@@ -30,16 +30,8 @@ import AccordionSection from '../account/AccordionSection'
 import { useHardwareAccounts } from '../../hooks/useHardwareAccounts'
 import './Custody.css'
 
-/** Custody chains other than the connected one, for the "create elsewhere" affordance (FR-005). */
-function otherCustodyChains(chainId) {
-  return CUSTODY_SUPPORTED_CHAIN_IDS.filter((id) => id !== Number(chainId)).map((id) => ({
-    chainId: id,
-    name: NETWORKS[id]?.name || `Chain ${id}`,
-  }))
-}
-
 function OnChainSection() {
-  const { address, chainId, switchNetwork } = useWallet()
+  const { address, chainId } = useWallet()
   const { active } = useCustody()
   const {
     groups,
@@ -49,8 +41,6 @@ function OnChainSection() {
     error,
     refresh,
     loadByAddress,
-    createVault,
-    previewVaultAddress,
   } = useCustodyVaults()
   // Release 1.14.0 — the four vault actions live in one bottom sheet (VaultActionSheet) instead of
   // two inline toggles plus two flows buried inside the open vault's card. `sheet` is null when
@@ -62,7 +52,6 @@ function OnChainSection() {
   // (VaultDetail → PolicyPanel) land in the same queue the VaultProposalsPanel renders.
   const proposals = useVaultProposals(activeVault)
   const canCreateHere = isCustodySupported(chainId)
-  const elsewhere = otherCustodyChains(chainId)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const openVault = useCallback(
@@ -108,24 +97,6 @@ function OnChainSection() {
         </button>
       </div>
 
-      {!canCreateHere && (
-        // FR-005: creation is honestly unavailable here, but the member's existing vaults on other
-        // chains stay listed below — the estate never disappears because of the connected network.
-        <div className="custody-unavailable" role="status">
-          <p>New vaults cannot be created on this network.</p>
-          {elsewhere.length > 0 && (
-            <p className="custody-hint">
-              Custody is available on {elsewhere.map((c) => c.name).join(', ')}.{' '}
-              {switchNetwork && (
-                <button type="button" className="custody-link" onClick={() => { Promise.resolve(switchNetwork(elsewhere[0].chainId)).catch(() => {}) }}>
-                  Switch to {elsewhere[0].name}
-                </button>
-              )}
-            </p>
-          )}
-        </div>
-      )}
-
       <VaultActionSheet
         open={Boolean(sheet)}
         onClose={() => setSheet(null)}
@@ -133,8 +104,12 @@ function OnChainSection() {
         chainId={chainId}
         connectedAddress={address}
         canCreateHere={canCreateHere}
-        onCreate={createVault}
-        onPreview={previewVaultAddress}
+        onCreated={async (createdAddress) => {
+          // Spec 105 — the guided flow deployed (or found) the vault itself; refresh the list and
+          // land the member on its card once the Done sheet closes.
+          await refresh?.()
+          if (createdAddress) selectVault?.(createdAddress)
+        }}
         onLoad={loadByAddress}
         vault={activeVault}
         proposals={proposals}

@@ -42,6 +42,16 @@ vi.mock('../../lib/custody/policy', () => ({
   shortAddress: (a) => String(a),
 }))
 vi.mock('../../lib/custody/policyV2', () => ({ isPolicyV2Supported: () => false }))
+vi.mock('../../components/custody/createflow/createFlowModel', async (importOriginal) => {
+  const mod = await importOriginal()
+  return { ...mod, creationChainIds: () => [137, 8453, 10] }
+})
+let creationRecord = null
+vi.mock('../../lib/custody/vaultCreationRecords', () => ({
+  getCreationRecord: () => creationRecord,
+}))
+let deploymentCtx
+vi.mock('../../hooks/useVaultDeployment', () => ({ default: () => deploymentCtx }))
 
 import VaultDetailsView from '../../components/custody/VaultDetailsView'
 
@@ -94,6 +104,8 @@ beforeEach(() => {
     choose: vi.fn(),
   }
   activeCtx = { identity: { mode: 'personal' }, operateAsPersonal: vi.fn() }
+  creationRecord = null
+  deploymentCtx = { byChain: {}, start: vi.fn().mockResolvedValue({ address: VAULT }), railFor: () => ({ available: true }) }
   names = {
     [ALICE.toLowerCase()]: { displayName: 'Alice', source: 'addressBook', address: ALICE },
   }
@@ -110,33 +122,68 @@ describe('VaultDetailsView', () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(VAULT)
   })
 
-  it('renders one article per network with version, threshold, role and the policy block (FR-010)', async () => {
+  it('renders one compact ROW per network — status + arrangement, switch only where the wallet is elsewhere (spec 105 FR-012)', () => {
     render(<VaultDetailsView group={group()} onClose={vi.fn()} />)
-    const articles = screen.getAllByTestId('vault-network')
-    expect(articles).toHaveLength(2)
-    expect(articles[0]).toHaveAttribute('data-chain-id', '137')
-    expect(articles[0]).toHaveTextContent(/Safe 1\.4\.1 · 2 of 3 · Owner/)
-    expect(articles[1]).toHaveAttribute('data-chain-id', '8453')
-    expect(articles[1]).toHaveTextContent(/2 of 2/)
-    // The policy block is mounted per network (v1 panel here, in its unsupported state).
-    expect(within(articles[0]).getByRole('heading', { name: /^policy$/i })).toBeInTheDocument()
-    expect(await within(articles[0]).findByText(/aren.t supported on this network/i)).toBeInTheDocument()
-    // The non-connected network is read-only with the switch prompt, never a second address row.
-    expect(within(articles[1]).getByText(/shown read-only/i)).toBeInTheDocument()
-    expect(within(articles[1]).queryByText('Address')).not.toBeInTheDocument()
-    fireEvent.click(within(articles[1]).getByRole('button', { name: /switch to base/i }))
+    const rows = screen.getAllByTestId('vault-network')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveAttribute('data-chain-id', '137')
+    expect(rows[0]).toHaveTextContent(/Live · 2 of 3 · Owner/)
+    expect(rows[0]).toHaveTextContent(/wallet here/i)
+    expect(within(rows[0]).queryByRole('button', { name: /switch/i })).not.toBeInTheDocument()
+    expect(rows[1]).toHaveAttribute('data-chain-id', '8453')
+    expect(rows[1]).toHaveTextContent(/2 of 2/)
+    // No up-front "shown read-only" banner — the switch is a per-row affordance.
+    expect(screen.queryByText(/shown read-only/i)).not.toBeInTheDocument()
+    fireEvent.click(within(rows[1]).getByRole('button', { name: /switch/i }))
     expect(walletCtx.switchNetwork).toHaveBeenCalledWith(8453)
+    // "Same address on every chain" is stated once, on the address block.
+    expect(screen.getByTestId('vault-same-address')).toBeInTheDocument()
   })
 
-  it('states an unreachable network inside its article instead of dropping it', () => {
+  it('names per-network drift on the shared facts instead of averaging or repeating cards (FR-013)', () => {
+    render(<VaultDetailsView group={group()} onClose={vi.fn()} />)
+    const fact = screen.getByTestId('vault-fact-approvals')
+    expect(fact).toHaveTextContent('2 of 3 owners')
+    expect(fact).toHaveTextContent(/differs on/i)
+    expect(fact).toHaveTextContent(/base/i)
+  })
+
+  it('offers Deploy on a missing cohort network only WITH a creation record; states the honest reason without one (FR-015/FR-018)', () => {
+    const { unmount } = render(<VaultDetailsView group={group()} onClose={vi.fn()} />)
+    const missing = screen.getByTestId('vault-network-missing')
+    expect(missing).toHaveAttribute('data-chain-id', '10')
+    expect(missing).toHaveTextContent(/not deployed/i)
+    expect(missing).toHaveTextContent(/creation details, which this app does not hold/i)
+    expect(within(missing).queryByRole('button', { name: /deploy/i })).not.toBeInTheDocument()
+    unmount()
+
+    creationRecord = { address: VAULT, owners: [ME, ALICE, STRANGER], threshold: 2, saltNonce: '7', presetType: 'complex', rules: null }
+    render(<VaultDetailsView group={group()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('vault-deploy-10'))
+    fireEvent.click(screen.getByTestId('vault-deploy-confirm'))
+    expect(deploymentCtx.start).toHaveBeenCalledWith(
+      expect.objectContaining({ chainIds: [10], owners: [ME, ALICE, STRANGER], threshold: 2, saltNonce: '7' }),
+    )
+  })
+
+  it('disclosing original owners gates deploy-later when the live owner set drifted (FR-017)', () => {
+    creationRecord = { address: VAULT, owners: [ME, ALICE], threshold: 1, saltNonce: '7', presetType: 'joint', rules: null }
+    render(<VaultDetailsView group={group()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('vault-deploy-10'))
+    const note = screen.getByTestId('vault-deploy-original-owners')
+    expect(note).toHaveTextContent(/original arrangement/i)
+    expect(note).toHaveTextContent('1 of 2')
+  })
+
+  it('an unreachable network stays LISTED as unreadable, and the shared facts name their coverage', () => {
     const g = group()
     g.instances = [g.instances[0], { address: VAULT, chainId: 8453, chainName: 'Base', reachable: false }]
     g.readable = [g.instances[0]]
     render(<VaultDetailsView group={g} onClose={vi.fn()} />)
-    const articles = screen.getAllByTestId('vault-network')
-    expect(articles).toHaveLength(2)
-    expect(articles[1]).toHaveTextContent(/Base could not be reached/)
-    expect(articles[1]).toHaveTextContent(/nothing about the vault has changed/i)
+    const rows = screen.getAllByTestId('vault-network')
+    expect(rows).toHaveLength(2)
+    expect(rows[1]).toHaveTextContent(/could not be read/i)
+    expect(screen.getByTestId('vault-facts-coverage')).toHaveTextContent(/base could not be read/i)
   })
 
   it('cross-references every owner: "You", the address-book nickname, and a generated name with add-to-book (FR-011)', () => {

@@ -51,6 +51,11 @@ export default function LoadVaultForm({ onLoad, onDone, chainId }) {
 
   return (
     <form className="custody-load" onSubmit={(e) => e.preventDefault()} aria-label="Load a vault by address">
+      {/* Spec 105 (US4) — the sheet states what it does before asking for anything. */}
+      <p className="custody-hint">
+        Paste a vault&rsquo;s address — every custody network is searched, and the vault is added on
+        each network it lives on.
+      </p>
       <CustodyAddressField
         id="load-address"
         label="Vault address"
@@ -91,7 +96,13 @@ export default function LoadVaultForm({ onLoad, onDone, chainId }) {
       )}
 
       <div className="custody-actions">
-        <button type="button" onClick={handleLoad} disabled={!address.trim() || busy} data-testid="load-vault-submit">
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={handleLoad}
+          disabled={!address.trim() || busy}
+          data-testid="load-vault-submit"
+        >
           {busy ? 'Searching all networks…' : 'Load vault'}
         </button>
       </div>

@@ -202,6 +202,27 @@ The usage is real and is exported separately as `vendor_usage`. Token needs Zone
 If the plan includes the enterprise `/exporter/prometheus` endpoint, set `QUICKNODE_PROMETHEUS_URL`
 — it is the vendor's own metrics and is preferred over parsing the usage JSON.
 
+### gateway-upstream-usage
+
+Measured request counts from the relay-gateway (spec 106, #1447): per assurance tier and per
+platform-credentialed upstream. **Not a dollar** — it is the attribution series beside the vendor
+cost panels, and the one that says where the QuickNode account's shared 50 req/s went.
+
+- **Enable**: set `METRICS_PORT` on the gateway (compose-network internal — **never publish this
+  port to the host**) and `FINOPS_GATEWAY_METRICS_URL` on the exporter (e.g.
+  `http://gateway:9091/counters`). Unset ⇒ the source reads `not-configured`, which is the honest
+  state, not a failure.
+- **Unreadable** means the exporter cannot reach the gateway's counters port — a scrape problem,
+  never "no traffic". Check the compose network and that the gateway logged the counters listener
+  at boot (a bind failure logs and stands down; it never takes the gateway with it).
+- **Counters are cumulative-since-boot.** A restart is an ordinary Prometheus counter reset:
+  `rate()` shows a moment of zero slope, never a negative and never a phantom level. This is why
+  in-process counters are admissible here when the catalogue rejects them for revenue LEVELS — the
+  reasoning lives at `services/finops-exporter/src/collectors/gateway.js`.
+- **Labels are bounded by construction** (tiers from the fixed ladder, upstreams from the route
+  table) and re-bounded by the collector, which drops anything outside the expected sets rather
+  than trusting the scrape target with a cardinality promise.
+
 ### self-cost
 
 What this system costs: the Grafana Cloud plan plus the BigQuery query spend the exporter incurs.
@@ -218,8 +239,22 @@ exist to prevent.
 
 Four sources are declared and **not live**. They render as *not yet live*, contribute nothing to any
 total, and emit no metric — a `planned` source showing `$0` would be indistinguishable from a shipped
-source earning nothing (FR-014). They fall into two groups, and the difference decides how each is
+source earning nothing (FR-014). They fall into three groups, and the difference decides how each is
 watched.
+
+**Readable by nobody, and not cash.** `referral-guttertoken` (spec 104): when a member funds a
+GutterToken account through the referral-coded signup link on the Assistant tab, GutterToken credits
+FairWins' own GutterToken account with prepaid usage credit — in-kind, non-cashable, spendable only on
+model calls from that account. It is catalogued `planned` rather than `live` + `not-configured` like
+the other referrals for a reason that will not change with configuration: GutterToken exposes no
+balance, usage or referral endpoint, so **no collector could ever read the figure**; it is visible
+only on GutterToken's billing page. The referral code lives in the tenant manifest
+(`settings.assistant.guttertokenReferralCode`) and ships in the frontend, which is also why C2b cannot
+see it — the gateway reads no env var for it, so the entry carries `moneyPath: { namespace:
+'guttertoken' }` with no `payeeEnv`. Do not promote it to a USD revenue line: if P3 (a FairWins-owned
+GutterToken account as the FairWins rail's upstream) is adopted, this credit accrues on the same
+account `assistant-model-api` would be billed to and is an **offset against that cost**, to be noted
+on the cost entry, never summed with cash revenue. No code is registered yet.
 
 **Does not exist anywhere.** `miniapp-licenses` and `wager-platform-fee`: `MiniAppRegistry` has no
 fee or `payable` function, and `WagerRegistry` takes no platform cut. There is nothing that could

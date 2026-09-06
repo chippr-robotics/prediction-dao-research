@@ -39,6 +39,7 @@ import { createPoolsCollector, emitPoolSeries } from './collectors/pools.js'
 import { createGcpBillingCollector, emitGcpDetail } from './collectors/gcpBilling.js'
 import { createCloudflareCollector, emitCloudflareUsage } from './collectors/cloudflare.js'
 import { createQuickNodeCollector, emitQuickNodeUsage } from './collectors/quicknode.js'
+import { createGatewayUsageCollector, emitGatewayUsage } from './collectors/gateway.js'
 import { createFxReader } from './collectors/fx.js'
 import { aggregate } from './aggregate.js'
 
@@ -79,6 +80,7 @@ export function createApp(overrides = {}) {
   })
   const cloudflare = createCloudflareCollector({ config, fetchImpl: overrides.fetchImpl, log })
   const quicknode = createQuickNodeCollector({ config, fetchImpl: overrides.fetchImpl, log })
+  const gatewayUsage = createGatewayUsageCollector({ config, fetchImpl: overrides.fetchImpl })
 
   const collectors = {
     feeRouter: createFeeRouterCollector({ config, providers, cursors, log }),
@@ -89,6 +91,7 @@ export function createApp(overrides = {}) {
     gcpBilling,
     cloudflare,
     quicknode,
+    gateway: gatewayUsage,
     /** `planned` sources never reach a collector, but a named one keeps the catalogue self-consistent. */
     none: async () => ({ state: 'not-configured', value: null, unit: null, at: Date.now(), labels: {}, reason: 'not yet live' }),
     ...overrides.collectors,
@@ -128,6 +131,7 @@ export function createApp(overrides = {}) {
       if (source.collector === 'gcpBilling') emitGcpDetail(registry, gcpBilling, source)
       if (source.collector === 'cloudflare') emitCloudflareUsage(registry, cloudflare, source)
       if (source.collector === 'quicknode') emitQuickNodeUsage(registry, quicknode, source)
+      if (source.collector === 'gateway') emitGatewayUsage(registry, gatewayUsage, source)
     }
 
     return { registry, readings }

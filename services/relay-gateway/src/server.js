@@ -30,8 +30,18 @@ import { createIntentStore } from './intent/store.js'
 import { createSanctionsScreen } from './policy/sanctions.js'
 import { createDedupStore } from './policy/dedup.js'
 import { createQuotas, createSpendTracker, createTokenBudget } from './policy/quotas.js'
+import { createIdentityMiddleware } from './identity/middleware.js'
+import { createAttestationVerifier } from './identity/verifiers/attestation.js'
+import { createChallengeVerifier } from './identity/verifiers/challenge.js'
+import { createGrantVerifier } from './identity/verifiers/grant.js'
+import { createUpstreamCeilings, withUpstreamCeiling } from './identity/upstreamCeiling.js'
+import { createAccessRouter, accessStatus } from './access/routes.js'
+import { createEnforcementVerifier } from './access/enforcement.js'
+import { loadSigningKey } from './access/jwt.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
+import { createReloadHandler } from './policy/reload.js'
+import { createIdentityCounters, startCountersServer } from './metrics/counters.js'
 import { createEngineClient } from './engine/client.js'
 import { applyEngineEvent } from './engine/webhook.js'
 import { createOpenSeaClient } from './opensea/client.js'
@@ -247,6 +257,120 @@ export function createApp(config, deps = {}) {
     next()
   })
 
+  // ---- Caller identity (spec 106) ---------------------------------------------------------
+  // Placed HERE on purpose: after the origin lock, before route dispatch.
+  //
+  //   After the lock, because the lock is a string comparison that rejects non-edge traffic while
+  //   resolution may make a network call — resolving first would let an off-edge caller cost us an
+  //   upstream round trip per request, turning an identity layer into an amplifier.
+  //
+  //   Before dispatch, because identity must resolve for a route that does not exist. Otherwise an
+  //   unauthenticated prober could enumerate the route surface from the difference between a 404
+  //   and a 403, which is a map of which paths are worth attacking.
+  //
+  // Preflight never reaches this: OPTIONS short-circuits at the CORS middleware above, because a
+  // browser cannot attach credentials to a preflight. If resolution saw one it would resolve
+  // anonymous every time and pollute the metering it exists to make honest.
+  //
+  // This slice RESOLVES ONLY — it attaches req.caller and the X-FairWins-Tier header and changes
+  // no status code, so the tier model can be validated against real traffic before anything depends
+  // on it. Enforcement lands in a later slice.
+  // Deliberately NOT wired to the global kill switch. That one stops the relayer during an
+  // incident; identity is a safety layer, and turning it off mid-incident is the wrong direction.
+  // IDENTITY_KILLSWITCH is its own switch, for the case where this layer itself misbehaves.
+  //
+  // The verifier list is a LIVE ARRAY, registered into below once the member-API dependencies it
+  // needs (the revocation store, the membership reader) have been constructed further down. The
+  // resolver reads it per request, so registration order does not matter — but MOUNT order does,
+  // which is why the middleware is installed here and populated later rather than moved.
+  // Per-upstream ceilings (FR-013). Wraps each upstream CLIENT rather than the route, so a cache
+  // hit — which never touches the vendor — does not spend against a budget it is not using.
+  const upstreamCeilings =
+    deps.upstreamCeilings ??
+    createUpstreamCeilings(
+      config.identity?.upstreamCeilings ?? {},
+      config.identity?.upstreamCeilingWindowMs ?? 60_000,
+      nowMs
+    )
+
+  // ---- Keyed RPC access issuance (spec 107) — mounted unconditionally, dormant until config ----
+  // The signing key loads at BOOT, not per request: a malformed key must fail the deploy loudly
+  // rather than fail the first member quietly. Load failure with the module enabled is fatal —
+  // an enabled issuer that cannot sign is a misconfiguration, not a degraded mode.
+  let accessSigningKey = null
+  if (config.rpcAccess?.signingKeyPem) {
+    try {
+      accessSigningKey = loadSigningKey(config.rpcAccess.signingKeyPem)
+    } catch (err) {
+      if (config.rpcAccess.enabled) {
+        throw new Error(`RPC_ACCESS_SIGNING_KEY is present but unusable: ${err.message}`)
+      }
+      // Disabled module + broken key: boot continues, the route answers unconfigured, and the
+      // warning names the problem instead of hiding it behind a healthy-looking start.
+      console.warn('[relay-gateway] WARN: RPC_ACCESS_SIGNING_KEY present but unusable while module disabled:', err.message)
+    }
+  }
+  const accessEnforcement =
+    deps.accessEnforcement ??
+    (config.rpcAccess?.adminKey
+      ? createEnforcementVerifier({
+          adminBaseUrl: config.rpcAccess.adminBaseUrl,
+          adminKey: config.rpcAccess.adminKey,
+          cacheTtlMs: config.rpcAccess.enforcementCacheTtlMs,
+          timeoutMs: config.rpcAccess.adminTimeoutMs,
+          now: nowMs,
+          ...(deps.accessFetch ? { fetchImpl: deps.accessFetch } : {}),
+        })
+      : null)
+  const accessMintQuotas =
+    deps.accessMintQuotas ??
+    createQuotas({
+      signerPerWindow: config.rpcAccess?.mintQuotaPerSubject ?? 12,
+      globalPerWindow: config.rpcAccess?.mintQuotaGlobal ?? 600,
+      windowMs: config.rpcAccess?.mintQuotaWindowMs ?? 60_000,
+      now: nowMs,
+    })
+
+  // The challenge verifier registers unconditionally and ABSTAINS when unconfigured — the
+  // registered-but-abstaining shape is what keeps /status able to say "not-configured" honestly
+  // instead of omitting a tier the ladder declares.
+  const identityCounters = deps.identityCounters ?? createIdentityCounters()
+  const identityVerifiers = [
+    createAttestationVerifier(),
+    createChallengeVerifier(config.identity?.challenge ?? {}, {
+      now: nowMs,
+      ...(deps.challengeFetch ? { fetchImpl: deps.challengeFetch } : {}),
+    }),
+  ]
+  // Live getters, not captured booleans: SIGHUP reload (policy/reload.js) mutates config in
+  // place, and the middleware reads these per request so a reload takes effect on the next
+  // request without a restart.
+  app.use(
+    createIdentityMiddleware(
+      {
+        get enabled() {
+          return config.identity?.enabled === true && config.identity?.killswitch !== true
+        },
+        get enforce() {
+          return config.identity?.enforce === true
+        },
+        counters: identityCounters,
+      },
+      identityVerifiers
+    )
+  )
+
+  // Issuance sits AFTER identity resolution (it reads req.caller for tier and metering subject)
+  // and before the module routers, like everything client-facing.
+  app.use(
+    createAccessRouter(config, {
+      signingKey: accessSigningKey,
+      enforcement: accessEnforcement,
+      mintQuotas: accessMintQuotas,
+      now,
+    })
+  )
+
   // ---- GET /healthz + /status (origin-lock exempt) ----------------------------------------
   // Google's GFE intercepts the literal `/healthz` on *.run.app (it never reaches the container),
   // so `/status` is the externally reachable alias used by the client self-submit probe and the
@@ -385,7 +509,39 @@ export function createApp(config, deps = {}) {
     // the assistant has a credential. No member data, no key material, nothing about any token.
     // `memberApiAssistant` is declared further down; this closure only runs at request time.
     const memberApi = memberApiStatus(config, { killSwitch, assistantConfigured: memberApiAssistant.configured })
-    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi })
+    // ---- Caller identity + keyed access (specs 106/107) — GATED, deliberately -----------------
+    // /status is origin-lock EXEMPT (see above), so anything in the public body is world-readable
+    // on the raw origin URL. These blocks are operator telemetry and sit behind `disclose`, next
+    // to gasWalletRunwayHrs, for the same reason. Inside them, honesty rules bind:
+    //   - `enforcing` is EXPLICIT either way (FR-015): a layer running with checks off must never
+    //     be indistinguishable from one enforcing them, and both flags read the LIVE config so a
+    //     SIGHUP reload is reflected on the next poll.
+    //   - attestation reports "not-built" — not `false`, not "disabled", which would imply a
+    //     switch exists that could turn it on.
+    //   - upstream labels come from the bounded table (FR-036), never from request content.
+    const identityGated = disclose
+      ? {
+          callerIdentity: {
+            enabled: config.identity?.enabled === true && config.identity?.killswitch !== true,
+            enforcing:
+              config.identity?.enabled === true &&
+              config.identity?.killswitch !== true &&
+              config.identity?.enforce === true,
+            verifiers: Object.fromEntries(
+              identityVerifiers.map((v) => [v.kind, v.state ?? 'configured'])
+            ),
+          },
+          upstreams: {
+            state: 'read', // in-process counters: readable by construction, volatile by design
+            windowCalls: upstreamCeilings.snapshot(),
+            cumulativeCalls: upstreamCeilings.cumulative(),
+            ceilings: config.identity?.upstreamCeilings ?? {},
+          },
+          tierRequests: identityCounters.snapshot(),
+          access: accessStatus(config, { signingKey: accessSigningKey, enforcement: accessEnforcement }),
+        }
+      : {}
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi, ...identityGated })
   }
   app.get('/healthz', healthLimiter, healthHandler)
   app.get('/status', healthLimiter, healthHandler)
@@ -674,7 +830,11 @@ export function createApp(config, deps = {}) {
     now: nowMs,
   })
   const openseaClient =
-    deps.openseaClient ?? createOpenSeaClient({ ...config.opensea, ...(deps.openseaFetch ? { fetchImpl: deps.openseaFetch } : {}) })
+    withUpstreamCeiling(
+      deps.openseaClient ?? createOpenSeaClient({ ...config.opensea, ...(deps.openseaFetch ? { fetchImpl: deps.openseaFetch } : {}) }),
+      'opensea',
+      upstreamCeilings
+    )
   app.use(
     createOpenSeaRouter(config, {
       client: openseaClient,
@@ -702,7 +862,11 @@ export function createApp(config, deps = {}) {
   })
   const pmFetch = deps.polymarketFetch ? { fetchImpl: deps.polymarketFetch } : {}
   const polymarketClient =
-    deps.polymarketClient ?? createPolymarketClient({ ...config.polymarket, now: nowMs, ...pmFetch })
+    withUpstreamCeiling(
+      deps.polymarketClient ?? createPolymarketClient({ ...config.polymarket, now: nowMs, ...pmFetch }),
+      'polymarket',
+      upstreamCeilings
+    )
   // Discovery (Gamma) + positions (Data API) hosts — both PUBLIC, so no creds (no L2 auth headers).
   const polymarketGammaClient =
     deps.polymarketGammaClient ??
@@ -888,6 +1052,24 @@ export function createApp(config, deps = {}) {
     })
   const memberApiMembership =
     deps.memberApiMembership ?? createMembershipReader(config, providers, { now: nowMs })
+  // ---- Register the grant verifier (spec 106) ----------------------------------------------
+  // Deliberately AFTER the revocation store and membership reader exist, and deliberately sharing
+  // them: a second revocation store would let a key revoked on one path keep working on the other.
+  //
+  // `membership` is passed so the verifier can OFFER the `member` upgrade, never to require it. A
+  // valid signature alone is accepted at `address` — which is what keeps trading from silently
+  // requiring a paid membership (see verifiers/grant.js).
+  identityVerifiers.push(
+    createGrantVerifier({
+      referenceProvider: providers?.[config.memberApi.referenceChainId] ?? null,
+      revocations: memberApiRevocations,
+      membership: memberApiMembership,
+      clockSkewSec: config.memberApi.clockSkewSec,
+      maxTtlDays: config.memberApi.maxTtlDays,
+      now: () => Math.floor(nowMs() / 1000),
+    })
+  )
+
   const memberApiWagers =
     deps.memberApiWagers ??
     createWagerReader(config, deps.memberApiFetch ? { fetchImpl: deps.memberApiFetch } : {})
@@ -969,7 +1151,7 @@ export function createApp(config, deps = {}) {
     res.status(400).json({ error: { code: 'bad_request', reason: 'invalid request body' } })
   })
 
-  return { app, killSwitch, store, dedup }
+  return { app, killSwitch, identityCounters, upstreamCeilings, store, dedup }
 }
 
 // ---- boot (only when run directly; tests import createApp) -----------------------------------
@@ -1003,12 +1185,22 @@ if (isMain) {
     process.exit(1)
   }
 
-  const { app, killSwitch } = createApp(config)
+  const { app, killSwitch, identityCounters, upstreamCeilings } = createApp(config)
+  // Usage counters endpoint (spec 106/#1447): an UNPUBLISHED compose-network port the FinOps
+  // exporter scrapes. Unset => not started; the exporter's source reads not-configured, honestly.
+  if (config.metricsPort) {
+    startCountersServer({ port: config.metricsPort, counters: identityCounters, upstreamCeilings })
+  }
   // Runtime kill switch: `kill -USR2 <pid>` toggles accept/refuse (FR-015).
   process.on('SIGUSR2', () => {
     const active = killSwitch.toggle()
     console.warn(`[relay-gateway] kill switch ${active ? 'ACTIVATED' : 'cleared'} via SIGUSR2`)
   })
+  // Runtime config reload (spec 106 FR-014, #1446): `kill -HUP <pid>` re-reads the allowlisted
+  // operational switches from RELOAD_ENV_FILE. A reload, not a remote control — and deliberately
+  // a DIFFERENT signal from the kill switch: changing a gesture operators use during incidents
+  // is how an incident gets worse.
+  process.on('SIGHUP', createReloadHandler(config, killSwitch))
   app.listen(config.port, () => {
     console.log(
       `[relay-gateway] listening on :${config.port} | chains=${config.enabledChainIds.join(',')} | ` +
