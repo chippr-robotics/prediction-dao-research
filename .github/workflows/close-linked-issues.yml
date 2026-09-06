@@ -97,8 +97,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Written to a file, not passed inline: a heredoc inside the loop would carry the
-          # shell's own indentation into the rendered comment.
+          # Rendered to a file first (a heredoc inside the loop would carry the shell's own
+          # indentation), then passed inline: gh issue close has no --comment-file flag.
           cat > /tmp/close-comment.md <<COMMENT
           Closed by #${PR}, merged into \`${BASE}\`.
 
@@ -135,7 +135,7 @@ jobs:
               continue
             fi
 
-            gh issue close "$n" --repo "$REPO" --reason completed --comment-file /tmp/close-comment.md
+            gh issue close "$n" --repo "$REPO" --reason completed --comment "$(cat /tmp/close-comment.md)"
 
             echo "Closed #$n."
             echo "- Closed #$n" >> "$GITHUB_STEP_SUMMARY"
