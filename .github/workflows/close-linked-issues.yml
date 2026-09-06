@@ -135,7 +135,10 @@ jobs:
               continue
             fi
 
-            gh issue close "$n" --repo "$REPO" --reason completed --comment-file /tmp/close-comment.md
+            # --comment takes the STRING, not a file — `--comment-file` does not exist on gh's
+            # issue close, and the workflow's first real close (#1476's four issues, 2026-09-06)
+            # died on "unknown flag" after every earlier run had passed with nothing to close.
+            gh issue close "$n" --repo "$REPO" --reason completed --comment "$(cat /tmp/close-comment.md)"
 
             echo "Closed #$n."
             echo "- Closed #$n" >> "$GITHUB_STEP_SUMMARY"
