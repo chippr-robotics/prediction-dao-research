@@ -152,9 +152,20 @@ describe('useRoleDetails — the membership read is deadline-bounded (issue #146
     expect(details.concurrentLimit).toBe(0)
   })
 
-  it('the tier-config ceiling is strictly inside the membership ceiling', () => {
-    // Otherwise the sub-bound could never fire on its own, and the degrade path above would be
-    // dead code that this file would still report as covered.
+  it('the ceilings are ordered, and the outer one stays inside the budget that makes it useful', () => {
+    // The tests above advance timers RELATIVE to the constant, so they prove a bound exists and
+    // sits exactly where the constant says — but they pass just as happily at ten minutes. That is
+    // the whole failure being fixed: an unbounded wait and an absurdly long one are the same thing
+    // to a member watching a spinner. So the magnitude is asserted here, separately and literally.
+    //
+    // 40s is the window `39-api-access [API-05]` gives the unreadable state to appear, and the read
+    // does not start until the app has booted and connected. A ceiling at or above that budget puts
+    // the merge gate back on a race with runner load, which is where issue #1463 came from.
+    expect(MEMBERSHIP_READ_TIMEOUT_MS).toBeLessThanOrEqual(20_000)
+    expect(MEMBERSHIP_READ_TIMEOUT_MS).toBeGreaterThanOrEqual(5_000)
+
+    // And the sub-bound must be able to fire on its own, or the degrade path above is dead code
+    // that this file would still report as covered.
     expect(TIER_CONFIG_READ_TIMEOUT_MS).toBeLessThan(MEMBERSHIP_READ_TIMEOUT_MS)
   })
 })
