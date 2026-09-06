@@ -12,16 +12,18 @@
 // — is the on-chain tier's row (`trade.wrap-cross-chain-submit`), per the e2e
 // policy's money-path rule.
 //
-// The build's cohort here is the TESTNET one, so the offered coins are exactly
-// the cohort chains with a configured wrapper: Hardhat 1337 (the connected
-// chain), Mordor 63, Amoy 80002. Sepolia is in the cohort and has NO wrapper —
-// its absence from the list is itself an assertion (no guessed addresses).
+// THE COHORT HERE IS MAINNET. The fast tier's dev server (`dev:fast`) builds the
+// default (mainnet) cohort — this spec's first CI run assumed testnet and looked
+// for Mordor/Amoy rows that a mainnet build honestly never offers. So the
+// offered coins are the mainnet chains with a configured wrapper — Ethereum,
+// Optimism, Ethereum Classic, Polygon, Base, Arbitrum — while the mock wallet's
+// own chain (Hardhat 1337, testnet) is NOT in the cohort and must not be listed,
+// and Sepolia (no wrapper anywhere) must not be either: absence over guessed
+// addresses, and never a cross-cohort row.
 //
-// RPC stubbing: each candidate chain's balance read goes to that chain's own
-// build-default endpoint. These testnet rails are SINGLE (the drpc failovers of
-// issue #1463 are mainnet-only), so one intercept per host is the whole story —
-// but the Mordor/Amoy hosts are matched by pattern all the same, so a second
-// rung appearing later fails loudly here rather than leaking a live read.
+// RPC stubbing rides issue #1463's rule: EVERY rung of every read is matched —
+// publicnode + drpc for the five EVM mainnets, rivet + etcdesktop for ETC — so
+// no live endpoint can quietly answer for a chain this spec declares dead.
 // =============================================================================
 
 const TEST_ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
@@ -30,8 +32,8 @@ const WRAP_URL = '/wallet?tab=trade&view=wrap'
 const ONE_ETHER = '0x0de0b6b3a7640000' // 1e18
 
 /**
- * Stub one chain's JSON-RPC endpoint. `fail: true` refuses every method — the
- * single rail dies whole, which is what "this chain could not be read" means.
+ * Stub one chain's JSON-RPC rails. `fail: true` refuses every method on every
+ * rung — the chain dies whole, which is what "could not be read" means.
  */
 function stubChainRpc(urlPattern, { chainIdHex, fail = false, balance = ONE_ETHER, alias }) {
   cy.intercept({ method: 'POST', url: urlPattern }, (req) => {
@@ -44,7 +46,7 @@ function stubChainRpc(urlPattern, { chainIdHex, fail = false, balance = ONE_ETHE
       switch (method) {
         case 'eth_chainId': result = chainIdHex; break
         case 'net_version': result = String(parseInt(chainIdHex, 16)); break
-        case 'eth_blockNumber': result = '0x100000'; break
+        case 'eth_blockNumber': result = '0x1000000'; break
         case 'eth_getBalance': result = balance; break
         case 'eth_gasPrice': result = '0x3b9aca00'; break
         case 'eth_call': result = '0x'; break
@@ -59,14 +61,22 @@ function stubChainRpc(urlPattern, { chainIdHex, fail = false, balance = ONE_ETHE
   }).as(alias)
 }
 
-function stubAllChains({ amoyFails = false } = {}) {
-  stubChainRpc(/rpc\.mordor\.etccooperative\.org/, { chainIdHex: '0x3f', alias: 'mordorRpc' })
-  stubChainRpc(/rpc-amoy\.polygon\.technology/, {
-    chainIdHex: '0x13882',
-    fail: amoyFails,
-    alias: 'amoyRpc',
+/**
+ * Both rails of every cohort chain. Polygon is the one this file kills when a
+ * test needs an unreadable chain — BOTH its rungs, or live drpc answers for a
+ * chain the test declared dead (issue #1463).
+ */
+function stubAllChains({ polygonFails = false } = {}) {
+  stubChainRpc(/ethereum-rpc\.publicnode\.com|eth\.drpc\.org/, { chainIdHex: '0x1', alias: 'ethRpc' })
+  stubChainRpc(/optimism-rpc\.publicnode\.com|optimism\.drpc\.org/, { chainIdHex: '0xa', alias: 'opRpc' })
+  stubChainRpc(/etc\.rivet\.link|etc\.etcdesktop\.com/, { chainIdHex: '0x3d', alias: 'etcRpc' })
+  stubChainRpc(/polygon-bor-rpc\.publicnode\.com|polygon\.drpc\.org/, {
+    chainIdHex: '0x89',
+    fail: polygonFails,
+    alias: 'polygonRpc',
   })
-  stubChainRpc(/localhost:8545|127\.0\.0\.1:8545/, { chainIdHex: '0x539', alias: 'localRpc' })
+  stubChainRpc(/base-rpc\.publicnode\.com|base\.drpc\.org/, { chainIdHex: '0x2105', alias: 'baseRpc' })
+  stubChainRpc(/arbitrum-one-rpc\.publicnode\.com|arbitrum\.drpc\.org/, { chainIdHex: '0xa4b1', alias: 'arbRpc' })
 }
 
 function openPicker() {
@@ -87,21 +97,27 @@ describe('Wrap — multi-currency picker (spec 108)', () => {
     cy.visit(WRAP_URL)
     openPicker()
     cy.get('[role="listbox"]').within(() => {
-      cy.contains('[role="option"]', 'Hardhat').should('exist')
-      cy.contains('[role="option"]', 'Mordor').should('exist')
-      cy.contains('[role="option"]', 'Amoy').should('exist')
-      // Sepolia is IN the cohort and has no configured wrapper: absent, never a
-      // disabled row wearing a guessed address.
+      cy.contains('[role="option"]', 'Ethereum Classic').should('exist')
+      cy.contains('[role="option"]', 'Polygon').should('exist')
+      cy.contains('[role="option"]', 'Base').should('exist')
+      cy.contains('[role="option"]', 'Optimism').should('exist')
+      cy.contains('[role="option"]', 'Arbitrum').should('exist')
+      // Sepolia has no configured wrapper anywhere: absent, never a disabled row
+      // wearing a guessed address.
       cy.contains('[role="option"]', 'Sepolia').should('not.exist')
+      // The mock wallet's own chain (Hardhat, testnet) is outside the mainnet
+      // cohort — constitution III: the list never crosses the cohort boundary,
+      // whatever the wallet is connected to.
+      cy.contains('[role="option"]', 'Hardhat').should('not.exist')
     })
   })
 
   it('[WMC-02] an unreadable chain shows an unknown balance — never a zero — and stays selectable with the switch disclosed', () => {
-    stubAllChains({ amoyFails: true })
+    stubAllChains({ polygonFails: true })
     cy.visit(WRAP_URL)
-    cy.wait('@amoyRpc')
+    cy.wait('@polygonRpc')
     openPicker()
-    cy.contains('[role="option"]', 'Amoy')
+    cy.contains('[role="option"]', 'Polygon')
       .should('not.contain.text', 'Balance: 0')
       .click()
     // The selection is honest about the failed read, and about the switch to come.
@@ -109,7 +125,7 @@ describe('Wrap — multi-currency picker (spec 108)', () => {
     cy.contains('unknown, not zero').should('be.visible')
     cy.get('#pt-wrap-amount').type('0.5')
     cy.contains('your wallet will be asked to switch').should('be.visible')
-    cy.contains('button', /^Wrap .* on Polygon Amoy$/).should('be.enabled')
+    cy.contains('button', /^Wrap .* on Polygon$/).should('be.enabled')
   })
 
   it('[WMC-03] changing the coin clears the amount — a MAX quoted on one chain never rides to another', () => {
@@ -117,7 +133,7 @@ describe('Wrap — multi-currency picker (spec 108)', () => {
     cy.visit(WRAP_URL)
     cy.get('#pt-wrap-amount', { timeout: 15000 }).type('2.5')
     openPicker()
-    cy.contains('[role="option"]', 'Mordor').click()
+    cy.contains('[role="option"]', 'Ethereum Classic').click()
     cy.get('#pt-wrap-amount').should('have.value', '')
   })
 
@@ -128,11 +144,11 @@ describe('Wrap — multi-currency picker (spec 108)', () => {
     cy.mockWeb3Provider({ account: TEST_ACCOUNT, preAuthorized: true, rejectChainSwitch: true })
     cy.visit(WRAP_URL)
     openPicker()
-    cy.contains('[role="option"]', 'Mordor').click()
+    cy.contains('[role="option"]', 'Ethereum Classic').click()
     cy.get('#pt-wrap-amount').type('0.25')
-    cy.contains('button', /^Wrap ETC on Ethereum Classic Mordor$/).click()
+    cy.contains('button', /^Wrap ETC on Ethereum Classic$/).click()
     cy.get('[role="alert"]', { timeout: 15000 })
-      .should('contain.text', 'Ethereum Classic Mordor')
+      .should('contain.text', 'Ethereum Classic')
       .and('contain.text', 'Hardhat')
       .and('contain.text', 'nothing was sent')
     // No success notice, no receipt — the refusal is the whole outcome.
