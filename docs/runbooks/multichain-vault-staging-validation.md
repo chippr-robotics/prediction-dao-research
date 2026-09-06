@@ -36,7 +36,7 @@ signer-rail variant (ETC has no bundler, so it also exercises the "signer first"
 - DevTools console open throughout; copy any raised error alongside the member-facing sentence
   into the results comment.
 
-Record results as a checklist comment on issue #1453 (protocol letter → pass/fail + notes).
+Record results as a checklist comment on issue #1491 (protocol letter → pass/fail + notes). #1453 asked for this protocol and closed when it shipped; #1491 tracks RUNNING it.
 
 ## Protocol A — one flow, two networks, one address
 
