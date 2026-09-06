@@ -3301,6 +3301,35 @@
           "note": "The member signs something that costs money, so execution lives here (e2e policy rule 2). WXC-01 starts the mock wallet on Mordor and wraps the local chain's coin \u2014 the switch-then-settle path against a real deposit(), asserted by the wrapped balance read back from the chain; WXC-03 closes the 1:1 round trip."
         }
       ]
+    },
+    {
+      "id": "109-token-news",
+      "title": "Token news on portfolio and trade surfaces",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "news.portfolio-token-card",
+          "name": "Selecting a portfolio token shows that asset's latest news with link-out attribution; an unreadable feed renders a sentence + retry (never an empty feed pretending to be no news), an unmapped asset renders honest absence, and the module off hides the card",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1465"
+        },
+        {
+          "id": "news.trade-pair-feed",
+          "name": "Selecting a trade pair shows the pair's token news below the amount entry under the same three-state honesty; items are text with attribution, never rendered HTML",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "information",
+          "tests": [],
+          "issue": "#1465"
+        }
+      ]
     }
   ]
 }
