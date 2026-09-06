@@ -44,8 +44,11 @@ name: CodeQL
 on:
   push:
     branches: [main, staging]
+  # NO base-branch filter here, deliberately (spec 075, `test/config/CiGates.test.js`). Stacked
+  # PRs are the normal shape of work in this repo, and `branches: [main, staging]` would have
+  # meant a PR into a feature branch got no scan at all — code reviewed more weakly precisely
+  # where it is least finished. Scope a workflow with `paths:`, never with the base branch.
   pull_request:
-    branches: [main, staging]
   schedule:
     # Weekly, so a newly published query still finds an old commit.
     - cron: '25 14 * * 2'
