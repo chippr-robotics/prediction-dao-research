@@ -3274,26 +3274,31 @@
         {
           "id": "trade.wrap-multi-currency-picker",
           "name": "The Wrap view offers every cohort chain's base coin the member holds from one trading-view-style picker (icon, symbol, network, balance), with unreadable balances shown as unread (never zero) and unconfigured wrappers honestly absent",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "no-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1439",
-          "note": "Reserved with the spec; rows fill in when the surface ships. The existing single-chain wrap view rows stay on spec 082, which owns the Trade view switch."
+          "tests": [
+            "frontend/cypress/e2e/fast/48-wrap-multi-currency.cy.js::WMC-01",
+            "frontend/cypress/e2e/fast/48-wrap-multi-currency.cy.js::WMC-02",
+            "frontend/cypress/e2e/fast/48-wrap-multi-currency.cy.js::WMC-03",
+            "frontend/cypress/e2e/fast/48-wrap-multi-currency.cy.js::WMC-04"
+          ],
+          "note": "WMC-02 pins null-not-zero for an unreadable chain and the switch disclosure; WMC-04 pins the refused-switch wording (both chains named, nothing sent) via the mock wallet's rejectChainSwitch."
         },
         {
           "id": "trade.wrap-cross-chain-submit",
           "name": "Selecting a coin whose chain differs from the wallet's switches the wallet at submit time (settle loop), wraps against that chain's own wrapped-native contract, and a refused switch names both chains and sends nothing",
-          "status": "absent",
-          "tier": "none",
-          "proposedTier": "on-chain",
-          "depth": "none",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
           "risk": "custody",
-          "tests": [],
-          "issue": "#1439",
-          "note": "The member signs something that costs money (the wrap sends coin plus fee), so the e2e policy's money-path rule puts execution coverage in the on-chain tier."
+          "tests": [
+            "frontend/cypress/e2e/full/45-wrap-cross-chain.cy.js::WXC-01",
+            "frontend/cypress/e2e/full/45-wrap-cross-chain.cy.js::WXC-02",
+            "frontend/cypress/e2e/full/45-wrap-cross-chain.cy.js::WXC-03"
+          ],
+          "note": "The member signs something that costs money, so execution lives here (e2e policy rule 2). WXC-01 starts the mock wallet on Mordor and wraps the local chain's coin \u2014 the switch-then-settle path against a real deposit(), asserted by the wrapped balance read back from the chain; WXC-03 closes the 1:1 round trip."
         }
       ]
     }

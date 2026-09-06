@@ -1048,9 +1048,26 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   entities) and are covered by the address path. See
   `docs/developer-guide/passkey-account-recovery.md` + `specs/104-passkey-account-recovery/`.
 
+- **Wrap is multi-currency, and the ASSET is the entry point (spec 108).** Trade ▸ Wrap offers every
+  cohort chain's base coin with a configured wrapper — the candidate list is
+  `config/wrappedNative.js#listWrappableCoins()` (`cohortChainIds().filter(hasWrappedNative)`,
+  SelectableAsset-shaped), living beside the ONE resolver on purpose so "offered" and "resolvable"
+  cannot drift; an unconfigured chain is ABSENT, never a disabled row (no guessed wrapper ever
+  receives funds). Picker balances ride `useWrapCoinOptions` → `readBalancesSettled` +
+  `getReadProvider` with per-chain failure isolation — `null` survives to the row ("—"), never a
+  fabricated zero, and an unreadable chain stays selectable. `useWrapNative({ chainId })` re-binds
+  every read to the TARGET and retargets the write per rail: classic cross-chain
+  switches-then-settles (the spec-102 / `useEarnSend` device — refusal names BOTH chains and sends
+  nothing), passkey batches pin the target via the `sendCalls` `{ chainId }` override gated on
+  `isPasskeySupported` (unavailable is stated BEFORE the tap with the seam's own reason),
+  vault/legacy/hardware keep their refusals with the picker pinned to the acting chain. Changing the
+  coin CLEARS the amount — a MAX quoted on one chain never rides to another. No target passed =
+  wallet's chain, byte-compatible with every pre-108 caller. See
+  `docs/developer-guide/wrap-native.md` + `specs/108-multi-currency-wrap/`.
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/105-multichain-vault-creation/plan.md
+at specs/108-multi-currency-wrap/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also
