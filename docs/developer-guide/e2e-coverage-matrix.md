@@ -26,12 +26,12 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 
 | Metric | Count |
 |---|---|
-| Spec directories | 111 |
-| With a member-facing flow | 87 |
-| Member-facing flows | 199 |
+| Spec directories | 112 |
+| With a member-facing flow | 88 |
+| Member-facing flows | 201 |
 | 🟢 covered | 182 |
 | 🟡 partial | 6 |
-| 🔴 absent | 4 |
+| 🔴 absent | 6 |
 | ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
