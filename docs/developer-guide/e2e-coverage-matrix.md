@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 112 |
 | With a member-facing flow | 88 |
 | Member-facing flows | 202 |
-| 🟢 covered | 183 |
+| 🟢 covered | 185 |
 | 🟡 partial | 6 |
-| 🔴 absent | 6 |
+| 🔴 absent | 4 |
 | ⚪ out of scope | 7 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-84 flows — 🟢 67 · 🟡 6 · 🔴 4 · ⚪ 7 · covered-but-not-proven 0
+84 flows — 🟢 69 · 🟡 6 · 🔴 2 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -333,8 +333,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `trade.wrap-multi-currency-picker` | The Wrap view offers every cohort chain's base coin the member holds from one trading-view-style picker (icon, symbol, network, balance), with unreadable balances shown as unread (never zero) and unconfigured wrappers honestly absent | 🔴 absent | none | — (proposed: no-chain) | #1439 |  |
-| `trade.wrap-cross-chain-submit` | Selecting a coin whose chain differs from the wallet's switches the wallet at submit time (settle loop), wraps against that chain's own wrapped-native contract, and a refused switch names both chains and sends nothing | 🔴 absent | none | — (proposed: on-chain) | #1439 |  |
+| `trade.wrap-multi-currency-picker` | The Wrap view offers every cohort chain's base coin the member holds from one trading-view-style picker (icon, symbol, network, balance), with unreadable balances shown as unread (never zero) and unconfigured wrappers honestly absent | 🟢 covered | flow | `no-chain` | `48-wrap-multi-currency.cy.js` (WMC-01, WMC-02, WMC-03, WMC-04) |  |
+| `trade.wrap-cross-chain-submit` | Selecting a coin whose chain differs from the wallet's switches the wallet at submit time (settle loop), wraps against that chain's own wrapped-native contract, and a refused switch names both chains and sends nothing | 🟢 covered | settled | `on-chain` | `45-wrap-cross-chain.cy.js` (WXC-01, WXC-02, WXC-03) |  |
 
 ## Disclosure — a member consents to a cost
 

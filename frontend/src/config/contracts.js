@@ -102,7 +102,11 @@ const HARDHAT_CONTRACTS = {
   // has no bundler configured either, so `isPasskeySupported` still answers false there.
   entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
   accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
-  wmatic: '0x007e106a5664D48e02f571b58694B74c9D5c22a1',
+  // Spec 108: the local wrapped native is now the WETH9-shaped MockWNative (payable
+  // deposit()/withdraw()), because the Wrap surface's on-chain flow runs a REAL wrap here.
+  // CREATE2 (salt V2+"MockWMATIC" + MockWNative init code), so the address is the same on
+  // every clean local chain; re-derived from a fresh node:e2e + setup:e2e run.
+  wmatic: '0x637914a81B4F67BeA3acd94fc5a233656f8C08f7',
   /*
    * spec 030 pillar A — the native standard-DAO factory. NONCE-DERIVED, deployed by
    * `deploy:local:clearpath` (which `setup:e2e` runs after the seed); recorded from a clean
