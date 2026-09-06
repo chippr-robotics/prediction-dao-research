@@ -1015,6 +1015,27 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   throwing form inside the action callbacks, so any caller that gets past the UI fails with the same
   sentence. See `docs/developer-guide/protect-policies.md` § "The write rail is a property of the
   signer".
+- **Address screening asks EVERY list on EVERY cohort chain, and green means all of them answered
+  (spec 021 amendment, issue #1458).** `lib/screening/sources.js` is the registry — the FairWins
+  `SanctionsGuard` where deployed, the Chainalysis oracle where published (Base is at a DIFFERENT
+  address from the other four), and the NATIVE issuer freeze lists (Circle `isBlacklisted`, Tether
+  `isBlackListed` — different selectors; a bridged token has neither). Every row was verified by a
+  live read before it was written; a wrong row costs a member a source silently, so verify before
+  adding one. `verdict.js` derives ONE word from the readings and never stores it: `flagged` on ANY
+  hit, `screened` ONLY when every configured source answered clear (`unreadable === 0` — a list
+  that did not answer is not a list that said no), `partial` otherwise, `unscreened` when nothing
+  answered; chains with no source are UNCOVERED, never clear. The sweep (`screenEstate.js`) is
+  cohort-bounded, per-source failure-isolated, deadline-bounded (8 s) and never rejects; providers
+  come from `readProviderFor`. **Two hooks, on purpose**: `useAddressScreening` stays the PER-CHAIN
+  live read that gates a submission on the chain the value moves on (FR-013/FR-032 — the contract
+  will repeat that exact read), and `useEstateScreening` feeds the advisory `ScreeningPill` under
+  every address field via `AddressScreenNotice`, which now renders for every valid address (a
+  clear answer that rendered as silence was indistinguishable from no screen at all). The pill is
+  icon + word, `role="alert"` when flagged, and expands to the per-source rows; the no-chain e2e
+  tier answers `0x` to every read, so there it must be amber, never green (`MS-06`). Nothing here
+  enforces — the guard and the issuing token do. No subgraph, no off-chain provider: the source
+  shape is what a BYO provider would implement, behind a member-held credential. See
+  `docs/developer-guide/address-screening.md`.
 - **A passkey's account is LOOKED UP, never derived (spec 104).** `lib/passkey/accountLookup.js` is
   the one seam that answers "which account does this key control?", and its `Resolution` type has
   four shapes of which **only `resolved` carries an address** — three of its four constructors take

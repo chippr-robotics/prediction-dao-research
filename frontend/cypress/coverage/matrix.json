@@ -523,6 +523,19 @@
           "tests": [
             "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-01"
           ]
+        },
+        {
+          "id": "addressbook.estate-screening-pill",
+          "name": "Enter an address and see whether it is flagged on any list on any network \u2014 never a false green",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-06",
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::CM-01"
+          ],
+          "note": "Issue #1458. MS-06 runs in a world where every contract read answers 0x, so every source is unreadable and the pill must be amber (Unscreened/Partly screened), never green, with each source's 'Could not read' row named. CM-01 models the FairWins guard answering not-allowed and asserts the alert names that guard. The positive path against the live Chainalysis oracle and the Circle/Tether freeze lists was verified by hand (SC-009) and cannot run in CI without a real mainnet endpoint."
         }
       ]
     },

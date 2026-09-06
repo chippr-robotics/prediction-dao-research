@@ -28,8 +28,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 112 |
 | With a member-facing flow | 88 |
-| Member-facing flows | 201 |
-| 🟢 covered | 182 |
+| Member-facing flows | 202 |
+| 🟢 covered | 183 |
 | 🟡 partial | 6 |
 | 🔴 absent | 6 |
 | ⚪ out of scope | 7 |
@@ -587,7 +587,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-47 flows — 🟢 47 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
+48 flows — 🟢 48 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -660,6 +660,12 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `account.see-stats` | See your wager record and balances | 🟢 covered | smoke | `no-chain` | `13-dashboard.cy.js` (DSH-10, DSH-11, DSH-12) |  |
+
+### `021-address-book` — Address book
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `addressbook.estate-screening-pill` | Enter an address and see whether it is flagged on any list on any network — never a false green | 🟢 covered | settled | `no-chain` | `34-member-surfaces.cy.js` (MS-06); `31-identity-access.cy.js` (CM-01) |  |
 
 ### `023-oracle-graph-gating` — Oracle graph gating
 
