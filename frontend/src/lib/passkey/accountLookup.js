@@ -23,6 +23,20 @@ import { publicKeyToOwnerBytes, readControllers, computeAccountAddress } from '.
 /** Default bound on the whole resolution. Expiry yields `unverified`, never `none-found`. */
 export const RESOLUTION_DEADLINE_MS = 20_000
 
+/**
+ * How many creation nonces leg A enumerates (spec 104 T-103).
+ *
+ * The factory salts an account with `keccak(owners, nonce)`, so one key produces a DIFFERENT
+ * address at each nonce. Release 1 checked nonce 0 only, which finds an account only when the
+ * member's first creation attempt succeeded — a member whose first attempt reverted and who
+ * retried holds an account at nonce 1 that the resolver could not see, and was told `none-found`.
+ *
+ * 8 comes from research.md's leg-A costing (N × getCode, N ≈ 8). It is a bound on a SEARCH, not a
+ * limit on what may exist: a member with an account past it gets `none-found`, whose wording
+ * already sends them to the address path. Raising it costs one `getCode` per nonce.
+ */
+export const NONCE_SCAN_LIMIT = 8
+
 export const OUTCOMES = Object.freeze({
   RESOLVED: 'resolved',
   NONE_FOUND: 'none-found',
@@ -143,35 +157,80 @@ export async function verifyAccountForKey({ ownerBytes, address, chainId, deadli
 }
 
 /**
- * Search for accounts this key controls, then confirm each one.
+ * Search for accounts this key controls, then confirm every one it finds.
  *
- * Release 1 runs a single candidate: the address the key would own had it been the sole initial
- * owner at nonce 0. That candidate is a HINT and is confirmed like any other — which is the whole
- * change, because the old code treated it as an answer. An undeployed candidate is therefore
- * `none-found` (we looked and found nothing), not an account to sign into.
+ * **Leg A — nonce enumeration (T-103).** The candidates are the addresses this key would own had
+ * it been the sole initial owner at each creation nonce. They are HINTS: each is confirmed against
+ * its current owner set exactly as a member-typed address is, which is the whole point of the
+ * seam — the code this replaced treated a derived address as an answer and signed members into
+ * empty accounts.
  *
- * Release 2 adds nonce enumeration and an `AccountCreated` scan behind the same signature; a leg
- * that fails contributes nothing rather than failing the resolution, and the resolver never
- * reports `none-found` on the strength of legs it did not run.
+ * Leg B (the `AccountCreated` scan) is deliberately NOT here. Measured 2026-09-06, the endpoints
+ * `config/networks.js` ships cannot serve it: Polygon's public node retains ~1.4 days of logs and
+ * the others cap `getLogs` near 100 blocks and refuse historical ranges without a paid token. It
+ * needs an index — the subgraph — and lands with one (#1432). Until then this resolver runs one
+ * leg, and the aggregation below is written so that never becomes a claim it cannot support.
+ *
+ * Three rules govern the result, and each has a way to be quietly wrong:
+ *
+ * 1. **`none-found` requires that the legs actually RAN.** A chain that would not answer is not
+ *    evidence of absence. If any candidate came back `unverified`, the answer is `unverified`,
+ *    even though other candidates were read cleanly — a partial search that found nothing has not
+ *    found nothing, it has not finished.
+ * 2. **Every verified account is returned; the resolver picks none** (FR-007). Two accounts is a
+ *    question for the member, and choosing for them would silently strand value in the other.
+ * 3. **The deadline covers the whole search, not each candidate.** Candidates run concurrently
+ *    under one budget, so widening `NONCE_SCAN_LIMIT` cannot extend how long a member waits.
  *
  * @returns {object} a Resolution. Never throws for a chain condition — a thrown error here is a
  *   programming fault, not something a member did.
  */
-export async function resolveAccounts({ ownerBytes, chainId, deadlineMs = RESOLUTION_DEADLINE_MS, deps = {} }) {
-  const candidate =
-    deps.deriveCandidate?.({ ownerBytes, chainId }) ??
-    computeAccountAddress({ ownersBytes: [ownerBytes], chainId })
+export async function resolveAccounts({
+  ownerBytes,
+  chainId,
+  deadlineMs = RESOLUTION_DEADLINE_MS,
+  nonceLimit = NONCE_SCAN_LIMIT,
+  deps = {},
+}) {
+  const limit = Math.max(1, Math.floor(Number(nonceLimit)) || 1)
 
-  const verdict = await verifyAccountForKey({ ownerBytes, address: candidate, chainId, deadlineMs, deps })
-
-  if (verdict.outcome === OUTCOMES.NOT_CONTROLLER) {
-    // The chain was READ and this key does not control the address it would have created. That is
-    // an absence, not a refusal of something the member named: they never named this address, we
-    // computed it. Reporting `not-controller` here would show a member an address they have never
-    // seen and tell them they do not own it.
-    return noneFound(REASONS.nothingFound)
+  // Derived up front and OUTSIDE the try/catch below: a missing factory address is a build
+  // misconfiguration, not a chain condition, and must keep surfacing as the throw it always was
+  // rather than being laundered into `none-found` — which would tell every member on a
+  // misconfigured build that they have no account.
+  const candidates = []
+  for (let nonce = 0; nonce < limit; nonce += 1) {
+    const address =
+      deps.deriveCandidate?.({ ownerBytes, chainId, nonce }) ??
+      computeAccountAddress({ ownersBytes: [ownerBytes], nonce: BigInt(nonce), chainId })
+    if (address) candidates.push({ address, nonce })
   }
-  return verdict
+
+  const verdicts = await Promise.all(
+    candidates.map(({ address }) =>
+      verifyAccountForKey({ ownerBytes, address, chainId, deadlineMs, deps })
+    )
+  )
+
+  const verified = []
+  let incomplete = null
+
+  verdicts.forEach((verdict, i) => {
+    if (verdict.outcome === OUTCOMES.RESOLVED) {
+      // `origin` is carried for diagnosis only (data-model.md); it never shortens a check, and
+      // nothing downstream may trust an account more for having come from one leg or another.
+      verified.push(...verdict.accounts.map((a) => ({ ...a, origin: 'nonce', nonce: candidates[i].nonce })))
+    } else if (verdict.outcome === OUTCOMES.UNVERIFIED) {
+      incomplete = incomplete ?? verdict.reason
+    }
+    // `not-controller` is a READ absence at this nonce: the chain answered and the key is not
+    // there. It contributes nothing and is never surfaced — the member never named this address,
+    // we computed it, and showing them an address they have never seen to deny it is noise.
+  })
+
+  if (verified.length > 0) return resolved(verified)
+  if (incomplete) return unverified(incomplete)
+  return noneFound(REASONS.nothingFound)
 }
 
 /** Owner bytes for a recovered P-256 key, lowercased for comparison. */
