@@ -104,7 +104,11 @@ describe('Wrap across chains (spec 108)', () => {
     cy.get('[data-testid="wrap-coin-field"]', { timeout: 20000 }).should('exist')
     cy.contains('[role="radio"]', 'Unwrap').click()
     cy.get('#pt-wrap-amount').type('0.2')
-    cy.contains('button', /^Unwrap W/).click()
+    cy.get('#pt-wrap-amount').should('have.value', '0.2')
+    // The SUBMIT button, by its container — `cy.contains('button', /^Unwrap/)` would match
+    // the direction radio first ("Unwrap WMATIC → POL" precedes it in DOM order), and
+    // clicking that toggle clears the amount by design.
+    cy.get('.pt-actions .pt-btn-primary').click()
 
     cy.get('.pt-notice-success', { timeout: 60000 }).should('contain.text', 'Done')
     // 0.5 wrapped in WXC-01, 0.2 burned here: the chain says 0.3 remains.

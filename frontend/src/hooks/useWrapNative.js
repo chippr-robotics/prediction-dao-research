@@ -223,13 +223,27 @@ export function useWrapNative({ chainId: targetChainId } = {}) {
       throw new Error(refusal, { cause })
     }
     const deadline = Date.now() + SETTLE_TIMEOUT_MS
-    while (Number(latestRef.current.chainId) !== target || !latestRef.current.signer) {
+    for (;;) {
+      const { chainId: settledChain, signer: settledSigner } = latestRef.current
+      if (Number(settledChain) === target && settledSigner) {
+        // A truthy signer is not yet a SETTLED one: the context chainId updates from the
+        // connector's chainChanged event before WalletContext's async effect rebuilds the
+        // chain-scoped signer, so the snapshot can pair the new chain with the PRE-switch
+        // signer — bound to a provider whose (static) network is still the old chain, which
+        // ethers rejects with "network changed: A => B" only AFTER broadcasting. Only a
+        // signer whose own provider reports the target chain may send.
+        try {
+          const settledNet = await settledSigner.provider?.getNetwork?.()
+          if (Number(settledNet?.chainId) === target) return settledSigner
+        } catch {
+          // Provider mid-teardown or still bound to the old chain — keep waiting.
+        }
+      }
       if (Date.now() > deadline) {
         throw new Error(`The switch to ${chainName(target)} did not complete — nothing was sent.`)
       }
       await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS))
     }
-    return latestRef.current.signer
   }, [onTargetChain, signer, target, chainId, switchNetwork])
 
   /**

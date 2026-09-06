@@ -80,7 +80,10 @@ beforeEach(() => {
   wallet.current = {
     address: '0xAaAa000000000000000000000000000000000001',
     chainId: MORDOR,
-    signer: { sendTransaction },
+    // A real JsonRpcSigner carries the provider it was built on, and that provider knows
+    // which chain it serves — the spec-108 settle loop reads it to tell a settled signer
+    // from the pre-switch one.
+    signer: { sendTransaction, provider: { getNetwork: async () => ({ chainId: MORDOR }) } },
     provider: null,
     loginMethod: 'eoa',
     sendCalls,
@@ -351,11 +354,14 @@ describe('the target chain (spec 108) — the asset is the entry point', () => {
       .fn()
       .mockResolvedValue({ hash: '0xsettled', wait: async () => ({ hash: '0xsettled' }) })
     // The switch arrives as new context values on a LATER render, not as the switch
-    // promise's resolution — exactly what the settle loop exists to wait for. The mock only
-    // mutates the wallet snapshot; the rerender that delivers it happens below, outside the
-    // pending update, the way a real wallet event would.
+    // promise's resolution — exactly what the settle loop exists to wait for. And it arrives
+    // in TWO steps, the way a real wallet delivers it: the connector's chainChanged updates
+    // the context chainId FIRST, while the chain-scoped signer is still the pre-switch one
+    // (whose own provider still answers the OLD chain); the rebuilt signer lands on a later
+    // render. The loop must skip that stale pair — ethers only rejects a send through it
+    // AFTER broadcasting ("network changed: 63 => 137"), so waiting is the only safe answer.
     const switchNetwork = vi.fn().mockImplementation(async () => {
-      wallet.current = { ...wallet.current, chainId: POLYGON, signer: { sendTransaction: settledSend } }
+      wallet.current = { ...wallet.current, chainId: POLYGON } // stale signer still in place
     })
     wallet.current = { ...wallet.current, switchNetwork }
     const view = renderHook(() => useWrapNative({ chainId: POLYGON }))
@@ -367,7 +373,15 @@ describe('the target chain (spec 108) — the asset is the entry point', () => {
     let pending
     act(() => { pending = view.result.current.wrap('1') })
     await waitFor(() => expect(switchNetwork).toHaveBeenCalledWith(POLYGON))
-    view.rerender()
+    view.rerender() // delivers chainId=137 with the PRE-switch signer — must not send
+    wallet.current = {
+      ...wallet.current,
+      signer: {
+        sendTransaction: settledSend,
+        provider: { getNetwork: async () => ({ chainId: POLYGON }) },
+      },
+    }
+    view.rerender() // the rebuilt, target-bound signer lands
     let res
     await act(async () => { res = await pending })
     expect(res.txHash).toBe('0xsettled')

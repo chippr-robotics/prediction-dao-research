@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ethers } from 'ethers'
 import SensitiveValue from '../common/SensitiveValue'
 import UniversalAssetSelect from '../ui/UniversalAssetSelect'
@@ -62,8 +62,14 @@ export default function WrapView() {
   } = wrapper
 
   // A MAX (or any amount) quoted against one chain's balance and reserve is never carried to
-  // another — changing the coin clears the form exactly as changing direction does.
+  // another — changing the coin clears the form exactly as changing direction does. Only a
+  // CHANGE clears: the picker's options load asynchronously, so the default key resolving
+  // (null → first coin) is not a member action and must not wipe an amount already typed.
+  const prevKeyRef = useRef(null)
   useEffect(() => {
+    const prev = prevKeyRef.current
+    prevKeyRef.current = activeKey
+    if (prev == null || prev === activeKey) return
     setAmount('')
     setFormError(null)
     setReceipt(null)

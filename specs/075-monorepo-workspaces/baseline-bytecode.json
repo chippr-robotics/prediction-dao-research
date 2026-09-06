@@ -103,6 +103,7 @@
  "artifacts/contracts/mocks/MockUniswapSwap.sol/MockUniswapRates.json": "5effcadb2881d9fd365d43061f12026bb23a8401b225246a2346cc15e49db6a9",
  "artifacts/contracts/mocks/MockUniswapSwap.sol/MockUniswapSwapRouter.json": "6c5d21d2880d7aa87a13f6e79ed08fdafffbe2bc4348fc343292f067248221d9",
  "artifacts/contracts/mocks/MockUniswapV3Pool.sol/MockUniswapV3Pool.json": "7e8d9d71067c8fe301f312e58729a06fc7f557f837da2aac4c21e6ef213a0823",
+ "artifacts/contracts/mocks/MockWNative.sol/MockWNative.json": "56cfcfcd03afdd312462c030067b987a99d2009e4485dd81c431b0a485c87b57",
  "artifacts/contracts/mocks/ReentrantToken.sol/ReentrantToken.json": "9976fe4d171e7b9c981ee3ca46048df3e407a6f537974e516a2f5069cc25af54",
  "artifacts/contracts/mocks/TokenFactoryBadLayoutMock.sol/TokenFactoryBadLayoutMock.json": "d1f5aa237b4fcce1aae5ef826ac340087d4c16265e36b545710d34d76f421ac4",
  "artifacts/contracts/mocks/TokenFactoryUpgradeMock.sol/TokenFactoryUpgradeMock.json": "80e693cc5d67efc57910ddc7da349c14c49a10a57bf4abe86a27607b8c03fd15",
