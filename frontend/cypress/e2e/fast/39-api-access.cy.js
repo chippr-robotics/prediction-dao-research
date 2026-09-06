@@ -85,11 +85,22 @@ const WALLET_CHAIN_ID = 1337
 /** Gold, expiring in 2100 — a fixed timestamp, never `Date.now()` in a test body (anti-pattern 9). */
 const ACTIVE_MEMBERSHIP = encodeMembership({ tier: 3, expiresAt: 4102444800 })
 
-function stubMembership({ fail = false, membership = ACTIVE_MEMBERSHIP } = {}) {
+function stubMembership({ fail = false, membership = ACTIVE_MEMBERSHIP, alias = 'referenceChainRpc' } = {}) {
   cy.intercept({ method: 'POST', url: RPC_PATTERN }, (req) => {
     const one = (payload) => {
       const { method, params, id } = payload
-      if (fail) {
+      /*
+       * The fail arm answers chain IDENTITY and HEIGHT and refuses every STATE read. Refusing
+       * eth_blockNumber too burns the cached spec-069 FallbackProvider's one-time sync, and the
+       * provider then never dispatches another request — measured: after "Try again" with a
+       * fully-good stub in place, ZERO reference-chain requests were issued and the upgrade card
+       * could not render (the 2026-09-06 phase-2 timeout, present since this test's first run —
+       * masked whenever the un-stubbed drpc failover leaked a real answer). The scenario this
+       * test states is "the chain would not answer the membership READ", which this models
+       * exactly; a chain that cannot even report its height is a different outage, and one the
+       * card's retry currently cannot recover from without a reload.
+       */
+      if (fail && !['eth_chainId', 'net_version', 'eth_blockNumber'].includes(method)) {
         return { jsonrpc: '2.0', id, error: { code: -32000, message: 'reference chain unreachable' } }
       }
       let result
@@ -119,7 +130,7 @@ function stubMembership({ fail = false, membership = ACTIVE_MEMBERSHIP } = {}) {
       statusCode: 200,
       body: Array.isArray(req.body) ? req.body.map(one) : one(req.body || {}),
     })
-  }).as('referenceChainRpc')
+  }).as(alias)
 }
 
 /**
@@ -327,8 +338,13 @@ describe('API access (spec 095)', () => {
     // control rather than a second cy.visit: visiting the SAME URL is a no-op in Cypress (no
     // reload, no refetch), which left the phase-1 state on screen and failed this test's first CI
     // run. Clicking retry also proves the recovery affordance actually recovers.
-    stubMembership({ membership: encodeMembership({ tier: 0, expiresAt: 0 }) })
+    stubMembership({ membership: encodeMembership({ tier: 0, expiresAt: 0 }), alias: 'phase2Rpc' })
     cy.get('[data-testid="api-access-unreadable"]').contains('button', 'Try again').click()
+
+    // The retry must actually REACH the network (its own alias — a shared one hands back stale
+    // phase-1 interceptions): a recovery that never issues a read would otherwise burn the full
+    // 40s card timeout and report the failure at the wrong layer.
+    cy.wait('@phase2Rpc', { timeout: 20000 })
 
     cy.get('[data-testid="api-access-upgrade"]', { timeout: 40000 })
       .should('be.visible')
