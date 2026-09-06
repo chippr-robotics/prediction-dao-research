@@ -3225,7 +3225,7 @@
             "frontend/cypress/e2e/full/44-vault-rules-lanes.cy.js::RL-02"
           ],
           "issue": "#1491",
-          "missing": "the replay deployment itself and FR-019 already-live need a SECOND custody network, which the one-chain full tier cannot host — staged manual protocol (docs/runbooks/multichain-vault-staging-validation.md, #1491). The record gate is chain-proven: the record holder is OFFERED Deploy for the missing cohort network (RL-01) and the no-record co-owner gets the honest FR-018 reason (RL-02); gating, disclosure and orchestrator handoff stay Vitest/component-proven (VaultDetailsView.test.jsx)."
+          "missing": "the replay deployment itself and FR-019 already-live need a SECOND custody network, which the one-chain full tier cannot host \u2014 staged manual protocol (docs/runbooks/multichain-vault-staging-validation.md, #1491). The record gate is chain-proven: the record holder is OFFERED Deploy for the missing cohort network (RL-01) and the no-record co-owner gets the honest FR-018 reason (RL-02); gating, disclosure and orchestrator handoff stay Vitest/component-proven (VaultDetailsView.test.jsx)."
         },
         {
           "id": "custody.vault-details-one-card",
@@ -3265,6 +3265,37 @@
       "memberFacing": false,
       "reason": "Runtime-issued read-only RPC credentials. Dormant end to end until an issuance endpoint is configured (#1438 runbook); every client failure mode falls back to the public default the app uses today, so there is no member-distinguishable flow yet. Covered by gateway vitest (test/access.test.js) and frontend vitest (src/test/network/issuedAccess.test.js); a member-facing degradation-disclosure flow gets a row when the disclosure surface ships.",
       "flows": []
+    },
+    {
+      "id": "108-multi-currency-wrap",
+      "title": "Multi-currency wrap/unwrap \u2014 the asset is the entry point",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "trade.wrap-multi-currency-picker",
+          "name": "The Wrap view offers every cohort chain's base coin the member holds from one trading-view-style picker (icon, symbol, network, balance), with unreadable balances shown as unread (never zero) and unconfigured wrappers honestly absent",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "no-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1439",
+          "note": "Reserved with the spec; rows fill in when the surface ships. The existing single-chain wrap view rows stay on spec 082, which owns the Trade view switch."
+        },
+        {
+          "id": "trade.wrap-cross-chain-submit",
+          "name": "Selecting a coin whose chain differs from the wallet's switches the wallet at submit time (settle loop), wraps against that chain's own wrapped-native contract, and a refused switch names both chains and sends nothing",
+          "status": "absent",
+          "tier": "none",
+          "proposedTier": "on-chain",
+          "depth": "none",
+          "risk": "custody",
+          "tests": [],
+          "issue": "#1439",
+          "note": "The member signs something that costs money (the wrap sends coin plus fee), so the e2e policy's money-path rule puts execution coverage in the on-chain tier."
+        }
+      ]
     }
   ]
 }
