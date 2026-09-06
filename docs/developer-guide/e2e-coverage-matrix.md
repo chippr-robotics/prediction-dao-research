@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-82 flows — 🟢 67 · 🟡 6 · 🔴 2 · ⚪ 7 · covered-but-not-proven 0
+84 flows — 🟢 67 · 🟡 6 · 🔴 4 · ⚪ 7 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -328,6 +328,13 @@ establish the outcome. They are listed in full at the end of this document.
 | `custody.deploy-later` | From Details, a vault with a creation record deploys to a cohort network it is not on yet at the SAME address; a drifted owner set is disclosed as the original arrangement first; a vault without a record gets the honest reason, never a dead control | 🟡 partial | flow | `on-chain` | `44-vault-rules-lanes.cy.js` (RL-01, RL-02) | the replay deployment itself and FR-019 already-live need a SECOND custody network, which the one-chain full tier cannot host — staged manual protocol (docs/runbooks/multichain-vault-staging-validation.md, #1453). The record gate is chain-proven: the record holder is OFFERED Deploy for the missing cohort network (RL-01) and the no-record co-owner gets the honest FR-018 reason (RL-02); gating, disclosure and orchestrator handoff stay Vitest/component-proven (VaultDetailsView.test.jsx). |
 | `custody.vault-details-one-card` | Details renders ONE card — compact network status rows, shared facts stated once with drift naming the differing network and coverage naming the unread one — never a repeated per-network card or an up-front switch gate | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-06, VS-12) |  |
 | `custody.queue-readability` | Queue chips (All / Needs you / per-network) filter the rows without touching the four-state per-chain read disclosure; recognised proposals read in plain language and unknown calldata keeps the honest raw row | 🟢 covered | flow | `no-chain` | `42-protect-vault-sheet.cy.js` (VS-11) |  |
+
+### `108-multi-currency-wrap` — Multi-currency wrap/unwrap — the asset is the entry point
+
+| Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
+|---|---|---|---|---|---|---|
+| `trade.wrap-multi-currency-picker` | The Wrap view offers every cohort chain's base coin the member holds from one trading-view-style picker (icon, symbol, network, balance), with unreadable balances shown as unread (never zero) and unconfigured wrappers honestly absent | 🔴 absent | none | — (proposed: no-chain) | #1439 |  |
+| `trade.wrap-cross-chain-submit` | Selecting a coin whose chain differs from the wallet's switches the wallet at submit time (settle loop), wraps against that chain's own wrapped-native contract, and a refused switch names both chains and sends nothing | 🔴 absent | none | — (proposed: on-chain) | #1439 |  |
 
 ## Disclosure — a member consents to a cost
 

@@ -3278,7 +3278,7 @@
           "tier": "none",
           "proposedTier": "no-chain",
           "depth": "none",
-          "risk": "money",
+          "risk": "custody",
           "tests": [],
           "issue": "#1439",
           "note": "Reserved with the spec; rows fill in when the surface ships. The existing single-chain wrap view rows stay on spec 082, which owns the Trade view switch."
@@ -3290,7 +3290,7 @@
           "tier": "none",
           "proposedTier": "on-chain",
           "depth": "none",
-          "risk": "money",
+          "risk": "custody",
           "tests": [],
           "issue": "#1439",
           "note": "The member signs something that costs money (the wrap sends coin plus fee), so the e2e policy's money-path rule puts execution coverage in the on-chain tier."
