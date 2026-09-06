@@ -16,6 +16,12 @@ bodies, any assistant prompt injection of news. Prior art: the merged estate eva
 
 ## User Scenarios & Testing *(mandatory)*
 
+> Story priorities below (P1–P3) rank the user stories **within this feature** — P1 is the story
+> that must ship for the feature to be a viable MVP. They do not re-triage issue #1465's product
+> priority, which remains as its issue fields state (Priority: Medium; the issue body's
+> "P3 — nice to have"): this whole feature is nice-to-have relative to the platform, and its P1
+> story is simply its most essential slice.
+
 ### User Story 1 - News for a selected portfolio token (Priority: P1)
 
 A member holding an asset opens it in their portfolio and sees a short feed of that asset's most
@@ -200,9 +206,11 @@ reports it is unavailable.
 - **SC-004**: The assistant answers an asset-news question with at least one attributed item when
   coverage exists, and states non-coverage or unreadability otherwise, in 100% of scripted
   evaluation prompts; it never volunteers news in conversations where none was requested.
-- **SC-005**: Vendor request volume for a given asset is bounded by the platform's coalescing
-  window regardless of how many members view that asset concurrently (verifiable in a load drill:
-  N members, one asset, upstream requests ≤ the window's ceiling).
+- **SC-005**: Upstream (vendor) requests for a given asset number at most one per refresh
+  interval — the platform's configurable cache window, floor 5 minutes — regardless of how many
+  members view that asset concurrently (verifiable in a load drill: N concurrent viewers of one
+  asset within one interval produce exactly 1 upstream request; the bound holds for any
+  configured interval ≥ the floor).
 - **SC-006**: Disabling the capability removes every news affordance from the product with no
   other member-visible change.
 
