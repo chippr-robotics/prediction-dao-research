@@ -50,8 +50,16 @@ const API_ACCESS_URL = '/wallet?tab=settings#api-access'
 /** Wallet-scoped metadata store — `lib/apiAccess/apiKeys.js` + `utils/userStorage.js`. */
 const KEYS_STORAGE = `fw_user_${ACCOUNT.toLowerCase()}_api_access_keys`
 
-/** Every shipped read provider this build resolves runs through publicnode. */
-const RPC_PATTERN = /publicnode\.com/
+/*
+ * BOTH rungs of the reference chain's read provider. The primary is publicnode, but spec 069
+ * gives chain 137 a build-default FAILOVER on polygon.drpc.org — and a `fail: true` stub that
+ * matches only the primary makes the FallbackProvider do its job: the read fails over to the
+ * REAL drpc endpoint, the chain is genuinely readable, and API-05's "unreachable" premise is
+ * defeated whenever drpc happens to answer the runner (the ~coin-toss flake of 2026-09-06;
+ * the success arms never error, never fail over, and never flaked). The unreachable story is
+ * only true when EVERY rung is stubbed.
+ */
+const RPC_PATTERN = /publicnode\.com|drpc\.org/
 
 /*
  * ── The membership answer, encoded by hand ─────────────────────────────────────────────────────
