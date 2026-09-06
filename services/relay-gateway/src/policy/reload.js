@@ -31,6 +31,7 @@
  * value. No connection is dropped, nothing restarts.
  */
 import fs from 'node:fs'
+import { describeIdentityMode } from '../identity/mode.js'
 
 /**
  * Reloadable keys, each with exactly where it lands. Adding one here is a deliberate act — the
@@ -149,6 +150,11 @@ export function createReloadHandler(config, killSwitch, { readFile = fs.readFile
         ? `[relay-gateway] SIGHUP reload applied: ${changed.join(', ')}` // names only, never values
         : '[relay-gateway] SIGHUP reload: no allowlisted setting differed — nothing changed.'
     )
+    // The resulting MODE, by value — deliberately, and not a breach of the names-only rule above.
+    // That rule exists so a secret cannot reach the log; this is a derived operating state that
+    // FR-015 requires be legible, and since #1505 made `enforcing` operator-only on /status, an
+    // operator who has just changed it has no other way to confirm what they changed it TO.
+    log(`[relay-gateway] ${describeIdentityMode(config)}`)
     return { reloaded: true, changed }
   }
 }

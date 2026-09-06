@@ -412,6 +412,12 @@ export function loadConfig(env = process.env, opts = {}) {
     chains,
     port: int(env, 'PORT', 8788),
     originAuthSecret: opt(env, 'ORIGIN_AUTH_SECRET', null),
+    // Operator-only disclosure secret (#1505). The origin lock CANNOT serve this purpose: the
+    // zone-wide Transform Rule injects X-Origin-Auth on EVERY request, so "behind the edge gate"
+    // means "not readable on the raw origin IP" and public to everyone else. This is a separate
+    // INBOUND, operator-held secret. Unset means the fields it guards are absent for everyone —
+    // honest, and never a silent fallback to public.
+    opsStatusSecret: opt(env, 'OPS_STATUS_SECRET', null),
     webhookSecret: opt(env, 'WEBHOOK_SHARED_SECRET', null),
     // Browser origins allowed to call the gateway cross-origin (CORS). The SPA lives on a different
     // host than the relay subdomain (fairwins.app -> relay.fairwins.app), so it needs an explicit
