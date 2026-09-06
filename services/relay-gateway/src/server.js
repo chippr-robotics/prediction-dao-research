@@ -31,6 +31,7 @@ import { createSanctionsScreen } from './policy/sanctions.js'
 import { createDedupStore } from './policy/dedup.js'
 import { createQuotas, createSpendTracker, createTokenBudget } from './policy/quotas.js'
 import { createIdentityMiddleware } from './identity/middleware.js'
+import { describeIdentityMode } from './identity/mode.js'
 import { createAttestationVerifier } from './identity/verifiers/attestation.js'
 import { createChallengeVerifier } from './identity/verifiers/challenge.js'
 import { createGrantVerifier } from './identity/verifiers/grant.js'
@@ -450,6 +451,24 @@ export function createApp(config, deps = {}) {
     return !!header && timingSafeEqual(header, config.originAuthSecret)
   }
   /**
+   * Operator-only disclosure (#1505).
+   *
+   * `edgeAuthorized` above is NOT an authorization check and must never be mistaken for one: the
+   * zone-wide Cloudflare Transform Rule injects `X-Origin-Auth` on every request, which is spec
+   * 106's own founding premise. It proves the request did not arrive on the raw origin IP, and
+   * nothing else. Measured in production on 2026-09-06: the identity blocks were readable by
+   * anyone curling the public hostname.
+   *
+   * This is a SEPARATE inbound secret held by operators. Unset ⇒ false, so the guarded field is
+   * absent for everyone rather than falling back to public — the failure direction matters, and
+   * "nobody sees it" is recoverable where "everybody sees it" is not.
+   */
+  const operatorAuthorized = (req) => {
+    if (!config.opsStatusSecret) return false
+    const header = req.get('x-fairwins-ops')
+    return !!header && timingSafeEqual(header, config.opsStatusSecret)
+  }
+  /**
    * Build identity (spec 076, FR-030/FR-031).
    *
    * Deliberately OUTSIDE the `disclose` gate below: an operator matching a member's bug report to a
@@ -519,14 +538,24 @@ export function createApp(config, deps = {}) {
     //   - attestation reports "not-built" — not `false`, not "disabled", which would imply a
     //     switch exists that could turn it on.
     //   - upstream labels come from the bounded table (FR-036), never from request content.
+    const operatorDisclose = operatorAuthorized(req)
     const identityGated = disclose
       ? {
           callerIdentity: {
             enabled: config.identity?.enabled === true && config.identity?.killswitch !== true,
-            enforcing:
-              config.identity?.enabled === true &&
-              config.identity?.killswitch !== true &&
-              config.identity?.enforce === true,
+            // `enforcing` is OPERATOR-ONLY (#1505). It is the single most useful fact an abuser can
+            // learn about this gateway — observe mode says the door is open — and the edge gate it
+            // used to sit behind admits everyone. It is still reported unconditionally at BOOT and
+            // on every SIGHUP reload, which is where FR-015's "disabled must be legible" is now
+            // satisfied. Absent here means "you are not an operator", never "not enforcing".
+            ...(operatorDisclose
+              ? {
+                  enforcing:
+                    config.identity?.enabled === true &&
+                    config.identity?.killswitch !== true &&
+                    config.identity?.enforce === true,
+                }
+              : {}),
             verifiers: Object.fromEntries(
               identityVerifiers.map((v) => [v.kind, v.state ?? 'configured'])
             ),
@@ -1206,5 +1235,11 @@ if (isMain) {
       `[relay-gateway] listening on :${config.port} | chains=${config.enabledChainIds.join(',')} | ` +
         `killSwitch=${killSwitch.isActive()} | originLock=${Boolean(config.originAuthSecret)}`
     )
+    // FR-015's other half, and until #1505 it existed only in prose: the API contract and the
+    // config both said the identity state is disclosed "loudly at boot", and nothing printed it.
+    // That mattered little while `enforcing` was in the (widely readable) gated /status; now that
+    // it is operator-only, this line is the disclosure that is always available — to anyone who
+    // can read the journal, which is the audience FR-015 was written for.
+    console.log(`[relay-gateway] ${describeIdentityMode(config)}`)
   })
 }

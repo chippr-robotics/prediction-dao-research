@@ -81,19 +81,33 @@ sys.exit(0 if c and c.get('rpc')=='up' else 1)" 2>/dev/null; then
       # Gas-wallet runway — the numeric check no string matcher can do. If the relay gas wallet runs
       # dry, gasless relaying stops platform-wide and members silently fall back to paying their own
       # gas. Threshold is generous because topping up is a manual, human-latency operation.
+      # ABSENT IS NOT HEALTHY. This check previously read `if r is not None and r < 48`, so a
+      # response with no runway fields at all appended nothing, exited 0 and reported `ok runway`.
+      # The runway numbers live in the DISCLOSED view, so the way they go missing is the probe's own
+      # X-Origin-Auth failing — i.e. exactly when the operator has least reason to trust silence.
+      # A missing number is now its own failure, distinct from a number below the threshold.
       printf '%s' "$status" | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
+chains=(d.get('chains') or {})
 bad=[]
-for cid,c in (d.get('chains') or {}).items():
-    r=c.get('gasWalletRunwayHrs')
-    if r is not None and r < 48: bad.append(f'{cid}:{r}h')
+if not chains:
+    bad.append('no-chains-in-status')
+for cid,c in chains.items():
+    # key absent  => the disclosed view did not arrive (credential/gating problem)
+    # key present, value null => genuinely unknown for this chain (e.g. no paymaster there)
+    if 'gasWalletRunwayHrs' not in c:
+        bad.append(f'{cid}:runway-not-disclosed')
+    else:
+        r=c.get('gasWalletRunwayHrs')
+        if r is None: bad.append(f'{cid}:runway-unreadable')
+        elif r < 48: bad.append(f'{cid}:{r}h')
     p=c.get('paymasterDepositRunwayHrs')
     if p is not None and p < 48: bad.append(f'{cid}-paymaster:{p}h')
 print(' '.join(bad))
 sys.exit(1 if bad else 0)" >/tmp/.probe_runway 2>/dev/null \
         && ok runway \
-        || bad "runway below 48h: $(cat /tmp/.probe_runway 2>/dev/null)"
+        || bad "runway check failed: $(cat /tmp/.probe_runway 2>/dev/null)"
     fi
 
     # The engine is the piece whose death is invisible from the public surface: the gateway keeps
