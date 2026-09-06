@@ -14,6 +14,136 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.17.0 — 2026-09-06
+
+Promoted from: v1.17.0-rc.24
+Previous release: v1.16.1 · Range: `v1.16.1..v1.17.0` (117 commits)
+
+### 🚀 Features
+
+- feat(107): the wagmi rail rides issued access, and degradation gets its sentence
+- feat(107): deliver the issuance credentials, adopt the key, arm observe mode
+- feat(105): usage gets a kind, the catalogue gets the gateway, and a gate catches its author
+- feat(105): say what is enforcing, fail what would publish, write it down
+- feat(105): SIGHUP reloads the operational switches; SIGUSR2 keeps its meaning
+- feat(105): proof of human — a challenge buys throughput, never entry
+- feat(106): the client half — issued access, held in memory, injected per request
+- feat(106): the issuance route, dormant until an endpoint exists
+- feat(ci): close issues on staging merge, and skip the E2E tiers for inert changes
+- feat(process): coordinated multi-agent development flow (#1460)
+- feat(105): bound each upstream before the call, not after
+- feat(105): enforce route minimums, behind a second switch
+- feat(105): prove control of an account without demanding a purchase
+- feat(105): resolve who is calling, and deliberately enforce nothing yet
+- feat(105): queue readability, load-sheet polish, retired wizard, suites migrated
+- feat(105): details is one card — network rows, shared facts with named drift, inline deploy-later
+- feat(105): four-sheet guided creation flow + deployment orchestrator hook
+- feat(105): creation records, semantic rules realization, deployment core, proposal decode
+- feat(assistant): Assistant tab in Tools, provider chooser, GutterToken key surfaces (spec 104 WP-C)
+- feat(assistant): provider seam, GutterToken client, key store and client-side tool loop (spec 104 WP-B)
+- feat(assistant): gateway tool loop, MCP snapshot parity, legal/FinOps/tenant/docs (spec 104 WP-A/WP-D)
+- feat(assistant-contract): prompt, tool table and honest result helpers
+- feat(assistant): scaffold spec 104 — assistant-contract workspace package + spec artifacts
+- feat(104): look a passkey's account up, never derive one and hope
+- feat(passkey): name a saved passkey after the account it signs for (#1425)
+
+### 🐛 Bug Fixes
+
+- fix(e2e): the multi-network coverage rows cite an OPEN tracker again
+- fix(rpc): a FallbackProvider that lost both rails once was dead until reload
+- fix(ci): drop codeql.yml's base-branch filter on pull_request
+- fix(e2e): stub BOTH rpc rails — the drpc failover was answering for a 'failed' chain
+- fix(ci): declare CodeQL's languages instead of letting it infer Swift
+- fix(ansible): converge the legacy Docker repo entry away instead of colliding with it
+- fix(ansible): the per-node playbooks could not see group_vars
+- fix(ci): close-linked-issues used a gh flag that does not exist
+- fix(membership): bound the membership read so "unreadable" is reachable
+- fix(custody): address every propose-mode install call — the hub emit leaked its sendCalls shape
+- fix(107): unused param the full-suite lint caught and scoped runs cannot
+- fix(106): the new spec-registry gate is right, and this branch yields the number
+- fix(ci): a closing keyword only counts at the start of a line
+- fix(docs): a staging merge does not close an issue — closing is deliberate
+- fix(specs): record the 104 collision the gate caught on its first CI run
+- fix(106): the lockout was never real; the capacity ceiling is
+- fix(105): quotas metered nothing, because callers chose their own key
+- fix(pinata): the pin proxy was a wildcard into Pinata with ACAO:*
+- fix(spa-image): copy @fairwins/assistant-contract into both build stages
+- fix(assistant-tests): compare parsed URL origin, not a substring prefix
+- fix(relay-gateway): reword a describe title the dependency scanner misreads
+- fix(relay-gateway): copy @fairwins/assistant-contract into both image stages
+- fix(e2e): drop the mainnet RPC stub — it broke the verify tests it never needed to touch
+- fix(custody): choose the write rail by the signer, and stop the tick waiting on mainnet
+- fix(104): offer a not-yet-deployed account instead of refusing it
+- fix(104): make the recovery spec run, and stop two honesty bugs it exposed
+- fix(release): sync the native shells into the release record (#1424)
+
+### ⚡ Performance
+
+- perf(1459): one multicall per chain, not one request per asset
+
+### ♻️ Refactoring
+
+- refactor(process): drop the status mirror; derive state from the repo (#1460)
+
+### 📚 Documentation
+
+- docs(membership): say what the sub-ceiling guarantees, not an ordering
+- docs(custody): multi-network staging protocol, round-2 screenshot record, and a readable drift disclosure
+- docs: the Projects v2 API is real, and GitHub's built-in workflows already move the board
+- docs(labels): correct the stale labels-sync header (Copilot review)
+- docs(106): the fan-out is the problem, not the plan
+- docs(105): matrix rows + regenerated coverage doc, developer guide, guardrail, screenshots
+- docs(105): T026-T028 done — quota re-keying landed
+- docs(105): track the remaining slices as issues
+- spec(105): research says three of my own assumptions were wrong
+- spec(105): guided multichain vault creation — one vault, chosen networks
+- docs(assistant): actor-critic screenshot record and spec-104 task closure (WP-F)
+- docs(research): answer the GutterToken wallet sign-in question from the live signup flow
+- docs(research): add Part II — the MCP server and a client-side tool loop
+- docs(research): evaluate GutterToken as a member-paid assistant rail
+- spec(105): keyed read capacity is issued at runtime, not compiled in
+- spec(104): add the coverage matrix row for the new spec directory
+- spec(105): authenticate the caller, not the network path
+- spec(104): passkey account recovery — find the account, never guess it
+
+### 🧪 Tests
+
+- test(api-access): port #1484's API-05 fix so this PR can reach green
+- test(membership): assert the ceiling's magnitude, not just its existence
+- test(custody): give loadVault the same 60s card deadline the create flow already has
+- test(custody): count the direct install's two Safe transactions in RL-01's nonce arithmetic
+- test(custody): chain-judged rules-lane legs and the passkey one-batch create (spec 105)
+- test(105): e2e migrated to the guided flow, new create-flow spec, queue/details cases
+- test(e2e): spec-104 coverage rows and the two-rail assistant flows (WP-E)
+
+### 🏗️ Infrastructure
+
+- build(gateway): run the spec-106/107 gateway and finops images
+
+### 🧹 Maintenance
+
+- chore(assistant-contract): drop the hand-written version field
+- chore(deps): bump @scure/bip39 from 2.3.0 to 2.4.0
+
+### Artifacts
+
+Range: `v1.16.1..v1.17.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
+### Native channel artifacts (v1.17.0)
+
+| Channel | Artifact | SHA-256 | Signed |
+|---|---|---|---|
+| android | `FairWins-v1.17.0.aab` | `4c7519f3e05d3a8051805914a1f87e39a4f36964435cdc3ee564dbff25a9d752` | no — operator signing ceremony (see docs/runbooks/native-release-operations.md) |
+| ios | `FairWins-v1.17.0-ios.xcarchive.zip` | `61dd65c52114185f7bb80daab87f947a795da6f23c04836dfd53c04ef2789219` | no — operator signing ceremony (see docs/runbooks/native-release-operations.md) |
+
 ## v1.16.1 — 2026-09-04
 
 Promoted from: none — released directly from main
