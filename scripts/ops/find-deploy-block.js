@@ -138,6 +138,18 @@ async function firstEventBlock({ base, address, topic0 }) {
 }
 
 /**
+ * Contract names come from `--contract` and are used as a JSON key and a search token. Only
+ * identifier characters are accepted, and anything else is REFUSED rather than escaped: this
+ * value decides which key gets rewritten in a record of on-chain authority, and a refusal is
+ * legible where a silently-escaped oddity is not.
+ */
+function assertSafeContractName(contract) {
+  if (!/^[A-Za-z0-9_]+$/.test(String(contract))) {
+    throw new Error(`unsafe contract name: ${contract}`)
+  }
+}
+
+/**
  * Insert `deployBlocks.<contract>` by editing the file's TEXT, not by re-serialising it.
  *
  * A `JSON.parse` → `JSON.stringify` round-trip rewrites bytes it was never asked to touch: it
@@ -147,17 +159,28 @@ async function firstEventBlock({ base, address, topic0 }) {
  * file that should carry incidental churn, because the next reader cannot tell it was incidental.
  */
 function writeDeployBlock(file, contract, block) {
+  assertSafeContractName(contract)
   const text = fs.readFileSync(file, 'utf8')
   const entry = `"${contract}": ${block}`
 
   const existing = text.match(/(\n(\s*)"deployBlocks":\s*\{)([\s\S]*?)(\n\s*\})/)
   if (existing) {
     const [full, open, indent, body, close] = existing
-    if (new RegExp(`"${contract}"\\s*:`).test(body)) {
-      // Already present: replace just the number, leaving every other byte alone.
-      const replaced = body.replace(new RegExp(`("${contract}"\\s*:\\s*)\\d+`), `$1${block}`)
-      fs.writeFileSync(file, text.replace(full, open + replaced + close))
-      return
+    // Located by string search and a STATIC regex on the remainder — never by a pattern built
+    // from `contract`. Interpolating an argument into a RegExp is regex injection (CodeQL flagged
+    // exactly this), and escaping it would leave a sanitiser that has to stay correct forever;
+    // not building the pattern at all leaves nothing to get wrong.
+    const keyAt = body.indexOf(`"${contract}"`)
+    if (keyAt !== -1) {
+      const tail = body.slice(keyAt + contract.length + 2)
+      const value = tail.match(/^(\s*:\s*)(\d+)/)
+      if (value) {
+        // Replace just the digits, leaving every other byte alone.
+        const start = keyAt + contract.length + 2 + value[1].length
+        const replaced = body.slice(0, start) + block + body.slice(start + value[2].length)
+        fs.writeFileSync(file, text.replace(full, open + replaced + close))
+        return
+      }
     }
     const sep = body.trim() === '' ? '' : ','
     fs.writeFileSync(file, text.replace(full, `${open}${body}${sep}\n${indent}  ${entry}${close}`))
@@ -183,6 +206,11 @@ async function main() {
   const topic0 = arg('topic0')
   const write = args.includes('--write')
 
+  // An operator typo should read as a usage error, not a stack trace.
+  if (contract && !/^[A-Za-z0-9_]+$/.test(contract)) {
+    console.error(`--contract must be an identifier (letters, digits, underscore); got: ${contract}`)
+    process.exit(2)
+  }
   if (!contract) {
     console.error('usage: find-deploy-block.js --contract <name> [--chain <id>] [--topic0 <hash>] [--write]')
     process.exit(2)
