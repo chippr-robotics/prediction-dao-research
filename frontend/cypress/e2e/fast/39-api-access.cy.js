@@ -309,6 +309,16 @@ describe('API access (spec 095)', () => {
     stubMembership({ fail: true })
     openApiAccess()
 
+    /*
+     * `fail: true` refuses EVERY call, `eth_chainId` included, so the provider cannot even finish
+     * network detection — a deliberately hostile chain, and the arm is written that way on purpose.
+     * Reaching the unreadable state from there is `useRoleDetails`' own doing: the read is bounded
+     * by `MEMBERSHIP_READ_TIMEOUT_MS` and expires to `readable: false`. Before that bound existed
+     * this assertion was a race against ethers' retry backoff, which is why it was ~40% red on
+     * `staging` (issue #1463). Do NOT "fix" a future flake here by narrowing the stub to leave
+     * `eth_chainId` answering: that would make the test agree with the app, and this arm exists to
+     * hold the app to a member-facing promise — a spinner is not an answer.
+     */
     cy.get('[data-testid="api-access-unreadable"]', { timeout: 40000 }).should('be.visible')
     cy.get('[data-testid="api-access-unreadable"]').contains('button', 'Try again').should('exist')
     cy.get('[data-testid="api-access-upgrade"]').should('not.exist')
