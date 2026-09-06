@@ -93,6 +93,8 @@ async function getJson(url, { timeoutMs = 45000, tries = 3 } = {}) {
  * produced `target`. Returns `{ block, timestamp, hash }` or null when no tx matches.
  */
 async function findCreate2Deploy({ base, deployer, target }) {
+  assertHex(deployer, 20, 'deployer address')
+  assertHex(target, 20, 'contract address')
   const wanted = target.toLowerCase()
   let page = 1
   // Blockscout pages at 10k; a deployer with more history than this pages through rather than
@@ -127,6 +129,8 @@ async function findCreate2Deploy({ base, deployer, target }) {
 
 /** Earliest block carrying `topic0` for `address`, via Blockscout's full-history getLogs. */
 async function firstEventBlock({ base, address, topic0 }) {
+  assertHex(address, 20, 'contract address')
+  assertHex(topic0, 32, 'topic0')
   const body = await getJson(
     `${base}/api?module=logs&action=getLogs&fromBlock=0&toBlock=latest&address=${address}&topic0=${topic0}`,
     { timeoutMs: 120000 }
@@ -146,6 +150,24 @@ async function firstEventBlock({ base, address, topic0 }) {
 function assertSafeContractName(contract) {
   if (!/^[A-Za-z0-9_]+$/.test(String(contract))) {
     throw new Error(`unsafe contract name: ${contract}`)
+  }
+}
+
+/**
+ * Shape-check a value before it is interpolated into a request URL.
+ *
+ * Two reasons, and the second is the one that bites. An `&` in either value would silently add a
+ * query parameter — the same injection family CodeQL caught in the regexes. And a merely
+ * MALFORMED address needs rejecting just as firmly: the enumeration below would find no matching
+ * transaction and report "no CREATE2 transaction produces <target>", which reads as a measured
+ * absence rather than as a typo. A confident wrong answer is the failure this whole tool exists
+ * to prevent, so a bad input has to stop rather than answer.
+ */
+function assertHex(value, bytes, what) {
+  // Length checked separately so the pattern stays STATIC — see the regex-injection note above.
+  const v = String(value)
+  if (!/^0x[0-9a-fA-F]*$/.test(v) || v.length !== 2 + bytes * 2) {
+    throw new Error(`${what} must be 0x followed by ${bytes * 2} hex characters; got: ${value}`)
   }
 }
 
