@@ -368,40 +368,38 @@ export function useWrapNative({ chainId: targetChainId } = {}) {
   const wrap = useCallback((amount) => execute(WRAP_DIRECTION.WRAP, amount), [execute])
   const unwrap = useCallback((amount) => execute(WRAP_DIRECTION.UNWRAP, amount), [execute])
 
-  return useMemo(
-    () => ({
-      token,
-      available: Boolean(token),
-      networkName: net?.name || '',
-      // The TARGET chain — where the wrap runs and where the receipt's explorer lives.
-      // Identical to the wallet's chain for callers that passed no target.
-      chainId: Number.isFinite(target) ? target : null,
-      // Stated-before-the-tap facts for the view (spec 108).
-      needsSwitch: !isPasskey && !isVault && !isLegacy && !isHardware && !onTargetChain,
-      writeRail,
-      nativeSymbol,
-      wrappedSymbol,
-      decimals,
-      nativeBalance,
-      wrappedBalance,
-      maxWrappable,
-      gasReserve,
-      sponsored,
-      isVault,
-      status,
-      error,
-      busy: status === 'signing' || status === 'submitting' || status === 'pending',
-      wrap,
-      unwrap,
-      refresh,
-      reset,
-    }),
-    [
-      token, net?.name, target, onTargetChain, isPasskey, isLegacy, isHardware, writeRail,
-      nativeSymbol, wrappedSymbol, decimals, nativeBalance, wrappedBalance,
-      maxWrappable, gasReserve, sponsored, isVault, status, error, wrap, unwrap, refresh, reset,
-    ],
-  )
+  // A plain object, like the other settle-loop hooks (useEarnSend, useActiveAccount): the
+  // spec-108 switch device reads `latestRef.current` inside the action callbacks, and wrapping
+  // the return in useMemo puts that (handler-only) read into a render-scoped call graph the
+  // react-hooks/refs rule rejects. No consumer depends on the object's identity — the view
+  // destructures — so nothing is lost.
+  return {
+    token,
+    available: Boolean(token),
+    networkName: net?.name || '',
+    // The TARGET chain — where the wrap runs and where the receipt's explorer lives.
+    // Identical to the wallet's chain for callers that passed no target.
+    chainId: Number.isFinite(target) ? target : null,
+    // Stated-before-the-tap facts for the view (spec 108).
+    needsSwitch: !isPasskey && !isVault && !isLegacy && !isHardware && !onTargetChain,
+    writeRail,
+    nativeSymbol,
+    wrappedSymbol,
+    decimals,
+    nativeBalance,
+    wrappedBalance,
+    maxWrappable,
+    gasReserve,
+    sponsored,
+    isVault,
+    status,
+    error,
+    busy: status === 'signing' || status === 'submitting' || status === 'pending',
+    wrap,
+    unwrap,
+    refresh,
+    reset,
+  }
 }
 
 export default useWrapNative
