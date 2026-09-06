@@ -28,6 +28,7 @@ vi.mock('../../../config/contracts', () => ({
 import {
   OUTCOMES,
   resolveAccounts,
+  NONCE_SCAN_LIMIT,
   verifyAccountForKey,
   isResolved,
   ownerBytesForPublicKey,
@@ -140,15 +141,98 @@ describe('verifyAccountForKey', () => {
 })
 
 describe('resolveAccounts', () => {
+  /**
+   * A chain that lists OWNER on exactly the addresses named, and answers "nothing deployed" for
+   * every other address it is asked about.
+   *
+   * Written as a lookup rather than an assertion inside the mock on purpose. Asserting
+   * `expect(address).toBe(expected)` in here reads strict and is not: leg A asks about several
+   * candidates, the throw from the non-matching ones lands in `verifyAccountForKey`'s own catch,
+   * and the test goes green having proved far less than it claims (spec 094's assertion-depth
+   * hazard, found when leg A landed).
+   */
+  const chainListing = (owned) =>
+    vi.fn(async ({ accountAddress }) =>
+      owned.includes(accountAddress)
+        ? { deployed: true, controllers: [{ index: 0n, ownerBytes: OWNER, kind: 'passkey' }] }
+        : { deployed: false, controllers: [] }
+    )
+
+  const at = (nonce) => computeAccountAddress({ ownersBytes: [OWNER], nonce: BigInt(nonce), chainId: CHAIN })
+
   it('resolves the derived account when the chain confirms the key owns it', async () => {
-    const expected = computeAccountAddress({ ownersBytes: [OWNER], chainId: CHAIN })
-    const readControllers = vi.fn(async ({ accountAddress }) => {
-      expect(accountAddress).toBe(expected)
-      return { deployed: true, controllers: [{ index: 0n, ownerBytes: OWNER, kind: 'passkey' }] }
-    })
+    const readControllers = chainListing([at(0)])
     const out = await resolveAccounts({ ownerBytes: OWNER, chainId: CHAIN, deps: { readControllers } })
     expect(out.outcome).toBe(OUTCOMES.RESOLVED)
-    expect(out.accounts[0].address).toBe(expected)
+    expect(out.accounts).toHaveLength(1)
+    expect(out.accounts[0].address).toBe(at(0))
+  })
+
+  it('finds an account created at a NON-ZERO nonce — the Release 1 blind spot (T-103)', async () => {
+    // A member whose first creation attempt reverted and who retried holds an account at nonce 1.
+    // Release 1 checked nonce 0 only and told them `none-found`, which is a search limit reported
+    // as a fact about their account.
+    const readControllers = chainListing([at(3)])
+    const out = await resolveAccounts({ ownerBytes: OWNER, chainId: CHAIN, deps: { readControllers } })
+    expect(out.outcome).toBe(OUTCOMES.RESOLVED)
+    expect(out.accounts).toHaveLength(1)
+    expect(out.accounts[0].address).toBe(at(3))
+    expect(out.accounts[0].nonce).toBe(3)
+  })
+
+  it('returns EVERY verified account and picks none of them (FR-007)', async () => {
+    const readControllers = chainListing([at(0), at(2)])
+    const out = await resolveAccounts({ ownerBytes: OWNER, chainId: CHAIN, deps: { readControllers } })
+    expect(out.outcome).toBe(OUTCOMES.RESOLVED)
+    expect(out.accounts.map((a) => a.address)).toEqual([at(0), at(2)])
+    // Choosing for the member would strand whatever is in the other account, silently.
+    expect(out).not.toHaveProperty('chosen')
+    expect(out).not.toHaveProperty('preferred')
+  })
+
+  it('carries the real owner index the chain reported, never a hardcoded 0 (spec 045 FR-009)', async () => {
+    const readControllers = vi.fn(async ({ accountAddress }) =>
+      accountAddress === at(0)
+        ? { deployed: true, controllers: [
+            { index: 0n, ownerBytes: OTHER_OWNER, kind: 'eoa' },
+            { index: 4n, ownerBytes: OWNER, kind: 'passkey' },
+          ] }
+        : { deployed: false, controllers: [] }
+    )
+    const out = await resolveAccounts({ ownerBytes: OWNER, chainId: CHAIN, deps: { readControllers } })
+    expect(out.accounts[0].ownerIndex).toBe(4)
+  })
+
+  it('a search that could not finish is unverified, even when the candidates it DID read were absent', async () => {
+    // The rule leg A is most likely to break: seven clean absences plus one unreadable candidate
+    // is not an absence. Reporting `none-found` here would tell a member with a perfectly good
+    // account that they have none, on the strength of one RPC that did not answer.
+    let call = 0
+    const readControllers = vi.fn(async () => {
+      call += 1
+      if (call === 2) throw new Error('ECONNRESET')
+      return { deployed: false, controllers: [] }
+    })
+    const out = await resolveAccounts({ ownerBytes: OWNER, chainId: CHAIN, deps: { readControllers } })
+    expect(out.outcome).toBe(OUTCOMES.UNVERIFIED)
+    expect(out.outcome).not.toBe(OUTCOMES.NONE_FOUND)
+  })
+
+  it('checks every nonce in the range, and the range is the documented one', async () => {
+    const readControllers = chainListing([])
+    await resolveAccounts({ ownerBytes: OWNER, chainId: CHAIN, deps: { readControllers } })
+    expect(readControllers).toHaveBeenCalledTimes(NONCE_SCAN_LIMIT)
+    const asked = readControllers.mock.calls.map((c) => c[0].accountAddress)
+    // Distinct addresses: a salt that ignored the nonce would collapse the search to one candidate
+    // while every count above still passed.
+    expect(new Set(asked).size).toBe(NONCE_SCAN_LIMIT)
+    expect(asked[0]).toBe(at(0))
+  })
+
+  it('honours a narrowed nonce range', async () => {
+    const readControllers = chainListing([])
+    await resolveAccounts({ ownerBytes: OWNER, chainId: CHAIN, nonceLimit: 3, deps: { readControllers } })
+    expect(readControllers).toHaveBeenCalledTimes(3)
   })
 
   it('an UNDEPLOYED derived address is none-found — the address never leaves the resolver', async () => {
