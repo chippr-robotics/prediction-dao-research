@@ -166,6 +166,14 @@ jobs:
       - name: Check the E2E bypass is still safe
         run: npm run check:ci-gating
 
+      # A VITE_ build arg a Cloud Build file sets but the Dockerfile never declares is DROPPED by
+      # docker with only a warning — green pipeline, built image, absent feature. Its first run
+      # found VITE_STAGING_BANNER in exactly that state, so the marker saying staging sends REAL
+      # mainnet transactions had never rendered. Same job because it is the same shape: no npm ci,
+      # dependency-free, its own must-fail fixtures.
+      - name: Check every build arg reaches the build
+        run: npm run check:build-args
+
       # The parser that decides which issues a `staging` merge closes. Same job because it is the
       # same shape of thing: dependency-free, must-refuse fixtures, no npm ci.
       - name: Test the closing-keyword parser
