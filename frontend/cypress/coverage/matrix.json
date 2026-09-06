@@ -3184,8 +3184,8 @@
           "tests": [
             "frontend/cypress/e2e/full/29-protect-custody.cy.js::CV-01"
           ],
-          "issue": "#1494",
-          "missing": "deployment to a SECOND network in the same run (identical address, wallet switch mid-orchestration, per-network failure isolation) \u2014 the on-chain tier runs one private chain per leg, so the multi-network half is the staged manual protocol in docs/runbooks/multichain-vault-staging-validation.md (#1453); the state machine and CREATE2 identity across chainIds are Vitest-proven"
+          "issue": "#1491",
+          "missing": "deployment to a SECOND network in the same run (identical address, wallet switch mid-orchestration, per-network failure isolation) \u2014 the on-chain tier runs one private chain per leg, so the multi-network half is the staged manual protocol in docs/runbooks/multichain-vault-staging-validation.md (#1491); the state machine and CREATE2 identity across chainIds are Vitest-proven"
         },
         {
           "id": "custody.create-rules-install",
@@ -3224,8 +3224,8 @@
             "frontend/cypress/e2e/full/44-vault-rules-lanes.cy.js::RL-01",
             "frontend/cypress/e2e/full/44-vault-rules-lanes.cy.js::RL-02"
           ],
-          "issue": "#1494",
-          "missing": "the replay deployment itself and FR-019 already-live need a SECOND custody network, which the one-chain full tier cannot host \u2014 staged manual protocol (docs/runbooks/multichain-vault-staging-validation.md, #1453). The record gate is chain-proven: the record holder is OFFERED Deploy for the missing cohort network (RL-01) and the no-record co-owner gets the honest FR-018 reason (RL-02); gating, disclosure and orchestrator handoff stay Vitest/component-proven (VaultDetailsView.test.jsx)."
+          "issue": "#1491",
+          "missing": "the replay deployment itself and FR-019 already-live need a SECOND custody network, which the one-chain full tier cannot host \u2014 staged manual protocol (docs/runbooks/multichain-vault-staging-validation.md, #1491). The record gate is chain-proven: the record holder is OFFERED Deploy for the missing cohort network (RL-01) and the no-record co-owner gets the honest FR-018 reason (RL-02); gating, disclosure and orchestrator handoff stay Vitest/component-proven (VaultDetailsView.test.jsx)."
         },
         {
           "id": "custody.vault-details-one-card",
