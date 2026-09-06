@@ -132,7 +132,9 @@ function loadVault(address, label = 'E2E Vault') {
     cy.get('#load-label').clear().type(label)
     cy.contains('button', /^Load/).click()
   })
-  cy.get(CARD, { timeout: 30000 }).should('have.length.at.least', 1)
+  // 60s, as in full/29: loading probes every custody network before the card lists, and that
+  // read burst has exceeded 30s on a loaded runner while the load itself was fine.
+  cy.get(CARD, { timeout: 60000 }).should('have.length.at.least', 1)
 }
 
 /** Open the FIRST vault card's sheet on the given view (these flows hold one vault). */
