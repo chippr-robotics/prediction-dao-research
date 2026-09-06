@@ -1097,9 +1097,29 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   wallet's chain, byte-compatible with every pre-108 caller. See
   `docs/developer-guide/wrap-native.md` + `specs/108-multi-currency-wrap/`.
 
+- **Token news (spec 109) is the fourth read-proxy, and the ASSET-IDENTITY MAPPING is ours.**
+  `services/relay-gateway/src/news/` (`NEWS_ENABLED`, default off) proxies the keyless Alphaday
+  `/items/news/?tags=<slug>` — **the vendor has no CORS** (a browser can never call it directly)
+  **and no contract identity anywhere** (tags/coins are slug+ticker only), so
+  `frontend/src/config/newsAssets.js` holds the curated `(chainId,address)→slug` table beside the
+  asset registry (spec-108 offered-beside-resolvable precedent), every row probe-verified, and a
+  missing row IS "not covered" — resolved client-side with NO network call; never a ticker
+  heuristic (a garbage slug fails closed to `[]` upstream, verified). Cache TTL is clamped
+  **≥ 300 s** (the vendor itself serves `max-age=300` — lower buys load, not freshness),
+  single-flight per slug, serve-stale ≤ 10× TTL then `unreadable`, never stale-as-live. The
+  `FeedReading` has three states + a DISTINCT honest-empty (`read` with `items: []` — sparse
+  long-tail coverage is content, not failure; ages always shown). News is ADVISORY-ONLY: no value
+  path gates on it, items render title/source/age/link-out as TEXT (vendor `image`/`icon`/HTML
+  never forwarded), and the assistant gets exactly ONE public tool, `get_token_news`
+  (tool-pull; never in a prompt, never pre-loaded — spec-104 injection posture) with the MCP
+  snapshot regenerated. **No datastore, no member-keyed interest record, no FeeRouter service, no
+  key anywhere**; FinOps entry `alphaday-news-api` (`modelled` $0) ships with the module. The
+  parked graph/retrieval layer is #1504-lineage/#1513 — do not reintroduce it here. See
+  `specs/109-token-news/` (research.md carries the probe evidence).
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/108-multi-currency-wrap/plan.md
+at specs/109-token-news/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also
