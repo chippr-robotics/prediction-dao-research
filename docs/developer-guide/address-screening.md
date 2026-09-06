@@ -36,7 +36,7 @@ function.
 Chains with no source (Ethereum Classic, Mordor, the non-EVM ids) are **reported as uncovered**,
 never counted as clear.
 
-## The three states, and the one rule (`lib/screening/verdict.js`)
+## Two reading states, four verdicts, one rule (`lib/screening/verdict.js`)
 
 A reading is `{ status: 'read', flagged }` or `{ status: 'unreadable', reason }`. The verdict:
 

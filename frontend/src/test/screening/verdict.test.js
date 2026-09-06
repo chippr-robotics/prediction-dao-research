@@ -62,6 +62,13 @@ describe('describeVerdict — the sentence names what the verdict rests on', () 
     expect(s).toContain('Not a clean bill')
   })
 
+  it('names the uncovered networks even when sources existed and none answered', () => {
+    const result = { verdict: VERDICTS.UNSCREENED, readings: [unreadable(137, 'FairWins sanctions guard')], uncovered: [61] }
+    const s = describeVerdict(result, (id) => (id === 61 ? 'Ethereum Classic' : `chain ${id}`))
+    expect(s).toContain('no source answered')
+    expect(s).toContain('No screening source covers Ethereum Classic')
+  })
+
   it('names the uncovered networks when there was nothing to ask', () => {
     const result = { verdict: VERDICTS.UNSCREENED, readings: [], uncovered: [61] }
     expect(describeVerdict(result, (id) => (id === 61 ? 'Ethereum Classic' : `chain ${id}`))).toContain(

@@ -98,13 +98,19 @@ export function describeVerdict(result, nameForChain = (id) => `chain ${id}`) {
       return `Partly screened: ${c.read} of ${c.total} sources answered clear; ${names} could not be read. Not a clean bill.`
     }
     case VERDICTS.UNSCREENED:
-    default:
+    default: {
+      // Two different facts can each be true here, and both are named when they are: the sources
+      // that exist gave no answer, and the networks that have no source at all (acceptance
+      // scenario 5 — a member on ETC needs to hear that nothing screens there, not just that a
+      // Polygon read timed out).
+      const un = (result?.uncovered || []).map(nameForChain)
+      const uncoveredSentence = un.length ? ` No screening source covers ${joinNames(un)}.` : ''
       if (c.total === 0) {
-        const un = (result?.uncovered || []).map(nameForChain)
         return un.length
           ? `No screening source covers ${joinNames(un)}. This address could not be checked.`
           : 'This address could not be screened.'
       }
-      return 'This address could not be screened: no source answered. Proceed with caution.'
+      return `This address could not be screened: no source answered.${uncoveredSentence} Proceed with caution.`
+    }
   }
 }
