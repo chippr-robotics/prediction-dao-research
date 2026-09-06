@@ -56,12 +56,11 @@ afterEach(() => {
 })
 
 // Mock fetch globally to prevent real network requests
-// This is test code that mocks fetch responses - URL matching here is for test
-// purposes only and does not represent actual URL validation or network requests
 global.fetch = vi.fn().mockImplementation(async (url, _options) => {
-  // Mock CoinGecko API for price conversion
-  // codeql[js/incomplete-url-substring-sanitization] - Safe: test mock, no real network requests
-  if (url.startsWith('https://api.coingecko.com')) {
+  // Mock CoinGecko API for price conversion. Match through the path separator: a bare
+  // host prefix also matches https://api.coingecko.com.evil.test, and a test double that
+  // answers for a look-alike host teaches the suite the wrong thing.
+  if (url.startsWith('https://api.coingecko.com/')) {
     return {
       ok: true,
       status: 200,
