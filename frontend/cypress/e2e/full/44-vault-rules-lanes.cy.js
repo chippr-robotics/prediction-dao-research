@@ -326,11 +326,18 @@ describe('Protect — spec-105 rules realization on chain (issue #1452)', () => 
         // Fund the vault with the stable the lanes are realized in.
         fixture('mintToken', { address, amount: (1000n * ONE_UNIT).toString() })
 
+        /*
+         * Nonce arithmetic for everything below: the DIRECT install already executed TWO Safe
+         * transactions (setRules, then setGuard), so the vault stands at nonce 2 before any
+         * transfer — the everyday send is nonce 3, the big send nonce 4. Counting from 1 here
+         * was the first CI run's failure: the chain reported 3 where the test assumed 1.
+         */
+
         // (a) An everyday send — inside lane 1's band — clears on the creator's signature alone.
         fixture('tokenBalance', { address: PAYEE }).then((before) => {
           transferStableAsVault(address, 'Lane Vault', PAYEE, '10')
           waitForTokenBalanceAbove(PAYEE, before.balance)
-          waitForNonce(address, 1)
+          waitForNonce(address, 3)
         })
 
         // (b) An over-cap send SKIPS the banded lane and lands on the big-send lane, which needs
@@ -342,7 +349,7 @@ describe('Protect — spec-105 rules realization on chain (issue #1452)', () => 
             expect(after.balance, 'the refused transfer moved nothing').to.equal(before.balance)
           })
           fixture('vaultInfo', { address }).then((info) => {
-            expect(info.nonce, 'the vault executed nothing beyond the everyday send').to.equal(1)
+            expect(info.nonce, 'the vault executed nothing beyond the installs + everyday send').to.equal(3)
           })
           cy.get(PENDING_ROW).should('have.length.at.least', 1)
 
@@ -354,7 +361,7 @@ describe('Protect — spec-105 rules realization on chain (issue #1452)', () => 
            */
           asCoOwner(address, 'Lane Vault (B)')
           openVaultCard('queue')
-          executeTop(address, 2)
+          executeTop(address, 4)
           waitForTokenBalanceAbove(PAYEE, before.balance).then((finalBal) => {
             expect(
               BigInt(finalBal.balance) - BigInt(before.balance),
