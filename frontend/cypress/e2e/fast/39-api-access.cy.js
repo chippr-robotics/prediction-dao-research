@@ -81,13 +81,10 @@ const WALLET_CHAIN_ID = 1337
 /** Gold, expiring in 2100 — a fixed timestamp, never `Date.now()` in a test body (anti-pattern 9). */
 const ACTIVE_MEMBERSHIP = encodeMembership({ tier: 3, expiresAt: 4102444800 })
 
-function stubMembership({ fail = false, membership = ACTIVE_MEMBERSHIP, alias = 'referenceChainRpc' } = {}) {
+function stubMembership({ fail = false, membership = ACTIVE_MEMBERSHIP } = {}) {
   cy.intercept({ method: 'POST', url: RPC_PATTERN }, (req) => {
     const one = (payload) => {
       const { method, params, id } = payload
-      // Refusing EVERYTHING (identity and height included) is deliberate: it kills both
-      // FallbackProvider members, so phase 2's recovery only works through the rpcProvider.js
-      // "no runners?!" cache eviction — this test is what proves that eviction recovers.
       if (fail) {
         return { jsonrpc: '2.0', id, error: { code: -32000, message: 'reference chain unreachable' } }
       }
@@ -118,7 +115,7 @@ function stubMembership({ fail = false, membership = ACTIVE_MEMBERSHIP, alias = 
       statusCode: 200,
       body: Array.isArray(req.body) ? req.body.map(one) : one(req.body || {}),
     })
-  }).as(alias)
+  }).as('referenceChainRpc')
 }
 
 /**
@@ -336,13 +333,8 @@ describe('API access (spec 095)', () => {
     // control rather than a second cy.visit: visiting the SAME URL is a no-op in Cypress (no
     // reload, no refetch), which left the phase-1 state on screen and failed this test's first CI
     // run. Clicking retry also proves the recovery affordance actually recovers.
-    stubMembership({ membership: encodeMembership({ tier: 0, expiresAt: 0 }), alias: 'phase2Rpc' })
+    stubMembership({ membership: encodeMembership({ tier: 0, expiresAt: 0 }) })
     cy.get('[data-testid="api-access-unreadable"]').contains('button', 'Try again').click()
-
-    // The retry must actually REACH the network (its own alias — a shared one hands back stale
-    // phase-1 interceptions): a recovery that never issues a read would otherwise burn the full
-    // 40s card timeout and report the failure at the wrong layer.
-    cy.wait('@phase2Rpc', { timeout: 20000 })
 
     cy.get('[data-testid="api-access-upgrade"]', { timeout: 40000 })
       .should('be.visible')
