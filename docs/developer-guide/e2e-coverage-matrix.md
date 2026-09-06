@@ -313,7 +313,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `passkey.recover-account-by-lookup` | A member signing in on a new device reaches the account their passkey controls, including when that passkey was added to the account later rather than being the key that created it | 🔴 absent | none | — (proposed: on-chain) | #1432 |  |
+| `passkey.recover-account-by-lookup` | A member signing in on a new device reaches the account their passkey controls, including when that passkey was added to the account later rather than being the key that created it | 🔴 absent | none | — (proposed: on-chain) | #1514 |  |
 | `passkey.recover-never-wrong-account` | A passkey whose account cannot be verified never opens a session on an unverified address; the member is told what could not be confirmed, and an unreachable chain reads as unverified rather than as no account existing | 🟢 covered | flow | `account-native` | `account-recovery.cy.js` (REC-01, REC-02) |  |
 | `passkey.recover-by-address` | A member relinks by entering their account address, and is signed in only when the chain lists the recovered key among that account's current owners | 🟡 partial | smoke | `account-native` | `account-recovery.cy.js` (REC-03) | The chain agreeing. This tier reaches no RPC, so what is proven is the form, the refusal of a malformed address, and that the address is handed on to be CHECKED — never that a verified address opens a session on the account it names. That needs a deployed account whose owner set includes a key this browser has no record of, i.e. the full-stack passkey tier. |
 
