@@ -679,9 +679,20 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   (4) **Terraform owns Cloud Run SHAPE; Cloud Build owns the IMAGE.** The `ignore_changes` set
   (`image`, `revision`, `client`, `client_version`) is gate-enforced — without it every merge reports
   drift, and drift nobody reads is worse than none. The pipeline correspondingly must not set shape
-  flags. **The Cloud Run alto bundler must stay decommissioned** (G-11): re-arming it puts two
-  executors on ONE EOA — colliding nonces, stuck bundles, both instances healthy-looking, no in-band
-  detection.
+  flags. **AT MOST ONE ALTO PER (CHAIN, EXECUTOR EOA)** (G-11). Two altos sharing an
+  executor key are two senders on ONE EOA — colliding nonces, stuck bundles, both instances
+  healthy-looking, **no in-band detection**. Note what the invariant is *not*: it was written as
+  "the Cloud Run alto bundler must stay decommissioned", which is a fact about one named service and
+  is **satisfied by an estate that violates the real rule** — a second VM alto for chain 8453 beside
+  the existing 8453 alto breaks it while Cloud Run stays dark. Keeping Cloud Run decommissioned
+  remains required (it was one of three re-arming paths, and `single-alto-gate.sh` steps 1–2 still
+  enforce it); it is a consequence of the rule, not the rule. Enforcement is per-chain: each alto
+  declares `FW_CHAIN_ID`, the gate permits at most one per chain and only chains the host is
+  *declared* to serve, and an alto it cannot attribute is **refused rather than assumed safe**.
+  Matching is on the image REPOSITORY, never a pinned tag — a duplicate mid-upgrade runs a different
+  tag, which is exactly when you need to see it. **One executor key per chain, never shared**: that
+  is what turns a mis-wired RPC from a silent nonce war on someone else's chain into an unfunded EOA
+  whose bundles simply never land.
   (4a) **The five Terraform modules live in the private `chippr-robotics/chippr-tf-modules`**, pinned
   by **commit SHA** (a tag can be repointed, a commit cannot; G-16 enforces the pin). Add new modules
   THERE, not to `infra/terraform/modules/`, which now holds only a pointer — a local module is

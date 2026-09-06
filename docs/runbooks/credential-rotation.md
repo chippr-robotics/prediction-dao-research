@@ -266,6 +266,13 @@ gcloud compute ssh fairwins-gateway --zone=us-central1-a --tunnel-through-iap --
   sudo systemctl restart fairwins-secrets@gateway && sudo systemctl restart fairwins-stack@gateway'
 ```
 
+> **Bundler VMs: rsync and restart are ONE operation.** `single-alto-gate.sh` attributes each
+> running alto to a chain by the `FW_CHAIN_ID` its compose declares, and refuses an alto it cannot
+> attribute. probe.sh also runs that gate every 60s, so between the rsync and the restart one tick
+> can see the NEW gate against the OLD container and refuse it. Self-resolving, and the correct
+> trade against passing an unattributable alto — but do not stop after the rsync and wonder why the
+> probe is red.
+
 **The VM tracks `main` only** — its clone is shallow with a `main`-restricted refspec. Work on
 `staging` cannot be deployed; it must be promoted first.
 
