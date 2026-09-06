@@ -97,8 +97,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Written to a file, not passed inline: a heredoc inside the loop would carry the
-          # shell's own indentation into the rendered comment.
+          # Rendered to a file first (a heredoc inside the loop would carry the shell's own
+          # indentation), then passed inline: gh issue close has no --comment-file flag.
           cat > /tmp/close-comment.md <<COMMENT
           Closed by #${PR}, merged into \`${BASE}\`.
 
@@ -135,9 +135,6 @@ jobs:
               continue
             fi
 
-            # --comment takes the STRING, not a file — `--comment-file` does not exist on gh's
-            # issue close, and the workflow's first real close (#1476's four issues, 2026-09-06)
-            # died on "unknown flag" after every earlier run had passed with nothing to close.
             gh issue close "$n" --repo "$REPO" --reason completed --comment "$(cat /tmp/close-comment.md)"
 
             echo "Closed #$n."
