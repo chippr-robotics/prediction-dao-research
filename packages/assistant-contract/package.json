@@ -21,5 +21,6 @@
     "copy because it may not take a dependency (spec 095 R4). The gates are:",
     "  services/relay-gateway/test/assistantContract.test.js  (tool routes exist in contract.js ROUTES)",
     "  services/relay-gateway/test/mcpToolParity.test.js      (services/mcp-server/src/toolDefs.snapshot.json == this table)"
-  ]
+  ],
+  "version": "1.17.0"
 }
