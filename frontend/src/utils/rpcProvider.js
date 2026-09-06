@@ -154,7 +154,7 @@ export function makeReadProvider(rpcUrl, chainId = null) {
       preflight: issuedPreflight,
     })
     const failover = buildProvider(failoverUrl, null, chainId, { staticNetwork: true })
-    return new ethers.FallbackProvider(
+    const fp = new ethers.FallbackProvider(
       [
         { provider: primary, priority: 1, weight: 1, stallTimeout: 2000 },
         { provider: failover, priority: 2, weight: 1 },
@@ -162,6 +162,30 @@ export function makeReadProvider(rpcUrl, chainId = null) {
       new ethers.Network(`chain-${Number(chainId)}`, Number(chainId)),
       { quorum: 1 },
     )
+    // ethers' FallbackProvider marks a member config `_lastFatalError` when its block-number
+    // probe fails and NEVER clears it. Once every member has failed once — one bad minute of
+    // connectivity kills both rails — the instance rejects everything instantly with
+    // "no runners?!" and no request ever reaches the wire again. Cached module-wide, that turns
+    // a transient outage into "dead until full reload" while every surface honestly offers a
+    // retry that cannot work. Evicting the cache entry on that terminal state makes the NEXT
+    // read rebuild fresh members; the failing call still fails (the network really was down
+    // when the instance died), which keeps the degradation honest.
+    // (Guarded: the vitest suite substitutes a global ethers mock without `_perform`.)
+    const perform = typeof fp._perform === 'function' ? fp._perform.bind(fp) : null
+    if (perform) {
+      fp._perform = async (req) => {
+        try {
+          return await perform(req)
+        } catch (err) {
+          if (String(err?.message ?? '').includes('no runners')) {
+            const cached = providerCache.get(chainId)
+            if (cached?.provider === fp) providerCache.delete(chainId)
+          }
+          throw err
+        }
+      }
+    }
+    return fp
   })
 }
 
