@@ -4,6 +4,7 @@ import { arbitrum, base, mainnet, optimism, sepolia } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
 import { passkeyConnector } from './connectors/passkey'
 import { resolveRpcEndpoints } from './lib/network/rpcEndpoints'
+import { issuedFetchFor } from './lib/network/issuedAccess'
 import { tenantBrand } from './config/tenant'
 
 // Define Hoodi — Ethereum's long-lived proof-of-stake testnet (spec 048). Not a
@@ -246,8 +247,17 @@ function transportFor(chainId, defaultUrl) {
     // only on ethers reads — the exact "only ETC is wired for failover" gap.
     const primaryUrl = route.primary?.url || fallbackUrl
     const failoverUrl = route.failover && route.failover.url !== primaryUrl ? route.failover.url : null
-    if (failoverUrl) return fallback([http(primaryUrl), http(failoverUrl)])
-    return http(fallbackUrl)
+    // Issued keyed access on the wagmi rail (spec 107, #1470). Transports are built at module
+    // evaluation, before anything can have been minted — so instead of baking a URL that will be
+    // stale by first use, the PRIMARY leg gets a per-request fetchFn that consults the issued
+    // store on every call: credential live => the request is retargeted to the issued endpoint
+    // with the current token attached; otherwise it is exactly fetch to the URL viem resolved.
+    // Same properties as the ethers rail's preflight: rotation never rebuilds a transport, and
+    // the FAILOVER leg is built plain, so a credential never fans out to a second host and an
+    // issued endpoint going dark degrades to the public route mid-request.
+    const primary = http(primaryUrl, { fetchFn: issuedFetchFor(chainId) })
+    if (failoverUrl) return fallback([primary, http(failoverUrl)])
+    return primary
   }
 
   const options = Object.keys(route.primary.headers).length
