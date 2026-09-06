@@ -301,8 +301,10 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
     cy.get('.ab-screen-notice-text').invoke('text').should('not.match', /Screened clear/)
 
     // The receipts: every source is listed with its network and the reason it gave no answer.
+    // The list opens below the pill inside a fixed-position modal, so on the phone profile it
+    // lands under the fold — scroll to it rather than asserting a viewport-dependent layout.
     cy.get('button.screen-pill').click()
-    cy.get('.screen-pill-details').should('be.visible')
+    cy.get('.screen-pill-details').scrollIntoView().should('be.visible')
     cy.get('.screen-pill-details').should('contain.text', 'Polygon')
     cy.get('.screen-pill-details').should('contain.text', 'FairWins sanctions guard')
     cy.get('.screen-pill-details').should('contain.text', 'Could not read')
