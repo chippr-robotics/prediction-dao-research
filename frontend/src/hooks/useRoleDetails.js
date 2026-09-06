@@ -151,9 +151,13 @@ async function readMembership(mgr, address, roleBytes, roleName) {
   }
 
   if (details.tier > 0) {
-    // Sub-bounded, and deliberately NOT allowed to reach the outer ceiling: the membership is
-    // already in hand at this point, so a tier config that will not load degrades the LIMITS
-    // (this is what the catch below has always done) rather than discarding a tier we read.
+    // Sub-bounded so a STALLED tier config degrades the LIMITS — what the catch below has always
+    // done for a failing one — instead of spending the rest of the outer budget on a read whose
+    // answer is optional. It does not reorder the ceilings: the outer one still wraps this call,
+    // so a membership that itself came back slowly can leave less than the sub-ceiling's worth of
+    // budget, and the whole read then expires to `readable: false`. That is the honest reading of
+    // a chain that slow, and it is why the sub-ceiling is the smaller number rather than a
+    // promise that this stage always survives.
     try {
       const cfg = await withReadTimeout(
         mgr.getTierConfig(roleBytes, details.tier),

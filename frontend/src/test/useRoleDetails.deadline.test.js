@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 
 // ── WHAT THIS GUARDS (issue #1463) ──────────────────────────────────────────────────────────
 // `readable: false` is the hook's honest "the reference chain would not answer". It was written,
-// consumed by five surfaces, and UNREACHABLE on the failure it names: with every JSON-RPC call
+// consumed across the app, and UNREACHABLE on the failure it names: with every JSON-RPC call
 // erroring — `eth_chainId` included — ethers retries network detection with backoff, so
 // `getMembership` neither resolved nor rejected. Every consumer derives "checking your
 // membership…" from a membership that is still `null`, so the member sat on a spinner for as long
