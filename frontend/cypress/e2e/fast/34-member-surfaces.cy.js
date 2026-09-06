@@ -274,4 +274,44 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
     cy.get('[role="dialog"][aria-labelledby="entry-gate-title"]', { timeout: 40000 }).should('be.visible')
   })
 
+  it('[MS-06] addressbook.estate-screening-pill — an entered address gets an honest screening pill that names its sources', () => {
+    /*
+     * Issue #1458. The pill under an address field is the one place the app says "this address is
+     * safe to send to", so the thing to prove is that it cannot say so falsely. This world answers
+     * `0x` to every contract read, so EVERY source is unreadable — and the pill must therefore be
+     * amber (Unscreened / Partly screened), never green: a list that did not answer is not a list
+     * that said no. The expanded rows must say so per source, in words.
+     */
+    chainWorld()
+    connect()
+    cy.visit('/wallet?tab=addressbook')
+    waitForAccount()
+
+    cy.get('[aria-label="Add contact"]', { timeout: 40000 }).click()
+    cy.get('[role="dialog"][aria-label="Add contact"]').should('exist')
+    cy.get('#ab-addr-0').type(FRIEND)
+
+    // A verdict arrives (the sweep is deadline-bounded, so it always does), and it is not green.
+    cy.get('.ab-screen-notice[data-screen-verdict]', { timeout: 40000 })
+      .should('not.have.attr', 'data-screen-verdict', 'loading')
+      .invoke('attr', 'data-screen-verdict')
+      .should('be.oneOf', ['unscreened', 'partial'])
+
+    cy.get('.screen-pill[data-verdict]').should('not.have.attr', 'data-verdict', 'screened')
+    cy.get('.ab-screen-notice-text').invoke('text').should('not.match', /Screened clear/)
+
+    // The receipts: every source is listed with its network and the reason it gave no answer.
+    // The list opens below the pill inside a fixed-position modal, so on the phone profile it
+    // lands under the fold — scroll to it rather than asserting a viewport-dependent layout.
+    cy.get('button.screen-pill').click()
+    cy.get('.screen-pill-details').scrollIntoView().should('be.visible')
+    cy.get('.screen-pill-details').should('contain.text', 'Polygon')
+    cy.get('.screen-pill-details').should('contain.text', 'FairWins sanctions guard')
+    cy.get('.screen-pill-details').should('contain.text', 'Could not read')
+    cy.get('.screen-pill-details').should('not.contain.text', 'Clear')
+
+    // No colour-only state: every row carries words, and the modal stays accessible with it open.
+    cy.a11yScan('[role="dialog"][aria-label="Add contact"]')
+  })
+
 })

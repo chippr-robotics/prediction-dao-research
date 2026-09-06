@@ -18,6 +18,7 @@ import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useAccountAssets } from '../../hooks/useAccountAssets'
 import usePortfolio from '../../hooks/usePortfolio'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
+import AddressScreenNotice from '../ui/AddressScreenNotice'
 import { useGroupPay } from '../../hooks/useGroupPay'
 import { GROUP_RAIL, validateRecipients } from '../../lib/payments/groupPay'
 import { useNotification } from '../../hooks/useUI'
@@ -498,13 +499,15 @@ export default function TransferForm({ onSent }) {
               </button>
             </div>
             <QRScanner isOpen={scanOpen} onClose={() => setScanOpen(false)} onScanSuccess={handleScan} />
+            {/* Estate-wide advisory screen (issue #1458): every list on every cohort chain. */}
+            <AddressScreenNotice address={toResolved} chainId={assetChainId} />
+            {/* The per-chain `screening` read is a SEPARATE fact: it is the guard on the chain the
+                value moves on, the read the contract will repeat, and it is what withholds the
+                button — so its refusal is stated as its own alert, next to the button it disables. */}
             {screening === 'restricted' && (
               <div className="pt-notice pt-notice-error" role="alert">
-                This address is flagged by sanctions screening. Transfers to it are blocked.
+                This address is flagged by sanctions screening on this network. Sending is withheld: the on-chain guard would refuse it.
               </div>
-            )}
-            {screening === 'uncertain' && toResolved && (
-              <span className="pt-hint">Screening unavailable — proceed with care.</span>
             )}
             {isGroup && issuesFor(PRIMARY_ID).map((issue) => (
               <div
