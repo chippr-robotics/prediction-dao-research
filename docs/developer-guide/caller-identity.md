@@ -73,10 +73,24 @@ starts refusing the moment it deploys fails in the shape "the product is broken"
   swappable by editing a file and signalling is a key swapped silently by anyone who can write that
   file. Absent keys mean "leave alone", never "reset to default". In-flight requests finish under
   what they read.
-- **`/status` is origin-lock EXEMPT.** The identity/access blocks sit inside the **gated** portion
-  (`X-Origin-Auth`), beside `gasWalletRunwayHrs`. `enforcing` is explicit either way (FR-015), reads
-  the live config so a reload shows on the next poll, and attestation reports `"not-built"` — not
-  `false`, which would imply a switch exists.
+- **`/status` is origin-lock EXEMPT, and has THREE tiers — not two.**
+  1. *Public* (no headers): status, build, per-chain `rpc`, killSwitch, fees. The Google uptime
+     check reads this tier and matches on `"rpc":"up"`, so nothing here may move.
+  2. *Edge* (`X-Origin-Auth`): the identity/access blocks and `gasWalletRunwayHrs`. **This is not an
+     authorization tier.** Cloudflare's zone-wide Transform Rule injects that header on every
+     request, so it means "did not arrive on the raw origin IP" and nothing more — measured in
+     production on 2026-09-06, when these blocks were readable by anyone curling the public
+     hostname (#1505). The on-VM probe reads this tier for the runway numbers.
+  3. *Operator* (`X-FairWins-Ops`, `OPS_STATUS_SECRET`): `callerIdentity.enforcing` only. It is the
+     single most useful fact an abuser can learn about the gateway — observe mode says the door is
+     open. Unset secret ⇒ the field is absent for everyone; there is deliberately no fallback to
+     public, because "nobody sees it" is recoverable and "everybody sees it" is not.
+
+  **FR-015 is satisfied at BOOT, not by the HTTP body.** The gateway prints its identity mode on
+  listen and again after every SIGHUP reload (`src/identity/mode.js#describeIdentityMode`, one
+  function so the two can never disagree). That is the disclosure that is always available to the
+  audience FR-015 was written for — an operator reading the journal. Attestation still reports
+  `"not-built"` — not `false`, which would imply a switch exists.
 
 ## Issued RPC access (spec 107), briefly
 

@@ -15,6 +15,7 @@ import { useSelectableAssets } from '../../hooks/useSelectableAssets'
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useBitcoinWallet } from '../../hooks/useBitcoinWallet'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
+import AddressScreenNotice from '../ui/AddressScreenNotice'
 import { useGroupPay } from '../../hooks/useGroupPay'
 import { useNotification } from '../../hooks/useUI'
 import { getNetwork } from '../../config/networks'
@@ -527,13 +528,15 @@ function PayPanel({ onSuccess }) {
         </div>
         <QRScanner isOpen={scanOpen} onClose={() => setScanOpen(false)} onScanSuccess={handleScan} />
         {scanNotice && <div className="fm-hint" role="status">{scanNotice}</div>}
+        {/* Estate-wide advisory screen (issue #1458): every list on every cohort chain. */}
+        <AddressScreenNotice address={toResolved} chainId={assetChainId} />
+        {/* The per-chain `screening` read is a SEPARATE fact: it is the guard on the chain the value
+            moves on, the read the contract will repeat, and it is what withholds the button — so
+            its refusal is stated as its own alert, next to the button it disables. */}
         {screening === 'restricted' && (
           <div className="fm-error-banner" role="alert">
-            This address is flagged by sanctions screening. Transfers to it are blocked.
+            This address is flagged by sanctions screening on this network. Pay is withheld: the on-chain guard would refuse it.
           </div>
-        )}
-        {screening === 'uncertain' && toResolved && (
-          <span className="fm-hint">Screening unavailable — proceed with care.</span>
         )}
         {isGroup && issuesFor(PRIMARY_ID).map((issue) => (
           <div

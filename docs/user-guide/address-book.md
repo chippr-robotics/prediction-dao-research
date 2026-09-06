@@ -39,33 +39,45 @@ automatically.
 
 ## How screening works
 
-Every saved or entered address is checked against the on-chain
-sanctions/compliance oracle. Results appear as small tags:
+Every address you enter or save is checked against **every screening list FairWins knows
+about, on every network this app can read** — not just the network your wallet is on. The
+result is a small pill under the address:
 
-| Tag | Meaning |
+| Pill | Meaning |
 |-----|---------|
-| *(no tag)* | The address screened **clear** on this network. |
-| **Restricted** | The address is flagged by sanctions screening. |
-| **Unscreened** | The address could not be checked (see "Fails closed" below). |
+| **Screened clear** (green) | Every list on every network answered, and none of them flag this address. |
+| **Flagged** (red) | At least one list says the address is listed. The sentence names the list and the network. |
+| **Partly screened** (amber) | No list flagged it, but at least one list could not be read. This is **not** a clean bill. |
+| **Unscreened** (amber) | No list could be read, or no list exists for this network. |
+| **Screening…** | The check is still running. |
+
+**Tap the pill** to see exactly which lists were asked, on which networks, and what each one
+said — including the ones that could not be reached and the networks that have no list at all.
+
+The lists are:
+
+- **FairWins sanctions guard** — FairWins' own on-chain guard (the OFAC list plus FairWins'
+  deny list). Where it says no, a wager, membership or pool action with that address is refused
+  on-chain.
+- **Chainalysis sanctions oracle** — the OFAC sanctions list, published on-chain by Chainalysis.
+- **Issuer freeze lists** — Circle's USDC and Tether's USDT freeze lists. An address on one of
+  these cannot receive or move that token: the transfer fails and the funds stay put.
 
 Four principles govern screening:
 
-1. **Advisory only.** The tags in the app are a convenience pre-check. They do
-   **not** block anything by themselves.
-2. **The on-chain guard enforces.** FairWins' smart contracts independently
-   screen every participant when a wager is created or accepted. A restricted
-   address is blocked on-chain **even if the app shows no warning** — the contract
-   is the source of truth, not the UI.
-3. **Fails closed.** If an address cannot be screened — for example the guard is
-   not configured on the current network, or the check fails — it is shown as
-   **Unscreened**, never as clear. Treat "Unscreened" as "unknown, proceed with
-   caution."
-4. **Network-scoped.** A screening result applies only to the network it was
-   checked on. The same address may screen differently on a different network, so
-   the network is always part of the result.
+1. **Green means all of them said yes.** One flag from any list is **Flagged**. One list that
+   could not be reached is **Partly screened** — never green, because a missing answer is not a
+   clear one.
+2. **Advisory only.** The pill is a convenience pre-check. It does **not** block anything by
+   itself.
+3. **The chain enforces.** FairWins' smart contracts independently screen every participant, and
+   an issuer freeze is enforced by the token itself. A flagged address is refused on-chain
+   **even if the app shows no warning** — the contract is the source of truth, not the UI.
+4. **Fails closed.** If nothing can be checked, the address shows as **Unscreened**, never as
+   clear. Treat amber as "unknown, proceed with caution."
 
-Results are cached briefly during your session to avoid repeated on-chain reads,
-then re-checked the next time you open the book or pick an address.
+Results are cached briefly during your session to avoid repeated on-chain reads, then
+re-checked the next time you enter or pick the address.
 
 ## Portability: encrypted export & import
 
