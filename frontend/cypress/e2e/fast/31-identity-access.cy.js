@@ -24,7 +24,11 @@ const MEMBERSHIP_URL = '/wallet?tab=membership'
 const FLAGGED_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 
 /** Every shipped read provider this build resolves runs through publicnode. */
-const RPC_PATTERN = /publicnode\.com/
+// BOTH rails, or the stub is a lie: since 480720bf every EVM mainnet has a drpc.org FAILOVER,
+// so makeReadProvider builds a FallbackProvider — a stub that fails only the publicnode primary
+// is answered by LIVE drpc, and "the chain is unreachable" quietly becomes "the chain answered
+// tier 0 from production" (issue #1463; spec 42 and the passkey suite hit the same class).
+const RPC_PATTERN = /publicnode\.com|drpc\.org/
 
 /*
  * The WALLET's own transport, pointed at the same host the intercept covers.
