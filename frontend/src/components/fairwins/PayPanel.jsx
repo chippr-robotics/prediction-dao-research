@@ -78,8 +78,6 @@ function PayPanel({ onSuccess }) {
   const { address: effectiveAddress, isActingAccount } = useEffectiveAccount()
   const actingAddress = isActingAccount ? effectiveAddress : null
   const { options, defaultKey, isGasless } = useSelectableAssets({ activity: ASSET_ACTIVITIES.PAY, actingAddress })
-  // Group pay (release 1.14.0): dormant until the member adds a second recipient.
-  const groupPay = useGroupPay()
 
   const [selectedKey, setSelectedKey] = useState(null)
   const [amount, setAmount] = useState('')
@@ -102,8 +100,6 @@ function PayPanel({ onSuccess }) {
   const [groupResult, setGroupResult] = useState(null)
 
   const connectedChainId = Number(chainId)
-  const groupBusy = groupPay.status === 'screening' || groupPay.status === 'submitting'
-  const busy = status === 'signing' || status === 'submitting' || status === 'pending' || groupBusy
 
   // Preference-aware default (spec 058): the home currency preference still picks
   // the STARTING asset — 'native' preselects the connected native coin, otherwise
@@ -126,6 +122,13 @@ function PayPanel({ onSuccess }) {
   const symbol = selectedAsset?.symbol || ''
   const bal = selectedAsset?.balance ?? null
   const gasless = selectedAsset ? isGasless(selectedAsset) : false
+
+  // Group pay (release 1.14.0): dormant until the member adds a second recipient. It is handed
+  // the selected asset because issue #1441's availability is a fact about the asset's own
+  // NETWORK, not only about the acting identity — hence its position here, after the selection.
+  const groupPay = useGroupPay({ asset: selectedAsset })
+  const groupBusy = groupPay.status === 'screening' || groupPay.status === 'submitting'
+  const busy = status === 'signing' || status === 'submitting' || status === 'pending' || groupBusy
 
   useEffect(() => { refreshBalances() }, [refreshBalances])
 
@@ -548,7 +551,8 @@ function PayPanel({ onSuccess }) {
           </div>
         ))}
 
-        {/* Rows 2..N. Absent — and inert — until the member presses Add. */}
+        {/* Rows 2..N. Withdrawn entirely while `available` is false (#1441); otherwise
+            absent — and inert — until the member presses Add. */}
         <GroupPayRecipients
           recipients={extraRecipients}
           onChange={setExtraRecipients}
@@ -557,6 +561,7 @@ function PayPanel({ onSuccess }) {
           symbol={symbol}
           disabled={busy}
           idPrefix="pay"
+          available={Boolean(groupPay.available)}
         />
       </div>
 

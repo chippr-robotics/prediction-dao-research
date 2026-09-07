@@ -1589,38 +1589,38 @@
           ]
         },
         {
-          "id": "pay.group-recipient-list",
-          "name": "Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee)",
+          "id": "pay.group-affordance-withdrawn",
+          "name": "The send surfaces offer no multi-recipient control, and a single-recipient send is unchanged",
           "status": "covered",
           "tier": "no-chain",
           "depth": "flow",
           "risk": "disclosure",
           "tests": [
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-01",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-02",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-03",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-04",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-05",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-06",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-07",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-08",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-09"
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-10",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-11"
           ]
+        },
+        {
+          "id": "pay.group-recipient-list",
+          "name": "Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee)",
+          "status": "out-of-scope",
+          "tier": "none",
+          "depth": "none",
+          "risk": "disclosure",
+          "tests": [],
+          "proposedTier": "no-chain",
+          "reason": "Withdrawn by #1441: no send surface renders the multi-recipient control, so there is no member-facing flow to drive. GROUP_PAY_ENABLED in frontend/src/lib/payments/groupPay.js is the one lever; fast/41-group-pay.cy.js is guarded by the same constant rather than deleted, and its GP-10/GP-11 assert the withdrawal itself. Restoring it is #1538."
         },
         {
           "id": "pay.group-settlement",
           "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes",
-          "status": "partial",
-          "tier": "on-chain",
-          "depth": "settled",
+          "status": "out-of-scope",
+          "tier": "none",
+          "depth": "none",
           "risk": "custody",
-          "tests": [
-            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-01",
-            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-02",
-            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-03"
-          ],
-          "issue": "#1400",
-          "missing": "the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain."
+          "tests": [],
+          "proposedTier": "on-chain",
+          "reason": "Withdrawn by #1441: a member cannot reach a group payment from any surface, so nothing settles one. The engine is untouched and the spec moved to withdrawn/41-group-settlement.cy.js, guarded by GROUP_PAY_ENABLED rather than deleted - GS-01/02/03 settle on chain again the moment it flips (#1538). Still absent when it does: the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain."
         }
       ]
     },
