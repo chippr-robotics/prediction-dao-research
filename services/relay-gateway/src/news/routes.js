@@ -56,8 +56,14 @@ export function createNewsRouter(config, { client, cache, quotas, killSwitch, no
     }
   }
 
+  /**
+   * Quota ONLY — liveness is checked separately, at the top of the handler.
+   * Folding requireLive() in here and calling guard() after validation inverted the documented
+   * pipeline: a killed or unconfigured module answered 400 invalid_params for a malformed
+   * request, telling the caller their parameters were wrong when the truth was that the module
+   * was not serving at all. Same split as bridge/routes.js.
+   */
   function guard(req) {
-    requireLive()
     const q = quotas.hit(callerQuotaKey(req))
     if (!q.allowed) {
       throw new GatewayError(429, 'quota_exceeded', `${q.scope} news read quota exceeded`, {
@@ -84,6 +90,9 @@ export function createNewsRouter(config, { client, cache, quotas, killSwitch, no
   // (SC-005; single-flight via cache.fetchThrough).
   router.get('/v1/news/:chainId/:asset', async (req, res) => {
     try {
+      // Liveness before anything else: a killed or unconfigured module owes the caller a 503
+      // saying so, never a 400 about parameters it was never going to read.
+      requireLive()
       const { chainId, asset } = req.params
       if (!CHAIN_SEGMENT_RE.test(chainId)) {
         throw new GatewayError(400, 'invalid_params', 'chainId must be a numeric EVM id or a bitcoin network id')

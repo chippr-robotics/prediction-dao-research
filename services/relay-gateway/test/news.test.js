@@ -234,4 +234,43 @@ describe('GET /v1/news/:chainId/:asset', () => {
     expect(res.status).toBe(429)
     expect(res.headers['retry-after']).toBeDefined()
   })
+
+  /*
+   * PIPELINE ORDER, pinned.
+   *
+   * The module-off and killswitch tests above pass valid params, and the validation tests run
+   * against an ENABLED module — so both orders (liveness-then-validation and the reverse) satisfy
+   * every assertion above, and the documented order lived only in a comment. It was wrong: a
+   * killed or unconfigured module answered 400 invalid_params, which tells a caller their request
+   * was malformed when the truth is the module was never going to serve it. The frontend seam maps
+   * the 503 module-off codes to `not-configured` and a 400 to nothing of the sort, so the two are
+   * different member-visible states.
+   *
+   * The malformed request is the ONLY way to tell the orders apart, which is why it is the test.
+   */
+  it('answers liveness BEFORE validation: a killed or off module 503s even on a malformed request', async () => {
+    const off = makeApp({ env: { NEWS_ENABLED: 'false' } })
+    const offRes = await get(off.app, '/v1/news/notachain/NOTANASSET?slug=BAD_SLUG&limit=999')
+    expect(offRes.status).toBe(503)
+    expect(offRes.body.error.code).toBe('news_unconfigured')
+
+    const killed = makeApp({ env: { NEWS_KILLSWITCH: 'true' } })
+    const killedRes = await get(killed.app, '/v1/news/notachain/NOTANASSET?slug=BAD_SLUG')
+    expect(killedRes.status).toBe(503)
+    expect(killedRes.body.error.code).toBe('news_killed')
+
+    // And nothing reached the vendor on either path.
+    expect(off.calls).toHaveLength(0)
+    expect(killed.calls).toHaveLength(0)
+  })
+
+  it('does not spend quota on a request the killswitch already refused', async () => {
+    // Quota is a scarce per-caller budget; a killed module must not consume it. With a budget of
+    // one, two killed requests both answer 503 — a spent budget would surface as a 429.
+    const { app } = makeApp({ env: { NEWS_KILLSWITCH: 'true', NEWS_QUOTA_PER_IP: '1', NEWS_QUOTA_GLOBAL: '1' } })
+    expect((await get(app, ROUTE)).body.error.code).toBe('news_killed')
+    const second = await get(app, ROUTE)
+    expect(second.status).toBe(503)
+    expect(second.body.error.code).toBe('news_killed')
+  })
 })
