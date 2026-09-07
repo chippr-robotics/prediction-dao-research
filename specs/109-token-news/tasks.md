@@ -120,26 +120,27 @@ never gated. **Independent test**: quickstart scenario 6.
 
 ## Phase 6: Polish & cross-cutting closers
 
-- [ ] T020 [P] Add FinOps cost entry `alphaday-news-api` to
+- [X] T020 [P] Add FinOps cost entry `alphaday-news-api` to
       `packages/finops-catalogue/src/sources.js` (`basis: modelled`, $0 free tier, live with the
       module — research R7); `npm run check:finops` + `npm run test:finops-gate` green.
-- [ ] T021 Create `frontend/cypress/e2e/fast/49-token-news.cy.js` (no-chain tier; global
+- [X] T021 Create `frontend/cypress/e2e/fast/49-token-news.cy.js` (no-chain tier; global
       beforeEach covers both viewports): TN-01 covered-token card renders items with attribution
       via a stubbed gateway; TN-02 unmapped asset ⇒ not-covered with zero `/v1/news` requests;
       TN-03 unreadable ⇒ sentence + retry, visually distinct from TN-04 honest-empty; TN-05
       trade-pair partial labelling with the swap form untouched; `cy.a11yScan` on the card. Every
       assertion must be able to fail (no guarded `expect(true)` — spec 094).
-- [ ] T022 Flip both `109-token-news` rows in `frontend/cypress/coverage/matrix.json` to
+- [X] T022 Flip both `109-token-news` rows in `frontend/cypress/coverage/matrix.json` to
       `covered` (tier `no-chain`, depth `flow`, tests listed) and regenerate
       `docs/developer-guide/e2e-coverage-matrix.md` (`npm run e2e:matrix`); confirm the fast-tier
       splitter picks the spec up (`frontend/src/test/e2e-policy/tierSharding.test.js`).
-- [ ] T023 [P] Write `docs/developer-guide/token-news.md`: the module, the mapping table's
+- [X] T023 [P] Write `docs/developer-guide/token-news.md`: the module, the mapping table's
       curation rule (probe-verify every row, absence = not covered), the TTL floor's reason, the
       tool's posture; link from the spec-109 bullet's "See" line if wording drifts.
-- [ ] T024 Add `news` synonyms to `frontend/src/config/navSearchIndex.js` only if the card gets a
+- [X] T024 Add `news` synonyms to `frontend/src/config/navSearchIndex.js` only if the card gets a
       nav-reachable home requiring it (likely none — cards live inside existing surfaces; skip
-      with a note if so).
-- [ ] T025 Full verification pass per quickstart.md: scoped Vitest dirs, gateway node:test,
+      with a note if so). DONE AS A SKIP: TokenNewsCard has no nav-reachable home — it renders
+      inside AssetDetailSheet and TradePanel, both already indexed — so no entry was added.
+- [X] T025 Full verification pass per quickstart.md: scoped Vitest dirs, gateway node:test,
       Cypress spec locally, `check:specs`, `check:e2e-matrix`, `check:finops`,
       `tenants:validate`, and the monorepo-verify gates for anything the diff touched.
       Deployment note (not a code task): enabling `NEWS_ENABLED` in

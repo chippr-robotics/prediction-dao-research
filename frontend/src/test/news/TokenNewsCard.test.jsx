@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import TokenNewsCard, { newsAgeLabel } from '../../components/news/TokenNewsCard'
+import TokenNewsCard from '../../components/news/TokenNewsCard'
+import { newsAgeLabel } from '../../lib/news/newsAge'
 
 const mockFetchTokenNews = vi.fn()
 vi.mock('../../lib/news/newsClient', () => ({

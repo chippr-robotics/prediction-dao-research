@@ -505,12 +505,68 @@
         "uid": "${datasource}"
       },
       "type": "timeseries",
+      "title": "Alphaday news API (modelled)",
+      "description": "The token-news vendor behind the relay-gateway news proxy (spec 109). Keyless public API on a free tier: the modelled figure is $0 by declared plan rate, and the entry exists so the dependency is VISIBLE — if Alphaday ever prices the tier, this line is where the change lands rather than a surprise (research R7). No revenue entry pairs with it: the module carries no fee, no referral, no payee env, so C2b has nothing to claim. Gateway request volume shows in gateway-upstream-usage under the news upstream label.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 41
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "noValue": "no data — source unreadable or not configured",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "fairwins_finops_cost_usd_total{source=\"alphaday-news-api\"}",
+          "legendFormat": "{{unit}} ({{basis}})"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "type": "timeseries",
       "title": "Grafana Cloud (this system) (modelled)",
       "description": "What the FinOps system itself costs: the Grafana Cloud plan plus the BigQuery query spend this exporter incurs reading the billing export. FR-029 — a FinOps system that hides its own cost is not credible. The free tier really is $0, but assert that by setting FINOPS_GRAFANA_PLAN_USD=0: unset reports not-configured, because \"we are on the free tier\" and \"nobody set this\" are different facts.",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 41
       },
       "fieldConfig": {

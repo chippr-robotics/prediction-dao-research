@@ -16,21 +16,9 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { fetchTokenNews } from '../../lib/news/newsClient'
+import { newsAgeLabel } from '../../lib/news/newsAge'
 import { membershipChainId, MAINNET_CHAIN_ID } from '../../config/networks'
 import './TokenNewsCard.css'
-
-/** Coarse, honest age label — the vendor's own freshness varies by asset (research R3). */
-export function newsAgeLabel(publishedAt, now = Date.now()) {
-  const t = Date.parse(publishedAt)
-  if (!Number.isFinite(t)) return ''
-  const mins = Math.max(0, Math.floor((now - t) / 60_000))
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 60) return `${days}d ago`
-  return `${Math.floor(days / 30)}mo ago`
-}
 
 export default function TokenNewsCard({ chainId, address = null, assetLabel = 'this asset' }) {
   const [reading, setReading] = useState(null) // null = loading

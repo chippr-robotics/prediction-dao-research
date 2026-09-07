@@ -1115,7 +1115,8 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   snapshot regenerated. **No datastore, no member-keyed interest record, no FeeRouter service, no
   key anywhere**; FinOps entry `alphaday-news-api` (`modelled` $0) ships with the module. The
   parked graph/retrieval layer is #1504-lineage/#1513 — do not reintroduce it here. See
-  `specs/109-token-news/` (research.md carries the probe evidence).
+  `docs/developer-guide/token-news.md` + `specs/109-token-news/` (research.md carries the probe
+  evidence).
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
