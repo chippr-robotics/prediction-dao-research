@@ -50,7 +50,15 @@ export function createGatewayUsageCollector({ config, fetchImpl = fetch }) {
       return unreadable(`gateway counters response had no recognisable shape (keys: ${Object.keys(body ?? {}).join(',')})`)
     }
 
-    last = { tierRequests: tiers, upstreamCalls: upstreams }
+    // `sponsoredOps` is OPTIONAL and its absence is meaningful: a gateway with no sponsorship
+    // counter wired reports nothing rather than an empty object, so "not configured" never renders
+    // as "configured and granting nothing" (#1539).
+    const sponsored = body?.sponsoredOps
+    last = {
+      tierRequests: tiers,
+      upstreamCalls: upstreams,
+      sponsoredOps: sponsored && typeof sponsored === 'object' ? sponsored : null,
+    }
     const total = Object.values(tiers).reduce((acc, n) => acc + (Number.isFinite(n) ? n : 0), 0)
     return read(total, 'requests')
   }
@@ -82,6 +90,22 @@ export function emitGatewayUsage(registry, collector, source) {
       count,
     )
   }
+  // Sponsored UserOps granted, per chain — the DEMAND signal that makes
+  // `executor_nonce_stale_seconds` interpretable (#1539). Staleness alone is not a fault: an idle
+  // bundler is healthy. Staleness WHILE this counter is advancing is the 2026-07-12 stall.
+  for (const [chain, count] of Object.entries(last.sponsoredOps ?? {})) {
+    // Bounded: chain ids are numeric strings from the gateway's own configured set, never request
+    // content. Anything else is dropped rather than growing the label space (FR-036).
+    if (!/^[0-9]+$/.test(chain) || !Number.isFinite(count)) continue
+    registry.emit(
+      'sponsored_ops_total',
+      'counter',
+      'Sponsored UserOps GRANTED since gateway boot, per chain. The demand signal to pair with executor nonce staleness — a refused request is not demand. Consume with rate().',
+      { chain },
+      count,
+    )
+  }
+
   for (const [upstream, count] of Object.entries(last.upstreamCalls)) {
     if (!UPSTREAM_LABEL_RE.test(upstream) || !Number.isFinite(count)) continue
     registry.emit(
