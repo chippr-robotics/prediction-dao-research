@@ -55,12 +55,36 @@ reach green with a source missing.
 The verdict is **derived from the readings, never stored**: the readings are what is cached, so
 the rows a member expands always match the pill.
 
+## The roster: the cohort, minus what cannot be reached
+
+```js
+import { screeningChainIds } from '../lib/screening/sources'
+```
+
+**A source a build can never reach is not a degraded source — it is not a source.** Chain 1337 is
+`isTestnet: true`, so it sat in every testnet build's cohort; it carries a `sanctionsGuard` in the
+contracts config; and its endpoint is `http://127.0.0.1:8545`. The deployed testnet build therefore
+told every member, about every address, that "FairWins sanctions guard on Hardhat could not be
+read" — and since an unanswered list can never be a clear one, the pill could never reach green
+there. QA found it as *"screening is failing to read from networks on testnet staging; working on
+staging mainnet"*, with three of four sources unreadable.
+
+`screeningChainIds()` is `cohortChainIds()` minus `isLocalOnlyChain`. It can only subtract, so the
+cohort boundary (constitution III) still binds. `frontend/src/test/screening/screeningRoster.test.js`
+drives the filter against a cohort that contains a sandbox, because the cohort a test run happens
+to resolve is not the thing under test.
+
+The other half of that QA report was an endpoint, not a rule: Amoy's build default was Polygon's
+own `rpc-amoy.polygon.technology`, which had stopped answering browser reads. It now defaults to
+publicnode, like Polygon mainnet, Sepolia and Hoodi already did. A member's own endpoint (spec 069)
+still wins over it.
+
 ## The sweep (`lib/screening/screenEstate.js`)
 
 `screenAddressAcrossEstate(address, opts)`:
 
-- **Cohort-bounded** — `cohortChainIds()`; constitution III forbids reading across the
-  testnet/mainnet boundary, and `readProviderFor` refuses an out-of-cohort chain regardless.
+- **Roster-bounded** — `screeningChainIds()` (above); `readProviderFor` refuses an out-of-cohort
+  chain regardless.
 - **Failure-isolated** — every source resolves on its own. The function **never rejects**.
 - **Deadline-bounded** — `DEFAULT_DEADLINE_MS` (8 s) per source; a timeout is `unreadable` with
   that reason (spec-104 lesson: an unbounded wait turns one failure into a hung surface).
@@ -70,12 +94,46 @@ the rows a member expands always match the pill.
   de-duplication; `force: true` bypasses, `forgetEstateScreening(address)` evicts.
 - Test seams: `providerFor`, `sourcesFor`, `chainIds`, `deadlineMs`.
 
+## What the member actually reads
+
+| Element | Carries |
+|---|---|
+| `ScreeningPill` | the verdict **in a word**, and the expansion naming every source with its answer |
+| `ScreeningStatusBar` | the **shape of the scan** — one segment per source asked, coloured by its answer |
+| the summary line | counts, and — for `flagged` only — the lists that objected |
+
+The summary used to name every unreachable source. On a build where three of four could not be
+read that made the notice a paragraph, and QA's note was blunt: *"the end user does not need the
+text specifics."* They do need them eventually — so they moved one tap away, into the pill's own
+rows, where each source is named with the reason it gave. `flagged` is the exception that still
+names its lists inline: a member about to send value needs to know whether a FairWins guard will
+revert the transaction or an issuer freeze will strand the token after it lands.
+
+The bar is never the only carrier of a fact (WCAG 1.4.1) — it is one `role="img"` element whose
+accessible name is the summary sentence, sitting beside a pill that says the verdict in words.
+
+**There is no ⓘ in the notice.** It opened a bubble taller than a phone, clipped by the scrolling
+modal it sat in, and stacked under the assistant launcher on the Pay panel. The explainer lives on
+the Address Book header instead, and `InfoTip` itself was fixed for every caller: it now sits above
+the assistant (z-index 1350, still below the nav drawer and the modal tier) and scrolls internally
+rather than running off the screen.
+
 ## Two hooks, on purpose
 
 | Hook | Question | Used by |
 |---|---|---|
 | `useAddressScreening` (spec 021) | does the guard on **this** chain allow it? | everything that **gates a submission** — Transfer, Pay, Bridge, Supply, group pay — forced and live at submit time (FR-032) |
 | `useEstateScreening` (this amendment) | is it flagged **anywhere**? | `AddressScreenNotice` — the pill under every address field |
+| `useEstateScreeningMany` (same sweep, many addresses) | same question, for a list | the address book, and the saved-contact picker |
+
+The address book used to ask the per-chain hook, which can only answer for the chain the wallet is
+connected to — so a contact saved on Amoy while the wallet sat on Polygon, or any contact at all
+with no wallet connected, rendered **Unscreened**. QA's screenshot showed thirteen contacts and
+thirteen amber tags on a build where screening worked perfectly. Screening needs no wallet, so the
+book no longer pretends it does: one sweep per unique address (shared through the module cache),
+`getVerdict(address)` for the contact-level flag, and `getVerdictOn(address, chainId)` for a saved
+address's own network — which answers `no-source` when nothing screens that chain, a different
+sentence from "nothing answered", and never collapses into it.
 
 Do not collapse them. The per-chain read is the one the contract will repeat, and it must stay a
 live read on the chain the value moves on. The estate read is advisory and its cache is fine.

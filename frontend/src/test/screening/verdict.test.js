@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { deriveVerdict, describeVerdict, countReadings, VERDICTS, VERDICT_LABELS } from '../../lib/screening/verdict'
+import {
+  deriveVerdict,
+  describeVerdict,
+  countReadings,
+  verdictOnChain,
+  worstVerdict,
+  VERDICTS,
+  VERDICT_LABELS,
+} from '../../lib/screening/verdict'
 
 const read = (chainId, flagged, label = 'Chainalysis sanctions oracle', detail = null) => ({
   id: `${label}:${chainId}`, kind: 'x', label, chainId, address: '0x', status: 'read', flagged, detail,
@@ -51,15 +59,16 @@ describe('describeVerdict — the sentence names what the verdict rests on', () 
 
   it('counts sources and networks for a clean bill', () => {
     const result = { verdict: VERDICTS.SCREENED, readings: [read(1, false), read(1, false, 'Circle USDC freeze list'), read(137, false)] }
-    expect(describeVerdict(result, nameFor)).toBe('Screened clear by 3 sources on 2 networks.')
+    expect(describeVerdict(result, nameFor)).toBe('All 3 lists on 2 networks answered clear.')
   })
 
-  it('names the missing list on a partial screen and says it is not a clean bill', () => {
+  it('gives counts on a partial screen, and leaves the names to the detail (#1458 QA round)', () => {
     const result = { verdict: VERDICTS.PARTIAL, readings: [read(1, false), unreadable(137, 'FairWins sanctions guard')] }
     const s = describeVerdict(result, nameFor)
-    expect(s).toContain('1 of 2 sources answered clear')
-    expect(s).toContain('FairWins sanctions guard on Polygon could not be read')
-    expect(s).toContain('Not a clean bill')
+    expect(s).toBe('1 of 2 lists answered clear; 1 could not be read — not a clean bill.')
+    // The summary must stay a sentence, not a roll-call: naming every unreachable source is what
+    // turned this line into a paragraph on a build where three of four could not be read.
+    expect(s).not.toContain('FairWins sanctions guard')
   })
 
   it('names the uncovered networks even when sources existed and none answered', () => {
@@ -74,5 +83,32 @@ describe('describeVerdict — the sentence names what the verdict rests on', () 
     expect(describeVerdict(result, (id) => (id === 61 ? 'Ethereum Classic' : `chain ${id}`))).toContain(
       'No screening source covers Ethereum Classic',
     )
+  })
+})
+
+describe("verdictOnChain — one network's answer, from the whole-estate readings", () => {
+  it("derives that chain's verdict from only that chain's readings", () => {
+    const result = { readings: [read(1, false), read(137, true), unreadable(8453)] }
+    expect(verdictOnChain(result, 1).verdict).toBe(VERDICTS.SCREENED)
+    expect(verdictOnChain(result, 137).verdict).toBe(VERDICTS.FLAGGED)
+    expect(verdictOnChain(result, 8453).verdict).toBe(VERDICTS.UNSCREENED)
+  })
+
+  it('returns null when nothing screens that chain — never a verdict about silence', () => {
+    expect(verdictOnChain({ readings: [read(1, false)] }, 61)).toBeNull()
+  })
+})
+
+describe('worstVerdict — the contact-level flag', () => {
+  it('ranks a flag above a gap, and a gap above a clean bill', () => {
+    expect(worstVerdict([VERDICTS.SCREENED, VERDICTS.FLAGGED, VERDICTS.PARTIAL])).toBe(VERDICTS.FLAGGED)
+    expect(worstVerdict([VERDICTS.SCREENED, VERDICTS.PARTIAL])).toBe(VERDICTS.PARTIAL)
+    expect(worstVerdict([VERDICTS.SCREENED, VERDICTS.UNSCREENED])).toBe(VERDICTS.UNSCREENED)
+    expect(worstVerdict([VERDICTS.SCREENED, VERDICTS.SCREENED])).toBe(VERDICTS.SCREENED)
+  })
+
+  it('is null when nothing has answered yet, so a pending sweep never reads as clear', () => {
+    expect(worstVerdict([])).toBeNull()
+    expect(worstVerdict([null, undefined])).toBeNull()
   })
 })

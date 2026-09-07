@@ -638,3 +638,10 @@
   gap: 0.75rem;
   font-size: 0.85rem;
 }
+
+/* "Nothing screens this network" — a fact about coverage, not a verdict about the address, so it
+   is stated in words rather than dressed as a status tag (issue #1458). */
+.ab-address-nosource {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}

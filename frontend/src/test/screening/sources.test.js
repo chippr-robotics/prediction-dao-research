@@ -10,6 +10,9 @@ vi.mock('../../config/contracts', () => ({
     if (world.throwFor === chainId) throw new Error('boom')
     return name === 'sanctionsGuard' ? world.guards[chainId] : undefined
   },
+  // sources.js imports this for the roster filter; the mock replaces the whole module, so it has
+  // to carry every export the module under test reaches for.
+  isLocalOnlyChain: (id) => Number(id) === 1337,
 }))
 
 import {

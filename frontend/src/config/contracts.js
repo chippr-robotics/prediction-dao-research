@@ -547,6 +547,19 @@ export function getContractAddressForChain(contractName, chainId) {
 
 // Local-only sandboxes — never surfaced as public "deployed" networks.
 const LOCAL_ONLY_CHAIN_IDS = new Set([1337])
+
+/**
+ * Is this chain a local development sandbox rather than a real network?
+ *
+ * Exported because "local-only" is a fact about REACHABILITY, not just about the landing page:
+ * a shipped build can never reach `http://127.0.0.1:8545`, so any read routed at such a chain
+ * from a deployed origin is guaranteed to fail. Callers that would otherwise report that
+ * guaranteed failure to a member as a degraded state must exclude these chains first —
+ * see `lib/screening/sources.js#screeningChainIds` for the case that made this necessary.
+ */
+export function isLocalOnlyChain(chainId) {
+  return LOCAL_ONLY_CHAIN_IDS.has(Number(chainId))
+}
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
 /**
@@ -601,7 +614,8 @@ const NETWORK_INFO_BY_CHAIN = {
   },
   80002: {
     name: 'Polygon Amoy',
-    rpcUrl: 'https://rpc-amoy.polygon.technology',
+    // Mirrors config/networks.js — see the note there on why this is not Polygon's own endpoint.
+    rpcUrl: 'https://polygon-amoy-bor-rpc.publicnode.com',
     blockExplorer: 'https://amoy.polygonscan.com',
   },
   137: {

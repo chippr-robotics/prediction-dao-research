@@ -57,6 +57,8 @@ const RPC_HOSTS = /publicnode\.com$|rivet\.link$|etccooperative\.org$|polygon\.t
 
 /** Host fragment -> chain id, per the rpcUrl values in frontend/src/config/networks.js. */
 const CHAIN_BY_RPC = [
+  // Amoy before Polygon: both are publicnode `*-bor-rpc` hosts, and this list is first-match.
+  ['polygon-amoy-bor-rpc', 80002],
   ['polygon-bor-rpc', 137],
   ['arbitrum-one-rpc', 42161],
   ['base-rpc', 8453],
@@ -65,7 +67,6 @@ const CHAIN_BY_RPC = [
   ['ethereum-rpc', 1],
   ['rivet.link', 61],
   ['mordor.etccooperative.org', 63],
-  ['rpc-amoy.polygon.technology', 80002],
 ]
 
 const hex = (n) => `0x${Number(n).toString(16)}`
