@@ -40,11 +40,14 @@ const readBody = (items) => ({
 
 // ---- read-provider JSON-RPC stub ---------------------------------------------------------------
 //
-// EVERY shipped read provider must be intercepted, not just the one this spec cares about.
-// Intercepting only publicnode.com let the ETC/Mordor/Amoy reads escape to the real network, and
-// the escaped request reset the connection and crashed the whole run before a single assertion
-// ran — a spec-level failure, not a flake. The host set and the hostname-based match are the ones
-// 33-account-surfaces.cy.js already proved; the host->chain map is read off config/networks.js.
+// EVERY shipped read provider is intercepted, not just the one this spec cares about, so the spec
+// is hermetic: no assertion here depends on a real network answering. Intercepting only
+// publicnode.com left the ETC/Mordor/Amoy reads reaching out. In CI that merely makes the spec
+// slower and non-deterministic; in a sandbox whose egress proxy resets such connections it
+// aborts the run outright (an untouched spec, 30-verify-message.cy.js, does the same there), so
+// full coverage is also what makes this spec runnable and verifiable off CI. The host set and the
+// hostname match are the ones 33-account-surfaces.cy.js already proved; the host->chain map is
+// read off config/networks.js.
 //
 // Only Polygon answers a non-zero balance, so exactly one native POL row exists to open. Contract
 // reads answer a zero word, so ERC-20 rows hold nothing and stay out of the way.
