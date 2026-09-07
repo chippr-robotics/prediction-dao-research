@@ -14,51 +14,51 @@ gateway module + mapping + seam because all three stories consume the same `Feed
 
 ## Phase 1: Setup
 
-- [ ] T001 Verify workspace install is healthy (`node scripts/deps/check-dependency-hygiene.js`);
+- [X] T001 Verify workspace install is healthy (`node scripts/deps/check-dependency-hygiene.js`);
       if node_modules is absent run `npm run deps:reinstall` (NEVER plain `npm install` — spec 075).
       No new dependencies exist anywhere in this feature; the lockfile must end byte-identical.
-- [ ] T002 [P] Add `NEWS_ENABLED` (default false), `NEWS_BASE_URL` (default
+- [X] T002 [P] Add `NEWS_ENABLED` (default false), `NEWS_BASE_URL` (default
       `https://api.alphaday.com`), `NEWS_CACHE_TTL_MS` (default 300000, clamped ≥ 300000 with one
       boot log line on clamp) to `services/relay-gateway/src/config/index.js`, following the
       `PERPS_*` block's shape and comments.
 
 ## Phase 2: Foundational (blocking — all three stories consume these)
 
-- [ ] T003 Create `services/relay-gateway/src/news/normalize.js`: vendor item → `NewsItem` per
+- [X] T003 Create `services/relay-gateway/src/news/normalize.js`: vendor item → `NewsItem` per
       data-model.md (id/title/url/source{name,slug}/publishedAt/sentiment; drop image, icon,
       author, hash, likes, sentiment_score; drop items with non-`https:` url or missing/unparsable
       `published_at`). Document each field's provenance in comments (spec-082 normalizer rule).
-- [ ] T004 Create `services/relay-gateway/src/news/client.js`: keyless fetch of
+- [X] T004 Create `services/relay-gateway/src/news/client.js`: keyless fetch of
       `{NEWS_BASE_URL}/items/news/?tags=<slug>&limit=<n>` with single-flight per slug, TTL cache
       (`NEWS_CACHE_TTL_MS`), `stale` marking, and STALE_FACTOR=10 beyond which the entry is gone
       (answer becomes `unreadable`, never stale-as-live). Copy the perps `client.js` cache device;
       no venue fan-out (research R3/R5, plan deviation 1).
-- [ ] T005 Create `services/relay-gateway/src/news/routes.js`: `GET /v1/news/:chainId/:asset`
+- [X] T005 Create `services/relay-gateway/src/news/routes.js`: `GET /v1/news/:chainId/:asset`
       per contracts/gateway-news-api.md — pipeline killswitch → enabled (`503 news_unconfigured`
       off) → param validation (`slug` required, `^[a-z0-9-]{1,64}$`; `limit` 1–20 default 8;
       `chainId` integer or spec-061 Bitcoin string id; `asset` `0x…`-lowercase or `native`;
       `400 invalid_params` locally, never proxied) → quota (`callerQuotaKey`) → cached fetch
       returning the `FeedReading` shapes (`read` with possibly-empty `items`,
       `unreadable` with reason). Read-only: no write route in the module.
-- [ ] T006 Mount the news module unconditionally in `services/relay-gateway/src/server.js`
+- [X] T006 Mount the news module unconditionally in `services/relay-gateway/src/server.js`
       beside the perps mount (off ⇒ the route itself answers 503).
-- [ ] T007 Create `services/relay-gateway/test/news.test.js` (node:test, fixture server like
+- [X] T007 Create `services/relay-gateway/test/news.test.js` (node:test, fixture server like
       `test/perps.test.js`): read-with-items, honest-empty (`read`+`[]`), upstream 5xx/unreachable
       ⇒ `unreadable`, garbage-slug fixture ⇒ `read`+`[]` (fail-closed, research R3), missing slug ⇒
       400, module off ⇒ 503 `news_unconfigured`, single-flight (N concurrent = 1 upstream call —
       SC-005), TTL-clamp boot behaviour, normalize drops (http url, undated item, image/icon never
       forwarded).
-- [ ] T008 [P] Create `frontend/src/config/newsAssets.js`: curated `(chainId,address)→{slug}` +
+- [X] T008 [P] Create `frontend/src/config/newsAssets.js`: curated `(chainId,address)→{slug}` +
       Bitcoin string-id entries, `newsSlugFor(assetKey) → slug | null` resolver (null IS
       "not covered"; no ticker heuristic, no fallback — data-model.md AssetNewsMapping). Seed rows
       probe-verified against live tags for: each cohort chain's native coin, the portfolio
       registry's majors (USDC, USDT, WETH, WBTC…), `bitcoin`, `ethereum-classic`. Record the
       verification date per row in a comment (spec-021-amendment discipline).
-- [ ] T009 [P] Create `frontend/src/lib/news/newsClient.js`: `fetchTokenNews({ chainId, asset })`
+- [X] T009 [P] Create `frontend/src/lib/news/newsClient.js`: `fetchTokenNews({ chainId, asset })`
       → resolves slug via `newsAssets.js`; null slug short-circuits to the local not-covered
       outcome with NO network call; otherwise fetches the gateway route and passes the
       `FeedReading` through without invention; 503 `news_unconfigured` ⇒ `not-configured`.
-- [ ] T010 Create `frontend/src/test/news/newsClient.test.js` + `newsAssets.test.js` (Vitest):
+- [X] T010 Create `frontend/src/test/news/newsClient.test.js` + `newsAssets.test.js` (Vitest):
       resolver null-for-unmapped, zero-network short-circuit (fetch spy), three states + honest
       empty passthrough, not-configured on 503, Bitcoin ids never hit EVM-shaped paths.
 
@@ -70,19 +70,19 @@ parallel if staffed).
 **Goal**: selecting a portfolio token shows attributed, dated news with link-outs, under full
 three-state + honest-empty honesty. **Independent test**: quickstart scenarios 1–5.
 
-- [ ] T011 [US1] Create `frontend/src/components/news/TokenNewsCard.jsx` +
+- [X] T011 [US1] Create `frontend/src/components/news/TokenNewsCard.jsx` +
       `TokenNewsCard.css`: consumes one `FeedReading`; renders items as TEXT (headline, source
       name, relative age, external link with attribution and plain-link fallback — perps
       `linkouts.js` pattern); `unreadable` ⇒ sentence + retry button; `read`+`[]` ⇒
       "No recent items for <asset>"; not-covered ⇒ "No news source covers this asset";
       `not-configured` ⇒ renders nothing. All colours via existing theme tokens (specs 090/091 —
       no new colour anywhere); component states carry accessible roles (a11y scanned in T021).
-- [ ] T012 [US1] Mount `TokenNewsCard` in `frontend/src/components/wallet/AssetDetailSheet.jsx`
+- [X] T012 [US1] Mount `TokenNewsCard` in `frontend/src/components/wallet/AssetDetailSheet.jsx`
       behind `isFeatureEnabled('news')`, fed by `fetchTokenNews` for the sheet's asset; on a
       testnet cohort render the perps-style honest notice (news describes the mainnet asset).
-- [ ] T013 [P] [US1] Add tenant feature `news` to `tenants/fairwins/manifest.json` and confirm
+- [X] T013 [P] [US1] Add tenant feature `news` to `tenants/fairwins/manifest.json` and confirm
       `npm run tenants:validate` passes (feature list is validator-gated).
-- [ ] T014 [US1] Create `frontend/src/test/news/TokenNewsCard.test.jsx` (Vitest): each state
+- [X] T014 [US1] Create `frontend/src/test/news/TokenNewsCard.test.jsx` (Vitest): each state
       renders its distinct copy; empty ≠ unreadable wording/style; no `<img>`/HTML from vendor
       fields; retry re-invokes the seam; feature-off renders nothing.
 
@@ -91,12 +91,12 @@ three-state + honest-empty honesty. **Independent test**: quickstart scenarios 1
 **Goal**: the selected pair's news below the amount entry; partial coverage labelled; trading
 never gated. **Independent test**: quickstart scenario 6.
 
-- [ ] T015 [US2] Mount a two-asset news feed (reusing `TokenNewsCard` per token) below the amount
+- [X] T015 [US2] Mount a two-asset news feed (reusing `TokenNewsCard` per token) below the amount
       entry in `frontend/src/components/fairwins/TradePanel.jsx`, behind `isFeatureEnabled('news')`:
       mapped token renders its card, unmapped token renders the not-covered line (partial is
       labelled, never silently completed); every news state leaves the amount entry, quoting and
       submission untouched (FR-006).
-- [ ] T016 [US2] Extend `frontend/src/test/news/` with `TradePanelNews.test.jsx`: one-mapped/
+- [X] T016 [US2] Extend `frontend/src/test/news/` with `TradePanelNews.test.jsx`: one-mapped/
       one-unmapped labelling; unreadable feed does not disable or delay the swap form.
 
 ## Phase 5: User Story 3 — Assistant `get_token_news` (P3)
