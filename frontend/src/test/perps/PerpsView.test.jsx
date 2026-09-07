@@ -471,6 +471,87 @@ describe('PerpsView', () => {
  * Spec 083 — the management gate
  * --------------------------------------------------------------------------------------------- */
 
+/* ------------------------------------------------------------------------------------------- *
+ * Issue #1440 — the controls are one row at rest, and a collapsed panel never hides a live filter
+ *
+ * The venue pills and the sort select cost roughly a fifth of a phone viewport before a single pair
+ * was on screen. Collapsing them is only safe if the closed control still SAYS what is shaping the
+ * table: a table quietly missing rows is indistinguishable from a venue that stopped reporting,
+ * which is the exact confusion the rest of this view is built to avoid.
+ * ------------------------------------------------------------------------------------------- */
+describe('PerpsView market controls', () => {
+  it('rests as one row: search visible, venue pills and sort UNMOUNTED', async () => {
+    renderView()
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+
+    // The one control a member reaches for first stays on the toolbar.
+    expect(screen.getByLabelText('Search pairs')).toBeInTheDocument()
+
+    // Not `display: none` — a control in the tab order under `aria-expanded="false"` is claiming
+    // something untrue, so the panel is genuinely absent.
+    const toggle = screen.getByRole('button', { name: /filters/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('group', { name: /filter by venue/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Sort pairs')).not.toBeInTheDocument()
+  })
+
+  it('reveals the venue filter and the sort on demand, and folds them away again', async () => {
+    renderView()
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    const toggle = screen.getByRole('button', { name: /filters/i })
+
+    await userEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('group', { name: /filter by venue/i })).toBeInTheDocument()
+    expect(screen.getByLabelText('Sort pairs')).toBeInTheDocument()
+
+    await userEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('Sort pairs')).not.toBeInTheDocument()
+  })
+
+  it('NAMES the active venue filter on the closed control, and still filters the table', async () => {
+    renderView()
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Hyperliquid' }))
+    // Fold the panel away — the filter it set is still shaping the table.
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }))
+
+    expect(screen.queryByRole('group', { name: /filter by venue/i })).not.toBeInTheDocument()
+    // The toggle carries the live filter, so nothing about the short table is hidden.
+    expect(screen.getByRole('button', { name: /filters/i })).toHaveTextContent('Hyperliquid')
+    expect(screen.queryByText('BTC/USD')).not.toBeInTheDocument()
+    expect(screen.getByText('ETH/USD')).toBeInTheDocument()
+  })
+
+  it('names a non-default sort on the closed control too', async () => {
+    renderView()
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }))
+    await userEvent.selectOptions(screen.getByLabelText('Sort pairs'), 'symbol')
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }))
+
+    expect(screen.getByRole('button', { name: /filters/i })).toHaveTextContent('Pair name')
+  })
+
+  it('shows the result count only while something is narrowing the list', async () => {
+    renderView()
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+
+    // Announced to a screen reader from the start, but not taking height on a resting view.
+    const before = screen.getByText(/showing 2 of 2 pairs/i)
+    expect(before).toHaveClass('sr-only')
+
+    await userEvent.type(screen.getByLabelText('Search pairs'), 'BTC')
+    const after = screen.getByText(/showing 1 of 2 pairs/i)
+    expect(after).not.toHaveClass('sr-only')
+    expect(after).toHaveClass('perps-result-count')
+  })
+})
+
 describe('PerpsView management controls', () => {
   it('renders the phase-0 read-only surface with the management flag OFF', async () => {
     // This is the CI state and the state most members will see, so it is asserted rather than
