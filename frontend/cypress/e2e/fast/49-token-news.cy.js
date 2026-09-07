@@ -10,10 +10,11 @@
 // exactly what TN-02 exercises: an unmapped asset never produces a request.
 //
 // The portfolio card needs a holding row to open the AssetDetailSheet, and the
-// fast tier starts no chain — so the portfolio tests stub the read-provider
-// JSON-RPC the same way 25-perps-management.cy.js does (publicnode intercepts),
-// answering ONLY a Polygon native balance. Every other chain stays honestly
-// unreadable, which is per-chain isolation working, not a gap.
+// fast tier starts no chain — so every test stubs the read-provider JSON-RPC at
+// every configured provider host, answering a single non-zero native balance on
+// Ethereum Classic. Every other chain reads zero and contributes no row, which
+// is per-chain isolation working, not a gap. See the stub below for why the one
+// funded chain is ETC rather than Polygon.
 // =============================================================================
 
 const TEST_ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
@@ -49,8 +50,8 @@ const readBody = (items) => ({
 // hostname match are the ones 33-account-surfaces.cy.js already proved; the host->chain map is
 // read off config/networks.js.
 //
-// Only Polygon answers a non-zero balance, so exactly one native POL row exists to open. Contract
-// reads answer a zero word, so ERC-20 rows hold nothing and stay out of the way.
+// Only Ethereum Classic answers a non-zero balance, so exactly one native ETC row exists to open.
+// Contract reads answer a zero word, so ERC-20 rows hold nothing and stay out of the way.
 
 const RPC_HOSTS = /publicnode\.com$|rivet\.link$|etccooperative\.org$|polygon\.technology$|etcdesktop\.com$/
 
