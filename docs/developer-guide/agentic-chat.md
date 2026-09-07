@@ -435,6 +435,7 @@ snapshot, gated by `services/relay-gateway/test/mcpToolParity.test.js`). Eight t
 | `get_perps_pairs` | `none` | `GET /v1/perps/pairs` | — |
 | `get_prediction_markets` | `none` | `GET /v1/polymarket/{chainId}/markets` | — |
 | `get_profile` | `grant` | `GET /v1/member/me` | `read:profile` |
+| `get_token_news` | `none` | `GET /v1/news/{chainId}/{asset}` | — |
 | `get_wagers` | `grant` | `GET /v1/member/wagers` | `read:wagers` |
 
 `exec` is data, not a function — `{ kind: 'route', route: '<contract.js ROUTES id>' }`,

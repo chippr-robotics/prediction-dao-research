@@ -111,6 +111,10 @@
  *                              in sources.hyperliquid.unreadDexes, never silently dropped.
  *   PERPS_QUOTA_PER_IP/_GLOBAL/_WINDOW_MS   read quotas (defaults 60/300/60000)
  *   PERPS_KILLSWITCH           'true' => all /v1/perps/* routes answer 503 (ops kill)
+ *   NEWS_ENABLED               'true' enables the /v1/news/* read proxy (spec 109; default false)
+ *   NEWS_BASE_URL              Alphaday API host (keyless — no credential exists for this module)
+ *   NEWS_CACHE_TTL_MS          per-slug cache TTL, clamped >= 300000 (the vendor's own cache floor)
+ *   NEWS_TIMEOUT_MS / NEWS_RETRIES / NEWS_QUOTA_* / NEWS_KILLSWITCH   read plumbing (perps defaults)
  *   PERPS_GAINS_REFERRER       PUBLIC attribution: FairWins gains referrer address
  *   PERPS_GMX_REF_CODE         PUBLIC attribution: GMX referral code (1-20 [A-Za-z0-9_])
  *   PERPS_HL_BUILDER_ADDRESS   PUBLIC attribution: FairWins Hyperliquid builder wallet
@@ -856,6 +860,49 @@ export function loadConfig(env = process.env, opts = {}) {
         quotaGlobal: int(env, 'PERPS_QUOTA_GLOBAL', 300),
         quotaWindowMs: int(env, 'PERPS_QUOTA_WINDOW_MS', 60_000),
         killSwitch: opt(env, 'PERPS_KILLSWITCH', 'false').toLowerCase() === 'true',
+      }
+    })(),
+
+    // Token news read proxy (spec 109) — the fourth read-only proxy, on the perps template.
+    // Keyless by design: Alphaday's public API takes no credential (research R1), so there is
+    // deliberately NO key variable here and nothing for the secrets registry to hold.
+    news: (() => {
+      const enabled = opt(env, 'NEWS_ENABLED', 'false').toLowerCase() === 'true'
+      const baseUrl = opt(env, 'NEWS_BASE_URL', 'https://api.alphaday.com')
+      if (enabled) {
+        let ok = false
+        try {
+          const proto = new URL(baseUrl).protocol
+          // http is admitted for the fixture server in tests; production config is https.
+          ok = proto === 'https:' || proto === 'http:'
+        } catch {
+          ok = false
+        }
+        if (!ok) throw new Error(`[relay-gateway] NEWS_BASE_URL=${baseUrl} is not a valid URL`)
+      }
+      /**
+       * TTL floor 300s: the vendor itself serves `cache-control: max-age=300` (research R5), so a
+       * shorter TTL buys upstream load without buying freshness. A mis-set value is a tuning
+       * error, not a lie to members — clamp and log once rather than failing boot.
+       */
+      const NEWS_TTL_FLOOR_MS = 300_000
+      const rawTtl = int(env, 'NEWS_CACHE_TTL_MS', NEWS_TTL_FLOOR_MS)
+      const cacheTtlMs = Math.max(rawTtl, NEWS_TTL_FLOOR_MS)
+      if (rawTtl < NEWS_TTL_FLOOR_MS) {
+        console.warn(
+          `[relay-gateway] NEWS_CACHE_TTL_MS=${rawTtl} is below the vendor's 300s cache floor; clamped to ${NEWS_TTL_FLOOR_MS}`
+        )
+      }
+      return {
+        enabled,
+        baseUrl,
+        cacheTtlMs,
+        timeoutMs: int(env, 'NEWS_TIMEOUT_MS', 8000),
+        retries: int(env, 'NEWS_RETRIES', 1),
+        quotaPerIp: int(env, 'NEWS_QUOTA_PER_IP', 60),
+        quotaGlobal: int(env, 'NEWS_QUOTA_GLOBAL', 300),
+        quotaWindowMs: int(env, 'NEWS_QUOTA_WINDOW_MS', 60_000),
+        killSwitch: opt(env, 'NEWS_KILLSWITCH', 'false').toLowerCase() === 'true',
       }
     })(),
     // Member API (spec 095): member-signed capability tokens granting custody-free, scoped access to

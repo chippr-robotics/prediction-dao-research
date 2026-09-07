@@ -29,9 +29,9 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 | Spec directories | 113 |
 | With a member-facing flow | 89 |
 | Member-facing flows | 205 |
-| 🟢 covered | 185 |
+| 🟢 covered | 187 |
 | 🟡 partial | 5 |
-| 🔴 absent | 6 |
+| 🔴 absent | 4 |
 | ⚪ out of scope | 9 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
@@ -588,7 +588,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Information — read-only surfaces
 
-50 flows — 🟢 48 · 🟡 0 · 🔴 2 · ⚪ 0 · covered-but-not-proven 12
+50 flows — 🟢 50 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 12
 
 ### `005-multi-recipient-encryption` — Multi-recipient encryption
 
@@ -817,8 +817,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `news.portfolio-token-card` | Selecting a portfolio token shows that asset's latest news with link-out attribution; an unreadable feed renders a sentence + retry (never an empty feed pretending to be no news), an unmapped asset renders honest absence, and the module off hides the card | 🔴 absent | none | — (proposed: no-chain) | #1465 |  |
-| `news.trade-pair-feed` | Selecting a trade pair shows the pair's token news below the amount entry under the same three-state honesty; items are text with attribution, never rendered HTML | 🔴 absent | none | — (proposed: no-chain) | #1465 |  |
+| `news.portfolio-token-card` | Selecting a portfolio token shows that asset's latest news with link-out attribution; an unreadable feed renders a sentence + retry (never an empty feed pretending to be no news), an unmapped asset renders honest absence, and the module off hides the card | 🟢 covered | flow | `no-chain` | `49-token-news.cy.js` (TN-01, TN-03, TN-04, TN-04b) |  |
+| `news.trade-pair-feed` | Selecting a trade pair shows the pair's token news below the amount entry under the same three-state honesty; items are text with attribution, never rendered HTML | 🟢 covered | flow | `no-chain` | `49-token-news.cy.js` (TN-05, TN-05b) |  |
 
 ## No member consequence
 

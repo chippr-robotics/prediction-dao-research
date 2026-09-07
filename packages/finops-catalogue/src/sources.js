@@ -508,6 +508,26 @@ const vendors = [
       'plan the modelled figure is the flat subscription and credit usage is informational only.',
   },
   {
+    id: 'alphaday-news-api',
+    kind: 'cost',
+    status: 'live',
+    label: 'Alphaday news API',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'modelled',
+    collector: 'quicknode', // shares the flat-subscription modeller; the vendor exposes no billing API
+    interval: VENDOR,
+    credential: null,
+    docs: 'finops-operations.md#alphaday-news-cost',
+    meaning:
+      'The token-news vendor behind the relay-gateway news proxy (spec 109). Keyless public API on a free ' +
+      'tier: the modelled figure is $0 by declared plan rate, and the entry exists so the dependency is ' +
+      'VISIBLE — if Alphaday ever prices the tier, this line is where the change lands rather than a ' +
+      'surprise (research R7). No revenue entry pairs with it: the module carries no fee, no referral, no ' +
+      'payee env, so C2b has nothing to claim. Gateway request volume shows in gateway-upstream-usage ' +
+      'under the news upstream label.',
+  },
+  {
     id: 'gateway-upstream-usage',
     kind: 'usage',
     status: 'live',

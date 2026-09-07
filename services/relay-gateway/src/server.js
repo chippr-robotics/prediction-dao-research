@@ -54,6 +54,8 @@ import { createEsploraClient, createStampsClient } from './bitcoin/client.js'
 import { createBitcoinRouter } from './bitcoin/routes.js'
 import { createPerpsClients } from './perps/client.js'
 import { createPerpsRouter, perpsStatus } from './perps/routes.js'
+import { createNewsClient } from './news/client.js'
+import { createNewsRouter } from './news/routes.js'
 import { createAcrossClient } from './bridge/quotes.js'
 import { createBridgeRouter } from './bridge/routes.js'
 import { createMemberApiRouter, memberApiStatus } from './memberApi/routes.js'
@@ -1008,6 +1010,36 @@ export function createApp(config, deps = {}) {
       quotas: perpsQuotas,
       killSwitch,
       feeRates,
+      now: nowMs,
+    })
+  )
+
+  // ---- GET /v1/news/* (spec 109 token-news read proxy; origin-locked via middleware) -----------
+  // Read-only, keyless Alphaday proxy: recent items for one curated tag slug, single-flight cached
+  // per slug so vendor load is O(distinct assets), never O(members). News is ADVISORY-ONLY — no
+  // value path routes through here, and there are NO write routes. Mounting is unconditional so a
+  // disabled module answers 503 news_unconfigured, never a bare 404 (the SPA hides every news
+  // surface on that answer).
+  const newsQuotas = createQuotas({
+    signerPerWindow: config.news.quotaPerIp,
+    globalPerWindow: config.news.quotaGlobal,
+    windowMs: config.news.quotaWindowMs,
+    now: nowMs,
+  })
+  const newsClient =
+    deps.newsClient ??
+    createNewsClient({
+      baseUrl: config.news.baseUrl,
+      timeoutMs: config.news.timeoutMs,
+      retries: config.news.retries,
+      ...(deps.newsFetch ? { fetchImpl: deps.newsFetch } : {}),
+    })
+  app.use(
+    createNewsRouter(config, {
+      client: newsClient,
+      cache: deps.newsCache ?? createTtlCache({ now: nowMs }),
+      quotas: newsQuotas,
+      killSwitch,
       now: nowMs,
     })
   )

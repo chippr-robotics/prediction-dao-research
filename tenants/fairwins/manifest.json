@@ -5,8 +5,8 @@
   "identity": {
     "displayName": "FairWins",
     "legalName": "FairWins",
-    "tagline": "Enterprise-grade digital asset infrastructure \u2014 self-custody, multi-chain, white-label.",
-    "metaDescription": "FairWins is self-custody digital asset infrastructure: embedded wallets, policy-governed custody, payments and settlement, markets connectivity, and built-in compliance screening across major networks \u2014 available white-label under your own brand.",
+    "tagline": "Enterprise-grade digital asset infrastructure — self-custody, multi-chain, white-label.",
+    "metaDescription": "FairWins is self-custody digital asset infrastructure: embedded wallets, policy-governed custody, payments and settlement, markets connectivity, and built-in compliance screening across major networks — available white-label under your own brand.",
     "domains": [
       "fairwins.app"
     ],
@@ -35,9 +35,9 @@
     "appleTouchIcon": "/assets/fairwins_no-text_logo.svg",
     "htmlTitle": "FairWins - Digital Asset Infrastructure",
     "pwa": {
-      "name": "\ud83c\udf40FairWins",
+      "name": "🍀FairWins",
       "shortName": "FairWins",
-      "appleTitle": "\ud83c\udf40FairWins",
+      "appleTitle": "🍀FairWins",
       "themeColor": "#2E7D8C",
       "backgroundColor": "#122126"
     },
@@ -104,7 +104,8 @@
       "bitcoin",
       "recovery",
       "assistant",
-      "assistant-byok"
+      "assistant-byok",
+      "news"
     ],
     "chains": {
       "mainnet": [

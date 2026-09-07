@@ -30,6 +30,8 @@ import SensitiveValue from '../common/SensitiveValue'
 import InfoTip from '../ui/InfoTip'
 import { formatDecimalForDisplay } from '../../lib/format/amount'
 import TradeTokenSelect from './TradeTokenSelect'
+import TokenNewsCard from '../news/TokenNewsCard'
+import { isFeatureEnabled } from '../../config/tenant'
 import './TradePanel.css'
 
 // Price impact bands used to color the trade summary, mirroring the thresholds
@@ -674,6 +676,23 @@ function TradePanel() {
           </p>
         </div>
       </div>
+
+      {/* Token news (spec 109 US2) — below the amount entry, ADVISORY ONLY: no news state gates,
+          delays or alters the swap form, quoting or submission (FR-006). One card per leg, so a
+          pair with one covered and one uncovered token renders labelled partial coverage rather
+          than a silently completed feed. */}
+      {isFeatureEnabled('news') && (fromToken || toToken) && (
+        <div className="trade-news">
+          {[fromToken, toToken].filter(Boolean).map((token) => (
+            <TokenNewsCard
+              key={`${token.chainId}:${token.address}`}
+              chainId={Number(token.chainId)}
+              address={token.address}
+              assetLabel={token.symbol}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Trade summary — the capital-markets read-out */}
       {quote && (
