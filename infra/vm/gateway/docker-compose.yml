@@ -192,6 +192,26 @@ services:
       # rather than carrying a code that earns nothing. GMX's UI fee is NOT here — it rides on-chain
       # calldata from the SPA (uiFeeReceiver), never a gateway request.
       # PERPS_GAINS_REFERRER / PERPS_GMX_REF_CODE / PERPS_HL_BUILDER_ADDRESS: unset on purpose.
+      # ---- Token news read proxy (spec 109) ----
+      # READ-ONLY BY CONSTRUCTION, like perps above: no write route, no credential of any kind. It
+      # proxies the KEYLESS Alphaday tags feed, which is why there is no NEWS_API_KEY to wire — the
+      # vendor needs none, and it has no CORS, which is why the proxy exists at all rather than the
+      # browser calling it directly.
+      #
+      # REQUIRES AN IMAGE CONTAINING THE NEWS MODULE. The image pinned above (spec107-1ac148bf)
+      # PREDATES spec 109 (merged 2026-09-07), so until the tag is bumped this flag does nothing:
+      # `/v1/news/*` does not exist there and answers 404, not 503. The SPA now reads a 404 as
+      # not-configured — absence, rendering nothing — so the transition window is silent rather
+      # than showing every member a failure they cannot act on. Verify before pinning a new tag:
+      # /status must carry a `news` block, exactly as the perps note above describes.
+      #
+      # FinOps: the cost source `alphaday-news-api` is already catalogued LIVE (basis modelled, $0
+      # on the vendor's free tier), so no C2b promotion rides on this switch — there is no payee,
+      # no fee and no revenue path anywhere in the module.
+      NEWS_ENABLED: "true"
+      # Cache TTL is CLAMPED to >= 300000 ms in config (the vendor itself serves max-age=300), so a
+      # lower value here buys load, not freshness, and is logged once on boot when clamped. Left
+      # unset to take that floor. NEWS_BASE_URL is likewise unset: the default is the vendor.
     cpus: 0.5
     mem_limit: 320m
     healthcheck:

@@ -7,7 +7,8 @@
  *   { state: 'not-covered' }                        no curated mapping — resolved locally with
  *                                                   ZERO network cost (contract §frontend seam)
  *   { state: 'unreadable', reason }                 the read failed → sentence + retry
- *   { state: 'not-configured' }                     module/gateway off → the surface is absent
+ *   { state: 'not-configured' }                     module/gateway off, or the gateway image
+ *                                                   predates the module (404) → surface is absent
  */
 import { newsSlugFor } from '../../config/newsAssets'
 
@@ -51,6 +52,22 @@ export async function fetchTokenNews({ chainId, address = null, limit = 8, fetch
     return code === 'news_unconfigured' || code === 'news_killed' || code === 'killswitch_active'
       ? { state: 'not-configured' }
       : { state: 'unreadable', reason: 'gateway_error' }
+  }
+  if (res.status === 404) {
+    /*
+     * The route does not exist on this gateway, which means the IMAGE predates the news module —
+     * not that a read failed. The module mounts unconditionally (routes.js), so on any image that
+     * carries it `/v1/news/*` answers 503 when switched off and never 404s; a 404 is therefore
+     * unambiguous, and the honest reading is absence.
+     *
+     * This matters because the SPA and the gateway deploy INDEPENDENTLY. The news card ships with
+     * the frontend, while the module only arrives when the gateway image is rebuilt and re-pinned
+     * (infra/vm/gateway/docker-compose.yml). Without this branch, any window where the SPA is
+     * ahead puts "The news feed could not be read right now." plus a Retry on every asset sheet
+     * and every trade pair — an error the member cannot act on, for a surface that is simply not
+     * there yet. Absence renders nothing, which is what the spec asks for.
+     */
+    return { state: 'not-configured' }
   }
   if (!res.ok) return { state: 'unreadable', reason: 'gateway_error' }
 
