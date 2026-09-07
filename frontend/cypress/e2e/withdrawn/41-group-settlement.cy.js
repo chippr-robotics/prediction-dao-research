@@ -222,7 +222,20 @@ function preview() {
   cy.get('[data-testid="group-pay-confirm"]', { timeout: 20000 }).should('be.visible')
 }
 
-describe('Group settlement — how a group payment actually settles (spec 058)', () => {
+// ── Issue #1441: the affordance this file drives is WITHDRAWN ────────────────────────────────
+// `GROUP_PAY_ENABLED` in `frontend/src/lib/payments/groupPay.js` is false, so no send surface
+// renders "Add another recipient" and none of the journeys below can start. They are GUARDED,
+// not deleted: the engine, the lib and the components they exercise are all still in the tree,
+// and #1538 flips this constant back with them. A guarded describe reports as pending — which is
+// the point, because "passed" and "never ran" must not look alike (spec 094).
+//
+// Keep this in step with the constant. There is deliberately no import: a Cypress spec cannot
+// read the app's module graph, and a fetch-and-parse would fail open — reporting the suite green
+// on any error, which is the one outcome worse than a pending suite.
+const GROUP_PAY_ENABLED = false
+const groupPayDescribe = GROUP_PAY_ENABLED ? describe : describe.skip
+
+groupPayDescribe('Group settlement — how a group payment actually settles (spec 058)', () => {
   /*
    * PER-TEST CHAIN ISOLATION. Every test here moves coin and two of them create a vault, so a
    * re-run against a long-lived node would otherwise read "before" balances that already contain
