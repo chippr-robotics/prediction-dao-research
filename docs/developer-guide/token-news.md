@@ -51,7 +51,7 @@ Three states plus a distinct honest-empty, and nothing else:
 | `read` + `[]` | vendor answered, sparse coverage | "No recent items for X." — content, not failure |
 | `not-covered` | no mapping row | "No news source covers X." — no retry, no request |
 | `unreadable` | gateway/vendor did not answer | sentence + Retry — never an empty feed |
-| `not-configured` | module off / no gateway | NOTHING renders |
+| `not-configured` | module off, no gateway, or an image without the route (404) | NOTHING renders |
 
 Items are **text only**: the normalizer (`services/relay-gateway/src/news/normalize.js`) forwards
 `id/title/url/source{name,slug}/publishedAt/sentiment` and drops `image`, `icon`, vendor-account
@@ -87,11 +87,31 @@ explicitly. No `navigate`, no `build_intent` — a news result never makes the a
 
 ## Operations
 
-`NEWS_ENABLED=true` on a gateway deployment switches the module on; the SPA needs the `news`
-tenant feature (on for `fairwins`). Enabling it in `infra/vm/gateway/docker-compose.yml` is a
-deliberate ops change, separate from the code merge. Quotas ride the standard gateway knobs
-(`NEWS_QUOTA_PER_IP` / `NEWS_QUOTA_GLOBAL` / `NEWS_QUOTA_WINDOW_MS`), and `NEWS_KILLSWITCH=true`
-answers `503 news_killed` ahead of everything else.
+Two switches, and **both** must be on for a member to see anything: the `news` tenant feature
+(on for `fairwins`) and `NEWS_ENABLED` on the gateway (set `true` in
+`infra/vm/gateway/docker-compose.yml`). Either one off is honest absence — the surface renders
+nothing rather than an error. Quotas ride the standard gateway knobs (`NEWS_QUOTA_PER_IP` /
+`NEWS_QUOTA_GLOBAL` / `NEWS_QUOTA_WINDOW_MS`), and `NEWS_KILLSWITCH=true` answers
+`503 news_killed` ahead of everything else.
+
+### The flag is not the whole enablement
+
+**A gateway image that predates spec 109 has no `/v1/news/*` route at all**, so `NEWS_ENABLED`
+does nothing there — the same trap the `PERPS_ENABLED` note in that compose file records. The
+enablement is therefore two steps, in this order:
+
+1. Build and publish a relay-gateway image from a commit containing `services/relay-gateway/src/news/`,
+   and pin that tag in `infra/vm/gateway/docker-compose.yml`. **Verify before pinning**: the
+   image's `/status` must carry a `news` block. (The gateway image is an operator build — CI only
+   builds and boots it as a check, and `cloudbuild.yaml` builds the SPA, not this image.)
+2. Deploy the stack (`systemctl restart fairwins-stack@gateway` — never a single container; the
+   sidecars share the gateway's network namespace).
+
+The SPA and the gateway deploy independently, so the frontend card can be live while the module
+is not. That window is deliberately silent: `newsClient.js` reads a **404 as `not-configured`**,
+because the module mounts unconditionally and so an image carrying it answers `503` when switched
+off and never `404`s. Without that branch every asset sheet and trade pair would show "The news
+feed could not be read right now." plus a Retry, for a surface that simply has not shipped yet.
 
 See `specs/109-token-news/` (research.md carries the probe evidence) and
 `contracts/gateway-news-api.md` for the route contract.

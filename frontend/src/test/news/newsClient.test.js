@@ -78,6 +78,21 @@ describe('fetchTokenNews', () => {
     expect(flaky.state).toBe('unreadable')
   })
 
+  it('404 resolves not-configured: a gateway image without the module is ABSENCE, not a failure', async () => {
+    /*
+     * The SPA and the gateway deploy independently, so there is a window where the news card is
+     * live and the gateway image still predates the module. Its routes then 404. Reading that as
+     * `unreadable` put a sentence and a Retry the member cannot act on onto every asset sheet and
+     * every trade pair; the surface is simply not there yet, and absence renders nothing.
+     *
+     * Unambiguous by construction: the module mounts unconditionally, so an image carrying it
+     * answers 503 when switched off and never 404s.
+     */
+    const reading = await fetchTokenNews({ chainId: 137, fetchImpl: async () => json({}, 404) })
+    expect(reading.state).toBe('not-configured')
+    expect(reading.reason).toBeUndefined()
+  })
+
   it('transport failure is unreadable — never an empty read', async () => {
     const reading = await fetchTokenNews({
       chainId: 137,
