@@ -1,0 +1,64 @@
+{
+  "$comment": [
+    "Dependency vulnerability policy (issue #1521).",
+    "",
+    "THRESHOLD. `failOn` is what makes this gate adoptable. Failing on all 45 open alerts would",
+    "have meant a gate that is red on the day it lands, and a gate that is always red gets",
+    "bypassed — which is how the repo went without one at all. Critical fails at any scope; high",
+    "fails on the runtime path only. 32 of the 45 are development-scope and none of those is",
+    "critical, so they are reported by Dependabot and do not block a merge.",
+    "",
+    "ACCEPTANCES ARE TIME-BOXED, NOT PERMANENT. Each one needs a reason, the issue tracking its",
+    "removal, and a date it stops working. The expiry is the point: an acceptance with no end date",
+    "is a silenced alert, and the gate exists because silence is what let 45 accumulate. When one",
+    "expires the gate fails and the choice comes back — fix it, or renew it deliberately.",
+    "",
+    "THE LIST MUST ONLY EVER SHRINK. D-04 removes an entry that no longer matches an open alert, so",
+    "a stale excuse cannot sit here hiding the next real finding. Same rule as LEGACY_COLLISIONS",
+    "under the spec registry's S-04.",
+    "",
+    "WHAT IS DELIBERATELY NOT HERE. The 12 OpenZeppelin alerts (#1520) are not accepted, because",
+    "they never reach the threshold: they are development-scope and not critical. They describe an",
+    "OZ 4.7.3 copy nested under @chainlink/contracts -> @arbitrum/nitro-contracts that solc never",
+    "reads — contracts/ imports only functions/v1_0_0/** and shared/**, and nitro is reachable only",
+    "from automation/**. They should be DISMISSED on the alert itself, which is where the reasoning",
+    "belongs; an acceptance here would record them as tolerated risk, which is a different and",
+    "wrong claim."
+  ],
+
+  "failOn": [
+    { "severity": "critical", "scopes": ["development", "runtime"] },
+    { "severity": "high", "scopes": ["runtime"] }
+  ],
+
+  "acceptances": [
+    {
+      "ghsa": "GHSA-gcfj-64vw-6mp9",
+      "package": "axios",
+      "issue": 1519,
+      "expires": "2026-10-15",
+      "reason": "Nested axios@1.16.0 under @coinbase/cdp-sdk, reached via wagmi -> @wagmi/connectors -> @base-org/account. The root install is already 1.20.0 and outside every advisory range, so no direct bump clears it: the intermediate has to loosen its pin or we add an override. Tracked in #1519 for Iteration 6."
+    },
+    {
+      "ghsa": "GHSA-v5mp-jgw5-2x6j",
+      "package": "toml",
+      "issue": 1519,
+      "expires": "2026-10-15",
+      "reason": "toml@3.0.0 arrives through @trezor/blockchain-link -> @stellar/stellar-sdk, i.e. the spec-085 hardware-wallet seam. Prototype pollution reachable only by parsing an attacker-supplied TOML document, which that path does not do; the SDK is lazy-loaded behind connectHardware. Tracked in #1519."
+    },
+    {
+      "ghsa": "GHSA-82x6-q7mm-w9cf",
+      "package": "toml",
+      "issue": 1519,
+      "expires": "2026-10-15",
+      "reason": "Same toml@3.0.0 copy as above via the Trezor SDK. Uncontrolled recursion is a denial of service against the parser, and the only documents it parses are ones the vendor SDK itself supplies. Fixed together with the sibling advisory in #1519."
+    },
+    {
+      "ghsa": "GHSA-mp2f-45pm-3cg9",
+      "package": "decompress",
+      "issue": 1522,
+      "expires": "2026-10-29",
+      "reason": "decompress@4.2.1 via @graphprotocol/graph-cli, development scope, and there is NO patched release — the package is unmaintained, so first_patched_version is null. It runs at subgraph build time against archives the toolchain fetches itself, not attacker input. Resolution is a graph-cli bump or a recorded dismissal; tracked in #1522 for Iteration 7."
+    }
+  ]
+}
