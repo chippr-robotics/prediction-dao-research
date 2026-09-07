@@ -76,8 +76,10 @@ const amoy = {
     symbol: 'POL',
   },
   rpcUrls: {
-    default: { http: ['https://rpc-amoy.polygon.technology'] },
-    public: { http: ['https://rpc-amoy.polygon.technology'] },
+    // Mirrors config/networks.js (the build default): Polygon's own Amoy endpoint stopped
+    // answering browser reads — see the note there (issue #1458 QA round).
+    default: { http: ['https://polygon-amoy-bor-rpc.publicnode.com'] },
+    public: { http: ['https://polygon-amoy-bor-rpc.publicnode.com'] },
   },
   blockExplorers: {
     default: { name: 'PolygonScan', url: 'https://amoy.polygonscan.com' },
@@ -321,7 +323,7 @@ export const config = createConfig({
     passkeyConnector(),
   ],
   transports: {
-    [amoy.id]: transportFor(80002, 'https://rpc-amoy.polygon.technology'),
+    [amoy.id]: transportFor(80002, 'https://polygon-amoy-bor-rpc.publicnode.com'),
     [polygon.id]: transportFor(137, 'https://polygon-bor-rpc.publicnode.com'),
     [ethereumClassic.id]: transportFor(61, null),
     [mordor.id]: transportFor(63, 'https://rpc.mordor.etccooperative.org'),

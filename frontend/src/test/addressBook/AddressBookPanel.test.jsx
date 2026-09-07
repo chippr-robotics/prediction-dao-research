@@ -14,13 +14,16 @@ vi.mock('../../hooks/useWalletManagement', () => ({
   useWallet: () => walletState,
 }))
 
-// Screening: controllable status map.
+// Screening: controllable ESTATE verdict map. The book asks every list on every cohort chain
+// (issue #1458) — no wallet chain involved — so the mock answers per ADDRESS, not per (address,
+// chain), and `getVerdictOn` answers for a network that carries sources.
 let statusMap = {}
-vi.mock('../../hooks/useAddressScreening', () => ({
-  useAddressScreening: () => ({
-    getStatus: (address) => statusMap[address.toLowerCase()] || 'clear',
-    screen: vi.fn(),
-    anyRestricted: () => false,
+vi.mock('../../hooks/useEstateScreening', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useEstateScreeningMany: () => ({
+    getVerdict: (address) => statusMap[address.toLowerCase()] || 'screened',
+    getVerdictOn: (address) => statusMap[address.toLowerCase()] || 'screened',
+    resultFor: () => null,
   }),
 }))
 
@@ -75,7 +78,7 @@ describe('AddressBookPanel', () => {
 
   it('flags a restricted address and marks the contact (FR-010, FR-012)', async () => {
     const user = userEvent.setup()
-    statusMap[ADDR.toLowerCase()] = 'restricted'
+    statusMap[ADDR.toLowerCase()] = 'flagged'
     render(<AddressBookPanel address={walletState.address} />)
     await user.click(screen.getByRole('button', { name: 'Add contact' }))
     await user.type(screen.getByLabelText('Nickname *'), 'Sanctioned')
@@ -83,8 +86,8 @@ describe('AddressBookPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     const card = screen.getByText('Sanctioned').closest('.ab-contact-card')
-    // Restricted tag appears both at contact level and on the address row.
-    expect(within(card).getAllByText('Restricted').length).toBeGreaterThanOrEqual(1)
+    // The flag appears at contact level, and again on the address row when it is expanded.
+    expect(within(card).getAllByText('Flagged').length).toBeGreaterThanOrEqual(1)
   })
 
   it('has no accessibility violations with a contact present', async () => {

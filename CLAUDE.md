@@ -1045,7 +1045,22 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   icon + word, `role="alert"` when flagged, and expands to the per-source rows; the no-chain e2e
   tier answers `0x` to every read, so there it must be amber, never green (`MS-06`). Nothing here
   enforces — the guard and the issuing token do. No subgraph, no off-chain provider: the source
-  shape is what a BYO provider would implement, behind a member-held credential. See
+  shape is what a BYO provider would implement, behind a member-held credential.
+  **The roster is `screeningChainIds()` — the cohort MINUS `isLocalOnlyChain`** — because a source
+  a shipped build can never reach is not a degraded source, it is not a source: chain 1337 is
+  `isTestnet: true`, carries a guard, and lives at `http://127.0.0.1:8545`, so every testnet build
+  told every member that a Hardhat guard "could not be read" and could never reach green (QA round;
+  Amoy's build default was also dead and now points at publicnode like every other chain here).
+  **Every address surface reads the SAME sweep**: the book and the saved-contact picker use
+  `useEstateScreeningMany` — they asked the per-chain hook, which can only answer for the wallet's
+  chain, so a book full of contacts rendered "Unscreened" whenever the wallet was elsewhere or
+  absent. `getVerdictOn` has a THIRD answer, `no-source`, distinct from both a verdict and a
+  still-running null. **The summary line names sources only when FLAGGED** — naming every
+  unreachable one turned the notice into a paragraph; the names live one tap away, and the
+  `ScreeningStatusBar` (one segment per source, `role="img"` labelled with the summary) carries the
+  shape. The notice has **no ⓘ**: that bubble was taller than a phone and clipped by the scrolling
+  modal it sat in; the explainer stays on the Address Book header, and `InfoTip` now sits above the
+  assistant launcher (1350) and scrolls internally. See
   `docs/developer-guide/address-screening.md`.
 - **A passkey's account is LOOKED UP, never derived (spec 104).** `lib/passkey/accountLookup.js` is
   the one seam that answers "which account does this key control?", and its `Resolution` type has

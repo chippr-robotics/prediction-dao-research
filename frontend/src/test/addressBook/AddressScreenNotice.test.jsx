@@ -43,7 +43,7 @@ describe('AddressScreenNotice (issue #1458 — estate-wide)', () => {
     estate = done(VERDICTS.SCREENED, [reading(137, 'FairWins sanctions guard', false), reading(1, 'Chainalysis sanctions oracle', false)])
     render(<AddressScreenNotice address={A1} chainId={137} />)
     expect(screen.getByRole('button', { name: 'Screened clear' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Screened clear by 2 sources on 2 networks.')
+    expect(screen.getByRole('status')).toHaveTextContent('All 2 lists on 2 networks answered clear.')
   })
 
   it('alerts when any list flags the address, naming the list and network', () => {
@@ -62,7 +62,10 @@ describe('AddressScreenNotice (issue #1458 — estate-wide)', () => {
     ])
     render(<AddressScreenNotice address={A1} chainId={137} />)
     expect(screen.getByRole('button', { name: 'Partly screened' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Not a clean bill')
+    expect(screen.getByRole('status')).toHaveTextContent('1 of 2 lists answered clear; 1 could not be read — not a clean bill.')
+    // The names of the missing sources are NOT in the summary any more (issue #1458 QA round);
+    // they live in the pill's expansion, which is where someone who asks will look.
+    expect(screen.getByRole('status')).not.toHaveTextContent('Chainalysis sanctions oracle')
   })
 
   it('says Unscreened when nothing could be asked', () => {
@@ -70,6 +73,29 @@ describe('AddressScreenNotice (issue #1458 — estate-wide)', () => {
     render(<AddressScreenNotice address={A1} chainId={61} />)
     expect(screen.getByRole('button', { name: 'Unscreened' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('No screening source covers Ethereum Classic')
+  })
+
+  it('draws one bar segment per source asked, coloured by its answer', () => {
+    estate = done(VERDICTS.PARTIAL, [
+      reading(137, 'FairWins sanctions guard', false),
+      reading(1, 'Chainalysis sanctions oracle', true),
+      { id: 'u:1', kind: 'k', label: 'Circle USDC freeze list', chainId: 1, address: '0x1', status: 'unreadable', reason: 'timed out' },
+    ])
+    const { container } = render(<AddressScreenNotice address={A1} chainId={137} />)
+    expect(container.querySelectorAll('.screen-bar-seg')).toHaveLength(3)
+    expect(container.querySelectorAll('.screen-bar-seg-clear')).toHaveLength(1)
+    expect(container.querySelectorAll('.screen-bar-seg-flagged')).toHaveLength(1)
+    expect(container.querySelectorAll('.screen-bar-seg-unreadable')).toHaveLength(1)
+    // The bar is never the only carrier of the fact (WCAG 1.4.1): it is one labelled image.
+    expect(container.querySelector('.screen-bar')).toHaveAttribute('role', 'img')
+  })
+
+  it('does not put the explainer tooltip inside the notice', () => {
+    // It opened a bubble taller than a phone, clipped by the scrolling modal it sat in (QA round).
+    // The address book header keeps the ⓘ; an address field does not need one.
+    estate = done(VERDICTS.SCREENED, [reading(137, 'FairWins sanctions guard', false)])
+    render(<AddressScreenNotice address={A1} chainId={137} />)
+    expect(screen.queryByRole('button', { name: 'How address screening works' })).toBeNull()
   })
 
   it('has no accessibility violations', async () => {

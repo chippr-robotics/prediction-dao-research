@@ -31,6 +31,16 @@
  * https://go.chainalysis.com/chainalysis-oracle-docs.html ; the Base deployment is at a
  * different address from the others.
  *
+ * ── THE ROSTER IS NOT SIMPLY THE COHORT ──────────────────────────────────────────────────────
+ * `screeningChainIds()` is the cohort MINUS local-only sandboxes, and that subtraction is the
+ * whole of issue #1458's QA failure. Chain 1337 is `isTestnet: true`, so it sat in every testnet
+ * build's cohort; it carries a `sanctionsGuard` in the contracts config; and its endpoint is
+ * `http://127.0.0.1:8545`. From a deployed origin that read cannot ever succeed, so the testnet
+ * build reported "FairWins sanctions guard on Hardhat could not be read" to every member, on
+ * every address, forever — and because an unreadable source can never be a clear one (by design,
+ * and rightly), the pill could never reach green there. A source a build can never reach is not
+ * a degraded source, it is not a source at all.
+ *
  * ── WHAT IS DELIBERATELY NOT HERE ────────────────────────────────────────────────────────────
  *   • No source on Ethereum Classic / Mordor beyond the guard: Chainalysis publishes no oracle
  *     there and no issuer-controlled stablecoin is in the platform's asset list. A chain with no
@@ -41,7 +51,8 @@
  *   • Nothing here is enforcement. The on-chain guard remains the only thing that blocks.
  */
 import { ethers } from 'ethers'
-import { getContractAddressForChain } from '../../config/contracts'
+import { getContractAddressForChain, isLocalOnlyChain } from '../../config/contracts'
+import { cohortChainIds } from '../../config/networks'
 
 export const SOURCE_KINDS = Object.freeze({
   GUARD: 'fairwins-guard',
@@ -160,6 +171,19 @@ function issuerSource(chainId, token) {
       }
     },
   }
+}
+
+/**
+ * The chains a screen may ask: this build's cohort, minus the local-only sandboxes no shipped
+ * build can reach (see the roster note in the file header).
+ *
+ * Still cohort-bounded — constitution III forbids a testnet build reading mainnet lists and vice
+ * versa — this only removes chains whose reads are guaranteed to fail.
+ *
+ * @returns {number[]}
+ */
+export function screeningChainIds() {
+  return cohortChainIds().filter((id) => !isLocalOnlyChain(id))
 }
 
 /**

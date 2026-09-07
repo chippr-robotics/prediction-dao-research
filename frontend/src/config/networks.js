@@ -260,7 +260,12 @@ const NETWORKS = {
     // POL since Polygon's MATIC → POL migration (the testnet gas token followed
     // mainnet's rebrand). Same coin, same decimals — only the ticker moved.
     nativeCurrency: { decimals: 18, name: 'POL', symbol: 'POL' },
-    rpcUrl: import.meta.env?.VITE_RPC_URL_AMOY || 'https://rpc-amoy.polygon.technology',
+    // publicnode, not Polygon's own `rpc-amoy.polygon.technology`: the official endpoint
+    // stopped answering browser reads for the testnet staging build (issue #1458 QA round —
+    // every Amoy screening source came back unreadable while the same calls succeed here),
+    // and it is the odd one out anyway, since Polygon mainnet, Sepolia and Hoodi all default
+    // to publicnode already. A member can still point `network_endpoints` anywhere (spec 069).
+    rpcUrl: import.meta.env?.VITE_RPC_URL_AMOY || 'https://polygon-amoy-bor-rpc.publicnode.com',
     explorer: { name: 'Polygonscan', baseUrl: 'https://amoy.polygonscan.com' },
     // The Graph endpoint that indexes this chain's WagerRegistry. When present,
     // the wager list/reports read from the subgraph; when null (see Mordor),

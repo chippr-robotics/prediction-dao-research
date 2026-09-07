@@ -4,8 +4,10 @@
  *
  * Rules, each of which has a way to be silently wrong:
  *
- *   1. COHORT-BOUNDED. `cohortChainIds()` — constitution III forbids a testnet build reading
- *      mainnet lists and vice versa, and `readProviderFor` refuses an out-of-cohort chain anyway.
+ *   1. COHORT-BOUNDED, MINUS WHAT CANNOT BE REACHED. `screeningChainIds()` — the cohort
+ *      (constitution III: no testnet build reads mainnet lists, and `readProviderFor` refuses an
+ *      out-of-cohort chain anyway) minus the local-only sandboxes, whose reads are guaranteed to
+ *      fail from a shipped build and so are never reported as a degraded source (issue #1458).
  *   2. FAILURE-ISOLATED. Every source resolves on its own; one dead endpoint is one `unreadable`
  *      row, never a rejected screen. `screenAddressAcrossEstate` NEVER rejects.
  *   3. DEADLINE-BOUNDED. A source that does not answer within `deadlineMs` is `unreadable` with
@@ -21,10 +23,9 @@
  * in-flight de-duplication, so five fields showing the same address cost one sweep.
  */
 import { getAddress, isAddress } from 'ethers'
-import { cohortChainIds } from '../../config/networks'
 import { readProviderFor } from '../chains/estate'
 import { SCREENING_TTL_MS } from '../addressBook/constants'
-import { screeningSourcesFor } from './sources'
+import { screeningChainIds, screeningSourcesFor } from './sources'
 import { deriveVerdict, READ, UNREADABLE, VERDICTS } from './verdict'
 
 export const DEFAULT_DEADLINE_MS = 8_000
@@ -108,7 +109,7 @@ async function readSource(source, provider, account, deadlineMs) {
  */
 export function screenAddressAcrossEstate(address, opts = {}) {
   const {
-    chainIds = cohortChainIds(),
+    chainIds = screeningChainIds(),
     walletChainId,
     walletProvider,
     deadlineMs = DEFAULT_DEADLINE_MS,

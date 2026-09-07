@@ -51,8 +51,14 @@ result is a small pill under the address:
 | **Unscreened** (amber) | No list could be read, or no list exists for this network. |
 | **Screening…** | The check is still running. |
 
+Beside the pill, a small **segmented bar** shows the scan itself: one segment per list that was
+asked — green for clear, red for a flag, amber for one that could not be read.
+
 **Tap the pill** to see exactly which lists were asked, on which networks, and what each one
 said — including the ones that could not be reached and the networks that have no list at all.
+
+Your saved contacts carry the same pill, checked the same way. It does not depend on which network
+your wallet is on, or on having a wallet connected at all.
 
 The lists are:
 

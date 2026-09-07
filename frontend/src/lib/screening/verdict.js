@@ -58,6 +58,27 @@ export function deriveVerdict(readings = []) {
   return VERDICTS.SCREENED
 }
 
+/**
+ * The verdict for ONE network, from a whole-estate result.
+ *
+ * The address book saves an address WITH the network it is used on, so a row there is asking a
+ * narrower question than the pill above it: not "is this address listed anywhere?" but "what do
+ * this network's lists say?". Deriving it from the readings already in hand keeps one sweep
+ * answering both, and keeps the two answers consistent by construction.
+ *
+ * Returns `null` when nothing screens that chain — the caller says "no source on this network",
+ * which is a different sentence from "nothing answered" and must not be collapsed into it.
+ *
+ * @param {{readings: any[]}} result
+ * @param {number} chainId
+ * @returns {{verdict: string, readings: any[]}|null}
+ */
+export function verdictOnChain(result, chainId) {
+  const here = (result?.readings || []).filter((r) => Number(r.chainId) === Number(chainId))
+  if (!here.length) return null
+  return { verdict: deriveVerdict(here), readings: here }
+}
+
 /** Short pill labels. Words, never colour alone (WCAG 1.4.1). */
 export const VERDICT_LABELS = Object.freeze({
   [VERDICTS.SCREENED]: 'Screened clear',
@@ -86,17 +107,22 @@ export function describeVerdict(result, nameForChain = (id) => `chain ${id}`) {
   const networks = new Set(readings.filter((r) => r.status === READ).map((r) => r.chainId))
   switch (result?.verdict) {
     case VERDICTS.FLAGGED: {
+      // The one case that still names its sources in the summary: a member about to send value
+      // needs to know WHICH list objects, because the consequence differs — a FairWins guard hit
+      // reverts the transaction, an issuer freeze strands the token after it arrives.
       const hits = readings.filter((r) => r.status === READ && r.flagged)
       const where = joinNames(hits.map((r) => `${r.label} on ${nameForChain(r.chainId)}`))
       return `This address is flagged by sanctions screening: ${where}. Value sent to it may be refused on-chain or frozen.`
     }
     case VERDICTS.SCREENED:
-      return `Screened clear by ${c.read} ${c.read === 1 ? 'source' : 'sources'} on ${networks.size} ${networks.size === 1 ? 'network' : 'networks'}.`
-    case VERDICTS.PARTIAL: {
-      const missing = readings.filter((r) => r.status === UNREADABLE)
-      const names = joinNames(missing.map((r) => `${r.label} on ${nameForChain(r.chainId)}`))
-      return `Partly screened: ${c.read} of ${c.total} sources answered clear; ${names} could not be read. Not a clean bill.`
-    }
+      return `All ${c.read} ${c.read === 1 ? 'list' : 'lists'} on ${networks.size} ${networks.size === 1 ? 'network' : 'networks'} answered clear.`
+    case VERDICTS.PARTIAL:
+      // Deliberately does NOT name the missing sources (issue #1458 QA round). It used to, and on
+      // a build where several were unreachable the notice became a paragraph a member had to read
+      // to learn one thing: it is not a clean bill. WHICH list is missing is a detail for someone
+      // who asks — it lives one tap away, in the pill's own per-source rows, where each is named
+      // with the reason it gave. The count is the honest headline; the bar shows the shape.
+      return `${c.read} of ${c.total} lists answered clear; ${c.unreadable} could not be read — not a clean bill.`
     case VERDICTS.UNSCREENED:
     default: {
       // Two different facts can each be true here, and both are named when they are: the sources
@@ -113,4 +139,25 @@ export function describeVerdict(result, nameForChain = (id) => `chain ${id}`) {
       return `This address could not be screened: no source answered.${uncoveredSentence} Proceed with caution.`
     }
   }
+}
+
+/**
+ * Worst verdict in a set — the contact-level flag over a contact's addresses.
+ *
+ * Order is by what a member must act on, not by severity of colour: a flag anywhere outranks a
+ * gap, and a gap outranks a clean bill. `screened` is last precisely because it is the only one
+ * that claims something, so it can only survive when nothing else is present.
+ */
+const VERDICT_RANK = {
+  [VERDICTS.FLAGGED]: 3,
+  [VERDICTS.UNSCREENED]: 2,
+  [VERDICTS.PARTIAL]: 1,
+  [VERDICTS.SCREENED]: 0,
+}
+
+export function worstVerdict(verdicts = []) {
+  return (verdicts.filter(Boolean).reduce(
+    (worst, v) => ((VERDICT_RANK[v] ?? -1) > (VERDICT_RANK[worst] ?? -1) ? v : worst),
+    null,
+  ))
 }
