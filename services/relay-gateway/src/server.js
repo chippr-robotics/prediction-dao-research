@@ -42,7 +42,7 @@ import { loadSigningKey } from './access/jwt.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createReloadHandler } from './policy/reload.js'
-import { createIdentityCounters, startCountersServer } from './metrics/counters.js'
+import { createIdentityCounters, createSponsorshipCounters, startCountersServer } from './metrics/counters.js'
 import { createEngineClient } from './engine/client.js'
 import { applyEngineEvent } from './engine/webhook.js'
 import { createOpenSeaClient } from './opensea/client.js'
@@ -338,6 +338,9 @@ export function createApp(config, deps = {}) {
   // registered-but-abstaining shape is what keeps /status able to say "not-configured" honestly
   // instead of omitting a tier the ladder declares.
   const identityCounters = deps.identityCounters ?? createIdentityCounters()
+  // Demand, so nonce staleness is interpretable (#1539): staleness WHILE sponsorship was granted is
+  // a stall; the same staleness with no grants is a quiet night. Bounded to the configured chains.
+  const sponsorshipCounters = deps.sponsorshipCounters ?? createSponsorshipCounters(Object.keys(config.chains ?? {}))
   const identityVerifiers = [
     createAttestationVerifier(),
     createChallengeVerifier(config.identity?.challenge ?? {}, {
@@ -832,6 +835,7 @@ export function createApp(config, deps = {}) {
       const signature = await paymasterSigner.sign(hash)
       const paymasterAndData = packPaymasterAndData({ paymaster: pm, validUntil, validAfter, signature })
       audit({ chainId, action: 'sponsor', targetContract: pm, outcome: 'granted' })
+      sponsorshipCounters.grant(chainId)
       return res.json(rpcResult(id, { paymasterAndData }))
     } catch (err) {
       if (err instanceof GatewayError) {
@@ -1250,7 +1254,7 @@ if (isMain) {
   // Usage counters endpoint (spec 106/#1447): an UNPUBLISHED compose-network port the FinOps
   // exporter scrapes. Unset => not started; the exporter's source reads not-configured, honestly.
   if (config.metricsPort) {
-    startCountersServer({ port: config.metricsPort, counters: identityCounters, upstreamCeilings })
+    startCountersServer({ port: config.metricsPort, counters: identityCounters, upstreamCeilings, sponsorship: sponsorshipCounters })
   }
   // Runtime kill switch: `kill -USR2 <pid>` toggles accept/refuse (FR-015).
   process.on('SIGUSR2', () => {

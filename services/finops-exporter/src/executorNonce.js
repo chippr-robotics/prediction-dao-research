@@ -106,7 +106,12 @@ export function createExecutorNonceCollector({ config, providers, now = () => Da
       // Queue depth. Zero is the healthy steady state; a gap that persists across polls is a stuck
       // transaction or two senders on one EOA (G-11).
       gap: read(pending - latest, 'count', { labels }),
-      staleness: read(stalenessSec, 'seconds', { labels: { ...labels }, observedForSec }),
+      staleness: read(stalenessSec, 'seconds', { labels }),
+      // OUTSIDE the Reading on purpose: `read()` builds a CLOSED shape (state/value/unit/at/
+      // labels/reason) and drops anything else, so a field smuggled through `extra` is silently
+      // lost. It rides here instead — an alert rule needs it to refuse to fire on a fresh process,
+      // which honestly reports 0 staleness because it has watched for no time at all.
+      observedForSec,
     }
   }
 }

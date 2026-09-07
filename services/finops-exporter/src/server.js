@@ -35,12 +35,13 @@ import { createFeeRouterCollector } from './collectors/feeRouter.js'
 import { createMembershipCollector } from './collectors/membership.js'
 import { createReferralCollector } from './collectors/referral.js'
 import { createX402Collector } from './collectors/x402.js'
-import { createPoolsCollector, emitPoolSeries } from './collectors/pools.js'
+import { createPoolsCollector, emitPoolSeries, emitExecutorNonce } from './collectors/pools.js'
 import { createGcpBillingCollector, emitGcpDetail } from './collectors/gcpBilling.js'
 import { createCloudflareCollector, emitCloudflareUsage } from './collectors/cloudflare.js'
 import { createQuickNodeCollector, emitQuickNodeUsage } from './collectors/quicknode.js'
 import { createGatewayUsageCollector, emitGatewayUsage } from './collectors/gateway.js'
 import { createFxReader } from './collectors/fx.js'
+import { createExecutorNonceCollector } from './executorNonce.js'
 import { aggregate } from './aggregate.js'
 
 /** Lazily construct the BigQuery client so the dependency is not required to boot without GCP. */
@@ -82,12 +83,17 @@ export function createApp(overrides = {}) {
   const quicknode = createQuickNodeCollector({ config, fetchImpl: overrides.fetchImpl, log })
   const gatewayUsage = createGatewayUsageCollector({ config, fetchImpl: overrides.fetchImpl })
 
+  // The executor's nonce, read on the pools schedule (#1539). Its state is shared with the emitter
+  // rather than re-read at render time, because buildRegistry is synchronous.
+  const nonceState = new Map()
+  const executorNonce = overrides.executorNonce ?? createExecutorNonceCollector({ config, providers })
+
   const collectors = {
     feeRouter: createFeeRouterCollector({ config, providers, cursors, log }),
     membership: createMembershipCollector({ config, providers, cursors, log }),
     referral: createReferralCollector({ config, fetchImpl: overrides.fetchImpl }),
     x402: createX402Collector({ config, providers, cursors, log }),
-    pools: createPoolsCollector({ config, providers, burn }),
+    pools: createPoolsCollector({ config, providers, burn, executorNonce, nonceState }),
     gcpBilling,
     cloudflare,
     quicknode,
@@ -125,6 +131,7 @@ export function createApp(overrides = {}) {
 
     // Series that are functions of several readings, or of a collector's side detail.
     emitPoolSeries(registry, readings, burn, (unit) => fx.rateFor(unit))
+    emitExecutorNonce(registry, nonceState)
     fx.emit(registry)
 
     for (const { source } of readings) {

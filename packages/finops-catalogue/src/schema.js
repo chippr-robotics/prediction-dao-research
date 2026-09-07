@@ -43,6 +43,13 @@ export const METRIC_FAMILIES = [
   'fairwins_finops_pool_balance',
   'fairwins_finops_pool_burn_rate',
   'fairwins_finops_pool_runway_seconds',
+  // Executor nonce diagnostics (#1539). NOT a value a source declares — these are side series about
+  // an existing pool, emitted beside its balance, and listed here so the allowed-family set stays
+  // the whole truth about what the exporter publishes.
+  'fairwins_finops_executor_nonce',
+  'fairwins_finops_executor_nonce_pending_gap',
+  'fairwins_finops_executor_nonce_stale_seconds',
+  'fairwins_finops_executor_nonce_observed_seconds',
   'fairwins_finops_sponsored_ops_total',
   'fairwins_finops_relayed_intents_total',
 ]

@@ -40,11 +40,40 @@ export function createIdentityCounters() {
 }
 
 /**
+ * Sponsored UserOps granted, per chain (#1539) — the DEMAND signal.
+ *
+ * It exists to make a different metric interpretable. `executor_nonce_stale_seconds` cannot be
+ * alerted on alone: an idle bundler has a frozen nonce and is perfectly healthy, so a rule that
+ * pages on staleness pages every quiet night, and an alarm that cries wolf is exactly how the
+ * 2026-07-12 stall survived 40 minutes with members as the only alarm. Staleness WHILE SPONSORSHIP
+ * WAS GRANTED is the stall; the same staleness with no grants is a Tuesday.
+ *
+ * Counted at the moment sponsorship is GRANTED, not requested — a refused request is not demand the
+ * executor was supposed to serve.
+ *
+ * Labels are bounded by the configured chain set (FR-036); an unconfigured chain is dropped rather
+ * than growing the label space, because a chain id that reaches here from request content is
+ * exactly the cardinality failure that rule prevents.
+ */
+export function createSponsorshipCounters(chainIds = []) {
+  const granted = Object.fromEntries(chainIds.map((id) => [String(id), 0]))
+  return {
+    grant(chainId) {
+      const key = String(chainId)
+      if (Object.prototype.hasOwnProperty.call(granted, key)) granted[key] += 1
+    },
+    snapshot() {
+      return { ...granted }
+    },
+  }
+}
+
+/**
  * Serve `{ tierRequests, upstreamCalls, sinceMs }` as JSON on `port`. Returns the server (tests
  * close it); never throws the boot — a metrics listener that cannot bind logs and stands down,
  * because observability must not take down the thing it observes.
  */
-export function startCountersServer({ port, counters, upstreamCeilings, log = console.warn, now = () => Date.now() }) {
+export function startCountersServer({ port, counters, upstreamCeilings, sponsorship = null, log = console.warn, now = () => Date.now() }) {
   const since = now()
   const server = http.createServer((req, res) => {
     res.setHeader('content-type', 'application/json')
@@ -52,6 +81,9 @@ export function startCountersServer({ port, counters, upstreamCeilings, log = co
       JSON.stringify({
         tierRequests: counters.snapshot(),
         upstreamCalls: upstreamCeilings?.cumulative?.() ?? {},
+        // Absent when no sponsorship counter was wired — the exporter reads that as "not
+        // configured", which is honest, where a `{}` would read as "wired up and nothing granted".
+        ...(sponsorship ? { sponsoredOps: sponsorship.snapshot() } : {}),
         sinceMs: since,
       })
     )
