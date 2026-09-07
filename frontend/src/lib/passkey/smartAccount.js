@@ -32,6 +32,7 @@ import { getNetwork } from '../../config/networks'
 import { resolveRpcEndpoints } from '../network/rpcEndpoints'
 import { getContractAddressForChain } from '../../config/contracts'
 import { CeremonyCancelled, isTransactComplete } from './credentials'
+import { bundlerTransport } from './bundlerTransport.js'
 
 export class ChainNotSupportedError extends Error {
   constructor(chainId) {
@@ -445,10 +446,13 @@ export async function buildAccount({ chainId, credential, accountAddress, ownerI
     ? undefined
     : deps.paymaster ?? (sponsorPaymasterUrl ? createPaymasterClient({ transport: http(sponsorPaymasterUrl) }) : undefined)
 
+  // The whole list, not just [0] (#1535). A second entry has always been configurable and was
+  // never able to submit; failover applies to a bundler that did not ANSWER, never to one that
+  // answered and rejected the UserOp — see bundlerTransport.js.
   const bundlerClient = createBundlerClient({
     account,
     client,
-    transport: http(bundlerUrls[0]),
+    transport: bundlerTransport(bundlerUrls),
     ...(paymaster ? { paymaster } : {}),
   })
 
