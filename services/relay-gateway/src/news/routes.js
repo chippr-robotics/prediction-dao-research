@@ -144,7 +144,7 @@ export function createNewsRouter(config, { client, cache, quotas, killSwitch, no
   return router
 }
 
-/** Health/status snapshot for /healthz (the perpsStatus convention). */
+/** /status contribution (the perpsStatus convention). Config state only, no member data. */
 export function newsStatus(config, { killSwitch }) {
   const news = config.news
   return {

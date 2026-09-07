@@ -55,7 +55,7 @@ import { createBitcoinRouter } from './bitcoin/routes.js'
 import { createPerpsClients } from './perps/client.js'
 import { createPerpsRouter, perpsStatus } from './perps/routes.js'
 import { createNewsClient } from './news/client.js'
-import { createNewsRouter } from './news/routes.js'
+import { createNewsRouter, newsStatus } from './news/routes.js'
 import { createAcrossClient } from './bridge/quotes.js'
 import { createBridgeRouter } from './bridge/routes.js'
 import { createMemberApiRouter, memberApiStatus } from './memberApi/routes.js'
@@ -526,6 +526,13 @@ export function createApp(config, deps = {}) {
     // Perps read-proxy visibility (spec 082, FR-014): venue/attribution config state only —
     // no member data, and the live HL builder bps already surfaces via /v1/perps/config.
     const perps = perpsStatus(config, { killSwitch })
+    // Token-news read-proxy visibility (spec 109). The routes mount unconditionally, so this block
+    // is the ONLY way to tell an image that carries the module from one that predates it: without
+    // it, `NEWS_ENABLED` on a stale pin and a live module look identical from outside. That is the
+    // pre-pin check `infra/vm/gateway/docker-compose.yml` and docs/developer-guide/token-news.md
+    // both instruct an operator to run, so it has to be here for them to be able to run it.
+    // Config state only — no member data, no credential (the vendor is keyless).
+    const news = newsStatus(config, { killSwitch })
     // Member API visibility (spec 095): module state + which chains can answer a wager read + whether
     // the assistant has a credential. No member data, no key material, nothing about any token.
     // `memberApiAssistant` is declared further down; this closure only runs at request time.
@@ -572,7 +579,7 @@ export function createApp(config, deps = {}) {
           access: accessStatus(config, { signingKey: accessSigningKey, enforcement: accessEnforcement }),
         }
       : {}
-    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi, ...identityGated })
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, news, memberApi, ...identityGated })
   }
   app.get('/healthz', healthLimiter, healthHandler)
   app.get('/status', healthLimiter, healthHandler)
