@@ -1,0 +1,67 @@
+/* TokenNewsCard (spec 109). Colours come ONLY from theme tokens (specs 090/091) — links are
+   body-sized text, so they use --accent-color (Teal 700), never --brand-primary. */
+
+.token-news-card {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-color);
+}
+
+.token-news-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.token-news-cohort-note,
+.token-news-quiet {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.token-news-cohort-note {
+  margin-bottom: 0.5rem;
+}
+
+.token-news-unreadable p {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.token-news-card .token-news-retry {
+  /* index.css sets a global button padding; scope our box explicitly (spec-081 lesson). */
+  padding: 0.35em 0.9em;
+  font-size: 0.85rem;
+}
+
+.token-news-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.token-news-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.token-news-link {
+  color: var(--accent-color);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.token-news-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
