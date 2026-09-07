@@ -30,8 +30,12 @@
    phone, which — with the search field and the sort row under them — put roughly a fifth of the
    viewport above the first pair on a surface that exists to show pairs.
 
-   Every interactive target here clears 36px, which is what fixes the row height at ~38px rather
-   than letting the two controls disagree. */
+   EVERY interactive target in this block carries a 36px floor — the toolbar's search and toggle
+   (38px, which is what stops the two disagreeing about the row height) and, inside the panel, the
+   venue pills and the sort select. The panel is opened deliberately, so there is nothing to buy by
+   making the controls in it harder to hit than the one that revealed them.
+   Gated by `src/test/perps/perpsControlTargets.test.js`: this paragraph made a claim about four
+   selectors while two of them did not carry it (issue #1440 review). */
 .perps-controls {
   display: flex;
   flex-direction: column;
@@ -121,7 +125,7 @@
   color: var(--text-primary);
   cursor: pointer;
   font-size: 0.82rem;
-  min-height: 32px;
+  min-height: 36px;
   padding: 0.3rem 0.8rem;
 }
 .perps-filter-pill.active {
@@ -144,6 +148,7 @@
   border-radius: 8px;
   color: var(--text-primary, inherit);
   font-size: 0.85rem;
+  min-height: 36px;
   padding: 0.35rem 0.5rem;
 }
 /* Visible only while the search box or the venue filter is narrowing the list — otherwise it is

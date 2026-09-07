@@ -51,3 +51,25 @@ Critic findings fixed during this round (each re-verified by re-capture):
 
 Checked and unchanged: both themes at both viewports, no horizontal page scroll, every interactive
 target ≥ 36px, the degraded-venue banner, and the desktop table still fitting its container.
+
+## Round 3 — the touch-target floor was a claim, not a fact (PR #1545 review)
+
+Round 2's comment said "every interactive target here clears 36px". It was placed at the top of the
+controls block, so it read as governing all four controls — while the venue pills declared 32px and
+the sort select declared no floor at all (~28px computed). The prose was true of the toolbar it was
+written about and false of the panel it had grown to cover.
+
+Fixed by raising both to the 36px the comment claims, rather than narrowing the comment: the panel
+is opened deliberately, so there is nothing to buy by making the controls inside it harder to hit
+than the one that revealed them. (32px did pass WCAG 2.2 AA, whose floor is 24px — this is the
+repo's own spec-081 density floor, not an accessibility failure.)
+
+The comment now also names its gate. `src/test/perps/perpsControlTargets.test.js` parses the
+stylesheet and holds all four selectors to 36px — verified to FAIL on the exact defect (both
+selectors, "expected 32 to be greater than or equal to 36") before it was fixed. A paragraph making
+a claim about four selectors that nothing checks is how the claim and the code came apart in the
+first place.
+
+Re-captured the full matrix afterwards: the taller pills and select change the open panel's height
+by 8px and nothing else — no wrap change, no clipping, both themes.
+
