@@ -38,25 +38,38 @@ const readBody = (items) => ({
   items,
 })
 
-// ---- read-provider JSON-RPC stub (the 25-perps-management device) --------------
+// ---- read-provider JSON-RPC stub ---------------------------------------------------------------
 //
-// The app's read providers resolve NETWORKS[*].rpcUrl (spec 069) — publicnode
-// hosts on a mainnet-cohort build. Only Polygon answers a balance here; the
-// point is one clickable native POL row, nothing more.
+// EVERY shipped read provider must be intercepted, not just the one this spec cares about.
+// Intercepting only publicnode.com let the ETC/Mordor/Amoy reads escape to the real network, and
+// the escaped request reset the connection and crashed the whole run before a single assertion
+// ran — a spec-level failure, not a flake. The host set and the hostname-based match are the ones
+// 33-account-surfaces.cy.js already proved; the host->chain map is read off config/networks.js.
+//
+// Only Polygon answers a non-zero balance, so exactly one native POL row exists to open. Contract
+// reads answer a zero word, so ERC-20 rows hold nothing and stay out of the way.
 
+const RPC_HOSTS = /publicnode\.com$|rivet\.link$|etccooperative\.org$|polygon\.technology$|etcdesktop\.com$/
+
+/** Host fragment -> chain id, per the rpcUrl values in frontend/src/config/networks.js. */
 const CHAIN_BY_RPC = [
   ['polygon-bor-rpc', 137],
   ['arbitrum-one-rpc', 42161],
   ['base-rpc', 8453],
   ['optimism-rpc', 10],
+  ['ethereum-sepolia-rpc', 11155111],
   ['ethereum-rpc', 1],
+  ['rivet.link', 61],
+  ['mordor.etccooperative.org', 63],
+  ['rpc-amoy.polygon.technology', 80002],
 ]
 
 const hex = (n) => `0x${Number(n).toString(16)}`
+const ZERO_WORD = `0x${'0'.repeat(64)}`
 
 function chainIdForRpcUrl(url) {
   for (const [fragment, chainId] of CHAIN_BY_RPC) if (url.includes(fragment)) return chainId
-  return 137
+  return 137 // the wallet rail, which cy.mockWeb3Provider pins to Polygon
 }
 
 function rpcResult(url, { method } = {}) {
@@ -69,31 +82,42 @@ function rpcResult(url, { method } = {}) {
     case 'eth_blockNumber':
       return hex(75000000)
     case 'eth_getBalance':
-      // 2 POL on Polygon; zero elsewhere (those chains' rows simply do not exist).
-      return chainId === 137 ? '0x1bc16d674ec80000' : '0x0'
+      /*
+       * 2 ETC on Ethereum Classic; zero everywhere else, so exactly one native row exists.
+       *
+       * Deliberately NOT Polygon. Since issue #1459 the five Multicall3 chains
+       * (1/10/137/8453/42161) batch every balance — the NATIVE one included — through
+       * aggregate3, so an eth_getBalance answer on Polygon is never read and the row never
+       * appears. ETC 61 has no verified Multicall3 and falls back to provider.getBalance, which
+       * is what this stub can honestly answer. ETC is also a mapped news asset
+       * (ethereum-classic), so it is the right anchor for these tests either way.
+       */
+      return chainId === 61 ? '0x1bc16d674ec80000' : '0x0'
+    case 'eth_getCode':
+      return '0x'
+    case 'eth_call':
+      return ZERO_WORD
     case 'eth_getLogs':
       return []
     default:
-      // Honestly unanswerable: '0x' makes ethers reject the decode, and every consumer
-      // treats that as unreadable rather than inventing a number.
       return '0x'
   }
 }
 
 function stubJsonRpc() {
-  cy.intercept({ method: 'POST', url: /publicnode\.com/ }, (req) => {
+  cy.intercept({ method: 'POST', hostname: RPC_HOSTS }, (req) => {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
     const answer = (entry) => ({ jsonrpc: '2.0', id: entry?.id ?? 1, result: rpcResult(req.url, entry) })
     req.reply({ statusCode: 200, body: Array.isArray(body) ? body.map(answer) : answer(body) })
   }).as('readRpc')
 }
 
-function openPolAssetSheet() {
+function openEtcAssetSheet() {
   cy.mockWeb3Provider({ account: TEST_ACCOUNT, preAuthorized: true })
   cy.visit(PORTFOLIO_URL)
   // The one holding the RPC stub creates. Generous timeout: the other chains'
   // reads have to time out around it.
-  cy.contains('.portfolio-row-button', 'POL', { timeout: 60000 }).click()
+  cy.contains('.portfolio-row-button', 'ETC', { timeout: 60000 }).click()
   cy.get('.asset-sheet', { timeout: 30000 }).should('be.visible')
 }
 
@@ -101,22 +125,21 @@ describe('Token news (spec 109)', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
+    // Every test in this file loads the app, so every test needs the chain answered. Scoping this
+    // to the portfolio block left the trade tests reaching the real network.
+    stubJsonRpc()
   })
 
   // ---------------------------------------------------------------------------
   // Portfolio card (US1) — the AssetDetailSheet mount.
   // ---------------------------------------------------------------------------
   describe('portfolio token card', () => {
-    beforeEach(() => {
-      stubJsonRpc()
-    })
-
     it('[TN-01] a covered token renders attributed, dated, text-only items with a link-out', () => {
       const item = newsItem()
       cy.intercept('GET', '**/v1/news/**', { statusCode: 200, body: readBody([item]) }).as('news')
-      openPolAssetSheet()
+      openEtcAssetSheet()
 
-      cy.wait('@news').its('request.url').should('contain', 'slug=matic-network')
+      cy.wait('@news').its('request.url').should('contain', 'slug=ethereum-classic')
       cy.get('.token-news-card', { timeout: 15000 }).should('be.visible')
 
       // The headline is a link out, marked external, and TEXT — no vendor image ever renders.
@@ -144,7 +167,7 @@ describe('Token news (spec 109)', () => {
         if (fail) req.reply({ statusCode: 500, body: { error: { code: 'upstream_error' } } })
         else req.reply({ statusCode: 200, body: readBody([newsItem()]) })
       }).as('news')
-      openPolAssetSheet()
+      openEtcAssetSheet()
 
       // The failure state names itself; it must never look like "no news".
       cy.get('.token-news-card', { timeout: 15000 }).should(
@@ -164,9 +187,9 @@ describe('Token news (spec 109)', () => {
 
     it('[TN-04] an honest-empty read says sparse coverage, with no retry — distinct from unreadable', () => {
       cy.intercept('GET', '**/v1/news/**', { statusCode: 200, body: readBody([]) }).as('news')
-      openPolAssetSheet()
+      openEtcAssetSheet()
 
-      cy.get('.token-news-card', { timeout: 15000 }).should('contain.text', 'No recent items for POL.')
+      cy.get('.token-news-card', { timeout: 15000 }).should('contain.text', 'No recent items for ETC.')
       // Empty is NOT the failure state: no retry, no could-not-read sentence.
       cy.get('.token-news-card .token-news-retry').should('not.exist')
       cy.get('.token-news-card').should('not.contain.text', 'could not be read')
@@ -177,7 +200,7 @@ describe('Token news (spec 109)', () => {
         statusCode: 503,
         body: { error: { code: 'news_unconfigured' } },
       }).as('news')
-      openPolAssetSheet()
+      openEtcAssetSheet()
 
       cy.wait('@news')
       // The sheet is fine; the news surface simply is not there.
@@ -220,9 +243,37 @@ describe('Token news (spec 109)', () => {
       // TN-02: the unmapped leg produced ZERO gateway requests — the mapping is
       // client-side and a missing row IS "not covered" (no ticker heuristic).
       cy.get('.trade-news .token-news-card a.token-news-link').should('be.visible')
+      /*
+       * TN-02, stated as what is actually invariant.
+       *
+       * A raw request COUNT is not: the card refetches on re-render and the ticket's default pair
+       * (WPOL/USDC, both mapped) is fetched before the pair is moved, so "exactly one request" was
+       * never true and asserting it proved nothing except that the number happened to be one.
+       *
+       * What the mapping guarantees is the SET: a request is only ever made for an asset the
+       * curated table resolves, so an unmapped asset (USC) can never appear as a slug and costs
+       * no network at all. Every slug seen must therefore be one of the mapped three, and the
+       * mapped leg of this pair must be among them.
+       */
+      // EVERY slug the curated table can emit (config/newsAssets.js: the underlying-coin map plus
+      // the registry-symbol map). Listing a subset failed here for a good reason — a WETH leg
+      // legitimately asked for `ethereum` — and the invariant is not "these three assets" but
+      // "only assets the table resolves are ever asked for at all".
+      const MAPPED_SLUGS = [
+        'ethereum',
+        'ethereum-classic',
+        'matic-network',
+        'bitcoin',
+        'usd-coin',
+        'tether',
+        'wrapped-bitcoin',
+      ]
       cy.then(() => {
-        expect(newsCalls.length, 'exactly one news request, for the mapped leg').to.equal(1)
-        expect(newsCalls[0]).to.contain('slug=ethereum-classic')
+        const slugs = new Set(newsCalls.map((u) => new URL(u, 'http://x').searchParams.get('slug')))
+        for (const slug of slugs) {
+          expect(MAPPED_SLUGS, `a request was made for an unmapped asset: slug=${slug}`).to.include(slug)
+        }
+        expect(slugs.has('ethereum-classic'), 'the mapped leg of this pair was fetched').to.equal(true)
       })
 
       // FR-006: the ticket is untouched by any news state — the amount entry
