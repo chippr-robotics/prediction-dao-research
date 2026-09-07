@@ -186,3 +186,17 @@ variable "manage_monitoring" {
   type        = bool
   default     = false
 }
+
+variable "android_signing_service_account" {
+  description = <<-EOT
+    Email of the CI identity that reads the Play upload keystore at release time (#1378 H2),
+    declared in infra/terraform/bootstrap. It receives secretAccessor on exactly the two
+    android-upload secrets and holds no other grant anywhere in this estate.
+
+    This is NOT a mailbox address. A service account email ends
+    `@<project>.iam.gserviceaccount.com`; a human address here would produce a grant that can never
+    authenticate and a release that fails at signing.
+  EOT
+  type        = string
+  default     = "fairwins-android-signing@chippr-bots-site-wp.iam.gserviceaccount.com"
+}
