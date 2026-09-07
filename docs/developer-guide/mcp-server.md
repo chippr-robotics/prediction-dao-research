@@ -151,6 +151,7 @@ Every tool calls the gateway over HTTPS with JSON-schema'd inputs.
 | `get_gateway_status` | `/status` | Public. Works with no token. |
 | `get_prediction_markets` | `/v1/polymarket/137/markets?q=` | Public. |
 | `get_perps_pairs` | `/v1/perps/pairs` | Public. |
+| `get_token_news` | `/v1/news/{chainId}/{asset}?slug=` | Public (spec 109). The caller passes the vendor tag `slug`; the app resolves it from its curated mapping, an external caller states it. |
 
 `build_intent` is the only tool that touches a write path, and it stops one step short of one.
 The typed data goes back to the member, who signs it in their wallet and submits it themselves or
