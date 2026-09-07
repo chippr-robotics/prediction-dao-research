@@ -196,12 +196,12 @@ describe('the gateway attaches the tool table itself', () => {
 
     const wagersOnly = await memberToken({ scopes: ['assistant:chat', 'read:wagers'] })
     expect((await chat(app, wagersOnly, { messages: [{ role: 'user', content: 'hi' }] })).status).toBe(200)
-    expect(sentBody(fetchImpl).tools.map((t) => t.name)).toEqual(['find_in_app', 'get_gateway_status', 'get_perps_pairs', 'get_prediction_markets', 'get_wagers'])
+    expect(sentBody(fetchImpl).tools.map((t) => t.name)).toEqual(['find_in_app', 'get_gateway_status', 'get_perps_pairs', 'get_prediction_markets', 'get_token_news', 'get_wagers'])
     expect(sentBody(fetchImpl).system).toBe(buildSystemPrompt({ rail: 'fairwins', hasMemberTools: true }))
 
     const chatOnly = await memberToken({ scopes: ['assistant:chat'] })
     expect((await chat(app, chatOnly, { messages: [{ role: 'user', content: 'hi' }] })).status).toBe(200)
-    expect(sentBody(fetchImpl).tools.map((t) => t.name)).toEqual(['find_in_app', 'get_gateway_status', 'get_perps_pairs', 'get_prediction_markets'])
+    expect(sentBody(fetchImpl).tools.map((t) => t.name)).toEqual(['find_in_app', 'get_gateway_status', 'get_perps_pairs', 'get_prediction_markets', 'get_token_news'])
     // ...and the prompt then says so.
     expect(sentBody(fetchImpl).system).toBe(buildSystemPrompt({ rail: 'fairwins', hasMemberTools: false }))
     expect(sentBody(fetchImpl).system).toMatch(/NO access to this member’s own data/)
@@ -253,6 +253,17 @@ describe('parseChatRequest rejects every malformed block shape', () => {
     reject([user('hi'), assistant([use('bad id!')]), user([result('bad id!')])], /\.id must be/)
     reject([user('hi'), assistant([use('a', 'build_intent')]), user([result('a')])], /not a tool this gateway offers/)
     reject([user('hi'), assistant([use('a', 'drain_wallet')]), user([result('a')])], /not a tool this gateway offers/)
+    // spec 109: get_token_news is IN the table, so its tool_use round-trips the same validator
+    // that refuses build_intent — the news tool rides the existing loop, not a side channel.
+    expect(() =>
+      parseChatRequest({
+        messages: [
+          user('hi'),
+          assistant([use('a', 'get_token_news', { chainId: 61, asset: 'native', slug: 'ethereum-classic' })]),
+          user([result('a')]),
+        ],
+      }),
+    ).not.toThrow()
     reject([user('hi'), assistant([{ type: 'tool_use', id: 'a', name: 'get_fees' }]), user([result('a')])], /input must be an object/)
     reject([user('hi'), assistant([use('a', 'get_fees', [])]), user([result('a')])], /input must be an object/)
     reject([user('hi'), assistant([use('a', 'get_wagers', { q: 'x'.repeat(MAX_MESSAGE_CHARS) })]), user([result('a')])], /input exceeds/)

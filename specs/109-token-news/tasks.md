@@ -104,17 +104,17 @@ never gated. **Independent test**: quickstart scenario 6.
 **Goal**: tool-pull news on both rails and the MCP/external paths; never context-push.
 **Independent test**: quickstart scenario 7 + parity gates.
 
-- [ ] T017 [US3] Add `get_token_news` to `packages/assistant-contract/src/tools.js` per
+- [X] T017 [US3] Add `get_token_news` to `packages/assistant-contract/src/tools.js` per
       contracts/gateway-news-api.md (`auth: 'none'`, public exec on
       `/v1/news/{chainId}/{asset}` with `slug`/`limit` query; inputSchema per contract) and the
       honest-result wording to `packages/assistant-contract/src/results.js` (third-party reported,
       attributed, not advice; unreadable stated, never summarized from memory; empty = sparse
       coverage). In-app loop resolves `slug` via `newsAssets.js` before the call.
-- [ ] T018 [US3] Regenerate `services/mcp-server/src/toolDefs.snapshot.json` by the repo's
+- [X] T018 [US3] Regenerate `services/mcp-server/src/toolDefs.snapshot.json` by the repo's
       snapshot mechanism and run `node --test services/relay-gateway/test/mcpToolParity.test.js`
       green both directions. The MCP server itself gains no dependency and no code beyond the
       snapshot (spec 095 rule).
-- [ ] T019 [US3] Extend `services/relay-gateway/test/` assistant/tool coverage: the tool table
+- [X] T019 [US3] Extend `services/relay-gateway/test/` assistant/tool coverage: the tool table
       entry round-trips through the gateway's public-tool executor; no `navigate`/`build_intent`
       added to the in-app table; the prompt (frozen per thread) contains no news content (FR-008).
 
