@@ -28,11 +28,11 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 113 |
 | With a member-facing flow | 89 |
-| Member-facing flows | 204 |
+| Member-facing flows | 205 |
 | 🟢 covered | 187 |
-| 🟡 partial | 6 |
+| 🟡 partial | 5 |
 | 🔴 absent | 4 |
-| ⚪ out of scope | 7 |
+| ⚪ out of scope | 9 |
 | **Covered but not proven** (status `covered`, depth below `flow`) | **13** |
 
 The last row is the honest read of the suite: those flows have passing tests that do not
@@ -40,7 +40,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Custody — member funds are escrowed, moved, bridged, swept or sent
 
-84 flows — 🟢 69 · 🟡 6 · 🔴 2 · ⚪ 7 · covered-but-not-proven 0
+84 flows — 🟢 69 · 🟡 5 · 🔴 2 · ⚪ 8 · covered-but-not-proven 0
 
 ### `001-cypress-e2e-flows` — Core wager lifecycle (create → accept → resolve → claim/refund)
 
@@ -195,7 +195,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `transfer.send-from-home` | Send funds to someone from the home screen | 🟢 covered | settled | `on-chain` | `33-transfers-swap-vouchers.cy.js` (TR-01) |  |
-| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes | 🟡 partial | settled | `on-chain` | `41-group-settlement.cy.js` (GS-01, GS-02, GS-03) | the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain. |
+| `pay.group-settlement` | Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes | ⚪ out-of-scope | none | — (proposed: on-chain) | — | Withdrawn by #1441: a member cannot reach a group payment from any surface, so nothing settles one. The engine is untouched and the spec moved to withdrawn/41-group-settlement.cy.js, guarded by GROUP_PAY_ENABLED rather than deleted - GS-01/02/03 settle on chain again the moment it flips (#1538). Still absent when it does: the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain. |
 
 ### `061-bitcoin-transactions` — Bitcoin
 
@@ -338,7 +338,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Disclosure — a member consents to a cost
 
-17 flows — 🟢 17 · 🟡 0 · 🔴 0 · ⚪ 0 · covered-but-not-proven 0
+18 flows — 🟢 17 · 🟡 0 · 🔴 0 · ⚪ 1 · covered-but-not-proven 0
 
 ### `050-sponsored-paymaster` — Sponsored paymaster
 
@@ -368,7 +368,8 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `pay.group-recipient-list` | Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee) | 🟢 covered | flow | `no-chain` | `41-group-pay.cy.js` (GP-01, GP-02, GP-03, GP-04, GP-05, GP-06, GP-07, GP-08, GP-09) |  |
+| `pay.group-affordance-withdrawn` | The send surfaces offer no multi-recipient control, and a single-recipient send is unchanged | 🟢 covered | flow | `no-chain` | `41-group-pay.cy.js` (GP-10, GP-11) |  |
+| `pay.group-recipient-list` | Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee) | ⚪ out-of-scope | none | — (proposed: no-chain) | — | Withdrawn by #1441: no send surface renders the multi-recipient control, so there is no member-facing flow to drive. GROUP_PAY_ENABLED in frontend/src/lib/payments/groupPay.js is the one lever; fast/41-group-pay.cy.js is guarded by the same constant rather than deleted, and its GP-10/GP-11 assert the withdrawal itself. Restoring it is #1538. |
 
 ### `060-platform-fee-wrapper` — Platform fees
 

@@ -1,7 +1,7 @@
 {
   "measuredAt": "2026-09-03",
-  "source": "Actions run 33814290875 (PR #1416, head 1a4465f) — every spec in this tier re-recorded from ONE CI run, replacing the 2026-08-19 set that had gone three weeks stale and carried five specs it had never seen. Legs on that run were 23:53 / 23:18 / 25:17 (cancelled at the 25-minute cap, mid 40-acting-account-purchase) / 21:05 of JOB time, of which roughly 7:30 is checkout, install, compile and deploy before Cypress starts.",
-  "note": "Seconds are per-spec wall clock as Cypress reported it, and INCLUDE tests the spec skipped. Every entry but one comes from run 33814290875. The exception is 40-acting-account-purchase: its leg was cancelled at the cap while that spec was running, so its 148s from the sibling run 33811725322 (head c74e7e7, same branch, same spec bytes) is scaled by 1.19 — the mean ratio of the seven specs that ran on BOTH runs (54/47, 288/233, 232/190, 108/90, 102/85, 84/74, 54/46) — to put it on this run’s basis. Re-record it unscaled from the next full green run. Three specs still look implausibly cheap for on-chain work (11-refund-timeout, 08-oracle-resolution, 23-lifecycle-e2e) because most of their work happens in chainTx tasks rather than the browser, or because tests were skipped; that is a note about assertion depth (#1231), not about the measurement.",
+  "source": "Actions run 33814290875 (PR #1416, head 1a4465f) \u2014 every spec in this tier re-recorded from ONE CI run, replacing the 2026-08-19 set that had gone three weeks stale and carried five specs it had never seen. Legs on that run were 23:53 / 23:18 / 25:17 (cancelled at the 25-minute cap, mid 40-acting-account-purchase) / 21:05 of JOB time, of which roughly 7:30 is checkout, install, compile and deploy before Cypress starts.",
+  "note": "Seconds are per-spec wall clock as Cypress reported it, and INCLUDE tests the spec skipped. Every entry but one comes from run 33814290875. The exception is 40-acting-account-purchase: its leg was cancelled at the cap while that spec was running, so its 148s from the sibling run 33811725322 (head c74e7e7, same branch, same spec bytes) is scaled by 1.19 \u2014 the mean ratio of the seven specs that ran on BOTH runs (54/47, 288/233, 232/190, 108/90, 102/85, 84/74, 54/46) \u2014 to put it on this run\u2019s basis. Re-record it unscaled from the next full green run. Three specs still look implausibly cheap for on-chain work (11-refund-timeout, 08-oracle-resolution, 23-lifecycle-e2e) because most of their work happens in chainTx tasks rather than the browser, or because tests were skipped; that is a note about assertion depth (#1231), not about the measurement.",
   "shards": 4,
   "specs": {
     "cypress/e2e/full/02-membership.cy.js": 203,
@@ -35,7 +35,6 @@
     "cypress/e2e/full/39-api-access-console.cy.js": 97,
     "cypress/e2e/full/39-funding-pools.cy.js": 74,
     "cypress/e2e/full/40-acting-account-purchase.cy.js": 176,
-    "cypress/e2e/full/41-group-settlement.cy.js": 152,
     "cypress/e2e/full/42-clearpath-native-dao.cy.js": 27,
     "cypress/e2e/full/43-voucher-send-from-portfolio.cy.js": 28
   }

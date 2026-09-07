@@ -114,6 +114,9 @@
     "secrets:doctor": "node scripts/secrets/doctor.js",
     "secrets:migrate": "node scripts/secrets/migrate.js",
     "check:env-hygiene": "node scripts/secrets/check-env-hygiene.js",
+    "check:dep-alerts": "node scripts/security/check-dependency-alerts.js",
+    "check:dep-alerts:live": "node scripts/security/check-dependency-alerts.js --live",
+    "test:dep-alerts": "node --test \"scripts/security/__tests__/*.test.js\"",
     "test:secrets": "node --test \"scripts/secrets/__tests__/*.test.js\""
   },
   "keywords": [

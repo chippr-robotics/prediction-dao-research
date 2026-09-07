@@ -92,11 +92,8 @@ export default function TransferForm({ onSent }) {
   const [extraRecipients, setExtraRecipients] = useState([])
   const [groupScreening, setGroupScreening] = useState({})
   const [groupResult, setGroupResult] = useState(null)
-  const groupPay = useGroupPay()
 
   const connectedChainId = Number(chainId)
-  const groupBusy = groupPay.status === 'screening' || groupPay.status === 'submitting'
-  const busy = status === 'signing' || status === 'submitting' || status === 'pending' || groupBusy
 
   useEffect(() => { refreshBalances() }, [refreshBalances])
 
@@ -201,6 +198,14 @@ export default function TransferForm({ onSent }) {
 
   const isBitcoinAsset = selectedAsset?.kind === 'btc-native'
   const onConnectedChain = selectedAsset && Number(selectedAsset.chainId) === connectedChainId
+
+  // Group pay (release 1.14.0): dormant until the member adds a second recipient. It is handed
+  // the selected asset because issue #1441's availability is a fact about the asset's own
+  // NETWORK, not only about the acting identity — hence its position here, after the selection.
+  const groupPay = useGroupPay({ asset: selectedAsset })
+  const groupBusy = groupPay.status === 'screening' || groupPay.status === 'submitting'
+  const busy = status === 'signing' || status === 'submitting' || status === 'pending' || groupBusy
+
   // Bitcoin is never gasless (FR-015) — both the badge and the dropdown's
   // per-option marker must say so, whatever the EVM quote would claim.
   const gaslessForOption = useCallback(
@@ -519,7 +524,8 @@ export default function TransferForm({ onSent }) {
               </div>
             ))}
 
-            {/* Rows 2..N. Absent — and inert — until the member presses Add. */}
+            {/* Rows 2..N. Withdrawn entirely while `available` is false (#1441); otherwise
+                absent — and inert — until the member presses Add. */}
             <GroupPayRecipients
               recipients={extraRecipients}
               onChange={setExtraRecipients}
@@ -528,6 +534,7 @@ export default function TransferForm({ onSent }) {
               symbol={symbol}
               disabled={busy}
               idPrefix="pt"
+              available={Boolean(groupPay.available)}
             />
           </div>
 
