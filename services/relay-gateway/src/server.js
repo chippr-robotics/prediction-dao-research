@@ -31,6 +31,7 @@ import { createSanctionsScreen } from './policy/sanctions.js'
 import { createDedupStore } from './policy/dedup.js'
 import { createQuotas, createSpendTracker, createTokenBudget } from './policy/quotas.js'
 import { createIdentityMiddleware } from './identity/middleware.js'
+import { describeIdentityMode } from './identity/mode.js'
 import { createAttestationVerifier } from './identity/verifiers/attestation.js'
 import { createChallengeVerifier } from './identity/verifiers/challenge.js'
 import { createGrantVerifier } from './identity/verifiers/grant.js'
@@ -41,7 +42,7 @@ import { loadSigningKey } from './access/jwt.js'
 import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createReloadHandler } from './policy/reload.js'
-import { createIdentityCounters, startCountersServer } from './metrics/counters.js'
+import { createIdentityCounters, createSponsorshipCounters, startCountersServer } from './metrics/counters.js'
 import { createEngineClient } from './engine/client.js'
 import { applyEngineEvent } from './engine/webhook.js'
 import { createOpenSeaClient } from './opensea/client.js'
@@ -53,6 +54,8 @@ import { createEsploraClient, createStampsClient } from './bitcoin/client.js'
 import { createBitcoinRouter } from './bitcoin/routes.js'
 import { createPerpsClients } from './perps/client.js'
 import { createPerpsRouter, perpsStatus } from './perps/routes.js'
+import { createNewsClient } from './news/client.js'
+import { createNewsRouter, newsStatus } from './news/routes.js'
 import { createAcrossClient } from './bridge/quotes.js'
 import { createBridgeRouter } from './bridge/routes.js'
 import { createMemberApiRouter, memberApiStatus } from './memberApi/routes.js'
@@ -335,6 +338,9 @@ export function createApp(config, deps = {}) {
   // registered-but-abstaining shape is what keeps /status able to say "not-configured" honestly
   // instead of omitting a tier the ladder declares.
   const identityCounters = deps.identityCounters ?? createIdentityCounters()
+  // Demand, so nonce staleness is interpretable (#1539): staleness WHILE sponsorship was granted is
+  // a stall; the same staleness with no grants is a quiet night. Bounded to the configured chains.
+  const sponsorshipCounters = deps.sponsorshipCounters ?? createSponsorshipCounters(Object.keys(config.chains ?? {}))
   const identityVerifiers = [
     createAttestationVerifier(),
     createChallengeVerifier(config.identity?.challenge ?? {}, {
@@ -450,6 +456,24 @@ export function createApp(config, deps = {}) {
     return !!header && timingSafeEqual(header, config.originAuthSecret)
   }
   /**
+   * Operator-only disclosure (#1505).
+   *
+   * `edgeAuthorized` above is NOT an authorization check and must never be mistaken for one: the
+   * zone-wide Cloudflare Transform Rule injects `X-Origin-Auth` on every request, which is spec
+   * 106's own founding premise. It proves the request did not arrive on the raw origin IP, and
+   * nothing else. Measured in production on 2026-09-06: the identity blocks were readable by
+   * anyone curling the public hostname.
+   *
+   * This is a SEPARATE inbound secret held by operators. Unset ⇒ false, so the guarded field is
+   * absent for everyone rather than falling back to public — the failure direction matters, and
+   * "nobody sees it" is recoverable where "everybody sees it" is not.
+   */
+  const operatorAuthorized = (req) => {
+    if (!config.opsStatusSecret) return false
+    const header = req.get('x-fairwins-ops')
+    return !!header && timingSafeEqual(header, config.opsStatusSecret)
+  }
+  /**
    * Build identity (spec 076, FR-030/FR-031).
    *
    * Deliberately OUTSIDE the `disclose` gate below: an operator matching a member's bug report to a
@@ -505,6 +529,13 @@ export function createApp(config, deps = {}) {
     // Perps read-proxy visibility (spec 082, FR-014): venue/attribution config state only —
     // no member data, and the live HL builder bps already surfaces via /v1/perps/config.
     const perps = perpsStatus(config, { killSwitch })
+    // Token-news read-proxy visibility (spec 109). The routes mount unconditionally, so this block
+    // is the ONLY way to tell an image that carries the module from one that predates it: without
+    // it, `NEWS_ENABLED` on a stale pin and a live module look identical from outside. That is the
+    // pre-pin check `infra/vm/gateway/docker-compose.yml` and docs/developer-guide/token-news.md
+    // both instruct an operator to run, so it has to be here for them to be able to run it.
+    // Config state only — no member data, no credential (the vendor is keyless).
+    const news = newsStatus(config, { killSwitch })
     // Member API visibility (spec 095): module state + which chains can answer a wager read + whether
     // the assistant has a credential. No member data, no key material, nothing about any token.
     // `memberApiAssistant` is declared further down; this closure only runs at request time.
@@ -519,14 +550,24 @@ export function createApp(config, deps = {}) {
     //   - attestation reports "not-built" — not `false`, not "disabled", which would imply a
     //     switch exists that could turn it on.
     //   - upstream labels come from the bounded table (FR-036), never from request content.
+    const operatorDisclose = operatorAuthorized(req)
     const identityGated = disclose
       ? {
           callerIdentity: {
             enabled: config.identity?.enabled === true && config.identity?.killswitch !== true,
-            enforcing:
-              config.identity?.enabled === true &&
-              config.identity?.killswitch !== true &&
-              config.identity?.enforce === true,
+            // `enforcing` is OPERATOR-ONLY (#1505). It is the single most useful fact an abuser can
+            // learn about this gateway — observe mode says the door is open — and the edge gate it
+            // used to sit behind admits everyone. It is still reported unconditionally at BOOT and
+            // on every SIGHUP reload, which is where FR-015's "disabled must be legible" is now
+            // satisfied. Absent here means "you are not an operator", never "not enforcing".
+            ...(operatorDisclose
+              ? {
+                  enforcing:
+                    config.identity?.enabled === true &&
+                    config.identity?.killswitch !== true &&
+                    config.identity?.enforce === true,
+                }
+              : {}),
             verifiers: Object.fromEntries(
               identityVerifiers.map((v) => [v.kind, v.state ?? 'configured'])
             ),
@@ -541,7 +582,7 @@ export function createApp(config, deps = {}) {
           access: accessStatus(config, { signingKey: accessSigningKey, enforcement: accessEnforcement }),
         }
       : {}
-    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, memberApi, ...identityGated })
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees, perps, news, memberApi, ...identityGated })
   }
   app.get('/healthz', healthLimiter, healthHandler)
   app.get('/status', healthLimiter, healthHandler)
@@ -801,6 +842,7 @@ export function createApp(config, deps = {}) {
       const signature = await paymasterSigner.sign(hash)
       const paymasterAndData = packPaymasterAndData({ paymaster: pm, validUntil, validAfter, signature })
       audit({ chainId, action: 'sponsor', targetContract: pm, outcome: 'granted' })
+      sponsorshipCounters.grant(chainId)
       return res.json(rpcResult(id, { paymasterAndData }))
     } catch (err) {
       if (err instanceof GatewayError) {
@@ -979,6 +1021,36 @@ export function createApp(config, deps = {}) {
       quotas: perpsQuotas,
       killSwitch,
       feeRates,
+      now: nowMs,
+    })
+  )
+
+  // ---- GET /v1/news/* (spec 109 token-news read proxy; origin-locked via middleware) -----------
+  // Read-only, keyless Alphaday proxy: recent items for one curated tag slug, single-flight cached
+  // per slug so vendor load is O(distinct assets), never O(members). News is ADVISORY-ONLY — no
+  // value path routes through here, and there are NO write routes. Mounting is unconditional so a
+  // disabled module answers 503 news_unconfigured, never a bare 404 (the SPA hides every news
+  // surface on that answer).
+  const newsQuotas = createQuotas({
+    signerPerWindow: config.news.quotaPerIp,
+    globalPerWindow: config.news.quotaGlobal,
+    windowMs: config.news.quotaWindowMs,
+    now: nowMs,
+  })
+  const newsClient =
+    deps.newsClient ??
+    createNewsClient({
+      baseUrl: config.news.baseUrl,
+      timeoutMs: config.news.timeoutMs,
+      retries: config.news.retries,
+      ...(deps.newsFetch ? { fetchImpl: deps.newsFetch } : {}),
+    })
+  app.use(
+    createNewsRouter(config, {
+      client: newsClient,
+      cache: deps.newsCache ?? createTtlCache({ now: nowMs }),
+      quotas: newsQuotas,
+      killSwitch,
       now: nowMs,
     })
   )
@@ -1189,7 +1261,7 @@ if (isMain) {
   // Usage counters endpoint (spec 106/#1447): an UNPUBLISHED compose-network port the FinOps
   // exporter scrapes. Unset => not started; the exporter's source reads not-configured, honestly.
   if (config.metricsPort) {
-    startCountersServer({ port: config.metricsPort, counters: identityCounters, upstreamCeilings })
+    startCountersServer({ port: config.metricsPort, counters: identityCounters, upstreamCeilings, sponsorship: sponsorshipCounters })
   }
   // Runtime kill switch: `kill -USR2 <pid>` toggles accept/refuse (FR-015).
   process.on('SIGUSR2', () => {
@@ -1206,5 +1278,11 @@ if (isMain) {
       `[relay-gateway] listening on :${config.port} | chains=${config.enabledChainIds.join(',')} | ` +
         `killSwitch=${killSwitch.isActive()} | originLock=${Boolean(config.originAuthSecret)}`
     )
+    // FR-015's other half, and until #1505 it existed only in prose: the API contract and the
+    // config both said the identity state is disclosed "loudly at boot", and nothing printed it.
+    // That mattered little while `enforcing` was in the (widely readable) gated /status; now that
+    // it is operator-only, this line is the disclosure that is always available — to anyone who
+    // can read the journal, which is the audience FR-015 was written for.
+    console.log(`[relay-gateway] ${describeIdentityMode(config)}`)
   })
 }

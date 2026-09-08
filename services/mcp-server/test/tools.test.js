@@ -7,7 +7,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildServer } from '../src/server.js'
+import { TOOL_SNAPSHOT } from '../src/tools.js'
 import { rpc, startStubGateway } from './helpers.js'
+
+/**
+ * What this server serves: every shared snapshot tool (the local one runs in the browser and is
+ * never served here) plus the MCP-only build_intent. Derived rather than written as a literal —
+ * mcp.test.js NAMES every tool, which is the assertion a new tool should have to update, and a
+ * second copy of the count here only ever breaks for the same reason.
+ */
+const SERVED_TOOL_COUNT = TOOL_SNAPSHOT.filter((d) => d.auth !== 'local').length + 1
 
 const TOKEN = 'fw1.eyJhY2NvdW50IjoiMHhhYmMifQ.c2ln'
 
@@ -106,7 +115,7 @@ test('with FAIRWINS_API_URL unset the server still answers, with a configuration
 
   // The protocol still works — that is the point of not exiting on a missing env.
   const listed = await handler.handle(rpc(9, 'tools/list'))
-  assert.equal(listed.result.tools.length, 8)
+  assert.equal(listed.result.tools.length, SERVED_TOOL_COUNT)
 
   const res = await call(handler, 'get_profile')
   assert.equal(res.result.isError, true)

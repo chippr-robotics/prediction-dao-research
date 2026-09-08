@@ -56,17 +56,20 @@ describe('applyReload — the allowlist', () => {
     const before = {
       engineUrl: config.engine.url,
       originSecret: config.originAuthSecret,
+      opsSecret: config.opsStatusSecret,
       signingKey: config.rpcAccess.signingKeyPem,
     }
     const changed = applyReload(config, createKillSwitch(false), {
       ENGINE_URL: 'http://attacker.example',
       ORIGIN_AUTH_SECRET: 'attacker-secret',
+      OPS_STATUS_SECRET: 'attacker-ops-secret', // #1505 — a reloadable disclosure secret is no secret
       RPC_ACCESS_SIGNING_KEY: 'attacker-key',
       RPC_URL_PRIMARY_137: 'http://attacker.example/rpc',
     })
     expect(changed).toEqual([])
     expect(config.engine.url).toBe(before.engineUrl)
     expect(config.originAuthSecret).toBe(before.originSecret)
+    expect(config.opsStatusSecret).toBe(before.opsSecret)
     expect(config.rpcAccess.signingKeyPem).toBe(before.signingKey)
   })
 

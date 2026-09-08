@@ -33,17 +33,27 @@ const { isOwnerAddress, addOwnerPublicKey, txWait } = vi.hoisted(() => ({
   addOwnerPublicKey: vi.fn(),
   txWait: vi.fn(),
 }))
-vi.mock('ethers', () => ({
-  ethers: {
-    Contract: class {
-      constructor(target) {
-        this.target = target
-        this.isOwnerAddress = isOwnerAddress
-        this.addOwnerPublicKey = addOwnerPublicKey
-      }
+// Only `Contract` is stubbed; everything else stays REAL. The panel's module graph reaches
+// modules that use ethers at import time (`lib/chains/estate.js` builds its role-hash table with
+// `ethers.id` at module scope), and a mock that replaces the whole package with two methods makes
+// those fail as `ethers.id is not a function` — a confusing error about a module this test is not
+// about. Spreading the real package keeps the stub to the one thing the test actually controls.
+vi.mock('ethers', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    ethers: {
+      ...actual.ethers,
+      Contract: class {
+        constructor(target) {
+          this.target = target
+          this.isOwnerAddress = isOwnerAddress
+          this.addOwnerPublicKey = addOwnerPublicKey
+        }
+      },
     },
-  },
-}))
+  }
+})
 
 import RecoverAccountPanel from '../RecoverAccountPanel'
 import { knownCredentials } from '../../../lib/passkey/credentials'

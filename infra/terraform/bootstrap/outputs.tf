@@ -17,3 +17,8 @@ output "tf_apply_service_account" {
   description = "Apply identity, restricted to the default branch."
   value       = google_service_account.tf_apply.email
 }
+
+output "android_signing_service_account" {
+  description = "Set this as the ANDROID_SIGNING_SERVICE_ACCOUNT repo variable. Until it is set, releases build an UNSIGNED .aab and record signed:false — which is the honest default, not a failure."
+  value       = google_service_account.android_signing.email
+}

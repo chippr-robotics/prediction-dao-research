@@ -523,6 +523,19 @@
           "tests": [
             "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-01"
           ]
+        },
+        {
+          "id": "addressbook.estate-screening-pill",
+          "name": "Enter an address and see whether it is flagged on any list on any network \u2014 never a false green",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-06",
+            "frontend/cypress/e2e/fast/31-identity-access.cy.js::CM-01"
+          ],
+          "note": "Issue #1458. MS-06 runs in a world where every contract read answers 0x, so every source is unreadable and the pill must be amber (Unscreened/Partly screened), never green, with each source's 'Could not read' row named. CM-01 models the FairWins guard answering not-allowed and asserts the alert names that guard. The positive path against the live Chainalysis oracle and the Circle/Tether freeze lists was verified by hand (SC-009) and cannot run in CI without a real mainnet endpoint."
         }
       ]
     },
@@ -1576,38 +1589,38 @@
           ]
         },
         {
-          "id": "pay.group-recipient-list",
-          "name": "Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee)",
+          "id": "pay.group-affordance-withdrawn",
+          "name": "The send surfaces offer no multi-recipient control, and a single-recipient send is unchanged",
           "status": "covered",
           "tier": "no-chain",
           "depth": "flow",
           "risk": "disclosure",
           "tests": [
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-01",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-02",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-03",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-04",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-05",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-06",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-07",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-08",
-            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-09"
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-10",
+            "frontend/cypress/e2e/fast/41-group-pay.cy.js::GP-11"
           ]
+        },
+        {
+          "id": "pay.group-recipient-list",
+          "name": "Build a multi-recipient payment: add/remove rows, per-chain refusals, and the confirm disclosure (total, breakdown, rail, fee)",
+          "status": "out-of-scope",
+          "tier": "none",
+          "depth": "none",
+          "risk": "disclosure",
+          "tests": [],
+          "proposedTier": "no-chain",
+          "reason": "Withdrawn by #1441: no send surface renders the multi-recipient control, so there is no member-facing flow to drive. GROUP_PAY_ENABLED in frontend/src/lib/payments/groupPay.js is the one lever; fast/41-group-pay.cy.js is guarded by the same constant rather than deleted, and its GP-10/GP-11 assert the withdrawal itself. Restoring it is #1538."
         },
         {
           "id": "pay.group-settlement",
           "name": "Settle a group payment - one batched transaction (passkey), one MultiSend proposal (vault), N separate consecutive-nonce proposals when the vault policy denies batches, or sequential sends with per-recipient outcomes",
-          "status": "partial",
-          "tier": "on-chain",
-          "depth": "settled",
+          "status": "out-of-scope",
+          "tier": "none",
+          "depth": "none",
           "risk": "custody",
-          "tests": [
-            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-01",
-            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-02",
-            "frontend/cypress/e2e/full/41-group-settlement.cy.js::GS-03"
-          ],
-          "issue": "#1400",
-          "missing": "the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain."
+          "tests": [],
+          "proposedTier": "on-chain",
+          "reason": "Withdrawn by #1441: a member cannot reach a group payment from any surface, so nothing settles one. The engine is untouched and the spec moved to withdrawn/41-group-settlement.cy.js, guarded by GROUP_PAY_ENABLED rather than deleted - GS-01/02/03 settle on chain again the moment it flips (#1538). Still absent when it does: the PASSKEY batched rail (one UserOp carrying every payment). sendPasskeyBatch reaches the chain only through bundlerClient.sendUserOperation after chooseRoute finds a healthy relayer or bundler, and its self-funded fallback drops the paymaster rather than the bundler - so a batch cannot be self-submitted and this rail needs the PASSKEY_FULL_STACK harness (now the cypress-passkey-full-stack job). The three rails a classic or vault member actually uses are covered and settled on chain."
         }
       ]
     },
@@ -3120,7 +3133,7 @@
           "depth": "none",
           "risk": "custody",
           "tests": [],
-          "issue": "#1432",
+          "issue": "#1504",
           "note": "Blocked on T-101: accountFactory has no recorded deploy block on any chain, so a log scan has no floor -- and this repo degrades that silently (deployBlocks?.X || 0 starts at block 0) rather than loudly. Release 1 confirms a single derived candidate and reports none-found honestly for every other shape."
         },
         {
@@ -3147,7 +3160,7 @@
           "tests": [
             "frontend/cypress/e2e/passkey/account-recovery.cy.js::REC-03"
           ],
-          "issue": "#1432",
+          "issue": "#1504",
           "note": "The member-facing half is covered without a chain: the form, the refusal of a malformed address in words rather than colour, and the address being handed on to be CHECKED rather than trusted. The half that needs a chain -- a real deployed account confirming the key and a session opening on it -- belongs to the full-stack passkey tier.",
           "missing": "The chain agreeing. This tier reaches no RPC, so what is proven is the form, the refusal of a malformed address, and that the address is handed on to be CHECKED \u2014 never that a verified address opens a session on the account it names. That needs a deployed account whose owner set includes a key this browser has no record of, i.e. the full-stack passkey tier."
         }
@@ -3225,7 +3238,7 @@
             "frontend/cypress/e2e/full/44-vault-rules-lanes.cy.js::RL-02"
           ],
           "issue": "#1491",
-          "missing": "the replay deployment itself and FR-019 already-live need a SECOND custody network, which the one-chain full tier cannot host — staged manual protocol (docs/runbooks/multichain-vault-staging-validation.md, #1491). The record gate is chain-proven: the record holder is OFFERED Deploy for the missing cohort network (RL-01) and the no-record co-owner gets the honest FR-018 reason (RL-02); gating, disclosure and orchestrator handoff stay Vitest/component-proven (VaultDetailsView.test.jsx)."
+          "missing": "the replay deployment itself and FR-019 already-live need a SECOND custody network, which the one-chain full tier cannot host \u2014 staged manual protocol (docs/runbooks/multichain-vault-staging-validation.md, #1491). The record gate is chain-proven: the record holder is OFFERED Deploy for the missing cohort network (RL-01) and the no-record co-owner gets the honest FR-018 reason (RL-02); gating, disclosure and orchestrator handoff stay Vitest/component-proven (VaultDetailsView.test.jsx)."
         },
         {
           "id": "custody.vault-details-one-card",
@@ -3265,6 +3278,77 @@
       "memberFacing": false,
       "reason": "Runtime-issued read-only RPC credentials. Dormant end to end until an issuance endpoint is configured (#1438 runbook); every client failure mode falls back to the public default the app uses today, so there is no member-distinguishable flow yet. Covered by gateway vitest (test/access.test.js) and frontend vitest (src/test/network/issuedAccess.test.js); a member-facing degradation-disclosure flow gets a row when the disclosure surface ships.",
       "flows": []
+    },
+    {
+      "id": "108-multi-currency-wrap",
+      "title": "Multi-currency wrap/unwrap \u2014 the asset is the entry point",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "trade.wrap-multi-currency-picker",
+          "name": "The Wrap view offers every cohort chain's base coin the member holds from one trading-view-style picker (icon, symbol, network, balance), with unreadable balances shown as unread (never zero) and unconfigured wrappers honestly absent",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/fast/48-wrap-multi-currency.cy.js::WMC-01",
+            "frontend/cypress/e2e/fast/48-wrap-multi-currency.cy.js::WMC-02",
+            "frontend/cypress/e2e/fast/48-wrap-multi-currency.cy.js::WMC-03",
+            "frontend/cypress/e2e/fast/48-wrap-multi-currency.cy.js::WMC-04"
+          ],
+          "note": "WMC-02 pins null-not-zero for an unreadable chain and the switch disclosure; WMC-04 pins the refused-switch wording (both chains named, nothing sent) via the mock wallet's rejectChainSwitch."
+        },
+        {
+          "id": "trade.wrap-cross-chain-submit",
+          "name": "Selecting a coin whose chain differs from the wallet's switches the wallet at submit time (settle loop), wraps against that chain's own wrapped-native contract, and a refused switch names both chains and sends nothing",
+          "status": "covered",
+          "tier": "on-chain",
+          "depth": "settled",
+          "risk": "custody",
+          "tests": [
+            "frontend/cypress/e2e/full/45-wrap-cross-chain.cy.js::WXC-01",
+            "frontend/cypress/e2e/full/45-wrap-cross-chain.cy.js::WXC-02",
+            "frontend/cypress/e2e/full/45-wrap-cross-chain.cy.js::WXC-03"
+          ],
+          "note": "The member signs something that costs money, so execution lives here (e2e policy rule 2). WXC-01 starts the mock wallet on Mordor and wraps the local chain's coin \u2014 the switch-then-settle path against a real deposit(), asserted by the wrapped balance read back from the chain; WXC-03 closes the 1:1 round trip."
+        }
+      ]
+    },
+    {
+      "id": "109-token-news",
+      "title": "Token news on portfolio and trade surfaces",
+      "memberFacing": true,
+      "flows": [
+        {
+          "id": "news.portfolio-token-card",
+          "name": "Selecting a portfolio token shows that asset's latest news with link-out attribution; an unreadable feed renders a sentence + retry (never an empty feed pretending to be no news), an unmapped asset renders honest absence, and the module off hides the card",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-01",
+            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-03",
+            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-04",
+            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-04b"
+          ],
+          "issue": "#1465"
+        },
+        {
+          "id": "news.trade-pair-feed",
+          "name": "Selecting a trade pair shows the pair's token news below the amount entry under the same three-state honesty; items are text with attribution, never rendered HTML",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "flow",
+          "risk": "information",
+          "tests": [
+            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-05",
+            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-05b"
+          ],
+          "issue": "#1465"
+        }
+      ]
     }
   ]
 }

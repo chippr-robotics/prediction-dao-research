@@ -679,9 +679,20 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   (4) **Terraform owns Cloud Run SHAPE; Cloud Build owns the IMAGE.** The `ignore_changes` set
   (`image`, `revision`, `client`, `client_version`) is gate-enforced — without it every merge reports
   drift, and drift nobody reads is worse than none. The pipeline correspondingly must not set shape
-  flags. **The Cloud Run alto bundler must stay decommissioned** (G-11): re-arming it puts two
-  executors on ONE EOA — colliding nonces, stuck bundles, both instances healthy-looking, no in-band
-  detection.
+  flags. **AT MOST ONE ALTO PER (CHAIN, EXECUTOR EOA)** (G-11). Two altos sharing an
+  executor key are two senders on ONE EOA — colliding nonces, stuck bundles, both instances
+  healthy-looking, **no in-band detection**. Note what the invariant is *not*: it was written as
+  "the Cloud Run alto bundler must stay decommissioned", which is a fact about one named service and
+  is **satisfied by an estate that violates the real rule** — a second VM alto for chain 8453 beside
+  the existing 8453 alto breaks it while Cloud Run stays dark. Keeping Cloud Run decommissioned
+  remains required (it was one of three re-arming paths, and `single-alto-gate.sh` steps 1–2 still
+  enforce it); it is a consequence of the rule, not the rule. Enforcement is per-chain: each alto
+  declares `FW_CHAIN_ID`, the gate permits at most one per chain and only chains the host is
+  *declared* to serve, and an alto it cannot attribute is **refused rather than assumed safe**.
+  Matching is on the image REPOSITORY, never a pinned tag — a duplicate mid-upgrade runs a different
+  tag, which is exactly when you need to see it. **One executor key per chain, never shared**: that
+  is what turns a mis-wired RPC from a silent nonce war on someone else's chain into an unfunded EOA
+  whose bundles simply never land.
   (4a) **The five Terraform modules live in the private `chippr-robotics/chippr-tf-modules`**, pinned
   by **commit SHA** (a tag can be repointed, a commit cannot; G-16 enforces the pin). Add new modules
   THERE, not to `infra/terraform/modules/`, which now holds only a pointer — a local module is
@@ -1015,6 +1026,42 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   throwing form inside the action callbacks, so any caller that gets past the UI fails with the same
   sentence. See `docs/developer-guide/protect-policies.md` § "The write rail is a property of the
   signer".
+- **Address screening asks EVERY list on EVERY cohort chain, and green means all of them answered
+  (spec 021 amendment, issue #1458).** `lib/screening/sources.js` is the registry — the FairWins
+  `SanctionsGuard` where deployed, the Chainalysis oracle where published (Base is at a DIFFERENT
+  address from the other four), and the NATIVE issuer freeze lists (Circle `isBlacklisted`, Tether
+  `isBlackListed` — different selectors; a bridged token has neither). Every row was verified by a
+  live read before it was written; a wrong row costs a member a source silently, so verify before
+  adding one. `verdict.js` derives ONE word from the readings and never stores it: `flagged` on ANY
+  hit, `screened` ONLY when every configured source answered clear (`unreadable === 0` — a list
+  that did not answer is not a list that said no), `partial` otherwise, `unscreened` when nothing
+  answered; chains with no source are UNCOVERED, never clear. The sweep (`screenEstate.js`) is
+  cohort-bounded, per-source failure-isolated, deadline-bounded (8 s) and never rejects; providers
+  come from `readProviderFor`. **Two hooks, on purpose**: `useAddressScreening` stays the PER-CHAIN
+  live read that gates a submission on the chain the value moves on (FR-013/FR-032 — the contract
+  will repeat that exact read), and `useEstateScreening` feeds the advisory `ScreeningPill` under
+  every address field via `AddressScreenNotice`, which now renders for every valid address (a
+  clear answer that rendered as silence was indistinguishable from no screen at all). The pill is
+  icon + word, `role="alert"` when flagged, and expands to the per-source rows; the no-chain e2e
+  tier answers `0x` to every read, so there it must be amber, never green (`MS-06`). Nothing here
+  enforces — the guard and the issuing token do. No subgraph, no off-chain provider: the source
+  shape is what a BYO provider would implement, behind a member-held credential.
+  **The roster is `screeningChainIds()` — the cohort MINUS `isLocalOnlyChain`** — because a source
+  a shipped build can never reach is not a degraded source, it is not a source: chain 1337 is
+  `isTestnet: true`, carries a guard, and lives at `http://127.0.0.1:8545`, so every testnet build
+  told every member that a Hardhat guard "could not be read" and could never reach green (QA round;
+  Amoy's build default was also dead and now points at publicnode like every other chain here).
+  **Every address surface reads the SAME sweep**: the book and the saved-contact picker use
+  `useEstateScreeningMany` — they asked the per-chain hook, which can only answer for the wallet's
+  chain, so a book full of contacts rendered "Unscreened" whenever the wallet was elsewhere or
+  absent. `getVerdictOn` has a THIRD answer, `no-source`, distinct from both a verdict and a
+  still-running null. **The summary line names sources only when FLAGGED** — naming every
+  unreachable one turned the notice into a paragraph; the names live one tap away, and the
+  `ScreeningStatusBar` (one segment per source, `role="img"` labelled with the summary) carries the
+  shape. The notice has **no ⓘ**: that bubble was taller than a phone and clipped by the scrolling
+  modal it sat in; the explainer stays on the Address Book header, and `InfoTip` now sits above the
+  assistant launcher (1350) and scrolls internally. See
+  `docs/developer-guide/address-screening.md`.
 - **A passkey's account is LOOKED UP, never derived (spec 104).** `lib/passkey/accountLookup.js` is
   the one seam that answers "which account does this key control?", and its `Resolution` type has
   four shapes of which **only `resolved` carries an address** — three of its four constructors take
@@ -1048,9 +1095,47 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   entities) and are covered by the address path. See
   `docs/developer-guide/passkey-account-recovery.md` + `specs/104-passkey-account-recovery/`.
 
+- **Wrap is multi-currency, and the ASSET is the entry point (spec 108).** Trade ▸ Wrap offers every
+  cohort chain's base coin with a configured wrapper — the candidate list is
+  `config/wrappedNative.js#listWrappableCoins()` (`cohortChainIds().filter(hasWrappedNative)`,
+  SelectableAsset-shaped), living beside the ONE resolver on purpose so "offered" and "resolvable"
+  cannot drift; an unconfigured chain is ABSENT, never a disabled row (no guessed wrapper ever
+  receives funds). Picker balances ride `useWrapCoinOptions` → `readBalancesSettled` +
+  `getReadProvider` with per-chain failure isolation — `null` survives to the row ("—"), never a
+  fabricated zero, and an unreadable chain stays selectable. `useWrapNative({ chainId })` re-binds
+  every read to the TARGET and retargets the write per rail: classic cross-chain
+  switches-then-settles (the spec-102 / `useEarnSend` device — refusal names BOTH chains and sends
+  nothing), passkey batches pin the target via the `sendCalls` `{ chainId }` override gated on
+  `isPasskeySupported` (unavailable is stated BEFORE the tap with the seam's own reason),
+  vault/legacy/hardware keep their refusals with the picker pinned to the acting chain. Changing the
+  coin CLEARS the amount — a MAX quoted on one chain never rides to another. No target passed =
+  wallet's chain, byte-compatible with every pre-108 caller. See
+  `docs/developer-guide/wrap-native.md` + `specs/108-multi-currency-wrap/`.
+
+- **Token news (spec 109) is the fourth read-proxy, and the ASSET-IDENTITY MAPPING is ours.**
+  `services/relay-gateway/src/news/` (`NEWS_ENABLED`, default off) proxies the keyless Alphaday
+  `/items/news/?tags=<slug>` — **the vendor has no CORS** (a browser can never call it directly)
+  **and no contract identity anywhere** (tags/coins are slug+ticker only), so
+  `frontend/src/config/newsAssets.js` holds the curated `(chainId,address)→slug` table beside the
+  asset registry (spec-108 offered-beside-resolvable precedent), every row probe-verified, and a
+  missing row IS "not covered" — resolved client-side with NO network call; never a ticker
+  heuristic (a garbage slug fails closed to `[]` upstream, verified). Cache TTL is clamped
+  **≥ 300 s** (the vendor itself serves `max-age=300` — lower buys load, not freshness),
+  single-flight per slug, serve-stale ≤ 10× TTL then `unreadable`, never stale-as-live. The
+  `FeedReading` has three states + a DISTINCT honest-empty (`read` with `items: []` — sparse
+  long-tail coverage is content, not failure; ages always shown). News is ADVISORY-ONLY: no value
+  path gates on it, items render title/source/age/link-out as TEXT (vendor `image`/`icon`/HTML
+  never forwarded), and the assistant gets exactly ONE public tool, `get_token_news`
+  (tool-pull; never in a prompt, never pre-loaded — spec-104 injection posture) with the MCP
+  snapshot regenerated. **No datastore, no member-keyed interest record, no FeeRouter service, no
+  key anywhere**; FinOps entry `alphaday-news-api` (`modelled` $0) ships with the module. The
+  parked graph/retrieval layer is #1504-lineage/#1513 — do not reintroduce it here. See
+  `docs/developer-guide/token-news.md` + `specs/109-token-news/` (research.md carries the probe
+  evidence).
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/105-multichain-vault-creation/plan.md
+at specs/109-token-news/plan.md
 <!-- SPECKIT END -->
 - **Workstation credentials live in Secret Manager, never in `.env` (spec 097).** The machine the
   platform is administered FROM is a production surface — it can read a funded deploy key that also

@@ -166,10 +166,33 @@ jobs:
       - name: Check the E2E bypass is still safe
         run: npm run check:ci-gating
 
+      # A VITE_ build arg a Cloud Build file sets but the Dockerfile never declares is DROPPED by
+      # docker with only a warning — green pipeline, built image, absent feature. Its first run
+      # found VITE_STAGING_BANNER in exactly that state, so the marker saying staging sends REAL
+      # mainnet transactions had never rendered. Same job because it is the same shape: no npm ci,
+      # dependency-free, its own must-fail fixtures.
+      - name: Check every build arg reaches the build
+        run: npm run check:build-args
+
       # The parser that decides which issues a `staging` merge closes. Same job because it is the
       # same shape of thing: dependency-free, must-refuse fixtures, no npm ci.
       - name: Test the closing-keyword parser
         run: node --test "scripts/ci/__tests__/parse-closing-keywords.test.js"
+
+      # Gate (issue #1521): dependency vulnerabilities were the last class still on the honour
+      # system. dependabot.yml said in its own header that no vulnerability gate existed anywhere in
+      # CI; none did, and 45 alerts (1 critical, 9 high) accumulated with every required check green.
+      #
+      # This is the OFFLINE half — policy schema, acceptance expiry, and the wiring of
+      # dependency-alerts.yml. It needs no token and no network, so it runs on every PR including
+      # forks and Dependabot's own, which is exactly where the live half cannot run. Expiry is
+      # enforced here, so a time-boxed acceptance rotting past its date fails a pull request rather
+      # than waiting for the nightly job.
+      - name: Test the dependency alert gate's own rules
+        run: npm run test:dep-alerts
+
+      - name: Check the dependency alert policy
+        run: npm run check:dep-alerts
 
   # Gate (spec 089, FR-019…FR-023): a revenue or cost source that reaches production without a
   # dashboard entry is money moving that nobody is watching. The brief stated updating the dashboard

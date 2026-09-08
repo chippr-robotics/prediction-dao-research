@@ -253,6 +253,12 @@ describe('Endpoints, callsigns and compliance (specs 069 / 054 / 007)', () => {
       cy.contains('.fm-error-banner', /flagged by sanctions screening/i, { timeout: 30000 })
         .should('be.visible')
 
+      // And the estate-wide pill (issue #1458) reaches the same verdict from the same read, naming
+      // the FairWins guard as the list that said no — the pill and the gate never disagree here.
+      cy.get('.ab-screen-notice[role="alert"]', { timeout: 30000 })
+        .should('be.visible')
+        .and('contain.text', 'FairWins sanctions guard')
+
       // And the refusal is not cosmetic: the action is withheld, not merely annotated.
       cy.get('.pay-panel .fm-success-actions')
         .contains('button', /^Pay$/)

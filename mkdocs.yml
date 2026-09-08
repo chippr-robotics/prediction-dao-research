@@ -162,6 +162,7 @@ nav:
     - Perps Operations: runbooks/perps-operations.md
     - Mini-App Registry Operations: runbooks/miniapp-registry-operations.md
     - Member API Operations (spec 095): runbooks/member-api-operations.md
+    - Keyed RPC Access (spec 107): runbooks/keyed-rpc-access.md
     - Staking Operations: runbooks/staking-operations.md
     - Contract Upgrades: runbooks/contract-upgrades.md
     - Relayer Mordor Deploy: runbooks/relayer-mordor-deploy.md

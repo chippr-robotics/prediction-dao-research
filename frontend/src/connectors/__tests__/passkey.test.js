@@ -462,11 +462,16 @@ describe('cross-device sign-in (fresh browser, synced passkey)', () => {
       deriveAddress: undefined, // use the real local derivation
       resolveAddress: undefined,
       // Spec 104: the derived address is a CANDIDATE now, so this path only yields a session
-      // when the chain agrees the key owns it. The double answers as the deployed account does.
-      readControllers: vi.fn().mockResolvedValue({
-        deployed: true,
-        controllers: [{ index: 0n, kind: 'passkey', ownerBytes: xy }],
-      }),
+      // when the chain agrees the key owns it. The double answers as the deployed account does —
+      // for ONE address, not for every address it is asked about. Leg A (T-103) enumerates several
+      // creation nonces, so a double that says "deployed and owned" to everything now claims the
+      // member owns an account at every nonce, and the connector correctly refuses to choose among
+      // them. A member has one account here; the double has to say so.
+      readControllers: vi.fn(async ({ accountAddress }) =>
+        accountAddress === computeAccountAddress({ ownersBytes: [xy], chainId: 80002 })
+          ? { deployed: true, controllers: [{ index: 0n, kind: 'passkey', ownerBytes: xy }] }
+          : { deployed: false, controllers: [] }
+      ),
     })
     const out = await connector.connect({ chainId: 80002, mode: 'sign-in' })
 
