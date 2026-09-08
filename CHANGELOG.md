@@ -14,6 +14,107 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.18.0 — 2026-09-08
+
+Promoted from: v1.18.0-rc.26
+Previous release: v1.17.0 · Range: `v1.17.0..v1.18.0` (100 commits)
+
+### 🚀 Features
+
+- feat(1378): declare the Android upload-key reader, scoped to exactly two secrets
+- feat(finops): the nonce signal actually emits, and gains the demand to read it against
+- feat(109): enable token news on the gateway, and make the rollout order safe
+- feat(109): closers — FinOps entry, e2e coverage, docs (Phase 6)
+- feat(109): assistant get_token_news tool (US3)
+- feat(109): trade-pair news feed (US2)
+- feat(109): portfolio token news card (US1)
+- feat(109): gateway news read-proxy and curated asset-news mapping seam
+- feat(finops): observe the executor's NONCE, because balance cannot see a stall
+- feat(screening): screen an entered address against every list on every cohort chain (#1458)
+- feat(passkey): enumerate creation nonces so leg A can find a retried account
+- feat(108): multi-currency wrap/unwrap — the asset is the entry point
+- feat(ops): measure deploy blocks from public sources, and record accountFactory
+
+### 🐛 Bug Fixes
+
+- fix(screening): make the estate screen readable on testnet, and the notice legible
+- fix(109): report the news module in /status so the pre-pin check can run
+- fix(perps): hold the market controls to the 36px floor the comment claims
+- fix(perps): collapse the market filters so the table gets the viewport
+- fix(109): make the token-news e2e spec actually run
+- fix(passkey): the bundler list finally submits through more than its first entry
+- fix(109): check news liveness before validation, and pin the order
+- fix(payments): withdraw the multi-recipient affordance from the send surfaces
+- fix(bundler): the single-alto gate enforced per-HOST a rule that is per-KEY
+- fix(e2e-matrix): repoint spec-104 recovery rows at open tracker #1514
+- fix(build): a build arg the Dockerfile never declares is silently dropped
+- fix(106): `enforcing` is operator-only, and FR-015 moves to boot where it belongs
+- fix(screening): the Unscreened sentence names uncovered networks even when sources existed
+- fix(e2e-matrix): repoint the spec-104 gap rows at open tracker #1504
+- fix(108): make the local wrapper real, settle on a verified signer, and keep a typed amount
+- fix(ops): validate the address and topic before they reach a URL
+- fix(ops): stop building regexes from --contract (CodeQL, 2 high)
+- fix(e2e): fast/48 tests the cohort the fast build actually resolves
+- fix(e2e-matrix): spec-108 rows use the declared risk enum
+- fix(e2e-matrix): repoint spec-105 partial rows at open tracker #1494
+- fix(ci): gh issue close has no --comment-file flag
+
+### 📚 Documentation
+
+- docs(109): fix two spec comments left describing the replaced stub
+- docs(109): correct why the e2e spec stubs every provider host
+- spec(109): tasks — dependency-ordered task list for token news
+- spec(109): address review — concrete SC-005 bound, story-vs-issue priority note
+- spec(109): specify — token news on portfolio and trade surfaces
+- docs(G-11): the rule was about a service name; the invariant is about a key
+- spec(109): reserve — token-news
+- docs(bundler): three documents that would cause the incident they warn about
+- docs(research): evaluate issue #1465 (token news + agent context) against the estate
+- docs(107): the keyed RPC access runbook, written from the live-fire run
+- docs(108): actor-critic screenshots (round 1 clean) + lint-clean return
+- docs(108): plan, research, data model, quickstart, tasks
+- spec(108): keep matrix.json's original unicode escaping
+- spec(108): reserve — multi-currency-wrap
+
+### 🧪 Tests
+
+- test(recover): keep the real ethers around the Contract stub
+- test(109): the MCP server serves nine tools, not eight
+- test(e2e): MS-06 scrolls the pill's details into view before asserting on them
+- test(108): e2e for the multi-currency picker + cross-chain submit, docs
+- test(api-access): the unreachable arm must leave chain height readable, or nothing ever recovers
+- test(api-access): stub BOTH provider rungs in API-05's unreachable arm
+
+### 🏗️ Infrastructure
+
+- ci: gate dependency vulnerabilities instead of only reporting them
+
+### 🧹 Maintenance
+
+- chore(1378): create the Android upload-key reader identity
+- chore(109): pin the gateway image that actually carries the news module
+- chore(native): sync the shells to v1.17.0 — ported base-branch fix
+- revert(e2e): drop the superseded API-05 alias/wait delta — branch now matches staging
+
+### Artifacts
+
+Range: `v1.17.0..v1.18.0`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | moved | `amoy-chain80002-v2/membershipManagerImpl` → `0xb6499596703cEE6eA4BE5b5F01DEc4d7ccfe10bD`<br>`amoy-chain80002-v2/wagerRegistryImpl` → `0xa2176F5Fea39888cD1697Be4651415490C78905d`<br>`amoy-chain80002-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`arbitrum-chain42161-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`arbitrum-chain42161-v2/bridgeRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`arbitrum-chain42161-v2/liquidityRouterImpl` → `0x7Af46728e7C969b75723398e3F93b565E968A3ba`<br>`arbitrum-chain42161-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`base-chain8453-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`base-chain8453-v2/bridgeRouterImpl` → `0x41ba6bcA216bd6A4c5A0Bf8F9b2d682ec0a879D5`<br>`base-chain8453-v2/liquidityRouterImpl` → `0x7Af46728e7c969b75723398E3f93b565E968A3bA`<br>`base-chain8453-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`etc-chain61-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mainnet-chain1-v2/feeRouterImpl` → `0x5cCd55D62Ce7Df730c39543B332dD8d6054B5d00`<br>`mainnet-chain1-v2/bridgeRouterImpl` → `0xcA277Cc3485Da12771d6171a9D0A894B8DD159f8`<br>`mainnet-chain1-v2/liquidityRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`mainnet-chain1-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mordor-chain63-v2/membershipManagerImpl` → `0x7D38F7Ef26f7E2409d5C04a62c1d9A3Ec002A49e`<br>`mordor-chain63-v2/wagerRegistryImpl` → `0x9FfE701be18Ff033706f2df19cd8730F5CB884B2`<br>`mordor-chain63-v2/tokenFactoryImpl` → `0x135108EB6f81e361b6cF131d2Cb9A01E92Cd8ED9`<br>`mordor-chain63-v2/openERC20Impl` → `0xd8E67C6C058a6D35E69c691B44b8D5f858591971`<br>`mordor-chain63-v2/openERC721Impl` → `0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB`<br>`mordor-chain63-v2/restrictedERC20Impl` → `0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444`<br>`mordor-chain63-v2/openERC20V2Impl` → `0x92169007926fBc8Ac90cdD311dD3C2557158C395`<br>`mordor-chain63-v2/openERC721V2Impl` → `0xEeaBC05214FF0C42cbA42b365aB400b7ca4311cE`<br>`mordor-chain63-v2/restrictedERC20V2Impl` → `0x664d87bed13ea4D50Cd3da8e0aC5A8D70A302A0B`<br>`mordor-chain63-v2/externalDAORegistryImpl` → `0x28270cB71E87D2D6C662e61CFE6eD02d05d43B7A`<br>`mordor-chain63-v2/zkWagerPoolFactoryImpl` → `0xd3e851FDDa9D5796D503daFd34b2403D7336d9fD`<br>`mordor-chain63-v2/poolImpl` → `0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277`<br>`mordor-chain63-v2/wagerPoolFactoryImpl` → `0xfB6F9F7EfD86a220eE1aD7906278247051B25430`<br>`mordor-chain63-v2/feeRouterImpl` → `0x744b8E56d84bb8D7657b2Bb13426cB882c93B7E6`<br>`mordor-chain63-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`mordor-chain63-v2/miniAppRegistryImpl` → `0xc8Dd8601b35aDa3AF367C9E41f24Fd0503Ced674`<br>`optimism-chain10-v2/feeRouterImpl` → `0x9B68fDbBaEaeafbe2349549A4994A4697462AFea`<br>`optimism-chain10-v2/bridgeRouterImpl` → `0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5`<br>`optimism-chain10-v2/liquidityRouterImpl` → `0x7Af46728e7C969b75723398e3F93b565E968A3ba`<br>`optimism-chain10-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`polygon-chain137-v2/membershipManagerImpl` → `0x7177470fE3c5D89CEf965A596540E57cE290C939`<br>`polygon-chain137-v2/wagerRegistryImpl` → `0x9c52C1ef4Bbe65CF19a5C26bebD4A22100964898`<br>`polygon-chain137-v2/tokenFactoryImpl` → `0xE819f7b672D81A8b78d40b1C99Fe5d646513D12C`<br>`polygon-chain137-v2/openERC20Impl` → `0xd8E67C6C058a6D35E69c691B44b8D5f858591971`<br>`polygon-chain137-v2/openERC721Impl` → `0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB`<br>`polygon-chain137-v2/restrictedERC20Impl` → `0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444`<br>`polygon-chain137-v2/wagerPoolFactoryImpl` → `0x754d8aa4785Ec4bEE7c921f8d032D5E3a78d9308`<br>`polygon-chain137-v2/poolImpl` → `0xB153e4456FaD1A7E96e35e14094Cf6964348BC40`<br>`polygon-chain137-v2/accountImpl` → `0xfC5086A397e4FbAAF8f73892807415Da8d255E61`<br>`polygon-chain137-v2/callsignRegistryImpl` → `0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49`<br>`polygon-chain137-v2/feeRouterImpl` → `0x40ee755246E60f66E7bA425F99C6d704859d38db`<br>`polygon-chain137-v2/bridgeRouterImpl` → `0x8F7A7e7437733326BD2F8045BFceD9B821aF1De1`<br>`polygon-chain137-v2/liquidityRouterImpl` → `0x33818052Ca8B5b8Bb9777Bf6eBbaFCD8Faae6e65`<br>`polygon-chain137-v2/miniAppRegistryImpl` → `0x41858006aD6dd0788b84F9fb17A28d8167C7b331` |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.3.0` |
+
+### Native channel artifacts (v1.18.0)
+
+| Channel | Artifact | SHA-256 | Signed |
+|---|---|---|---|
+| android | `FairWins-v1.18.0.aab` | `c5c94a1ce6687074680c4d07495f4f3cb704329334f7478fe61a0862e7541a89` | no — operator signing ceremony (see docs/runbooks/native-release-operations.md) |
+| ios | `FairWins-v1.18.0-ios.xcarchive.zip` | `482b766e650ae967db6471a9a4c55ae03d856424ce15da1576dd6b9d3112a2d4` | no — operator signing ceremony (see docs/runbooks/native-release-operations.md) |
+
 ## v1.17.0 — 2026-09-06
 
 Promoted from: v1.17.0-rc.24
