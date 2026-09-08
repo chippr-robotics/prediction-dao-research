@@ -26,16 +26,22 @@ services:
   # ---- namespace owner: the policy gateway (the only public surface) ----
   gateway:
     container_name: fairwins-gateway-gateway
-    # agentic-096 (staging 7d5f2c10): the first image carrying spec 095's member API and spec 096's
-    # x402 rail, plus the spec-089 FinOps catalogue work and the member-API quota/spend bounds from
-    # #1311. Verified before push: /status returns a `memberApi` block (with x402 nested inside it)
-    # that the live perps-083 does not. Digest sha256:c57e88ae0960519ef461a7316f782281e0f1bcccc499a…
+    # spec109-7110b663 (#1544, spec-109 go-live): the first image carrying the token-news read
+    # proxy (services/relay-gateway/src/news/). Verified before push, on the built image itself:
+    # /status returns a `news` block ({enabled, killed, cacheTtlMs: 300000}) that the previous pin
+    # spec107-1ac148bf does not, and GET /v1/news/137/native?slug=matic-network answered a `read`
+    # envelope with live items. Digest sha256:1f5e5ca951fd16fbe6f6d7658834546e6232bfccae9056305…
     #
-    # The member API and the x402 rail were switched ON in the same change that promoted
-    # `x402-agent-payments` to a live FinOps source — shipping a revenue path and the thing that
-    # watches it together is what the C2b gate exists to force. ASSISTANT_ENABLED is still off;
-    # see the flag block below for why that one is not a flag flip.
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:spec107-1ac148bf
+    # That `news` block is itself part of this build: newsStatus() shipped with 109 exported and
+    # never called, so /status could not distinguish an image carrying the module from one
+    # predating it — the pre-pin check the NEWS_ENABLED note below tells you to run had no signal
+    # to read. Wiring it in is what makes the ritual performable, not a cosmetic addition.
+    #
+    # Carries everything the previous two pins did: spec 095's member API, spec 096's x402 rail,
+    # the spec-089 FinOps catalogue work and the member-API quota/spend bounds from #1311; the
+    # spec-107 keyed-RPC issuance; and the spec 082/083 perps proxy. ASSISTANT_ENABLED is still
+    # off; see the flag block below for why that one is not a flag flip.
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:spec109-7110b663
     restart: unless-stopped
     pull_policy: missing
     ports:
@@ -198,12 +204,16 @@ services:
       # vendor needs none, and it has no CORS, which is why the proxy exists at all rather than the
       # browser calling it directly.
       #
-      # REQUIRES AN IMAGE CONTAINING THE NEWS MODULE. The image pinned above (spec107-1ac148bf)
-      # PREDATES spec 109 (merged 2026-09-07), so until the tag is bumped this flag does nothing:
-      # `/v1/news/*` does not exist there and answers 404, not 503. The SPA now reads a 404 as
-      # not-configured — absence, rendering nothing — so the transition window is silent rather
-      # than showing every member a failure they cannot act on. Verify before pinning a new tag:
-      # /status must carry a `news` block, exactly as the perps note above describes.
+      # REQUIRES AN IMAGE CONTAINING THE NEWS MODULE — and as of the pin above it has one
+      # (spec109-7110b663, #1544). This flag was inert from #1543 until that repin, because the
+      # previous pin spec107-1ac148bf PREDATED spec 109: `/v1/news/*` did not exist there and
+      # answered 404, not 503. The SPA reads a 404 as not-configured — absence, rendering nothing
+      # — so that window was silent rather than showing every member a failure they could not act
+      # on. Keep that branch: it is what makes the NEXT such window safe, not dead code.
+      #
+      # The rule survives the fix: before pinning any future tag, boot the image and confirm
+      # /status carries a `news` block, exactly as the perps note above describes. A flag with no
+      # code behind it looks enabled and does nothing.
       #
       # FinOps: the cost source `alphaday-news-api` is already catalogued LIVE (basis modelled, $0
       # on the vendor's free tier), so no C2b promotion rides on this switch — there is no payee,
