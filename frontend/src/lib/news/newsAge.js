@@ -15,3 +15,31 @@ export function newsAgeLabel(publishedAt, now = Date.now()) {
   if (days < 60) return `${days}d ago`
   return `${Math.floor(days / 30)}mo ago`
 }
+
+/**
+ * Recency bucket for a news item (spec 109 presentation).
+ *
+ * Three buckets, because a feed whose rows all carry equal weight makes a one-hour report and a
+ * three-month price-prediction piece look like the same claim. The boundaries are coarse on
+ * purpose — same reason the age label is: the vendor's freshness varies by asset (research R3),
+ * so a finer grid would imply a precision the data does not have.
+ *
+ * An unparseable date sorts and buckets as OLDEST rather than newest: the normalizer already drops
+ * undated items, so this only ever catches something malformed, and burying it is the safe error.
+ */
+const DAY_MS = 86_400_000
+
+export function newsBucket(publishedAt, now = Date.now()) {
+  const t = Date.parse(publishedAt)
+  if (!Number.isFinite(t)) return 'earlier'
+  const age = now - t
+  if (age < DAY_MS) return 'today'
+  if (age < 7 * DAY_MS) return 'week'
+  return 'earlier'
+}
+
+export const NEWS_BUCKET_LABELS = {
+  today: 'Today',
+  week: 'This week',
+  earlier: 'Earlier',
+}

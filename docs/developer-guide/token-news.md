@@ -53,6 +53,32 @@ Three states plus a distinct honest-empty, and nothing else:
 | `unreadable` | gateway/vendor did not answer | sentence + Retry — never an empty feed |
 | `not-configured` | module off, no gateway, or an image without the route (404) | NOTHING renders |
 
+## Layout: the feed is ranked, not listed
+
+The first pass rendered every item as an equally-weighted underlined link. On a real ETC feed that
+put a one-hour report and a three-month price-prediction piece at identical visual weight, made the
+card a wall of teal, and gave the reader nothing but the age string to tell them apart — on a sheet
+whose actual job is Trade and Transfer. The ranking now lives in size, weight and spacing:
+
+- **One featured item** — the NEWEST by published date, larger and unadorned, with source and age on
+  one quiet line. Ordering is ours and comes from the dates alone: there is no ranking signal here
+  that the vendor did not give us, and none we invented.
+- **Compact rows** beneath it — two-line clamp, hairline dividers, `--text-primary` titles that take
+  their underline on hover and focus. The link affordance is structural (each row's whole content is
+  the link), so nothing here is small text in a brand hue and spec 090's rule (1) never applies.
+- **Recency headings** (Today / This week / Earlier) emitted only where the bucket CHANGES, seeded by
+  the featured item's bucket — so a feed that all landed today renders no headings at all, and one
+  that spans months visibly ends instead of running on.
+- **First paint is capped** at the featured item plus three; the tail sits behind ONE disclosure whose
+  collapsed rows are **unmounted, not hidden** (a control claiming `aria-expanded="false"` over rows
+  still in the tab order is claiming something untrue — the spec-081 drawer lesson). Its label reports
+  what is actually in the tail: `Earlier · N` only when every hidden item really is older than a week,
+  otherwise `Show N older`.
+
+All of it is presentation over the same reading. Nothing is dropped, no item is summarized or
+re-titled, and every row still carries its source and its age — including inside the disclosure.
+Ages and buckets are both measured from the instant the feed landed, so the card reads one clock.
+
 Items are **text only**: the normalizer (`services/relay-gateway/src/news/normalize.js`) forwards
 `id/title/url/source{name,slug}/publishedAt/sentiment` and drops `image`, `icon`, vendor-account
 fields, and the raw `sentiment_score`; non-`https:` URLs and undated items are dropped whole (the

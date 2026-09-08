@@ -3331,7 +3331,8 @@
             "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-01",
             "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-03",
             "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-04",
-            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-04b"
+            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-04b",
+            "frontend/cypress/e2e/fast/49-token-news.cy.js::TN-06"
           ],
           "issue": "#1465"
         },
