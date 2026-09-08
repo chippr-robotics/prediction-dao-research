@@ -186,6 +186,27 @@ resource "google_secret_manager_secret" "managed" {
   }
 }
 
+# The Android upload key's reader (#1378 H2). ADDITIVE `_iam_member`, never `_iam_binding` — this
+# project is SHARED (guardrail 1), and the authoritative form would strip the role from every other
+# principal on these secrets while showing an unremarkable plan diff.
+#
+# Scoped to EXACTLY the two upload-key secrets, by name rather than by a list variable, because the
+# blast radius of this grant is the whole point: an identity that can read one more secret than it
+# needs is a signing key reader that is quietly something else. The SA itself is declared in
+# infra/terraform/bootstrap (it belongs with the other CI identities and the WIF pool) and is
+# referenced here by email so the grant sits beside the containers it applies to.
+resource "google_secret_manager_secret_iam_member" "android_signing_reader" {
+  for_each = toset([
+    "fairwins-android-upload-keystore",
+    "fairwins-android-upload-keystore-password",
+  ])
+
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.managed[each.value].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.android_signing_service_account}"
+}
+
 # ── artifact registry ─────────────────────────────────────────────────────────────────────────
 
 resource "google_artifact_registry_repository" "cloud_run_source_deploy" {
