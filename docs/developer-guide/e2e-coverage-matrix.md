@@ -817,7 +817,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
-| `news.portfolio-token-card` | Selecting a portfolio token shows that asset's latest news with link-out attribution; an unreadable feed renders a sentence + retry (never an empty feed pretending to be no news), an unmapped asset renders honest absence, and the module off hides the card | 🟢 covered | flow | `no-chain` | `49-token-news.cy.js` (TN-01, TN-03, TN-04, TN-04b) |  |
+| `news.portfolio-token-card` | Selecting a portfolio token shows that asset's latest news with link-out attribution; an unreadable feed renders a sentence + retry (never an empty feed pretending to be no news), an unmapped asset renders honest absence, and the module off hides the card | 🟢 covered | flow | `no-chain` | `49-token-news.cy.js` (TN-01, TN-03, TN-04, TN-04b, TN-06) |  |
 | `news.trade-pair-feed` | Selecting a trade pair shows the pair's token news below the amount entry under the same three-state honesty; items are text with attribution, never rendered HTML | 🟢 covered | flow | `no-chain` | `49-token-news.cy.js` (TN-05, TN-05b) |  |
 
 ## No member consequence

@@ -148,10 +148,12 @@ describe('Token news (spec 109)', () => {
       cy.get('.token-news-card', { timeout: 15000 }).should('be.visible')
 
       // The headline is a link out, marked external, and TEXT — no vendor image ever renders.
-      cy.get('.token-news-card a.token-news-link')
+      // ONE item means one FEATURED item: the layout ranks by published date, so the newest is
+      // `.token-news-featured-link` and the compact `.token-news-link` rows are what follows it.
+      cy.get('.token-news-card a.token-news-featured-link')
         .should('have.attr', 'href', item.url)
         .and('have.attr', 'target', '_blank')
-      cy.get('.token-news-card a.token-news-link').invoke('attr', 'rel').should('contain', 'noopener')
+      cy.get('.token-news-card a.token-news-featured-link').invoke('attr', 'rel').should('contain', 'noopener')
       cy.get('.token-news-card').should('contain.text', item.title)
       cy.get('.token-news-card img').should('not.exist')
 
@@ -187,7 +189,7 @@ describe('Token news (spec 109)', () => {
           cy.wrap($btn).click()
         })
       // Retry re-invokes the seam and the items arrive.
-      cy.get('.token-news-card a.token-news-link', { timeout: 15000 }).should('be.visible')
+      cy.get('.token-news-card a.token-news-featured-link', { timeout: 15000 }).should('be.visible')
     })
 
     it('[TN-04] an honest-empty read says sparse coverage, with no retry — distinct from unreadable', () => {
@@ -198,6 +200,51 @@ describe('Token news (spec 109)', () => {
       // Empty is NOT the failure state: no retry, no could-not-read sentence.
       cy.get('.token-news-card .token-news-retry').should('not.exist')
       cy.get('.token-news-card').should('not.contain.text', 'could not be read')
+    })
+
+    it('[TN-06] the feed is RANKED: newest featured, first paint capped, the tail behind one disclosure', () => {
+      // Deliberately out of vendor order and spanning three recency buckets. Ordering is ours,
+      // from the published dates — there is no ranking signal here the vendor did not give us.
+      const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString()
+      const items = [
+        newsItem({ id: '3', title: 'Third newest', url: 'https://news.example/3', publishedAt: hoursAgo(5) }),
+        newsItem({ id: '1', title: 'The newest thing', url: 'https://news.example/1', publishedAt: hoursAgo(1) }),
+        newsItem({ id: '6', title: 'A months-old take', url: 'https://news.example/6', publishedAt: hoursAgo(24 * 70) }),
+        newsItem({ id: '2', title: 'Second newest', url: 'https://news.example/2', publishedAt: hoursAgo(3) }),
+        newsItem({ id: '4', title: 'Fourth newest', url: 'https://news.example/4', publishedAt: hoursAgo(7) }),
+        newsItem({ id: '5', title: 'A last-week piece', url: 'https://news.example/5', publishedAt: hoursAgo(24 * 3) }),
+      ]
+      cy.intercept('GET', '**/v1/news/**', { statusCode: 200, body: readBody(items) }).as('news')
+      openEtcAssetSheet()
+
+      // Exactly one featured item, and it is the NEWEST — not the vendor's first array entry.
+      cy.get('.token-news-card a.token-news-featured-link', { timeout: 15000 })
+        .should('have.length', 1)
+        .and('have.text', 'The newest thing')
+
+      // First paint is capped at featured + 3; the rest is not in the DOM at all, because a
+      // control claiming aria-expanded="false" over rows still in the tab order is untrue.
+      cy.get('.token-news-card a.token-news-link').should('have.length', 3)
+      cy.get('.token-news-card').should('not.contain.text', 'A months-old take')
+
+      // The tail is hours-to-months old, so it is "older", not "Earlier" — the label reports what
+      // is actually in it rather than assuming the tail is always ancient.
+      cy.get('.token-news-card .token-news-more')
+        .should('have.attr', 'aria-expanded', 'false')
+        .and('contain.text', 'Show 2 older')
+        .click()
+      cy.get('.token-news-card .token-news-more').should('have.attr', 'aria-expanded', 'true')
+      cy.get('.token-news-card').should('contain.text', 'A months-old take')
+
+      // Recency headings appear only where the bucket CHANGES — the three same-day rows under a
+      // same-day featured item carry none, and the two older ones are named.
+      cy.get('.token-news-card .token-news-bucket').should('have.length', 2)
+      cy.get('.token-news-card .token-news-bucket').first().should('have.text', 'This week')
+      cy.get('.token-news-card .token-news-bucket').last().should('have.text', 'Earlier')
+
+      cy.get('.asset-sheet').then(($sheet) => {
+        cy.a11yScan({ context: $sheet[0], label: 'asset sheet with an expanded news feed' })
+      })
     })
 
     it('[TN-04b] the module switched off renders NO card — absence, not an empty affordance', () => {
@@ -247,7 +294,7 @@ describe('Token news (spec 109)', () => {
 
       // TN-02: the unmapped leg produced ZERO gateway requests — the mapping is
       // client-side and a missing row IS "not covered" (no ticker heuristic).
-      cy.get('.trade-news .token-news-card a.token-news-link').should('be.visible')
+      cy.get('.trade-news .token-news-card a.token-news-featured-link').should('be.visible')
       /*
        * TN-02, stated as what is actually invariant.
        *
