@@ -1,122 +1,105 @@
-previous: v1.16.1
-commits:  117
-  [unclassified] Merge pull request #1490 from chippr-robotics/staging
-  [unclassified] Merge pull request #1492 from chippr-robotics/fix/e2e-tracker-1491
-  [fix -> patch] the multi-network coverage rows cite an OPEN tracker again
-  [unclassified] Merge pull request #1487 from chippr-robotics/claude/codeql-error-1486-jly5rt
-  [unclassified] Merge origin/staging: take staging's API-05 stub, which fixed the app instead
-  [unclassified] Merge pull request #1489 from chippr-robotics/fix/1463-stub-the-failover
-  [fix -> patch] a FallbackProvider that lost both rails once was dead until reload
-  [test -> patch] port #1484's API-05 fix so this PR can reach green
-  [unclassified] Merge pull request #1483 from chippr-robotics/fix/ansible-playbook-groupvars
-  [fix -> patch] drop codeql.yml's base-branch filter on pull_request
-  [fix -> patch] stub BOTH rpc rails — the drpc failover was answering for a 'failed' chain
-  [unclassified] Merge pull request #1482 from chippr-robotics/claude/issue-1463-fires-i9hvl6
-  [fix -> patch] declare CodeQL's languages instead of letting it infer Swift
-  [unclassified] Merge pull request #1481 from chippr-robotics/fix/close-linked-issues-flag
-  [unclassified] Merge pull request #1413 from chippr-robotics/dependabot/npm_and_yarn/staging/scure/bip39-2.4.0
-  [docs -> patch] say what the sub-ceiling guarantees, not an ordering
-  [fix -> patch] converge the legacy Docker repo entry away instead of colliding with it
-  [fix -> patch] the per-node playbooks could not see group_vars
-  [unclassified] Merge pull request #1476 from chippr-robotics/claude/multichain-experience-improvements-7z3wti
-  [unclassified] Merge pull request #1477 from chippr-robotics/build/relay-gateway-107
-  [unclassified] Merge pull request #1437 from chippr-robotics/fix/pinata-proxy-hardening
-  [test -> patch] assert the ceiling's magnitude, not just its existence
-  [fix -> patch] close-linked-issues used a gh flag that does not exist
-  [fix -> patch] bound the membership read so "unreadable" is reachable
-  [unclassified] Merge pull request #1475 from chippr-robotics/feat/1470-1471-issued-client
-  [test -> patch] give loadVault the same 60s card deadline the create flow already has
-  [build -> patch] run the spec-106/107 gateway and finops images
-  [test -> patch] count the direct install's two Safe transactions in RL-01's nonce arithmetic
-  [unclassified] Merge pull request #1474: deliver the issuance credentials, adopt the key, arm observe mode
-  [docs -> patch] multi-network staging protocol, round-2 screenshot record, and a readable drift disclosure
-  [test -> patch] chain-judged rules-lane legs and the passkey one-batch create (spec 105)
-  [fix -> patch] address every propose-mode install call — the hub emit leaked its sendCalls shape
-  [fix -> patch] unused param the full-suite lint caught and scoped runs cannot
-  [feat -> minor] the wagmi rail rides issued access, and degradation gets its sentence
-  [feat -> minor] deliver the issuance credentials, adopt the key, arm observe mode
-  [unclassified] Merge pull request #1450: authenticate the caller, not the network path
-  [unclassified] Merge pull request #1467: one multicall per chain, not one request per asset
-  [fix -> patch] the new spec-registry gate is right, and this branch yields the number
-  [feat -> minor] usage gets a kind, the catalogue gets the gateway, and a gate catches its author
-  [feat -> minor] say what is enforcing, fail what would publish, write it down
-  [feat -> minor] SIGHUP reloads the operational switches; SIGUSR2 keeps its meaning
-  [feat -> minor] proof of human — a challenge buys throughput, never entry
-  [feat -> minor] the client half — issued access, held in memory, injected per request
-  [feat -> minor] the issuance route, dormant until an endpoint exists
-  [perf -> patch] one multicall per chain, not one request per asset
-  [unclassified] Merge origin/staging into spec/105-gateway-caller-auth
-  [unclassified] Merge pull request #1464 from chippr-robotics/claude/multi-agent-flow-docs-xddy47
-  [fix -> patch] a closing keyword only counts at the start of a line
-  [unclassified] Merge pull request #1462 from chippr-robotics/claude/multi-agent-flow-docs-xddy47
-  [docs -> patch] the Projects v2 API is real, and GitHub's built-in workflows already move the board
-  [feat -> minor] close issues on staging merge, and skip the E2E tiers for inert changes
-  [fix -> patch] a staging merge does not close an issue — closing is deliberate
-  [unclassified] Merge pull request #1461 from chippr-robotics/claude/multi-agent-flow-docs-xddy47
-  [unclassified] Merge pull request #1457 from chippr-robotics/claude/multichain-experience-improvements-7z3wti
-  [docs -> patch] correct the stale labels-sync header (Copilot review)
-  [refactor -> patch] drop the status mirror; derive state from the repo (#1460)
-  [fix -> patch] record the 104 collision the gate caught on its first CI run
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/multi-agent-flow-docs-xddy47
-  [feat -> minor] coordinated multi-agent development flow (#1460)
-  [docs -> patch] the fan-out is the problem, not the plan
+previous: v1.17.0
+commits:  100
+  [unclassified] Merge pull request #1556 from chippr-robotics/staging
+  [unclassified] Merge pull request #1555 from chippr-robotics/ops/1378-android-signing-sa
+  [chore -> patch] create the Android upload-key reader identity
+  [unclassified] Merge pull request #1554 from chippr-robotics/main
+  [unclassified] Merge pull request #1553 from chippr-robotics/staging
+  [unclassified] Merge pull request #1547 from chippr-robotics/ops/1544-news-gateway-image
+  [unclassified] Merge pull request #1549 from chippr-robotics/feat/1378-android-signing-identity
+  [unclassified] Merge pull request #1551 from chippr-robotics/claude/address-scanning-risk-feature-ax6ota
+  [test -> patch] keep the real ethers around the Contract stub
+  [fix -> patch] make the estate screen readable on testnet, and the notice legible
+  [feat -> minor] declare the Android upload-key reader, scoped to exactly two secrets
+  [unclassified] Merge pull request #1546 from chippr-robotics/feat/1539-nonce-signal-wired
+  [chore -> patch] pin the gateway image that actually carries the news module
+  [feat -> minor] the nonce signal actually emits, and gains the demand to read it against
+  [fix -> patch] report the news module in /status so the pre-pin check can run
+  [unclassified] Merge pull request #1545 from chippr-robotics/claude/issue-1440-ux-6y2514
+  [fix -> patch] hold the market controls to the 36px floor the comment claims
+  [fix -> patch] collapse the market filters so the table gets the viewport
+  [unclassified] Merge pull request #1543 from chippr-robotics/claude/external-data-context-2cec94
+  [feat -> minor] enable token news on the gateway, and make the rollout order safe
+  [unclassified] Merge pull request #1541 from chippr-robotics/claude/external-data-context-2cec94
+  [unclassified] Merge staging into claude/external-data-context-2cec94
+  [docs -> patch] fix two spec comments left describing the replaced stub
+  [unclassified] Merge pull request #1542 from chippr-robotics/fix/1535-bundler-failover
+  [unclassified] Merge pull request #1540 from chippr-robotics/claude/issue-1441-p1hdsq
+  [docs -> patch] correct why the e2e spec stubs every provider host
+  [fix -> patch] make the token-news e2e spec actually run
+  [fix -> patch] the bundler list finally submits through more than its first entry
+  [fix -> patch] check news liveness before validation, and pin the order
+  [test -> patch] the MCP server serves nine tools, not eight
+  [feat -> minor] closers — FinOps entry, e2e coverage, docs (Phase 6)
+  [fix -> patch] withdraw the multi-recipient affordance from the send surfaces
+  [unclassified] Merge pull request #1528 from chippr-robotics/1521-dependency-alert-gate
+  [feat -> minor] assistant get_token_news tool (US3)
+  [feat -> minor] trade-pair news feed (US2)
+  [feat -> minor] portfolio token news card (US1)
+  [feat -> minor] gateway news read-proxy and curated asset-news mapping seam
+  [unclassified] Merge pull request #1524 from chippr-robotics/claude/external-data-context-2cec94
+  [ci -> patch] gate dependency vulnerabilities instead of only reporting them
+  [spec -> patch] tasks — dependency-ordered task list for token news
+  [unclassified] Merge pull request #1518 from chippr-robotics/claude/external-data-context-2cec94
+  [unclassified] Merge pull request #1517 from chippr-robotics/docs/1501-g11-multichain-rule
+  [spec -> patch] address review — concrete SC-005 bound, story-vs-issue priority note
+  [unclassified] plan(109): design artifacts — token news on the perps read-proxy template
+  [unclassified] Merge pull request #1516 from chippr-robotics/feat/1501-executor-nonce-accountability
+  [spec -> patch] specify — token news on portfolio and trade surfaces
+  [unclassified] Merge pull request #1512 from chippr-robotics/claude/external-data-context-2cec94
+  [docs -> patch] the rule was about a service name; the invariant is about a key
+  [unclassified] Merge pull request #1515 from chippr-robotics/fix/1501-gate-per-chain-key
+  [feat -> minor] observe the executor's NONCE, because balance cannot see a stall
+  [unclassified] Merge pull request #1511 from chippr-robotics/fix/1501-dangerous-bundler-docs
+  [fix -> patch] the single-alto gate enforced per-HOST a rule that is per-KEY
+  [unclassified] Merge pull request #1510 from chippr-robotics/fix/1501-build-arg-passthrough
+  [unclassified] Merge origin/staging into 109-token-news reservation
+  [fix -> patch] repoint spec-104 recovery rows at open tracker #1514
+  [unclassified] Merge pull request #1503 from chippr-robotics/claude/address-scanning-risk-feature-ax6ota
+  [spec -> patch] reserve — token-news
+  [unclassified] Merge pull request #1509 from chippr-robotics/fix/1505-scope-enforcing-disclosure
+  [unclassified] Merge pull request #1508 from chippr-robotics/claude/external-data-context-2cec94
+  [docs -> patch] three documents that would cause the incident they warn about
+  [fix -> patch] a build arg the Dockerfile never declares is silently dropped
+  [unclassified] Merge pull request #1506 from chippr-robotics/docs/keyed-rpc-access-runbook
+  [fix -> patch] `enforcing` is operator-only, and FR-015 moves to boot where it belongs
+  [docs -> patch] evaluate issue #1465 (token news + agent context) against the estate
+  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/address-scanning-risk-feature-ax6ota
+  [fix -> patch] the Unscreened sentence names uncovered networks even when sources existed
+  [test -> patch] MS-06 scrolls the pill's details into view before asserting on them
+  [docs -> patch] the keyed RPC access runbook, written from the live-fire run
+  [unclassified] Merge pull request #1498 from chippr-robotics/claude/multichain-experience-improvements-7z3wti
+  [fix -> patch] repoint the spec-104 gap rows at open tracker #1504
+  [feat -> minor] screen an entered address against every list on every cohort chain (#1458)
+  [unclassified] Merge pull request #1502 from chippr-robotics/claude/issue-1432-discovery
+  [fix -> patch] make the local wrapper real, settle on a verified signer, and keep a typed amount
+  [unclassified] Merge pull request #1500 from chippr-robotics/chore/auto-backmerge-main-into-staging
+  [chore -> patch] sync the shells to v1.17.0 — ported base-branch fix
+  [fix -> patch] validate the address and topic before they reach a URL
+  [fix -> patch] stop building regexes from --contract (CodeQL, 2 high)
+  [feat -> minor] enumerate creation nonces so leg A can find a retried account
+  [fix -> patch] fast/48 tests the cohort the fast build actually resolves
+  [skipped] Merge pull request #1497 from chippr-robotics/release/v1.17.0-changelog
+  [skipped] chore(release): sync the native shells to v1.17.0 [skip release]
+  [docs -> patch] actor-critic screenshots (round 1 clean) + lint-clean return
+  [test -> patch] e2e for the multi-currency picker + cross-chain submit, docs
+  [feat -> minor] multi-currency wrap/unwrap — the asset is the entry point
+  [feat -> minor] measure deploy blocks from public sources, and record accountFactory
+  [docs -> patch] plan, research, data model, quickstart, tasks
+  [unclassified] Merge pull request #1493 from chippr-robotics/claude/multichain-experience-improvements-7z3wti
+  [skipped] chore(release): v1.17.0 [skip release]
+  [unclassified] Merge origin/staging: keep #1492's tracker for the 105 rows, re-add the 108 rows
+  [fix -> patch] spec-108 rows use the declared risk enum
+  [fix -> patch] repoint spec-105 partial rows at open tracker #1494
+  [spec -> patch] keep matrix.json's original unicode escaping
+  [spec -> patch] reserve — multi-currency-wrap
+  [revert -> patch] drop the superseded API-05 alias/wait delta — branch now matches staging
   [unclassified] Merge remote-tracking branch 'origin/staging' into claude/multichain-experience-improvements-7z3wti
-  [feat -> minor] bound each upstream before the call, not after
-  [fix -> patch] the lockout was never real; the capacity ceiling is
-  [docs -> patch] matrix rows + regenerated coverage doc, developer guide, guardrail, screenshots
-  [docs -> patch] T026-T028 done — quota re-keying landed
-  [fix -> patch] quotas metered nothing, because callers chose their own key
-  [test -> patch] e2e migrated to the guided flow, new create-flow spec, queue/details cases
-  [docs -> patch] track the remaining slices as issues
-  [feat -> minor] enforce route minimums, behind a second switch
-  [feat -> minor] prove control of an account without demanding a purchase
-  [feat -> minor] resolve who is calling, and deliberately enforce nothing yet
-  [feat -> minor] queue readability, load-sheet polish, retired wizard, suites migrated
-  [feat -> minor] details is one card — network rows, shared facts with named drift, inline deploy-later
-  [feat -> minor] four-sheet guided creation flow + deployment orchestrator hook
-  [unclassified] plan(105): split the half that cannot be hosted, keep the half that can
-  [fix -> patch] the pin proxy was a wildcard into Pinata with ACAO:*
-  [feat -> minor] creation records, semantic rules realization, deployment core, proposal decode
-  [spec -> patch] research says three of my own assumptions were wrong
-  [unclassified] tasks(105): dependency-ordered task list
-  [unclassified] plan(105): research, plan, data model, contracts, quickstart
-  [unclassified] Merge pull request #1435 from chippr-robotics/claude/guttertoken-fairwins-integration-9iytem
-  [spec -> patch] guided multichain vault creation — one vault, chosen networks
-  [unclassified] Merge remote-tracking branch 'origin/staging' into claude/guttertoken-fairwins-integration-9iytem
-  [docs -> patch] actor-critic screenshot record and spec-104 task closure (WP-F)
-  [fix -> patch] copy @fairwins/assistant-contract into both build stages
-  [test -> patch] spec-104 coverage rows and the two-rail assistant flows (WP-E)
-  [feat -> minor] Assistant tab in Tools, provider chooser, GutterToken key surfaces (spec 104 WP-C)
-  [fix -> patch] compare parsed URL origin, not a substring prefix
-  [feat -> minor] provider seam, GutterToken client, key store and client-side tool loop (spec 104 WP-B)
-  [fix -> patch] reword a describe title the dependency scanner misreads
-  [fix -> patch] copy @fairwins/assistant-contract into both image stages
-  [feat -> minor] gateway tool loop, MCP snapshot parity, legal/FinOps/tenant/docs (spec 104 WP-A/WP-D)
-  [docs -> patch] answer the GutterToken wallet sign-in question from the live signup flow
-  [feat -> minor] prompt, tool table and honest result helpers
-  [chore -> patch] drop the hand-written version field
-  [feat -> minor] scaffold spec 104 — assistant-contract workspace package + spec artifacts
-  [docs -> patch] add Part II — the MCP server and a client-side tool loop
-  [docs -> patch] evaluate GutterToken as a member-paid assistant rail
-  [unclassified] Merge pull request #1434 from chippr-robotics/claude/custody-write-rail-and-ens-tick
-  [fix -> patch] drop the mainnet RPC stub — it broke the verify tests it never needed to touch
-  [fix -> patch] choose the write rail by the signer, and stop the tick waiting on mainnet
-  [spec -> patch] keyed read capacity is issued at runtime, not compiled in
-  [unclassified] Merge pull request #1430 from chippr-robotics/104-passkey-account-recovery
-  [fix -> patch] offer a not-yet-deployed account instead of refusing it
-  [fix -> patch] make the recovery spec run, and stop two honesty bugs it exposed
-  [feat -> minor] look a passkey's account up, never derive one and hope
-  [unclassified] plan(104): passkey account recovery — research, plan, data model, contract, quickstart
-  [unclassified] Merge pull request #1429 from chippr-robotics/spec/104-passkey-account-recovery
-  [spec -> patch] add the coverage matrix row for the new spec directory
-  [spec -> patch] authenticate the caller, not the network path
-  [spec -> patch] passkey account recovery — find the account, never guess it
-  [unclassified] Merge main into staging after the v1.16.1 hotfix
-  [skipped] Merge pull request #1428 from chippr-robotics/release/v1.16.1-changelog
-  [skipped] chore(release): v1.16.1 [skip release]
-  [feat -> minor] name a saved passkey after the account it signs for (#1425)
-  [fix -> patch] sync the native shells into the release record (#1424)
-  [chore -> patch] bump @scure/bip39 from 2.3.0 to 2.4.0
+  [unclassified] Merge origin/staging: keep #1489's form of the both-rails stub
+  [test -> patch] the unreachable arm must leave chain height readable, or nothing ever recovers
+  [unclassified] Merge origin/staging: the --comment-file fix landed there independently; keep its form
+  [test -> patch] stub BOTH provider rungs in API-05's unreachable arm
+  [fix -> patch] gh issue close has no --comment-file flag
 bump:     minor
 reason:   computed
-next:     v1.17.0
+next:     v1.18.0
