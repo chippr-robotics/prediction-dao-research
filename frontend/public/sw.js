@@ -90,6 +90,15 @@ function isMiniAppPackageUrl(rawUrl) {
   return CID_PATTERN.test(segments[1])
 }
 
+/** Is this one of our own URLs? Same parse guard as above — an unparseable URL is not ours. */
+function isSameOrigin(rawUrl) {
+  try {
+    return new URL(rawUrl).origin === self.location.origin
+  } catch {
+    return false
+  }
+}
+
 /**
  * Move `url` to the head of the LRU index and report what that pushes out.
  *
@@ -269,13 +278,7 @@ self.addEventListener('fetch', (event) => {
   //
   // Mini-app packages are the one deliberately cross-origin class this worker must serve,
   // and they are matched above, before this guard.
-  let sameOrigin = false
-  try {
-    sameOrigin = new URL(request.url).origin === self.location.origin
-  } catch {
-    sameOrigin = false
-  }
-  if (!sameOrigin) return
+  if (!isSameOrigin(request.url)) return
 
   if (request.mode === 'navigate') {
     event.respondWith(
