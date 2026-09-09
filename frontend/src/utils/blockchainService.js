@@ -657,6 +657,14 @@ const ROLE_NAME_TO_HASH = {
   'ROLE_MANAGER': ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
   'SANCTIONS_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('SANCTIONS_ADMIN_ROLE')),
   'FEE_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('FEE_ADMIN_ROLE')),
+  // STAKING_ADMIN_ROLE on the StakingRouter (spec 066). `ROLES.STAKING_ADMIN` has been
+  // declared in RoleContext and read by `useAdminAccess` since that spec landed, but the
+  // name was never added here — so `getRoleHash` returned undefined and every lookup took
+  // the `absent()` branch. That is not merely the "Unknown role: STAKING_ADMIN" console
+  // warning it presents as: an operator who genuinely holds the role was told they did not,
+  // and the staking controls stayed hidden from the only people entitled to use them. A
+  // missing entry must never read as a denied one.
+  'STAKING_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('STAKING_ADMIN_ROLE')),
   'LIQUIDITY_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('LIQUIDITY_ADMIN_ROLE')),
 }
 

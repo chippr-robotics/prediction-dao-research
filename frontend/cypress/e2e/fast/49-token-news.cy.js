@@ -65,7 +65,7 @@ const CHAIN_BY_RPC = [
   ['optimism-rpc', 10],
   ['ethereum-sepolia-rpc', 11155111],
   ['ethereum-rpc', 1],
-  ['rivet.link', 61],
+  ['etcdesktop.com', 61], // ETC's rpcUrl; was rivet.link until that host stopped resolving
   ['mordor.etccooperative.org', 63],
 ]
 
