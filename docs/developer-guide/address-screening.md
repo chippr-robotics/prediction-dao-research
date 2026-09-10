@@ -124,7 +124,7 @@ rather than running off the screen.
 |---|---|---|
 | `useAddressScreening` (spec 021) | does the guard on **this** chain allow it? | every surface that puts an address in front of a value action — Transfer, Pay, Bridge, Supply, group pay. Bridge, Supply, group pay and the mini-app host `submit` re-read it **forced past the cache at submission** (`{ force: true }`, **spec 067** FR-032); Transfer and Pay single-recipient use it as an advisory pre-check and lean on the gateway and the on-chain guard to enforce |
 | `useEstateScreening` (this amendment) | is it flagged **anywhere**? | `AddressScreenNotice` — the pill under every address field |
-| `useEstateScreeningMany` (same sweep, many addresses) | same question, for a list | the address book, and the saved-contact picker |
+| `useEstateScreeningMany` (same sweep, many addresses) | same question, for a list | `AddressBookPanel` (the book) and `AddressInputBookAddon` (the inline addon beside an address field). **Not** the modal picker — `AddressBookButton` still calls `useAddressScreening().getStatus` and was missed by the #1458 migration (issue #1571) |
 
 `force: true` is the difference that matters. The cache has a 60-second TTL (`SCREENING_TTL_MS`),
 so a verdict good enough for browsing is not good enough to authorise a signature: a wallet

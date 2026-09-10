@@ -1052,10 +1052,12 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   `isTestnet: true`, carries a guard, and lives at `http://127.0.0.1:8545`, so every testnet build
   told every member that a Hardhat guard "could not be read" and could never reach green (QA round;
   Amoy's build default was also dead and now points at publicnode like every other chain here).
-  **Every address surface reads the SAME sweep**: the book and the saved-contact picker use
-  `useEstateScreeningMany` — they asked the per-chain hook, which can only answer for the wallet's
-  chain, so a book full of contacts rendered "Unscreened" whenever the wallet was elsewhere or
-  absent. `getVerdictOn` has a THIRD answer, `no-source`, distinct from both a verdict and a
+  **The book and the inline address-field addon read the SAME sweep**: `AddressBookPanel` and
+  `AddressInputBookAddon` use `useEstateScreeningMany` — they asked the per-chain hook, which can
+  only answer for the wallet's chain, so a book full of contacts rendered "Unscreened" whenever the
+  wallet was elsewhere or absent. **The MODAL picker (`AddressBookButton`) was missed by that
+  migration** and still calls `useAddressScreening().getStatus`, so it reproduces the original
+  amber-everything behaviour off the wallet's chain on all ten surfaces that mount it (issue #1571). `getVerdictOn` has a THIRD answer, `no-source`, distinct from both a verdict and a
   still-running null. **The summary line names sources only when FLAGGED** — naming every
   unreachable one turned the notice into a paragraph; the names live one tap away, and the
   `ScreeningStatusBar` (one segment per source, `role="img"` labelled with the summary) carries the
