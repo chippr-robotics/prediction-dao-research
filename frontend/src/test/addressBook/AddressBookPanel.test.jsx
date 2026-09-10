@@ -91,6 +91,44 @@ describe('AddressBookPanel', () => {
     expect(within(card).getAllByText('Flagged').length).toBeGreaterThanOrEqual(1)
   })
 
+  it('exports the contact the member just added, not a copy frozen at mount (issue #1550)', async () => {
+    /*
+     * The export control lives in a child component. It used to call
+     * useAddressBook() itself, and that hook holds the book in its own
+     * useState — so the child kept a SECOND, independent copy: a contact added
+     * here never reached it, and it happily exported an empty book. The panel
+     * now owns the book and passes it down. Caught by the e2e round-trip, which
+     * is the only place both halves were on screen at once.
+     */
+    const user = userEvent.setup()
+    const blobs = []
+    const realCreate = URL.createObjectURL
+    const realRevoke = URL.revokeObjectURL
+    URL.createObjectURL = (blob) => {
+      blobs.push(blob)
+      return 'blob:mock'
+    }
+    URL.revokeObjectURL = () => {}
+    try {
+      render(<AddressBookPanel address={walletState.address} />)
+      await user.click(screen.getByRole('button', { name: 'Add contact' }))
+      await user.type(screen.getByLabelText('Nickname *'), 'Alex')
+      await user.type(screen.getByLabelText('Address *'), ADDR)
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      expect(screen.getByText('Alex')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Export address book' }))
+
+      expect(blobs).toHaveLength(1)
+      const text = await blobs[0].text()
+      expect(text).toContain('Alex')
+      expect(JSON.parse(text).contacts).toHaveLength(1)
+    } finally {
+      URL.createObjectURL = realCreate
+      URL.revokeObjectURL = realRevoke
+    }
+  })
+
   it('has no accessibility violations with a contact present', async () => {
     const user = userEvent.setup()
     const { container } = render(<AddressBookPanel address={walletState.address} />)

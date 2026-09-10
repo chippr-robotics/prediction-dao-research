@@ -356,7 +356,8 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
     cy.window()
       .its('__fwExported')
       .should('have.length', 1)
-      .then((blobs) => Cypress.Blob.blobToText(blobs[0]))
+      // Native Blob.text(); Cypress.Blob has no blobToText in v15.
+      .then((blobs) => blobs[0].text())
       .then((text) => {
         // The export is READABLE — that is the change, not an accident of it.
         expect(text).to.contain('Alice')
@@ -365,8 +366,12 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
         expect(doc.format).to.equal('fairwins-address-book')
         expect(doc.contacts).to.have.length(1)
 
-        // Wipe the book, then bring the same bytes back through the file input.
-        cy.clearLocalStorage()
+        // Wipe ONLY the book, then bring the same bytes back through the file input.
+        // cy.clearLocalStorage() would take the connected session with it and the
+        // account would never land after the reload.
+        cy.window().then((win) => {
+          win.localStorage.removeItem(`fw_user_${ACCOUNT.toLowerCase()}_addressBook`)
+        })
         cy.reload()
         waitForAccount()
         cy.get('.ab-empty', { timeout: 40000 }).should('contain.text', 'No saved contacts yet')
@@ -378,8 +383,14 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
         cy.get('.ab-meta-count').should('contain.text', '1 saved address')
       })
 
-    // A pre-#1550 encrypted backup is refused by naming ENCRYPTION and the way out.
-    // "Wrong wallet" would send a member looking for a wallet problem they do not have.
+    // A pre-#1550 encrypted backup. This session HAS an injected signer, so the app
+    // does the honest thing: it signs, the AEAD fails on a bogus ciphertext, and the
+    // message names the two causes that are genuinely possible once a signature was
+    // actually tried. The no-signer branch — a passkey session, where that sentence
+    // would be a guess and "wallet not connected" was the #1550 bug — is asserted in
+    // src/test/addressBook/addressBookFile.test.js and AddressBookImportExport.test.jsx,
+    // which run with signer: null. What must hold HERE is that nothing claims the
+    // member is disconnected while they are plainly signed in.
     cy.get('[data-testid="ab-import-input"]').selectFile(
       {
         contents: Cypress.Buffer.from(
@@ -397,8 +408,8 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
       { force: true },
     )
     cy.get('.ab-import-export [role="alert"]')
-      .should('contain.text', 'older encrypted backup')
-      .and('not.contain.text', 'different wallet')
+      .should('contain.text', 'Could not decrypt this backup')
+      .and('not.contain.text', 'Wallet not connected')
 
     // The book the failed import touched is still there (FR-021).
     cy.get('.ab-contact-grid').should('contain.text', 'Alice')

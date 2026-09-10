@@ -7,11 +7,16 @@
  * never gates a button, because a passkey session has no ethers signer and the
  * old gate refused those members with "Wallet not connected" while their account
  * was plainly signed in.
+ *
+ * The book and its mutators arrive as PROPS from AddressBookPanel, deliberately.
+ * `useAddressBook()` holds the book in its own `useState`, so calling it here as
+ * well produced a SECOND, independent copy: a contact added in the panel never
+ * reached this component (it exported a book frozen at mount), and an import
+ * here never reached the panel's grid. One subtree, one book.
  */
 
 import { useState, useRef, useCallback } from 'react'
 import { useWallet } from '../../hooks/useWalletManagement'
-import { useAddressBook } from '../../hooks/useAddressBook'
 import { exportAddressBook, importAddressBook } from '../../lib/addressBook/addressBookFile'
 
 /** Arrow leaving the page into a tray — "take a copy out". */
@@ -46,11 +51,11 @@ function downloadFile(filename, text) {
   URL.revokeObjectURL(url)
 }
 
-export default function AddressBookImportExport() {
+export default function AddressBookImportExport({ book, importBook, resolveConflicts }) {
   // Legacy-envelope unlock ONLY. Absent on a passkey session, and that is fine:
   // nothing on the export path and nothing on the plain-text import path reads it.
   const { signer } = useWallet()
-  const { book, contacts, importBook, resolveConflicts } = useAddressBook()
+  const contacts = book?.contacts
   const fileRef = useRef(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(null) // { type: 'error'|'success', text }

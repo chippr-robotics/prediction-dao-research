@@ -21,6 +21,7 @@ vi.mock('../../hooks/useWalletManagement', () => ({
 }))
 
 import AddressBookImportExport from '../../components/account/AddressBookImportExport'
+import { useAddressBook } from '../../hooks/useAddressBook'
 import { exportAddressBook } from '../../lib/addressBook/addressBookFile'
 import {
   addContact,
@@ -28,6 +29,23 @@ import {
   saveAddressBook,
   loadAddressBook,
 } from '../../lib/addressBook/addressBookStore'
+
+/**
+ * The component takes the book as PROPS. This host mirrors how AddressBookPanel
+ * supplies them — one useAddressBook() for the subtree — so the test exercises
+ * the same wiring the app does. Rendering the component with its own hook call
+ * is what produced the stale second copy the e2e run caught.
+ */
+function Host() {
+  const { book, importBook, resolveConflicts } = useAddressBook()
+  return (
+    <AddressBookImportExport
+      book={book}
+      importBook={importBook}
+      resolveConflicts={resolveConflicts}
+    />
+  )
+}
 
 const OWNER = '0x1111111111111111111111111111111111111111'
 const FRIEND = '0x2222222222222222222222222222222222222222'
@@ -74,7 +92,7 @@ describe('AddressBookImportExport (issue #1550)', () => {
   it('never tells a signed-in member their wallet is not connected', async () => {
     const user = userEvent.setup()
     seedBook()
-    render(<AddressBookImportExport />)
+    render(<Host />)
 
     await user.click(screen.getByRole('button', { name: 'Export address book' }))
 
@@ -86,7 +104,7 @@ describe('AddressBookImportExport (issue #1550)', () => {
   it('exports a readable file on a session with no signer', async () => {
     const user = userEvent.setup()
     seedBook()
-    render(<AddressBookImportExport />)
+    render(<Host />)
 
     await user.click(screen.getByRole('button', { name: 'Export address book' }))
 
@@ -100,7 +118,7 @@ describe('AddressBookImportExport (issue #1550)', () => {
 
   it('says so when there is nothing to export, instead of writing an empty file', async () => {
     const user = userEvent.setup()
-    render(<AddressBookImportExport />)
+    render(<Host />)
 
     await user.click(screen.getByRole('button', { name: 'Export address book' }))
 
@@ -122,7 +140,7 @@ describe('AddressBookImportExport (issue #1550)', () => {
       'book.json',
       { type: 'application/json' },
     )
-    render(<AddressBookImportExport />)
+    render(<Host />)
 
     await user.upload(screen.getByTestId('ab-import-input'), file)
 
@@ -149,7 +167,7 @@ describe('AddressBookImportExport (issue #1550)', () => {
       'old-backup.json',
       { type: 'application/json' },
     )
-    render(<AddressBookImportExport />)
+    render(<Host />)
 
     await user.upload(screen.getByTestId('ab-import-input'), legacy)
 
@@ -163,7 +181,7 @@ describe('AddressBookImportExport (issue #1550)', () => {
     const user = userEvent.setup()
     seedBook()
     const junk = new File(['{ not json'], 'junk.json', { type: 'application/json' })
-    render(<AddressBookImportExport />)
+    render(<Host />)
 
     await user.upload(screen.getByTestId('ab-import-input'), junk)
 
@@ -172,7 +190,7 @@ describe('AddressBookImportExport (issue #1550)', () => {
   })
 
   it('discloses that the export is readable before anyone taps Export', () => {
-    render(<AddressBookImportExport />)
+    render(<Host />)
     expect(
       screen.getByText(/anyone who opens the file can see these names, addresses and notes/i),
     ).toBeInTheDocument()
@@ -181,7 +199,7 @@ describe('AddressBookImportExport (issue #1550)', () => {
   it('names both controls even where the labels are hidden at phone width', () => {
     // `.ab-btn-label` is display:none below 640px and the icons are aria-hidden,
     // so without these names the buttons are unnamed on a phone (axe: critical).
-    render(<AddressBookImportExport />)
+    render(<Host />)
     expect(screen.getByRole('button', { name: 'Export address book' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Import address book' })).toBeInTheDocument()
     // The icons themselves stay out of the accessibility tree.
