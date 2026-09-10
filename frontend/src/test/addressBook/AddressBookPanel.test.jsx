@@ -3,12 +3,13 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
-// Wallet: a fixed connected account.
+// Wallet: a fixed connected account, signing with a PASSKEY — so no ethers signer.
+// The panel and its export/import controls must work in full from here (issue #1550).
 let walletState = {
   address: '0x1111111111111111111111111111111111111111',
   chainId: 137,
   provider: {},
-  signer: { signMessage: vi.fn() },
+  signer: null, // passkey session: no ethers signer (issue #1550)
 }
 vi.mock('../../hooks/useWalletManagement', () => ({
   useWallet: () => walletState,
@@ -39,7 +40,7 @@ describe('AddressBookPanel', () => {
       address: '0x1111111111111111111111111111111111111111',
       chainId: 137,
       provider: {},
-      signer: { signMessage: vi.fn() },
+      signer: null, // passkey session: no ethers signer (issue #1550)
     }
   })
 

@@ -314,4 +314,97 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
     cy.a11yScan('[role="dialog"][aria-label="Add contact"]')
   })
 
+
+  it('[MS-07] addressbook.export-import-roundtrip — the book exports to a readable file and comes back, with no signature', () => {
+    chainWorld()
+    connect()
+    cy.visit('/wallet?tab=addressbook')
+    waitForAccount()
+
+    // Save one contact so there is something to export.
+    cy.get('.ab-empty', { timeout: 40000 }).should('contain.text', 'No saved contacts yet')
+    cy.get('[aria-label="Add contact"]').click()
+    cy.get('#ab-nickname').type('Alice')
+    cy.get('#ab-addr-0').type(FRIEND)
+    cy.contains('button', /^Save$/).click()
+    cy.get('.ab-contact-grid', { timeout: 20000 }).should('contain.text', 'Alice')
+
+    // The privacy fact is stated BEFORE anyone taps Export, not after.
+    cy.get('.ab-plaintext-note').should('contain.text', 'plain text')
+
+    // Capture what the download would have been. The app builds a Blob and hands
+    // it to URL.createObjectURL; reading it here is steadier than watching the
+    // downloads directory, and it lets us assert on the bytes themselves.
+    cy.window().then((win) => {
+      win.__fwExported = []
+      const real = win.URL.createObjectURL
+      cy.stub(win.URL, 'createObjectURL').callsFake((blob) => {
+        win.__fwExported.push(blob)
+        return real.call(win.URL, blob)
+      })
+    })
+
+    // Selected by aria-label, not by text: `.ab-btn-label` is display:none at the
+    // phone profile, so `cy.contains('button', /^Export$/)` would find nothing there.
+    cy.get('[aria-label="Export address book"]').click()
+
+    // Issue #1550: this session's rail is irrelevant — no signature is requested and
+    // nothing claims the wallet is disconnected.
+    cy.contains('Wallet not connected').should('not.exist')
+    cy.get('.ab-import-export [role="status"]').should('contain.text', 'plain text')
+
+    cy.window()
+      .its('__fwExported')
+      .should('have.length', 1)
+      .then((blobs) => Cypress.Blob.blobToText(blobs[0]))
+      .then((text) => {
+        // The export is READABLE — that is the change, not an accident of it.
+        expect(text).to.contain('Alice')
+        expect(text.toLowerCase()).to.contain(FRIEND.toLowerCase())
+        const doc = JSON.parse(text)
+        expect(doc.format).to.equal('fairwins-address-book')
+        expect(doc.contacts).to.have.length(1)
+
+        // Wipe the book, then bring the same bytes back through the file input.
+        cy.clearLocalStorage()
+        cy.reload()
+        waitForAccount()
+        cy.get('.ab-empty', { timeout: 40000 }).should('contain.text', 'No saved contacts yet')
+        cy.get('[data-testid="ab-import-input"]').selectFile(
+          { contents: Cypress.Buffer.from(text), fileName: 'address-book.json', mimeType: 'application/json' },
+          { force: true },
+        )
+        cy.get('.ab-contact-grid', { timeout: 20000 }).should('contain.text', 'Alice')
+        cy.get('.ab-meta-count').should('contain.text', '1 saved address')
+      })
+
+    // A pre-#1550 encrypted backup is refused by naming ENCRYPTION and the way out.
+    // "Wrong wallet" would send a member looking for a wallet problem they do not have.
+    cy.get('[data-testid="ab-import-input"]').selectFile(
+      {
+        contents: Cypress.Buffer.from(
+          JSON.stringify({
+            format: 'fairwins-address-book-backup',
+            version: 1,
+            alg: 'chacha20poly1305',
+            nonce: '000000000000000000000000',
+            ciphertext: 'deadbeef',
+          }),
+        ),
+        fileName: 'old-backup.json',
+        mimeType: 'application/json',
+      },
+      { force: true },
+    )
+    cy.get('.ab-import-export [role="alert"]')
+      .should('contain.text', 'older encrypted backup')
+      .and('not.contain.text', 'different wallet')
+
+    // The book the failed import touched is still there (FR-021).
+    cy.get('.ab-contact-grid').should('contain.text', 'Alice')
+
+    // Both controls carry a name even where their labels are hidden (phone profile).
+    cy.a11yScan('.ab-panel')
+  })
+
 })

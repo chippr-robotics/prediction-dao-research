@@ -3,7 +3,7 @@
  *
  * Per-wallet CRUD over saved contacts (FR-001..FR-009), with advisory sanctions
  * tags screened on open (FR-010..FR-012), in-panel search (FR-015), and (added
- * in US5) encrypted export/import.
+ * in US5, plain text since issue #1550) file export/import.
  */
 
 import { useState, useMemo, useCallback } from 'react'

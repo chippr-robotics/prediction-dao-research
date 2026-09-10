@@ -536,6 +536,18 @@
             "frontend/cypress/e2e/fast/31-identity-access.cy.js::CM-01"
           ],
           "note": "Issue #1458. MS-06 runs in a world where every contract read answers 0x, so every source is unreadable and the pill must be amber (Unscreened/Partly screened), never green, with each source's 'Could not read' row named. CM-01 models the FairWins guard answering not-allowed and asserts the alert names that guard. The positive path against the live Chainalysis oracle and the Circle/Tether freeze lists was verified by hand (SC-009) and cannot run in CI without a real mainnet endpoint."
+        },
+        {
+          "id": "addressbook.export-import-roundtrip",
+          "name": "Export the address book to a plain-text file and import it back, with no wallet signature",
+          "status": "covered",
+          "tier": "no-chain",
+          "depth": "settled",
+          "risk": "access",
+          "tests": [
+            "frontend/cypress/e2e/fast/34-member-surfaces.cy.js::MS-07"
+          ],
+          "note": "Issue #1550. The export is deliberately PLAIN JSON: the old design derived its key from a wallet signature, and a passkey session has no ethers signer, so both buttons threw 'Wallet not connected' at a member who was plainly signed in. MS-07 asserts the exported bytes carry the nickname and address in readable form (that IS the change), that the same bytes restore the book after a wipe, and that a pre-#1550 encrypted envelope is refused with a message naming encryption rather than a wallet."
         }
       ]
     },

@@ -1,7 +1,11 @@
 // Spec 032 — encryption for the unified data backup. Reuses the audited primitives + the wallet-signature
-// key-derivation pattern from addressBookCrypto (keccak256 of a domain-separated signMessage). The domain
-// message is DISTINCT from the wager/address-book messages so the backup key can never coincide with another
-// key the wallet derives. The envelope mirrors the address-book backup shape; header is bound via AEAD AAD.
+// key-derivation pattern (keccak256 of a domain-separated signMessage). The domain message is DISTINCT from
+// the wager/address-book messages so the backup key can never coincide with another key the wallet derives.
+// Header is bound via AEAD AAD.
+//
+// NOTE: this channel is still encrypted, and stays that way. The MANUAL address-book export file went to
+// plain text in issue #1550 (lib/addressBook/addressBookFile.js) because it is meant to be read and shared;
+// this bundle is not, and it carries recovery-code envelopes and legacy private-key blobs besides.
 
 import { concat, getBytes, keccak256, toUtf8Bytes } from 'ethers'
 import { encryptJson, decryptJson, utf8ToBytes } from '../../utils/crypto/primitives'

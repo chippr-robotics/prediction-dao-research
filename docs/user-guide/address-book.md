@@ -85,26 +85,50 @@ Four principles govern screening:
 Results are cached briefly during your session to avoid repeated on-chain reads, then
 re-checked the next time you enter or pick the address.
 
-## Portability: encrypted export & import
+## Portability: export & import
 
-You can move your address book between devices:
+You can move your address book between devices, or hand it to someone else.
 
-- **Export** produces an encrypted file. The encryption key is derived from a
-  signature from your wallet, so the file contains **no readable** names,
-  addresses, or notes.
+- **Export** produces a plain `.json` file. No signature, no passphrase, no wallet
+  — it works the same whether you sign in with a browser wallet, a hardware
+  wallet, or a passkey.
 - **Import** on another device (or after clearing your browser) restores your
-  contacts — but only with the **same wallet** that created the export, since the
-  decryption key comes from that wallet's signature. There is no separate
-  passphrase to remember.
+  contacts. Any account can open any export: a file is no longer tied to the
+  wallet that made it, so you can also share one with a friend or move it to a
+  different account of your own.
+- The file is **readable**, which is the point — you can open it in a text
+  editor, check it, or edit it by hand before importing.
 - Importing **merges** additively: new addresses are added, existing ones are
   kept (no duplicates), and where a nickname or note differs you are asked which
   to keep. Nothing is silently deleted.
 
-If you import a file created by a different wallet, or a corrupted file, the
-import fails safely and your existing book is left unchanged.
+> **The export file is not encrypted.** Every nickname, address and note in it is
+> readable by anyone who opens it. Treat it like a contacts list, because that is
+> what it is — think before you email it, drop it in shared storage, or leave it
+> in your Downloads folder on a shared computer.
+
+If you import a corrupted file, or a file that is not an address book, the import
+fails safely and your existing book is left unchanged. An import is not a
+verification: a file can put any address under any name, so a contact that arrived
+from someone else deserves the same look as one you typed yourself — the screening
+tags apply to imported addresses exactly as they do to the rest.
+
+### Older encrypted exports
+
+Exports made before this changed were encrypted with a key from your wallet's
+signature. They still open — but only in a session connected to the **browser
+wallet that created them**, since only that wallet can produce the key. If you now
+sign in with a passkey, that file cannot be opened; export a fresh one from a
+device that still has the book instead. The app will tell you this in those words
+rather than blaming your wallet.
 
 ## Privacy notes
 
 - Contacts live in your browser's local storage, keyed to your wallet address.
-  Clearing your browser data removes them — export a backup first.
+  Clearing your browser data removes them — export a copy first, and keep in mind
+  that the copy is plain text.
+- The separate **Backup** feature (My Account → Recovery) is a different thing and
+  is still encrypted: it syncs your address book along with your other app data
+  under a key only your wallet can derive. Use that when you want your contacts
+  protected; use Export when you want a file you can read or share.
 - Different wallets on the same device have separate, isolated address books.
