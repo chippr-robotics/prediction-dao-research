@@ -82,8 +82,12 @@ export default function RestrictionTag({ status }) {
     )
   }
   if (status === 'loading') {
+    // role="status" is not decoration: `aria-label` is PROHIBITED on a span with no
+    // role, so without it the label is dropped and axe reports a serious
+    // aria-prohibited-attr. The three tags above are already status tags; this one
+    // is a status too. Surfaced by the MS-07 a11y scan (issue #1550).
     return (
-      <span className="ab-tag ab-tag-loading" aria-label="Screening address">
+      <span className="ab-tag ab-tag-loading" role="status" aria-label="Screening address">
         <span aria-hidden="true">…</span>
       </span>
     )

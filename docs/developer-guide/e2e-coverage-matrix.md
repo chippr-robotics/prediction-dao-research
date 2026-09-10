@@ -28,8 +28,8 @@ See [the tiering policy](./e2e-testing-policy.md) for what belongs in which tier
 |---|---|
 | Spec directories | 113 |
 | With a member-facing flow | 89 |
-| Member-facing flows | 205 |
-| 🟢 covered | 187 |
+| Member-facing flows | 206 |
+| 🟢 covered | 188 |
 | 🟡 partial | 5 |
 | 🔴 absent | 4 |
 | ⚪ out of scope | 9 |
@@ -410,7 +410,7 @@ establish the outcome. They are listed in full at the end of this document.
 
 ## Access — gating, identity and permission
 
-49 flows — 🟢 48 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
+50 flows — 🟢 49 · 🟡 0 · 🔴 1 · ⚪ 0 · covered-but-not-proven 1
 
 ### `003-polymarket-only-oracle-ui` — Polymarket-only oracle UI
 
@@ -446,6 +446,7 @@ establish the outcome. They are listed in full at the end of this document.
 | Flow | What a member does | Status | Depth | Tier | Evidence / issue | Note |
 |---|---|---|---|---|---|---|
 | `addressbook.save-and-use-contact` | Save a contact and address a wager or transfer to it | 🟢 covered | settled | `no-chain` | `34-member-surfaces.cy.js` (MS-01) |  |
+| `addressbook.export-import-roundtrip` | Export the address book to a plain-text file and import it back, with no wallet signature | 🟢 covered | settled | `no-chain` | `34-member-surfaces.cy.js` (MS-07) |  |
 
 ### `022-membership-purchase-progress` — Membership purchase progress
 

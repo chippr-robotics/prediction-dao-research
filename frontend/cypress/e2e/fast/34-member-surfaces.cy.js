@@ -314,4 +314,108 @@ describe('The member’s records and references (specs 021 / 016 / 031 / 059 / 0
     cy.a11yScan('[role="dialog"][aria-label="Add contact"]')
   })
 
+
+  it('[MS-07] addressbook.export-import-roundtrip — the book exports to a readable file and comes back, with no signature', () => {
+    chainWorld()
+    connect()
+    cy.visit('/wallet?tab=addressbook')
+    waitForAccount()
+
+    // Save one contact so there is something to export.
+    cy.get('.ab-empty', { timeout: 40000 }).should('contain.text', 'No saved contacts yet')
+    cy.get('[aria-label="Add contact"]').click()
+    cy.get('#ab-nickname').type('Alice')
+    cy.get('#ab-addr-0').type(FRIEND)
+    cy.contains('button', /^Save$/).click()
+    cy.get('.ab-contact-grid', { timeout: 20000 }).should('contain.text', 'Alice')
+
+    // The privacy fact is stated BEFORE anyone taps Export, not after.
+    cy.get('.ab-plaintext-note').should('contain.text', 'plain text')
+
+    // Capture what the download would have been. The app builds a Blob and hands
+    // it to URL.createObjectURL; reading it here is steadier than watching the
+    // downloads directory, and it lets us assert on the bytes themselves.
+    cy.window().then((win) => {
+      win.__fwExported = []
+      const real = win.URL.createObjectURL
+      cy.stub(win.URL, 'createObjectURL').callsFake((blob) => {
+        win.__fwExported.push(blob)
+        return real.call(win.URL, blob)
+      })
+    })
+
+    // Selected by aria-label, not by text: `.ab-btn-label` is display:none at the
+    // phone profile, so `cy.contains('button', /^Export$/)` would find nothing there.
+    cy.get('[aria-label="Export address book"]').click()
+
+    // Issue #1550: this session's rail is irrelevant — no signature is requested and
+    // nothing claims the wallet is disconnected.
+    cy.contains('Wallet not connected').should('not.exist')
+    cy.get('.ab-import-export [role="status"]').should('contain.text', 'plain text')
+
+    cy.window()
+      .its('__fwExported')
+      .should('have.length', 1)
+      // Native Blob.text(); Cypress.Blob has no blobToText in v15.
+      .then((blobs) => blobs[0].text())
+      .then((text) => {
+        // The export is READABLE — that is the change, not an accident of it.
+        expect(text).to.contain('Alice')
+        expect(text.toLowerCase()).to.contain(FRIEND.toLowerCase())
+        const doc = JSON.parse(text)
+        expect(doc.format).to.equal('fairwins-address-book')
+        expect(doc.contacts).to.have.length(1)
+
+        // Wipe ONLY the book, then bring the same bytes back through the file input.
+        // cy.clearLocalStorage() would take the connected session with it and the
+        // account would never land after the reload.
+        cy.window().then((win) => {
+          win.localStorage.removeItem(`fw_user_${ACCOUNT.toLowerCase()}_addressBook`)
+        })
+        cy.reload()
+        waitForAccount()
+        cy.get('.ab-empty', { timeout: 40000 }).should('contain.text', 'No saved contacts yet')
+        cy.get('[data-testid="ab-import-input"]').selectFile(
+          { contents: Cypress.Buffer.from(text), fileName: 'address-book.json', mimeType: 'application/json' },
+          { force: true },
+        )
+        cy.get('.ab-contact-grid', { timeout: 20000 }).should('contain.text', 'Alice')
+        cy.get('.ab-meta-count').should('contain.text', '1 saved address')
+      })
+
+    // A pre-#1550 encrypted backup. This session HAS an injected signer, so the app
+    // does the honest thing: it signs, the AEAD fails on a bogus ciphertext, and the
+    // message names the two causes that are genuinely possible once a signature was
+    // actually tried. The no-signer branch — a passkey session, where that sentence
+    // would be a guess and "wallet not connected" was the #1550 bug — is asserted in
+    // src/test/addressBook/addressBookFile.test.js and AddressBookImportExport.test.jsx,
+    // which run with signer: null. What must hold HERE is that nothing claims the
+    // member is disconnected while they are plainly signed in.
+    cy.get('[data-testid="ab-import-input"]').selectFile(
+      {
+        contents: Cypress.Buffer.from(
+          JSON.stringify({
+            format: 'fairwins-address-book-backup',
+            version: 1,
+            alg: 'chacha20poly1305',
+            nonce: '000000000000000000000000',
+            ciphertext: 'deadbeef',
+          }),
+        ),
+        fileName: 'old-backup.json',
+        mimeType: 'application/json',
+      },
+      { force: true },
+    )
+    cy.get('.ab-import-export [role="alert"]')
+      .should('contain.text', 'Could not decrypt this backup')
+      .and('not.contain.text', 'Wallet not connected')
+
+    // The book the failed import touched is still there (FR-021).
+    cy.get('.ab-contact-grid').should('contain.text', 'Alice')
+
+    // Both controls carry a name even where their labels are hidden (phone profile).
+    cy.a11yScan('.ab-panel')
+  })
+
 })
