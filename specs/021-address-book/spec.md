@@ -412,7 +412,8 @@ chain does not consult, until the funds were already gone or stuck.
 
 **Scope.** Advisory only. No contract change, no new enforcement, no change to which read gates
 a submission (FR-013 stands: the guard on the chain the value moves on remains the enforcement,
-and the surfaces that gate a button on it still read it live). This amendment changes what the
+and the surfaces that gate a button on it still read it live — the *timing* of that read, forced
+past the cache at submission, is **spec 067** FR-032, not FR-013). This amendment changes what the
 member is TOLD when they enter an address, and what that statement rests on.
 
 ### User Story 6 — Know that an address is flagged anywhere before sending (Priority: P1)
@@ -458,8 +459,10 @@ on-chain or whose funds will be frozen — regardless of which network the list 
   (one dead endpoint never fails the sweep), and MUST obtain its provider through the spec-069
   endpoint seam (`readProviderFor`), never from `NETWORKS[chainId].rpcUrl`.
 - **FR-030**: The estate screen is advisory. It MUST NOT replace the per-chain live read that gates
-  a submission on the chain the value moves on (FR-013), and it MUST NOT be presented as
-  enforcement: the on-chain guard and the issuing token remain the only things that block.
+  a submission on the chain the value moves on (FR-013 keeps that read advisory; **spec 067**
+  FR-032 is what requires it to be taken again, forced, at submission — see the 2026-09-10
+  amendment), and it MUST NOT be presented as enforcement: the on-chain guard and the issuing
+  token remain the only things that block.
 
 ### Key Entities (added)
 
@@ -590,11 +593,21 @@ overwrites, and a differing nickname or note is a question put to the member, no
   the responsive layout hides the word, the control MUST still expose an accessible name
   (FR-023, WCAG 1.4.1 / 4.1.2).
 
-*FR-032 is deliberately not minted here.* `docs/developer-guide/address-screening.md` and the root
-`CLAUDE.md` both already cite spec-021 "FR-032" for the per-chain live screen that gates a
-submission — a requirement that was never actually written down in this document. Taking the number
-for something unrelated would turn two dangling citations into two wrong ones; leaving it free lets
-the requirement they mean be written under the number they already point at.
+*FR-032 is deliberately not minted here, and — corrected on review — it should not be minted at
+all.* `docs/developer-guide/address-screening.md` and the root `CLAUDE.md` both cited a bare
+"FR-032" for the forced, live screen at submission time, next to the words "spec 021", which read
+as a spec-021 requirement that had never been written down. It is not one: the requirement exists
+verbatim as **spec 067 FR-032** — *"Screening MUST occur on the real acting wallet … and MUST be
+enforced at the point of submission — not only at display time — so a wallet deny-listed between
+quote and submission is still refused"* — and both citations have been corrected to name it. This
+is the same cross-spec number bleed that mislabels spec 067's FR-044 as spec 071's in four places.
+
+Minting a spec-021 FR-032 would therefore create a second requirement, under the same number in a
+different spec, saying what 067 already says — and it would not even be true as written: only
+Bridge, Supply, group pay and the mini-app host `submit` force a re-read past the cache. Transfer
+and Pay (single-recipient) screen advisorily at render and rely on the gateway and the on-chain
+guard, which spec 021 permits (FR-013 is a ceiling on what the client may claim, not a floor on
+what it must check). The number is left unused rather than filled.
 
 ### Success Criteria (added)
 
