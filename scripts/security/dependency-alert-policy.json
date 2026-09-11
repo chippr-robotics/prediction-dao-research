@@ -23,7 +23,9 @@
     "reads — contracts/ imports only functions/v1_0_0/** and shared/**, and nitro is reachable only",
     "from automation/**. They should be DISMISSED on the alert itself, which is where the reasoning",
     "belongs; an acceptance here would record them as tolerated risk, which is a different and",
-    "wrong claim."
+    "wrong claim. That dismissal is declared in `dismissals.json` and executed by",
+    "`npm run dismiss:alerts`, so the criteria that selected those twelve are reviewable — which a",
+    "click is not."
   ],
 
   "failOn": [
