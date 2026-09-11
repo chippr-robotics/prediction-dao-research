@@ -22,13 +22,16 @@ can enter at the altitude they need:
 | **Architectural** | What are the components, and what are the seams between them? | [02-architecture-view.md](02-architecture-view.md) |
 | **Systems** | Where does it physically run, and along which network paths? | [03-systems-view.md](03-systems-view.md) |
 
-Three reference annexes carry the detail the views point at:
+Six reference annexes carry the detail the views point at:
 
 | Annex | Contents | Page |
 |---|---|---|
-| **Connectors & ports** | Every connector crossing a process boundary; every listening socket and egress path | [04-connectors-and-ports.md](04-connectors-and-ports.md) |
-| **Cryptographic BOM** | Curves, typed-data domains, KDFs, key material inventory, library pins | [05-cryptographic-bom.md](05-cryptographic-bom.md) |
-| **External vendors** | Every third-party dependency, auth model, data exposure, commercial direction | [06-external-vendors.md](06-external-vendors.md) |
+| **04 Connectors & ports** | Every connector crossing a process boundary; every listening socket, bind address, firewall rule and egress path | [04-connectors-and-ports.md](04-connectors-and-ports.md) |
+| **05 Cryptographic BOM** | Curves, EIP-712 domains, KDFs, key-material inventory, library pins, risk register | [05-cryptographic-bom.md](05-cryptographic-bom.md) |
+| **06 External vendors** | Every third-party dependency, auth model, data exposure, commercial direction | [06-external-vendors.md](06-external-vendors.md) |
+| **07 On-chain estate** | Every contract, proxy, facet, role, chain, and the external protocols called but not owned | [07-onchain-estate.md](07-onchain-estate.md) |
+| **08 Spec index** | Every numbered spec directory → the capability it delivers | [08-spec-index.md](08-spec-index.md) |
+| **09 Findings & drift** | Where the docs, the code and the deployed estate disagree, and what is load-bearing but unguarded | [09-findings-and-drift.md](09-findings-and-drift.md) |
 
 An [executive summary](00-executive-summary.md) states the architecture and
 its controls in review-board register, for readers who will not read the body.
@@ -41,12 +44,17 @@ mermaid blocks in the markdown pages are the rendered-in-docs equivalent.
 
 | File | View |
 |---|---|
-| `diagrams/logical-view.drawio` | Capability and domain model |
-| `diagrams/architecture-view.drawio` | Components and seams |
+| `diagrams/logical-view.drawio` | Actors, capability map, domain entities, the twenty invariants |
+| `diagrams/architecture-view.drawio` | Components, seams, the on-chain estate |
 | `diagrams/systems-view.drawio` | Deployment and network topology |
-| `diagrams/trust-boundaries.drawio` | Trust boundaries and crypto controls |
+| `diagrams/trust-boundaries.drawio` | The seven trust boundaries and the control enforcing each |
 
 ## How to keep it true
+
+**Read [09](09-findings-and-drift.md) before trusting any other page's optimism.**
+The sweep that produced this workbook found places where the documentation, the
+code and the deployed estate disagree; they are catalogued rather than smoothed
+over, because a workbook that reads cleaner than the system is worse than none.
 
 This workbook is descriptive, never authoritative — the code and the CI
 gates decide. When the two disagree, the code is right and this document is
