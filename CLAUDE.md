@@ -608,7 +608,7 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
-- **Native release channels (spec 103): the app ships as Capacitor iOS/Android shells beside the
+- **Native release channels (spec 102): the app ships as Capacitor iOS/Android shells beside the
   web/PWA, and FIVE rules govern every change.** (1) **Seam-only native logic**:
   `frontend/src/lib/native/runtime.js` is the ONE runtime/capability read (three-state,
   `available` only when the bridging plugin confirmed itself — never fabricate); the four gaps
@@ -656,7 +656,7 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   differently from the release would pass while the release fails, so change the preparation in the
   action, never in a caller. See
   `docs/developer-guide/native-channels.md` + `docs/runbooks/native-release-operations.md` +
-  `specs/103-capacitor-channels/`.
+  `specs/102-capacitor-channels/`.
 - **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
   (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
   each of which has a way to be silently wrong:
@@ -1038,8 +1038,9 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   answered; chains with no source are UNCOVERED, never clear. The sweep (`screenEstate.js`) is
   cohort-bounded, per-source failure-isolated, deadline-bounded (8 s) and never rejects; providers
   come from `readProviderFor`. **Two hooks, on purpose**: `useAddressScreening` stays the PER-CHAIN
-  live read that gates a submission on the chain the value moves on (FR-013/FR-032 — the contract
-  will repeat that exact read), and `useEstateScreening` feeds the advisory `ScreeningPill` under
+  live read that gates a submission on the chain the value moves on (FR-013 here, and **spec 067**
+  FR-032 for the forced submit-time re-read on Bridge/Supply — the contract will repeat that exact
+  read), and `useEstateScreening` feeds the advisory `ScreeningPill` under
   every address field via `AddressScreenNotice`, which now renders for every valid address (a
   clear answer that rendered as silence was indistinguishable from no screen at all). The pill is
   icon + word, `role="alert"` when flagged, and expands to the per-source rows; the no-chain e2e
@@ -1051,10 +1052,12 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   `isTestnet: true`, carries a guard, and lives at `http://127.0.0.1:8545`, so every testnet build
   told every member that a Hardhat guard "could not be read" and could never reach green (QA round;
   Amoy's build default was also dead and now points at publicnode like every other chain here).
-  **Every address surface reads the SAME sweep**: the book and the saved-contact picker use
-  `useEstateScreeningMany` — they asked the per-chain hook, which can only answer for the wallet's
-  chain, so a book full of contacts rendered "Unscreened" whenever the wallet was elsewhere or
-  absent. `getVerdictOn` has a THIRD answer, `no-source`, distinct from both a verdict and a
+  **The book and the inline address-field addon read the SAME sweep**: `AddressBookPanel` and
+  `AddressInputBookAddon` use `useEstateScreeningMany` — they asked the per-chain hook, which can
+  only answer for the wallet's chain, so a book full of contacts rendered "Unscreened" whenever the
+  wallet was elsewhere or absent. **The MODAL picker (`AddressBookButton`) was missed by that
+  migration** and still calls `useAddressScreening().getStatus`, so it reproduces the original
+  amber-everything behaviour off the wallet's chain on all ten surfaces that mount it (issue #1571). `getVerdictOn` has a THIRD answer, `no-source`, distinct from both a verdict and a
   still-running null. **The summary line names sources only when FLAGGED** — naming every
   unreachable one turned the notice into a paragraph; the names live one tap away, and the
   `ScreeningStatusBar` (one segment per source, `role="img"` labelled with the summary) carries the
