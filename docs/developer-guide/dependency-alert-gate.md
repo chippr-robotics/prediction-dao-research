@@ -147,6 +147,7 @@ unreachable is not the same as proving it is — the same rule as D-05 above, on
 | **X-04** | the alert is runtime-scope (an unknown scope counts as runtime), or above the reviewed `maxSeverity` |
 | **X-05** | the live selection is a different size than the reviewed `expectedCount` |
 | **X-06** | the alert list could not be read |
+| **X-07** | on `--apply`: the plan in hand is not the one merged on `staging`, or that could not be confirmed |
 
 X-02 is the one that matters over time. `compiledVersion` is an assertion about this repository, and
 the day someone bumps OpenZeppelin it stops being true; unchecked, the plan would keep dismissing
@@ -184,6 +185,29 @@ package is present and reported **UNVERIFIED** (never "clean") when it is not.
 
 X-05 is consent. A set that grew is a set nobody looked at, so the run refuses rather than
 dismissing the extras under a paragraph written about something else.
+
+### X-07: only a reviewed plan may be applied
+
+"The criteria are reviewed before they are ever executed" was the premise of this whole design, and
+for its first day it was a sentence in a comment rather than anything enforced. Two ways to break
+it, and a reviewing agent hit both within hours:
+
+- **Stale.** The correction above lived in an open pull request while `staging` still carried the
+  retracted wording. The instruction of the moment — *pull staging first, then apply* — would have
+  stamped the **retracted** text onto twelve alerts.
+- **Unreviewed.** Nothing stopped anyone editing `dismissals.json` locally and applying it.
+
+Both are the same bug: executing a plan nobody merged. So `--apply` now fetches
+`scripts/security/dismissals.json` from `staging` and refuses unless the entry in hand matches it on
+`comment`, `dismissedReason`, `expectedCount` and `match`. An unreadable review branch refuses too —
+not being able to confirm a plan was reviewed is not the same as it having been.
+
+**There is deliberately no override flag.** An override is how a gate becomes decoration, and the
+legitimate path is three steps: merge the plan, pull, re-run the dry run, then apply.
+
+This matters more here than in most gates because of an asymmetry: a `dismissed_comment` is what the
+next reader meets on the alert, and **no later pull request can correct it**. A wrong file is a
+nuisance; a wrong dismissal is permanent.
 
 ### It cannot run in CI
 
@@ -228,6 +252,9 @@ GITHUB_REPOSITORY=chippr-robotics/prediction-dao-research \
 GITHUB_TOKEN=$SECURITY_EVENTS_TOKEN \
 npm run dismiss:alerts -- --apply
 ```
+
+**Order matters, and X-07 enforces it.** If the plan has been changed, that change must be *merged*
+to `staging` first — applying from a checkout that predates it stamps the old wording permanently.
 
 Read the dry run before applying. The near-miss lines are the interesting part: an alert that
 *almost* matched is either a thirteenth case worth understanding or a bug in the criteria.
