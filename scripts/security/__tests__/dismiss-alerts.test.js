@@ -148,7 +148,7 @@ test('the committed plan is valid against the real package.json', () => {
   assert.deepEqual(out, [], out.map((x) => `[${x.rule}] ${x.message}`).join('\n'));
 });
 
-test('the committed plan argues about the OZ version the contracts actually import', () => {
+test('the committed plan argues about the OZ version the contracts actually compile against', () => {
   const [entry] = loadPlan().dismissals;
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   for (const name of entry.match.packages) {
