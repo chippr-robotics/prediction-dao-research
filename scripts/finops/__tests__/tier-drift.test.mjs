@@ -36,14 +36,30 @@ function runGate() {
   }
 }
 
+/**
+ * Hosts are PARSED, here as in the gate itself — never matched as substrings of the file.
+ *
+ * A substring check matches prose, and the prose that would trip it is exactly the comment somebody
+ * writes while preparing this migration ("point this at gateway.thegraph.com to publish"). A test
+ * asserting the weaker property would pass while the gate it describes cries wolf.
+ */
+function configuredHosts(text) {
+  const hosts = new Set()
+  for (const [, literal] of text.matchAll(/['"`](https?:\/\/[^'"`\s]+)['"`]/g)) {
+    try {
+      hosts.add(new URL(literal).hostname.toLowerCase())
+    } catch {
+      /* not a URL */
+    }
+  }
+  return hosts
+}
+
 test('C6 passes on this tree — every subgraph URL is a Studio endpoint', () => {
-  const networks = readFileSync(NETWORKS, 'utf8')
-  assert.ok(
-    networks.includes('api.studio.thegraph.com'),
-    'expected the Studio endpoints this rule is predicated on',
-  )
+  const hosts = configuredHosts(readFileSync(NETWORKS, 'utf8'))
+  assert.ok(hosts.has('api.studio.thegraph.com'), 'expected the Studio endpoints this rule is predicated on')
   assert.equal(
-    networks.includes('gateway.thegraph.com'),
+    hosts.has('gateway.thegraph.com'),
     false,
     'a gateway URL exists — if this is intentional, C6 should be failing and the plan price revisited',
   )
@@ -74,7 +90,23 @@ test('C6 FAILS when a subgraph URL moves to the paid decentralized gateway', () 
   }
 })
 
+test('a COMMENT naming the gateway host does not trip C6', () => {
+  // The false positive that matters. Somebody preparing this migration writes exactly this comment,
+  // and a substring-matching gate fails their build with nothing wrong — which is how a gate gets
+  // merged past by habit. The rule is about a configured ENDPOINT, not a mention of one.
+  const original = readFileSync(NETWORKS, 'utf8')
+  try {
+    writeFileSync(
+      NETWORKS,
+      '// TODO: to publish, point these at gateway.thegraph.com (paid, GRT on Arbitrum One)\n' + original,
+    )
+    assert.ok(runGate().ok, 'a prose mention of the gateway host must not fail the gate')
+  } finally {
+    writeFileSync(NETWORKS, original)
+  }
+})
+
 test('the restored tree is byte-identical and green again', () => {
   assert.ok(runGate().ok, 'the fixture must not leave the tree dirty')
-  assert.equal(readFileSync(NETWORKS, 'utf8').includes('gateway.thegraph.com'), false)
+  assert.equal(configuredHosts(readFileSync(NETWORKS, 'utf8')).has('gateway.thegraph.com'), false)
 })

@@ -324,7 +324,38 @@ const networksFile = readIfExists('frontend/src/config/networks.js')
 // committed deployment, and a gate that cannot see deployment files cannot see it change.
 const deploymentText = deploymentConfigs.map((c) => c.text ?? '').join('\n')
 
-if (networksFile && networksFile.includes(GATEWAY_HOST)) {
+/**
+ * Match on the URL's HOST, parsed — never `text.includes('gateway.thegraph.com')`.
+ *
+ * Two different failures, and the substring version has both. The one CodeQL names
+ * (js/incomplete-url-substring-sanitization) is that a host can appear anywhere in a URL, so
+ * `https://evil.example/?x=gateway.thegraph.com` would match a check meant to identify the vendor.
+ * That is the weaker half here, since this reads a file we commit rather than anything an attacker
+ * supplies.
+ *
+ * The half that would actually have bitten us: a substring scan matches PROSE. A comment in
+ * networks.js reading "to publish, point this at gateway.thegraph.com" — the exact comment someone
+ * writes while preparing this migration — would fail the build with nothing wrong. A gate that
+ * cries wolf is worse than no gate, because it teaches everyone to merge past it, and this file
+ * already carries that lesson at C4 (a naive substring match reported every source as unpanelled).
+ *
+ * So: pull the quoted URL literals out, parse each, compare hostnames exactly. Anything unparseable
+ * is not a URL and cannot be an endpoint.
+ */
+function configuredHosts(text) {
+  const hosts = new Set()
+  for (const [, literal] of text.matchAll(/['"`](https?:\/\/[^'"`\s]+)['"`]/g)) {
+    try {
+      hosts.add(new URL(literal).hostname.toLowerCase())
+    } catch {
+      // Not a URL. A template literal with an interpolation lands here, and is correctly ignored:
+      // this rule is about a committed endpoint, not one assembled at runtime.
+    }
+  }
+  return hosts
+}
+
+if (networksFile && configuredHosts(networksFile).has(GATEWAY_HOST)) {
   const assertedZero = /FINOPS_THEGRAPH_PLAN_USD:\s*["']?0["']?/.test(deploymentText)
   if (assertedZero) {
     fail(
