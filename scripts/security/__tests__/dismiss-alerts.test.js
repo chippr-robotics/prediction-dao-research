@@ -23,6 +23,9 @@ const {
   selectAlerts,
   loadPlan,
   MAX_COMMENT,
+  reviewedEntryMatches,
+  fetchReviewedPlan,
+  REVIEW_BRANCH,
 } = require('../dismiss-alerts.js');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
@@ -159,23 +162,120 @@ test('the committed plan argues about the OZ version the contracts actually comp
 /**
  * The reachability claim itself, checked against the source rather than taken on trust.
  *
- * The whole dismissal rests on `contracts/` importing nothing under chainlink's `automation/**`,
- * which is the only route to the nested OpenZeppelin 4.7.3 copy. That is a property of the source
- * tree, so it can rot — and if it ever does, the argument recorded on twelve alerts becomes false
- * with nothing to say so.
+ * THIS TEST USED TO ASSERT THE WRONG THING. It read "no contract imports chainlink automation/** —
+ * the only route to the nested OZ copy", mirroring a plan-file claim that nitro-contracts is
+ * reachable only from `automation/**`. That is false: 16 files in @chainlink/contracts@1.5.0 import
+ * nitro and 11 are outside automation/, including `shared/util/ChainSpecificUtil.sol` and three
+ * under `functions/` — the two directories this repo does import from. The old assertion therefore
+ * passed while proving nothing about the actual risk, and would have kept passing if a contract
+ * started importing `shared/util/`.
+ *
+ * What actually holds is a statement about the CLOSURE: the chainlink files contracts/ imports
+ * close over 11 files containing no non-relative imports at all, so they cannot reach node_modules
+ * and therefore cannot reach OpenZeppelin. Two halves, because they need different things:
+ *
+ *   - the ROOTS are in this repo, so they are pinned here and checked on every run;
+ *   - the CLOSURE is a property of an installed package, so it is checked by
+ *     `chainlink-closure.js` when the package is present, and reported UNVERIFIED when it is not
+ *     (this suite runs with no `npm ci`, by design).
  */
-test('no contract imports chainlink automation/** — the only route to the nested OZ copy', () => {
-  const offenders = [];
-  const walk = (dir) => {
-    for (const name of fs.readdirSync(dir)) {
-      const full = path.join(dir, name);
-      if (fs.statSync(full).isDirectory()) walk(full);
-      else if (name.endsWith('.sol')) {
-        const text = fs.readFileSync(full, 'utf8');
-        if (/@chainlink\/contracts\/src\/v0\.8\/automation/.test(text)) offenders.push(path.relative(ROOT, full));
-      }
-    }
-  };
-  walk(path.join(ROOT, 'contracts'));
-  assert.deepEqual(offenders, [], `these import chainlink automation/**, which reaches the vulnerable OZ copy:\n${offenders.join('\n')}`);
+
+/** The exact chainlink surface contracts/ imports. Changing it means re-deriving the closure. */
+const EXPECTED_CHAINLINK_ROOTS = [
+  '@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol',
+  '@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsClient.sol',
+  '@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol',
+  '@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol',
+];
+
+test('contracts/ imports exactly the four chainlink paths the dismissal argument covers', () => {
+  const { chainlinkImportsInContracts } = require('../chainlink-closure.js');
+  assert.deepEqual(
+    chainlinkImportsInContracts(),
+    EXPECTED_CHAINLINK_ROOTS,
+    'The #1520 dismissals rest on the import closure of exactly these four files. A new chainlink ' +
+      'import may pull OpenZeppelin or nitro into what solc reads, which would make the reasoning ' +
+      'recorded on twelve alerts false. Re-derive it with `node scripts/security/chainlink-closure.js`, ' +
+      'then update this list and the plan comment together.',
+  );
+});
+
+test('the closure of those four reaches no package at all (skipped when not installed)', (t) => {
+  const { analyze } = require('../chainlink-closure.js');
+  const res = analyze();
+  if (!res.verified) {
+    // Never a silent pass: this suite deliberately runs without `npm ci`, so say which happened.
+    t.skip(`UNVERIFIED — ${res.reason}; run \`node scripts/security/chainlink-closure.js\` where it is installed`);
+    return;
+  }
+  assert.deepEqual(res.external, [], 'closure must contain no non-relative imports');
+  assert.deepEqual(res.missing, [], 'every relative import must resolve');
+  assert.equal(res.mentionsOpenZeppelin, false);
+  assert.equal(res.mentionsNitro, false);
+});
+
+/* ----------------------------------------------- X-07: the reviewed plan */
+
+/**
+ * X-07 exists because a teammate hit both halves of it for real.
+ *
+ * STALE: #1575 corrected the dismissal comment, but until it merged, `staging` still carried the
+ * retracted "reachable only from automation/**" wording. The instruction of the moment — "pull
+ * staging first, then apply" — would have stamped the RETRACTED text onto twelve alerts. A
+ * dismissed_comment is what the next reader meets and no later PR can correct it.
+ *
+ * UNREVIEWED: nothing stopped anyone editing the plan locally and applying it, which makes the
+ * review — the only thing between a typed paragraph and twelve permanent records — optional.
+ *
+ * Both are "executing a plan nobody merged", so both fail here. There is deliberately no override.
+ */
+
+const REVIEWED = JSON.stringify({ dismissals: [ENTRY] });
+
+test('X-07 accepts the plan that is merged on the review branch', () => {
+  assert.deepEqual(reviewedEntryMatches(REVIEWED, ENTRY), { ok: true });
+});
+
+test('X-07 refuses a comment that differs from the merged one — the stale-checkout case', () => {
+  const retracted = { ...ENTRY, comment: 'Unreachable: nitro is reachable only from automation/** — the retracted wording.' };
+  const { ok, why } = reviewedEntryMatches(REVIEWED, retracted);
+  assert.equal(ok, false);
+  assert.match(why, /comment.*differs/s);
+});
+
+test('X-07 refuses a locally edited reason, count or match block', () => {
+  for (const local of [
+    { ...ENTRY, dismissedReason: 'tolerable_risk' },
+    { ...ENTRY, expectedCount: 99 },
+    { ...ENTRY, match: { ...ENTRY.match, maxSeverity: 'critical' } },
+  ]) {
+    assert.equal(reviewedEntryMatches(REVIEWED, local).ok, false, JSON.stringify(local));
+  }
+});
+
+test('X-07 refuses a plan whose id does not exist on the review branch at all', () => {
+  const { ok, why } = reviewedEntryMatches(JSON.stringify({ dismissals: [] }), ENTRY);
+  assert.equal(ok, false);
+  assert.match(why, /never merged/);
+});
+
+test('X-07 refuses rather than proceeding when the review branch is unreadable', async () => {
+  await assert.rejects(
+    () => fetchReviewedPlan({ repo: 'o/r', token: 't', fetchImpl: async () => ({ ok: false, status: 404, statusText: 'Not Found' }) }),
+    /404/,
+    'an unreadable review branch must throw, never resolve to something that compares equal',
+  );
+  // Unparseable content is refused too, rather than treated as "no constraint".
+  assert.equal(reviewedEntryMatches('{ not json', ENTRY).ok, false);
+});
+
+test('X-07 reads the plan from the review branch, not the default branch', async () => {
+  let seen = null;
+  await fetchReviewedPlan({
+    repo: 'o/r',
+    token: 't',
+    fetchImpl: async (url) => { seen = url; return { ok: true, text: async () => REVIEWED }; },
+  });
+  assert.match(seen, /scripts\/security\/dismissals\.json/);
+  assert.match(seen, new RegExp(`ref=${REVIEW_BRANCH}`));
 });

@@ -117,10 +117,8 @@ next reader meets it without having to find this document first.
 Twelve of the original forty-five were the second kind. They name `@openzeppelin/contracts` and
 `@openzeppelin/contracts-upgradeable`, and every one of them tops out below 4.9.6 — the pin here is
 5.4.0, outside every range. What they match is a nested 4.7.3 copy that arrives through
-`@chainlink/contracts` → `@arbitrum/nitro-contracts`, reachable only from chainlink's
-`automation/**`. `contracts/` imports four chainlink paths, all under `functions/v1_0_0/**` and
-`shared/**`, so solc never opens those files and no FairWins bytecode contains them. Nothing we can
-bump clears them either: `@chainlink/contracts` is exact-pinned under spec 075 because it
+`@chainlink/contracts` → `@arbitrum/nitro-contracts`, which solc never opens, so no FairWins
+bytecode contains it. Nothing we can bump clears them either: `@chainlink/contracts` is exact-pinned under spec 075 because it
 contributes Solidity source, and OZ is held at 5.4.0 deliberately (5.5+ emits `mcopy`, which fails
 at `evmVersion: paris`).
 
@@ -149,15 +147,67 @@ unreachable is not the same as proving it is — the same rule as D-05 above, on
 | **X-04** | the alert is runtime-scope (an unknown scope counts as runtime), or above the reviewed `maxSeverity` |
 | **X-05** | the live selection is a different size than the reviewed `expectedCount` |
 | **X-06** | the alert list could not be read |
+| **X-07** | on `--apply`: the plan in hand is not the one merged on `staging`, or that could not be confirmed |
 
 X-02 is the one that matters over time. `compiledVersion` is an assertion about this repository, and
 the day someone bumps OpenZeppelin it stops being true; unchecked, the plan would keep dismissing
-alerts with an argument that no longer holds. The fixtures also assert the reachability claim
-against the source tree — no `.sol` file may import chainlink `automation/**` — because that is the
-single fact the whole paragraph rests on, and it can rot silently.
+alerts with an argument that no longer holds.
+
+### Why the code is unreachable — and why the first version of this was wrong
+
+The first draft of this argument said nitro-contracts is **"reachable only from `automation/**`"**,
+and the fixtures encoded the same claim: *no `.sol` may import chainlink `automation/**`*. It is
+false. 16 files in `@chainlink/contracts@1.5.0` import nitro and **11 are outside `automation/`** —
+among them `shared/util/ChainSpecificUtil.sol` and three under `functions/`, which are the two
+directories this repo *does* import from. The assertion passed while proving nothing, and would have
+kept passing if a contract started importing `shared/util/`. Worse, a future reader grepping for
+nitro under `shared/` would have found a hit and concluded the whole dismissal was wrong.
+
+It was caught by a reviewing agent before any alert carried the text — which is the argument for
+writing the reasoning down in a reviewable file rather than typing it into twelve dismissal boxes.
+
+The correct argument never mentions a directory, because **solc reads a closure, not a directory**.
+Start at the chainlink files `contracts/` imports and follow every import:
+
+| | |
+|---|---|
+| roots | 4 (`functions/v1_0_0/**` ×2, `shared/access/ConfirmedOwner.sol`, `shared/interfaces/AggregatorV3Interface.sol`) |
+| closure | 11 files |
+| non-relative imports anywhere in it | **none** |
+
+A closure with no non-relative imports cannot name a package at all, so it reaches neither
+OpenZeppelin nor nitro — whatever else `@chainlink/contracts` happens to contain. That holds where
+the directory claim did not.
+
+`npm run check:chainlink-closure` re-derives it. The roots are in this repo, so the fixtures pin
+them on every run; the closure is a property of an installed package, so it is checked when the
+package is present and reported **UNVERIFIED** (never "clean") when it is not.
 
 X-05 is consent. A set that grew is a set nobody looked at, so the run refuses rather than
 dismissing the extras under a paragraph written about something else.
+
+### X-07: only a reviewed plan may be applied
+
+"The criteria are reviewed before they are ever executed" was the premise of this whole design, and
+for its first day it was a sentence in a comment rather than anything enforced. Two ways to break
+it, and a reviewing agent hit both within hours:
+
+- **Stale.** The correction above lived in an open pull request while `staging` still carried the
+  retracted wording. The instruction of the moment — *pull staging first, then apply* — would have
+  stamped the **retracted** text onto twelve alerts.
+- **Unreviewed.** Nothing stopped anyone editing `dismissals.json` locally and applying it.
+
+Both are the same bug: executing a plan nobody merged. So `--apply` now fetches
+`scripts/security/dismissals.json` from `staging` and refuses unless the entry in hand matches it on
+`comment`, `dismissedReason`, `expectedCount` and `match`. An unreadable review branch refuses too —
+not being able to confirm a plan was reviewed is not the same as it having been.
+
+**There is deliberately no override flag.** An override is how a gate becomes decoration, and the
+legitimate path is three steps: merge the plan, pull, re-run the dry run, then apply.
+
+This matters more here than in most gates because of an asymmetry: a `dismissed_comment` is what the
+next reader meets on the alert, and **no later pull request can correct it**. A wrong file is a
+nuisance; a wrong dismissal is permanent.
 
 ### It cannot run in CI
 
@@ -202,6 +252,9 @@ GITHUB_REPOSITORY=chippr-robotics/prediction-dao-research \
 GITHUB_TOKEN=$SECURITY_EVENTS_TOKEN \
 npm run dismiss:alerts -- --apply
 ```
+
+**Order matters, and X-07 enforces it.** If the plan has been changed, that change must be *merged*
+to `staging` first — applying from a checkout that predates it stamps the old wording permanently.
 
 Read the dry run before applying. The near-miss lines are the interesting part: an alert that
 *almost* matched is either a thirteenth case worth understanding or a bug in the criteria.

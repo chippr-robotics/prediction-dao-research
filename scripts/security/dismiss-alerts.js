@@ -223,6 +223,78 @@ function selectAlerts(alerts, plan, { only } = {}) {
   });
 }
 
+/* ------------------------------------------------- X-07: the reviewed plan */
+
+/** Where a plan must be merged before it may be executed. */
+const REVIEW_BRANCH = 'staging';
+
+/**
+ * X-07 — an apply may only execute the plan that is MERGED on the review branch.
+ *
+ * The premise of this whole file is "the criteria are reviewed before they are ever executed", and
+ * until now that was a sentence in a comment rather than something enforced. Two ways to break it,
+ * one of which a reviewing agent hit within hours of the plan landing:
+ *
+ *   1. STALE. #1575 corrected the dismissal comment, but until it merges `staging` still carries
+ *      the retracted wording. "Pull staging first, then apply" — the instruction given at the
+ *      time — would therefore have stamped the RETRACTED text onto twelve alerts. A
+ *      `dismissed_comment` is what the next reader meets, and unlike a file it cannot be fixed by
+ *      a later pull request.
+ *   2. UNREVIEWED. Nothing stopped someone editing `dismissals.json` locally and applying it. The
+ *      review is the only thing standing between a typed paragraph and twelve permanent records.
+ *
+ * Both are the same bug — executing a plan nobody merged — so both get the same gate: fetch the
+ * plan from the review branch and refuse unless it is byte-identical to the one in hand.
+ *
+ * There is deliberately NO override flag. An override is how this becomes decoration again, and
+ * the legitimate path is short: merge the plan, then apply it.
+ *
+ * An unreadable review branch REFUSES rather than proceeding (the D-05 rule, again): not being
+ * able to confirm the plan was reviewed is not the same as it having been.
+ */
+async function fetchReviewedPlan({ repo, token, branch = REVIEW_BRANCH, fetchImpl = globalThis.fetch }) {
+  const url =
+    `https://api.github.com/repos/${repo}/contents/` +
+    `scripts/security/dismissals.json?ref=${encodeURIComponent(branch)}`;
+  const res = await fetchImpl(url, {
+    headers: {
+      accept: 'application/vnd.github.v3.raw',
+      authorization: `Bearer ${token}`,
+      'x-github-api-version': '2022-11-28',
+    },
+  });
+  if (!res.ok) throw new Error(`GET ${url} -> ${res.status} ${res.statusText}`);
+  return res.text();
+}
+
+/** Compare the entry that is about to run against the same entry on the review branch. */
+function reviewedEntryMatches(reviewedText, entry) {
+  let reviewed;
+  try {
+    reviewed = JSON.parse(reviewedText);
+  } catch (err) {
+    return { ok: false, why: `the plan on ${REVIEW_BRANCH} is not valid JSON: ${err.message}` };
+  }
+  const there = (reviewed.dismissals || []).find((d) => d.id === entry.id);
+  if (!there) return { ok: false, why: `no dismissal with id \`${entry.id}\` exists on ${REVIEW_BRANCH} — this plan was never merged` };
+
+  for (const field of ['comment', 'dismissedReason', 'expectedCount']) {
+    if (JSON.stringify(there[field]) !== JSON.stringify(entry[field])) {
+      return {
+        ok: false,
+        why:
+          `\`${field}\` differs from the version merged on ${REVIEW_BRANCH}.\n` +
+          `      merged:  ${JSON.stringify(there[field])}\n` +
+          `      local:   ${JSON.stringify(entry[field])}`,
+      };
+    }
+  }
+  if (JSON.stringify(there.match) !== JSON.stringify(entry.match)) {
+    return { ok: false, why: `\`match\` differs from the version merged on ${REVIEW_BRANCH}` };
+  }
+  return { ok: true };
+}
+
 /* ------------------------------------------------------------------ write */
 
 async function dismissAlert({ repo, token, number, entry, fetchImpl = globalThis.fetch }) {
@@ -297,6 +369,37 @@ async function main(argv) {
     }
   }
 
+  // X-07 — refuse to execute a plan that is not the one merged on the review branch.
+  if (apply && violations.length === 0) {
+    let reviewedText = null;
+    try {
+      reviewedText = await fetchReviewedPlan({
+        repo: process.env.GITHUB_REPOSITORY || 'chippr-robotics/prediction-dao-research',
+        token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+      });
+    } catch (err) {
+      violations.push(
+        v('X-07', `could not read the plan on ${REVIEW_BRANCH}, so it cannot be confirmed reviewed: ${err.message}`),
+      );
+    }
+    if (reviewedText !== null) {
+      for (const { entry } of selections) {
+        const { ok, why } = reviewedEntryMatches(reviewedText, entry);
+        if (!ok) {
+          violations.push(
+            v(
+              'X-07',
+              `\`${entry.id}\` is not the plan merged on ${REVIEW_BRANCH}: ${why}\n` +
+                `      Nothing was dismissed. A dismissal comment is permanent and cannot be corrected by a ` +
+                `later PR, so only a REVIEWED plan may be applied. Merge the plan, pull, re-run the dry run, ` +
+                'then apply.',
+            ),
+          );
+        }
+      }
+    }
+  }
+
   const applied = [];
   if (apply && violations.length === 0) {
     for (const { entry, eligible } of selections) {
@@ -363,6 +466,9 @@ function report({ violations, json, selections = [], apply = false, applied = []
 }
 
 module.exports = {
+  fetchReviewedPlan,
+  reviewedEntryMatches,
+  REVIEW_BRANCH,
   parseVersion,
   compareVersions,
   rangeIncludes,
