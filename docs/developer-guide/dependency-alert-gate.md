@@ -148,6 +148,7 @@ unreachable is not the same as proving it is — the same rule as D-05 above, on
 | **X-05** | the live selection is a different size than the reviewed `expectedCount` |
 | **X-06** | the alert list could not be read |
 | **X-07** | on `--apply`: the plan in hand is not the one merged on `staging`, or that could not be confirmed |
+| **X-08** | on `--apply`: the token is known not to carry `security_events`, or a write failed part-way |
 
 X-02 is the one that matters over time. `compiledVersion` is an assertion about this repository, and
 the day someone bumps OpenZeppelin it stops being true; unchecked, the plan would keep dismissing
@@ -204,6 +205,29 @@ not being able to confirm a plan was reviewed is not the same as it having been.
 
 **There is deliberately no override flag.** An override is how a gate becomes decoration, and the
 legitimate path is three steps: merge the plan, pull, re-run the dry run, then apply.
+
+### X-08: a green dry run is not a working credential
+
+From the first real apply: **a token carrying `repo` but not `security_events` reads the alert list
+perfectly well and 403s only on the PATCH.** Reading needs `repo`; dismissing needs
+`security_events`. So the dry run goes green, prints a clean selection, and the scope gap surfaces
+only at the write — where a green dry run naturally reads as "the credential is good".
+
+On its own that is an annoyance. What made it worth a gate is the state a *late* failure leaves:
+the apply loop had no error handling, so a 403 on the seventh alert would leave **six permanently
+dismissed** and throw. The next run then sees 6 open against an `expectedCount` of 12 — X-05 fires,
+and the tool refuses to finish the job it half did, leaving the operator between an unfinished
+dismissal and editing a reviewed plan. That was survived only because the failing token happened to
+fail on the *first* write.
+
+Two changes:
+
+- **Pre-flight.** GitHub advertises a classic PAT's scopes on every response (`x-oauth-scopes`), so
+  the gap is knowable before any write. Fine-grained and app tokens send no such header, and that is
+  reported as **unknown** rather than guessed in either direction.
+- **A partial apply is now legible.** The loop stops at the first failure instead of hammering, and
+  says exactly which alerts were dismissed, that they are permanent, and that `expectedCount` will
+  now legitimately need correcting — once, in a merged change.
 
 This matters more here than in most gates because of an asymmetry: a `dismissed_comment` is what the
 next reader meets on the alert, and **no later pull request can correct it**. A wrong file is a
