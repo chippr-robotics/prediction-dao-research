@@ -302,6 +302,41 @@ if (!dashboards.length) {
   }
 }
 
+// ── C6: an asserted $0 must still describe the tier we actually use ──────────────────────────
+//
+// A declared plan price is the operator saying "I checked". C1-C4 make sure a source EXISTS; nothing
+// makes sure its price is still true, and for most vendors that is fine — a plan changes when
+// somebody clicks something on a billing page, which is a human event with a human attached.
+//
+// The Graph is not like that. Its tier is decided by WHICH ENDPOINT THE APP CALLS.
+// `api.studio.thegraph.com` is the free development tier; `gateway.thegraph.com` is the
+// decentralized network, where queries are paid in GRT from a billing balance on Arbitrum One. So
+// the entire cost basis flips on a one-line edit to `frontend/src/config/networks.js`, made by
+// somebody thinking about indexing, in a file that has nothing to do with FinOps — and a $0 that
+// was true on Monday is a confidently wrong number on Tuesday, on a dashboard nobody rechecks.
+//
+// The free allowance also does not bill over, it FAILS. So the wrong figure and a member-facing
+// outage arrive together, and the dashboard says everything is free.
+
+const GATEWAY_HOST = 'gateway.thegraph.com'
+const networksFile = readIfExists('frontend/src/config/networks.js')
+// Reuses C2b's deployment sweep — the same files, for the same reason: a tier assertion lives in a
+// committed deployment, and a gate that cannot see deployment files cannot see it change.
+const deploymentText = deploymentConfigs.map((c) => c.text ?? '').join('\n')
+
+if (networksFile && networksFile.includes(GATEWAY_HOST)) {
+  const assertedZero = /FINOPS_THEGRAPH_PLAN_USD:\s*["']?0["']?/.test(deploymentText)
+  if (assertedZero) {
+    fail(
+      'C6',
+      `A subgraph endpoint now points at ${GATEWAY_HOST} (the decentralized network, where queries are paid in GRT), ` +
+        `but a committed deployment still asserts FINOPS_THEGRAPH_PLAN_USD=0. That $0 described Subgraph Studio's free tier.`,
+      'Set FINOPS_THEGRAPH_PLAN_USD to the real modelled spend (and fund the GRT billing balance on Arbitrum One — ' +
+        'the free allowance does not bill over, it fails). See docs/runbooks/finops-operations.md#thegraph-cost.',
+    )
+  }
+}
+
 // ── C5: committed dashboards match a fresh generation ────────────────────────────────────────
 
 try {

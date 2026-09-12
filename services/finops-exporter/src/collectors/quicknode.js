@@ -11,21 +11,15 @@
  *       metered  → credits x FINOPS_QUICKNODE_USD_PER_MCREDIT
  *       flat RPS → FINOPS_QUICKNODE_PLAN_USD, with credits informational only.
  *
- * This collector also serves the sources that have no vendor API at all (Grafana Cloud), where the
- * declared subscription IS the whole model. FR-029: the FinOps system's own cost is catalogued,
- * because a system that hides what it costs is not credible about what anything else costs.
+ * This collector reads QUICKNODE ONLY. The flat-subscription modeller it used to also host now
+ * lives in `flatSubscription.js`: at four sources, a module named for one vendor was reporting
+ * `QUICKNODE_API_KEY is not set` for vendors QuickNode has nothing to do with.
  */
 import { read, notConfigured, unreadable } from '../reading.js'
 
 export function createQuickNodeCollector({ config, fetchImpl = fetch, log = console.warn }) {
   /** @type {number|null} */
   let lastCredits = null
-
-  // Defaulted rather than assumed. `flatSubscriptions` is read on every render (the usage emitter
-  // asks whether a source is a flat subscription before publishing credits against it), so an
-  // absent key here is not a quiet mis-read — it throws inside /metrics and takes the whole scrape
-  // down, blanking twenty-five healthy sources over one missing config branch.
-  const flat = config.flatSubscriptions ?? {}
 
   async function readCredits() {
     const { apiKey, endpoint, prometheusUrl } = config.quicknode
@@ -73,17 +67,7 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
     return credits
   }
 
-  async function collectQuickNode(source) {
-    // Sources with no vendor API: the declared subscription is the entire model. An UNSET price is
-    // `not-configured`, never 0 — see the note on `flatSubscriptions` in config/index.js.
-    if (source.id in flat) {
-      const declared = flat[source.id]
-      if (declared == null) {
-        return notConfigured(`no plan price declared for '${source.id}' — set its FINOPS_*_PLAN_USD (0 asserts a free tier)`)
-      }
-      return read(declared, 'USD', { labels: { basis: 'modelled' } })
-    }
-
+  async function collectQuickNode(_source) {
     const { planMonthlyUsd, usdPerMillionCredits } = config.quicknode
 
     let credits
@@ -110,7 +94,6 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
   }
 
   collectQuickNode._lastCredits = () => lastCredits
-  collectQuickNode._isFlatSubscription = (id) => id in flat
 
   return collectQuickNode
 }
@@ -118,17 +101,14 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
 /**
  * Emit measured credit consumption — the part of the QuickNode picture that is not a model.
  *
- * ONLY FOR THE SOURCE THAT ACTUALLY READS CREDITS. Three catalogue entries share this collector —
- * `quicknode`, `grafana-cloud` and `alphaday-news-api` — because the other two reuse its flat-
- * subscription modeller, not because they have a usage API. The caller iterates every source with
- * `collector === 'quicknode'`, so without this guard QuickNode's credit count would be published
- * three times over, labelled `source="grafana-cloud"` and `source="alphaday-news-api"`: one
- * vendor's measured usage attributed to two others that publish no usage at all. Latent only
- * because credits have never read successfully on this estate — it would have become a fabricated
- * fact the day QuickNode started answering.
+ * Only `quicknode` names this collector now, which is what makes this emitter safe again. It
+ * previously served three sources — the other two reused the flat-subscription modeller that lived
+ * here — and published QuickNode's credit count under `source="grafana-cloud"` and
+ * `source="alphaday-news-api"`: one vendor's measured usage attributed to two that publish none.
+ * Latent only because credits never read successfully here; it would have become a fabricated fact
+ * the day QuickNode started answering. Splitting the modeller out removes the class, not the symptom.
  */
 export function emitQuickNodeUsage(registry, collector, source) {
-  if (collector._isFlatSubscription?.(source.id)) return
   const credits = collector._lastCredits?.()
   if (credits == null) return
   registry.emit(

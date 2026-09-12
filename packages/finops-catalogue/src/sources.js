@@ -539,7 +539,7 @@ const vendors = [
     metric: 'fairwins_finops_cost_usd_total',
     unit: 'USD',
     basis: 'modelled',
-    collector: 'quicknode', // shares the flat-subscription modeller; the vendor exposes no billing API
+    collector: 'flatSubscription', // keyless vendor, no billing API — the declared plan IS the model
     interval: VENDOR,
     credential: null,
     docs: 'finops-operations.md#alphaday-news-cost',
@@ -570,6 +570,28 @@ const vendors = [
       'from the route table.',
   },
   {
+    id: 'thegraph',
+    kind: 'cost',
+    status: 'live',
+    label: 'The Graph (subgraph queries)',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'modelled',
+    collector: 'flatSubscription',
+    interval: VENDOR,
+    credential: null,
+    docs: 'finops-operations.md#thegraph-cost',
+    meaning:
+      'Subgraph query spend, MODELLED from the declared plan rate. THE TIER IS WHICH ENDPOINT THE APP CALLS, not ' +
+      'a setting: `api.studio.thegraph.com` is Subgraph Studio, the free development tier, where the cost really ' +
+      'is $0 and no GRT is consumed. Publishing to the decentralized network and switching a `subgraphUrl` to ' +
+      '`gateway.thegraph.com` changes that in one edit — query fees are then paid in GRT from a billing balance ' +
+      'held on ARBITRUM ONE (GRT on Ethereum L1 does not pay them). The free allowance does not bill over, it ' +
+      'FAILS, so this line is about a dependency as much as a dollar. `check:finops` C6 fails if a gateway URL ' +
+      'appears while the plan price is still asserted at zero, because that transition is a one-character edit ' +
+      'that would otherwise leave a confidently wrong $0 on the dashboard.',
+  },
+  {
     id: 'grafana-cloud',
     kind: 'cost',
     status: 'live',
@@ -577,7 +599,7 @@ const vendors = [
     metric: 'fairwins_finops_cost_usd_total',
     unit: 'USD',
     basis: 'modelled',
-    collector: 'quicknode', // shares the flat-subscription modeller; no vendor API is polled
+    collector: 'flatSubscription', // no vendor API is polled; the declared plan IS the model
     interval: VENDOR,
     credential: null,
     docs: 'finops-operations.md#self-cost',

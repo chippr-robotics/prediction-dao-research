@@ -193,6 +193,11 @@ export function loadConfig(env = process.env) {
     flatSubscriptions: {
       'grafana-cloud': num(env.FINOPS_GRAFANA_PLAN_USD, null),
       'alphaday-news-api': num(env.FINOPS_ALPHADAY_PLAN_USD, 0),
+      // The Graph. Null by default like everything else: the free tier here is a property of WHICH
+      // ENDPOINT the app calls (Studio vs. the decentralized gateway), and that can change in a
+      // one-line edit to networks.js, so it must be asserted rather than assumed. `check:finops` C6
+      // refuses a zero assertion once a gateway.thegraph.com URL exists.
+      thegraph: num(env.FINOPS_THEGRAPH_PLAN_USD, null),
     },
 
     referral: {

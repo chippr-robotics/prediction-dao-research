@@ -347,6 +347,16 @@ services:
       # reporting `not-configured`, which is honest but indistinguishable on a panel from the
       # QuickNode source beside it that is genuinely broken.
       FINOPS_GRAFANA_PLAN_USD: "0"
+      # The Graph: an asserted zero, and the evidence is IN THE REPO rather than on a billing page.
+      # Every configured subgraphUrl in frontend/src/config/networks.js points at
+      # api.studio.thegraph.com — Subgraph Studio, the free development tier, which consumes no GRT.
+      # This is therefore a property of the endpoint we call, not a guess about an account.
+      #
+      # It stops being true the moment a subgraphUrl becomes gateway.thegraph.com: query fees are
+      # then paid in GRT from a billing balance on ARBITRUM ONE (L1 GRT does not pay them), and the
+      # free allowance FAILS rather than billing over. `check:finops` C6 fails on exactly that
+      # combination, so this line cannot quietly outlive the tier it describes.
+      FINOPS_THEGRAPH_PLAN_USD: "0"
       # V8 SIZES ITS HEAP FROM HOST RAM, NOT THE CGROUP. Without this, Node looks at the VM's
       # ~2 GB and targets a heap far above the container ceiling, so it feels no pressure to
       # collect and simply grows until the kernel kills it — which is precisely what happened

@@ -40,6 +40,7 @@ import { createGcpBillingCollector, emitGcpDetail } from './collectors/gcpBillin
 import { createCloudflareCollector, emitCloudflareUsage } from './collectors/cloudflare.js'
 import { createQuickNodeCollector, emitQuickNodeUsage } from './collectors/quicknode.js'
 import { createPinataCollector, emitPinataUsage } from './collectors/pinata.js'
+import { createFlatSubscriptionCollector } from './collectors/flatSubscription.js'
 import { createGatewayUsageCollector, emitGatewayUsage } from './collectors/gateway.js'
 import { createFxReader } from './collectors/fx.js'
 import { createExecutorNonceCollector } from './executorNonce.js'
@@ -100,6 +101,7 @@ export function createApp(overrides = {}) {
     cloudflare,
     quicknode,
     pinata,
+    flatSubscription: createFlatSubscriptionCollector({ config }),
     gateway: gatewayUsage,
     /** `planned` sources never reach a collector, but a named one keeps the catalogue self-consistent. */
     none: async () => ({ state: 'not-configured', value: null, unit: null, at: Date.now(), labels: {}, reason: 'not yet live' }),

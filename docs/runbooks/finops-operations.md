@@ -318,6 +318,39 @@ cost panels, and the one that says where the QuickNode account's shared 50 req/s
   table) and re-bounded by the collector, which drops anything outside the expected sets rather
   than trusting the scrape target with a cardinality promise.
 
+### thegraph-cost
+
+**The tier is which endpoint the app calls — it is not a setting anywhere.**
+
+| endpoint in `frontend/src/config/networks.js` | what it is | what it costs |
+|---|---|---|
+| `api.studio.thegraph.com/...` | Subgraph Studio, the free **development** tier | $0, no GRT consumed |
+| `gateway.thegraph.com/api/<key>/...` | the **decentralized network** | query fees in GRT, from a billing balance on **Arbitrum One** |
+
+Today every configured `subgraphUrl` is a Studio endpoint, so `FINOPS_THEGRAPH_PLAN_USD=0` on the
+gateway node is an asserted zero whose evidence is in the repo rather than on a billing page — a
+property of the endpoint we call, not a guess about an account.
+
+**Two things about the paid tier that are easy to get wrong.** GRT held on **Ethereum L1 does not
+pay query fees**; the billing balance is an Arbitrum One contract, funded through the Studio billing
+page. And the free allowance **does not bill over — it fails**: exceeding it makes queries return
+errors, so the day this line becomes wrong is also the day subgraph-backed surfaces start degrading.
+On Polygon that would arrive on top of the subgraph already indexing a dead registry.
+
+#### If you publish to the decentralized network
+
+`check:finops` **C6** fails the build if any `subgraphUrl` contains `gateway.thegraph.com` while a
+committed deployment still asserts `FINOPS_THEGRAPH_PLAN_USD=0`. That rule exists because this
+transition is a one-line edit to a networks file, made by somebody thinking about indexing, that
+silently invalidates a cost figure on a dashboard nobody rechecks. When it fires:
+
+1. Fund the GRT billing balance on **Arbitrum One** (Studio → Billing).
+2. Set `FINOPS_THEGRAPH_PLAN_USD` to the modelled monthly spend on the gateway node.
+3. Consider promoting this source from a flat subscription to a real read: the billing balance is an
+   on-chain balance on a chain this exporter can already reach, which makes it a **prepaid pool** —
+   the shape that gets burn-rate and runway alerting for free (FR-015). It is deliberately NOT that
+   today, because a pool with no balance and no burn would alert on nothing while looking monitored.
+
 ### self-cost
 
 What this system costs: the Grafana Cloud plan plus the BigQuery query spend the exporter incurs.
