@@ -295,6 +295,62 @@ function reviewedEntryMatches(reviewedText, entry) {
   return { ok: true };
 }
 
+/* ------------------------------------------------- X-08: can this token write? */
+
+/**
+ * X-08 — a green dry run must not mean "this credential can apply".
+ *
+ * Field evidence from the first real run (#1520): a token carrying `repo` but not `security_events`
+ * READS the alert list perfectly well and 403s only on the PATCH. So the dry run passes, prints a
+ * clean selection, and the scope gap does not surface until the write — where the natural reading of
+ * a green dry run is that the credential is good.
+ *
+ * That would be a mild annoyance on its own. What makes it worth a gate is the state it can leave
+ * behind: the apply loop had no error handling, so a 403 on the SEVENTH alert would leave six
+ * dismissed and throw. On the next run the open set is 6 where `expectedCount` is 12, X-05 fires,
+ * and the tool refuses to finish the job it half did. The operator is then stuck between an
+ * unfinished dismissal and editing a reviewed plan. We got away with it because the failing token
+ * failed on the first PATCH and wrote nothing.
+ *
+ * GitHub advertises a classic PAT's scopes on every response (`x-oauth-scopes`), so for that case
+ * the gap is knowable BEFORE any write. Fine-grained and app tokens send no such header, and
+ * "unknown" is reported as unknown rather than guessed either way — the third state, same as
+ * everywhere else here.
+ */
+function describeWriteCapability(headers) {
+  const raw = headers && typeof headers.get === 'function' ? headers.get('x-oauth-scopes') : null;
+  if (!raw || !raw.trim()) {
+    return {
+      state: 'unknown',
+      reason:
+        'this token does not advertise its scopes (fine-grained or app tokens do not), so whether it ' +
+        'may dismiss cannot be known until the first write',
+    };
+  }
+  const scopes = raw.split(',').map((x) => x.trim()).filter(Boolean);
+  if (scopes.includes('security_events')) {
+    return { state: 'can-write', reason: `token carries \`security_events\`` };
+  }
+  return {
+    state: 'cannot-write',
+    reason:
+      `token carries [${scopes.join(', ')}] but not \`security_events\`. Reading alerts only needs ` +
+      '`repo`, which is why the dry run passed — the PATCH will 403',
+  };
+}
+
+/** Probe the alerts endpoint purely to read its scope headers back. */
+async function probeWriteCapability({ repo, token, fetchImpl = globalThis.fetch }) {
+  const res = await fetchImpl(`https://api.github.com/repos/${repo}/dependabot/alerts?state=open&per_page=1`, {
+    headers: {
+      accept: 'application/vnd.github+json',
+      authorization: `Bearer ${token}`,
+      'x-github-api-version': '2022-11-28',
+    },
+  });
+  return describeWriteCapability(res.headers);
+}
+
 /* ------------------------------------------------------------------ write */
 
 async function dismissAlert({ repo, token, number, entry, fetchImpl = globalThis.fetch }) {
@@ -400,18 +456,56 @@ async function main(argv) {
     }
   }
 
-  const applied = [];
+  // X-08 — refuse before writing anything when the token is KNOWN not to be able to.
+  let capability = null;
   if (apply && violations.length === 0) {
-    for (const { entry, eligible } of selections) {
+    try {
+      capability = await probeWriteCapability({
+        repo: process.env.GITHUB_REPOSITORY || 'chippr-robotics/prediction-dao-research',
+        token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+      });
+    } catch {
+      capability = { state: 'unknown', reason: 'the scope probe itself failed' };
+    }
+    if (capability.state === 'cannot-write') {
+      violations.push(
+        v('X-08', `this token cannot dismiss: ${capability.reason}. Nothing was attempted.`),
+      );
+    }
+  }
+
+  const applied = [];
+  let writeFailure = null;
+  if (apply && violations.length === 0) {
+    outer: for (const { entry, eligible } of selections) {
       for (const alert of eligible) {
-        await dismissAlert({
-          repo: process.env.GITHUB_REPOSITORY || 'chippr-robotics/prediction-dao-research',
-          token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
-          number: alert.number,
-          entry,
-        });
-        applied.push(alert.number);
+        try {
+          await dismissAlert({
+            repo: process.env.GITHUB_REPOSITORY || 'chippr-robotics/prediction-dao-research',
+            token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+            number: alert.number,
+            entry,
+          });
+          applied.push(alert.number);
+        } catch (err) {
+          // Stop at the first failure rather than hammering, and make the half-done state legible
+          // — silence here is what turns a partial apply into a plan that can never be completed.
+          writeFailure = { number: alert.number, message: err.message };
+          break outer;
+        }
       }
+    }
+    if (writeFailure) {
+      violations.push(
+        v(
+          'X-08',
+          `stopped at alert #${writeFailure.number}: ${writeFailure.message}\n` +
+            `      ${applied.length} alert(s) WERE dismissed before this: ${applied.join(', ') || 'none'}.\n` +
+            '      Those are permanent. The remaining ones are still open, and because the open set is now ' +
+            `smaller than \`expectedCount\`, a re-run will fail X-05 until the plan's count is corrected ` +
+            'in a change that is merged (X-07). Fix the credential first, then adjust the count once.',
+        ),
+      );
     }
   }
 
@@ -466,6 +560,8 @@ function report({ violations, json, selections = [], apply = false, applied = []
 }
 
 module.exports = {
+  describeWriteCapability,
+  probeWriteCapability,
   fetchReviewedPlan,
   reviewedEntryMatches,
   REVIEW_BRANCH,

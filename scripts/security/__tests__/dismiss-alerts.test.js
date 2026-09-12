@@ -26,6 +26,8 @@ const {
   reviewedEntryMatches,
   fetchReviewedPlan,
   REVIEW_BRANCH,
+  describeWriteCapability,
+  probeWriteCapability,
 } = require('../dismiss-alerts.js');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
@@ -278,4 +280,49 @@ test('X-07 reads the plan from the review branch, not the default branch', async
   });
   assert.match(seen, /scripts\/security\/dismissals\.json/);
   assert.match(seen, new RegExp(`ref=${REVIEW_BRANCH}`));
+});
+
+/* ------------------------------------- X-08: can this token actually write? */
+
+/**
+ * From the first real run of #1520: a token carrying `repo` but not `security_events` reads the
+ * alert list fine and 403s only on the PATCH, so a GREEN DRY RUN said nothing about whether the
+ * credential could apply.
+ *
+ * The reason that is a gate and not a note is the state a late failure leaves behind. The apply
+ * loop had no error handling, so a 403 on the seventh alert would leave six permanently dismissed
+ * and throw; the next run then sees 6 open against an `expectedCount` of 12, X-05 fires, and the
+ * tool refuses to finish what it half did. That was survived only because the failing token failed
+ * on the FIRST write.
+ */
+const hdr = (value) => ({ get: (k) => (k.toLowerCase() === 'x-oauth-scopes' ? value : null) });
+
+test('X-08 spots a classic PAT that can read but not dismiss', () => {
+  const { state, reason } = describeWriteCapability(hdr('repo, read:org, gist'));
+  assert.equal(state, 'cannot-write');
+  assert.match(reason, /security_events/);
+  assert.match(reason, /dry run passed/);
+});
+
+test('X-08 accepts a token that carries security_events', () => {
+  assert.equal(describeWriteCapability(hdr('repo, security_events')).state, 'can-write');
+});
+
+test('X-08 reports unknown — never "fine" — when scopes are not advertised', () => {
+  for (const value of [null, '', '   ']) {
+    const { state, reason } = describeWriteCapability(hdr(value));
+    assert.equal(state, 'unknown', `scopes ${JSON.stringify(value)} must not be read as permission`);
+    assert.match(reason, /cannot be known/);
+  }
+  // A header object that does not support get() at all is also unknown, not a crash.
+  assert.equal(describeWriteCapability(undefined).state, 'unknown');
+});
+
+test('X-08 probes the alerts endpoint and reads its scope header back', async () => {
+  const cap = await probeWriteCapability({
+    repo: 'o/r',
+    token: 't',
+    fetchImpl: async () => ({ headers: hdr('repo') }),
+  });
+  assert.equal(cap.state, 'cannot-write');
 });
