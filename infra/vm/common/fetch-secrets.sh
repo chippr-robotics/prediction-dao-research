@@ -199,6 +199,17 @@ case "$ROLE" in
     emit "$FO" RPC_URL_PRIMARY_137        QUICKNODE_POLYGON_API     latest optional \
       "chain 137 reads fall back to the public endpoints in RPC_URLS_137"
     emit "$FO" POLYMARKET_API_KEY         POLYMARKET_API_KEY        latest optional
+    # A THIRD Pinata credential, and the distinction is the point. `fairwins-pinata-jwt` (workstation,
+    # `publish` profile) and the SPA's VITE_PINATA_JWT both authorise pinJSONToIPFS/pinFileToIPFS —
+    # they can WRITE to a member-facing store. Neither may ever land here: the exporter's guarantee is
+    # that it holds nothing capable of changing anything (FR-026), and the guard below only catches
+    # things named like signing keys, so a pinning JWT would sail straight past it.
+    #
+    # finops-pinata-read-jwt must be a Pinata key scoped to data/userPinnedDataTotal AND NOTHING
+    # ELSE. Absent ⇒ the pinata source reads not-configured, which costs a storage figure and
+    # nothing else. Create it per docs/runbooks/finops-operations.md#pinata-cost.
+    emit "$FO" FINOPS_PINATA_READ_JWT     finops-pinata-read-jwt    latest optional \
+      "the pinata cost/usage source reads not-configured"
 
     log "alloy container:"
     emit "$AY" GRAFANA_CLOUD_PROM_TOKEN   finops-grafana-cloud-token latest optional
