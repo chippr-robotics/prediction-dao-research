@@ -92,6 +92,56 @@ total including it is partial.
 3. If the source is genuinely retired, set its `status` to `retired` in the catalogue and
    regenerate. Do not leave a dead source alerting; that is how an alert channel gets muted.
 
+### the exporter is not serving at all
+
+**Every panel on every FinOps dashboard reads "no data", and `source-health` alerts on nothing —
+because nothing is being scraped.** This is a different failure from any single source going
+unreadable, and it looks *quieter*, not louder: the thing that publishes metrics is the thing that
+died, so there is no series anywhere carrying the news.
+
+Confirm it in this order — each step distinguishes it from a failure that only *looks* like it:
+
+```bash
+# 1. Is the container actually up, or up-and-restarting? RestartCount is the tell; a crash-loop
+#    reports `Up 20 seconds` forever and never reaches `(healthy)`.
+sudo docker inspect fairwins-gateway-finops \
+  --format '{{.State.Status}} restarts={{.RestartCount}} oom={{.State.OOMKilled}} exit={{.State.ExitCode}}'
+
+# 2. Is the port open INSIDE the shared namespace? A host-side `ss` shows nothing either way —
+#    the exporter binds loopback in the gateway's netns, so ask from in there.
+sudo docker inspect fairwins-gateway-finops --format '{{json .State.Health.Log}}' | tail -c 600
+
+# 3. Kernel OOM kills name the cgroup and the RSS at death. `anon-rss` landing on exactly the
+#    mem_limit means it grew into the ceiling rather than spiking past it.
+sudo dmesg -T | grep -i 'oom-kill\|Killed process' | tail
+```
+
+**If it is OOM:** the exporter's steady state is ~100 MB. A process dying at its `mem_limit` is
+almost never "the limit is too low" — it is a collector accumulating something unbounded, and the
+overwhelmingly likely candidate is a **log scan whose filter is too wide**. `scanLogs` now refuses
+past 50,000 accumulated entries and names the offending `address`/`topics` in the reason, so the
+source reports `unreadable` with a usable message instead of taking the process down. If you see
+that message, fix the filter — do not raise the cap.
+
+*This happened.* The x402 collector asked Polygon USDC for every `Transfer` and filtered in JS:
+~1.1M logs, ~635 MB of JSON, inside a 192 MB container. It was killed 5,966 consecutive times,
+always **before `app.listen()`**, so the exporter never served a single scrape in its life and every
+panel — including the twenty-four sources that were perfectly healthy — read "no data".
+
+Two properties now stop that shape recurring, and both matter independently:
+
+- **The listener comes up before the first collection**, so a slow or hanging collector can no
+  longer keep the exporter dark. An uncollected source reports `unreadable`, which is honest and
+  renderable; a closed port is neither.
+- **Every collection is deadline-bounded** (120s). A vendor that accepts a connection and goes
+  quiet used to hold its source's in-flight slot forever, so that source was never polled again
+  while everything else looked fine — the one failure the staleness alert cannot see, because
+  nothing ever writes a reading for it to be stale about.
+
+`NODE_OPTIONS=--max-old-space-size` is set on the container for a related reason: **V8 sizes its
+heap from host RAM, not the cgroup**. Without it Node looks at the VM's ~2 GB, targets a heap far
+above the container ceiling, and feels no pressure to collect before the kernel intervenes.
+
 ### fees-waived
 
 **Platform fees are being waived (no treasury configured).**
@@ -202,6 +252,12 @@ The usage is real and is exported separately as `vendor_usage`. Token needs Zone
 If the plan includes the enterprise `/exporter/prometheus` endpoint, set `QUICKNODE_PROMETHEUS_URL`
 — it is the vendor's own metrics and is preferred over parsing the usage JSON.
 
+**The Admin API answers errors with HTTP 200 and an `error` field**, so a reachable endpoint proves
+nothing about the account. That envelope is now reported verbatim (through the Reading redactor)
+rather than being folded into the generic "no recognisable credit field", which is a true statement
+that sends you looking for a parser bug while the vendor is saying something specific about the
+account. If this source is `unreadable` with a vendor message, the message is the answer.
+
 ### gateway-upstream-usage
 
 Measured request counts from the relay-gateway (spec 106, #1447): per assurance tier and per
@@ -231,6 +287,18 @@ Catalogued on purpose — a FinOps system that hides its own cost is not credibl
 The free tier really is $0 — but assert it by setting `FINOPS_GRAFANA_PLAN_USD=0`. Left unset, the
 source reports `not-configured`, because "we confirmed the free tier" and "nobody ever set this" are
 different facts and a defaulted zero renders as the first while meaning the second.
+
+**Asserted on the gateway node 2026-09-11** (operator-confirmed free tier). It had been unset since
+the exporter shipped, which was honest and also indistinguishable, on the panel, from the QuickNode
+source beside it that was genuinely broken — which is why the detail dashboards now carry their own
+`Source health` table rather than making the reader go to the overview to tell the two apart.
+
+**Every source that reuses the flat-subscription modeller must appear in `flatSubscriptions`** in
+`services/finops-exporter/src/config/index.js`. A missing key does not mean "no price declared" — it
+falls through to the QuickNode credit path and reports `not-configured` citing `QUICKNODE_API_KEY`,
+a message about a vendor it has nothing to do with. `alphaday-news-api` shipped that way with spec
+109. Alphaday is also the one entry whose default IS `0` rather than `null`, and only because its
+vendor is keyless: there is no account, so there is no tier it could silently be on.
 
 It stops being zero the moment the series budget is exceeded, which is what the cardinality rules
 exist to prevent.

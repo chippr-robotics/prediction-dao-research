@@ -21,6 +21,12 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
   /** @type {number|null} */
   let lastCredits = null
 
+  // Defaulted rather than assumed. `flatSubscriptions` is read on every render (the usage emitter
+  // asks whether a source is a flat subscription before publishing credits against it), so an
+  // absent key here is not a quiet mis-read — it throws inside /metrics and takes the whole scrape
+  // down, blanking twenty-five healthy sources over one missing config branch.
+  const flat = config.flatSubscriptions ?? {}
+
   async function readCredits() {
     const { apiKey, endpoint, prometheusUrl } = config.quicknode
 
@@ -43,6 +49,19 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
     if (!res.ok) throw new Error(`quicknode admin API HTTP ${res.status}`)
 
     const body = await res.json()
+
+    /**
+     * THE VENDOR ANSWERS ERRORS WITH HTTP 200 AND AN `error` FIELD, so `res.ok` above proves only
+     * that the request arrived. Reported verbatim (through the Reading's redactor), because the
+     * generic "no recognisable credit field" below is a true statement that sends the reader to
+     * the wrong place: this estate spent weeks with the key wired and a message that read like a
+     * parser bug when the vendor was plainly saying something specific about the account.
+     */
+    if (body?.error) {
+      const detail = typeof body.error === 'string' ? body.error : JSON.stringify(body.error)
+      throw new Error(`quicknode admin API returned an error: ${detail}`)
+    }
+
     // The Admin API's exact field naming is not pinned by public docs, so several plausible shapes
     // are accepted — and an UNRECOGNISED shape is an error, never a zero. A zero here would report
     // "no RPC usage" for an estate that is definitely making RPC calls.
@@ -57,12 +76,12 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
   async function collectQuickNode(source) {
     // Sources with no vendor API: the declared subscription is the entire model. An UNSET price is
     // `not-configured`, never 0 — see the note on `flatSubscriptions` in config/index.js.
-    if (source.id in config.flatSubscriptions) {
-      const flat = config.flatSubscriptions[source.id]
-      if (flat == null) {
+    if (source.id in flat) {
+      const declared = flat[source.id]
+      if (declared == null) {
         return notConfigured(`no plan price declared for '${source.id}' — set its FINOPS_*_PLAN_USD (0 asserts a free tier)`)
       }
-      return read(flat, 'USD', { labels: { basis: 'modelled' } })
+      return read(declared, 'USD', { labels: { basis: 'modelled' } })
     }
 
     const { planMonthlyUsd, usdPerMillionCredits } = config.quicknode
@@ -91,12 +110,25 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
   }
 
   collectQuickNode._lastCredits = () => lastCredits
+  collectQuickNode._isFlatSubscription = (id) => id in flat
 
   return collectQuickNode
 }
 
-/** Emit measured credit consumption — the part of the QuickNode picture that is not a model. */
+/**
+ * Emit measured credit consumption — the part of the QuickNode picture that is not a model.
+ *
+ * ONLY FOR THE SOURCE THAT ACTUALLY READS CREDITS. Three catalogue entries share this collector —
+ * `quicknode`, `grafana-cloud` and `alphaday-news-api` — because the other two reuse its flat-
+ * subscription modeller, not because they have a usage API. The caller iterates every source with
+ * `collector === 'quicknode'`, so without this guard QuickNode's credit count would be published
+ * three times over, labelled `source="grafana-cloud"` and `source="alphaday-news-api"`: one
+ * vendor's measured usage attributed to two others that publish no usage at all. Latent only
+ * because credits have never read successfully on this estate — it would have become a fabricated
+ * fact the day QuickNode started answering.
+ */
 export function emitQuickNodeUsage(registry, collector, source) {
+  if (collector._isFlatSubscription?.(source.id)) return
   const credits = collector._lastCredits?.()
   if (credits == null) return
   registry.emit(

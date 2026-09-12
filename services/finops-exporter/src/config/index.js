@@ -152,14 +152,27 @@ export function loadConfig(env = process.env) {
     /**
      * Flat, declared subscriptions with no vendor API at all.
      *
-     * Defaults to null, NOT 0. Grafana Cloud's free tier really does cost $0, but "the operator
+     * EVERY SOURCE WHOSE CATALOGUE ENTRY NAMES THE `quicknode` COLLECTOR AS ITS FLAT-SUBSCRIPTION
+     * MODELLER MUST APPEAR HERE. A missing key is not a missing price — it falls through to the
+     * QuickNode credit path and reports `not-configured` citing `QUICKNODE_API_KEY`, a message
+     * about a vendor the source has nothing to do with. `alphaday-news-api` shipped that way with
+     * spec 109 and read as an unwired QuickNode account for its whole life.
+     *
+     * Grafana Cloud defaults to null, NOT 0. Its free tier really does cost $0, but "the operator
      * confirmed we are on the free tier" and "nobody ever set this" are different facts, and a
-     * defaulted 0 renders as the former while meaning the latter. Set
-     * `FINOPS_GRAFANA_PLAN_USD=0` explicitly to assert the free tier; until then the source reports
-     * `not-configured`, consistent with how every other unset plan price behaves.
+     * defaulted 0 renders as the former while meaning the latter. Set `FINOPS_GRAFANA_PLAN_USD=0`
+     * explicitly to assert the free tier; until then the source reports `not-configured`,
+     * consistent with how every other unset plan price behaves.
+     *
+     * Alphaday is the one case where the default IS 0, and the reason is that the assertion has
+     * nowhere else to live: spec 109's vendor is KEYLESS by construction — there is no account,
+     * so there is no tier it could silently be on, and the catalogue entry itself declares the free
+     * tier. "Nobody set this" and "we are on the free tier" collapse into the same fact when the
+     * integration has no credential to configure.
      */
     flatSubscriptions: {
       'grafana-cloud': num(env.FINOPS_GRAFANA_PLAN_USD, null),
+      'alphaday-news-api': num(env.FINOPS_ALPHADAY_PLAN_USD, 0),
     },
 
     referral: {
