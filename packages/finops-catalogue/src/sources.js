@@ -508,6 +508,30 @@ const vendors = [
       'plan the modelled figure is the flat subscription and credit usage is informational only.',
   },
   {
+    id: 'pinata',
+    kind: 'cost',
+    status: 'live',
+    label: 'Pinata (IPFS pinning)',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'modelled',
+    collector: 'pinata',
+    interval: VENDOR,
+    // A SEPARATE, READ-SCOPED key — never the pinning JWT, which is a write credential and has no
+    // business in a service that is read-only by construction (FR-026).
+    credential: 'finops-pinata-read-jwt',
+    docs: 'finops-operations.md#pinata-cost',
+    meaning:
+      'Pinata spend MODELLED from the declared plan subscription; storage is read separately and exported as ' +
+      'measured vendor usage. This is a PAID vendor on the member write path — wager creation, open challenges ' +
+      'and encrypted backup pin JSON with no fallback, and mini-app packages are published here under CIDs that ' +
+      'are keccak-committed on chain — so an outage is a member-facing incident, not a reporting one. Neither ' +
+      'check:finops discovery route could ever have found it (no FeeRouter serviceId, no gateway payee env: the ' +
+      'money flows the other way), which is why it sat uncatalogued while the vendor workbook recorded "we pay ' +
+      'them" the whole time. The vendor publishes no billing API on our plan, so the dollar figure is arithmetic ' +
+      'over a declared rate and the bytes beside it are the fact.',
+  },
+  {
     id: 'alphaday-news-api',
     kind: 'cost',
     status: 'live',

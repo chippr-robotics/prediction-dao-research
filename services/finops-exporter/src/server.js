@@ -39,6 +39,7 @@ import { createPoolsCollector, emitPoolSeries, emitExecutorNonce } from './colle
 import { createGcpBillingCollector, emitGcpDetail } from './collectors/gcpBilling.js'
 import { createCloudflareCollector, emitCloudflareUsage } from './collectors/cloudflare.js'
 import { createQuickNodeCollector, emitQuickNodeUsage } from './collectors/quicknode.js'
+import { createPinataCollector, emitPinataUsage } from './collectors/pinata.js'
 import { createGatewayUsageCollector, emitGatewayUsage } from './collectors/gateway.js'
 import { createFxReader } from './collectors/fx.js'
 import { createExecutorNonceCollector } from './executorNonce.js'
@@ -81,6 +82,7 @@ export function createApp(overrides = {}) {
   })
   const cloudflare = createCloudflareCollector({ config, fetchImpl: overrides.fetchImpl, log })
   const quicknode = createQuickNodeCollector({ config, fetchImpl: overrides.fetchImpl, log })
+  const pinata = createPinataCollector({ config, fetchImpl: overrides.fetchImpl, log })
   const gatewayUsage = createGatewayUsageCollector({ config, fetchImpl: overrides.fetchImpl })
 
   // The executor's nonce, read on the pools schedule (#1539). Its state is shared with the emitter
@@ -97,6 +99,7 @@ export function createApp(overrides = {}) {
     gcpBilling,
     cloudflare,
     quicknode,
+    pinata,
     gateway: gatewayUsage,
     /** `planned` sources never reach a collector, but a named one keeps the catalogue self-consistent. */
     none: async () => ({ state: 'not-configured', value: null, unit: null, at: Date.now(), labels: {}, reason: 'not yet live' }),
@@ -138,6 +141,7 @@ export function createApp(overrides = {}) {
       if (source.collector === 'gcpBilling') emitGcpDetail(registry, gcpBilling, source)
       if (source.collector === 'cloudflare') emitCloudflareUsage(registry, cloudflare, source)
       if (source.collector === 'quicknode') emitQuickNodeUsage(registry, quicknode, source)
+      if (source.collector === 'pinata') emitPinataUsage(registry, pinata, source)
       if (source.collector === 'gateway') emitGatewayUsage(registry, gatewayUsage, source)
     }
 

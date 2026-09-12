@@ -564,12 +564,68 @@
         "uid": "${datasource}"
       },
       "type": "timeseries",
+      "title": "Pinata (IPFS pinning) (modelled)",
+      "description": "Pinata spend MODELLED from the declared plan subscription; storage is read separately and exported as measured vendor usage. This is a PAID vendor on the member write path — wager creation, open challenges and encrypted backup pin JSON with no fallback, and mini-app packages are published here under CIDs that are keccak-committed on chain — so an outage is a member-facing incident, not a reporting one. Neither check:finops discovery route could ever have found it (no FeeRouter serviceId, no gateway payee env: the money flows the other way), which is why it sat uncatalogued while the vendor workbook recorded \"we pay them\" the whole time. The vendor publishes no billing API on our plan, so the dollar figure is arithmetic over a declared rate and the bytes beside it are the fact.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 49
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "noValue": "no value published — see “Source health” for whether this is unreadable or not-configured",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "fairwins_finops_cost_usd_total{source=\"pinata\"}",
+          "legendFormat": "{{unit}} ({{basis}})"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "type": "timeseries",
       "title": "Alphaday news API (modelled)",
       "description": "The token-news vendor behind the relay-gateway news proxy (spec 109). Keyless public API on a free tier: the modelled figure is $0 by declared plan rate, and the entry exists so the dependency is VISIBLE — if Alphaday ever prices the tier, this line is where the change lands rather than a surprise (research R7). No revenue entry pairs with it: the module carries no fee, no referral, no payee env, so C2b has nothing to claim. Gateway request volume shows in gateway-upstream-usage under the news upstream label.",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 49
       },
       "fieldConfig": {
@@ -614,7 +670,7 @@
       ]
     },
     {
-      "id": 13,
+      "id": 14,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -625,8 +681,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 49
+        "x": 0,
+        "y": 57
       },
       "fieldConfig": {
         "defaults": {

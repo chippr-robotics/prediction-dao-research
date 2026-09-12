@@ -258,6 +258,45 @@ rather than being folded into the generic "no recognisable credit field", which 
 that sends you looking for a parser bug while the vendor is saying something specific about the
 account. If this source is `unreadable` with a vendor message, the message is the answer.
 
+### pinata-cost
+
+**A paid vendor on the member write path, catalogued late.** Wager creation, open challenges and
+encrypted data backup all pin JSON here with **no fallback**, and mini-app packages are published
+under CIDs that are keccak-committed on chain. The vendor workbook recorded "we pay them (not
+catalogued as a cost source)" from the day of the audit; neither `check:finops` discovery route
+could find it, because it registers no FeeRouter `serviceId` and no gateway payee env — the money
+flows the other way, and both routes look for money going out to someone else.
+
+**Storage is measured; the dollar figure is not.** `GET /data/userPinnedDataTotal` returns
+`pin_count`, `pin_size_total` and `pin_size_with_replications_total` — never money. Both size
+figures are published under separate `metric` labels rather than electing one: which of them a plan
+bills against is the vendor'"'"'s business, and quietly picking would put an unstated assumption inside
+a cost system. Set `FINOPS_PINATA_PLAN_USD` to model the cost; unset reports `not-configured`, and
+here that default is more than doctrine — **Pinata is a paid vendor, so a defaulted `0` would not be
+a cautious placeholder, it would be a figure known to be wrong.**
+
+#### The credential is NOT the pinning JWT
+
+> `PINATA_JWT` (workstation, `publish` profile) and `VITE_PINATA_JWT` (SPA runtime) authorise
+> `pinJSONToIPFS` and `pinFileToIPFS`. They can **write** to a member-facing store. Neither may ever
+> reach the exporter, whose entire guarantee is that it holds nothing that can change anything
+> (FR-026) — and note the `fetch-secrets.sh` boot guard only matches names that look like signing
+> keys, so a pinning JWT would pass it silently.
+
+Provision a **third** key instead:
+
+1. Pinata dashboard → **API Keys** → New Key. Turn **admin off**. Enable
+   **only** `data/userPinnedDataTotal`. Nothing else — not `pinList`, not any `pinning/*` scope.
+2. Store it as Secret Manager `finops-pinata-read-jwt`; `fetch-secrets.sh` emits it to the exporter
+   as `FINOPS_PINATA_READ_JWT` (optional — absent is `not-configured`, not an outage).
+3. Restart the whole stack, never one container: `systemctl restart fairwins-stack@gateway`.
+
+**A 401/403 on this source almost certainly means SCOPE, not a dead key**, which is why the
+collector says so in the reason rather than reporting a bare "unauthorized". This vendor has already
+burned that exact distinction in production: on 2026-08-30 a key valid for `pinFileToIPFS` but not
+`pinJSONToIPFS` authenticated correctly, passed `testAuthentication`, and broke every member write.
+Check what the key is scoped for before rotating it.
+
 ### gateway-upstream-usage
 
 Measured request counts from the relay-gateway (spec 106, #1447): per assurance tier and per

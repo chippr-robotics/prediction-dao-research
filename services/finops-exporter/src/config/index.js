@@ -138,6 +138,26 @@ export function loadConfig(env = process.env) {
     gateway: {
       metricsUrl: env.FINOPS_GATEWAY_METRICS_URL || null,
     },
+    /**
+     * Pinata / IPFS.
+     *
+     * `readJwt` is deliberately NOT `PINATA_JWT`. That variable (and its `VITE_` twin on the SPA)
+     * authorises `pinJSONToIPFS`/`pinFileToIPFS` — a WRITE credential to a member-facing store, in
+     * a service whose whole guarantee is that it holds nothing that can change anything (FR-026).
+     * This wants a second Pinata key scoped to `data/userPinnedDataTotal` and nothing else.
+     *
+     * The name is distinct on purpose: `fetch-secrets.sh` emits by name, so two similar variables
+     * are two audit trails, and nobody wires the wrong one by reaching for the one that is already
+     * in the environment.
+     */
+    pinata: {
+      readJwt: env.FINOPS_PINATA_READ_JWT || null,
+      endpoint: env.PINATA_API_URL || 'https://api.pinata.cloud',
+      // Unset ⇒ `not-configured`, never 0. Pinata is a PAID vendor — a defaulted zero here would
+      // not be a cautious placeholder, it would be an assertion that is known to be false.
+      planMonthlyUsd: num(env.FINOPS_PINATA_PLAN_USD, null),
+    },
+
     quicknode: {
       apiKey: env.QUICKNODE_API_KEY || null,
       endpoint: env.QUICKNODE_API_URL || 'https://api.quicknode.com/v0',
@@ -210,6 +230,7 @@ export function describeConfig(config) {
     credentials: {
       cloudflare: Boolean(config.cloudflare.apiToken && config.cloudflare.zoneTag),
       quicknode: Boolean(config.quicknode.apiKey || config.quicknode.prometheusUrl),
+      pinata: Boolean(config.pinata?.readJwt),
       gcpBilling: Boolean(config.gcp.projectId),
       polymarket: Boolean(config.referral.polymarketApiKey),
     },
