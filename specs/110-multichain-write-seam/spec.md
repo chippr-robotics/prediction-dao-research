@@ -187,5 +187,6 @@ migration is what makes the chain abstraction the default shape rather than a pe
   seam boundary is in scope for them.
 - `services/` (relay-gateway, finops-exporter) is the deliberate laggard — Node paths with no
   bundle pressure, migrated last or consciously left as a second model.
-- Delivery is phased (sub-issues of #1552): free wins + ratchet → read seam → write seam →
-  ambient-chain ban → surfaces name their target → packages, then services.
+- Delivery is phased, one sub-issue of #1552 per phase: #1591 (free wins + ratchet) →
+  #1592 (read seam) → #1593 (write seam) → #1594 (ambient-chain ban) → #1595 (surfaces name
+  their target) → #1596 (packages, then services).
