@@ -1,11 +1,11 @@
 {
  "token-mint/entry.js": "f2fedcdea0832a627c601db9ec37e283691c3814197999b92346f53b8a23167a",
- "token-mint/manifest.json": "32a0cce7a6bc7c6e5b071a37bea2bf86c8ea49f1cc6869a6dbb85d319a25e720",
+ "token-mint/manifest.json": "b56193dc62596f4f8f781299ab689d3a51b80704769eb999f9d30a5521856323",
  "token-mint/style.css": "366ca9390251961a336704a2b44b5cac85cd93d75f7dc7c1f352680fc33e23a6",
  "clearpath/entry.js": "cc0441ba6bd5f913a9ed84bdc3ac734d7ae782ebf28d0810e9cde00865dfc802",
- "clearpath/manifest.json": "481fa3ba0aca50d1c9c4049d1e415b580fc6b9c6ce3bed91a1279d0f9928b11b",
+ "clearpath/manifest.json": "6e7511ad40bfb04ab9ae297544fb3345b58c93f41fc435cb6af489149dcf2c1e",
  "clearpath/style.css": "974d09a6ed5dca56732a9268793885d1c79ba1f8c194496627e6642757e244ed",
  "api-access/entry.js": "1b09aeae8f46a1ceb0688c84a13b0616ccdd78468385a1d8165866f5a3170620",
- "api-access/manifest.json": "01c07787df87e396329e0ce37720d407e8d8acb40a098b4f705a53b31f72ab6a",
+ "api-access/manifest.json": "321298244e566e3058ac26d265558f382adeb05564185ae79ec91ba907797575",
  "api-access/style.css": "0426668a23137c4b03caf03dc7e60a41880bcb1b943bf661832a743874bb952f"
 }
