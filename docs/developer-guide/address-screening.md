@@ -122,9 +122,18 @@ rather than running off the screen.
 
 | Hook | Question | Used by |
 |---|---|---|
-| `useAddressScreening` (spec 021) | does the guard on **this** chain allow it? | everything that **gates a submission** — Transfer, Pay, Bridge, Supply, group pay — forced and live at submit time (FR-032) |
+| `useAddressScreening` (spec 021) | does the guard on **this** chain allow it? | every surface that puts an address in front of a value action — Transfer, Pay, Bridge, Supply, group pay. Bridge, Supply, group pay and the mini-app host `submit` re-read it **forced past the cache at submission** (`{ force: true }`, **spec 067** FR-032); Transfer and Pay single-recipient use it as an advisory pre-check and lean on the gateway and the on-chain guard to enforce |
 | `useEstateScreening` (this amendment) | is it flagged **anywhere**? | `AddressScreenNotice` — the pill under every address field |
-| `useEstateScreeningMany` (same sweep, many addresses) | same question, for a list | the address book, and the saved-contact picker |
+| `useEstateScreeningMany` (same sweep, many addresses) | same question, for a list | `AddressBookPanel` (the book) and `AddressInputBookAddon` (the inline addon beside an address field). **Not** the modal picker — `AddressBookButton` still calls `useAddressScreening().getStatus` and was missed by the #1458 migration (issue #1571) |
+
+`force: true` is the difference that matters. The cache has a 60-second TTL (`SCREENING_TTL_MS`),
+so a verdict good enough for browsing is not good enough to authorise a signature: a wallet
+deny-listed between the quote and the tap would still read "clear" for up to a minute. **Spec 067**
+FR-032 is the requirement — *"enforced at the point of submission — not only at display time"* —
+and it is why `screenOne` takes `force`, and why a forced read never joins the shared in-flight
+slot. Spec 021 itself requires no submission-time read; it requires the warning to be advisory and
+never to weaken on-chain enforcement (FR-013), which is a ceiling on what the client may claim, not
+a floor on what it must check.
 
 The address book used to ask the per-chain hook, which can only answer for the chain the wallet is
 connected to — so a contact saved on Amoy while the wallet sat on Polygon, or any contact at all

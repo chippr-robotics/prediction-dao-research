@@ -37,9 +37,12 @@ const ethereumClassic = {
     name: 'Ether',
     symbol: 'ETC',
   },
+  // Chain metadata, not the read route — `transportFor` resolves that through
+  // `resolveRpcEndpoints` (spec 069). It still matters: this is the URL a wallet is handed
+  // on `wallet_addEthereumChain`. It said `etc.rivet.link`, which no longer resolves at all.
   rpcUrls: {
-    default: { http: ['https://etc.rivet.link'] },
-    public: { http: ['https://etc.rivet.link'] },
+    default: { http: ['https://etc.etcdesktop.com'] },
+    public: { http: ['https://etc.etcdesktop.com'] },
   },
   blockExplorers: {
     default: { name: 'Blockscout', url: 'https://etc.blockscout.com' },

@@ -608,7 +608,7 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
-- **Native release channels (spec 103): the app ships as Capacitor iOS/Android shells beside the
+- **Native release channels (spec 102): the app ships as Capacitor iOS/Android shells beside the
   web/PWA, and FIVE rules govern every change.** (1) **Seam-only native logic**:
   `frontend/src/lib/native/runtime.js` is the ONE runtime/capability read (three-state,
   `available` only when the bridging plugin confirmed itself — never fabricate); the four gaps
@@ -656,7 +656,7 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   differently from the release would pass while the release fails, so change the preparation in the
   action, never in a caller. See
   `docs/developer-guide/native-channels.md` + `docs/runbooks/native-release-operations.md` +
-  `specs/103-capacitor-channels/`.
+  `specs/102-capacitor-channels/`.
 - **Cloud infrastructure is DECLARATIVE (spec 087), and the GCP project is SHARED.** Terraform
   (`infra/terraform/`) provisions; Ansible (`infra/ansible/`) converges node interiors. Six rules,
   each of which has a way to be silently wrong:
@@ -797,7 +797,23 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   moment the rail is switched on, not after. **Cost discovery is NOT automatable** (`fetch(vendor)`
   looks identical metered or free) and is deliberately left to `basis` + review; do not add a
   heuristic over outbound calls. `npm run test:finops-gate` drives each rule against a
-  must-fail fixture. The exporter is
+  must-fail fixture.
+  (6) **THE EXPORTER MUST BE READABLE BEFORE IT IS COMPLETE, and every honesty rule above is a rule
+  about a SERVED metric.** `app.listen()` comes BEFORE the first `collectAll()`; every collection is
+  deadline-bounded (120s, `reading.js#attempt`); every `scanLogs` refuses past 50,000 accumulated
+  entries and NAMES the too-wide `address`/`topics`. Narrow a log filter ON CHAIN — every indexed
+  parameter the RPC can match is one it must match — because the memory cost lives in what you ASK
+  FOR and no assertion about the returned value can see it. The x402 collector asked Polygon USDC
+  for every `Transfer` and filtered in JS (~1.1M logs, ~635 MB of JSON, 192 MB container): OOM-killed
+  **5,966 consecutive times, always before the port opened**, so the exporter served not one scrape
+  and all 25 sources — 24 of them healthy — read "no data" on every dashboard. FR-001 fabricated no
+  zero throughout, and could not: "absent means unknown" is only legible when something is there to
+  be absent from. Its test fake (`getLogs: async () => logs`) returned the same array for any
+  filter, so the suite could not tell a treasury-scoped scan from a chain-wide one — assert on the
+  REQUEST. Also: `NODE_OPTIONS=--max-old-space-size` is set on the container because **V8 sizes its
+  heap from HOST RAM, not the cgroup**, and every source reusing the flat-subscription modeller MUST
+  have a `flatSubscriptions` key (a missing one falls through to the QuickNode credit path and
+  blames `QUICKNODE_API_KEY` for an unrelated vendor). The exporter is
   **read-only by construction** (no signer, no write route), binds loopback only, and
   `fetch-secrets.sh` refuses to boot if key material reaches its env. See
   `docs/developer-guide/finops.md` + `docs/runbooks/finops-operations.md` + `specs/089-finops-dashboard/`.
@@ -1038,8 +1054,9 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   answered; chains with no source are UNCOVERED, never clear. The sweep (`screenEstate.js`) is
   cohort-bounded, per-source failure-isolated, deadline-bounded (8 s) and never rejects; providers
   come from `readProviderFor`. **Two hooks, on purpose**: `useAddressScreening` stays the PER-CHAIN
-  live read that gates a submission on the chain the value moves on (FR-013/FR-032 — the contract
-  will repeat that exact read), and `useEstateScreening` feeds the advisory `ScreeningPill` under
+  live read that gates a submission on the chain the value moves on (FR-013 here, and **spec 067**
+  FR-032 for the forced submit-time re-read on Bridge/Supply — the contract will repeat that exact
+  read), and `useEstateScreening` feeds the advisory `ScreeningPill` under
   every address field via `AddressScreenNotice`, which now renders for every valid address (a
   clear answer that rendered as silence was indistinguishable from no screen at all). The pill is
   icon + word, `role="alert"` when flagged, and expands to the per-source rows; the no-chain e2e
@@ -1051,10 +1068,12 @@ subagent's report is a claim — read the diff and run the gates before acceptin
   `isTestnet: true`, carries a guard, and lives at `http://127.0.0.1:8545`, so every testnet build
   told every member that a Hardhat guard "could not be read" and could never reach green (QA round;
   Amoy's build default was also dead and now points at publicnode like every other chain here).
-  **Every address surface reads the SAME sweep**: the book and the saved-contact picker use
-  `useEstateScreeningMany` — they asked the per-chain hook, which can only answer for the wallet's
-  chain, so a book full of contacts rendered "Unscreened" whenever the wallet was elsewhere or
-  absent. `getVerdictOn` has a THIRD answer, `no-source`, distinct from both a verdict and a
+  **The book and the inline address-field addon read the SAME sweep**: `AddressBookPanel` and
+  `AddressInputBookAddon` use `useEstateScreeningMany` — they asked the per-chain hook, which can
+  only answer for the wallet's chain, so a book full of contacts rendered "Unscreened" whenever the
+  wallet was elsewhere or absent. **The MODAL picker (`AddressBookButton`) was missed by that
+  migration** and still calls `useAddressScreening().getStatus`, so it reproduces the original
+  amber-everything behaviour off the wallet's chain on all ten surfaces that mount it (issue #1571). `getVerdictOn` has a THIRD answer, `no-source`, distinct from both a verdict and a
   still-running null. **The summary line names sources only when FLAGGED** — naming every
   unreachable one turned the notice into a paragraph; the names live one tap away, and the
   `ScreeningStatusBar` (one segment per source, `role="img"` labelled with the summary) carries the

@@ -11,9 +11,9 @@
  *       metered  → credits x FINOPS_QUICKNODE_USD_PER_MCREDIT
  *       flat RPS → FINOPS_QUICKNODE_PLAN_USD, with credits informational only.
  *
- * This collector also serves the sources that have no vendor API at all (Grafana Cloud), where the
- * declared subscription IS the whole model. FR-029: the FinOps system's own cost is catalogued,
- * because a system that hides what it costs is not credible about what anything else costs.
+ * This collector reads QUICKNODE ONLY. The flat-subscription modeller it used to also host now
+ * lives in `flatSubscription.js`: at four sources, a module named for one vendor was reporting
+ * `QUICKNODE_API_KEY is not set` for vendors QuickNode has nothing to do with.
  */
 import { read, notConfigured, unreadable } from '../reading.js'
 
@@ -43,6 +43,19 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
     if (!res.ok) throw new Error(`quicknode admin API HTTP ${res.status}`)
 
     const body = await res.json()
+
+    /**
+     * THE VENDOR ANSWERS ERRORS WITH HTTP 200 AND AN `error` FIELD, so `res.ok` above proves only
+     * that the request arrived. Reported verbatim (through the Reading's redactor), because the
+     * generic "no recognisable credit field" below is a true statement that sends the reader to
+     * the wrong place: this estate spent weeks with the key wired and a message that read like a
+     * parser bug when the vendor was plainly saying something specific about the account.
+     */
+    if (body?.error) {
+      const detail = typeof body.error === 'string' ? body.error : JSON.stringify(body.error)
+      throw new Error(`quicknode admin API returned an error: ${detail}`)
+    }
+
     // The Admin API's exact field naming is not pinned by public docs, so several plausible shapes
     // are accepted — and an UNRECOGNISED shape is an error, never a zero. A zero here would report
     // "no RPC usage" for an estate that is definitely making RPC calls.
@@ -54,17 +67,7 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
     return credits
   }
 
-  async function collectQuickNode(source) {
-    // Sources with no vendor API: the declared subscription is the entire model. An UNSET price is
-    // `not-configured`, never 0 — see the note on `flatSubscriptions` in config/index.js.
-    if (source.id in config.flatSubscriptions) {
-      const flat = config.flatSubscriptions[source.id]
-      if (flat == null) {
-        return notConfigured(`no plan price declared for '${source.id}' — set its FINOPS_*_PLAN_USD (0 asserts a free tier)`)
-      }
-      return read(flat, 'USD', { labels: { basis: 'modelled' } })
-    }
-
+  async function collectQuickNode(_source) {
     const { planMonthlyUsd, usdPerMillionCredits } = config.quicknode
 
     let credits
@@ -95,7 +98,16 @@ export function createQuickNodeCollector({ config, fetchImpl = fetch, log = cons
   return collectQuickNode
 }
 
-/** Emit measured credit consumption — the part of the QuickNode picture that is not a model. */
+/**
+ * Emit measured credit consumption — the part of the QuickNode picture that is not a model.
+ *
+ * Only `quicknode` names this collector now, which is what makes this emitter safe again. It
+ * previously served three sources — the other two reused the flat-subscription modeller that lived
+ * here — and published QuickNode's credit count under `source="grafana-cloud"` and
+ * `source="alphaday-news-api"`: one vendor's measured usage attributed to two that publish none.
+ * Latent only because credits never read successfully here; it would have become a fabricated fact
+ * the day QuickNode started answering. Splitting the modeller out removes the class, not the symptom.
+ */
 export function emitQuickNodeUsage(registry, collector, source) {
   const credits = collector._lastCredits?.()
   if (credits == null) return

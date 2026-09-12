@@ -325,7 +325,21 @@ describe('Dashboard', () => {
      * is satisfied every time. The old `else` branch describing "the user may already have the
      * role" could not happen here and silently covered for the banner never rendering at all.
      */
-    cy.get('.dashboard-cta-banner', { timeout: 10000 }).should('be.visible')
+    /*
+     * 30s, not the file's usual 10s, and the budget is sized to what this specific wait
+     * depends on rather than to the other assertions here. The banner's gate includes
+     * `blockchainSynced`, which RoleContext only flips after `syncRolesWithBlockchain`
+     * awaits `hasRoleOnChain` for FIVE roles IN SEQUENCE — and with no chain running each
+     * one still reaches for a provider before resolving false. Measured at 6.2s on an idle
+     * machine: 62% of a 10s budget already spent, which is a test living on borrowed time,
+     * and it duly tipped on a loaded CI runner (desktop shard 1, run 34301224346) while
+     * passing locally on the same commit.
+     *
+     * This widens a WAIT, not an assertion: what must be true is unchanged below, and a
+     * banner that never renders still fails. Shortening the wait itself would mean making
+     * that role sweep concurrent, which is a WalletContext change, not a spec one.
+     */
+    cy.get('.dashboard-cta-banner', { timeout: 30000 }).should('be.visible')
     cy.get('.dashboard-cta-banner').invoke('text').should((text) => {
       expect(text.includes('Get access') || text.includes('Wager Participant'), text).to.be.true
     })

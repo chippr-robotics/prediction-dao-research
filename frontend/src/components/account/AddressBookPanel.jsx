@@ -3,7 +3,7 @@
  *
  * Per-wallet CRUD over saved contacts (FR-001..FR-009), with advisory sanctions
  * tags screened on open (FR-010..FR-012), in-panel search (FR-015), and (added
- * in US5) encrypted export/import.
+ * in US5, plain text since issue #1550) file export/import.
  */
 
 import { useState, useMemo, useCallback } from 'react'
@@ -56,6 +56,8 @@ export default function AddressBookPanel({ address }) {
     addAddress,
     removeAddress,
     findByAddress,
+    importBook,
+    resolveConflicts,
   } = useAddressBook()
   // Every address in the book, screened against every list on every cohort chain — no wallet
   // required (issue #1458 QA round: the per-chain hook rendered a book full of "Unscreened"
@@ -142,7 +144,17 @@ export default function AddressBookPanel({ address }) {
           <ScreeningInfoButton />
         </div>
         <div className="ab-panel-head-actions">
-          <AddressBookImportExport />
+          {/*
+            The book is passed DOWN rather than re-read via useAddressBook():
+            that hook keeps the book in its own useState, so a second call here
+            is a second copy — the export would freeze at mount and an import
+            would never reach this grid.
+          */}
+          <AddressBookImportExport
+            book={book}
+            importBook={importBook}
+            resolveConflicts={resolveConflicts}
+          />
         </div>
       </div>
 

@@ -285,7 +285,17 @@ services:
   # key material ever lands there.
   finops:
     container_name: fairwins-gateway-finops
-    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:spec107-1ac148bf
+    # finops-8e9c1730 — the first image that SERVES. The previous pin (spec107-1ac148bf, 2026-09-05)
+    # was OOM-killed before app.listen() on every boot: 5,966 restarts, not one scrape, every FinOps
+    # panel blank. Verified on the built image itself under this file's own --memory 384m, twice:
+    # healthz in 2s, still serving /metrics after a 60s settle window, oom=false restarts=0. The
+    # PREVIOUS pin fails that same check at 384m — double the ceiling it actually died at — which is
+    # how we know the limit below is headroom and the fix is the x402 log filter.
+    #
+    # Also carries what spec107-1ac148bf predated: the spec-109 alphaday entry (dead on arrival — it
+    # had no flatSubscriptions key and reported a QuickNode credential as its problem), the #1539
+    # executor-nonce series, and the newly catalogued pinata + thegraph sources.
+    image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-finops-exporter:finops-8e9c1730
     restart: unless-stopped
     pull_policy: missing
     network_mode: "service:gateway"
@@ -339,18 +349,47 @@ services:
       # Unset ⇒ usage is still reported, no dollar figure is invented.
       # The zone is on Cloudflare's FREE plan, so 0 here is an ASSERTED zero, not an unset default —
       # which is the distinction the collector draws: unset reports `not-configured`, 0 reports a
-      # modelled cost of nothing. QuickNode stays unset until the account upgrade, and correctly
-      # reports `not-configured` rather than inventing a figure.
+      # modelled cost of nothing.
       CLOUDFLARE_ZONE_ID: "a548702815279eab4646275cde3be103"
       FINOPS_CLOUDFLARE_PLAN_USD: "0"
+      # Same asserted zero, for the plan this whole system runs on (FR-029 — a FinOps system that
+      # hides its own cost is not credible). Operator-confirmed free tier, 2026-09-11; unset was
+      # reporting `not-configured`, which is honest but indistinguishable on a panel from the
+      # QuickNode source beside it that is genuinely broken.
+      FINOPS_GRAFANA_PLAN_USD: "0"
+      # The Graph: an asserted zero, and the evidence is IN THE REPO rather than on a billing page.
+      # Every configured subgraphUrl in frontend/src/config/networks.js points at
+      # api.studio.thegraph.com — Subgraph Studio, the free development tier, which consumes no GRT.
+      # This is therefore a property of the endpoint we call, not a guess about an account.
+      #
+      # It stops being true the moment a subgraphUrl becomes gateway.thegraph.com: query fees are
+      # then paid in GRT from a billing balance on ARBITRUM ONE (L1 GRT does not pay them), and the
+      # free allowance FAILS rather than billing over. `check:finops` C6 fails on exactly that
+      # combination, so this line cannot quietly outlive the tier it describes.
+      FINOPS_THEGRAPH_PLAN_USD: "0"
+      # V8 SIZES ITS HEAP FROM HOST RAM, NOT THE CGROUP. Without this, Node looks at the VM's
+      # ~2 GB and targets a heap far above the container ceiling, so it feels no pressure to
+      # collect and simply grows until the kernel kills it — which is precisely what happened
+      # here: OOM-killed at exactly 192 MiB, 5,966 times, always before `app.listen()`, so the
+      # exporter never served a scrape and every FinOps panel read "no data". Keep this BELOW
+      # mem_limit: the ceiling has to leave room for the non-heap side (sockets, buffers, the
+      # BigQuery client) or V8 stays under its own limit while the cgroup still kills the process.
+      NODE_OPTIONS: "--max-old-space-size=256"
     cpus: 0.2
-    mem_limit: 192m
+    # 384m, not 192m. Measured: module load alone (ethers + @google-cloud/bigquery + express) is
+    # ~87 MB before a single collector runs, and the fan-out across ~25 sources sits on top of that.
+    # 192m left no headroom at all, so any transient allocation was fatal rather than collected.
+    # Host has ~880 MB free with the rest of the stack running, so this is affordable headroom, not
+    # a licence to grow: NODE_OPTIONS above keeps V8 collecting well under it.
+    mem_limit: 384m
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9464/healthz | grep -q '\"status\":\"ok\"' || exit 1"]
       interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 60s     # the first collectAll() fans out across every source before listening
+      # The listener now comes up BEFORE the first collection rather than behind it, so this is a
+      # real liveness window again instead of a race against a fan-out across every vendor.
+      start_period: 30s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }

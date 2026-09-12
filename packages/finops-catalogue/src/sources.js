@@ -508,6 +508,30 @@ const vendors = [
       'plan the modelled figure is the flat subscription and credit usage is informational only.',
   },
   {
+    id: 'pinata',
+    kind: 'cost',
+    status: 'live',
+    label: 'Pinata (IPFS pinning)',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'modelled',
+    collector: 'pinata',
+    interval: VENDOR,
+    // A SEPARATE, READ-SCOPED key — never the pinning JWT, which is a write credential and has no
+    // business in a service that is read-only by construction (FR-026).
+    credential: 'finops-pinata-read-jwt',
+    docs: 'finops-operations.md#pinata-cost',
+    meaning:
+      'Pinata spend MODELLED from the declared plan subscription; storage is read separately and exported as ' +
+      'measured vendor usage. This is a PAID vendor on the member write path — wager creation, open challenges ' +
+      'and encrypted backup pin JSON with no fallback, and mini-app packages are published here under CIDs that ' +
+      'are keccak-committed on chain — so an outage is a member-facing incident, not a reporting one. Neither ' +
+      'check:finops discovery route could ever have found it (no FeeRouter serviceId, no gateway payee env: the ' +
+      'money flows the other way), which is why it sat uncatalogued while the vendor workbook recorded "we pay ' +
+      'them" the whole time. The vendor publishes no billing API on our plan, so the dollar figure is arithmetic ' +
+      'over a declared rate and the bytes beside it are the fact.',
+  },
+  {
     id: 'alphaday-news-api',
     kind: 'cost',
     status: 'live',
@@ -515,7 +539,7 @@ const vendors = [
     metric: 'fairwins_finops_cost_usd_total',
     unit: 'USD',
     basis: 'modelled',
-    collector: 'quicknode', // shares the flat-subscription modeller; the vendor exposes no billing API
+    collector: 'flatSubscription', // keyless vendor, no billing API — the declared plan IS the model
     interval: VENDOR,
     credential: null,
     docs: 'finops-operations.md#alphaday-news-cost',
@@ -546,6 +570,28 @@ const vendors = [
       'from the route table.',
   },
   {
+    id: 'thegraph',
+    kind: 'cost',
+    status: 'live',
+    label: 'The Graph (subgraph queries)',
+    metric: 'fairwins_finops_cost_usd_total',
+    unit: 'USD',
+    basis: 'modelled',
+    collector: 'flatSubscription',
+    interval: VENDOR,
+    credential: null,
+    docs: 'finops-operations.md#thegraph-cost',
+    meaning:
+      'Subgraph query spend, MODELLED from the declared plan rate. THE TIER IS WHICH ENDPOINT THE APP CALLS, not ' +
+      'a setting: `api.studio.thegraph.com` is Subgraph Studio, the free development tier, where the cost really ' +
+      'is $0 and no GRT is consumed. Publishing to the decentralized network and switching a `subgraphUrl` to ' +
+      '`gateway.thegraph.com` changes that in one edit — query fees are then paid in GRT from a billing balance ' +
+      'held on ARBITRUM ONE (GRT on Ethereum L1 does not pay them). The free allowance does not bill over, it ' +
+      'FAILS, so this line is about a dependency as much as a dollar. `check:finops` C6 fails if a gateway URL ' +
+      'appears while the plan price is still asserted at zero, because that transition is a one-character edit ' +
+      'that would otherwise leave a confidently wrong $0 on the dashboard.',
+  },
+  {
     id: 'grafana-cloud',
     kind: 'cost',
     status: 'live',
@@ -553,7 +599,7 @@ const vendors = [
     metric: 'fairwins_finops_cost_usd_total',
     unit: 'USD',
     basis: 'modelled',
-    collector: 'quicknode', // shares the flat-subscription modeller; no vendor API is polled
+    collector: 'flatSubscription', // no vendor API is polled; the declared plan IS the model
     interval: VENDOR,
     credential: null,
     docs: 'finops-operations.md#self-cost',

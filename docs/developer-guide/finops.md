@@ -20,7 +20,7 @@ The service is not the interesting part. **The catalogue is.** One file declares
 the exporter, the dashboards and a CI gate all derive from it — which is what turns "remember to
 update the dashboard" into a build failure.
 
-## Four rules
+## Five rules
 
 ### 1. A value exists only in state `read`
 
@@ -94,6 +94,38 @@ Never label by member address, wager id, or transaction hash. Any of them exhaus
 tier within days and turns the observability system into a cost centre bigger than what it observes.
 Alloy carries a relabel rule that drops address-shaped label values as a last line of defence; the
 primary defence is that the exporter never emits one.
+
+### 5. The exporter must be readable before it is complete
+
+**Availability of the reporting surface outranks completeness of any figure on it.** The listener
+comes up first; the first collection runs behind it. A source nobody has reached yet reports
+`unreadable`, which is an honest state the dashboards can render — a closed port is not a state at
+all, and it takes every healthy source down with the broken one.
+
+Three mechanisms hold that, and each closes a hole the others cannot see:
+
+| Mechanism | Where | What it stops |
+|---|---|---|
+| `app.listen()` before `scheduler.collectAll()` | `src/server.js` | one slow collector keeping every panel blank |
+| 120s deadline per collection | `reading.js#attempt` | a vendor that never answers holding its in-flight slot forever, so that source is never polled again |
+| 50,000-entry cap per log scan | `chain/logs.js#scanLogs` | a filter that forgot to narrow exhausting the container instead of failing |
+
+This is not defensive theatre. Ordering `collectAll()` ahead of `listen()` is what took this system
+off the air entirely: the x402 collector asked Polygon USDC for every `Transfer` and filtered
+client-side — ~1.1M logs, ~635 MB of JSON, in a 192 MB container — so the process was OOM-killed
+5,966 consecutive times, always before the port opened. The exporter never served one scrape, and
+every dashboard read "no data" for **twenty-five sources that were fine**.
+
+Note what the FR-001 honesty rules could and could not do about that. They worked exactly as
+designed *within* a scrape: no zero was ever fabricated. But they are rules about what a **served**
+metric may say, and they have nothing to say about a metric that is never served. "Absent means
+unknown" is only readable as unknown when something is there to be absent *from*.
+
+The corollary for filters: **narrow on chain, not in JS.** Every indexed parameter the RPC can match
+is one it should match, because the memory cost lives in what you ask for and no assertion about the
+returned value can see it. That is why `test/x402Collector.test.js` asserts on the *request* — its
+provider fake honours the filter, and the previous one (`getLogs: async () => logs`) could not
+distinguish a treasury-scoped scan from a chain-wide one, which is precisely how this shipped green.
 
 ## Adding a source — the rule the brief made a MUST
 
